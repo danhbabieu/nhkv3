@@ -13,4 +13,5 @@ interface GraphRepository {
     public function retire(GraphEdge $edge, int $expected_revision): GraphEdge;
     public function reactivate(GraphEdge $edge, int $expected_revision): GraphEdge;
     public function nodeHasEdges(GraphNode $node): bool;
+    public function deleteNode(GraphNode $node): void;
 }
