@@ -1,0 +1,16 @@
+<?php
+declare(strict_types=1);
+namespace NHK\Core\Infrastructure\Authority;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Domain\Authority\{AuthorityEntity,AuthorityState};
+use NHK\Core\Authority\Exception\{AuthorityRevisionConflict,StableKeyCollision};
+use NHK\Core\Shared\Uuid\UuidCodec;
+final class WpdbAuthorityRepository implements AuthorityRepository {
+ private function table():string{global $wpdb;return $wpdb->prefix.'nhk_entities';}
+ private function row(?array $r):?AuthorityEntity{if(!$r)return null;return new AuthorityEntity(UuidCodec::fromBinary($r['canonical_uuid']),$r['entity_type'],$r['stable_key'],$r['canonical_name'],(int)$r['schema_version'],json_decode($r['payload'],true,512,JSON_THROW_ON_ERROR),((int)$r['state'])?AuthorityState::ACTIVE:AuthorityState::RETIRED,(int)$r['revision'],$r['created_at'],$r['updated_at'],$r['retired_at']);}
+ public function findByCanonicalId(string $id):?AuthorityEntity{global $wpdb;$r=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.$this->table().' WHERE canonical_uuid=%s',$wpdb->get_var($wpdb->prepare('SELECT %s',$id))),ARRAY_A);return $this->row($r);}
+ public function findByStableKey(string $type,string $key):?AuthorityEntity{global $wpdb;return $this->row($wpdb->get_row($wpdb->prepare('SELECT * FROM '.$this->table().' WHERE entity_type=%s AND stable_key=%s',$type,$key),ARRAY_A));}
+ public function create(AuthorityEntity $e):AuthorityEntity{global $wpdb;$now=gmdate('Y-m-d H:i:s.u');$ok=$wpdb->query($wpdb->prepare('INSERT INTO '.$this->table().' (canonical_uuid,entity_type,stable_key,canonical_name,schema_version,payload,state,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%d,%s,%d,%d,%s,%s)',UuidCodec::toBinary($e->canonicalId),$e->entityType,$e->stableKey,$e->canonicalName,$e->schemaVersion,wp_json_encode($e->payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$e->state->value,1,$now,$now));if($ok===false)throw new StableKeyCollision('Stable key collision.');return $this->findByCanonicalId($e->canonicalId)??$e;}
+ public function update(AuthorityEntity $e,int $expectedRevision):AuthorityEntity{global $wpdb;$now=gmdate('Y-m-d H:i:s.u');$ok=$wpdb->query($wpdb->prepare('UPDATE '.$this->table().' SET canonical_name=%s,payload=%s,state=%d,revision=revision+1,updated_at=%s,retired_at=%s WHERE canonical_uuid=%s AND revision=%d',$e->canonicalName,wp_json_encode($e->payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$e->state->value,$now,$e->retiredAt,UuidCodec::toBinary($e->canonicalId),$expectedRevision));if($ok!==1)throw new AuthorityRevisionConflict('Authority revision conflict.');return $this->findByCanonicalId($e->canonicalId)??$e;}
+ public function listByType(string $type):array{global $wpdb;$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.$this->table().' WHERE entity_type=%s ORDER BY id',$type),ARRAY_A);return array_map(fn(array $r)=>$this->row($r),$rows?:[]);}
+}
