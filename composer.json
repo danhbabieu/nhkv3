@@ -2,6 +2,7 @@
   "name": "nhk/nhk-v3",
   "description": "NHK v3 - WordPress clean architecture foundation",
   "type": "project",
+  "require": {"symfony/uid": "^7.3"},
   "require-dev": {"phpunit/phpunit": "^11.5"},
   "autoload": {"psr-4": {"NHK\\Core\\": "public/wp-content/plugins/nhk-core/src/"}},
   "autoload-dev": {"psr-4": {"NHK\\Tests\\": "public/wp-content/plugins/nhk-core/tests/"}},

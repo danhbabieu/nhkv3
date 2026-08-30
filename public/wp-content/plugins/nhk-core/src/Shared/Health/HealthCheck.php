@@ -18,6 +18,7 @@ final class HealthCheck {
             'database_reachable' => isset($wpdb) && is_object($wpdb) && ! empty($wpdb->dbh),
             'migration_current' => $migration['current'], 'migration_target' => $migration['target'],
             'migration_required' => $migration['current'] < $migration['target'],
+            'graph_storage_ready' => $this->migrations->graphStorageReady(),
         ];
     }
 }
