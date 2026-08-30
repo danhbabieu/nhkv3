@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php" colors="true">
+  <testsuites>
+    <testsuite name="NHK Unit"><directory>public/wp-content/plugins/nhk-core/tests/Unit</directory></testsuite>
+    <testsuite name="NHK Integration"><directory>public/wp-content/plugins/nhk-core/tests/Integration</directory></testsuite>
+    <testsuite name="NHK Contract"><directory>public/wp-content/plugins/nhk-core/tests/Contract</directory></testsuite>
+  </testsuites>
+</phpunit>

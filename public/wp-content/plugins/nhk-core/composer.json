@@ -1,0 +1,15 @@
+{
+  "name": "nhk/nhk-core-v3",
+  "description": "NHK Core v3 plugin foundation",
+  "type": "wordpress-plugin",
+  "autoload": {
+    "psr-4": {
+      "NHK\\Core\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "NHK\\Tests\\": "tests/"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# WordPress local/runtime files
+wp-config.php
+.htaccess
+wp-content/uploads/
+wp-content/cache/
+wp-content/upgrade/
+wp-content/debug.log
+
+# Dependencies and local tooling
+vendor/
+node_modules/
+.phpunit.result.cache
+
+# Local secrets, dumps and OS files
+*.sql
+*.sql.gz
+*.dump
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+
