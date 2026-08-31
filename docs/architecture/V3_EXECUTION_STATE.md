@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, REST/MCP runtime boundary checkpoint.
+Last updated: 2026-08-31, local MCP Streamable HTTP transport checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,10 +9,10 @@ Last updated: 2026-08-31, REST/MCP runtime boundary checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 70 tests, 210 assertions; guarded WordPress suite: 103 tests, 424 assertions; plugin/theme PHP lint, route smoke and diff check pass |
-| Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 70 tests, 210 assertions; guarded WordPress suite: 106 tests, 435 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Blockers | Responsive/tablet/mobile visual QA, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
+| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,379 rows with 2,594 explicit skips, including 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 2,379 candidates and 2,594 skipped; buckets match apply (747 domain-targeted, 42 unsupported media, 3 retired garbage, 1 invalid relation, 1,801 unsupported legacy); local-dev apply: 2,379 migrated, 2,594 skipped, 0 conflicts |
@@ -86,6 +86,13 @@ Last updated: 2026-08-31, REST/MCP runtime boundary checkpoint.
   remains delegated to GovernanceService. A `nhk_mcp_register_tools` hook
   provides a transport-neutral registration seam. Checkpoint `6ea8362` is
   pushed to `origin/main`; external transport is still not fabricated.
+- 2026-08-31: MCP tool definitions now expose protocol input schemas and a
+  capability-gated Streamable HTTP POST endpoint. The local runtime accepts
+  modern JSON-RPC `2026-07-28` metadata, retains legacy `2025-11-25`
+  initialization compatibility, validates Origin and mirrored headers, and
+  delegates all calls to the existing read/Governance handlers. Guarded
+  transport tests and local HTTP smoke pass; external client/deployment
+  interoperability remains open.
 - 2026-08-31: Canonical entity frontend routes now cover archive, filtered
   archive pagination and stable-key/UUID detail for all nine Authority types.
   `EntityPageQuery` owns repository access; the theme only presents the
@@ -304,5 +311,9 @@ Last updated: 2026-08-31, REST/MCP runtime boundary checkpoint.
 - 2026-08-31: Local REST smoke verified active entity/media/knowledge/search
   reads (`200`), wrong or missing entity routes (`404`) and unauthenticated
   Governance create/eligibility/apply (`401`). Runtime MCP registration
-  captured 11 tools, 5 governed tools and both read/governance handlers; an
-  external MCP transport is still not present or inferred.
+  captured 11 tools, 5 governed tools and both read/governance handlers; at
+  that checkpoint, an external MCP transport was not present or inferred.
+- 2026-08-31: Local MCP transport smoke returned `tools/list` 200 with 11
+  definitions, rejected an unauthenticated governed proposal call with 403,
+  and rejected an invalid Origin with 403. The endpoint is local-runtime
+  evidenced, not production or external-client approval.

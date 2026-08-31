@@ -1,0 +1,138 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Application\Mcp;
+
+final class McpTransport
+{
+    public const MODERN_VERSION = '2026-07-28';
+    public const LEGACY_VERSION = '2025-11-25';
+
+    /** @param callable(string):bool|null $can */
+    /** @param callable(string):bool|null $originAllowed */
+    public function __construct(
+        private McpReadHandler $read,
+        private McpGovernanceHandler $governance,
+        private $can = null,
+        private $originAllowed = null,
+    ) {}
+
+    /** @return array{status:int,body:?array} */
+    public function dispatch(array $request, array $headers = []): array
+    {
+        $id = array_key_exists('id', $request) ? $request['id'] : null;
+        if (($request['jsonrpc'] ?? null) !== '2.0' || !is_string($request['method'] ?? null)) return $this->error($id, -32600, 'Invalid Request.', 400);
+        $method = $request['method'];
+        $params = is_array($request['params'] ?? null) ? $request['params'] : [];
+        $modern = $this->isModern($request, $params, $headers);
+
+        $origin = $this->header($headers, 'Origin');
+        if ($origin !== '' && $this->originAllowed && !(bool) ($this->originAllowed)($origin)) return $this->error(null, -32003, 'Origin is not allowed.', 403);
+        if ($modern) {
+            $version = $this->header($headers, 'MCP-Protocol-Version');
+            $bodyVersion = (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '');
+            if (!in_array($version, [self::MODERN_VERSION], true)) return $this->error($id, -32022, 'Unsupported protocol version.', 400, ['supported' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'requested' => $version]);
+            if ($bodyVersion !== $version) return $this->error($id, -32020, 'Header mismatch: protocol version.', 400);
+            if ($this->header($headers, 'Mcp-Method') !== $method) return $this->error($id, -32020, 'Header mismatch: Mcp-Method.', 400);
+            if ($method === 'tools/call' && $this->header($headers, 'Mcp-Name') !== (string) ($params['name'] ?? '')) return $this->error($id, -32020, 'Header mismatch: Mcp-Name.', 400);
+        }
+
+        if (!array_key_exists('id', $request) && str_starts_with($method, 'notifications/')) return ['status' => 202, 'body' => null];
+        try {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => $this->handle($method, $params, $modern)]];
+        } catch (McpMethodNotFound $error) {
+            return $this->error($id, -32601, $error->getMessage(), 404);
+        } catch (McpPermissionDenied $error) {
+            return $this->error($id, -32003, 'Capability required: ' . $error->getMessage() . '.', 403);
+        } catch (\InvalidArgumentException $error) {
+            return $this->error($id, -32602, $error->getMessage(), 400);
+        } catch (\Throwable $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
+        }
+    }
+
+    private function handle(string $method, array $params, bool $modern): array
+    {
+        return match ($method) {
+            'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
+            'initialize' => $modern ? throw new \InvalidArgumentException('Modern MCP clients must use server/discover or per-request metadata.') : ['protocolVersion' => self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
+            'tools/list' => ['tools' => array_map(static fn (array $tool): array => ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']], McpToolCatalog::tools())],
+            'tools/call' => $this->callTool($params),
+            default => throw new McpMethodNotFound($method),
+        };
+    }
+
+    private function callTool(array $params): array
+    {
+        $name = (string) ($params['name'] ?? '');
+        $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
+        $definition = null;
+        foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
+        if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
+        $capability = match ($name) {
+            'nhk.proposal.create' => 'nhk_create_proposals',
+            'nhk.proposal.submit' => 'nhk_submit_proposals',
+            'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
+            'nhk.proposal.eligibility' => 'nhk_view_governance',
+            'nhk.proposal.apply' => 'nhk_apply_proposals',
+            default => null,
+        };
+        if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
+        $result = match ($name) {
+            'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
+            'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
+            'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
+            'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
+            'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
+            'nhk.proposal.create' => $this->proposal($this->governance->createFromArguments($arguments)),
+            'nhk.proposal.submit' => $this->proposal($this->governance->submit($this->required($arguments, 'id'))),
+            'nhk.proposal.approve' => $this->proposal($this->governance->approve($this->required($arguments, 'id'), $this->required($arguments, 'content_fingerprint'), $this->required($arguments, 'dependency_fingerprint'), function_exists('get_current_user_id') ? (string) get_current_user_id() : '0')),
+            'nhk.proposal.reject' => $this->proposal($this->governance->reject($this->required($arguments, 'id'), function_exists('get_current_user_id') ? (string) get_current_user_id() : '0')),
+            'nhk.proposal.eligibility' => $this->governance->eligibility($this->required($arguments, 'id')),
+            'nhk.proposal.apply' => $this->governance->apply($this->required($arguments, 'id')),
+        };
+        $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
+    }
+
+    private function isModern(array $request, array $params, array $headers): bool
+    {
+        return $this->header($headers, 'MCP-Protocol-Version') !== '' || (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '') === self::MODERN_VERSION;
+    }
+
+    private function meta(array $request, array $params): array
+    {
+        $meta = $params['_meta'] ?? ($request['_meta'] ?? []);
+        return is_array($meta) ? $meta : [];
+    }
+
+    private function header(array $headers, string $name): string
+    {
+        $wanted = strtolower(str_replace('_', '-', $name));
+        foreach ($headers as $key => $value) if (strtolower(str_replace('_', '-', (string) $key)) === $wanted) return is_array($value) ? (string) reset($value) : (string) $value;
+        return '';
+    }
+
+    private function required(array $arguments, string $key): string
+    {
+        $value = trim((string) ($arguments[$key] ?? ''));
+        if ($value === '') throw new \InvalidArgumentException('Missing required argument: ' . $key . '.');
+        return $value;
+    }
+
+    private function proposal(\NHK\Core\Domain\Governance\Proposal $proposal): array
+    {
+        return ['id' => $proposal->id, 'subject_id' => $proposal->subjectId, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'payload' => $proposal->payload, 'state' => $proposal->state->value, 'expected_revision' => $proposal->expectedRevision, 'revision' => $proposal->revision, 'idempotency_key' => $proposal->idempotencyKey, 'target_uuid' => $proposal->targetUuid];
+    }
+
+    /** @return array{status:int,body:array} */
+    private function error(mixed $id, int $code, string $message, int $status, ?array $data = null): array
+    {
+        $error = ['code' => $code, 'message' => $message];
+        if ($data !== null) $error['data'] = $data;
+        return ['status' => $status, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'error' => $error]];
+    }
+}
+
+final class McpMethodNotFound extends \RuntimeException {}
+final class McpPermissionDenied extends \RuntimeException {}
