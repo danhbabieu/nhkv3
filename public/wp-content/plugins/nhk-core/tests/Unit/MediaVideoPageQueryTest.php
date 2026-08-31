@@ -33,12 +33,17 @@ final class MediaVideoPageQueryTest extends TestCase
         $privateAsset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/private.jpg', hash('sha256', 'private-image'), 'image/jpeg', 7, 1200, 800, 'PRIVATE', ['status' => 'private']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured');
         $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference');
-        $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready')], [$video], [$asset, $privateAsset], [$usage]);
+        $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready', ['source' => 'v2', 'metadata' => ['legacy_id' => '42']])], [$video], [$asset, $privateAsset], [$usage]);
 
         $media = $query->mediaDetail($mediaId);
-        self::assertSame('uploads/odo/front.jpg', $media['assets'][0]['storage_key']);
+        self::assertSame('image/jpeg', $media['assets'][0]['mime_type']);
+        self::assertArrayNotHasKey('provenance', $media);
+        self::assertArrayNotHasKey('storage_key', $media['assets'][0]);
+        self::assertArrayNotHasKey('metadata', $media['assets'][0]);
         self::assertCount(1, $media['assets']);
-        self::assertSame('wp_post', $media['usages'][0]['endpoint_type']);
+        self::assertSame('featured', $media['usages'][0]['role']);
+        self::assertArrayNotHasKey('endpoint_type', $media['usages'][0]);
+        self::assertArrayNotHasKey('endpoint_key', $media['usages'][0]);
         self::assertSame($video->canonicalUrl, $query->videoDetail($video->canonicalId)['url']);
         self::assertSame('dQw4w9WgXcQ', $query->videoDetail($video->canonicalId)['external_id']);
     }
