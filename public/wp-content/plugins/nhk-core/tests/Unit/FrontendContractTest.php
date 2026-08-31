@@ -139,6 +139,11 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('function nhk_v3_public_value', $functions);
         self::assertStringContainsString("'canonical' => 'hồ sơ'", $functions);
         self::assertStringContainsString("'stable key' => 'mã ổn định'", $functions);
+        self::assertStringContainsString("'specimen uuid' => 'Hiện vật liên kết'", $functions);
+        self::assertStringContainsString("'availability' => 'Tình trạng'", $functions);
+        self::assertStringContainsString("'vendor' => 'Nhà cung cấp'", $functions);
+        self::assertStringContainsString("'price' => 'Giá niêm yết'", $functions);
+        self::assertStringContainsString("'url' => 'Nguồn sản phẩm'", $functions);
         self::assertStringContainsString('nhk_v3_public_value($value)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
         self::assertStringContainsString('nhk_v3_public_label((string) $key)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
     }
