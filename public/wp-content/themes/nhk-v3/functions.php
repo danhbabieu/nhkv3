@@ -119,6 +119,10 @@ function nhk_v3_seo_head(): void
     $comparison_context = $GLOBALS['nhk_core_comparison_context'] ?? null;
     $title = wp_get_document_title(); $description = get_bloginfo('description'); $canonical = '';
     if (is_front_page()) $description = 'Khám phá bài viết, thương hiệu, mẫu đồng hồ và hiện vật trong kho tri thức NHK.';
+    if (is_search()) {
+        $term = trim((string) get_search_query());
+        $description = $term === '' ? 'Tìm kiếm trong kho tri thức NHK.' : 'Kết quả tìm kiếm cho ' . $term . ' trong kho tri thức NHK.';
+    }
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
         if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ ' . (string) $entity['name'] . ' trong kho NHK.'; $canonical = home_url('/' . (string) $context['type'] . '/' . rawurlencode((string) $entity['stable_key']) . '/'); }

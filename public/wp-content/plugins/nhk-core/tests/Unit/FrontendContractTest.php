@@ -98,6 +98,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2)", $functions);
         self::assertStringContainsString('if (is_front_page() || is_home() || is_search()) $canonical = home_url(\'/\');', $functions);
         self::assertStringContainsString("return \$term === '' ? 'Tìm kiếm — Đồng Hồ Nhà Kho'", $functions);
+        self::assertStringContainsString("Kết quả tìm kiếm cho ' . \$term . ' trong kho tri thức NHK.", $functions);
     }
 
     public function test_admin_contract_associates_labels_with_operational_controls(): void
