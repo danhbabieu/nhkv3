@@ -52,9 +52,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - A transport-neutral MCP registration seam exists; read adapters are real and
   mutations delegate to Governance.
 - A local Streamable HTTP MCP endpoint exposes protocol tool schemas, validates
-  modern request metadata and Origin, and rejects governed calls without the
-  matching WordPress capability; external client/deployment interoperability
-  is still a separate gate.
+  modern request metadata, required response media types and Origin, and
+  rejects governed calls without the matching WordPress capability; external
+  client/deployment interoperability is still a separate gate.
 - The V2 dry-run tool is no-write and emits bounded reason codes. A local
   read-only V2 inventory and a separate governed local-dev migration ledger
   are recorded; live V2 data has not been mutated.
@@ -97,7 +97,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 40 tests, 257 assertions; combined current suite is 122 tests, 543 assertions; governed MCP Media ingest lifecycle is included |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 41 tests, 260 assertions; combined current suite is 123 tests, 546 assertions; governed MCP Media ingest lifecycle and Streamable HTTP Accept validation are included |
 | Frontend route/rewrite smoke | PASS 20/20 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects, query-preserving search redirect and comparison title/canonical metadata |
 | REST/MCP runtime boundary | PASS — active Entity/Media/Knowledge/Search reads returned 200, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, local MCP `tools/list` returned 200 with 11 protocol definitions, unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
 | Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 were visually inspected; a 32-combination browser sweep across page, archive pagination and empty/404 states at 390px/768px passes without horizontal overflow, and the menu exposes all ten links with synchronized ARIA state; remaining route-specific screenshots and active Video detail remain pending |

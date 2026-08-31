@@ -29,6 +29,7 @@ final class McpTransport
         $origin = $this->header($headers, 'Origin');
         if ($origin !== '' && $this->originAllowed && !(bool) ($this->originAllowed)($origin)) return $this->error(null, -32003, 'Origin is not allowed.', 403);
         if ($modern) {
+            if (!$this->acceptsStreamableHttp($headers)) return $this->error($id, -32020, 'Accept header must include application/json and text/event-stream.', 400);
             $version = $this->header($headers, 'MCP-Protocol-Version');
             $bodyVersion = (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '');
             if (!in_array($version, [self::MODERN_VERSION], true)) return $this->error($id, -32022, 'Unsupported protocol version.', 400, ['supported' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'requested' => $version]);
@@ -113,6 +114,13 @@ final class McpTransport
         $wanted = strtolower(str_replace('_', '-', $name));
         foreach ($headers as $key => $value) if (strtolower(str_replace('_', '-', (string) $key)) === $wanted) return is_array($value) ? (string) reset($value) : (string) $value;
         return '';
+    }
+
+    private function acceptsStreamableHttp(array $headers): bool
+    {
+        $accepted = [];
+        foreach (explode(',', strtolower($this->header($headers, 'Accept'))) as $part) $accepted[] = trim(explode(';', $part, 2)[0]);
+        return in_array('application/json', $accepted, true) && in_array('text/event-stream', $accepted, true);
     }
 
     private function required(array $arguments, string $key): string

@@ -38,6 +38,13 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(-32020, $response->get_data()['error']['code']);
     }
 
+    public function test_modern_streamable_http_requires_both_response_media_types(): void
+    {
+        $response = $this->request('tools/list', ['id' => 21], ['Accept' => 'application/json']);
+        self::assertSame(400, $response->get_status());
+        self::assertSame(-32020, $response->get_data()['error']['code']);
+    }
+
     public function test_unauthenticated_governed_tool_call_is_rejected(): void
     {
         $response = $this->request('tools/call', ['id' => 3, 'params' => ['name' => 'nhk.proposal.create', 'arguments' => ['operation' => 'create', 'payload' => ['name' => 'blocked']]]], ['Mcp-Name' => 'nhk.proposal.create']);
