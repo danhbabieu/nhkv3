@@ -41,6 +41,18 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('!$video->active', $readApi);
     }
 
+    public function test_theme_design_tokens_have_one_nhk_source(): void
+    {
+        $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/style.css');
+        self::assertSame(1, substr_count($style, ':root{'));
+        foreach (['--nhk-bg:', '--nhk-surface:', '--nhk-text:', '--nhk-muted:', '--nhk-border:', '--nhk-accent:', '--nhk-accent-secondary:', '--nhk-radius:', '--nhk-shadow:', '--nhk-content-width:', '--nhk-wide-width:'] as $token) {
+            self::assertSame(1, substr_count($style, $token));
+        }
+        foreach (['--ink:', '--line:', '--paper:', '--max:'] as $legacyToken) {
+            self::assertStringNotContainsString($legacyToken, $style);
+        }
+    }
+
     public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
