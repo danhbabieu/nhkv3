@@ -114,6 +114,35 @@ final class V2MigrationIntegrationTest extends TestCase
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-%'));
     }
 
+    public function test_normalized_source_type_is_preserved_when_legacy_type_is_absent(): void
+    {
+        global $wpdb;
+        (new KnowledgeMigration005())->up();
+        (new KnowledgeEvidenceMetadataMigration007())->up();
+        (new MigrationLedger006())->up();
+        $sourceId = UuidCodec::newV7();
+        $record = [
+            'type' => 'source',
+            'stable_key' => 'v2-migration-integration-normalized-source',
+            'canonical_uuid' => $sourceId,
+            'canonical_name' => 'Normalized migration source',
+            'source_type' => 'catalog',
+            'visibility' => 'PRIVATE',
+        ];
+
+        try {
+            $result = (new V2MigrationService($wpdb))->apply([$record], 9, 10);
+            self::assertSame(1, $result['migrated']);
+            self::assertSame('catalog', (string) $wpdb->get_var($wpdb->prepare(
+                "SELECT source_type FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s",
+                UuidCodec::toBinary($sourceId)
+            )));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", $record['stable_key']));
+        }
+    }
+
     public function test_url_mapping_requires_a_governed_target_and_allows_safe_noop(): void
     {
         global $wpdb;

@@ -234,7 +234,9 @@ final class V2MigrationService
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
         foreach (['visibility', 'verification_state', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
-        $sourceType = $this->sourceType((string) ($record['legacy_type'] ?? ''));
+        $sourceTypeValue = trim((string) ($record['legacy_type'] ?? ''));
+        if ($sourceTypeValue === '') $sourceTypeValue = trim((string) ($record['source_type'] ?? ''));
+        $sourceType = $this->sourceType($sourceTypeValue);
         $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
         $source = new Source($id, $key, $title, $sourceType, $locator !== '' ? $locator : null, $metadata, $active);
         $existing = $this->sources->findByCanonicalId($id);
@@ -412,7 +414,13 @@ final class V2MigrationService
         return $payload;
     }
     private function claimType(array $metadata): string { $kind = strtolower((string) ($metadata['claim_type'] ?? $metadata['semantic_type'] ?? '')); return str_contains($kind, 'history') ? 'history' : (str_contains($kind, 'technical') || str_contains($kind, 'spec') ? 'technical' : 'fact'); }
-    private function sourceType(string $type): string { $type = strtoupper($type); return str_contains($type, 'ARCHIVE') || str_contains($type, 'REGISTRY') || str_contains($type, 'HISTORICAL') ? 'archive' : (str_contains($type, 'PRESS') || str_contains($type, 'AD') ? 'publication' : (str_contains($type, 'TECHNICAL') || str_contains($type, 'PRODUCT') ? 'website' : 'other')); }
+    private function sourceType(string $type): string
+    {
+        $normalized = strtolower(trim($type));
+        if (in_array($normalized, ['publication', 'website', 'archive', 'catalog', 'interview', 'other'], true)) return $normalized;
+        $type = strtoupper($type);
+        return str_contains($type, 'ARCHIVE') || str_contains($type, 'REGISTRY') || str_contains($type, 'HISTORICAL') ? 'archive' : (str_contains($type, 'PRESS') || str_contains($type, 'AD') ? 'publication' : (str_contains($type, 'TECHNICAL') || str_contains($type, 'PRODUCT') ? 'website' : 'other'));
+    }
     private function evidenceRelation(string $role): string { $role = strtoupper($role); return str_contains($role, 'CONTRADICT') ? 'contradicts' : (str_contains($role, 'QUALIF') || str_contains($role, 'PARTIAL') || str_contains($role, 'CORRECTION') || str_contains($role, 'BOUND') ? 'qualifies' : 'supports'); }
     private function sourceKey(array $record): string { return (string) ($record['stable_key'] ?? ($record['source_key'] ?? ($record['type'] ?? '') . ':' . ($record['legacy_id'] ?? ($record['canonical_uuid'] ?? '')))); }
     private function isArchived(array $record): bool { return in_array(strtoupper((string) ($record['review_state'] ?? '')), ['ARCHIVED', 'RETIRED'], true); }
