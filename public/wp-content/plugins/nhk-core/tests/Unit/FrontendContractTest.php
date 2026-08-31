@@ -31,6 +31,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('!$media->active', $delivery);
         self::assertStringContainsString("'mode' => 'archive', 'type' => \$type", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php'));
         self::assertStringContainsString('nhk_v3_entity_label', $functions);
+        self::assertStringContainsString("return 'Đồng Hồ Nhà Kho — Kho tri thức và sưu tầm';", $functions);
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
         self::assertStringContainsString('!$media->active', $readApi);
         self::assertStringContainsString('!$video->active', $readApi);
