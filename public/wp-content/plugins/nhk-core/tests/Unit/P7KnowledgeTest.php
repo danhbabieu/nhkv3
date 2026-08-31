@@ -45,6 +45,17 @@ final class P7KnowledgeTest extends TestCase
         self::assertSame($claim->canonicalId, $sameClaim->canonicalId);
         self::assertSame($claim->canonicalId, $citation->claimId);
         self::assertCount(1, $service->evidenceForClaim($claim->canonicalId));
+
+        $claim = $service->updateClaim($claim->canonicalId, 'The clock was made around 1905.', 'history', ['origin' => 'catalog', 'reviewed' => true], 1);
+        $source = $service->updateSource($source->canonicalId, 'Reviewed archive catalogue', 'catalog', 'https://example.test/catalog/1', ['reviewed' => true], 1);
+        $citation = $service->updateEvidence($citation->canonicalId, 'qualifies', 'Circa 1905', 'https://example.test/catalog/1#date', ['reviewed' => true], 1);
+        self::assertSame('The clock was made around 1905.', $claim->claimText);
+        self::assertSame('Reviewed archive catalogue', $source->title);
+        self::assertSame('qualifies', $citation->relation);
+        self::assertFalse($service->retireClaim($claim->canonicalId, 1)->active);
+        self::assertTrue($service->reactivateClaim($claim->canonicalId, 1)->active);
+        self::assertFalse($service->retireSource($source->canonicalId, 1)->active);
+        self::assertFalse($service->retireEvidence($citation->canonicalId, 1)->active);
     }
 
     public function test_evidence_requires_existing_claim_and_source(): void

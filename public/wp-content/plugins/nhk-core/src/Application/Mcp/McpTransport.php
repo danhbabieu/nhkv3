@@ -74,6 +74,7 @@ final class McpTransport
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
             'nhk.video.ingest' => 'nhk_create_proposals',
+            'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
@@ -89,6 +90,9 @@ final class McpTransport
             'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
+            'nhk.knowledge.ingest' => $this->knowledgeIngest($arguments),
+            'nhk.source.ingest' => $this->sourceIngest($arguments),
+            'nhk.evidence.ingest' => $this->evidenceIngest($arguments),
             'nhk.proposal.create' => $this->proposal($this->governance->createFromArguments($arguments)),
             'nhk.proposal.submit' => $this->proposal($this->governance->submit($this->required($arguments, 'id'))),
             'nhk.proposal.approve' => $this->proposal($this->governance->approve($this->required($arguments, 'id'), $this->required($arguments, 'content_fingerprint'), $this->required($arguments, 'dependency_fingerprint'), function_exists('get_current_user_id') ? (string) get_current_user_id() : '0')),
@@ -160,6 +164,51 @@ final class McpTransport
             'thumbnail_media_id' => (string) ($arguments['thumbnail_media_id'] ?? ''),
         ];
         return $this->proposal($this->governance->createFromArguments($videoArguments));
+    }
+
+    private function knowledgeIngest(array $arguments): array
+    {
+        $knowledgeArguments = $arguments;
+        $knowledgeArguments['operation'] = 'ingest';
+        $knowledgeArguments['entity_type'] = 'knowledge';
+        $knowledgeArguments['payload'] = [
+            'stable_key' => (string) ($arguments['stable_key'] ?? ''),
+            'text' => (string) ($arguments['text'] ?? ''),
+            'claim_type' => (string) ($arguments['claim_type'] ?? 'fact'),
+            'provenance' => is_array($arguments['provenance'] ?? null) ? $arguments['provenance'] : [],
+        ];
+        return $this->proposal($this->governance->createFromArguments($knowledgeArguments));
+    }
+
+    private function sourceIngest(array $arguments): array
+    {
+        $sourceArguments = $arguments;
+        $sourceArguments['operation'] = 'ingest';
+        $sourceArguments['entity_type'] = 'source';
+        $sourceArguments['payload'] = [
+            'stable_key' => (string) ($arguments['stable_key'] ?? ''),
+            'title' => (string) ($arguments['title'] ?? ''),
+            'source_type' => (string) ($arguments['source_type'] ?? 'website'),
+            'locator' => isset($arguments['locator']) ? (string) $arguments['locator'] : null,
+            'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+        ];
+        return $this->proposal($this->governance->createFromArguments($sourceArguments));
+    }
+
+    private function evidenceIngest(array $arguments): array
+    {
+        $evidenceArguments = $arguments;
+        $evidenceArguments['operation'] = 'ingest';
+        $evidenceArguments['entity_type'] = 'evidence';
+        $evidenceArguments['payload'] = [
+            'claim_id' => (string) ($arguments['claim_id'] ?? ''),
+            'source_id' => (string) ($arguments['source_id'] ?? ''),
+            'excerpt' => (string) ($arguments['excerpt'] ?? ''),
+            'relation' => (string) ($arguments['relation'] ?? 'supports'),
+            'locator' => isset($arguments['locator']) ? (string) $arguments['locator'] : null,
+            'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+        ];
+        return $this->proposal($this->governance->createFromArguments($evidenceArguments));
     }
 
     private function proposal(\NHK\Core\Domain\Governance\Proposal $proposal): array

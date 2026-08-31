@@ -7,18 +7,20 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Media\MediaService;
 use NHK\Core\Application\Video\VideoService;
+use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Graph\GraphEdge;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence
     {
         if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
             if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
@@ -52,6 +54,7 @@ final class AuthorityProposalExecutor
                 'reactivate' => $this->video->reactivate($target, $proposal->expectedRevision),
             };
         }
+        if (in_array($proposal->entityType, ['knowledge', 'source', 'evidence'], true)) return $this->knowledge($proposal);
         if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
             return $this->relation($proposal);
         }
@@ -69,6 +72,40 @@ final class AuthorityProposalExecutor
             'retire' => $this->authority->retire($target, $proposal->expectedRevision),
             'reactivate' => $this->authority->reactivate($target, $proposal->expectedRevision),
             default => throw new \InvalidArgumentException('Unsupported authority proposal operation: ' . $proposal->operation),
+        };
+    }
+
+    private function knowledge(Proposal $proposal): KnowledgeClaim|Source|Evidence
+    {
+        if (!$this->knowledge) throw new \RuntimeException('Knowledge executor is not configured.');
+        $payload = $proposal->payload;
+        if (is_array($payload['entity_payload'] ?? null)) $payload = array_merge($payload, $payload['entity_payload']);
+        $target = $proposal->targetUuid ?: $proposal->subjectId;
+        if (in_array($proposal->operation, ['create', 'ingest'], true)) return match ($proposal->entityType) {
+            'knowledge' => $this->knowledge->createClaim((string) ($payload['stable_key'] ?? ''), (string) ($payload['text'] ?? $payload['claim_text'] ?? ''), (string) ($payload['claim_type'] ?? $payload['type'] ?? 'fact'), is_array($payload['provenance'] ?? null) ? $payload['provenance'] : []),
+            'source' => $this->knowledge->createSource((string) ($payload['stable_key'] ?? ''), (string) ($payload['title'] ?? ''), (string) ($payload['source_type'] ?? $payload['type'] ?? 'website'), isset($payload['locator']) ? (string) $payload['locator'] : null, is_array($payload['metadata'] ?? null) ? $payload['metadata'] : []),
+            'evidence' => $this->knowledge->cite((string) ($payload['claim_id'] ?? ''), (string) ($payload['source_id'] ?? ''), (string) ($payload['excerpt'] ?? ''), (string) ($payload['relation'] ?? 'supports'), isset($payload['locator']) ? (string) $payload['locator'] : null),
+        };
+        return match ($proposal->entityType) {
+            'knowledge' => match ($proposal->operation) {
+                'update' => $this->knowledge->updateClaim($target, (string) ($payload['text'] ?? $payload['claim_text'] ?? ''), (string) ($payload['claim_type'] ?? $payload['type'] ?? 'fact'), is_array($payload['provenance'] ?? null) ? $payload['provenance'] : [], $proposal->expectedRevision),
+                'retire' => $this->knowledge->retireClaim($target, $proposal->expectedRevision),
+                'reactivate' => $this->knowledge->reactivateClaim($target, $proposal->expectedRevision),
+                default => throw new \InvalidArgumentException('Unsupported knowledge proposal operation: ' . $proposal->operation),
+            },
+            'source' => match ($proposal->operation) {
+                'update' => $this->knowledge->updateSource($target, (string) ($payload['title'] ?? ''), (string) ($payload['source_type'] ?? $payload['type'] ?? 'website'), isset($payload['locator']) ? (string) $payload['locator'] : null, is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [], $proposal->expectedRevision),
+                'retire' => $this->knowledge->retireSource($target, $proposal->expectedRevision),
+                'reactivate' => $this->knowledge->reactivateSource($target, $proposal->expectedRevision),
+                default => throw new \InvalidArgumentException('Unsupported source proposal operation: ' . $proposal->operation),
+            },
+            'evidence' => match ($proposal->operation) {
+                'update' => $this->knowledge->updateEvidence($target, (string) ($payload['relation'] ?? 'supports'), (string) ($payload['excerpt'] ?? ''), isset($payload['locator']) ? (string) $payload['locator'] : null, is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [], $proposal->expectedRevision),
+                'retire' => $this->knowledge->retireEvidence($target, $proposal->expectedRevision),
+                'reactivate' => $this->knowledge->reactivateEvidence($target, $proposal->expectedRevision),
+                default => throw new \InvalidArgumentException('Unsupported evidence proposal operation: ' . $proposal->operation),
+            },
+            default => throw new \InvalidArgumentException('Unsupported knowledge proposal entity type: ' . $proposal->entityType),
         };
     }
 

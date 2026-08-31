@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Governance\GovernanceCapabilities;
+use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository};
 use NHK\Core\Infrastructure\Governance\WpdbProposalRepository;
 use NHK\Tests\Support\TestDatabaseGuard;
@@ -27,7 +28,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         $data = $response->get_data();
         self::assertSame('2.0', $data['jsonrpc']);
-        self::assertCount(13, $data['result']['tools']);
+        self::assertCount(16, $data['result']['tools']);
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string']], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
@@ -159,6 +160,82 @@ final class McpTransportIntegrationTest extends TestCase
         } finally {
             wp_set_current_user($previousUser);
         }
+    }
+
+    public function test_authenticated_knowledge_source_and_evidence_ingest_run_through_governed_lifecycle(): void
+    {
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        GovernanceCapabilities::register();
+        $previousUser = get_current_user_id();
+        wp_set_current_user((int) $users[0]->ID);
+        global $wpdb;
+        $suffix = bin2hex(random_bytes(4));
+        try {
+            $source = $this->governedIngest('nhk.source.ingest', [
+                'stable_key' => 'mcp-source-' . $suffix,
+                'title' => 'MCP source ' . $suffix,
+                'source_type' => 'catalog',
+                'locator' => 'https://example.test/mcp/' . $suffix,
+                'metadata' => ['source' => 'mcp-integration-test'],
+            ], 30);
+            $claim = $this->governedIngest('nhk.knowledge.ingest', [
+                'stable_key' => 'mcp-claim-' . $suffix,
+                'text' => 'The object has a spring-driven movement.',
+                'claim_type' => 'technical',
+                'provenance' => ['source' => 'mcp-integration-test'],
+            ], 40);
+            $evidence = $this->governedIngest('nhk.evidence.ingest', [
+                'claim_id' => (string) $claim['result_entity_uuid'],
+                'source_id' => (string) $source['result_entity_uuid'],
+                'excerpt' => 'Spring-driven movement',
+                'relation' => 'supports',
+                'locator' => 'https://example.test/mcp/' . $suffix . '#movement',
+                'metadata' => ['source' => 'mcp-integration-test'],
+            ], 50);
+
+            self::assertNotEmpty($evidence['result_entity_uuid']);
+            $claimRecord = (new WpdbKnowledgeRepository($wpdb))->findByCanonicalId((string) $claim['result_entity_uuid']);
+            $sourceRecord = (new WpdbSourceRepository($wpdb))->findByCanonicalId((string) $source['result_entity_uuid']);
+            $evidenceRecord = (new WpdbEvidenceRepository($wpdb))->findByCanonicalId((string) $evidence['result_entity_uuid']);
+            self::assertNotNull($claimRecord);
+            self::assertNotNull($sourceRecord);
+            self::assertNotNull($evidenceRecord);
+            self::assertSame('technical', $claimRecord->claimType);
+            self::assertSame('catalog', $sourceRecord->sourceType);
+            self::assertSame($claimRecord->canonicalId, $evidenceRecord->claimId);
+            self::assertSame($sourceRecord->canonicalId, $evidenceRecord->sourceId);
+
+            $claimRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/claim/' . $claimRecord->canonicalId));
+            $sourceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $sourceRecord->canonicalId));
+            self::assertSame(200, $claimRead->get_status());
+            self::assertSame(200, $sourceRead->get_status());
+            self::assertCount(1, $claimRead->get_data()['evidence']);
+            self::assertCount(1, $sourceRead->get_data()['evidence']);
+        } finally {
+            wp_set_current_user($previousUser);
+        }
+    }
+
+    private function governedIngest(string $tool, array $arguments, int $id): array
+    {
+        global $wpdb;
+        $create = $this->request('tools/call', ['id' => $id, 'params' => ['name' => $tool, 'arguments' => $arguments]], ['Mcp-Name' => $tool]);
+        self::assertSame(200, $create->get_status(), (string) wp_json_encode($create->get_data()));
+        $created = $create->get_data()['result']['structuredContent'];
+        self::assertFalse($create->get_data()['result']['isError'], (string) wp_json_encode($create->get_data()));
+        $proposalId = (string) $created['id'];
+        $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
+        self::assertNotNull($proposal);
+
+        $submit = $this->request('tools/call', ['id' => $id + 1, 'params' => ['name' => 'nhk.proposal.submit', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.submit']);
+        self::assertSame(200, $submit->get_status(), (string) wp_json_encode($submit->get_data()));
+        $approve = $this->request('tools/call', ['id' => $id + 2, 'params' => ['name' => 'nhk.proposal.approve', 'arguments' => ['id' => $proposalId, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint]]], ['Mcp-Name' => 'nhk.proposal.approve']);
+        self::assertSame(200, $approve->get_status(), (string) wp_json_encode($approve->get_data()));
+        $apply = $this->request('tools/call', ['id' => $id + 3, 'params' => ['name' => 'nhk.proposal.apply', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.apply']);
+        self::assertSame(200, $apply->get_status(), (string) wp_json_encode($apply->get_data()));
+        self::assertFalse($apply->get_data()['result']['isError'], (string) wp_json_encode($apply->get_data()));
+        return $apply->get_data()['result']['structuredContent'];
     }
 
     private function request(string $method, array $body, array $extraHeaders = []): \WP_REST_Response
