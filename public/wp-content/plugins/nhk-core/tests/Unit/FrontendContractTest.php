@@ -192,6 +192,17 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_public_related_and_external_links_fail_closed_when_url_is_missing(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['entity.php', 'single.php', 'video.php'] as $template) {
+            $contents = (string) file_get_contents($theme . '/' . $template);
+            self::assertStringNotContainsString("?? '#'", $contents, $template . ' must not render placeholder links');
+            self::assertStringContainsString("!empty($", $contents, $template . ' must guard optional URLs');
+        }
+        self::assertStringContainsString("if (\$url === '') continue", (string) file_get_contents($theme . '/index.php'));
+    }
+
     public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
     {
         foreach ([dirname(__DIR__, 2) . '/src/Application/Entity/EntityPageQuery.php', dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php'] as $file) {
