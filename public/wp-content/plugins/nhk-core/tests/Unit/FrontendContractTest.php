@@ -226,6 +226,17 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'permission_callback' => static fn (): bool => current_user_can('manage_options')", $graphApi);
     }
 
+    public function test_public_semantic_search_only_indexes_allowlisted_entity_fields(): void
+    {
+        foreach ([
+            dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php',
+            dirname(__DIR__, 2) . '/src/Application/Search/SearchSemanticQuery.php',
+            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
+        ] as $file) {
+            self::assertStringContainsString('array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true))', (string) file_get_contents($file), $file . ' must avoid indexing private entity payload fields');
+        }
+    }
+
     public function test_public_media_readiness_gate_covers_all_discovery_boundaries(): void
     {
         foreach ([
