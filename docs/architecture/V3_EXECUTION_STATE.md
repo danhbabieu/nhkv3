@@ -19,6 +19,14 @@ Last updated: 2026-09-01, P11 public MediaAsset delivery-boundary checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Read-only external NHK abilities were probed with bounded
+  Source/Media/Video list calls and recorded in
+  MCP_EXTERNAL_INTEROPERABILITY_EVIDENCE_2026-09-01.md. The adapter was
+  reachable with zero writes; it returned draft Source records, 242 mixed
+  visibility Media records and zero Video records with storage ready. Its
+  richer adapter schema is not yet wire-level V3 MCP parity, so external
+  interoperability remains PARTIAL and no deployment claim was made.
+
 - 2026-09-01: Migration URL targets for Knowledge now require an active
   public claim, matching the public Knowledge route's readiness/provenance
   boundary; non-public claims are recorded as MISSING_ENDPOINT instead of
