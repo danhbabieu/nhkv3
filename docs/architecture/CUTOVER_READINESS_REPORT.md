@@ -16,6 +16,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - Homepage discovery is query-driven: featured/latest/category/topic modules
   use WordPress services, while Authority/Media/Video modules come from the
   plugin semantic query boundary and disappear when storage is unavailable.
+- Search now has a theme query boundary that combines native WordPress Post
+  results with grouped active semantic results from Authority, Media, Video and
+  Knowledge repositories.
 - NHK Admin exposes health, lookup, governed proposal creation and lifecycle
   actions, including Graph relation proposals, through REST with capability and
   nonce checks.

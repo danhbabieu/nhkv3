@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Media/Video SEO and frontend contract checkpoint pushed.
+Last updated: 2026-08-31, unified semantic search checkpoint in progress.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `e9ea590` |
+| Branch / HEAD | `main` / `668cb28` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 61 tests, 170 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
+| Tests | Unit suite: 62 tests, 173 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
 | Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
-| Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke including homepage/Admin/Graph workflows, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
+| Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke including homepage/search/Admin/Graph workflows, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -147,3 +147,8 @@ Last updated: 2026-08-31, Media/Video SEO and frontend contract checkpoint pushe
   breadcrumbs and `VideoObject`; frontend contract tests enforce the
   HomePageQuery boundary and these metadata surfaces. Checkpoint `e9ea590` is
   pushed; unit evidence is 61 tests/170 assertions.
+- 2026-08-31: Unified semantic search now has a theme `SearchPageQuery` and
+  plugin `SearchSemanticQuery`; native WordPress Post results remain the
+  editorial source while active Authority/Media/Video/Knowledge results are
+  grouped and linked. Checkpoint `668cb28` is pushed; browser/REST smoke is
+  still gated by the local database connection.

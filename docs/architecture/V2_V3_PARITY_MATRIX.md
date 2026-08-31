@@ -14,7 +14,7 @@ the final parity declaration.
 | Media / Video | Legacy data pending | P6 domain/persistence + public archive/detail routes | NO | PASS | IN PROGRESS | Identity/asset/usage separation, active-only query services, schema readiness, responsive media template and YouTube external reference tested; V2 data, runtime smoke and binary storage delivery pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint + governed relation proposals | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; Post links and relation create/retire/reactivate proposals are covered locally; V2 data/runtime pending |
-| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search, entity/relation proposal composer, eligibility and governed Controlled Apply are implemented; runtime QA and V2 behavior reconciliation pending |
+| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + grouped semantic search + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search now combines native Posts with active Authority/Media/Video/Knowledge results; entity/relation proposal composer, eligibility and governed Controlled Apply are implemented; runtime QA and V2 behavior reconciliation pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
 | SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary + theme metadata/JSON-LD | NO | PARTIAL | IN PROGRESS | Canonical, description, OpenGraph, Article and BreadcrumbList hooks added; sitemap/RSS remain native and runtime audit pending |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages, Graph-derived related sections and Media gallery surface | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes, related groups, media archive/detail and readiness-aware asset states exist; V2 inventory and runtime gallery QA remain |
@@ -32,7 +32,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 |---|---|---|---|---|
 | Homepage | Pending read-only audit | Editorial discovery homepage | Real query services; no public fixtures or fake metrics | NO |
 | Header / footer / navigation | Pending audit | NHK responsive shell | Domain language for visitors; keyboard/mobile usable | NO |
-| Search / empty search | Pending audit | Unified semantic search | Posts plus canonical entities and videos | NO |
+| Search / empty search | Pending audit | Unified semantic search | Posts plus canonical entities, media, videos and knowledge | PARTIAL |
 | Post / Tri thức / Góc chia sẻ | Pending audit | Native WordPress editorial routes | Enriched by Graph/Knowledge without body duplication | NO |
 | Brand / Model / Movement / Music / Component | Pending audit | Domain-specific archive/single pages | Graph-backed sections and pagination | PARTIAL |
 | Specimen / Product | Pending audit | Separate physical-object/listing pages | Explicit identity distinction | PARTIAL |

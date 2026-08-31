@@ -10,7 +10,7 @@ V2 URL-parity claim.
 | Tri thức / Góc chia sẻ | `/tri-thuc/`, `/goc-chia-se/` plus paginated aliases | Native WP category query via `PublicEditorialRoutes` | Category-aware archive and empty states; no editorial body projection | Pending rewrite/browser smoke and V2 URL reconciliation |
 | Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | Pending WP rewrite smoke |
 | Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | Pending WP rewrite smoke |
-| Search | Native `/?s={term}` plus `/wp-json/nhk/v1/search` | WordPress search + `SearchApi` | Posts and active semantic domains are grouped | Pending REST/runtime smoke |
+| Search | Native `/?s={term}` plus `/wp-json/nhk/v1/search` | `NHK_V3_Search_Page_Query` + `SearchSemanticQuery` + `SearchApi` | Post results remain native; active Authority/Media/Video/Knowledge results are grouped and linked | Pending REST/runtime smoke |
 | Media archive | `/thu-vien/`, `/media/`, `/media/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `media.php` | Active-only archive, honest empty state | Pending WP rewrite/gallery smoke |
 | Media detail | `/media/{uuid}/` | `MediaVideoPageQuery` → `media.php` | Readiness-aware asset metadata and usage facts | Pending asset delivery/runtime smoke |
 | Video archive | `/video/`, `/video/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `video.php` | Active-only external references and empty state | Pending WP rewrite smoke |
