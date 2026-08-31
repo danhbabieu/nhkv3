@@ -52,17 +52,19 @@ a name-only guess because the legacy post title and the claim's
 `canonical_name` are identical. The table is still a proposal aid only; it does
 not approve a redirect or migrate an editorial body.
 
-| V2 ID | Legacy path | Exact V3 claim candidate | Candidate stable key | Required governed check |
-|---:|---|---|---|---|
-| 810 | `/tri-thuc/sua-article-cu-phai-giu-identity-va-nang-chuan-bien-tap/` | Sửa Article cũ phải giữ identity và nâng chuẩn biên tập | `nhk:knowledge:editorial.article.legacy-rewrite` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
-| 811 | `/tri-thuc/luat-article-phai-co-ket-qua-tiep-thu-ro-rang/` | Luật Article phải có kết quả tiếp thu rõ ràng | `nhk:knowledge:editorial.article.learning-outcome` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
-| 812 | `/tri-thuc/khong-mac-dinh-moi-cau-hoi-tao-mot-article/` | Không mặc định mỗi câu hỏi tạo một Article | `nhk:knowledge:editorial.article.question-cluster` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
-| 813 | `/tri-thuc/article-la-narrative-projection-danh-cho-nguoi-doc/` | Article là narrative projection dành cho người đọc | `nhk:knowledge:editorial.article.narrative-projection` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
-| 814 | `/tri-thuc/moi-article-phai-co-anh-chinh-va-chu-dong-xin-them-anh-khi-can/` | Mọi Article phải có ảnh chính và chủ động xin thêm ảnh khi cần | `nhk:knowledge:editorial.article.media-required` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
+| V2 ID | Legacy path | Exact V3 claim candidate | Candidate stable key | Read-only status | Required governed check |
+|---:|---|---|---|---|---|
+| 810 | `/tri-thuc/sua-article-cu-phai-giu-identity-va-nang-chuan-bien-tap/` | Sửa Article cũ phải giữ identity và nâng chuẩn biên tập | `nhk:knowledge:editorial.article.legacy-rewrite` | UUID `57fabad0-40ef-4f59-a104-58e7fbd6a441`; revision 2; `ARCHIVED`; `UNVERIFIED`; non-public; no active target | Decide whether to retire the legacy URL or approve a separate active target |
+| 811 | `/tri-thuc/luat-article-phai-co-ket-qua-tiep-thu-ro-rang/` | Luật Article phải có kết quả tiếp thu rõ ràng | `nhk:knowledge:editorial.article.learning-outcome` | UUID `dcf59e1e-8774-45e0-a61a-b4c569eada27`; revision 2; `ARCHIVED`; `UNVERIFIED`; non-public; no active target | Decide whether to retire the legacy URL or approve a separate active target |
+| 812 | `/tri-thuc/khong-mac-dinh-moi-cau-hoi-tao-mot-article/` | Không mặc định mỗi câu hỏi tạo một Article | `nhk:knowledge:editorial.article.question-cluster` | UUID `a796159e-20c1-4b97-a17a-1528ed77341c`; revision 2; `ARCHIVED`; `UNVERIFIED`; non-public; no active target | Decide whether to retire the legacy URL or approve a separate active target |
+| 813 | `/tri-thuc/article-la-narrative-projection-danh-cho-nguoi-doc/` | Article là narrative projection dành cho người đọc | `nhk:knowledge:editorial.article.narrative-projection` | UUID `51151d0b-8a63-471d-ad27-d568fc340fcf`; revision 2; `ARCHIVED`; `UNVERIFIED`; non-public; no active target | Decide whether to retire the legacy URL or approve a separate active target |
+| 814 | `/tri-thuc/moi-article-phai-co-anh-chinh-va-chu-dong-xin-them-anh-khi-can/` | Mọi Article phải có ảnh chính và chủ động xin thêm ảnh khi cần | `nhk:knowledge:editorial.article.media-required` | UUID `b503cbc4-26d5-4713-aafa-7d6d7f30cc2c`; revision 2; `ARCHIVED`; `UNVERIFIED`; non-public; no active target | Decide whether to retire the legacy URL or approve a separate active target |
 
-The candidate matches reduce the uncertainty for these five records, but the
-legacy posts have empty `post_content` in the restored export and their
-editorial URL/body policy is not equivalent to a Knowledge claim automatically.
-The candidate target must therefore pass the same governed review as any other
-redirect, while WordPress `wp_posts` remains the sole editorial body and URL
-authority.
+The candidate matches reduce identity uncertainty for these five records, but
+none is currently an eligible public target: all five claims are archived and
+unverified, with `ARCHIVED_OPERATIONAL_NOT_PUBLIC_KNOWLEDGE` disposition and no
+active consolidation target in the export. The legacy posts also have empty
+`post_content`; their editorial URL/body policy is not equivalent to a
+Knowledge claim automatically. A governed retirement or separately approved
+active target is therefore required, while WordPress `wp_posts` remains the
+sole editorial body and URL authority.

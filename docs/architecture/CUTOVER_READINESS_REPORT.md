@@ -122,8 +122,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
    domain-targeted custom/system posts; the new `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md`
    breaks these into 742 domain records, 21 attachments and one global-styles
    record. Exact read-only Knowledge candidates are now identified for the five
-   domain-targeted rows, but each still requires UUID/revision/provenance
-   verification and a governed redirect-or-retire decision; every other row
+   domain-targeted rows. Field-level verification shows all five are archived,
+   unverified and non-public with no active consolidation target, so each still
+   requires a governed retirement or separately approved active target; every other row
    requires a deterministic governed target or a documented
    retirement/skip decision.
 2. Review the local-dev ledger counts, verify all imported semantic fields and
