@@ -30,9 +30,12 @@ The read-only smoke harness is `php tools/frontend-route-smoke.php
 --base-url=http://localhost`. Representative concrete routes can be added
 without fixture assumptions, for example
 `--post-url=/a-real-post/ --brand-url=/brand/a-real-brand/
---model-url=/model/a-real-model/`. It expects 200 for the core public routes
-and 404 for a deliberately unknown route; it reports connection failures
-instead of turning an unavailable runtime into a false pass.
+--model-url=/model/a-real-model/`. It also accepts data-gated detail-alias
+checks in the form `--brand-alias=/legacy/|/brand/canonical/` or
+`--model-alias=/legacy/model/|/model/canonical/`; these expect HTTP 301 and
+verify the `Location` target. It expects 200 for the core public routes and
+404 for a deliberately unknown route; it reports connection failures instead
+of turning an unavailable runtime into a false pass.
 
 An initial attempt on 2026-08-31 against `http://localhost` occurred before
 the local WordPress rewrite file was present and returned Apache 404. After

@@ -161,6 +161,9 @@ final class FrontendContractTest extends TestCase
         $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
         self::assertStringContainsString("'/tim-kiem/?q=odo' => 301", $routeSmoke);
         self::assertStringContainsString("'/tim-kiem/?q=odo' => '/?s=odo'", $routeSmoke);
+        self::assertStringContainsString("'brand-alias', 'model-alias'", $routeSmoke);
+        self::assertStringContainsString('explode(\'|\', substr($argument, strlen($prefix)), 2)', $routeSmoke);
+        self::assertStringContainsString('optionalRedirects[$route] = $target', $routeSmoke);
     }
 
     public function test_comparison_surface_uses_entity_query_and_has_a_real_discovery_route(): void
