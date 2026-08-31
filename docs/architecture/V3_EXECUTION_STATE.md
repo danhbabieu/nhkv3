@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, unified semantic search readiness checkpoint pushed.
+Last updated: 2026-08-31, frontend route smoke harness checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `5601aef` |
+| Branch / HEAD | `main` / `eee6ede` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
 | Tests | Unit suite: 62 tests, 173 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
 | Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
-| Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke including homepage/search/Admin/Graph workflows, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
+| Next executable task | Resolve local WordPress HTTP/DB runtime, rerun frontend route smoke and mandatory integration/Admin/Graph workflows, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -155,3 +155,7 @@ Last updated: 2026-08-31, unified semantic search readiness checkpoint pushed.
 - 2026-08-31: Search readiness documentation checkpoint `5601aef` is pushed
   to `origin/main`; the repository remains pre-cutover with all unresolved
   runtime and V2-data gates explicitly recorded.
+- 2026-08-31: Read-only frontend route smoke harness was added at
+  `tools/frontend-route-smoke.php`; its localhost attempt reported connection
+  refused for all expected routes, with no false pass. Checkpoint `eee6ede`
+  is pushed; unit evidence remains 62 tests/173 assertions.
