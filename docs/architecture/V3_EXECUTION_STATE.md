@@ -1,21 +1,21 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P8 entity/search/proposal surfaces are pushed.
+Last updated: 2026-08-31, Graph read API and migration dry-run checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `cc40323` |
-| Current phase | P8 Admin/API + P7/P9 vertical slices in parallel |
+| Branch / HEAD | `main` / `27ce072` |
+| Current phase | P8 Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 48 tests, 110 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
-| Blockers | None for local code work; V2/live remains read-only; WP integration environment absent |
-| Working assumptions | Working tree was clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Add MCP adapter/read contract and migration inventory tooling; browser/DB integration remains environment-gated |
+| Tests | Unit suite: 52 tests, 133 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| Blockers | None for local code work; full suite is environment-blocked (no `NHK_WP_TEST_PATH`, one P5 bootstrap error and nine mandatory P4 failures); V2/live remains read-only |
+| Working assumptions | Working tree is clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
+| Next executable task | Feed a read-only V2 export into `tools/v2-dry-run.php`, then close remaining frontend/admin/MCP adapters; browser/DB integration remains environment-gated |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
-| Migration dry-run | Not applicable to code-only/P4 bootstrap; required before real V2 data migration |
+| Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
 
 ## Checkpoint journal
 
@@ -71,3 +71,8 @@ Last updated: 2026-08-31, P8 entity/search/proposal surfaces are pushed.
   are explicitly non-mutating; every mutation tool is marked governed and
   delegates to `GovernanceService` for authorization, idempotency and lifecycle
   policy. External MCP transport wiring remains pending.
+- 2026-08-31: Graph read REST routes were wired to all registered endpoint
+  resolvers with cursor pagination and public retired-edge suppression. Graph
+  reads no longer materialize missing graph nodes. A no-write V2 dry-run CLI
+  and reason-code service were added; checksum collisions remain review-only
+  duplicate candidates. Checkpoint `27ce072` is pushed to `origin/main`.
