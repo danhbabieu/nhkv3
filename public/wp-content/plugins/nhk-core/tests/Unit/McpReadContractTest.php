@@ -4,12 +4,12 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\McpReadHandler;
-use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Authority\AuthorityEntity;
-use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -27,6 +27,9 @@ final class McpReadContractTest extends TestCase
         $mcpAsset = new MediaAsset(UuidCodec::newV7(), $mcpMedia->canonicalId, 'original', 'private/storage.webp', hash('sha256', 'mcp'), 'image/webp', 3, 10, 10, 'PUBLIC', ['private' => 'metadata']);
         $mcpUsage = new MediaUsage(UuidCodec::newV7(), $mcpMedia->canonicalId, 'wp_post', '1:42', 'gallery', 1);
         $mcpVideo = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'MCP video', ['private' => 'metadata']);
+        $mcpClaim = new KnowledgeClaim(UuidCodec::newV7(), 'mcp-public-claim', 'MCP public claim', 'fact', ['metadata' => ['verification_status' => 'VERIFIED', 'private' => 'provenance']]);
+        $mcpSource = new Source(UuidCodec::newV7(), 'mcp-public-source', 'MCP public source');
+        $mcpEvidence = new Evidence(UuidCodec::newV7(), $mcpClaim->canonicalId, $mcpSource->canonicalId, 'supports', 'MCP public excerpt', null, true, 1, ['private' => 'metadata']);
         $media = new class($mcpMedia) implements MediaRepository {
             public function __construct(private Media $item) {}
             public function findByCanonicalId(string $id): ?Media { return $id === $this->item->canonicalId ? $this->item : null; }
@@ -57,21 +60,31 @@ final class McpReadContractTest extends TestCase
             public function update(Video $item, int $expectedRevision): Video { return $item; }
             public function list(bool $includeRetired = false): array { return []; }
         };
-        $claims = new class implements KnowledgeRepository {
-            public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; }
+        $claims = new class($mcpClaim) implements KnowledgeRepository {
+            public function __construct(private KnowledgeClaim $item) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return $id === $this->item->canonicalId ? $this->item : null; }
             public function findByStableKey(string $key): ?KnowledgeClaim { return null; }
             public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; }
             public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; }
-            public function list(bool $includeRetired = false): array { return []; }
+            public function list(bool $includeRetired = false): array { return [$this->item]; }
         };
-        $evidence = new class implements EvidenceRepository {
+        $evidence = new class($mcpEvidence) implements EvidenceRepository {
+            public function __construct(private Evidence $item) {}
             public function findByCanonicalId(string $id): ?Evidence { return null; }
             public function create(Evidence $item): Evidence { return $item; }
             public function update(Evidence $item, int $revision): Evidence { return $item; }
-            public function listByClaim(string $id, bool $includeRetired = false): array { return []; }
+            public function listByClaim(string $id, bool $includeRetired = false): array { return $id === $this->item->claimId ? [$this->item] : []; }
             public function listBySource(string $id, bool $includeRetired = false): array { return []; }
         };
-        $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence);
+        $sources = new class($mcpSource) implements SourceRepository {
+            public function __construct(private Source $item) {}
+            public function findByCanonicalId(string $id): ?Source { return $id === $this->item->canonicalId ? $this->item : null; }
+            public function findByStableKey(string $key): ?Source { return null; }
+            public function create(Source $item): Source { return $item; }
+            public function update(Source $item, int $expectedRevision): Source { return $item; }
+            public function list(bool $includeRetired = false): array { return [$this->item]; }
+        };
+        $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence, null, $sources);
         self::assertSame($entity->canonicalId, $handler->entityGet('brand', $entity->canonicalId)['id']);
         self::assertSame(['country' => 'Switzerland'], $handler->entityGet('brand', $entity->canonicalId)['payload']);
         $mediaRead = $handler->mediaGet($mcpMedia->canonicalId);
@@ -80,6 +93,9 @@ final class McpReadContractTest extends TestCase
         self::assertArrayNotHasKey('endpoint_type', $mediaRead['usages'][0]);
         $videoRead = $handler->videoGet($mcpVideo->canonicalId);
         self::assertArrayNotHasKey('metadata', $videoRead);
+        $knowledgeRead = $handler->knowledgeGet($mcpClaim->canonicalId);
+        self::assertArrayNotHasKey('provenance', $knowledgeRead);
+        self::assertArrayNotHasKey('metadata', $knowledgeRead['evidence'][0]);
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
         $retired = $authority->create('brand', 'retired', 'Retired');
         $authority->retire($retired->canonicalId, 1);
