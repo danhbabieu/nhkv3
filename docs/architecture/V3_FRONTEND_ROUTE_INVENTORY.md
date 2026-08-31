@@ -22,6 +22,15 @@ endpoints (`wp_post` included) through the existing read APIs. Governed proposal
 composer covers entity and Graph relation commands; lifecycle application still
 requires capability, approval, eligibility and Controlled Apply.
 
+The read-only smoke harness is php tools/frontend-route-smoke.php
+--base-url=http://localhost. It expects 200 for the core public routes and 404
+for a deliberately unknown route; it reports connection failures instead of
+turning an unavailable runtime into a false pass.
+
+It was attempted on 2026-08-31 against http://localhost; every route failed
+with connection refused because no local HTTP listener is running. This is a
+recorded blocker, not a route failure classification.
+
 ## Guardrails
 
 - Templates consume application contexts; they do not query database tables.
