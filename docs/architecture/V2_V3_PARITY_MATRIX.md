@@ -14,9 +14,9 @@ the final parity declaration.
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
-| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + Admin/read API | NO | PARTIAL | IN PROGRESS | Search, eligibility and governed proposal/Controlled Apply REST surfaces tested; daily Admin detail UI pending |
+| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search, eligibility, governed proposal/Controlled Apply REST and Admin console implemented; runtime QA and V2 behavior reconciliation pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
-| SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary | NO | NO | NOT ASSESSED | URL/API inventory pending in P10 |
+| SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary + theme metadata/JSON-LD | NO | PARTIAL | IN PROGRESS | Canonical, description, OpenGraph, Article and BreadcrumbList hooks added; sitemap/RSS remain native and runtime audit pending |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages implemented; related/media/gallery modules pending | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes and semantic facts exist; Graph-derived related content and galleries remain |
 
 ## Required parity inventory
@@ -39,6 +39,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Media gallery / Video | Pending audit | First-class query modules | Responsive assets; external embeds only | NO |
 | Pagination / 404 / empty states | Pending audit | Route-level accessible states | No dead ends or fixture leakage | NO |
 | Desktop / tablet / mobile | Pending audit | Responsive one-to-many-column layouts | Reading comfort and Core Web Vitals considered | NO |
+| SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article and BreadcrumbList | PARTIAL |
 
 ## Logic parity inventory
 
