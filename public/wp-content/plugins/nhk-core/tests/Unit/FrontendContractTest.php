@@ -167,6 +167,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("'provenance' => \$media->provenance", $mediaMethod);
     }
 
+    public function test_public_video_api_does_not_expose_metadata_blob(): void
+    {
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        $videoMethod = substr($readApi, strpos($readApi, 'private function video'), strpos($readApi, 'private function claim') - strpos($readApi, 'private function video'));
+        self::assertStringNotContainsString("'metadata' => \$video->metadata", $videoMethod);
+    }
+
     public function test_public_media_api_does_not_expose_usage_endpoint_keys(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');

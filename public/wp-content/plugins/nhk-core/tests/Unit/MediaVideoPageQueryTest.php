@@ -32,7 +32,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/front.jpg', hash('sha256', 'image'), 'image/jpeg', 5, 1200, 800);
         $privateAsset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/private.jpg', hash('sha256', 'private-image'), 'image/jpeg', 7, 1200, 800, 'PRIVATE', ['status' => 'private']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured');
-        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference');
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', ['source' => 'internal-test']);
         $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready', ['source' => 'v2', 'metadata' => ['legacy_id' => '42']])], [$video], [$asset, $privateAsset], [$usage]);
 
         $media = $query->mediaDetail($mediaId);
@@ -46,6 +46,7 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertArrayNotHasKey('endpoint_key', $media['usages'][0]);
         self::assertSame($video->canonicalUrl, $query->videoDetail($video->canonicalId)['url']);
         self::assertSame('dQw4w9WgXcQ', $query->videoDetail($video->canonicalId)['external_id']);
+        self::assertArrayNotHasKey('metadata', $query->videoDetail($video->canonicalId));
     }
 
     /** @param list<Media> $media @param list<Video> $videos @param list<MediaAsset> $assets @param list<MediaUsage> $usages */
