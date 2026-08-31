@@ -70,9 +70,12 @@ final class DryRunService
         }
         if ($type === 'wp_post') {
             $legacyType = (string) ($record['legacy_type'] ?? '');
-            if ($legacyType === 'attachment') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_MEDIA_REFERENCE'];
-            if ($legacyType === 'wp_global_styles') return ['status' => 'skipped', 'reason' => 'RETIRED_LEGACY_GARBAGE'];
-            if (!in_array($legacyType, ['nhk_article', 'post', 'page'], true)) return ['status' => 'skipped', 'reason' => 'DOMAIN_TARGETED'];
+            if ($legacyType === 'attachment') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_MEDIA_REFERENCE', 'review' => ['target_domain' => 'media_asset', 'requires_source_recovery' => true]];
+            if ($legacyType === 'wp_global_styles') return ['status' => 'skipped', 'reason' => 'RETIRED_LEGACY_GARBAGE', 'review' => ['disposition' => 'retire', 'editorial_import_forbidden' => true]];
+            if (!in_array($legacyType, ['nhk_article', 'post', 'page'], true)) {
+                $domainMap = ['nhk_brand' => 'brand', 'nhk_model' => 'model', 'nhk_variant' => 'variant', 'nhk_movement' => 'movement', 'nhk_music' => 'music', 'nhk_component' => 'component', 'nhk_classification' => 'classification', 'nhk_specimen' => 'specimen', 'nhk_product' => 'product', 'nhk_knowledge' => 'knowledge'];
+                return ['status' => 'skipped', 'reason' => 'DOMAIN_TARGETED', 'review' => ['target_domain' => $domainMap[$legacyType] ?? null, 'requires_explicit_mapping' => true, 'name_only_match_forbidden' => true]];
+            }
         }
         if ($type === 'category' && (string) ($record['taxonomy'] ?? '') !== 'category') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
         if (!in_array($type, self::SUPPORTED_TYPES, true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];

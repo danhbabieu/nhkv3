@@ -98,6 +98,27 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame(2, $report['skipped_by_reason']['UNSUPPORTED_LEGACY_TYPE']);
     }
 
+    public function test_domain_targeted_skips_include_explicit_mapping_review_metadata(): void
+    {
+        $report = (new DryRunService())->run([['type' => 'wp_post', 'stable_key' => 'wp_post:60', 'legacy_type' => 'nhk_brand', 'post_title' => 'Odo']]);
+        self::assertSame('DOMAIN_TARGETED', $report['items'][0]['reason']);
+        self::assertSame('brand', $report['items'][0]['review']['target_domain']);
+        self::assertTrue($report['items'][0]['review']['requires_explicit_mapping']);
+        self::assertTrue($report['items'][0]['review']['name_only_match_forbidden']);
+    }
+
+    public function test_attachment_and_global_style_skips_include_safe_dispositions(): void
+    {
+        $report = (new DryRunService())->run([
+            ['type' => 'wp_post', 'stable_key' => 'wp_post:31', 'legacy_type' => 'attachment'],
+            ['type' => 'wp_post', 'stable_key' => 'wp_post:6', 'legacy_type' => 'wp_global_styles'],
+        ]);
+        self::assertTrue($report['items'][0]['review']['requires_source_recovery']);
+        self::assertSame('media_asset', $report['items'][0]['review']['target_domain']);
+        self::assertSame('retire', $report['items'][1]['review']['disposition']);
+        self::assertTrue($report['items'][1]['review']['editorial_import_forbidden']);
+    }
+
     public function test_invalid_checksum_and_non_record_are_not_silently_mapped(): void
     {
         $report = (new DryRunService())->run([

@@ -4,6 +4,10 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
+Latest verification: unit 116 tests/716 assertions; guarded integration 56
+tests/396 assertions; combined 172 tests/1,112 assertions; Composer lint and
+route smoke 30/30 pass.
+
 ## What is ready
 
 - WordPress `wp_posts` remains the editorial source of truth.
