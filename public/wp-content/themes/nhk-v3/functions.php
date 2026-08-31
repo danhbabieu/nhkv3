@@ -83,6 +83,11 @@ function nhk_v3_public_archive_title(): string
     return wp_strip_all_tags(get_the_archive_title());
 }
 
+function nhk_v3_public_editorial_label(string $route): string
+{
+    return ['tri-thuc' => 'Tri thức', 'goc-chia-se' => 'Góc chia sẻ'][$route] ?? '';
+}
+
 function nhk_v3_public_url(mixed $value): string
 {
     if (!is_string($value)) return '';
@@ -143,6 +148,8 @@ function nhk_v3_document_title(string $title): string
         $term = trim((string) get_search_query());
         return $term === '' ? 'Tìm kiếm — Đồng Hồ Nhà Kho' : 'Tìm kiếm: ' . $term . ' — Đồng Hồ Nhà Kho';
     }
+    $editorialLabel = nhk_v3_public_editorial_label((string) get_query_var('nhk_editorial_route'));
+    if ($editorialLabel !== '') return $editorialLabel . ' — Đồng Hồ Nhà Kho';
     if (is_category() || is_tag() || is_author()) return nhk_v3_public_archive_title() . ' — Đồng Hồ Nhà Kho';
     if (is_front_page() || is_home()) return 'Đồng Hồ Nhà Kho — Kho tri thức và sưu tầm';
     return $title;
@@ -162,6 +169,13 @@ function nhk_v3_seo_head(): void
     if (is_search()) {
         $term = trim((string) get_search_query());
         $description = $term === '' ? 'Tìm kiếm trong kho tri thức NHK.' : 'Kết quả tìm kiếm cho ' . $term . ' trong kho tri thức NHK.';
+    }
+    $editorialRoute = (string) get_query_var('nhk_editorial_route');
+    $editorialLabel = nhk_v3_public_editorial_label($editorialRoute);
+    if ($editorialLabel !== '') {
+        $title = $editorialLabel . ' — Đồng Hồ Nhà Kho';
+        $description = 'Các bài viết trong chuyên mục ' . $editorialLabel . ' của NHK.';
+        $canonical = home_url('/' . $editorialRoute . '/');
     }
     if (is_category()) {
         $term = get_queried_object();

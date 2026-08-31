@@ -181,6 +181,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("' tháng '", $functions);
         self::assertStringContainsString('function nhk_v3_post_categories', $functions);
         self::assertStringContainsString('function nhk_v3_public_archive_title', $functions);
+        self::assertStringContainsString('function nhk_v3_public_editorial_label', $functions);
+        self::assertStringContainsString('nhk_v3_public_editorial_label($editorialRoute)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
+        self::assertStringContainsString("\$canonical = home_url('/' . \$editorialRoute . '/')", $functions);
         self::assertStringContainsString('nhk_v3_public_archive_title()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
         self::assertStringContainsString("is_category() || is_tag() || is_author()", $functions);
         self::assertStringContainsString("if (is_category())", $functions);
