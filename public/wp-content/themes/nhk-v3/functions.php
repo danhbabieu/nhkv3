@@ -17,7 +17,7 @@ add_action('wp_enqueue_scripts', 'nhk_v3_assets');
 
 function nhk_v3_nav_fallback(): void
 {
-    $items = ['Tri thức' => '/category/tri-thuc/', 'Thương hiệu' => '/brand/', 'Mẫu' => '/model/', 'Bộ máy' => '/movement/', 'Bản nhạc' => '/music/', 'So sánh' => '/comparison/', 'Linh kiện' => '/component/', 'Hiện vật' => '/specimen/', 'Video' => '/video/', 'Góc chia sẻ' => '/category/goc-chia-se/'];
+    $items = ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/brand/', 'Mẫu' => '/model/', 'Bộ máy' => '/movement/', 'Bản nhạc' => '/music/', 'So sánh' => '/comparison/', 'Linh kiện' => '/component/', 'Hiện vật' => '/specimen/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
     echo '<ul class="nav-list">';
     foreach ($items as $label => $path) printf('<li><a href="%s">%s</a></li>', esc_url(home_url($path)), esc_html($label));
     echo '</ul>';

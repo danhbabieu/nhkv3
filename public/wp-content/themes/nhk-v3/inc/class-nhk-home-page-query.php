@@ -15,7 +15,7 @@ final class NHK_V3_Home_Page_Query
             if (!$category) continue;
             $posts = $this->posts(['cat' => $category->term_id, 'posts_per_page' => 3]);
             if ($posts === []) continue;
-            $sections[] = ['label' => $label, 'slug' => $slug, 'url' => get_category_link($category), 'posts' => $posts];
+            $sections[] = ['label' => $label, 'slug' => $slug, 'url' => home_url('/' . $slug . '/'), 'posts' => $posts];
         }
         $topics = array_values(array_filter(get_categories(['hide_empty' => true, 'number' => 6, 'orderby' => 'count', 'order' => 'DESC']), static fn (WP_Term $term): bool => $term->count > 0));
         $semantic = apply_filters('nhk_v3_home_semantic_modules', ['entities' => [], 'media' => [], 'videos' => []]);
