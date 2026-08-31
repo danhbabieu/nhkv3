@@ -68,6 +68,11 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   conflicts. V2 PRIVATE media assets remain suppressed by public reads; the
   public asset route is fail-closed on visibility, MIME, storage-root,
   checksum and byte-size checks.
+- A read-only `nhk_v3` inventory now confirms the three imported MediaAsset
+  rows are PRIVATE but their absolute storage keys still point into the V2
+  upload tree; none of those source files exists under the V3 upload root, so
+  checksum and byte-size verification cannot pass. No asset was published or
+  rewritten as a workaround.
 - Migration009 preserves all 1,581 legacy semantic projections as bounded,
   non-canonical context metadata with provenance and `body_migrated=false`;
   projection bodies are rejected and no Authority, Knowledge or WordPress

@@ -68,7 +68,11 @@ through local HTTP 301 redirect behavior; one canonical entity target returned
 HTTP 200.
 The three V2 MediaAsset rows were imported with checksum, MIME, dimensions,
 field-level metadata and PRIVATE visibility; the local public API/query
-boundary therefore returns no asset delivery for those rows. Public Knowledge
+boundary therefore returns no asset delivery for those rows. A read-only
+source-file check on `nhk_v3` found all three `storage_key` values still point
+to absolute V2 paths under `/home/erourxcg/apps/NhakhoV2/` and none exists under
+the V3 upload root; consequently none has a verifiable local byte-size or
+checksum match. Public Knowledge
 REST also returns 404 for inactive PRIVATE Source/Claim identities. Nineteen Source rows and 40 citation Evidence
 rows were also imported with their V2 PRIVATE state, verification state and
 citation metadata preserved; runtime MediaAsset delivery/privacy and public
