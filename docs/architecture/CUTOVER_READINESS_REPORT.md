@@ -43,11 +43,11 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 66 tests, 190 assertions |
+| Unit tests | PASS — 67 tests, 192 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 99 tests, 404 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 100 tests, 406 assertions |
 | Frontend route/rewrite smoke | PASS for core routes, `/hello-world/` and Knowledge archive/detail; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,330 candidates, 1,643 no-write skips; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |

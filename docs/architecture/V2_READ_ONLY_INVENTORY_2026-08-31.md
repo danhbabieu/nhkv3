@@ -47,16 +47,18 @@ report was:
 | Conflicts | 0 |
 | Invalid relations | 0 |
 
-Skipped reason buckets were `DOMAIN_TARGETED` 5, `INVALID_URL_MAPPING` 23
-and `UNSUPPORTED_LEGACY_TYPE` 1,615. These are no-write
+Skipped reason buckets were `DOMAIN_TARGETED` 5,
+`UNSUPPORTED_MEDIA_REFERENCE` 21, `RETIRED_LEGACY_GARBAGE` 1,
+`INVALID_URL_MAPPING` 1 and `UNSUPPORTED_LEGACY_TYPE` 1,615. These are no-write
 reconciliation results, not approval to apply them.
 
 ## Local development apply checkpoint
 
-The governed `tools/v2-migrate.php` runner applied the Mapper 6.11 4,973-record
+The governed `tools/v2-migrate.php` runner applied the Mapper 6.12 4,973-record
 export to `nhk_v3` after the backup/restore gate. The ledger contains 2,379
 migrated records and 2,594 skipped records: `DOMAIN_TARGETED` 769,
-`INVALID_RELATION` 1, `INVALID_URL_MAPPING` 23 and
+`INVALID_RELATION` 1, `INVALID_URL_MAPPING` 1,
+`RETIRED_LEGACY_GARBAGE` 1, `UNSUPPORTED_MEDIA_REFERENCE` 21 and
 `UNSUPPORTED_LEGACY_TYPE` 1,682; conflicts were 0. The one proven identical
 URL candidate is recorded as a `READY_NOOP`; 34 `nhk_article` source paths are
 stored as native postmeta aliases, 370 Authority projection paths and 367
@@ -73,11 +75,11 @@ provenance presentation remain open reconciliation work. The V2 media usage
 inventory is exactly zero, so no usage rows require migration.
 Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
 links, all matching canonical entity UUIDs: 370 active Authority entities,
-292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.11 now
+292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.12 now
 exports the 370 Authority links, 292 active Knowledge links and 75 archived
 Knowledge links with active consolidation targets as deterministic canonical
 route targets; the remaining 5 archived/no-target Knowledge links are recorded
-as `DOMAIN_TARGETED`. The Mapper 6.11 apply rerun was idempotent with the same
+as `DOMAIN_TARGETED`. The Mapper 6.12 apply rerun was idempotent with the same
 2,379/2,594/0 counts, and the
 current ledger counts above are the accepted local-dev checkpoint.
 Subsequent runs were idempotent after the 40-row Evidence metadata backfill,

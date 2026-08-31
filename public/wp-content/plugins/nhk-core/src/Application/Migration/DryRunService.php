@@ -37,7 +37,8 @@ final class DryRunService
         if ($type === 'url') {
             if (trim((string) ($record['source_path'] ?? '')) === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
             if (trim((string) ($record['target_path'] ?? '')) !== '') return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
-            if (strtoupper((string) ($record['target_reason'] ?? '')) === 'DOMAIN_TARGETED') return ['status' => 'skipped', 'reason' => 'DOMAIN_TARGETED'];
+            $targetReason = strtoupper((string) ($record['target_reason'] ?? ''));
+            if (in_array($targetReason, ['DOMAIN_TARGETED', 'UNSUPPORTED_MEDIA_REFERENCE', 'RETIRED_LEGACY_GARBAGE'], true)) return ['status' => 'skipped', 'reason' => $targetReason];
             return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
         }
         if ($type === 'relation') {

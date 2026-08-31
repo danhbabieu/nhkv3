@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.11';
+    private const MAPPER_VERSION = '6.12';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -237,7 +237,8 @@ final class V2MigrationService
         $sourcePath = trim((string) ($record['source_path'] ?? ''));
         $targetPath = trim((string) ($record['target_path'] ?? ''));
         if ($sourcePath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no source path.');
-        if ($targetPath === '' && strtoupper((string) ($record['target_reason'] ?? '')) === 'DOMAIN_TARGETED') throw new MigrationSkip('skipped', 'DOMAIN_TARGETED', 'Legacy URL belongs to a domain without a public V3 route.');
+        $targetReason = strtoupper((string) ($record['target_reason'] ?? ''));
+        if ($targetPath === '' && in_array($targetReason, ['DOMAIN_TARGETED', 'UNSUPPORTED_MEDIA_REFERENCE', 'RETIRED_LEGACY_GARBAGE'], true)) throw new MigrationSkip('skipped', $targetReason, match ($targetReason) { 'UNSUPPORTED_MEDIA_REFERENCE' => 'Legacy attachment has no governed V3 MediaAsset target.', 'RETIRED_LEGACY_GARBAGE' => 'Legacy URL belongs to a retired non-editorial record.', default => 'Legacy URL belongs to a domain without a public V3 route.' });
         if ($targetPath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no governed V3 target path.');
         if (!str_starts_with($sourcePath, '/') || !str_starts_with($targetPath, '/') || str_contains($sourcePath, '..') || str_contains($targetPath, '..')) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL paths must be absolute local paths.');
         if ($sourcePath === $targetPath) return ['reason' => 'READY_NOOP', 'target_type' => 'wp_url', 'target_key' => $sourcePath, 'target_id' => $targetPath];

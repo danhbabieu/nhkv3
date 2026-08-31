@@ -61,10 +61,13 @@ The restored read-only V2 backup contains 800 posts, 1,301 entities, 2
 taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
 and 1,581 semantic projections. The expanded no-write dry-run processes 4,973
 records: 3,330 mapped candidates and 1,643 skipped candidates (5
-`DOMAIN_TARGETED`, 23 invalid URL maps and 1,615 unsupported legacy types).
+`DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE`, 1
+`RETIRED_LEGACY_GARBAGE`, 1 invalid URL map and 1,615 unsupported legacy
+types).
 The local-dev governed apply recorded 2,379 migrated rows and 2,594 explicit
-skips (769 domain-targeted posts, 1 invalid relation, 23 invalid URL mappings,
-1,682 unsupported legacy type) with zero conflicts. Thirty-four native-post
+skips (769 domain-targeted rows, 1 invalid relation, 21 unsupported media
+references, 1 retired legacy garbage, 1 invalid URL mapping, 1,682 unsupported
+legacy type) with zero conflicts. Thirty-four native-post
 redirects, one identical source/target URL, 370 canonical Authority entity
 redirects and 367 Knowledge claim redirects are migrated; three media assets
 were metadata-reconciled to

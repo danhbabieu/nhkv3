@@ -9,7 +9,7 @@ Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 66 tests, 190 assertions; guarded WordPress suite: 99 tests, 404 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Tests | Unit suite: 67 tests, 192 assertions; guarded WordPress suite: 100 tests, 406 assertions; plugin/theme PHP lint, route smoke and diff check pass |
 | Blockers | Visual QA (browser connector unavailable), external MCP transport, 28 residual URL candidates, MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Reconcile the 28 residual URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
@@ -244,3 +244,8 @@ Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
   `nhkv2_nhk_media_usage`; no usage rows require migration. Media parity is
   therefore recorded as usage-contract PASS, while the three imported PRIVATE
   MediaAsset rows remain gated on delivery/privacy policy approval.
+- 2026-08-31: Mapper 6.12 retained the 3,330/1,643 dry-run and 2,379/2,594/0
+  apply counts while splitting the 28 residual URL skips into 5
+  `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE`, 1
+  `RETIRED_LEGACY_GARBAGE` and 1 `INVALID_URL_MAPPING`; the full rerun stayed
+  idempotent.

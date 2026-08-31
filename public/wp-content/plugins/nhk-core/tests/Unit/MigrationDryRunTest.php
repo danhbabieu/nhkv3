@@ -44,6 +44,16 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('DOMAIN_TARGETED', $report['items'][0]['reason']);
     }
 
+    public function test_legacy_url_retirement_reasons_are_preserved(): void
+    {
+        $report = (new DryRunService())->run([
+            ['type' => 'url', 'source_path' => '/wp-content/uploads/missing.jpg', 'target_path' => '', 'target_reason' => 'UNSUPPORTED_MEDIA_REFERENCE'],
+            ['type' => 'url', 'source_path' => '/', 'target_path' => '', 'target_reason' => 'RETIRED_LEGACY_GARBAGE'],
+        ]);
+        self::assertSame(1, $report['skipped_by_reason']['UNSUPPORTED_MEDIA_REFERENCE']);
+        self::assertSame(1, $report['skipped_by_reason']['RETIRED_LEGACY_GARBAGE']);
+    }
+
     public function test_invalid_checksum_and_non_record_are_not_silently_mapped(): void
     {
         $report = (new DryRunService())->run([
