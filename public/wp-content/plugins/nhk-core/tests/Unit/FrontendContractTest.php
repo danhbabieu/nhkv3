@@ -79,5 +79,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('name="a"', $template);
         self::assertStringContainsString("home_url('/comparison/')", $home);
         self::assertStringContainsString("'/comparison/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString('nhk_core_comparison_context', $functions);
+        self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', $functions);
     }
 }

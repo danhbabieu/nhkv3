@@ -37,6 +37,7 @@ function nhk_v3_document_title(string $title): string
     $media = $GLOBALS['nhk_core_media_context'] ?? null;
     $video = $GLOBALS['nhk_core_video_context'] ?? null;
     $knowledge = $GLOBALS['nhk_core_knowledge_context'] ?? null;
+    $comparison = $GLOBALS['nhk_core_comparison_context'] ?? null;
     if (is_array($entity) && ($entity['mode'] ?? '') === 'detail' && is_array($entity['entity'] ?? null)) return (string) $entity['entity']['name'] . ' — Đồng Hồ Nhà Kho';
     if (is_array($entity) && ($entity['mode'] ?? '') === 'archive') return 'Khám phá ' . nhk_v3_entity_label((string) ($entity['type'] ?? '')) . ' — Đồng Hồ Nhà Kho';
     if (is_array($media) && ($media['mode'] ?? '') === 'detail' && is_array($media['media'] ?? null)) return (string) ($media['media']['name'] ?? 'Media') . ' — Đồng Hồ Nhà Kho';
@@ -45,6 +46,7 @@ function nhk_v3_document_title(string $title): string
     if (is_array($video) && ($video['mode'] ?? '') === 'archive') return 'Video — Đồng Hồ Nhà Kho';
     if (is_array($knowledge) && ($knowledge['mode'] ?? '') === 'detail' && is_array($knowledge['claim'] ?? null)) return (string) $knowledge['claim']['text'] . ' — Tri thức NHK';
     if (is_array($knowledge) && ($knowledge['mode'] ?? '') === 'archive') return 'Kho tri thức — Đồng Hồ Nhà Kho';
+    if (is_array($comparison) && ($comparison['mode'] ?? '') === 'compare') return 'So sánh hồ sơ — Đồng Hồ Nhà Kho';
     return $title;
 }
 add_filter('pre_get_document_title', 'nhk_v3_document_title');
@@ -56,6 +58,7 @@ function nhk_v3_seo_head(): void
     $media_context = $GLOBALS['nhk_core_media_context'] ?? null;
     $video_context = $GLOBALS['nhk_core_video_context'] ?? null;
     $knowledge_context = $GLOBALS['nhk_core_knowledge_context'] ?? null;
+    $comparison_context = $GLOBALS['nhk_core_comparison_context'] ?? null;
     $title = wp_get_document_title(); $description = get_bloginfo('description'); $canonical = '';
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
@@ -74,6 +77,7 @@ function nhk_v3_seo_head(): void
         if (($knowledge_context['mode'] ?? '') === 'detail' && is_array($knowledge_context['claim'] ?? null)) { $claim = $knowledge_context['claim']; $title = (string) $claim['text'] . ' — Tri thức NHK'; $description = 'Knowledge claim canonical được kiểm soát trong kho NHK.'; $canonical = home_url('/knowledge/claim/' . rawurlencode((string) ($claim['id'] ?? '')) . '/'); }
         elseif (($knowledge_context['mode'] ?? '') === 'archive') { $title = 'Kho tri thức — Đồng Hồ Nhà Kho'; $description = 'Các atomic claim canonical đang hoạt động trong kho NHK.'; $canonical = home_url('/knowledge/'); }
     }
+    if (is_array($comparison_context) && ($comparison_context['mode'] ?? '') === 'compare') { $title = 'So sánh hồ sơ — Đồng Hồ Nhà Kho'; $description = 'Đọc cạnh nhau các dữ kiện semantic công khai của hai hồ sơ canonical NHK.'; $canonical = home_url('/comparison/'); }
     if ($canonical === '') { $canonical = function_exists('wp_get_canonical_url') ? (string) wp_get_canonical_url() : home_url(add_query_arg([])); if ($canonical === '') $canonical = home_url('/'); }
     echo '<meta name="description" content="' . esc_attr(wp_strip_all_tags($description)) . '">' . "\n";
     echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
@@ -85,6 +89,7 @@ function nhk_v3_seo_head(): void
     if (is_array($media_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Thư viện media', 'item' => home_url('/thu-vien/')];
     if (is_array($video_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Video', 'item' => home_url('/video/')];
     if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/knowledge/')];
+    if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/comparison/')];
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'VideoObject', 'name' => (string) (($video['title'] ?? '') ?: 'Video NHK'), 'url' => $canonical, 'embedUrl' => strtolower((string) ($video['platform'] ?? '')) === 'youtube' ? 'https://www.youtube-nocookie.com/embed/' . (string) ($video['external_id'] ?? '') : null, 'contentUrl' => (string) ($video['url'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; }

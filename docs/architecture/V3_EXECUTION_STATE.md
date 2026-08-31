@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, discovery comparison checkpoint.
+Last updated: 2026-08-31, discovery comparison runtime checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, discovery comparison checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 77 tests, 235 assertions; guarded WordPress suite: 109 tests, 444 assertions (last complete DB-backed run); plugin/theme PHP lint and diff check pass; last successful route smoke was 20/20, while the current rerun is blocked by stopped local MySQL/Apache |
+| Tests | Unit suite: 77 tests, 237 assertions; guarded WordPress suite: 113 tests, 462 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
 | Blockers | Responsive/tablet/mobile visual QA, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP interoperability checks |
@@ -345,5 +345,14 @@ Last updated: 2026-08-31, discovery comparison checkpoint.
   completed as a read-only Authority comparison route. It accepts two
   `type/stable-key` references, resolves only active canonical entities through
   `EntityPageQuery`, and renders semantic payload facts without a duplicate
-  persistence model. Unit evidence is 77 tests/235 assertions; runtime route
-  verification remains blocked by stopped MySQL/Apache.
+  persistence model. Unit evidence is 77 tests/237 assertions; local runtime
+  verification is now available.
+- 2026-08-31: Browser QA of `/comparison/` found its semantic UI healthy but
+  its document metadata inherited the site default. Theme SEO now emits a
+  dedicated comparison title, description, canonical `/comparison/` and
+  breadcrumb; the correction is covered by the frontend contract test.
+- 2026-08-31: Local runtime verification passed the new discovery surfaces:
+  `/comparison/` returns 200 with its dedicated title; `/odo/` and
+  `/odo/odo-39/` return 301 to canonical Brand/Model stable-key routes; and
+  `/tim-kiem/?q=Odo` returns 301 to `/?s=Odo`. The guarded suite passes 113
+  tests/462 assertions and route smoke passes 20/20.

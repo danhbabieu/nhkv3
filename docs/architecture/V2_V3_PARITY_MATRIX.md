@@ -33,7 +33,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Homepage | Pending read-only audit | Editorial discovery homepage | Real query services; no public fixtures or fake metrics | NO |
 | Header / footer / navigation | Pending audit | NHK responsive shell | Domain language for visitors; keyboard/mobile usable | NO |
 | Search / empty search | Pending audit | Unified semantic search | Posts plus canonical entities, media, videos and knowledge | PARTIAL |
-| Comparison | V2 navigation contract / behavior reconciliation pending | Read-only `/comparison/` over two active Authority references | Native Authority query boundary; no duplicate comparison persistence or editorial body projection | PARTIAL |
+| Comparison | V2 navigation contract / behavior reconciliation pending | Read-only `/comparison/` over two active Authority references | Native Authority query boundary; no duplicate comparison persistence or editorial body projection | PARTIAL — HTTP 200 and desktop visual smoke pass |
 | Post / Tri thức / Góc chia sẻ | Pending audit | Native WordPress editorial routes | Post single now enriches from Graph-derived entities, articles, Media and Video without body duplication; desktop Post smoke passes | PARTIAL |
 | Brand / Model / Movement / Music / Component | Pending audit | Domain-specific archive/single pages | Graph-backed sections and pagination; Authority archive type/title/link boundary verified on desktop | PARTIAL |
 | Specimen / Product | Pending audit | Separate physical-object/listing pages | Explicit identity distinction | PARTIAL |
