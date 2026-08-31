@@ -156,6 +156,12 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - Browser runtime also confirms the homepage canonical resolves to `/` rather
   than an editorial post URL; search and custom archive page-two states emit
   one consolidated `robots` directive.
+- A fresh desktop browser sweep covered 14 public routes (editorial archives,
+  all exposed Authority archives, Comparison, Knowledge, Media, Video and 404):
+  every route had an expected H1/title, matched the viewport width without
+  overflow, and contained no internal Authority/Proposal/MediaAsset wording.
+  Video correctly remained an empty state because no active Video record exists;
+  this does not close the active-Video detail screenshot gate.
 
 ## Quality evidence
 

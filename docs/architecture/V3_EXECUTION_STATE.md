@@ -19,6 +19,13 @@ Last updated: 2026-09-01, P11 normalized provenance-state checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Browser runtime sweep inspected 14 public routes at the active
+  desktop viewport, including homepage, editorial archives, all currently
+  exposed Authority archives, Comparison, Knowledge, Media, Video and 404.
+  Each route produced the expected H1/title, had no horizontal overflow, and
+  exposed no internal Authority/Proposal/MediaAsset terminology; Video remains
+  an honest empty state because no active Video is available.
+
 - 2026-09-01: Source migration now resolves normalized `source_type` from
   top-level or metadata fields after legacy-type fallback, preserving the
   canonical V3 vocabulary across exporter shapes. Full guarded PHPUnit passed
