@@ -119,8 +119,10 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
    `RETIRED_LEGACY_GARBAGE`), MediaAsset
    delivery/privacy policy,
    Source/Evidence public visibility and the 764
-   domain-targeted custom/system posts; each requires a governed target or a
-   documented retirement/skip decision.
+   domain-targeted custom/system posts; the new `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md`
+   breaks these into 742 domain records, 21 attachments and one global-styles
+   record. Each requires a deterministic governed target or a documented
+   retirement/skip decision.
 2. Review the local-dev ledger counts, verify all imported semantic fields and
    relation semantics, and obtain explicit approval before any live V2
    migration. The versioned normalize/export/apply chain is evidence, not

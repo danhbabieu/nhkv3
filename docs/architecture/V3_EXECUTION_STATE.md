@@ -12,7 +12,7 @@ Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
 | Tests | Unit suite: 87 tests, 451 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 131 tests, 798 assertions; plugin/theme PHP lint and diff check pass; route smoke was blocked by the local HTTP listener being unavailable to the shell while browser runtime QA remained available |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
+| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,960 rows and skipped 1,013 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 3,960 candidates and 1,013 skipped; projection contexts account for 1,581 newly mapped records; remaining skips are reason-coded and no conflicts were reported |
@@ -33,6 +33,13 @@ Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
   absolute upload tree. None of the three source files is present under the V3
   upload root, so checksum/byte verification cannot pass and public delivery
   remains correctly fail-closed; no database or file state was changed.
+
+- 2026-08-31: Added `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md`, a read-only
+  breakdown of all 764 skipped V2 WordPress records: 742 domain records, 21
+  attachments and one global-styles record. The restored export lacks a
+  deterministic legacy-post-to-semantic-ID field, so name/slug joins remain
+  prohibited; governed target mappings or retirement decisions are still
+  required before redirects or body migration.
 
 - 2026-08-31: Preflight completed. HEAD `2247c87`; existing governance edits
   preserved. Governance documents being bootstrapped.
