@@ -58,7 +58,7 @@ final class RelatedContentQuery
             if (!$entity || !$entity->active()) return null;
             return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity)]];
         }
-        if ($node->endpoint_type === 'media') { $media = $this->media->findByCanonicalId($node->endpoint_key); return $media && $media->active ? ['group' => 'media', 'value' => $this->mediaValue($media)] : null; }
+        if ($node->endpoint_type === 'media') { $media = $this->media->findByCanonicalId($node->endpoint_key); return $media && $media->active && $media->readiness === 'ready' ? ['group' => 'media', 'value' => $this->mediaValue($media)] : null; }
         if ($node->endpoint_type === 'video') { $video = $this->videos->findByCanonicalId($node->endpoint_key); return $video && $video->active ? ['group' => 'videos', 'value' => $this->videoValue($video)] : null; }
         if ($node->endpoint_type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $node->endpoint_key, $match) === 1 && function_exists('get_post')) {
             $post = get_post((int) $match[1]);

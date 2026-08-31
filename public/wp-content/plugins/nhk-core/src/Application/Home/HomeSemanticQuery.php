@@ -26,7 +26,7 @@ final class HomeSemanticQuery
         }
         if ($this->ready('media')) {
             foreach ($this->media->list() as $item) {
-                if (!$item->active) continue;
+                if (!$item->active || $item->readiness !== 'ready') continue;
                 $modules['media'][] = ['id' => $item->canonicalId, 'title' => $item->canonicalName, 'url' => home_url('/media/' . rawurlencode($item->canonicalId) . '/')];
                 if (count($modules['media']) >= 4) break;
             }

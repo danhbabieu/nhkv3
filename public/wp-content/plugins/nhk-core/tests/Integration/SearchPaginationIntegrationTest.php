@@ -50,6 +50,7 @@ final class SearchPaginationIntegrationTest extends TestCase
         $suffix = bin2hex(random_bytes(5));
         $term = 'retiredvisibility' . $suffix;
         $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'search-retired-media-' . $suffix, $term . ' media', 'ready', [], false));
+        $draftMedia = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'search-draft-media-' . $suffix, $term . ' draft media', 'draft'));
         $video = (new WpdbVideoRepository($wpdb))->create(new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', $term . ' video', [], null, false));
         try {
             $request = new \WP_REST_Request('GET', '/nhk/v1/search');
@@ -61,6 +62,7 @@ final class SearchPaginationIntegrationTest extends TestCase
             self::assertSame(0, $data['semantic_totals']['videos']);
         } finally {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($draftMedia->canonicalId)));
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s", UuidCodec::toBinary($video->canonicalId)));
         }
     }

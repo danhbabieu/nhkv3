@@ -30,6 +30,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - Public Authority Entity REST and theme query responses allowlist payload
   fields from the registered canonical type definition, filtering
   unregistered legacy/internal keys.
+- Public Media discovery now requires both active state and `readiness=ready`
+  across REST, theme, homepage, search and Graph-related paths; active draft
+  records remain available only to internal governance/MCP reads.
 - Public Knowledge REST/theme payloads omit persisted Source/Evidence metadata
   blobs while retaining reader-facing provenance fields; internal MCP reads
   retain full metadata for governed review.
@@ -127,11 +130,11 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 100 tests, 557 assertions |
+| Unit tests | PASS — 101 tests, 562 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --configuration phpunit.xml.dist`; 46 tests, 358 assertions; combined current suite is 146 tests, 915 assertions; governed MCP Media/Video/Knowledge/Source/Evidence ingest lifecycles, Entity/Media/Video REST reads, Streamable HTTP Accept validation and bounded readiness-filtered REST/MCP semantic search pagination are included |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --configuration phpunit.xml.dist`; 46 tests, 358 assertions; combined current suite is 147 tests, 920 assertions; governed MCP Media/Video/Knowledge/Source/Evidence ingest lifecycles, Entity/Media/Video REST reads, readiness-gated Media discovery, Streamable HTTP Accept validation and bounded readiness-filtered REST/MCP semantic search pagination are included |
 | Frontend route/rewrite smoke | PASS 29/29 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, semantic search page 2, editorial/Knowledge/Media/Video archive page-two routes, native sitemap/RSS payload markers, V2 query-preserving search redirect and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects and comparison title/canonical metadata |
 | REST/MCP runtime boundary | PASS — active-only Entity/Media/Knowledge/Search reads returned 200, semantic Search/MCP groups are bounded per page with totals, retired Authority records are suppressed, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, raw localhost MCP probes returned `200 application/json` for modern `tools/list` with 16 protocol definitions (10 governed) and `nhk.search` page 2 with five items per group plus totals, unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
 | Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 plus mobile homepage/editorial archive/Post/Authority detail/Media detail were visually inspected; this checkpoint additionally inspected `/comparison/`, active Odo Brand/Model detail and nine remaining archive/detail/alias routes at 390px, including payload-language leakage and overflow checks; a 41-check browser sweep across page, archive pagination, entity routes and empty/404 states at 390px/768px passes without horizontal overflow, the menu exposes all ten links with synchronized ARIA state, pagination exposes `aria-current="page"` on the active link, and public Knowledge evidence presents the approved source title/type with inactive sources filtered; public templates plus entity payload presentation are contract-tested to avoid internal domain terminology; a read-only local query confirms no active Video row exists for detail inspection, so active Video detail remains pending |

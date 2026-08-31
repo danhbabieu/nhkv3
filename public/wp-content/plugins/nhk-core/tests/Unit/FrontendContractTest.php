@@ -203,8 +203,21 @@ final class FrontendContractTest extends TestCase
     public function test_public_search_filters_retired_media_and_video(): void
     {
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
-        self::assertStringContainsString('fn (Media $item): bool => $item->active &&', $searchApi);
+        self::assertStringContainsString('fn (Media $item): bool => $item->active && $item->readiness === \'ready\' &&', $searchApi);
         self::assertStringContainsString('fn (Video $item): bool => $item->active &&', $searchApi);
+    }
+
+    public function test_public_media_readiness_gate_covers_all_discovery_boundaries(): void
+    {
+        foreach ([
+            dirname(__DIR__, 2) . '/src/Application/Home/HomeSemanticQuery.php' => '!$item->active || $item->readiness !== \'ready\'',
+            dirname(__DIR__, 2) . '/src/Application/Search/SearchSemanticQuery.php' => '$item->active && $item->readiness === \'ready\' &&',
+            dirname(__DIR__, 2) . '/src/Application/Entity/RelatedContentQuery.php' => '$media->active && $media->readiness === \'ready\'',
+            dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php' => '!$media->active || $media->readiness !== \'ready\'',
+            dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php' => '!$media->active || $media->readiness !== \'ready\'',
+        ] as $file => $needle) {
+            self::assertStringContainsString($needle, (string) file_get_contents($file), $file . ' must apply the public Media readiness boundary');
+        }
     }
 
     public function test_post_template_uses_graph_related_query_boundary(): void

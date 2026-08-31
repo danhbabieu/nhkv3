@@ -17,12 +17,14 @@ final class MediaVideoPageQueryTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $retiredMedia = new Media(UuidCodec::newV7(), 'retired', 'Retired', 'ready', [], false);
+        $draftMedia = new Media(UuidCodec::newV7(), 'draft', 'Draft', 'draft');
         $activeMedia = new Media($mediaId, 'active', 'Active', 'ready');
         $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Reference');
         $retiredVideo = new Video(UuidCodec::newV7(), 'youtube', '9bZkp7q19f0', 'https://www.youtube.com/watch?v=9bZkp7q19f0', 'Retired', [], null, false);
-        $query = $this->query([$retiredMedia, $activeMedia], [$video, $retiredVideo]);
+        $query = $this->query([$retiredMedia, $draftMedia, $activeMedia], [$video, $retiredVideo]);
 
         self::assertSame(['active'], array_column($query->mediaArchive(1, 10)['items'], 'stable_key'));
+        self::assertNull($query->mediaDetail($draftMedia->canonicalId));
         self::assertSame([$video->canonicalId], array_column($query->videoArchive(1, 10)['items'], 'id'));
     }
 
