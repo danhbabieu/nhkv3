@@ -44,6 +44,15 @@ function nhk_v3_public_type(string $type): string
     return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng', 'publication' => 'ấn phẩm', 'website' => 'website', 'archive' => 'lưu trữ', 'catalog' => 'catalogue', 'interview' => 'phỏng vấn', 'fact' => 'dữ kiện', 'technical' => 'kỹ thuật', 'specification' => 'thông số'][$type] ?? 'nội dung liên quan';
 }
 
+function nhk_v3_public_url(mixed $value): string
+{
+    if (!is_string($value)) return '';
+    $url = trim($value);
+    if ($url === '' || $url === '#') return '';
+    $validated = wp_http_validate_url($url);
+    return is_string($validated) ? $validated : '';
+}
+
 function nhk_v3_public_value(mixed $value): string
 {
     $text = is_scalar($value) ? (string) $value : (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE);

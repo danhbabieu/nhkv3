@@ -198,9 +198,11 @@ final class FrontendContractTest extends TestCase
         foreach (['entity.php', 'single.php', 'video.php'] as $template) {
             $contents = (string) file_get_contents($theme . '/' . $template);
             self::assertStringNotContainsString("?? '#'", $contents, $template . ' must not render placeholder links');
-            self::assertStringContainsString("!empty($", $contents, $template . ' must guard optional URLs');
+            self::assertStringContainsString('nhk_v3_public_url', $contents, $template . ' must guard optional URLs');
         }
         self::assertStringContainsString("if (\$url === '') continue", (string) file_get_contents($theme . '/index.php'));
+        self::assertStringContainsString('function nhk_v3_public_url', (string) file_get_contents($theme . '/functions.php'));
+        self::assertStringContainsString('nhk_v3_public_url($item[\'locator\']', (string) file_get_contents($theme . '/knowledge.php'));
     }
 
     public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
