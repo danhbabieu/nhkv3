@@ -1,11 +1,11 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Admin governed proposal composer checkpoint pushed.
+Last updated: 2026-08-31, Cutover Readiness audit checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `16ea31a` |
+| Branch / HEAD | `main` / `86e5838` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
@@ -123,3 +123,6 @@ Last updated: 2026-08-31, Admin governed proposal composer checkpoint pushed.
   browser smoke, V2 inventory, backup/restore, URL reconciliation and
   external MCP transport gates. Decision is NOT READY; production cutover was
   not performed.
+- 2026-08-31: Cutover Readiness Report checkpoint `86e5838` is pushed to
+  `origin/main`. The repository is clean and remains explicitly pre-cutover;
+  external/runtime gates are documented rather than inferred as passed.
