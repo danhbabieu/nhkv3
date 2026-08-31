@@ -23,6 +23,61 @@ final class MediaService
         return $this->media->create(new Media(UuidCodec::newV7(), $stableKey, $name, $readiness, $provenance));
     }
 
+    /**
+     * Ingest a complete Media semantic packet under the caller's transaction.
+     * Binary delivery remains a separate, fail-closed concern; assets default
+     * to PRIVATE until an explicit publication policy makes them public.
+     *
+     * @param list<array<string,mixed>> $assetSpecs
+     * @param list<array<string,mixed>> $usageSpecs
+     */
+    public function ingest(string $stableKey, string $name, string $readiness = 'draft', array $provenance = [], array $assetSpecs = [], array $usageSpecs = []): Media
+    {
+        $media = $this->create($stableKey, $name, $readiness, $provenance);
+        $existingAssets = $this->assets->listByMediaId($media->canonicalId);
+        foreach ($assetSpecs as $spec) {
+            $candidate = new MediaAsset(
+                UuidCodec::newV7(),
+                $media->canonicalId,
+                (string) ($spec['kind'] ?? 'original'),
+                (string) ($spec['storage_key'] ?? ''),
+                (string) ($spec['checksum'] ?? ''),
+                (string) ($spec['mime_type'] ?? ''),
+                (int) ($spec['byte_size'] ?? 0),
+                isset($spec['width']) ? (int) $spec['width'] : null,
+                isset($spec['height']) ? (int) $spec['height'] : null,
+                strtoupper((string) ($spec['visibility'] ?? 'PRIVATE')),
+                is_array($spec['metadata'] ?? null) ? $spec['metadata'] : [],
+            );
+            $existing = null;
+            foreach ($existingAssets as $asset) if ($asset->storageKey === $candidate->storageKey) { $existing = $asset; break; }
+            if ($existing !== null) {
+                if (!$this->sameAsset($existing, $candidate)) throw new MediaException('Media asset storage key is already bound to different content.');
+                continue;
+            }
+            $existingAssets[] = $this->assets->create($candidate);
+        }
+        $existingUsages = $this->usages->listByMediaId($media->canonicalId);
+        foreach ($usageSpecs as $spec) {
+            $candidate = new MediaUsage(
+                UuidCodec::newV7(),
+                $media->canonicalId,
+                (string) ($spec['endpoint_type'] ?? ''),
+                (string) ($spec['endpoint_key'] ?? ''),
+                (string) ($spec['role'] ?? ''),
+                (int) ($spec['sort_order'] ?? 0),
+            );
+            $existing = null;
+            foreach ($existingUsages as $usage) if ($usage->endpointType === $candidate->endpointType && $usage->endpointKey === $candidate->endpointKey && $usage->role === $candidate->role) { $existing = $usage; break; }
+            if ($existing !== null) {
+                if ($existing->sortOrder !== $candidate->sortOrder) throw new MediaException('Media usage is already bound to a different sort order.');
+                continue;
+            }
+            $existingUsages[] = $this->usages->create($candidate);
+        }
+        return $media;
+    }
+
     public function update(string $id, string $name, string $readiness, array $provenance, int $revision): Media
     {
         $current = $this->media->findByCanonicalId($id);
@@ -56,6 +111,18 @@ final class MediaService
     public function assets(string $mediaId): array { return $this->assets->listByMediaId($mediaId); }
     /** @return list<MediaUsage> */
     public function usages(string $mediaId, ?string $role = null): array { return $this->usages->listByMediaId($mediaId, $role); }
+
+    private function sameAsset(MediaAsset $left, MediaAsset $right): bool
+    {
+        return $left->kind === $right->kind
+            && $left->checksum === $right->checksum
+            && $left->mimeType === $right->mimeType
+            && $left->byteSize === $right->byteSize
+            && $left->width === $right->width
+            && $left->height === $right->height
+            && $left->visibility === $right->visibility
+            && $left->metadata === $right->metadata;
+    }
 
     private function changeState(string $id, int $revision, bool $active): Media
     {

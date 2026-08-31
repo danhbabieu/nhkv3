@@ -71,6 +71,7 @@ final class McpTransport
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
         $capability = match ($name) {
             'nhk.proposal.create' => 'nhk_create_proposals',
+            'nhk.media.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
@@ -82,6 +83,7 @@ final class McpTransport
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
+            'nhk.media.ingest' => $this->mediaIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
             'nhk.proposal.create' => $this->proposal($this->governance->createFromArguments($arguments)),
@@ -118,6 +120,22 @@ final class McpTransport
         $value = trim((string) ($arguments[$key] ?? ''));
         if ($value === '') throw new \InvalidArgumentException('Missing required argument: ' . $key . '.');
         return $value;
+    }
+
+    private function mediaIngest(array $arguments): array
+    {
+        $mediaArguments = $arguments;
+        $mediaArguments['operation'] = 'ingest';
+        $mediaArguments['entity_type'] = 'media';
+        $mediaArguments['payload'] = [
+            'stable_key' => (string) ($arguments['stable_key'] ?? ''),
+            'name' => (string) ($arguments['name'] ?? ''),
+            'readiness' => (string) ($arguments['readiness'] ?? 'draft'),
+            'provenance' => is_array($arguments['provenance'] ?? null) ? $arguments['provenance'] : [],
+            'assets' => is_array($arguments['assets'] ?? null) ? $arguments['assets'] : [],
+            'usages' => is_array($arguments['usages'] ?? null) ? $arguments['usages'] : [],
+        ];
+        return $this->proposal($this->governance->createFromArguments($mediaArguments));
     }
 
     private function proposal(\NHK\Core\Domain\Governance\Proposal $proposal): array

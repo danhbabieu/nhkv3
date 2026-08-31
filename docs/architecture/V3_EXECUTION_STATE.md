@@ -9,7 +9,7 @@ Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 82 tests, 277 assertions; guarded WordPress integration: 38 tests, 235 assertions; combined current suite: 120 tests, 512 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
+| Tests | Unit suite: 82 tests, 286 assertions; guarded WordPress integration: 40 tests, 257 assertions; combined current suite: 122 tests, 543 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -431,3 +431,10 @@ Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
   expose form context through labelled/described regions. A source-level
   accessibility contract test covers the associations; the unit suite is now
   82 tests/277 assertions.
+- 2026-08-31: MCP now exposes governed `nhk.media.ingest`. The tool converts
+  a complete Media packet (identity, provenance, assets and usages) into a
+  Governance proposal; controlled apply uses the MediaService transaction
+  boundary and defaults ingested assets to PRIVATE. End-to-end integration
+  coverage passes create → submit → approve → apply with the asset still
+  private; current evidence is 82 unit tests/286 assertions and 40 integration
+  tests/257 assertions.

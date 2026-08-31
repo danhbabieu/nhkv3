@@ -8,6 +8,7 @@ use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Domain\Governance\Proposal;
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Governance\{WpdbAuditSink, WpdbProposalRepository};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -51,7 +52,15 @@ final class GovernanceApi
             $id = UuidCodec::newV7();
             $operation = (string) ($body['operation'] ?? ''); $entityType = (string) ($body['entity_type'] ?? ''); $subjectId = (string) ($body['subject_id'] ?? '');
             if ($subjectId === '' && in_array($operation, ['create', 'ingest', 'relation_create'], true)) $subjectId = $entityType !== '' ? $entityType : 'relation';
-            $proposal = new Proposal($id, $subjectId, $operation, is_array($body['payload'] ?? null) ? $body['payload'] : [], (string) ($body['content_fingerprint'] ?? ''), max(1, (int) ($body['expected_revision'] ?? 1)), (string) ($body['dependency_fingerprint'] ?? ''), actor: (string) get_current_user_id(), idempotencyKey: (string) ($body['idempotency_key'] ?? ''), targetUuid: isset($body['target_uuid']) ? (string) $body['target_uuid'] : null, entityType: $entityType);
+            $payload = is_array($body['payload'] ?? null) ? $body['payload'] : [];
+            $expectedRevision = max(1, (int) ($body['expected_revision'] ?? 1));
+            $targetUuid = isset($body['target_uuid']) ? (string) $body['target_uuid'] : null;
+            $dependencyIds = is_array($body['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $body['dependency_ids']))) : [];
+            $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencyIds];
+            $contentFingerprint = trim((string) ($body['content_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($binding));
+            $dependencyFingerprint = trim((string) ($body['dependency_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds));
+            $idempotencyKey = trim((string) ($body['idempotency_key'] ?? '')) ?: 'rest-' . hash('sha256', CommandCanonicalizer::canonicalize($binding));
+            $proposal = new Proposal($id, $subjectId, $operation, $payload, $contentFingerprint, $expectedRevision, $dependencyFingerprint, actor: (string) get_current_user_id(), idempotencyKey: $idempotencyKey, targetUuid: $targetUuid, entityType: $entityType);
             return $this->serialize($this->governance->create($proposal));
         } catch (\Throwable $error) { return $this->error($error); }
     }

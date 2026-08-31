@@ -5,17 +5,31 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Application\Media\MediaService;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Graph\GraphEdge;
 use NHK\Core\Domain\Graph\NodeReference;
+use NHK\Core\Domain\Media\Media;
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media
     {
+        if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
+            if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
+            $payload = $proposal->payload;
+            return $this->media->ingest(
+                (string) ($payload['stable_key'] ?? ''),
+                (string) ($payload['name'] ?? ''),
+                (string) ($payload['readiness'] ?? 'draft'),
+                is_array($payload['provenance'] ?? null) ? $payload['provenance'] : [],
+                is_array($payload['assets'] ?? null) ? $payload['assets'] : [],
+                is_array($payload['usages'] ?? null) ? $payload['usages'] : [],
+            );
+        }
         if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
             return $this->relation($proposal);
         }

@@ -3,15 +3,20 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Governance\AuthorityProposalExecutor;
 use NHK\Core\Application\Media\MediaService;
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
+use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Infrastructure\Graph\{MediaEndpointResolver, VideoEndpointResolver};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
 final class P6PersistenceTest extends TestCase
@@ -48,6 +53,36 @@ final class P6PersistenceTest extends TestCase
         self::assertSame($created->canonicalId, $usage->mediaId);
         self::assertCount(1, $service->assets($created->canonicalId));
         self::assertCount(1, $service->usages($created->canonicalId));
+
+        $packet = [
+            ['kind' => 'original', 'storage_key' => 'uploads/fast-media.jpg', 'checksum' => hash('sha256', 'fast-media'), 'mime_type' => 'image/jpeg', 'byte_size' => 9, 'width' => 900, 'height' => 600, 'metadata' => ['source' => 'mcp']],
+        ];
+        $fast = $service->ingest('fast-media', 'Fast Media', 'draft', ['source' => 'mcp'], $packet, [['endpoint_type' => 'wp_post', 'endpoint_key' => '1:42', 'role' => 'gallery']]);
+        $sameFast = $service->ingest('fast-media', 'Fast Media', 'draft', ['source' => 'mcp'], $packet, [['endpoint_type' => 'wp_post', 'endpoint_key' => '1:42', 'role' => 'gallery']]);
+        self::assertSame($fast->canonicalId, $sameFast->canonicalId);
+        self::assertCount(1, $service->assets($fast->canonicalId));
+        self::assertSame('PRIVATE', $service->assets($fast->canonicalId)[0]->visibility);
+        self::assertCount(1, $service->usages($fast->canonicalId));
+
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), $types), null, $service);
+        $executed = $executor(new Proposal(
+            id: 'media-ingest-1',
+            subjectId: 'media',
+            operation: 'ingest',
+            payload: ['stable_key' => 'executor-media', 'name' => 'Executor Media', 'assets' => $packet],
+            contentFingerprint: 'content',
+            expectedRevision: 1,
+            dependencyFingerprint: 'deps',
+            state: \NHK\Core\Domain\Governance\ProposalState::APPROVED,
+            actor: '1',
+            decisionActor: '2',
+            idempotencyKey: 'idem-media',
+            entityType: 'media',
+        ));
+        self::assertInstanceOf(Media::class, $executed);
+        self::assertCount(1, $service->assets($executed->canonicalId));
     }
 
     public function test_video_service_deduplicates_external_reference_without_merging_identity(): void

@@ -7,6 +7,7 @@ use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Domain\Governance\Proposal;
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class McpGovernanceHandler
@@ -20,17 +21,25 @@ final class McpGovernanceHandler
         $entityType = (string) ($arguments['entity_type'] ?? '');
         $subjectId = (string) ($arguments['subject_id'] ?? '');
         if ($subjectId === '' && in_array($operation, ['create', 'ingest', 'relation_create'], true)) $subjectId = $entityType !== '' ? $entityType : 'relation';
+        $payload = is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [];
+        $expectedRevision = max(1, (int) ($arguments['expected_revision'] ?? 1));
+        $targetUuid = isset($arguments['target_uuid']) ? (string) $arguments['target_uuid'] : null;
+        $dependencyIds = is_array($arguments['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $arguments['dependency_ids']))) : [];
+        $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencyIds];
+        $contentFingerprint = trim((string) ($arguments['content_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($binding));
+        $dependencyFingerprint = trim((string) ($arguments['dependency_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds));
+        $idempotencyKey = trim((string) ($arguments['idempotency_key'] ?? '')) ?: 'mcp-' . hash('sha256', CommandCanonicalizer::canonicalize($binding));
         return $this->create(new Proposal(
             UuidCodec::newV7(),
             $subjectId,
             $operation,
-            is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [],
-            (string) ($arguments['content_fingerprint'] ?? ''),
-            max(1, (int) ($arguments['expected_revision'] ?? 1)),
-            (string) ($arguments['dependency_fingerprint'] ?? ''),
+            $payload,
+            $contentFingerprint,
+            $expectedRevision,
+            $dependencyFingerprint,
             actor: function_exists('get_current_user_id') ? (string) get_current_user_id() : '0',
-            idempotencyKey: (string) ($arguments['idempotency_key'] ?? ''),
-            targetUuid: isset($arguments['target_uuid']) ? (string) $arguments['target_uuid'] : null,
+            idempotencyKey: $idempotencyKey,
+            targetUuid: $targetUuid,
             entityType: $entityType,
         ));
     }
