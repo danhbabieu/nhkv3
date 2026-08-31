@@ -107,6 +107,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('renderMigrationLedgerSummary', $admin);
         self::assertStringContainsString('nhk_migration_ledger', $admin);
         self::assertStringContainsString('reason_code', $admin);
+        self::assertStringContainsString('details_json', $admin);
+        self::assertStringContainsString('Explicit mapping required', $admin);
+        self::assertStringContainsString('Review action', $admin);
         foreach (['aria-labelledby="nhk-entity-lookup-heading"', 'for="nhk-entity-type"', 'for="nhk-entity-key"', 'for="nhk-proposal-id"', 'aria-describedby="nhk-proposal-composer-help"', 'id="nhk-source-key"', 'id="nhk-target-key"', 'for="nhk-semantic-id"', 'id="nhk-graph-endpoint-key"', 'id="nhk-video-url"', 'value="video"', 'value="knowledge"', 'value="source"', 'value="evidence"', 'aria-live="polite"'] as $contract) {
             self::assertStringContainsString($contract, $admin);
         }

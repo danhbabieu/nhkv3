@@ -42,15 +42,24 @@ final class AdminPage
             echo '<p class="notice notice-warning">Migration ledger chưa sẵn sàng.</p>';
             return;
         }
-        $rows = $wpdb->get_results("SELECT source_type,status,COALESCE(reason_code,'') AS reason_code,COUNT(*) AS record_count FROM {$table} GROUP BY source_type,status,reason_code ORDER BY source_type,status,reason_code", ARRAY_A);
-        echo '<h2 id="nhk-migration-ledger-heading">Migration ledger summary</h2><p id="nhk-migration-ledger-help">Tổng hợp read-only theo loại nguồn, trạng thái và reason code; mọi bản ghi skipped/conflict vẫn cần quyết định được quản trị.</p>';
-        if (!is_array($rows) || $rows === []) {
+        $ledgerRows = $wpdb->get_results("SELECT source_type,status,COALESCE(reason_code,'') AS reason_code,details_json FROM {$table} ORDER BY source_type,status,reason_code,id", ARRAY_A);
+        echo '<h2 id="nhk-migration-ledger-heading">Migration ledger summary</h2><p id="nhk-migration-ledger-help">Tổng hợp read-only theo loại nguồn, trạng thái, reason code và hành động review; mọi bản ghi skipped/conflict vẫn cần quyết định được quản trị.</p>';
+        if (!is_array($ledgerRows) || $ledgerRows === []) {
             echo '<p class="notice notice-info">Chưa có bản ghi migration ledger.</p>';
             return;
         }
-        echo '<table class="widefat striped" aria-labelledby="nhk-migration-ledger-heading" aria-describedby="nhk-migration-ledger-help"><thead><tr><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Reason code</th><th scope="col">Records</th></tr></thead><tbody>';
+        $rows = [];
+        foreach ($ledgerRows as $row) {
+            $details = json_decode((string) ($row['details_json'] ?? ''), true);
+            $review = is_array($details) && is_array($details['review'] ?? null) ? $details['review'] : [];
+            $action = isset($review['requires_explicit_mapping']) ? 'Explicit mapping required' : (isset($review['requires_source_recovery']) ? 'Source recovery required' : (($review['disposition'] ?? '') === 'retire' ? 'Retire; no editorial import' : 'Not classified'));
+            $key = implode("\0", [(string) ($row['source_type'] ?? ''), (string) ($row['status'] ?? ''), (string) ($row['reason_code'] ?? ''), $action]);
+            if (!isset($rows[$key])) $rows[$key] = ['source_type' => (string) ($row['source_type'] ?? ''), 'status' => (string) ($row['status'] ?? ''), 'reason_code' => (string) ($row['reason_code'] ?? ''), 'review_action' => $action, 'record_count' => 0];
+            $rows[$key]['record_count']++;
+        }
+        echo '<table class="widefat striped" aria-labelledby="nhk-migration-ledger-heading" aria-describedby="nhk-migration-ledger-help"><thead><tr><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Reason code</th><th scope="col">Review action</th><th scope="col">Records</th></tr></thead><tbody>';
         foreach ($rows as $row) {
-            echo '<tr><td>' . esc_html((string) ($row['source_type'] ?? '')) . '</td><td>' . esc_html((string) ($row['status'] ?? '')) . '</td><td><code>' . esc_html((string) ($row['reason_code'] ?? '')) . '</code></td><td>' . esc_html((string) ($row['record_count'] ?? '0')) . '</td></tr>';
+            echo '<tr><td>' . esc_html($row['source_type']) . '</td><td>' . esc_html($row['status']) . '</td><td><code>' . esc_html($row['reason_code']) . '</code></td><td>' . esc_html($row['review_action']) . '</td><td>' . esc_html((string) $row['record_count']) . '</td></tr>';
         }
         echo '</tbody></table>';
     }
