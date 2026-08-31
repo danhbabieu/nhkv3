@@ -66,4 +66,18 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("\$_GET['q']", $routes);
         self::assertStringContainsString("add_query_arg('s', \$term, home_url('/'))", $routes);
     }
+
+    public function test_comparison_surface_uses_entity_query_and_has_a_real_discovery_route(): void
+    {
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicComparisonRoutes.php');
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/comparison.php');
+        $home = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/front-page.php');
+        self::assertStringContainsString('PublicComparisonRoutes', $plugin);
+        self::assertStringContainsString("comparison/?$", $routes);
+        self::assertStringContainsString('ComparisonPageQuery', $plugin);
+        self::assertStringContainsString('name="a"', $template);
+        self::assertStringContainsString("home_url('/comparison/')", $home);
+        self::assertStringContainsString("'/comparison/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
+    }
 }

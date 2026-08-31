@@ -30,6 +30,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   contracts while continuing to query WordPress categories/posts.
 - V2 search `/tim-kiem/?q=...` now redirects with its query preserved to the
   native WordPress search parameter `/?s=...`.
+- The `/comparison/` discovery surface is now a real read-only comparison
+  route over two active canonical Authority references; it does not create a
+  duplicate comparison data model.
 - V2 archive aliases `/thuong-hieu/`, `/hien-vat/` and `/am-nhac/` now resolve
   to canonical V3 Authority archive contexts while emitting canonical V3 links
   and metadata.
@@ -63,7 +66,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 75 tests, 226 assertions |
+| Unit tests | PASS — 77 tests, 235 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |

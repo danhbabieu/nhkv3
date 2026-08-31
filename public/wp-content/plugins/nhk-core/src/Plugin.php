@@ -22,6 +22,7 @@ use NHK\Core\Infrastructure\Http\GraphApi;
 use NHK\Core\Infrastructure\Http\PublicMediaVideoRoutes;
 use NHK\Core\Infrastructure\Http\PublicMediaAssetRoutes;
 use NHK\Core\Infrastructure\Http\PublicEntityRoutes;
+use NHK\Core\Infrastructure\Http\PublicComparisonRoutes;
 use NHK\Core\Infrastructure\Http\PublicEditorialRoutes;
 use NHK\Core\Infrastructure\Http\LegacyUrlRedirects;
 use NHK\Core\Infrastructure\Http\PublicKnowledgeRoutes;
@@ -38,14 +39,14 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink,
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
-use NHK\Core\Application\Entity\{EntityPageQuery, RelatedContentQuery};
+use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, RelatedContentQuery};
 use NHK\Core\Application\Media\MediaVideoPageQuery;
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 
 final class Plugin {
-    private const REWRITE_VERSION = '4';
+    private const REWRITE_VERSION = '5';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
@@ -57,7 +58,7 @@ final class Plugin {
         (new PublicEditorialRoutes())->register();
         LegacyUrlRedirects::register();
         global $wpdb;
-        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); $publicAuthority = new WpdbAuthorityRepository($wpdb); $publicMedia = new WpdbMediaRepository($wpdb); $publicVideos = new WpdbVideoRepository($wpdb); $publicEndpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos); $publicStatus = new MigrationStatus(); add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus), 'extend']); $publicClaims = new WpdbKnowledgeRepository($wpdb); $publicSources = new WpdbSourceRepository($wpdb); $publicEvidence = new WpdbEvidenceRepository($wpdb); add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus), 'extend'], 10, 2); $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink()); $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus); add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2); (new PublicEntityRoutes(new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus), $publicTypes))->register(); $publicAssets = new WpdbMediaAssetRepository($wpdb); $publicUsages = new WpdbMediaUsageRepository($wpdb); (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus)))->register(); $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: ''); if ($mediaRoot === '' && function_exists('wp_upload_dir')) { $upload = wp_upload_dir(); $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : ''; } (new PublicMediaAssetRoutes(new \NHK\Core\Application\Media\PublicMediaAssetDelivery($publicAssets, $mediaRoot)))->register(); (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register(); }
+        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); $publicAuthority = new WpdbAuthorityRepository($wpdb); $publicMedia = new WpdbMediaRepository($wpdb); $publicVideos = new WpdbVideoRepository($wpdb); $publicEndpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos); $publicStatus = new MigrationStatus(); add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus), 'extend']); $publicClaims = new WpdbKnowledgeRepository($wpdb); $publicSources = new WpdbSourceRepository($wpdb); $publicEvidence = new WpdbEvidenceRepository($wpdb); add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus), 'extend'], 10, 2); $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink()); $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus); add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2); $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus); (new PublicEntityRoutes($publicEntityQuery, $publicTypes))->register(); (new PublicComparisonRoutes(new ComparisonPageQuery($publicEntityQuery)))->register(); $publicAssets = new WpdbMediaAssetRepository($wpdb); $publicUsages = new WpdbMediaUsageRepository($wpdb); (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus)))->register(); $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: ''); if ($mediaRoot === '' && function_exists('wp_upload_dir')) { $upload = wp_upload_dir(); $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : ''; } (new PublicMediaAssetRoutes(new \NHK\Core\Application\Media\PublicMediaAssetDelivery($publicAssets, $mediaRoot)))->register(); (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register(); }
         add_action('rest_api_init', static function (): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
