@@ -52,7 +52,8 @@ final class AdminPage
         foreach ($ledgerRows as $row) {
             $details = json_decode((string) ($row['details_json'] ?? ''), true);
             $review = is_array($details) && is_array($details['review'] ?? null) ? $details['review'] : [];
-            $action = isset($review['requires_explicit_mapping']) ? 'Explicit mapping required' : (isset($review['requires_source_recovery']) ? 'Source recovery required' : (($review['disposition'] ?? '') === 'retire' ? 'Retire; no editorial import' : 'Not classified'));
+            $reason = (string) ($row['reason_code'] ?? '');
+            $action = isset($review['requires_explicit_mapping']) || $reason === 'DOMAIN_TARGETED' ? 'Explicit mapping required' : (isset($review['requires_source_recovery']) || $reason === 'UNSUPPORTED_MEDIA_REFERENCE' ? 'Source recovery required' : (($review['disposition'] ?? '') === 'retire' || $reason === 'RETIRED_LEGACY_GARBAGE' ? 'Retire; no editorial import' : 'Not classified'));
             $key = implode("\0", [(string) ($row['source_type'] ?? ''), (string) ($row['status'] ?? ''), (string) ($row['reason_code'] ?? ''), $action]);
             if (!isset($rows[$key])) $rows[$key] = ['source_type' => (string) ($row['source_type'] ?? ''), 'status' => (string) ($row['status'] ?? ''), 'reason_code' => (string) ($row['reason_code'] ?? ''), 'review_action' => $action, 'record_count' => 0];
             $rows[$key]['record_count']++;
