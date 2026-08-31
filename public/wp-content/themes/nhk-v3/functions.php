@@ -78,7 +78,11 @@ function nhk_v3_seo_head(): void
         elseif (($knowledge_context['mode'] ?? '') === 'archive') { $title = 'Kho tri thức — Đồng Hồ Nhà Kho'; $description = 'Các atomic claim canonical đang hoạt động trong kho NHK.'; $canonical = home_url('/knowledge/'); }
     }
     if (is_array($comparison_context) && ($comparison_context['mode'] ?? '') === 'compare') { $title = 'So sánh hồ sơ — Đồng Hồ Nhà Kho'; $description = 'Đọc cạnh nhau các dữ kiện semantic công khai của hai hồ sơ canonical NHK.'; $canonical = home_url('/comparison/'); }
-    if ($canonical === '') { $canonical = function_exists('wp_get_canonical_url') ? (string) wp_get_canonical_url() : home_url(add_query_arg([])); if ($canonical === '') $canonical = home_url('/'); }
+    if ($canonical === '') {
+        if (is_front_page() || is_home() || is_search()) $canonical = home_url('/');
+        else $canonical = function_exists('wp_get_canonical_url') ? (string) wp_get_canonical_url() : home_url(add_query_arg([]));
+        if ($canonical === '') $canonical = home_url('/');
+    }
     echo '<meta name="description" content="' . esc_attr(wp_strip_all_tags($description)) . '">' . "\n";
     echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     echo '<meta property="og:type" content="' . esc_attr(is_singular('post') ? 'article' : 'website') . '"><meta property="og:title" content="' . esc_attr($title) . '"><meta property="og:description" content="' . esc_attr(wp_strip_all_tags($description)) . '"><meta property="og:url" content="' . esc_url($canonical) . '"><meta property="og:site_name" content="Đồng Hồ Nhà Kho">' . "\n";
@@ -95,3 +99,25 @@ function nhk_v3_seo_head(): void
     if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'VideoObject', 'name' => (string) (($video['title'] ?? '') ?: 'Video NHK'), 'url' => $canonical, 'embedUrl' => strtolower((string) ($video['platform'] ?? '')) === 'youtube' ? 'https://www.youtube-nocookie.com/embed/' . (string) ($video['external_id'] ?? '') : null, 'contentUrl' => (string) ($video['url'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; }
 }
 add_action('wp_head', 'nhk_v3_seo_head', 1);
+
+function nhk_v3_robots(array $robots): array
+{
+    $pageVars = ['paged', 'page', 'nhk_entity_page', 'nhk_media_page', 'nhk_video_page', 'nhk_knowledge_page'];
+    $isPaginated = false;
+    foreach ($pageVars as $pageVar) {
+        if ((int) get_query_var($pageVar, 1) > 1) {
+            $isPaginated = true;
+            break;
+        }
+    }
+    if (is_search() || $isPaginated) {
+        unset($robots['index']);
+        $robots['noindex'] = true;
+    } else {
+        unset($robots['noindex']);
+        $robots['index'] = true;
+    }
+    $robots['follow'] = true;
+    return $robots;
+}
+add_filter('wp_robots', 'nhk_v3_robots', 20);

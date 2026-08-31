@@ -6,7 +6,7 @@ V2 URL-parity claim.
 
 | Surface | Public route contract | Query/template owner | Current evidence | Runtime status |
 |---|---|---|---|---|
-| Homepage | `/` | WordPress theme `front-page.php` and native WP queries | Real editorial query loop, no fixture content | HTTP and desktop visual smoke pass; 390px/768px route metrics and tablet visual check pass |
+| Homepage | `/` | WordPress theme `front-page.php` and native WP queries | Real editorial query loop, no fixture content | HTTP and desktop visual smoke pass; 390px/768px route metrics and tablet visual check pass; homepage canonical `/` and `index,follow` verified |
 | Tri thức / Góc chia sẻ | `/tri-thuc/`, `/goc-chia-se/` plus paginated aliases | Native WP category query via `PublicEditorialRoutes` | Category-aware archive and empty states; no editorial body projection | HTTP rewrite smoke and 390px/768px route metrics pass; V2 URL reconciliation remains |
 | Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | HTTP smoke and desktop archive visual QA pass; declared page-2 routes have 390px/768px metrics and `/model/page/2/` mobile visual pass; broader pagination QA pending |
 | Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | HTTP smoke and desktop detail visual QA pass; 390px/768px route metrics pass |
@@ -18,7 +18,7 @@ V2 URL-parity claim.
 | Media detail | `/media/{uuid}/` | `MediaVideoPageQuery` → `media.php` | Readiness-aware asset metadata and usage facts | Active local Media detail 200 and desktop visual smoke pass; PRIVATE/draft asset state renders an honest empty state; 390px/768px route metrics pass; asset policy remains open |
 | Video archive | `/video/`, `/video/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `video.php` | Active-only external references and empty state | HTTP smoke and desktop empty-state visual QA pass; 390px/768px route metrics pass; active Video detail unavailable in local data |
 | Video detail | `/video/{uuid}/` | `MediaVideoPageQuery` → `video.php` | YouTube privacy embed only for validated 11-char IDs | Route contract and source-level embed validation pass; active-record browser coverage pending |
-| 404 / pagination | Theme 404 and route-level page links | Theme templates | Empty states and bounded pagination are implemented | Core 404/route smoke and desktop 404 visual QA pass; declared page-2 routes have 390px/768px metrics and `/model/page/2/` mobile visual pass; broader pagination QA pending |
+| 404 / pagination | Theme 404 and route-level page links | Theme templates | Empty states and bounded pagination are implemented | Core 404/route smoke and desktop 404 visual QA pass; declared page-2 routes have 390px/768px metrics, custom archive page-two states emit `noindex,follow`, and `/model/page/2/` mobile visual pass; broader pagination QA pending |
 
 Admin semantic lookup covers Media, Video, Knowledge Claim, Source and Graph
 endpoints (`wp_post` included) through the existing read APIs. Governed proposal

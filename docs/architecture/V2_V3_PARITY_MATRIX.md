@@ -40,7 +40,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Media gallery / Video | Pending audit | First-class archive/detail query modules and theme templates | Responsive assets; external embeds only | PARTIAL |
 | Pagination / 404 / empty states | Pending audit | Route-level accessible states | No dead ends or fixture leakage | PARTIAL — declared page-2 routes have 390px/768px metrics; `/model/page/2/` received mobile visual inspection; broader page-state coverage remains |
 | Desktop / tablet / mobile | Pending audit | Responsive one-to-many-column layouts | Reading comfort and Core Web Vitals considered | PARTIAL — 390px/768px overflow metrics pass on homepage, search, comparison, Authority detail and Media detail; full route/pagination visual sweep remains |
-| SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article and BreadcrumbList | PARTIAL |
+| SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article, BreadcrumbList and explicit archive index/noindex policy | PARTIAL — metadata surfaces, homepage canonical and robots policy are browser-verified/contract-tested; runtime/V2 reconciliation remains |
 
 ## Logic parity inventory
 

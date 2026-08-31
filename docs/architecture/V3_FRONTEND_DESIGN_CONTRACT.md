@@ -98,6 +98,12 @@ description metadata, OpenGraph, appropriate structured data, breadcrumbs,
 sitemap/RSS compatibility and an explicit archive index/noindex policy. Any
 changed URL is recorded in the migration ledger/redirect mapping.
 
+The theme policy is explicit through WordPress's single `wp_robots` output:
+canonical non-search surfaces emit `index,follow`; search results and
+page-two-or-later archive states emit `noindex,follow` while retaining
+followable links to their canonical content. This includes the custom entity,
+Media, Video and Knowledge pagination query vars.
+
 ## Acceptance
 
 Critical route smoke tests cover homepage, Post, Brand archive/single, Model

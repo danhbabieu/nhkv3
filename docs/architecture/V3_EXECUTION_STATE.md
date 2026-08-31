@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, frontend accessibility checkpoint.
+Last updated: 2026-08-31, SEO canonical/pagination checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, frontend accessibility checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 80 tests, 259 assertions; guarded WordPress suite: 117 tests, 476 assertions from the last healthy DB run; plugin/theme PHP lint, route smoke 20/20 and diff check pass; current shell HTTP/integration retry is blocked by local MySQL/Apache connection refusal |
+| Tests | Unit suite: 81 tests, 265 assertions; guarded WordPress suite: 117 tests, 476 assertions from the last healthy DB run; plugin/theme PHP lint, route smoke 20/20 and diff check pass; current shell HTTP/integration retry is blocked by local MySQL/Apache connection refusal |
 | Blockers | Complete visual QA beyond the sampled Model pagination state and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -396,3 +396,12 @@ Last updated: 2026-08-31, frontend accessibility checkpoint.
   `node --check`, PHP lint, unit tests (80/259) and diff check pass. A fresh
   shell route/integration retry is currently blocked by the local service
   connection state and is not counted as a pass.
+- 2026-08-31: SEO archive policy was made explicit through the single
+  WordPress `wp_robots` output: canonical non-search pages emit
+  `index,follow`, while search and paginated archive states emit
+  `noindex,follow`, including custom entity/Media/Video/Knowledge page vars;
+  the frontend contract test covers the policy.
+- 2026-08-31: Browser runtime verification confirmed the homepage canonical is
+  `http://localhost/` rather than the first editorial post, while search and
+  custom archive page-two states emit one consolidated `robots` directive with
+  `noindex,follow`; unit evidence is now 81 tests/265 assertions.

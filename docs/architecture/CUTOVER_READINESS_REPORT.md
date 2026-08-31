@@ -73,12 +73,20 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   verified the 390px menu state and no overflow; fresh shell route/integration
   retries were refused by the current local service state and do not replace
   the earlier recorded 20/20 and 117/476 evidence.
+- SEO now declares an explicit archive policy through WordPress's single
+  `wp_robots` output: canonical non-search pages are `index,follow`, while
+  search and paginated archive states are `noindex,follow`; custom entity,
+  Media, Video and Knowledge page vars are covered by the frontend contract
+  test.
+- Browser runtime also confirms the homepage canonical resolves to `/` rather
+  than an editorial post URL; search and custom archive page-two states emit
+  one consolidated `robots` directive.
 
 ## Quality evidence
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 80 tests, 259 assertions |
+| Unit tests | PASS — 81 tests, 265 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |

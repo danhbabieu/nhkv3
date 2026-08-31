@@ -53,6 +53,17 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_theme_seo_contract_declares_archive_index_policy(): void
+    {
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString('function nhk_v3_robots(array $robots): array', $functions);
+        self::assertStringContainsString("'nhk_entity_page', 'nhk_media_page', 'nhk_video_page', 'nhk_knowledge_page'", $functions);
+        self::assertStringContainsString('$robots[\'noindex\'] = true', $functions);
+        self::assertStringContainsString('$robots[\'index\'] = true', $functions);
+        self::assertStringContainsString("add_filter('wp_robots', 'nhk_v3_robots', 20)", $functions);
+        self::assertStringContainsString('if (is_front_page() || is_home() || is_search()) $canonical = home_url(\'/\');', $functions);
+    }
+
     public function test_search_template_uses_unified_search_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
