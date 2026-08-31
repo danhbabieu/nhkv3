@@ -21,7 +21,7 @@ final class KnowledgePageQueryTest extends TestCase
             public function findByStableKey(string $key): ?KnowledgeClaim { return $key === $this->claim->stableKey ? $this->claim : null; }
             public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
             public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
-            public function list(bool $includeRetired = false): array { return [$this->claim]; }
+            public function list(bool $includeRetired = false): array { return [$this->claim, new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:unverified-query-test', 'Unverified claim.', 'fact', ['metadata' => ['verification_status' => 'UNVERIFIED']])]; }
         };
         $sources = new class($sourceId, $privateSourceId) implements SourceRepository {
             public function __construct(private string $activeId, private string $privateId) {}
@@ -43,6 +43,7 @@ final class KnowledgePageQueryTest extends TestCase
         self::assertNotNull($result); self::assertCount(1, $result['evidence']); self::assertSame('Public excerpt.', $result['evidence'][0]['excerpt']); self::assertSame('Public source', $result['evidence'][0]['source_title']); self::assertSame('catalog', $result['evidence'][0]['source_type']); self::assertSame('https://example.test/source', $result['evidence'][0]['source_locator']);
         self::assertArrayNotHasKey('metadata', $result['evidence'][0]);
         self::assertArrayNotHasKey('provenance', $result);
+        self::assertSame(1, (new KnowledgePageQuery($claims, $evidence, $sources))->archive()['total']);
         self::assertSame($claimId, (new KnowledgePageQuery($claims, $evidence, $sources))->detail('nhk:knowledge:query-test')['id']);
     }
 

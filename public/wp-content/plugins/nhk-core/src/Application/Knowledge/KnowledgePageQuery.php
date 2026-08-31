@@ -15,7 +15,7 @@ final class KnowledgePageQuery
     {
         if (!$this->available()) return null;
         $claim = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->claims->findByCanonicalId($key) : $this->claims->findByStableKey($key);
-        if (!$claim || !$claim->active) return null;
+        if (!$claim || !$claim->active || !$claim->isPublic()) return null;
         $evidence = array_values(array_filter($this->evidence->listByClaim($claim->canonicalId), function (Evidence $item): bool {
             if (!$item->active || !$item->isPublic()) return false;
             $source = $this->sources->findByCanonicalId($item->sourceId);
@@ -28,7 +28,7 @@ final class KnowledgePageQuery
     public function archive(int $page = 1, int $perPage = 24): array
     {
         if (!$this->available()) return ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'items' => []];
-        $items = array_map(fn (KnowledgeClaim $claim): array => ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType], array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active)));
+        $items = array_map(fn (KnowledgeClaim $claim): array => ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType], array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic())));
         $page = max(1, $page); $perPage = min(100, max(1, $perPage));
         return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }

@@ -34,7 +34,7 @@ final class SearchApi
         if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) if ($entity->active() && $this->matches($term, $entity->canonicalName, $entity->stableKey, wp_json_encode($entity->payload))) $groups['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'stable_key' => $entity->stableKey];
         $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
         $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $this->matches($term, $item->title, $item->externalVideoId, $item->canonicalUrl)))) : [];
-        $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $this->matches($term, $item->claimText, $item->stableKey)))) : [];
+        $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $item->active && $item->isPublic() && $this->matches($term, $item->claimText, $item->stableKey)))) : [];
         $semanticTotals = [];
         $semanticOffset = ($page - 1) * $perPage;
         foreach (['entities', 'media', 'videos', 'knowledge'] as $group) {

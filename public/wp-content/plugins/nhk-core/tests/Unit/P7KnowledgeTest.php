@@ -84,4 +84,12 @@ final class P7KnowledgeTest extends TestCase
         $this->expectException(\NHK\Core\Domain\Knowledge\KnowledgeException::class);
         (new KnowledgeService($emptyClaims, $emptySources, $evidence))->cite(UuidCodec::newV7(), UuidCodec::newV7(), 'orphan evidence');
     }
+
+    public function test_claim_public_readiness_hides_explicitly_unverified_imports(): void
+    {
+        self::assertTrue((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:public-ready', 'Public-ready claim.'))->isPublic());
+        self::assertTrue((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:verified', 'Verified claim.', 'fact', ['metadata' => ['verification_status' => 'VERIFIED']]))->isPublic());
+        self::assertFalse((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:unverified', 'Unverified claim.', 'fact', ['metadata' => ['verification_status' => 'UNVERIFIED']]))->isPublic());
+        self::assertFalse((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:needs-confirmation', 'Needs confirmation claim.', 'fact', ['metadata' => ['knowledge_status' => 'NEEDS_CONFIRMATION']]))->isPublic());
+    }
 }
