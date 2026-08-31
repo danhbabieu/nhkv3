@@ -44,6 +44,24 @@ function nhk_v3_public_type(string $type): string
     return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng', 'publication' => 'ấn phẩm', 'website' => 'website', 'archive' => 'lưu trữ', 'catalog' => 'catalogue', 'interview' => 'phỏng vấn', 'fact' => 'dữ kiện', 'technical' => 'kỹ thuật', 'specification' => 'thông số'][$type] ?? 'nội dung liên quan';
 }
 
+function nhk_v3_public_category_name(string $name): string
+{
+    return strcasecmp(trim($name), 'Uncategorized') === 0 ? 'Chưa phân loại' : $name;
+}
+
+function nhk_v3_post_categories(string $separator = ', '): string
+{
+    $categories = get_the_category();
+    if (!is_array($categories) || $categories === []) return esc_html('Bài viết');
+    $links = [];
+    foreach ($categories as $category) {
+        $name = nhk_v3_public_category_name((string) ($category->name ?? ''));
+        $url = nhk_v3_public_url(get_category_link($category));
+        $links[] = $url === '' ? esc_html($name) : sprintf('<a href="%s">%s</a>', esc_url($url), esc_html($name));
+    }
+    return implode(esc_html($separator), $links);
+}
+
 function nhk_v3_public_url(mixed $value): string
 {
     if (!is_string($value)) return '';

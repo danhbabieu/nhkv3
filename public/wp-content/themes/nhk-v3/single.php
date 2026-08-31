@@ -5,9 +5,9 @@
     $related = is_array($related) ? $related : ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
 ?>
   <article class="article">
-    <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <?php the_category(', '); ?></p>
+    <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <?php echo nhk_v3_post_categories(', '); ?></p>
     <header class="article-header">
-      <p class="eyebrow"><?php the_category(' · '); ?></p>
+      <p class="eyebrow"><?php echo nhk_v3_post_categories(' · '); ?></p>
       <h1><?php the_title(); ?></h1>
       <p class="standfirst"><?php echo esc_html(nhk_v3_excerpt()); ?></p>
       <div class="article-meta"><?php echo esc_html(get_the_author()); ?> · <?php echo esc_html(get_the_date()); ?><?php if (get_the_modified_time('U') !== get_the_time('U')): ?> · Cập nhật <?php echo esc_html(get_the_modified_date()); ?><?php endif; ?></div>
