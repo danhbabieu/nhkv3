@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 empty-search safety checkpoint.
+Last updated: 2026-09-01, P11 search safety checkpoint.
 
 | Field | Current value |
 |---|---|
