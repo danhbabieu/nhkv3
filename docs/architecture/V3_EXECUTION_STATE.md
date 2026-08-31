@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P9 MCP semantic search pagination checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 85 tests, 332 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 129 tests, 679 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Tests | Unit suite: 85 tests, 334 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 129 tests, 681 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -494,3 +494,8 @@ Last updated: 2026-08-31, P9 MCP semantic search pagination checkpoint.
   retired Authority records. Unit evidence is 85 tests/332 assertions; guarded
   integration remains 44 tests/347 assertions; combined current suite is
   129/679.
+- 2026-08-31: REST Search now also suppresses retired Authority records, keeping
+  REST, theme and MCP semantic reads aligned on active-only visibility. The
+  contract assertion is included in the 85-test/334-assertion unit suite;
+  guarded integration remains 44 tests/347 assertions and combined evidence is
+  129/681.

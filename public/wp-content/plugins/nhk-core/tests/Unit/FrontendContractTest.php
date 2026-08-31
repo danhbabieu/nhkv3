@@ -90,6 +90,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString('new WP_Query', $index);
         self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
         self::assertStringContainsString("home_url('/knowledge/claim/'", $index);
+        $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
+        self::assertStringContainsString('$entity->active()', $searchApi);
+        self::assertStringContainsString("'semantic_totals' => \$semanticTotals", $searchApi);
     }
 
     public function test_post_template_uses_graph_related_query_boundary(): void
