@@ -11,10 +11,11 @@ use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchApi
 {
-    public function __construct(private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private AuthorityRepository $authority, private EntityTypeRegistry $types) {}
+    public function __construct(private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?MigrationStatus $status = null) {}
 
     public function register(): void
     {
@@ -30,10 +31,10 @@ final class SearchApi
         $posts = new \WP_Query(['post_type' => 'post', 'post_status' => 'publish', 's' => $term, 'posts_per_page' => $perPage, 'paged' => $page, 'ignore_sticky_posts' => true]);
         $groups = ['posts' => array_map(static fn (\WP_Post $post): array => ['type' => 'post', 'id' => (string) $post->ID, 'title' => get_the_title($post), 'url' => get_permalink($post), 'excerpt' => wp_trim_words(wp_strip_all_tags(get_the_excerpt($post)), 28), 'date' => get_the_date('c', $post)], $posts->posts)];
         $groups['entities'] = [];
-        foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) if ($this->matches($term, $entity->canonicalName, $entity->stableKey, wp_json_encode($entity->payload))) $groups['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'stable_key' => $entity->stableKey];
-        $groups['media'] = array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $this->matches($term, $item->canonicalName, $item->stableKey))));
-        $groups['videos'] = array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $this->matches($term, $item->title, $item->externalVideoId, $item->canonicalUrl))));
-        $groups['knowledge'] = array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $this->matches($term, $item->claimText, $item->stableKey))));
+        if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) if ($this->matches($term, $entity->canonicalName, $entity->stableKey, wp_json_encode($entity->payload))) $groups['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'stable_key' => $entity->stableKey];
+        $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
+        $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $this->matches($term, $item->title, $item->externalVideoId, $item->canonicalUrl)))) : [];
+        $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $this->matches($term, $item->claimText, $item->stableKey)))) : [];
         return ['query' => $term, 'page' => $page, 'per_page' => $perPage, 'post_total' => (int) $posts->found_posts, 'groups' => $groups];
     }
 

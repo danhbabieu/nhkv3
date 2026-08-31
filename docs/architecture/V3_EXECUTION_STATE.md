@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
+Last updated: 2026-08-31, P8 search/proposal read and governed surfaces are pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `51ff8bf` |
+| Branch / HEAD | `main` / `c9ac981` |
 | Current phase | P8 Admin/API + P7/P9 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | P7 unit suite: 48 tests, 110 assertions; lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
-| Blockers | None for local P6 work; V2/live remains read-only |
+| Tests | Unit suite: 48 tests, 110 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| Blockers | None for local code work; V2/live remains read-only; WP integration environment absent |
 | Working assumptions | Working tree was clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Add governed proposal/API mutations and MCP adapter; integration migration remains environment-gated |
+| Next executable task | Add MCP adapter/read contract and migration inventory tooling; browser/DB integration remains environment-gated |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | Not applicable to code-only/P4 bootstrap; required before real V2 data migration |
@@ -60,3 +60,7 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
   returning 503 until their migration storage is ready. Admin is capability
   protected and intentionally read-only for now; governed proposal mutations
   and MCP remain next.
+- 2026-08-31: Governed proposal REST create/submit/approve/reject and unified
+  semantic search were added. Search keeps native WordPress Post search and
+  groups active Authority, Media, Video and Knowledge results under one API;
+  capability checks remain fail-closed for mutation routes.

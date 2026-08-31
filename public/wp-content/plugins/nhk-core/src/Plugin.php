@@ -35,7 +35,7 @@ final class Plugin {
             (new GovernanceApi())->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
-            (new SearchApi(new WpdbMediaRepository($wpdb), new WpdbVideoRepository($wpdb), new WpdbKnowledgeRepository($wpdb), new WpdbAuthorityRepository($wpdb), $types))->register();
+            (new SearchApi(new WpdbMediaRepository($wpdb), new WpdbVideoRepository($wpdb), new WpdbKnowledgeRepository($wpdb), new WpdbAuthorityRepository($wpdb), $types, new MigrationStatus()))->register();
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
     }
