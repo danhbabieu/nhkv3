@@ -64,6 +64,9 @@ function nhk_v3_public_label(string $key): string
         'vendor' => 'Nhà cung cấp',
         'price' => 'Giá niêm yết',
         'url' => 'Nguồn sản phẩm',
+        'model uuid' => 'Mẫu liên kết',
+        'brand uuid' => 'Thương hiệu liên kết',
+        'serial number' => 'Số serial',
     ][strtolower(str_replace('_', ' ', $key))] ?? ucwords(str_replace('_', ' ', $key));
 }
 
