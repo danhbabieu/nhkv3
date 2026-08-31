@@ -106,6 +106,14 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_pagination_marks_the_current_page_for_assistive_technology(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['index.php', 'entity.php', 'media.php', 'video.php', 'knowledge.php'] as $template) {
+            self::assertStringContainsString("aria-current=\"page\"", (string) file_get_contents($theme . '/' . $template), $template . ' must expose the current page');
+        }
+    }
+
     public function test_public_templates_do_not_expose_internal_domain_terms(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
