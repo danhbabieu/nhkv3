@@ -158,6 +158,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('legacySearchRedirect', $routes);
         self::assertStringContainsString("\$_GET['q']", $routes);
         self::assertStringContainsString("add_query_arg('s', \$term, home_url('/'))", $routes);
+        $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
+        self::assertStringContainsString("'/tim-kiem/?q=odo' => 301", $routeSmoke);
+        self::assertStringContainsString("'/tim-kiem/?q=odo' => '/?s=odo'", $routeSmoke);
     }
 
     public function test_comparison_surface_uses_entity_query_and_has_a_real_discovery_route(): void

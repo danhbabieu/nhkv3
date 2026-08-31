@@ -44,6 +44,7 @@ $routes = [
     '/feed/' => 200,
     '/?s=watch' => 200,
     '/?s=odo&paged=2' => 200,
+    '/tim-kiem/?q=odo' => 301,
     '/comparison/' => 200,
     '/media/asset/00000000-0000-4000-8000-000000000000/' => 404,
     '/__nhk-route-must-404__/' => 404,
@@ -53,6 +54,9 @@ $contentMarkers = [
     '/wp-sitemap.xml' => '<sitemapindex',
     '/feed/' => '<rss',
 ];
+$locationMarkers = [
+    '/tim-kiem/?q=odo' => '/?s=odo',
+];
 $failures = 0;
 foreach ($routes as $route => $expected) {
     $url = $base . $route;
@@ -61,7 +65,8 @@ foreach ($routes as $route => $expected) {
         fwrite(STDERR, "curl_init failed for {$url}\n");
         exit(2);
     }
-    curl_setopt_array($handle, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HEADER => false, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15]);
+    $location = '';
+    curl_setopt_array($handle, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HEADER => false, CURLOPT_HEADERFUNCTION => static function ($handle, string $header) use (&$location): int { if (stripos($header, 'Location:') === 0) $location = trim(substr($header, 9)); return strlen($header); }, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15]);
     $body = curl_exec($handle);
     $error = curl_error($handle);
     $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
@@ -72,9 +77,12 @@ foreach ($routes as $route => $expected) {
     }
     $marker = $contentMarkers[$route] ?? null;
     $hasMarker = $marker === null || (is_string($body) && str_contains($body, $marker));
-    $ok = $status === $expected && $hasMarker;
+    $expectedLocation = $locationMarkers[$route] ?? null;
+    $hasLocation = $expectedLocation === null || str_contains($location, $expectedLocation);
+    $ok = $status === $expected && $hasMarker && $hasLocation;
     $detail = $status === $expected ? "expected {$expected}, got {$status}" : "expected {$expected}, got {$status}";
     if (!$hasMarker) $detail .= ", missing content marker {$marker}";
+    if (!$hasLocation) $detail .= ", expected Location containing {$expectedLocation}, got {$location}";
     echo ($ok ? 'PASS' : 'FAIL') . " {$route}: {$detail}\n";
     if (!$ok) $failures++;
 }
