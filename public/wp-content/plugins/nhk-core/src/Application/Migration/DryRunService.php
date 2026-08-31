@@ -40,7 +40,17 @@ final class DryRunService
             $targetPath = trim((string) ($record['target_path'] ?? ''));
             if ($sourcePath === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
             if ($sourcePath === '/' && $targetPath === '') return ['status' => 'mapped', 'reason' => 'READY_NOOP'];
-            if ($targetPath !== '') return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
+            if ($targetPath !== '') {
+                if (!str_starts_with($sourcePath, '/') || !str_starts_with($targetPath, '/') || str_contains($sourcePath, '..') || str_contains($targetPath, '..')) return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+                $entityType = trim((string) ($record['target_entity_type'] ?? ''));
+                $entityId = trim((string) ($record['target_entity_id'] ?? ''));
+                $entityKey = trim((string) ($record['target_entity_key'] ?? ''));
+                if ($entityType !== '' || $entityId !== '' || $entityKey !== '') {
+                    $types = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'knowledge'];
+                    if (!in_array($entityType, $types, true) || preg_match('/^[0-9a-f-]{36}$/i', $entityId) !== 1 || $entityKey === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+                }
+                return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
+            }
             $targetReason = strtoupper((string) ($record['target_reason'] ?? ''));
             if (in_array($targetReason, ['DOMAIN_TARGETED', 'UNSUPPORTED_MEDIA_REFERENCE', 'RETIRED_LEGACY_GARBAGE'], true)) return ['status' => 'skipped', 'reason' => $targetReason];
             return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];

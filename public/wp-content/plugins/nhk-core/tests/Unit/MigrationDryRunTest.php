@@ -67,6 +67,17 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame(1, $report['url_mapping']);
     }
 
+    public function test_url_dry_run_rejects_invalid_path_and_incomplete_entity_target(): void
+    {
+        $report = (new DryRunService())->run([
+            ['type' => 'url', 'source_path' => '/legacy/../unsafe/', 'target_path' => '/new/'],
+            ['type' => 'url', 'source_path' => '/legacy/entity/', 'target_path' => '/brand/odo/', 'target_entity_type' => 'brand', 'target_entity_key' => 'odo'],
+        ]);
+        self::assertSame(0, $report['mapped']);
+        self::assertSame(2, $report['skipped']);
+        self::assertSame(2, $report['skipped_by_reason']['INVALID_URL_MAPPING']);
+    }
+
     public function test_dry_run_matches_apply_boundaries_for_posts_categories_and_relations(): void
     {
         $uuid = UuidCodec::newV7();
