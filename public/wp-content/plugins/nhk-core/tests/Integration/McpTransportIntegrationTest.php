@@ -267,13 +267,18 @@ final class McpTransportIntegrationTest extends TestCase
 
             $claimRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/claim/' . $claimRecord->canonicalId));
             $sourceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $sourceRecord->canonicalId));
+            $evidenceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/evidence/' . $evidenceRecord->canonicalId));
             self::assertSame(200, $claimRead->get_status());
             self::assertSame(200, $sourceRead->get_status());
+            self::assertSame(200, $evidenceRead->get_status());
             self::assertCount(1, $claimRead->get_data()['evidence']);
             self::assertCount(1, $sourceRead->get_data()['evidence']);
             self::assertArrayNotHasKey('metadata', $sourceRead->get_data());
             self::assertArrayNotHasKey('metadata', $claimRead->get_data()['evidence'][0]);
             self::assertArrayNotHasKey('provenance', $claimRead->get_data());
+            self::assertSame($evidenceRecord->canonicalId, $evidenceRead->get_data()['id']);
+            self::assertSame($sourceRecord->title, $evidenceRead->get_data()['source_title']);
+            self::assertArrayNotHasKey('metadata', $evidenceRead->get_data());
 
             $sourceMcp = $this->request('tools/call', ['id' => 60, 'params' => ['name' => 'nhk.source.get', 'arguments' => ['id' => $sourceRecord->canonicalId]]], ['Mcp-Name' => 'nhk.source.get']);
             $evidenceMcp = $this->request('tools/call', ['id' => 61, 'params' => ['name' => 'nhk.evidence.get', 'arguments' => ['id' => $evidenceRecord->canonicalId]]], ['Mcp-Name' => 'nhk.evidence.get']);
