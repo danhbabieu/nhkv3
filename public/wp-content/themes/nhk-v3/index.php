@@ -4,7 +4,7 @@ $isSearch = is_search();
 $results = $isSearch ? (new NHK_V3_Search_Page_Query())->read() : null;
 $editorialRoute = (string) get_query_var('nhk_editorial_route');
 $editorialTitles = ['tri-thuc' => 'Tri thức', 'goc-chia-se' => 'Góc chia sẻ'];
-$archiveTitle = $editorialTitles[$editorialRoute] ?? get_the_archive_title();
+$archiveTitle = $editorialTitles[$editorialRoute] ?? nhk_v3_public_archive_title();
 ?><main id="main-content" class="site-main"><section class="archive-intro"><p class="eyebrow"><?php echo $isSearch ? 'Tìm kiếm' : 'Kho bài viết'; ?></p><h1><?php echo $isSearch ? sprintf('Kết quả cho: %s', esc_html($results['term'])) : esc_html($archiveTitle); ?></h1></section><div class="content-layout"><section class="feed" aria-label="Danh sách bài viết">
 <?php if ($isSearch): ?>
   <?php if (!empty($results['posts'])): global $post; foreach ($results['posts'] as $post): setup_postdata($post); get_template_part('template-parts/article-card'); endforeach; wp_reset_postdata(); else: ?><div class="empty"><h2>Chưa tìm thấy bài viết</h2><p>Thử một từ khóa khác hoặc khám phá các chuyên mục của NHK.</p></div><?php endif; ?>

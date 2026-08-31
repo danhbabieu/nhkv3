@@ -174,6 +174,11 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('function nhk_v3_public_category_name', $functions);
         self::assertStringContainsString("'Uncategorized') === 0 ? 'Chưa phân loại'", $functions);
         self::assertStringContainsString('function nhk_v3_post_categories', $functions);
+        self::assertStringContainsString('function nhk_v3_public_archive_title', $functions);
+        self::assertStringContainsString('nhk_v3_public_archive_title()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
+        self::assertStringContainsString("is_category() || is_tag() || is_author()", $functions);
+        self::assertStringContainsString("if (is_category())", $functions);
+        self::assertStringContainsString('$canonical = nhk_v3_public_url($categoryUrl)', $functions);
         self::assertStringContainsString('nhk_v3_post_categories(', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/single.php'));
         self::assertStringContainsString("'wp_post' => 'bài viết'", $functions);
         self::assertStringContainsString('nhk_v3_public_type((string) ($item[\'type\'] ?? \'\'))', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));

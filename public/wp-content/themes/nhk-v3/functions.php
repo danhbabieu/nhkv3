@@ -62,6 +62,20 @@ function nhk_v3_post_categories(string $separator = ', '): string
     return implode(esc_html($separator), $links);
 }
 
+function nhk_v3_public_archive_title(): string
+{
+    if (is_category()) {
+        $term = get_queried_object();
+        return 'Chủ đề: ' . nhk_v3_public_category_name((string) ($term->name ?? ''));
+    }
+    if (is_tag()) {
+        $term = get_queried_object();
+        return 'Thẻ: ' . (string) ($term->name ?? '');
+    }
+    if (is_author()) return 'Bài viết của ' . get_the_author();
+    return wp_strip_all_tags(get_the_archive_title());
+}
+
 function nhk_v3_public_url(mixed $value): string
 {
     if (!is_string($value)) return '';
@@ -122,6 +136,7 @@ function nhk_v3_document_title(string $title): string
         $term = trim((string) get_search_query());
         return $term === '' ? 'Tìm kiếm — Đồng Hồ Nhà Kho' : 'Tìm kiếm: ' . $term . ' — Đồng Hồ Nhà Kho';
     }
+    if (is_category() || is_tag() || is_author()) return nhk_v3_public_archive_title() . ' — Đồng Hồ Nhà Kho';
     if (is_front_page() || is_home()) return 'Đồng Hồ Nhà Kho — Kho tri thức và sưu tầm';
     return $title;
 }
@@ -140,6 +155,25 @@ function nhk_v3_seo_head(): void
     if (is_search()) {
         $term = trim((string) get_search_query());
         $description = $term === '' ? 'Tìm kiếm trong kho tri thức NHK.' : 'Kết quả tìm kiếm cho ' . $term . ' trong kho tri thức NHK.';
+    }
+    if (is_category()) {
+        $term = get_queried_object();
+        $label = nhk_v3_public_category_name((string) ($term->name ?? ''));
+        $title = 'Chủ đề: ' . $label . ' — Đồng Hồ Nhà Kho';
+        $description = 'Các bài viết thuộc chủ đề ' . $label . ' trong kho NHK.';
+        $categoryUrl = get_category_link($term);
+        $canonical = nhk_v3_public_url($categoryUrl);
+    } elseif (is_tag()) {
+        $term = get_queried_object();
+        $label = (string) ($term->name ?? '');
+        $title = 'Thẻ: ' . $label . ' — Đồng Hồ Nhà Kho';
+        $description = 'Các bài viết gắn với thẻ ' . $label . ' trong kho NHK.';
+        $tagUrl = get_tag_link($term);
+        $canonical = nhk_v3_public_url($tagUrl);
+    } elseif (is_author()) {
+        $title = nhk_v3_public_archive_title() . ' — Đồng Hồ Nhà Kho';
+        $description = 'Các bài viết của ' . get_the_author() . ' trong kho NHK.';
+        $canonical = nhk_v3_public_url(get_author_posts_url(get_queried_object_id()));
     }
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
