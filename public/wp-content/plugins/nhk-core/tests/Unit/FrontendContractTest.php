@@ -160,6 +160,14 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_public_media_api_does_not_expose_usage_endpoint_keys(): void
+    {
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        $usageMethod = substr($readApi, strpos($readApi, 'private function usage'), strpos($readApi, 'private function evidence') - strpos($readApi, 'private function usage'));
+        self::assertStringNotContainsString("'endpoint_type'", $usageMethod);
+        self::assertStringNotContainsString("'endpoint_key'", $usageMethod);
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
