@@ -45,7 +45,7 @@ use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 
 final class Plugin {
-    private const REWRITE_VERSION = '3';
+    private const REWRITE_VERSION = '4';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.

@@ -8,11 +8,14 @@ use NHK\Core\Domain\Authority\EntityTypeRegistry;
 
 final class PublicEntityRoutes
 {
+    /** @var array<string,string> */
+    private const LEGACY_ARCHIVE_ALIASES = ['thuong-hieu' => 'brand', 'hien-vat' => 'specimen', 'am-nhac' => 'music'];
+
     public function __construct(private EntityPageQuery $query, private EntityTypeRegistry $types) {}
 
     public function register(): void
     {
-        add_filter('query_vars', function (array $vars): array { foreach (['nhk_entity_type', 'nhk_entity_key', 'nhk_entity_page', 'nhk_entity_q'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
+        add_filter('query_vars', function (array $vars): array { foreach (['nhk_entity_type', 'nhk_entity_key', 'nhk_entity_page', 'nhk_entity_q', 'nhk_entity_alias'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
         add_action('init', [$this, 'rewrite']);
         add_filter('template_include', [$this, 'template']);
     }
@@ -24,6 +27,10 @@ final class PublicEntityRoutes
             add_rewrite_rule('^' . $type . '/page/([1-9][0-9]*)/?$', 'index.php?nhk_entity_type=' . $definition->type . '&nhk_entity_page=$matches[1]', 'top');
             add_rewrite_rule('^' . $type . '/([^/]+)/?$', 'index.php?nhk_entity_type=' . $definition->type . '&nhk_entity_key=$matches[1]', 'top');
             add_rewrite_rule('^' . $type . '/?$', 'index.php?nhk_entity_type=' . $definition->type, 'top');
+        }
+        foreach (self::LEGACY_ARCHIVE_ALIASES as $alias => $type) {
+            add_rewrite_rule('^' . preg_quote($alias, '#') . '/page/([1-9][0-9]*)/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_alias=' . $alias . '&nhk_entity_page=$matches[1]', 'top');
+            add_rewrite_rule('^' . preg_quote($alias, '#') . '/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_alias=' . $alias, 'top');
         }
     }
 

@@ -49,4 +49,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('function (array $value, int $postId)', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php'));
         self::assertStringContainsString('forPost', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Entity/RelatedContentQuery.php'));
     }
+
+    public function test_v2_archive_aliases_resolve_to_canonical_entity_types(): void
+    {
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
+        self::assertStringContainsString("'thuong-hieu' => 'brand'", $routes);
+        self::assertStringContainsString("'hien-vat' => 'specimen'", $routes);
+        self::assertStringContainsString("'am-nhac' => 'music'", $routes);
+        self::assertStringContainsString('nhk_entity_alias', $routes);
+    }
 }
