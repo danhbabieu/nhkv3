@@ -1,7 +1,7 @@
 # NHK V3 Cutover Readiness Report
 
 Date: 2026-08-31
-Repository: `main` at checkpoint `3e3a914`
+Repository: `main` at checkpoint pending this migration checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
 ## What is ready
@@ -29,7 +29,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - A transport-neutral MCP registration seam exists; read adapters are real and
   mutations delegate to Governance.
 - The V2 dry-run tool is no-write and emits bounded reason codes. A local
-  read-only V2 inventory is recorded; no V2 data has been migrated.
+  read-only V2 inventory and a separate governed local-dev migration ledger
+  are recorded; live V2 data has not been mutated.
 - The dry-run report now provides per-type counts and skipped-reason buckets,
   rejects malformed records/checksums and marks explicit conflicts for review.
 
@@ -41,24 +42,28 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 88 tests, 351 assertions |
-| Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; no active V3 Authority detail rows yet |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 89 tests, 363 assertions |
+| Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 3,086-record read-only export/dry-run; 1,917 mapped, 1,169 skipped with reason codes |
-| V2 backup restore | PARTIAL — reviewed staging conversion restores the dump; original dump is not MariaDB-portable without that conversion, and field-level migration evidence remains open |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,933-record export/dry-run; 2,516 candidates, 2,417 no-write skips; local-dev ledger: 1,545 migrated, 3,388 explicit skips, 0 conflicts |
+| V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates
 
-1. Complete field-level read-only V2 inventory for posts, categories, attachments/media,
-   all Authority types, Knowledge, Sources, Evidence, relations, Videos and
-   URLs; feed it to `tools/v2-dry-run.php`.
-2. Promote the reviewed V2 restore conversion into a versioned, reproducible
-   migration input, then reconcile counts, identity mappings, relations, media
-   state and URL redirects using the migration ledger.
+1. Complete field-level reconciliation for URLs, media assets/usages,
+   Sources/Evidence/citations, semantic projections and the 764
+   domain-targeted custom/system posts; each requires a governed target or a
+   documented retirement/skip decision.
+2. Review the local-dev ledger counts, verify all imported semantic fields and
+   relation semantics, and obtain explicit approval before any live V2
+   migration. The versioned normalize/export/apply chain is evidence, not
+   production authorization.
 3. Run browser visual QA for homepage, Post, entity archives/details, search,
    Media, Video, 404, pagination and desktop/tablet/mobile states using a
    working browser automation runtime;
-   populate V3 detail data only through the governed migration path.
+   populate V3 detail data only through the governed migration path; visual QA
+   remains open because the available browser runtime cannot complete headless
+   screenshots.
 4. Complete external MCP transport/runtime verification and close mandatory
    red rows in `V2_V3_PARITY_MATRIX.md`.
 

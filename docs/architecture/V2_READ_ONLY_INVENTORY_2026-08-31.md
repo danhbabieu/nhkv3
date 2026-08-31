@@ -1,14 +1,17 @@
 # V2 Read-only Inventory — 2026-08-31
 
 This inventory was collected from the restored local V2 backup in the guarded
-database `nhk_v3_test` and is read-only after restore. No V2 source row is
-claimed as migrated.
+database `nhk_v3_test`. The source database was read-only during export. A
+separate local-dev apply was later run against `nhk_v3`; it is recorded in the
+migration ledger and is not a production parity or cutover claim.
 
 ## Source counts
 
 | Source surface | Count | Evidence |
 |---|---:|---|
 | WordPress posts table rows | 800 | `nhkv2_posts` exact `COUNT(*)` |
+| Published `nhk_*` editorial/entity post rows | 776 | `nhkv2_posts` grouped by post type/status; one published page and one system style row are separate |
+| Native taxonomy rows | 2 | `nhkv2_terms`/`nhkv2_term_taxonomy` |
 | Canonical/legacy entity rows | 1,301 | `nhkv2_nhk_entities` exact `COUNT(*)` |
 | Graph relation rows | 185 | `nhkv2_nhk_relations` exact `COUNT(*)` |
 | Media asset rows | 3 | `nhkv2_nhk_media_assets` |
@@ -31,24 +34,39 @@ native `wp_posts`/category mapping rather than a body projection.
 
 The read-only exporter is `tools/v2-read-only-export.php`; it selects only
 identity, status, type and route fields and never bootstraps V2 WordPress.
-Piped through `tools/v2-dry-run.php`, the report was:
+Piped through `tools/v2-dry-run.php` from the full normalized backup, the
+report was:
 
 | Dry-run result | Count |
 |---|---:|
-| Source records | 3,086 |
-| Mapped candidates | 1,917 |
-| Skipped candidates | 1,169 |
+| Source records | 4,933 |
+| Mapped candidates | 2,516 |
+| Skipped candidates | 2,417 |
 | URL mappings ready | 1 |
 | Conflicts | 0 |
 | Invalid relations | 0 |
 
 Skipped reason buckets were `INVALID_URL_MAPPING` 799 and
-`UNSUPPORTED_LEGACY_TYPE` 370. These are no-write
+`UNSUPPORTED_LEGACY_TYPE` 1,618. These are no-write
 reconciliation results, not approval to apply them.
+
+## Local development apply checkpoint
+
+The governed `tools/v2-migrate.php` runner applied the same 4,933-record
+export to `nhk_v3` after the backup/restore gate. The ledger contains 1,545
+migrated records and 3,388 skipped records: `DOMAIN_TARGETED` 764,
+`INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 2,485; conflicts were 0.
+The second run was idempotent with the same counts. Target verification found
+36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
+rows, 655 Knowledge claims and 241 Graph edges imported from the ledger.
+This checkpoint is reversible in local development from
+`/private/tmp/nhk_v3-before-v2-apply.sql`; it does not authorize live V2 or
+production mutation.
 
 ## Required follow-up
 
-Posts/categories, all Authority types, media state, external videos,
-relations, semantic projections and URL redirects still require field-level
-mapping review against V3 contracts. The exporter intentionally does not
-convert legacy custom post types into editorial body projections.
+URL redirects, media assets/usages, external videos without a supported
+reference, evidence/source provenance and semantic projections remain
+explicitly unmigrated or require a governed target mapping. The exporter and
+runner intentionally do not convert legacy custom post types into editorial
+body projections or merge identities by name.

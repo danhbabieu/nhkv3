@@ -6,17 +6,17 @@ the final parity declaration.
 | AREA | V2 | V3 | MIGRATED? | TESTED? | PARITY STATUS | NOTES |
 |---|---|---|---|---|---|---|
 | Homepage | Reference audit pending | HomePageQuery-driven responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Featured/latest/category/topics plus real Authority/Media/Video modules; V2 reference audit and browser smoke pending |
-| Posts | 50 rows / 21 published in local read-only inventory | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned; field mapping and migration ledger pending |
-| Categories | V2 taxonomy rows partially inventoried; editorial aliases observed | Native WP categories | NO | PARTIAL | IN PROGRESS | Empty aliases now return 200; complete V2 taxonomy/URL inventory pending |
+| Posts | 800 rows in restored read-only backup; 34 `nhk_article` rows plus native/system rows | Native `wp_posts` boundary | DEV ONLY: 36 | PARTIAL | IN PROGRESS | 36 safe native post/page rows imported; 764 domain-targeted rows remain explicit skips |
+| Categories | 2 taxonomy rows in restored backup | Native WP categories | DEV ONLY: 1 | PARTIAL | IN PROGRESS | One native category imported; non-category taxonomy skipped; URL ledger pending |
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
-| Brand / Model / Variant / Movement / Music / Component / Classification | V2 entity inventory present for brand/model; other direct types pending | Authority registry/core + canonical entity read API + frontend routes | NO | PARTIAL | IN PROGRESS | V2 has 4 brands and 5 models; active V3 detail data and remaining type mappings are pending |
-| Specimen / Product | Legacy data pending | Registry-backed Authority contract + frontend routes | NO | PARTIAL | IN PROGRESS | Physical specimen vs commercial product distinction and route/query contract tested; runtime smoke and legacy data pending |
-| Media / Video | V2 inventory has 4 media entities, 2 assets and 3 videos | P6 domain/persistence + public archive/detail routes | NO | PASS | IN PROGRESS | Identity/asset/usage separation and runtime archives pass; V2 mapping, media delivery and detail fixtures remain pending |
-| Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
-| Relations / Post Graph | 72 V2 relation rows, 71 active | Graph Core + Post/Knowledge endpoint + governed relation proposals | NO | PARTIAL | IN PROGRESS | No-write inventory found 3 missing endpoints; field mapping and governed apply remain pending |
+| Brand / Model / Variant / Movement / Music / Component / Classification | 4 / 30 / 42 / 18 / 11 / 91 / 174 entity rows | Authority registry/core + canonical entity read API + frontend routes | DEV ONLY: exact counts | PARTIAL | IN PROGRESS | Exact UUID/stable-key rows imported into local dev; semantic field review remains |
+| Specimen / Product | No rows found in selected full V2 backup | Registry-backed Authority contract + frontend routes | NO | PARTIAL | IN PROGRESS | Absence is recorded from this backup; source/API confirmation and retirement reason remain pending |
+| Media / Video | 242 media entities, 3 assets, 0 usage and 0 visual-video rows | P6 domain/persistence + public archive/detail routes | DEV ONLY: 242 Media | PASS | IN PROGRESS | Media identities imported; assets/usages and video delivery remain pending |
+| Knowledge Claim / Source / Evidence | 655 knowledge entities, 19 evidence, 40 citations, 242 Knowledge relations | P7 contracts, schema and service | DEV ONLY: 655 claims | PASS | IN PROGRESS | Claims imported; explicit Source/Evidence citation mapping remains pending |
+| Relations / Post Graph | 185 Graph relation rows plus 242 Knowledge relations | Graph Core + Post/Knowledge endpoint + governed relation proposals | DEV ONLY: 241 | PARTIAL | IN PROGRESS | 241 explicit `about` relations imported; 186 legacy/invalid relation rows remain skipped |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + grouped semantic search + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search combines native Posts with active semantic groups; guarded lifecycle integration passes, but V2 behavior reconciliation remains pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
-| SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary + theme metadata/JSON-LD | NO | PARTIAL | IN PROGRESS | Canonical, description, OpenGraph, Article and BreadcrumbList hooks added; sitemap/RSS remain native and runtime audit pending |
+| SEO / URLs / Sitemap / RSS | 800 source URL candidates; 1 ready, 799 unmapped | WordPress boundary + theme metadata/JSON-LD | NO | PARTIAL | IN PROGRESS | Canonical, description, OpenGraph, Article and BreadcrumbList hooks added; URL ledger and sitemap/RSS audit pending |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages, Graph-derived related sections and Media gallery surface | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes, related groups, media archive/detail and readiness-aware asset states exist; V2 inventory and runtime gallery QA remain |
 
 ## Required parity inventory
@@ -57,8 +57,13 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 
 ## Data parity inventory
 
-Counts and mappings remain `—` until a read-only V2 export/API/database source
-is available. The route audit is evidence for UX only, not source counts. The
-no-write dry-run validates inventory records and emits bounded reason codes,
-but it does not constitute migrated data. Every delta must be explained by a ledger reason code;
-identity merges require explicit evidence and name-only matching is forbidden.
+The restored read-only V2 backup contains 800 posts, 1,301 entities, 2
+taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
+and 1,581 semantic projections. The expanded no-write dry-run processes 4,933
+records: 2,516 mapped candidates and 2,417 skipped candidates (799 invalid URL
+maps and 1,618 unsupported legacy types). The local-dev governed apply
+recorded 1,545 migrated rows and 3,388 explicit skips (764 domain-targeted, 1
+invalid relation, 2,485 unsupported legacy type) with zero conflicts. This
+does not constitute production parity. Every delta must be explained by a
+ledger reason code; identity merges require explicit evidence and name-only
+matching is forbidden.

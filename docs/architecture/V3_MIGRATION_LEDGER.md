@@ -1,20 +1,20 @@
 # V2 → V3 Migration Ledger
 
-No real V2 data migration has run. Counts remain explicitly unpopulated until
-the read-only legacy inventory and dry-run exist.
+The local development apply checkpoint has run after the read-only inventory,
+backup/restore rehearsal and dry-run. It is not a live or production
+migration, and unresolved rows remain explicit in the ledger.
 
 | Data type | Source count | Mapped | Migrated | Skipped | Duplicate | Conflict | Verified | Status / reason codes |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| WordPress Posts | — | — | — | — | — | — | — | NOT STARTED |
-| Categories | — | — | — | — | — | — | — | NOT STARTED |
-| Media | — | — | — | — | — | — | — | NOT STARTED; checksum is candidate evidence only |
-| Authority entities | — | — | — | — | — | — | — | NOT STARTED |
-| Brands / Models / Variants | — | — | — | — | — | — | — | NOT STARTED |
-| Movements / Music / Components | — | — | — | — | — | — | — | NOT STARTED |
-| Classifications / Specimens / Products | — | — | — | — | — | — | — | NOT STARTED |
-| Sources / Knowledge / Relations | — | — | — | — | — | — | — | NOT STARTED |
-| Videos | — | — | — | — | — | — | — | NOT STARTED |
-| URLs | — | — | — | — | — | — | — | NOT STARTED; 301 mapping required for changes |
+| WordPress Posts | 800 | 36 | 36 | 764 | 0 | 0 | 36 | DEV ONLY; 764 domain-targeted custom/system posts |
+| Categories | 2 | 1 | 1 | 1 | 0 | 0 | 1 | DEV ONLY; non-category taxonomy is explicit skip |
+| Media entities | 242 | 242 | 242 | 0 | 0 | 0 | 242 | DEV ONLY; assets/usages remain separate |
+| Authority entities | 370 | 370 | 370 | 0 | 0 | 0 | 370 | DEV ONLY; exact UUID/stable-key mapping |
+| Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; source/evidence joins remain open |
+| Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
+| Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
+| URLs | 800 | 1 candidate | 0 | 800 | 0 | 0 | 0 | Candidate inventory only; 301 mapping remains open |
+| Evidence / assets / projections | 1,603 | 0 | 0 | 1,603 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
 
 ## Read-only reference checkpoint
 
@@ -22,8 +22,9 @@ the read-only legacy inventory and dry-run exist.
 `demo.1945.vn`. It observed 12 visible cards on `/tri-thuc/` and 15 visible
 cards on `/thuong-hieu/`; these are page samples, not source counts. The
 sharing, video, media and specimen routes exposed honest empty states at audit
-time. V2 REST access was blocked by the browser client, so all data counts and
-identity mappings remain pending a read-only export/API/database source.
+time. V2 REST access was blocked by the browser client, so the database export
+is the authoritative source for the counts and identity mappings recorded in
+this ledger.
 
 ## Reason-code policy
 
@@ -62,4 +63,6 @@ and emits bounded reason codes including `DUPLICATE_CANDIDATE`,
 and malformed records are not silently mapped. A repeated media checksum is
 evidence for review only; it never merges identities. The tool is ready for a
 read-only V2 export, while actual migration remains gated by backup,
-readability/restore evidence and resumable checkpoint design.
+readability/restore evidence, field-level reconciliation, approval and
+Cutover Readiness. The apply runner is `tools/v2-migrate.php`; `--offset`
+selects the next source window and Migration006 stores the durable checkpoint.

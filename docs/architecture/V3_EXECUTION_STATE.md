@@ -1,21 +1,21 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, runtime and V2 inventory checkpoint pushed.
+Last updated: 2026-08-31, governed local-dev migration checkpoint.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `3e3a914` |
-| Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
+| Branch / HEAD | `main` / pending migration checkpoint |
+| Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
-| DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 88 tests, 351 assertions; plugin/theme PHP lint and diff check pass |
-| Blockers | V3 detail data, visual QA (browser connector unavailable), external MCP transport, URL/media field reconciliation and governed migration apply remain open; V2/live remains read-only |
+| DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |
+| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 89 tests, 363 assertions; plugin/theme PHP lint and diff check pass |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, URL/media/source/evidence reconciliation, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Obtain a compatible V2 backup restore path, complete field-level URL/media/identity reconciliation, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; no V2 record migrated |
-| Pending migrations | None for P4; future P5 migrations require their own gate |
-| Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
+| Next executable task | Complete field-level URL/media/source/evidence/semantic projection reconciliation, review the 1,545-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; local-dev ledger imported 1,545 rows with 3,388 explicit skips |
+| Pending migrations | None; `nhk_v3` is current 6/target 6 and Migration006 ledger is active |
+| Migration dry-run | Full restored-backup export: 4,933 records; 2,516 candidates and 2,417 skipped; local-dev apply: 1,545 migrated, 3,388 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -168,10 +168,17 @@ Last updated: 2026-08-31, runtime and V2 inventory checkpoint pushed.
   WordPress rewrite file and empty-editorial alias handling made core frontend
   smoke pass, including a real `/hello-world/` post route.
 - 2026-08-31: The V2 backup was restored into guarded staging with a reviewed
-  MariaDB compatibility conversion. Read-only export/dry-run produced 3,086
-  records: 1,917 mapped, 1,169 skipped (`INVALID_URL_MAPPING` 799,
-  `UNSUPPORTED_LEGACY_TYPE` 370). Temporary V2 tables were removed, the V3
-  test snapshot was restored, and no V2 record was migrated.
+  MariaDB compatibility conversion. The expanded read-only export/dry-run
+  produced 4,933 records: 2,180 mapped, 2,753 skipped
+  (`INVALID_URL_MAPPING` 799, `UNSUPPORTED_LEGACY_TYPE` 1,954). Temporary V2
+  tables were removed, the V3 test snapshot was restored, and no V2 record was
+  migrated.
 - 2026-08-31: Final route smoke passed 15/15 checks including `/hello-world/`.
   Visual automation remains pending because Playwright has no browser binary
   and the available system Chrome aborts in the headless connector.
+- 2026-08-31: Migration006 added a durable source checksum/status ledger and
+  `tools/v2-migrate.php` added guarded plan/apply with source offsets. After a
+  reviewed normalized V2 restore, the full 4,933-record export was applied to
+  local `nhk_v3`: 1,545 migrated, 3,388 explicit skips, 0 conflicts. A second
+  run produced the same counts and no duplicate targets. The guarded test DB
+  was restored from snapshot and remains free of `nhkv2_*` tables.

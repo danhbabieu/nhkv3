@@ -8,6 +8,7 @@ use NHK\Core\Infrastructure\Migration\AuthorityMigration002;
 use NHK\Core\Infrastructure\Migration\GovernanceMigration003;
 use NHK\Core\Infrastructure\Migration\MediaMigration004;
 use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
+use NHK\Core\Infrastructure\Migration\MigrationLedger006;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpToolCatalog};
@@ -40,7 +41,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', KnowledgeMigration005::VERSION, false);
+        update_option('nhk_core_migration_target', MigrationLedger006::VERSION, false);
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
@@ -58,7 +59,7 @@ final class Plugin {
             $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $graphService = new GraphService($graphRepository, $endpoints, new PredicateRegistry(), new WpdbAuditSink());
             $proposalRepository = new WpdbProposalRepository($wpdb); $governanceAudit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb); $transactionManager = new WpdbTransactionManager($wpdb); $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository));
-            $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink($wpdb));
+            $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, new MigrationStatus()))->register();
@@ -70,12 +71,13 @@ final class Plugin {
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', 5, '', false);
+        add_option('nhk_core_migration_target', MigrationLedger006::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
         (new MediaMigration004())->up();
         (new KnowledgeMigration005())->up();
+        (new MigrationLedger006())->up();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }

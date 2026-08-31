@@ -16,6 +16,7 @@ define('NHK_CORE_VERSION', '0.1.0');
 define('NHK_CORE_API_VERSION', 'v1');
 
 $autoload = __DIR__ . '/vendor/autoload.php';
+if (! is_readable($autoload)) { $autoload = __DIR__ . '/../../../../vendor/autoload.php'; }
 if (is_readable($autoload)) { require_once $autoload; }
 else {
     spl_autoload_register(static function (string $class): void {

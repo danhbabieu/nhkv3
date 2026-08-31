@@ -31,7 +31,7 @@ $rows = static function (mysqli $db, string $query): array {
 
 $records = [];
 $postIds = [];
-$posts = $rows($db, 'SELECT ID,post_type,post_status,post_name,guid FROM ' . $table('posts') . ' ORDER BY ID');
+$posts = $rows($db, 'SELECT ID,post_author,post_date,post_date_gmt,post_modified,post_type,post_status,post_name,post_title,post_excerpt,post_content,guid FROM ' . $table('posts') . ' ORDER BY ID');
 foreach ($posts as $post) {
     $id = (string) $post['ID'];
     $postIds[$id] = true;
@@ -41,6 +41,14 @@ foreach ($posts as $post) {
         'legacy_id' => $id,
         'legacy_type' => (string) $post['post_type'],
         'status' => (string) $post['post_status'],
+        'post_author' => (string) $post['post_author'],
+        'post_date' => (string) $post['post_date'],
+        'post_date_gmt' => (string) $post['post_date_gmt'],
+        'post_modified' => (string) $post['post_modified'],
+        'post_name' => (string) $post['post_name'],
+        'post_title' => (string) $post['post_title'],
+        'post_excerpt' => (string) $post['post_excerpt'],
+        'post_content' => (string) $post['post_content'],
     ];
     $path = parse_url((string) $post['guid'], PHP_URL_PATH);
     $sourcePath = is_string($path) && $path !== '' ? $path : '/' . trim((string) $post['post_name'], '/') . '/';
@@ -50,14 +58,38 @@ foreach ($posts as $post) {
     $records[] = ['type' => 'url', 'source_path' => $sourcePath, 'target_path' => $targetPath, 'legacy_id' => $id];
 }
 
+$categories = $rows($db, 'SELECT t.term_id,t.slug,t.name,tt.taxonomy FROM ' . $table('terms') . ' t JOIN ' . $table('term_taxonomy') . ' tt ON tt.term_id=t.term_id ORDER BY t.term_id');
+foreach ($categories as $category) {
+    $records[] = [
+        'type' => 'category',
+        'stable_key' => 'category:' . (string) $category['taxonomy'] . ':' . (string) $category['slug'],
+        'legacy_id' => (string) $category['term_id'],
+        'name' => (string) $category['name'],
+        'taxonomy' => (string) $category['taxonomy'],
+        'slug' => (string) $category['slug'],
+    ];
+}
+
 $entityIds = [];
-$entities = $rows($db, 'SELECT id,stable_key,entity_type,canonical_name,review_state,revision FROM ' . $table('nhk_entities') . ' ORDER BY id');
-$supportedEntityTypes = ['brand', 'model', 'product', 'media', 'video', 'knowledge'];
+$entityTypesById = [];
+$entities = $rows($db, 'SELECT id,stable_key,entity_type,canonical_name,review_state,revision,metadata FROM ' . $table('nhk_entities') . ' ORDER BY id');
+$supportedEntityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge'];
+$endpointType = static function (string $legacyType): string {
+    return match ($legacyType) {
+        'article' => 'wp_post',
+        'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge' => $legacyType,
+        default => '',
+    };
+};
 foreach ($entities as $entity) {
     $id = (string) $entity['id'];
     $entityIds[$id] = true;
     $legacyType = (string) $entity['entity_type'];
     $type = in_array($legacyType, $supportedEntityTypes, true) ? $legacyType : 'legacy_' . $legacyType;
+    $entityTypesById[$id] = $endpointType($legacyType);
+    $metadata = json_decode((string) $entity['metadata'], true);
+    $metadata = is_array($metadata) ? $metadata : [];
+    unset($metadata['private_notes'], $metadata['token'], $metadata['password'], $metadata['secret']);
     $records[] = [
         'type' => $type,
         'stable_key' => (string) $entity['stable_key'],
@@ -66,6 +98,7 @@ foreach ($entities as $entity) {
         'canonical_name' => (string) $entity['canonical_name'],
         'review_state' => (string) $entity['review_state'],
         'revision' => (int) $entity['revision'],
+        'metadata' => $metadata,
         'conflict' => strtoupper((string) $entity['review_state']) === 'CONFLICT',
     ];
 }
@@ -79,10 +112,72 @@ foreach ($relations as $relation) {
         'stable_key' => 'relation:' . (string) $relation['id'],
         'source_key' => $source,
         'target_key' => $target,
+        'source_type' => $entityTypesById[$source] ?? '',
+        'target_type' => $entityTypesById[$target] ?? '',
         'source_missing' => !isset($entityIds[$source]) && !isset($postIds[$source]),
         'target_missing' => !isset($entityIds[$target]) && !isset($postIds[$target]),
         'relation_type' => (string) $relation['relation_type'],
         'status' => (string) $relation['status'],
+    ];
+}
+
+$knowledgeRelations = $rows($db, 'SELECT id,relation_type,source_id,source_type,target_id,target_type,lifecycle_status FROM ' . $table('nhk_knowledge_relations') . ' ORDER BY id');
+foreach ($knowledgeRelations as $relation) {
+    $source = (string) $relation['source_id'];
+    $target = (string) $relation['target_id'];
+    $records[] = [
+        'type' => 'relation',
+        'stable_key' => 'knowledge-relation:' . (string) $relation['id'],
+        'source_key' => $source,
+        'target_key' => $target,
+        'source_type' => (string) $relation['source_type'],
+        'target_type' => (string) $relation['target_type'],
+        'source_missing' => !isset($entityIds[$source]) && !isset($postIds[$source]),
+        'target_missing' => !isset($entityIds[$target]) && !isset($postIds[$target]),
+        'relation_type' => (string) $relation['relation_type'],
+        'status' => (string) $relation['lifecycle_status'],
+    ];
+}
+
+$evidence = $rows($db, 'SELECT id,evidence_type,title,source_identity,source_location,verification_state FROM ' . $table('nhk_knowledge_evidence') . ' ORDER BY id');
+foreach ($evidence as $item) {
+    $records[] = [
+        'type' => 'evidence',
+        'stable_key' => 'evidence:' . (string) $item['id'],
+        'canonical_uuid' => (string) $item['id'],
+        'legacy_type' => (string) $item['evidence_type'],
+        'canonical_name' => (string) $item['title'],
+        'verification_state' => (string) $item['verification_state'],
+    ];
+}
+
+$mediaAssets = $rows($db, 'SELECT id,public_id,attachment_id,status,visibility,title,mime_type,checksum FROM ' . $table('nhk_media_assets') . ' ORDER BY id');
+foreach ($mediaAssets as $asset) {
+    $records[] = [
+        'type' => 'legacy_media_asset',
+        'stable_key' => 'media-asset:' . (string) $asset['public_id'],
+        'canonical_uuid' => (string) $asset['id'],
+        'legacy_type' => 'media_asset',
+        'status' => (string) $asset['status'],
+        'visibility' => (string) $asset['visibility'],
+        'mime_type' => (string) $asset['mime_type'],
+        'checksum' => (string) $asset['checksum'],
+    ];
+}
+
+$projections = $rows($db, 'SELECT projection_id,semantic_id,canonical_object_id,canonical_object_type,projection_type,visibility,quality_state,seo_ready,ai_ready,stale FROM ' . $table('nhk_semantic_projections') . ' ORDER BY projection_id');
+foreach ($projections as $projection) {
+    $records[] = [
+        'type' => 'legacy_semantic_projection',
+        'stable_key' => (string) $projection['semantic_id'],
+        'legacy_type' => (string) $projection['projection_type'],
+        'canonical_object_type' => (string) $projection['canonical_object_type'],
+        'canonical_object_id' => (string) $projection['canonical_object_id'],
+        'visibility' => (string) $projection['visibility'],
+        'quality_state' => (string) $projection['quality_state'],
+        'seo_ready' => (int) $projection['seo_ready'],
+        'ai_ready' => (int) $projection['ai_ready'],
+        'stale' => (int) $projection['stale'],
     ];
 }
 
