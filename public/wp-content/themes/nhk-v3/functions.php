@@ -26,6 +26,11 @@ function nhk_v3_nav_fallback(): void
 
 function nhk_v3_excerpt(): string { return wp_trim_words(wp_strip_all_tags(get_the_excerpt()), 28); }
 
+function nhk_v3_entity_label(string $type): string
+{
+    return ['brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm'][$type] ?? 'hồ sơ';
+}
+
 function nhk_v3_document_title(string $title): string
 {
     $entity = $GLOBALS['nhk_core_entity_context'] ?? null;
@@ -33,6 +38,7 @@ function nhk_v3_document_title(string $title): string
     $video = $GLOBALS['nhk_core_video_context'] ?? null;
     $knowledge = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     if (is_array($entity) && ($entity['mode'] ?? '') === 'detail' && is_array($entity['entity'] ?? null)) return (string) $entity['entity']['name'] . ' — Đồng Hồ Nhà Kho';
+    if (is_array($entity) && ($entity['mode'] ?? '') === 'archive') return 'Khám phá ' . nhk_v3_entity_label((string) ($entity['type'] ?? '')) . ' — Đồng Hồ Nhà Kho';
     if (is_array($media) && ($media['mode'] ?? '') === 'detail' && is_array($media['media'] ?? null)) return (string) ($media['media']['name'] ?? 'Media') . ' — Đồng Hồ Nhà Kho';
     if (is_array($video) && ($video['mode'] ?? '') === 'detail' && is_array($video['video'] ?? null)) return (string) (($video['video']['title'] ?? '') ?: 'Video NHK') . ' — Đồng Hồ Nhà Kho';
     if (is_array($media) && ($media['mode'] ?? '') === 'archive') return 'Hình ảnh & media — Đồng Hồ Nhà Kho';
@@ -54,7 +60,7 @@ function nhk_v3_seo_head(): void
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
         if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ canonical ' . (string) $entity['name'] . ' trong kho NHK.'; $canonical = home_url('/' . (string) $context['type'] . '/' . rawurlencode((string) $entity['stable_key']) . '/'); }
-        elseif (($context['mode'] ?? '') === 'archive') { $title = 'Khám phá ' . (string) ($context['type'] ?? '') . ' — Đồng Hồ Nhà Kho'; $canonical = home_url('/' . (string) ($context['type'] ?? '') . '/'); }
+        elseif (($context['mode'] ?? '') === 'archive') { $title = 'Khám phá ' . nhk_v3_entity_label((string) ($context['type'] ?? '')) . ' — Đồng Hồ Nhà Kho'; $canonical = home_url('/' . (string) ($context['type'] ?? '') . '/'); }
     }
     if (is_array($media_context)) {
         if (($media_context['mode'] ?? '') === 'detail' && is_array($media_context['media'] ?? null)) { $media = $media_context['media']; $title = (string) ($media['name'] ?? 'Media') . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ media canonical trong thư viện NHK.'; $canonical = home_url('/media/' . rawurlencode((string) ($media['id'] ?? '')) . '/'); }

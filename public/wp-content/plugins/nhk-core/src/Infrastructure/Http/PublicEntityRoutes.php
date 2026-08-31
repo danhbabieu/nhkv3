@@ -38,7 +38,7 @@ final class PublicEntityRoutes
             $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $type, 'entity' => $entity, 'archive_url' => home_url('/' . $type . '/')];
         } else {
             $page = max(1, (int) get_query_var('nhk_entity_page', 1)); $query = trim((string) get_query_var('nhk_entity_q'));
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'archive' => $this->query->archive($type, $page, 24, $query), 'archive_url' => home_url('/' . $type . '/')];
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'archive' => $this->query->archive($type, $page, 24, $query), 'archive_url' => home_url('/' . $type . '/')];
         }
         $themeTemplate = locate_template('entity.php');
         return $themeTemplate !== '' ? $themeTemplate : $template;

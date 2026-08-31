@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, fail-closed MediaAsset delivery checkpoint.
+Last updated: 2026-08-31, Authority archive QA checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, fail-closed MediaAsset delivery checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 70 tests, 205 assertions; guarded WordPress suite: 103 tests, 419 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Tests | Unit suite: 70 tests, 207 assertions; guarded WordPress suite: 103 tests, 419 assertions; plugin/theme PHP lint, route smoke and diff check pass |
 | Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
@@ -284,3 +284,14 @@ Last updated: 2026-08-31, fail-closed MediaAsset delivery checkpoint.
 - 2026-08-31: Guarded WordPress integration passed after the delivery boundary
   and rewrite registration changes: `nhk_v3_test` remains migration 8/8 and
   the suite is 103 tests/419 assertions with no V2 tables restored.
+- 2026-08-31: Desktop Authority archive QA found the archive context omitted
+  its entity type, producing the duplicate heading “Khám phá khám phá”, a
+  generic document title and malformed stable-key links. The archive context
+  now preserves `type` for the theme/query boundary; the fix is covered by a
+  frontend contract assertion and browser verification.
+- 2026-08-31: Authority archive title handling now uses the preserved entity
+  type for localized document titles and canonical SEO title output; the
+  previous generic site title is removed from this surface.
+- 2026-08-31: Authority archive browser verification now reports the localized
+  title “Khám phá thương hiệu — Đồng Hồ Nhà Kho”, a non-duplicated heading,
+  canonical `/brand/nhk%3Abrand%3Ajunghans/` card links and route smoke 17/17.
