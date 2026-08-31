@@ -32,14 +32,14 @@ final class McpReadHandler
     {
         if (!$this->types->has($type) || !$this->ready('authority')) return null;
         $entity = $this->authority->findByCanonicalId($id);
-        return $entity && $entity->entityType === $type ? $this->entity($entity) : null;
+        return $entity && $entity->entityType === $type && $entity->active() ? $this->entity($entity) : null;
     }
 
     public function mediaGet(string $id): ?array
     {
         if (!$this->ready('media')) return null;
         $media = $this->media->findByCanonicalId($id);
-        if (!$media) return null;
+        if (!$media || !$media->active) return null;
         $assets = array_values(array_filter($this->assets->listByMediaId($id), static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
         return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'readiness' => $media->readiness, 'active' => $media->active, 'revision' => $media->revision, 'provenance' => $media->provenance, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($id))];
     }
@@ -48,7 +48,7 @@ final class McpReadHandler
     {
         if (!$this->ready('video')) return null;
         $video = $this->videos->findByCanonicalId($id);
-        return $video ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'metadata' => $video->metadata, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision] : null;
+        return $video && $video->active ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'metadata' => $video->metadata, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision] : null;
     }
 
     public function knowledgeGet(string $id): ?array

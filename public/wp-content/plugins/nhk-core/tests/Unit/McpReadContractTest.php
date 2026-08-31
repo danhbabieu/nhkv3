@@ -64,6 +64,9 @@ final class McpReadContractTest extends TestCase
         $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence);
         self::assertSame($entity->canonicalId, $handler->entityGet('brand', $entity->canonicalId)['id']);
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
+        $retired = $authority->create('brand', 'retired', 'Retired');
+        $authority->retire($retired->canonicalId, 1);
+        self::assertNull($handler->entityGet('brand', $retired->canonicalId));
         self::assertSame($entity->canonicalId, $authorityRepository->findByCanonicalId($entity->canonicalId)?->canonicalId);
     }
 }

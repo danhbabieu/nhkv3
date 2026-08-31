@@ -27,7 +27,7 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->mediaStorageReady(), 'media')) return $error;
         $media = $this->media->findByCanonicalId((string) $request['id']);
-        if (!$media) return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
+        if (!$media || !$media->active) return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
         $assets = array_values(array_filter($this->assets->listByMediaId($media->canonicalId), static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
         return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'readiness' => $media->readiness, 'active' => $media->active, 'revision' => $media->revision, 'provenance' => $media->provenance, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($media->canonicalId))];
     }
@@ -36,7 +36,7 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->videoStorageReady(), 'video')) return $error;
         $video = $this->videos->findByCanonicalId((string) $request['id']);
-        if (!$video) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
+        if (!$video || !$video->active) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
         return ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'metadata' => $video->metadata, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision];
     }
 
