@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P11 native homepage URL no-op reconciliation checkpoint.
+Last updated: 2026-08-31, P11 readiness evidence synchronization checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,13 @@ Last updated: 2026-08-31, P11 native homepage URL no-op reconciliation checkpoin
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-08-31: Cutover readiness and master-plan evidence were synchronized
+  with the current guarded suite (88 unit tests/455 assertions; 132 combined
+  tests/802 assertions) and the policy-normalized migration checkpoint
+  (3,961 mapped, 1,012 skipped, 0 conflicts, 27 residual URL candidates).
+  No implementation or database state changed in this documentation-only
+  checkpoint; the repository remains pre-cutover.
 
 - 2026-08-31: Public entity payload rendering now maps technical field labels and
   filters internal phrases such as canonical, stable key, external reference and
