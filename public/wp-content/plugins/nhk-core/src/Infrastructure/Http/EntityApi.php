@@ -5,10 +5,11 @@ namespace NHK\Core\Infrastructure\Http;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class EntityApi
 {
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?MigrationStatus $status = null) {}
 
     public function register(): void
     {
@@ -18,6 +19,7 @@ final class EntityApi
 
     private function detail(\WP_REST_Request $request): array|\WP_Error
     {
+        if ($error = $this->unavailable()) return $error;
         $type = (string) $request['type'];
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
         $entity = $this->authority->findByCanonicalId((string) $request['id']);
@@ -27,6 +29,7 @@ final class EntityApi
 
     private function list(\WP_REST_Request $request): array|\WP_Error
     {
+        if ($error = $this->unavailable()) return $error;
         $type = (string) $request['type'];
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
         $page = max(1, (int) $request['page']); $perPage = min(100, max(1, (int) $request['per_page']));
@@ -36,4 +39,5 @@ final class EntityApi
     }
 
     private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload, 'active' => $entity->active(), 'revision' => $entity->revision]; }
+    private function unavailable(): ?\WP_Error { return $this->status && !$this->status->authorityStorageReady() ? new \WP_Error('nhk_storage_unavailable', 'Authority storage is not ready.', ['status' => 503]) : null; }
 }

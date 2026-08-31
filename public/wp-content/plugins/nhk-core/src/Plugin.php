@@ -78,7 +78,7 @@ final class Plugin {
             $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, new MediaService($media, $assets, $usages), new VideoService($videos), new KnowledgeService($claims, $sources, $evidence)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, new MigrationStatus()))->register();
-            (new EntityApi($authority, $types))->register();
+            (new EntityApi($authority, $types, new MigrationStatus()))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources);
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);

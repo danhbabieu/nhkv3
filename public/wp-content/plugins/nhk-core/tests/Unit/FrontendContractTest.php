@@ -158,6 +158,14 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_public_entity_api_has_fail_closed_authority_storage_guard(): void
+    {
+        $entityApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php');
+        self::assertStringContainsString('authorityStorageReady()', $entityApi);
+        self::assertStringContainsString("'nhk_storage_unavailable'", $entityApi);
+        self::assertStringContainsString("['status' => 503]", $entityApi);
+    }
+
     public function test_public_media_api_does_not_expose_asset_storage_metadata(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
