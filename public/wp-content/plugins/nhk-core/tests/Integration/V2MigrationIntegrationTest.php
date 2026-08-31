@@ -87,6 +87,35 @@ final class V2MigrationIntegrationTest extends TestCase
         self::assertSame([], json_decode((string) $wpdb->get_var($wpdb->prepare("SELECT payload FROM {$wpdb->prefix}nhk_entities WHERE stable_key=%s", 'v2-migration-integration-brand')), true)['private_notes'] ?? []);
     }
 
+    public function test_skipped_domain_records_retain_structured_review_metadata(): void
+    {
+        global $wpdb;
+        $records = [
+            ['type' => 'wp_post', 'stable_key' => 'v2-migration-integration-review-brand', 'legacy_type' => 'nhk_brand', 'post_title' => 'Review brand'],
+            ['type' => 'wp_post', 'stable_key' => 'v2-migration-integration-review-attachment', 'legacy_type' => 'attachment'],
+            ['type' => 'wp_post', 'stable_key' => 'v2-migration-integration-review-style', 'legacy_type' => 'wp_global_styles'],
+        ];
+
+        try {
+            $result = (new V2MigrationService($wpdb))->apply($records, 11, 10);
+            self::assertSame(3, $result['processed']);
+            self::assertSame(3, $result['skipped']);
+            $details = $wpdb->get_results($wpdb->prepare(
+                "SELECT source_key,reason_code,details_json FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s ORDER BY source_key",
+                'v2-migration-integration-review-%'
+            ), ARRAY_A);
+            self::assertCount(3, $details);
+            $byKey = [];
+            foreach ($details as $row) $byKey[$row['source_key']] = json_decode((string) $row['details_json'], true);
+            self::assertSame('brand', $byKey['v2-migration-integration-review-brand']['review']['target_domain']);
+            self::assertTrue($byKey['v2-migration-integration-review-brand']['review']['name_only_match_forbidden']);
+            self::assertTrue($byKey['v2-migration-integration-review-attachment']['review']['requires_source_recovery']);
+            self::assertSame('retire', $byKey['v2-migration-integration-review-style']['review']['disposition']);
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-review-%'));
+        }
+    }
+
     public function test_source_and_citation_evidence_migrate_only_with_governed_endpoints(): void
     {
         global $wpdb;

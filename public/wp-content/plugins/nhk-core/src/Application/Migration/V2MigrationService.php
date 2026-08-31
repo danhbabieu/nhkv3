@@ -74,7 +74,10 @@ final class V2MigrationService
                 $this->ledger->record($type, $key, 'migrated', $result['reason'], $checksum, $result['target_type'] ?? null, $result['target_key'] ?? null, $result['target_id'] ?? null, $batchNo, $result['details'] ?? []);
                 $migrated++;
             } catch (MigrationSkip $error) {
-                $this->ledger->record($type, $key, $error->status, $error->reason, $checksum, null, null, null, $batchNo, ['message' => $error->getMessage()]);
+                $details = ['message' => $error->getMessage()];
+                $review = $this->reviewDetails($record, $error->reason);
+                if ($review !== []) $details['review'] = $review;
+                $this->ledger->record($type, $key, $error->status, $error->reason, $checksum, null, null, null, $batchNo, $details);
                 if ($error->status === 'conflict') $conflict++; else $skipped++;
             } catch (\Throwable $error) {
                 // A storage or domain failure is recorded as a conflict and is
@@ -84,6 +87,26 @@ final class V2MigrationService
             }
         }
         return ['processed' => $processed, 'migrated' => $migrated, 'skipped' => $skipped, 'conflict' => $conflict, 'ledger' => $this->ledger->counts()];
+    }
+
+    /** @return array<string,mixed> */
+    private function reviewDetails(array $record, string $reason): array
+    {
+        return match ($reason) {
+            'DOMAIN_TARGETED' => [
+                'target_domain' => [
+                    'nhk_brand' => 'brand', 'nhk_model' => 'model', 'nhk_variant' => 'variant',
+                    'nhk_movement' => 'movement', 'nhk_music' => 'music', 'nhk_component' => 'component',
+                    'nhk_classification' => 'classification', 'nhk_specimen' => 'specimen',
+                    'nhk_product' => 'product', 'nhk_knowledge' => 'knowledge',
+                ][(string) ($record['legacy_type'] ?? '')] ?? ($record['target_type'] ?? null),
+                'requires_explicit_mapping' => true,
+                'name_only_match_forbidden' => true,
+            ],
+            'UNSUPPORTED_MEDIA_REFERENCE' => ['target_domain' => 'media_asset', 'requires_source_recovery' => true],
+            'RETIRED_LEGACY_GARBAGE' => ['disposition' => 'retire', 'editorial_import_forbidden' => true],
+            default => [],
+        };
     }
 
     private function migrate(array $record, int $batchNo): array
