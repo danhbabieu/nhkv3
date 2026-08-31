@@ -19,6 +19,12 @@ Last updated: 2026-09-01, P11 Source/Evidence provenance checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Read-only MediaAsset recovery audit confirmed that the V2
+  storage root recorded by all three imported assets is absent on the current
+  host, and exact legacy filenames are absent from the V3 upload root and known
+  local artifact root. No byte/checksum evidence exists for a governed mapping;
+  public delivery remains fail-closed and no asset was rewritten or published.
+
 - 2026-09-01: Source/Evidence migration now retains top-level V2
   `review_state` inside the durable metadata envelope as well as using it to
   fail closed archived/retired rows. Guarded coverage verifies both inactive

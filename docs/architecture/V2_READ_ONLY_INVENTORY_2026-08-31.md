@@ -81,6 +81,16 @@ rows were also imported with their V2 PRIVATE state, verification state and
 citation metadata preserved; runtime MediaAsset delivery/privacy and public
 provenance presentation remain open reconciliation work. The V2 media usage
 inventory is exactly zero, so no usage rows require migration.
+
+## MediaAsset source-file recovery audit
+
+On 2026-09-01 the referenced V2 root `/home/erourxcg/apps/NhakhoV2/` was
+checked read-only on the current host and was absent. The V3 upload root and
+the known local artifact root `/Users/imac24-2125d/Documents/Codex/2026-08-31`
+were also checked for the exact legacy filenames from the 21 attachment URL
+records and the three imported MediaAsset storage keys; no matching source file
+was found. This is evidence that the bytes are unavailable in the current
+workspace, not permission to infer, re-encode, publish or replace any asset.
 Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
 links, all matching canonical entity UUIDs: 370 active Authority entities,
 292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.14 now
