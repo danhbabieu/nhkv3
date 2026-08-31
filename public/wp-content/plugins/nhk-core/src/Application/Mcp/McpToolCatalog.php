@@ -18,6 +18,8 @@ final class McpToolCatalog
             ['name' => 'nhk.proposal.submit', 'kind' => 'mutation', 'governed' => true],
             ['name' => 'nhk.proposal.approve', 'kind' => 'mutation', 'governed' => true],
             ['name' => 'nhk.proposal.reject', 'kind' => 'mutation', 'governed' => true],
+            ['name' => 'nhk.proposal.eligibility', 'kind' => 'read', 'governed' => false],
+            ['name' => 'nhk.proposal.apply', 'kind' => 'mutation', 'governed' => true],
         ];
     }
 

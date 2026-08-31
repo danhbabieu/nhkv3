@@ -50,7 +50,7 @@ final class GovernanceApi
             $body = is_array($body) ? $body : [];
             $id = UuidCodec::newV7();
             $operation = (string) ($body['operation'] ?? ''); $entityType = (string) ($body['entity_type'] ?? ''); $subjectId = (string) ($body['subject_id'] ?? '');
-            if ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) $subjectId = $entityType;
+            if ($subjectId === '' && in_array($operation, ['create', 'ingest', 'relation_create'], true)) $subjectId = $entityType !== '' ? $entityType : 'relation';
             $proposal = new Proposal($id, $subjectId, $operation, is_array($body['payload'] ?? null) ? $body['payload'] : [], (string) ($body['content_fingerprint'] ?? ''), max(1, (int) ($body['expected_revision'] ?? 1)), (string) ($body['dependency_fingerprint'] ?? ''), actor: (string) get_current_user_id(), idempotencyKey: (string) ($body['idempotency_key'] ?? ''), targetUuid: isset($body['target_uuid']) ? (string) $body['target_uuid'] : null, entityType: $entityType);
             return $this->serialize($this->governance->create($proposal));
         } catch (\Throwable $error) { return $this->error($error); }

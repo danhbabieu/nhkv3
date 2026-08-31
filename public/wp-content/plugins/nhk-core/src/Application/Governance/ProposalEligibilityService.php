@@ -24,7 +24,7 @@ final class ProposalEligibilityService
             return EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
         }
         $reasons = [];
-        $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
+        $isCreation = in_array($proposal->operation, ['create', 'ingest', 'relation_create'], true) && $proposal->targetUuid === null;
         if (!$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
         if (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';

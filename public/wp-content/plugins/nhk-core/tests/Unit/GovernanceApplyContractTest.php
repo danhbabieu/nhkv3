@@ -5,8 +5,12 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\AuthorityProposalExecutor;
+use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
+use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
+use NHK\Tests\Support\InMemoryGraphRepository;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -23,5 +27,42 @@ final class GovernanceApplyContractTest extends TestCase
         self::assertSame($created->canonicalId, $renamed->canonicalId);
         self::assertSame('Odo & Co.', $repository->findByCanonicalId($created->canonicalId)?->canonicalName);
         self::assertSame(2, $renamed->revision);
+    }
+
+    public function test_relation_proposals_are_executed_by_graph_service_with_revisioned_lifecycle(): void
+    {
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $authority = new AuthorityService(new InMemoryAuthorityRepository(), $types);
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:42']));
+        $endpoints->register('brand', new FakeEndpointResolver('brand', ['odo']));
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $executor = new AuthorityProposalExecutor($authority, $graph);
+
+        $edge = $executor(new Proposal(
+            'relation-create-1',
+            'relation',
+            'relation_create',
+            ['source_type' => 'wp_post', 'source_key' => '1:42', 'predicate' => 'about', 'target_type' => 'brand', 'target_key' => 'odo'],
+            'content',
+            1,
+            'deps',
+            ProposalState::APPROVED,
+            '1',
+            '2',
+            null,
+            'idem-relation-create',
+            1,
+            null,
+            null,
+            null,
+            'relation',
+        ));
+        self::assertSame('about', $edge->predicate);
+        $retired = $executor(new Proposal('relation-retire-1', $edge->edge_uuid, 'relation_retire', [], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-relation-retire', 1, null, null, $edge->edge_uuid, 'relation'));
+        self::assertFalse($retired->isActive());
+        $reactivated = $executor(new Proposal('relation-reactivate-1', $edge->edge_uuid, 'relation_reactivate', [], 'content', 2, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-relation-reactivate', 1, null, null, $edge->edge_uuid, 'relation'));
+        self::assertTrue($reactivated->isActive());
     }
 }
