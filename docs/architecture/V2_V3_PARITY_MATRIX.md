@@ -14,8 +14,8 @@ the final parity declaration.
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
-| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + Admin/read API | NO | PARTIAL | IN PROGRESS | Search and governed proposal REST surfaces tested; Controlled Apply/Admin detail UI pending |
-| MCP | Legacy behavior pending | Tool catalog + governed handler contract | NO | PARTIAL | IN PROGRESS | External MCP transport and read adapters pending |
+| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + Admin/read API | NO | PARTIAL | IN PROGRESS | Search, eligibility and governed proposal/Controlled Apply REST surfaces tested; daily Admin detail UI pending |
+| MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
 | SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary | NO | NO | NOT ASSESSED | URL/API inventory pending in P10 |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Not implemented | NO | NO | NOT ASSESSED | P6/P9 |
 

@@ -10,6 +10,7 @@ use NHK\Core\Infrastructure\Migration\MediaMigration004;
 use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
+use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpToolCatalog};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
@@ -53,6 +54,7 @@ final class Plugin {
             (new EntityApi($authority, $types))->register();
             $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
             (new GraphApi(new GraphService(new WpdbGraphRepository($wpdb), $endpoints, new PredicateRegistry(), new WpdbAuditSink()), new MigrationStatus()))->register();
+            do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus()), new McpGovernanceHandler($governance));
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
     }
