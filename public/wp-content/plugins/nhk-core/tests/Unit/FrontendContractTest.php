@@ -140,6 +140,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("'metadata' =>", $readApi);
     }
 
+    public function test_knowledge_template_accepts_evidence_locator_fallback_without_notices(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/knowledge.php');
+        self::assertStringContainsString("\$item['locator'] ?? (\$item['source_locator'] ?? null)", $template);
+        self::assertStringNotContainsString("\$item['locator'] ?:", $template);
+    }
+
     public function test_semantic_archives_render_pagination_from_query_totals(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
