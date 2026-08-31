@@ -5,7 +5,7 @@ Last updated: 2026-08-31, final media persistence and local-dev migration checkp
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `3854448` |
+| Branch / HEAD | `main` / current local checkpoint |
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |
