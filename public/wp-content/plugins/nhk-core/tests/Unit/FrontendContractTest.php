@@ -24,4 +24,14 @@ final class FrontendContractTest extends TestCase
             self::assertStringContainsString($contract, $functions);
         }
     }
+
+    public function test_search_template_uses_unified_search_query_boundary(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $index = (string) file_get_contents($theme . '/index.php');
+        $query = (string) file_get_contents($theme . '/inc/class-nhk-search-page-query.php');
+        self::assertStringContainsString('NHK_V3_Search_Page_Query', $index);
+        self::assertStringNotContainsString('new WP_Query', $index);
+        self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
+    }
 }
