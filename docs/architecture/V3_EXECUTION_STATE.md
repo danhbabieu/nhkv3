@@ -5,7 +5,7 @@ Last updated: 2026-08-31, initial autonomous bootstrap.
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `6eac802` |
+| Branch / HEAD | `main` / `51ff8bf` |
 | Current phase | P6 Media + Video — foundation design |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 4 on `nhk_v3`; MediaMigration004 UP-only applied and media/video storage ready |
@@ -34,3 +34,6 @@ Last updated: 2026-08-31, initial autonomous bootstrap.
 - 2026-08-31: MediaMigration004 applied UP-only to `nhk_v3`; runtime health
   reports migration 4/4 and media/video storage ready. P6 persistence services
   and Graph relations remain the next executable work.
+- 2026-08-31: P6 domain/schema checkpoint committed as `51ff8bf` and pushed to
+  `origin/main`; P6 remains active for persistence services and shared Graph
+  endpoint integration.
