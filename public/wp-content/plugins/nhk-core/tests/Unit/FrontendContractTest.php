@@ -33,6 +33,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_entity_label', $functions);
         self::assertStringContainsString("return 'Đồng Hồ Nhà Kho — Kho tri thức và sưu tầm';", $functions);
         self::assertStringContainsString("Khám phá bài viết, thương hiệu, mẫu đồng hồ và hiện vật trong kho tri thức NHK.", $functions);
+        self::assertStringContainsString('$description = \'Khám phá \' . $label . \' trong kho tri thức NHK.\';', $functions);
+        self::assertStringContainsString('if (is_front_page()) $description', $functions);
+        self::assertLessThan(strpos($functions, 'if (is_array($context))'), strpos($functions, 'if (is_front_page()) $description'));
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
         self::assertStringContainsString('!$media->active', $readApi);
         self::assertStringContainsString('!$video->active', $readApi);
