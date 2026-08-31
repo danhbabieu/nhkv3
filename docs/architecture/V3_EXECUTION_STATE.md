@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, MCP read adapter bridge checkpoint pushed.
+Last updated: 2026-08-31, canonical entity frontend routes checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `6ea8362` |
+| Branch / HEAD | `main` / `dea84fd` |
 | Current phase | P8 Governance/Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 54 tests, 140 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| Tests | Unit suite: 55 tests, 145 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
 | Blockers | None for local code work; full suite is environment-blocked (no `NHK_WP_TEST_PATH`, one P5 bootstrap error and nine mandatory P4 failures); V2/live remains read-only |
 | Working assumptions | Working tree is clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Build domain-specific frontend/admin surfaces and route smoke coverage; feed a read-only V2 export into `tools/v2-dry-run.php`; browser/DB integration remains environment-gated |
+| Next executable task | Expand daily Admin console and related Graph/media/video sections; run frontend route smoke when WordPress runtime is available; feed a read-only V2 export into `tools/v2-dry-run.php` |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -86,3 +86,9 @@ Last updated: 2026-08-31, MCP read adapter bridge checkpoint pushed.
   remains delegated to GovernanceService. A `nhk_mcp_register_tools` hook
   provides a transport-neutral registration seam. Checkpoint `6ea8362` is
   pushed to `origin/main`; external transport is still not fabricated.
+- 2026-08-31: Canonical entity frontend routes now cover archive, filtered
+  archive pagination and stable-key/UUID detail for all nine Authority types.
+  `EntityPageQuery` owns repository access; the theme only presents the
+  context, with responsive empty states and semantic facts. Checkpoint
+  `dea84fd` is pushed to `origin/main`; runtime route smoke and related Graph,
+  media and video modules remain pending.
