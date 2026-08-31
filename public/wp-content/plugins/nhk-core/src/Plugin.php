@@ -13,6 +13,9 @@ final class Plugin {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
         update_option('nhk_core_migration_target', GovernanceMigration003::VERSION, false);
+        // Register capabilities on every load so existing installations and
+        // upgrades do not need a deactivate/activate cycle to authorize P4.
+        GovernanceCapabilities::register();
         add_action('rest_api_init', static function (): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
         });

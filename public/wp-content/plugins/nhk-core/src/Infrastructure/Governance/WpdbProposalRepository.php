@@ -13,22 +13,29 @@ final class WpdbProposalRepository implements ProposalRepository
     private function db(): object { global $wpdb; return $this->database ?? $wpdb; }
     private function table(): string { return $this->db()->prefix . 'nhk_proposals'; }
     private function state(ProposalState $state): int { return array_search($state, ProposalState::cases(), true) + 1; }
+    private function normalizedFingerprint(string $value): string { return preg_match('/^[a-f0-9]{64}$/i', $value) ? strtolower($value) : hash('sha256', $value); }
+    private function fingerprintBinary(string $value): string { return hex2bin($this->normalizedFingerprint($value)); }
     private function hydrate(?array $row): ?Proposal {
         if (!$row) return null;
         $state = ProposalState::cases()[max(0, (int) $row['state'] - 1)] ?? ProposalState::DRAFT;
         $targetBinary = (string) ($row['target_uuid'] ?? '');
         $target = $targetBinary !== '' && trim($targetBinary, "\0") !== '' ? UuidCodec::fromBinary($targetBinary) : null;
         $decisionActor = null;
+        $supersededBy = null;
         $proposalDbId = (int) ($row['id'] ?? 0);
         if ($proposalDbId > 0) {
             $approval = $this->db()->get_var($this->db()->prepare('SELECT approved_by FROM '.$this->db()->prefix.'nhk_proposal_approvals WHERE proposal_id=%d ORDER BY id DESC LIMIT 1', $proposalDbId));
             $decisionActor = $approval !== null ? (string) $approval : null;
+            if (!empty($row['superseded_by_proposal_id'])) {
+                $replacementUuid = $this->db()->get_var($this->db()->prepare('SELECT proposal_uuid FROM '.$this->table().' WHERE id=%d', (int) $row['superseded_by_proposal_id']));
+                $supersededBy = $replacementUuid ? UuidCodec::fromBinary((string) $replacementUuid) : null;
+            }
         }
-        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], json_decode((string) $row['command_json'], true, 512, JSON_THROW_ON_ERROR), bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], !empty($row['superseded_by_proposal_id']) ? (string)$row['superseded_by_proposal_id'] : null);
+        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], json_decode((string) $row['command_json'], true, 512, JSON_THROW_ON_ERROR), bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
     }
     public function create(Proposal $proposal): Proposal {
         $db = $this->db(); $now = gmdate('Y-m-d H:i:s.u');
-        $ok = $db->query($db->prepare('INSERT INTO '.$this->table().' (proposal_uuid,idempotency_key,operation,entity_type,target_uuid,expected_revision,command_json,fingerprint,dependency_fingerprint,state,revision,created_by,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s)', UuidCodec::toBinary($proposal->id), $proposal->idempotencyKey, $proposal->operation, $proposal->entityType ?: $proposal->subjectId, $proposal->targetUuid ? UuidCodec::toBinary($proposal->targetUuid) : null, $proposal->expectedRevision, wp_json_encode($proposal->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), hex2bin($proposal->contentFingerprint), hash('sha256',$proposal->dependencyFingerprint,true), $this->state($proposal->state), $proposal->revision, (int) ($proposal->actor ?? 0), $now, $now));
+        $ok = $db->query($db->prepare('INSERT INTO '.$this->table().' (proposal_uuid,idempotency_key,operation,entity_type,target_uuid,expected_revision,command_json,fingerprint,dependency_fingerprint,state,revision,created_by,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s)', UuidCodec::toBinary($proposal->id), $proposal->idempotencyKey, $proposal->operation, $proposal->entityType ?: $proposal->subjectId, $proposal->targetUuid ? UuidCodec::toBinary($proposal->targetUuid) : null, $proposal->expectedRevision, wp_json_encode($proposal->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $this->fingerprintBinary($proposal->contentFingerprint), $this->fingerprintBinary($proposal->dependencyFingerprint), $this->state($proposal->state), $proposal->revision, (int) ($proposal->actor ?? 0), $now, $now));
         if ($ok === false) {
             // The unique idempotency index is the race-safe serialization point.
             $existing = $this->findByIdempotencyKey($proposal->idempotencyKey);
@@ -38,7 +45,7 @@ final class WpdbProposalRepository implements ProposalRepository
                     && $existing->operation === $proposal->operation
                     && $existing->payload === $proposal->payload
                     && $existing->targetUuid === $proposal->targetUuid
-                    && $existing->contentFingerprint === $proposal->contentFingerprint
+                    && $this->normalizedFingerprint($existing->contentFingerprint) === $this->normalizedFingerprint($proposal->contentFingerprint)
                     && $existing->expectedRevision === $proposal->expectedRevision
                     && $sameDependency($existing->dependencyFingerprint) === $sameDependency($proposal->dependencyFingerprint)) return $existing;
                 throw new \NHK\Core\Governance\Exception\ProposalIdempotencyConflict('Idempotency key is already bound to different content.');
@@ -57,7 +64,7 @@ final class WpdbProposalRepository implements ProposalRepository
         $db = $this->db();
         $proposalId = $db->get_var($db->prepare('SELECT id FROM '.$this->table().' WHERE proposal_uuid=%s', UuidCodec::toBinary($proposal->id)));
         if (!$proposalId) throw new \RuntimeException('PROPOSAL_NOT_FOUND');
-        $ok = $db->query($db->prepare('INSERT INTO '.$db->prefix.'nhk_proposal_approvals (approval_uuid,proposal_id,proposal_revision,fingerprint,approved_by,approved_at) VALUES (%s,%d,%d,%s,%d,%s)', UuidCodec::toBinary(UuidCodec::newV7()), (int) $proposalId, $proposal->revision, hex2bin($proposal->contentFingerprint), (int) $actor, gmdate('Y-m-d H:i:s.u')));
+        $ok = $db->query($db->prepare('INSERT INTO '.$db->prefix.'nhk_proposal_approvals (approval_uuid,proposal_id,proposal_revision,fingerprint,approved_by,approved_at) VALUES (%s,%d,%d,%s,%d,%s)', UuidCodec::toBinary(UuidCodec::newV7()), (int) $proposalId, $proposal->revision, $this->fingerprintBinary($proposal->contentFingerprint), (int) $actor, gmdate('Y-m-d H:i:s.u')));
         if ($ok === false) throw new \RuntimeException('APPROVAL_INSERT_FAILED: '.(string) $db->last_error);
     }
 

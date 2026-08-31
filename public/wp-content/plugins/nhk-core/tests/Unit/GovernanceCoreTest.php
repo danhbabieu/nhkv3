@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\GovernanceService;
+use NHK\Core\Contracts\Governance\GovernanceAuthorizer;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Governance\Exception\ProposalBindingConflict;
+use NHK\Core\Governance\Exception\GovernancePermissionDenied;
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Governance\Exception\DependencyCycle;
 use NHK\Tests\Support\{InMemoryDependencyRepository, InMemoryProposalRepository};
@@ -47,5 +49,38 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame(['b', 'c'], $graph->closure('a'));
         $this->expectException(DependencyCycle::class);
         $graph->add('c', 'a');
+    }
+
+    public function test_terminal_states_cannot_be_reopened_and_supersede_requires_replacement(): void
+    {
+        $proposal = new Proposal('p4', 'entity-1', 'rename', ['name' => 'New'], 'content', 1, 'deps', ProposalState::DRAFT, null, null, null, 'key-4');
+        $submitted = $proposal->transition(ProposalState::SUBMITTED, 'author');
+        $approved = $submitted->transition(ProposalState::APPROVED, 'reviewer');
+        $applied = $approved->transition(ProposalState::APPLIED, 'reviewer');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $applied->transition(ProposalState::DRAFT);
+    }
+
+    public function test_supersede_requires_a_different_replacement(): void
+    {
+        $proposal = new Proposal('p5', 'entity-1', 'rename', ['name' => 'New'], 'content', 1, 'deps', ProposalState::DRAFT, null, null, null, 'key-5');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $proposal->transition(ProposalState::SUPERSEDED, 'reviewer', null, 'p5');
+    }
+
+    public function test_authorizer_denies_unauthorized_proposal_creation(): void
+    {
+        $authorizer = new class implements GovernanceAuthorizer {
+            public function require(string $capability): void
+            {
+                throw new GovernancePermissionDenied($capability);
+            }
+        };
+        $service = new GovernanceService(new InMemoryProposalRepository(), null, null, $authorizer);
+
+        $this->expectException(GovernancePermissionDenied::class);
+        $service->create(new Proposal('p6', 'entity-1', 'rename', ['name' => 'New'], 'content', 1, 'deps', ProposalState::DRAFT, null, null, null, 'key-6'));
     }
 }

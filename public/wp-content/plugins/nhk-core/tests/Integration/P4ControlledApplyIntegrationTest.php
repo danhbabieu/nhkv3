@@ -29,6 +29,8 @@ final class P4ControlledApplyIntegrationTest extends TestCase
         try{$failing->apply($proposal->id);self::fail('failure hook did not throw');}catch(\RuntimeException $e){self::assertSame('INJECTED_AFTER_AUTHORITY',$e->getMessage());}
         self::assertSame('P4 Original',(new WpdbAuthorityRepository($wpdb))->findByCanonicalId($entity->canonicalId)?->canonicalName);self::assertSame(ProposalState::APPROVED,$repo->find($proposal->id)?->state);self::assertSame('failed',$attempts->findByProposal($proposal->id)[0]->state);
         $retry=new ControlledApplyService($repo,$attempts,new WpdbTransactionManager(),fn(Proposal $p)=>$authority->rename($p->targetUuid??$p->subjectId,'P4 Changed',1),new WpdbAuditSink(),null,new NoOpApplyExecutionHook());$result=$retry->apply($proposal->id);self::assertSame(2,$result['attempt_no']);self::assertSame(ProposalState::APPLIED,$repo->find($proposal->id)?->state);self::assertCount(2,$attempts->findByProposal($proposal->id));self::assertSame(2,(new WpdbAuthorityRepository($wpdb))->findByCanonicalId($entity->canonicalId)?->revision);
+        $events = $wpdb->get_col($wpdb->prepare('SELECT event_type FROM '.$wpdb->prefix.'nhk_audit_events WHERE object_type=%s AND object_key=%s ORDER BY id', 'proposal', $proposal->id));
+        self::assertSame(['ProposalCreated','ProposalApproved','ApplyFailed','ApplyStarted','ApplySucceeded'], $events);
     }
 
     public function test_true_concurrent_apply_serializes_on_proposal_row_and_returns_same_result(): void

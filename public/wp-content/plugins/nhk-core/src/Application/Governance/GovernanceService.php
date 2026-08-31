@@ -34,21 +34,21 @@ final class GovernanceService
     public function submit(string $id): Proposal
     {
         $this->authorizer?->require('nhk_submit_proposals');
-        $proposal = $this->get($id);
-        if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be submitted.');
-        return $this->transition($proposal, ProposalState::SUBMITTED, $proposal->actor, 'submitted');
+        return $this->withLockedProposal($id, function (Proposal $proposal): Proposal {
+            if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be submitted.');
+            return $this->transition($proposal, ProposalState::SUBMITTED, $proposal->actor, 'submitted');
+        });
     }
 
     public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal
     {
         $this->authorizer?->require('nhk_approve_proposals');
-        $proposal = $this->get($id);
-        $approve = function () use ($id, $contentFingerprint, $dependencyFingerprint, $actor, $proposal): Proposal {
+        $approve = function () use ($id, $contentFingerprint, $dependencyFingerprint, $actor): Proposal {
             $proposal = $this->repository->findForUpdate($id) ?? throw new ProposalNotFound('Proposal not found.');
             if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be approved.');
             if ($proposal->contentFingerprint !== $contentFingerprint || $proposal->dependencyFingerprint !== $dependencyFingerprint) throw new ProposalBindingConflict('Approval binding no longer matches the proposal.');
             $saved = $this->transition($proposal, ProposalState::APPROVED, $actor, 'approved');
-            if (method_exists($this->repository, 'recordApproval')) $this->repository->recordApproval($saved, $actor);
+            $this->repository->recordApproval($saved, $actor);
             return $saved;
         };
         return $this->transactions ? $this->transactions->transactional($approve) : $approve();
@@ -57,41 +57,53 @@ final class GovernanceService
     public function reject(string $id, string $actor): Proposal
     {
         $this->authorizer?->require('nhk_approve_proposals');
-        $proposal = $this->get($id);
-        if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be rejected.');
-        return $this->transition($proposal, ProposalState::REJECTED, $actor, 'rejected');
+        return $this->withLockedProposal($id, function (Proposal $proposal) use ($actor): Proposal {
+            if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be rejected.');
+            return $this->transition($proposal, ProposalState::REJECTED, $actor, 'rejected');
+        });
     }
 
     public function cancel(string $id, string $actor): Proposal
     {
         $this->authorizer?->require('nhk_submit_proposals');
-        $proposal=$this->get($id);
-        if(in_array($proposal->state,[ProposalState::APPLIED,ProposalState::REJECTED,ProposalState::CANCELLED,ProposalState::SUPERSEDED],true))throw new InvalidProposalTransition('Terminal proposals cannot be cancelled.');
-        return $this->transition($proposal,ProposalState::CANCELLED,$actor,'cancelled');
+        return $this->withLockedProposal($id, function (Proposal $proposal) use ($actor): Proposal {
+            if(in_array($proposal->state,[ProposalState::APPLIED,ProposalState::REJECTED,ProposalState::CANCELLED,ProposalState::SUPERSEDED],true))throw new InvalidProposalTransition('Terminal proposals cannot be cancelled.');
+            return $this->transition($proposal,ProposalState::CANCELLED,$actor,'cancelled');
+        });
     }
 
     public function supersede(string $id, string $replacementId, string $actor): Proposal
     {
         $this->authorizer?->require('nhk_submit_proposals');
-        $proposal=$this->get($id);
-        if(in_array($proposal->state,[ProposalState::APPLIED,ProposalState::REJECTED,ProposalState::CANCELLED,ProposalState::SUPERSEDED],true))throw new InvalidProposalTransition('Terminal proposals cannot be superseded.');
-        $this->get($replacementId);
-        return $this->transition($proposal,ProposalState::SUPERSEDED,$actor,'superseded',$replacementId);
+        return $this->withLockedProposal($id, function (Proposal $proposal) use ($replacementId, $actor): Proposal {
+            if(in_array($proposal->state,[ProposalState::APPLIED,ProposalState::REJECTED,ProposalState::CANCELLED,ProposalState::SUPERSEDED],true))throw new InvalidProposalTransition('Terminal proposals cannot be superseded.');
+            $this->get($replacementId);
+            return $this->transition($proposal,ProposalState::SUPERSEDED,$actor,'superseded',$replacementId);
+        });
     }
 
     public function markApplied(string $id, int $actualRevision, string $contentFingerprint, string $dependencyFingerprint): Proposal
     {
-        $proposal = $this->get($id);
-        if ($proposal->state !== ProposalState::APPROVED) throw new InvalidProposalTransition('Only approved proposals can be applied.');
-        if ($actualRevision !== $proposal->expectedRevision || $contentFingerprint !== $proposal->contentFingerprint || $dependencyFingerprint !== $proposal->dependencyFingerprint) {
-            throw new ProposalBindingConflict('Approved proposal is stale or has changed dependencies.');
-        }
-        return $this->transition($proposal, ProposalState::APPLIED, $proposal->decisionActor, 'applied');
+        $this->authorizer?->require('nhk_apply_proposals');
+        return $this->withLockedProposal($id, function (Proposal $proposal) use ($actualRevision, $contentFingerprint, $dependencyFingerprint): Proposal {
+            if ($proposal->state !== ProposalState::APPROVED) throw new InvalidProposalTransition('Only approved proposals can be applied.');
+            if ($actualRevision !== $proposal->expectedRevision || $contentFingerprint !== $proposal->contentFingerprint || $dependencyFingerprint !== $proposal->dependencyFingerprint) {
+                throw new ProposalBindingConflict('Approved proposal is stale or has changed dependencies.');
+            }
+            return $this->transition($proposal, ProposalState::APPLIED, $proposal->decisionActor, 'applied');
+        });
     }
 
     private function get(string $id): Proposal
     {
         return $this->repository->find($id) ?? throw new ProposalNotFound('Proposal not found.');
+    }
+
+    /** @param callable(Proposal): Proposal $callback */
+    private function withLockedProposal(string $id, callable $callback): Proposal
+    {
+        $work = fn (): Proposal => $callback($this->repository->findForUpdate($id) ?? throw new ProposalNotFound('Proposal not found.'));
+        return $this->transactions ? $this->transactions->transactional($work) : $work();
     }
 
     private function sameCommand(Proposal $left, Proposal $right): bool

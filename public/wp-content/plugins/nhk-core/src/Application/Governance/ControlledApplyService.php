@@ -43,5 +43,5 @@ final class ControlledApplyService
             throw $error;
         }
     }
-    private function auditEvent(string $event,string $id,?int $actor,array $context):void { if($this->audit && method_exists($this->audit,'recordEvent')) $this->audit->recordEvent($event,'proposal',$id,$actor,$context); }
+    private function auditEvent(string $event,string $id,?int $actor,array $context):void { $this->audit?->recordEvent($event,'proposal',$id,$actor,$context); }
 }

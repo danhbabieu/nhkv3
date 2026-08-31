@@ -61,6 +61,18 @@ final readonly class Proposal
 
     public function transition(ProposalState $state, ?string $decisionActor = null, ?string $at = null, ?string $supersededBy = null): self
     {
+        $allowed = match ($this->state) {
+            ProposalState::DRAFT => [ProposalState::SUBMITTED, ProposalState::APPROVED, ProposalState::REJECTED, ProposalState::CANCELLED, ProposalState::SUPERSEDED],
+            ProposalState::SUBMITTED => [ProposalState::APPROVED, ProposalState::REJECTED, ProposalState::CANCELLED, ProposalState::SUPERSEDED],
+            ProposalState::APPROVED => [ProposalState::APPLIED, ProposalState::CANCELLED, ProposalState::SUPERSEDED],
+            default => [],
+        };
+        if (!in_array($state, $allowed, true)) {
+            throw new InvalidArgumentException(sprintf('Invalid proposal transition: %s -> %s.', $this->state->value, $state->value));
+        }
+        if ($state === ProposalState::SUPERSEDED && ($supersededBy === null || $supersededBy === $this->id)) {
+            throw new InvalidArgumentException('A superseded proposal requires a different replacement proposal.');
+        }
         $when=$at ?? gmdate('Y-m-d H:i:s.u');
         return new self($this->id, $this->subjectId, $this->operation, $this->payload, $this->contentFingerprint, $this->expectedRevision, $this->dependencyFingerprint, $state, $this->actor, $decisionActor ?? $this->decisionActor, $when, $this->idempotencyKey, $this->revision + 1, $this->submittedAt ?? ($state === ProposalState::SUBMITTED ? $when : null), $state === ProposalState::APPLIED ? $when : $this->appliedAt, $this->targetUuid, $this->entityType, $this->createdAt, gmdate('Y-m-d H:i:s.u'), $state === ProposalState::CANCELLED ? $when : $this->cancelledAt, $state === ProposalState::REJECTED ? $when : $this->rejectedAt, $state === ProposalState::SUPERSEDED ? $when : $this->supersededAt, $supersededBy ?? $this->supersededByProposalId);
     }
