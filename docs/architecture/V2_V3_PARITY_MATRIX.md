@@ -5,10 +5,10 @@ the final parity declaration.
 
 | AREA | V2 | V3 | MIGRATED? | TESTED? | PARITY STATUS | NOTES |
 |---|---|---|---|---|---|---|
-| Homepage | Reference audit pending | WordPress editorial surface | N/A | NO | NOT ASSESSED | Inventory in P9/P10 |
+| Homepage | Reference audit pending | Responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Theme scaffold; V2 reference audit and browser smoke pending |
 | Posts | Reference audit pending | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned |
 | Categories | Reference audit pending | Native WP categories | NO | PARTIAL | IN PROGRESS | Editorial intent only |
-| Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | NO | NOT ASSESSED | P9 |
+| Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
 | Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PASS | IN PROGRESS | Nine-type registry/catalog and generic persistence tested in P5; legacy data pending |
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract | NO | PASS | IN PROGRESS | Physical specimen vs commercial product distinction tested; legacy data pending |
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |

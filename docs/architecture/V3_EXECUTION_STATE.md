@@ -6,7 +6,7 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
 | Branch / HEAD | `main` / `51ff8bf` |
-| Current phase | P7 Knowledge + Source + Evidence — persistence and Post Graph links |
+| Current phase | P7 Knowledge + Source + Evidence + P9 Frontend — vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
 | Tests | P7 unit suite: 48 tests, 110 assertions; lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
@@ -49,3 +49,9 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
   resolvers were added. Post links use the single `about` Graph predicate and
   never duplicate WordPress editorial body. Unit evidence remains green;
   Migration005 is pending WordPress integration environment.
+- 2026-08-31: P9 responsive editorial theme scaffold was expanded on the
+  existing user-owned theme files: NHK shell/navigation/search, discovery
+  homepage, editorial archive/search, Post, 404 and reusable article cards.
+  Warm NHK design tokens, mobile navigation, two-column desktop feed/sidebar,
+  accessible labels and empty states are present; browser smoke/visual QA and
+  semantic entity routes remain pending.

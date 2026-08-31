@@ -13,7 +13,7 @@ Status is based on code and test evidence, not commit titles.
 | P6 Media + Video | IN PROGRESS | Build Media identity/asset/usage and external Video reference vertical slices. |
 | P7 Knowledge + Source + Evidence + Post Graph | IN PROGRESS | Atomic claims, provenance, persistence and Post semantic links. |
 | P8 Admin + MCP operational layer | NOT STARTED | Governed read/mutation workflows. |
-| P9 Frontend/UI parity | NOT STARTED | V2 route/function inventory and V3 assembly. |
+| P9 Frontend/UI parity | IN PROGRESS | Responsive NHK editorial theme scaffold; semantic/entity routes and smoke QA pending. |
 | P10 V2 → V3 Data Migration | NOT STARTED | Backup, restore verification and dry-run gates required. |
 | P11 Reconciliation + parity + cutover readiness | NOT STARTED | Count/semantic/UI/logic reconciliation and readiness report; stop before cutover. |
 

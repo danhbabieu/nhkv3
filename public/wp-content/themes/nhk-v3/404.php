@@ -1,0 +1,1 @@
+<?php get_header(); ?><main class="site-main"><section class="not-found"><p class="eyebrow">404</p><h1>Trang này chưa được tìm thấy.</h1><p>Có thể đường dẫn đã thay đổi. Hãy quay về trang khám phá hoặc tìm kiếm trong kho NHK.</p><a class="button" href="<?php echo esc_url(home_url('/')); ?>">Về trang chủ →</a><?php get_search_form(); ?></section></main><?php get_footer(); ?>

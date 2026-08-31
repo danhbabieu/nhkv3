@@ -38,9 +38,11 @@ The theme must define and consume these tokens from a single source:
 }
 ```
 
-Concrete values are selected after inspecting the current theme and must be
-documented with contrast checks. Tokens are responsive-safe and must not be
-redeclared ad hoc in templates.
+The initial implementation selects warm neutral paper/surface tones, deep
+charcoal text, muted taupe, wood accent `#8c4f2f`, secondary brass `#b18a5a`,
+small radius, restrained shadow, 760px reading width and 1180px wide layout.
+These values remain subject to contrast verification during browser QA. Tokens
+are responsive-safe and must not be redeclared ad hoc in templates.
 
 ## Shell and navigation
 
