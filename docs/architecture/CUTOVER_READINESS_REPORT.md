@@ -21,6 +21,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   nonce checks.
 - MCP exposes governed eligibility and Controlled Apply handlers in addition to
   proposal lifecycle operations.
+- Native editorial aliases preserve `/tri-thuc/` and `/goc-chia-se/` route
+  contracts while continuing to query WordPress categories/posts.
 - A transport-neutral MCP registration seam exists; read adapters are real and
   mutations delegate to Governance.
 - The V2 dry-run tool is no-write and emits bounded reason codes. No V2 data

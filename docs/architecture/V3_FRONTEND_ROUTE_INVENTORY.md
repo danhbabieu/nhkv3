@@ -7,7 +7,7 @@ V2 URL-parity claim.
 | Surface | Public route contract | Query/template owner | Current evidence | Runtime status |
 |---|---|---|---|---|
 | Homepage | `/` | WordPress theme `front-page.php` and native WP queries | Real editorial query loop, no fixture content | Pending browser smoke |
-| Tri thức / Góc chia sẻ | Native WP category routes | WordPress archive/query boundary | Category-aware archive and empty states | Pending V2 URL reconciliation |
+| Tri thức / Góc chia sẻ | `/tri-thuc/`, `/goc-chia-se/` plus paginated aliases | Native WP category query via `PublicEditorialRoutes` | Category-aware archive and empty states; no editorial body projection | Pending rewrite/browser smoke and V2 URL reconciliation |
 | Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | Pending WP rewrite smoke |
 | Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | Pending WP rewrite smoke |
 | Search | Native `/?s={term}` plus `/wp-json/nhk/v1/search` | WordPress search + `SearchApi` | Posts and active semantic domains are grouped | Pending REST/runtime smoke |
@@ -16,6 +16,11 @@ V2 URL-parity claim.
 | Video archive | `/video/`, `/video/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `video.php` | Active-only external references and empty state | Pending WP rewrite smoke |
 | Video detail | `/video/{uuid}/` | `MediaVideoPageQuery` → `video.php` | YouTube privacy embed only for validated 11-char IDs | Pending embed/browser smoke |
 | 404 / pagination | Theme 404 and route-level page links | Theme templates | Empty states and bounded pagination are implemented | Pending browser smoke |
+
+Admin semantic lookup covers Media, Video, Knowledge Claim, Source and Graph
+endpoints (`wp_post` included) through the existing read APIs. Governed proposal
+composer covers entity and Graph relation commands; lifecycle application still
+requires capability, approval, eligibility and Controlled Apply.
 
 ## Guardrails
 

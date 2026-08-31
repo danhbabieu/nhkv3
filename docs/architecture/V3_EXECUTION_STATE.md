@@ -1,11 +1,11 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, governed relations and homepage query checkpoint in progress.
+Last updated: 2026-08-31, editorial routes and Admin semantic lookup checkpoint in progress.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `ee09ad4` |
+| Branch / HEAD | `main` / `41cc81a` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
@@ -135,3 +135,8 @@ Last updated: 2026-08-31, governed relations and homepage query checkpoint in pr
   featured/latest/category/topic modules and a plugin semantic filter for real
   Authority/Media/Video data. Empty storage hides semantic modules. Checkpoint
   `ee09ad4` is pushed; browser smoke remains blocked by the local DB.
+- 2026-08-31: Native category aliases now preserve `/tri-thuc/` and
+  `/goc-chia-se/` with pagination while keeping WordPress as editorial source;
+  Admin semantic lookup now covers Media, Video, Knowledge, Source and Graph
+  endpoints. Checkpoint `41cc81a` is pushed; runtime rewrite/REST smoke is
+  still gated by the local database connection.
