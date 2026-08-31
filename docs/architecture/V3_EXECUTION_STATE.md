@@ -1,11 +1,11 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, unified semantic search checkpoint in progress.
+Last updated: 2026-08-31, unified semantic search readiness checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `668cb28` |
+| Branch / HEAD | `main` / `5601aef` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
@@ -152,3 +152,6 @@ Last updated: 2026-08-31, unified semantic search checkpoint in progress.
   editorial source while active Authority/Media/Video/Knowledge results are
   grouped and linked. Checkpoint `668cb28` is pushed; browser/REST smoke is
   still gated by the local database connection.
+- 2026-08-31: Search readiness documentation checkpoint `5601aef` is pushed
+  to `origin/main`; the repository remains pre-cutover with all unresolved
+  runtime and V2-data gates explicitly recorded.
