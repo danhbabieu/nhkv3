@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Authority archive QA checkpoint.
+Last updated: 2026-08-31, Authority archive regression verification checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, Authority archive QA checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 70 tests, 207 assertions; guarded WordPress suite: 103 tests, 419 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Tests | Unit suite: 70 tests, 207 assertions; guarded WordPress suite: 103 tests, 421 assertions; plugin/theme PHP lint, route smoke and diff check pass |
 | Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
@@ -295,3 +295,5 @@ Last updated: 2026-08-31, Authority archive QA checkpoint.
 - 2026-08-31: Authority archive browser verification now reports the localized
   title “Khám phá thương hiệu — Đồng Hồ Nhà Kho”, a non-duplicated heading,
   canonical `/brand/nhk%3Abrand%3Ajunghans/` card links and route smoke 17/17.
+- 2026-08-31: Guarded WordPress integration was rerun after the Authority
+  archive fix and passed on `nhk_v3_test`: 103 tests/421 assertions.

@@ -49,7 +49,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 103 tests, 419 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 103 tests, 421 assertions |
 | Frontend route/rewrite smoke | PASS 17/17 for core routes, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PARTIAL — desktop homepage, Search, Media archive, Video empty state, Authority archive/detail and 404 were visually inspected; tablet/mobile responsive coverage remains pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,379 candidates, 2,594 no-write skips with buckets matching apply; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
