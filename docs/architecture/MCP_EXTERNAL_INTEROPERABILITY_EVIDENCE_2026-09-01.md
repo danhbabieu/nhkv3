@@ -29,9 +29,10 @@ adapter exposes a write counter.
 ## Local V3 wire probe
 
 The local V3 endpoint was also probed with standard Streamable HTTP JSON-RPC:
-`initialize` with `params.protocolVersion` and `tools/list` with the
-`MCP-Protocol-Version` header only both returned HTTP 200 and JSON-RPC success.
-Custom `Mcp-Method`/`Mcp-Name` headers remain supported as optional mismatch
-guards. This closes the previously observed custom `_meta`/header coupling for
-the basic initialization and tool-list exchange; external adapter mapping and
-deployment verification remain open.
+`initialize` with `params.protocolVersion`, `tools/list` and `tools/call` with
+the `MCP-Protocol-Version` header only all returned HTTP 200 and JSON-RPC
+success. `notifications/initialized` returned HTTP 202 with no body. Custom
+`Mcp-Method`/`Mcp-Name` headers remain supported as optional mismatch guards.
+This closes the previously observed custom `_meta`/header coupling for the
+basic session and tool exchange; external adapter mapping and deployment
+verification remain open.

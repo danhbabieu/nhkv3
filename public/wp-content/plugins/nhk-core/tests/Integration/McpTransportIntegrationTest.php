@@ -56,6 +56,30 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertCount(18, $response->get_data()['result']['tools']);
     }
 
+    public function test_standard_modern_tools_call_accepts_header_only_without_custom_method_headers(): void
+    {
+        $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+        $request->set_header('MCP-Protocol-Version', '2026-07-28');
+        $request->set_header('Content-Type', 'application/json');
+        $request->set_header('Accept', 'application/json, text/event-stream');
+        $request->set_body(wp_json_encode(['jsonrpc' => '2.0', 'id' => 21, 'method' => 'tools/call', 'params' => ['name' => 'nhk.search', 'arguments' => ['q' => 'odo', 'page' => 1, 'per_page' => 1]]]));
+        $response = rest_do_request($request);
+        self::assertSame(200, $response->get_status());
+        self::assertFalse($response->get_data()['result']['isError']);
+    }
+
+    public function test_standard_initialized_notification_returns_202_without_a_response_body(): void
+    {
+        $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+        $request->set_header('MCP-Protocol-Version', '2026-07-28');
+        $request->set_header('Content-Type', 'application/json');
+        $request->set_header('Accept', 'application/json, text/event-stream');
+        $request->set_body(wp_json_encode(['jsonrpc' => '2.0', 'method' => 'notifications/initialized', 'params' => []]));
+        $response = rest_do_request($request);
+        self::assertSame(202, $response->get_status());
+        self::assertNull($response->get_data());
+    }
+
     public function test_modern_header_body_mismatch_is_rejected(): void
     {
         $response = $this->request('tools/list', ['id' => 2], ['Mcp-Method' => 'tools/call']);
