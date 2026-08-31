@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, SEO canonical/pagination checkpoint.
+Last updated: 2026-08-31, long-title responsive checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -405,3 +405,7 @@ Last updated: 2026-08-31, SEO canonical/pagination checkpoint.
   `http://localhost/` rather than the first editorial post, while search and
   custom archive page-two states emit one consolidated `robots` directive with
   `noindex,follow`; unit evidence is now 81 tests/265 assertions.
+- 2026-08-31: Added a responsive long-title/long-key guard for article,
+  semantic, entity, media, knowledge and related cards, plus a zero-width
+  filter input constraint. Unit tests remain 81/265, PHP lint and diff check
+  pass; full route smoke remains subject to the local service gate.
