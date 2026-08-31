@@ -15,6 +15,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('NHK_V3_Home_Page_Query', $frontPage);
         self::assertStringNotContainsString('new WP_Query', $frontPage);
         self::assertStringContainsString('nhk_v3_home_semantic_modules', $query);
+        self::assertStringContainsString('<br> <em>mang một câu chuyện.</em>', $frontPage);
     }
 
     public function test_theme_seo_contract_covers_editorial_entity_media_and_video_surfaces(): void

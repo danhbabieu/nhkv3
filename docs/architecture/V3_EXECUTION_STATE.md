@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
+Last updated: 2026-08-31, P11 route visual QA and homepage copy checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 87 tests, 451 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 131 tests, 798 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Tests | Unit suite: 87 tests, 452 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 131 tests, 799 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -22,8 +22,8 @@ Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
 - 2026-08-31: Public entity payload rendering now maps technical field labels and
   filters internal phrases such as canonical, stable key, external reference and
   atomic claim at the theme presentation boundary without changing source data.
-  The frontend contract is now 87 unit tests/451 assertions; guarded full suite
-  passes 131 tests/798 assertions. Browser QA confirms the active Odo detail has
+  The frontend contract is now 87 unit tests/452 assertions; guarded full suite
+  passes 131 tests/799 assertions. Browser QA confirms the active Odo detail has
   no internal payload terminology and no horizontal overflow. Route smoke was
   attempted after this checkpoint but the shell could not reach the local HTTP
   listener; this remains an environment evidence gap, not a route assertion.
@@ -39,6 +39,11 @@ Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
   public archives, V2 aliases, semantic search page two, comparison and 404.
   The earlier shell-listener evidence gap is closed; active Video data and
   broader screenshot coverage remain separate gates.
+
+- 2026-08-31: Browser route sweep found and corrected a missing whitespace in
+  the homepage hero headline. The frontend contract now asserts the rendered
+  headline boundary; browser textContent is `Mỗi chiếc đồng hồ mang một câu
+  chuyện.` and the full guarded suite passes 131 tests/799 assertions.
 
 - 2026-08-31: Added `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md`, a read-only
   breakdown of all 764 skipped V2 WordPress records: 742 domain records, 21
