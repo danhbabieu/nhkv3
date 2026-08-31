@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P9 complete public language parity checkpoint.
+Last updated: 2026-08-31, P8/P9 raw MCP interoperability checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -516,3 +516,9 @@ Last updated: 2026-08-31, P9 complete public language parity checkpoint.
   video cards. Technical wording is absent from rendered public copy; full
   verification is 86 unit tests/446 assertions, 44 guarded integration
   tests/347 assertions, combined 130/793, lint pass and route smoke 21/21.
+- 2026-08-31: A raw HTTP client probe against the local Streamable HTTP endpoint
+  returned `200 application/json` for modern `tools/list` with all 16 tools;
+  modern `tools/call` for `nhk.search` page 2/per-page 5 returned JSON-RPC
+  success with five items per semantic group and totals entities 76, media 143,
+  videos 0 and knowledge 200. This strengthens local protocol evidence only;
+  external client/deployment interoperability remains open.
