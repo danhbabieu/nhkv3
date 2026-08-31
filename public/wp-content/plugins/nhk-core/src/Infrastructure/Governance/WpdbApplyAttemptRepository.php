@@ -17,5 +17,13 @@ final class WpdbApplyAttemptRepository implements ApplyAttemptRepository
     public function persistFailed(ApplyAttempt $a):ApplyAttempt{$db=$this->db();$pid=$this->proposalDbId($a->proposalId);$ok=$db->query($db->prepare('INSERT INTO '.$this->table().' (attempt_uuid,proposal_id,attempt_no,state,error_code,error_message,started_at,finished_at) VALUES (%s,%d,%d,4,%s,%s,%s,%s)',UuidCodec::toBinary($a->id),$pid,$a->number,$a->errorCode,substr((string)$a->errorMessage,0,2000),$a->startedAt??gmdate('Y-m-d H:i:s.u'),$a->finishedAt??gmdate('Y-m-d H:i:s.u')));if($ok===false)throw new \RuntimeException('FAILED_ATTEMPT_INSERT_FAILED: '.$db->last_error);return $a;}
     private function find(string $id):?ApplyAttempt{$db=$this->db();$r=$db->get_row($db->prepare('SELECT a.*,p.proposal_uuid FROM '.$this->table().' a JOIN '.$db->prefix.'nhk_proposals p ON p.id=a.proposal_id WHERE a.attempt_uuid=%s',UuidCodec::toBinary($id)),ARRAY_A);return $this->row($r);}
     public function findByProposal(string $id):array{$db=$this->db();$rows=$db->get_results($db->prepare('SELECT a.*,p.proposal_uuid FROM '.$this->table().' a JOIN '.$db->prefix.'nhk_proposals p ON p.id=a.proposal_id WHERE p.proposal_uuid=%s ORDER BY a.attempt_no',UuidCodec::toBinary($id)),ARRAY_A)?:[];return array_map(fn(array $r)=>$this->row($r),$rows);}
-    public function findSuccessful(string $id):?ApplyAttempt{foreach($this->findByProposal($id) as $a)if($a->state==='succeeded')return $a;return null;}
+    public function findSuccessful(string $id):?ApplyAttempt
+    {
+        // A caller can reach this branch immediately after waiting on the
+        // proposal lock. Use a locking/current read so REPEATABLE READ does
+        // not return a snapshot taken before the winning attempt committed.
+        $db=$this->db();
+        $r=$db->get_row($db->prepare('SELECT a.*,p.proposal_uuid FROM '.$this->table().' a JOIN '.$db->prefix.'nhk_proposals p ON p.id=a.proposal_id WHERE p.proposal_uuid=%s AND a.state=3 ORDER BY a.attempt_no LIMIT 1 FOR UPDATE',UuidCodec::toBinary($id)),ARRAY_A);
+        return $this->row($r);
+    }
 }

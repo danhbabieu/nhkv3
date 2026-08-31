@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
-use NHK\Core\Contracts\Governance\{ApplyAttemptRepository,ApplyExecutionHook,GovernanceAuditSink,ProposalRepository};
+use NHK\Core\Contracts\Governance\{ApplyAttemptRepository,ApplyExecutionHook,GovernanceAuditSink,GovernanceAuthorizer,ProposalRepository};
 use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Domain\Governance\{ApplyAttempt,ProposalState};
 use NHK\Core\Governance\Exception\{InvalidProposalTransition,ProposalNotFound};
@@ -11,11 +11,12 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 /** Transaction owner for governed authority mutations. The executor must use the same wpdb connection. */
 final class ControlledApplyService
 {
-    public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null) {}
+    public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null, private ?GovernanceAuthorizer $authorizer=null) {}
 
     /** @return array{proposal_id:string,attempt_no:int,result_entity_uuid:?string,idempotent:bool} */
     public function apply(string $proposalId): array
     {
+        $this->authorizer?->require('nhk_apply_proposals');
         $started = gmdate('Y-m-d H:i:s.u');
         try {
             return $this->transactions->transactional(function() use ($proposalId,$started):array {
@@ -31,7 +32,14 @@ final class ControlledApplyService
             });
         } catch(\Throwable $error) {
             // The semantic transaction has rolled back. Failure history is deliberately durable in a new transaction.
-            try{$this->transactions->transactional(function()use($proposalId,$started,$error):void{$n=$this->attempts->nextAttemptNumberLocked($proposalId);$a=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$n,'failed',null,substr((string)$error->getCode(),0,64),substr($error->getMessage(),0,2000),$started,gmdate('Y-m-d H:i:s.u'));$this->attempts->persistFailed($a);$this->auditEvent('ApplyFailed',$proposalId,null,['attempt_no'=>$n,'error_code'=>$a->errorCode]);});}catch(\Throwable $failure){$error->addSuppressed($failure);}
+            try{$this->transactions->transactional(function()use($proposalId,$started,$error):void{
+                // The proposal row remains the serialization point for the
+                // durable attempt history, including the post-rollback write.
+                $this->proposals->findForUpdate($proposalId)??throw new ProposalNotFound('Proposal not found.');
+                $n=$this->attempts->nextAttemptNumberLocked($proposalId);
+                $a=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$n,'failed',null,substr((string)$error->getCode(),0,64),substr($error->getMessage(),0,2000),$started,gmdate('Y-m-d H:i:s.u'));
+                $this->attempts->persistFailed($a);$this->auditEvent('ApplyFailed',$proposalId,null,['attempt_no'=>$n,'error_code'=>$a->errorCode]);
+            });}catch(\Throwable $failure){$error->addSuppressed($failure);}
             throw $error;
         }
     }

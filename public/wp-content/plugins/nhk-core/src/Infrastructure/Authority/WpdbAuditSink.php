@@ -12,6 +12,7 @@ final class WpdbAuditSink implements AuthorityAuditSink
     public function __construct(private ?EventStore $events = null) {}
     public function record(string $event, AuthorityEntity $entity): void
     {
-        ($this->events ?? new EventStore())->recordEvent('AuthorityEntity'.ucfirst($event), 'authority', $entity->canonicalId, null, ['entity_type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'revision' => $entity->revision, 'state' => $entity->state->value]);
+        $names=['created'=>'AuthorityEntityCreated','renamed'=>'AuthorityEntityUpdated','updated'=>'AuthorityEntityUpdated','retired'=>'AuthorityEntityRetired','reactivated'=>'AuthorityEntityReactivated'];
+        ($this->events ?? new EventStore())->recordEvent($names[$event] ?? 'AuthorityEntityUpdated', 'authority', $entity->canonicalId, null, ['entity_type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'revision' => $entity->revision, 'state' => $entity->state->value]);
     }
 }

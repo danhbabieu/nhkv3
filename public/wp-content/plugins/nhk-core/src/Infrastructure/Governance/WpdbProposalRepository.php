@@ -16,8 +16,15 @@ final class WpdbProposalRepository implements ProposalRepository
     private function hydrate(?array $row): ?Proposal {
         if (!$row) return null;
         $state = ProposalState::cases()[max(0, (int) $row['state'] - 1)] ?? ProposalState::DRAFT;
-        $target = !empty($row['target_uuid']) ? UuidCodec::fromBinary($row['target_uuid']) : null;
-        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], json_decode((string) $row['command_json'], true, 512, JSON_THROW_ON_ERROR), bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], null, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], !empty($row['superseded_by_proposal_id']) ? (string)$row['superseded_by_proposal_id'] : null);
+        $targetBinary = (string) ($row['target_uuid'] ?? '');
+        $target = $targetBinary !== '' && trim($targetBinary, "\0") !== '' ? UuidCodec::fromBinary($targetBinary) : null;
+        $decisionActor = null;
+        $proposalDbId = (int) ($row['id'] ?? 0);
+        if ($proposalDbId > 0) {
+            $approval = $this->db()->get_var($this->db()->prepare('SELECT approved_by FROM '.$this->db()->prefix.'nhk_proposal_approvals WHERE proposal_id=%d ORDER BY id DESC LIMIT 1', $proposalDbId));
+            $decisionActor = $approval !== null ? (string) $approval : null;
+        }
+        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], json_decode((string) $row['command_json'], true, 512, JSON_THROW_ON_ERROR), bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], !empty($row['superseded_by_proposal_id']) ? (string)$row['superseded_by_proposal_id'] : null);
     }
     public function create(Proposal $proposal): Proposal {
         $db = $this->db(); $now = gmdate('Y-m-d H:i:s.u');
@@ -26,7 +33,14 @@ final class WpdbProposalRepository implements ProposalRepository
             // The unique idempotency index is the race-safe serialization point.
             $existing = $this->findByIdempotencyKey($proposal->idempotencyKey);
             if ($existing) {
-                if ($existing->bindingFingerprint() === $proposal->bindingFingerprint()) return $existing;
+                $sameDependency = static fn(string $value): string => preg_match('/^[a-f0-9]{64}$/i', $value) ? strtolower($value) : hash('sha256', $value);
+                if (($existing->entityType ?: $existing->subjectId) === ($proposal->entityType ?: $proposal->subjectId)
+                    && $existing->operation === $proposal->operation
+                    && $existing->payload === $proposal->payload
+                    && $existing->targetUuid === $proposal->targetUuid
+                    && $existing->contentFingerprint === $proposal->contentFingerprint
+                    && $existing->expectedRevision === $proposal->expectedRevision
+                    && $sameDependency($existing->dependencyFingerprint) === $sameDependency($proposal->dependencyFingerprint)) return $existing;
                 throw new \NHK\Core\Governance\Exception\ProposalIdempotencyConflict('Idempotency key is already bound to different content.');
             }
             throw new \RuntimeException('PROPOSAL_INSERT_FAILED: '.(string) $db->last_error);
@@ -35,7 +49,7 @@ final class WpdbProposalRepository implements ProposalRepository
     }
     public function find(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1',UuidCodec::toBinary($id)),ARRAY_A)); }
     public function findByIdempotencyKey(string $key): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE idempotency_key=%s LIMIT 1',$key),ARRAY_A)); }
-    public function save(Proposal $proposal): Proposal { $db=$this->db(); $ok=$db->query($db->prepare('UPDATE '.$this->table().' SET state=%d,revision=%d,updated_at=%s,submitted_at=%s,applied_at=%s,cancelled_at=%s,rejected_at=%s,superseded_at=%s WHERE proposal_uuid=%s AND revision=%d',$this->state($proposal->state),$proposal->revision,gmdate('Y-m-d H:i:s.u'),$proposal->submittedAt,$proposal->appliedAt,$proposal->cancelledAt,$proposal->rejectedAt,$proposal->supersededAt,UuidCodec::toBinary($proposal->id),$proposal->revision-1)); if($ok!==1)throw new \RuntimeException('PROPOSAL_REVISION_CONFLICT'); return $this->find($proposal->id)??$proposal; }
+    public function save(Proposal $proposal): Proposal { $db=$this->db(); $replacementDbId=$proposal->supersededByProposalId ? $db->get_var($db->prepare('SELECT id FROM '.$this->table().' WHERE proposal_uuid=%s',UuidCodec::toBinary($proposal->supersededByProposalId))) : null; $ok=$db->query($db->prepare('UPDATE '.$this->table().' SET state=%d,revision=%d,updated_at=%s,submitted_at=%s,applied_at=%s,cancelled_at=%s,rejected_at=%s,superseded_at=%s,superseded_by_proposal_id=%s WHERE proposal_uuid=%s AND revision=%d',$this->state($proposal->state),$proposal->revision,gmdate('Y-m-d H:i:s.u'),$proposal->submittedAt,$proposal->appliedAt,$proposal->cancelledAt,$proposal->rejectedAt,$proposal->supersededAt,$replacementDbId,UuidCodec::toBinary($proposal->id),$proposal->revision-1)); if($ok!==1)throw new \RuntimeException('PROPOSAL_REVISION_CONFLICT'); return $this->find($proposal->id)??$proposal; }
     public function findForUpdate(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1 FOR UPDATE',UuidCodec::toBinary($id)),ARRAY_A)); }
 
     public function recordApproval(Proposal $proposal, string $actor): void

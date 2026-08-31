@@ -17,6 +17,12 @@ final class ProposalEligibilityService
         if ($proposal->state === ProposalState::APPLIED) return EligibilityResult::blocked('ALREADY_APPLIED');
         if (!in_array($proposal->state, [ProposalState::SUBMITTED, ProposalState::APPROVED], true)) return EligibilityResult::blocked('NOT_APPROVED');
         if ($proposal->state !== ProposalState::APPROVED) return EligibilityResult::blocked('APPROVAL_MISSING');
+        $approval = $this->proposals->latestApproval($proposalId);
+        if ($approval === null) return EligibilityResult::blocked('APPROVAL_MISSING');
+        if ((int) ($approval['proposal_revision'] ?? 0) !== $proposal->revision
+            || bin2hex((string) ($approval['fingerprint'] ?? '')) !== strtolower($proposal->contentFingerprint)) {
+            return EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
+        }
         $reasons = [];
         if ($proposal->subjectId !== '' && !$this->reader->targetExists($proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
         if ($proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
