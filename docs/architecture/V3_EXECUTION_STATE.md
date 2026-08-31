@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P11 public Media API boundary checkpoint.
+Last updated: 2026-08-31, P11 responsive entity-route QA checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -27,6 +27,15 @@ Last updated: 2026-08-31, P11 public Media API boundary checkpoint.
   assertions, composer lint and diff checks passed, and no database state
   changed. Source/Evidence public provenance policy remains intentionally
   open and was not bypassed.
+
+- 2026-08-31: Browser QA extended the mobile route evidence to nine remaining
+  archive/detail/alias surfaces (`brand`, `model`, `music`, `component`,
+  `specimen`, `product`, `/hien-vat/`, `/am-nhac/` and Góc chia sẻ page 2).
+  At 390px each had document width equal to the viewport, a bounded main
+  column and no detected internal public terminology; populated Brand/Model
+  details also received visual inspection. A read-only local database check
+  found no active Video row, so active Video detail QA remains an evidence
+  blocker and no fixture was created. No database state changed.
 
 - 2026-08-31: The public REST Media serializer now returns only reader-safe
   asset fields (id, kind, MIME, dimensions and size), omitting storage keys,
