@@ -12,6 +12,7 @@ use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
+use NHK\Core\Infrastructure\Http\EntityApi;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
@@ -36,6 +37,7 @@ final class Plugin {
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
             (new SearchApi(new WpdbMediaRepository($wpdb), new WpdbVideoRepository($wpdb), new WpdbKnowledgeRepository($wpdb), new WpdbAuthorityRepository($wpdb), $types, new MigrationStatus()))->register();
+            (new EntityApi(new WpdbAuthorityRepository($wpdb), $types))->register();
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
     }
