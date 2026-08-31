@@ -24,7 +24,6 @@ Last updated: 2026-09-01, P11 public Evidence REST checkpoint.
   Vietnamese language contract and no mobile overflow; full guarded PHPUnit
   passed 167 tests/1,090 assertions and route smoke passed 30/30.
 
-- 2026-09-01: The route smoke harness now accepts data-gated `--media-url` and
 - 2026-09-01: The route smoke harness now accepts data-gated detail checks for
   all Authority types, Media, Video, Comparison, Post and Knowledge, so active-
   record QA can be added without creating public fixtures. The options are
