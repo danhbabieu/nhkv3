@@ -5,7 +5,7 @@ Last updated: 2026-08-31, final media persistence and local-dev migration checkp
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `da748fd` |
+| Branch / HEAD | `main` / `3854448` |
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |
@@ -188,4 +188,5 @@ Last updated: 2026-08-31, final media persistence and local-dev migration checkp
   guarded full suite pass at 90 tests/367 assertions. The final governed
   local-dev apply is 1,548 migrated, 3,385 skipped and 0 conflicts; all three
   V2 MediaAsset rows are present with verified parent IDs. Checkpoint
-  `da748fd` is committed locally; production/live migration remains blocked.
+  `da748fd` is committed locally and this documentation checkpoint is
+  `3854448`; production/live migration remains blocked.
