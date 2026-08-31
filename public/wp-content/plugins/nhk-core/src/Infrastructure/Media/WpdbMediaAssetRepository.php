@@ -31,13 +31,25 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
         if ($mediaId === null) throw new MediaException('Media parent not found.');
         $args = [UuidCodec::toBinary($asset->assetId), $mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize];
         foreach ([$asset->width, $asset->height] as $dimension) if ($dimension !== null) $args[] = $dimension;
-        $args[] = gmdate('Y-m-d H:i:s.u');
-        $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (asset_uuid,media_id,asset_kind,storage_key,checksum,mime_type,byte_size,width,height,created_at) VALUES (%s,%s,%s,%s,UNHEX(%s),%s,%d,{$widthSql},{$heightSql},%s)", ...$args));
+        array_push($args, $asset->visibility, wp_json_encode($asset->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), gmdate('Y-m-d H:i:s.u'));
+        $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (asset_uuid,media_id,asset_kind,storage_key,checksum,mime_type,byte_size,width,height,visibility,metadata_json,created_at) VALUES (%s,%s,%s,%s,UNHEX(%s),%s,%d,{$widthSql},{$heightSql},%s,%s,%s)", ...$args));
         if ($ok === false) {
             $existing = $this->findByAssetId($asset->assetId);
             if ($existing && $existing->mediaId === $asset->mediaId && $existing->storageKey === $asset->storageKey && $existing->checksum === $asset->checksum) return $existing;
             throw new MediaException('Media asset identity or storage key already exists.');
         }
+        return $this->findByAssetId($asset->assetId) ?? $asset;
+    }
+
+    public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset
+    {
+        $widthSql = $asset->width === null ? 'NULL' : '%d';
+        $heightSql = $asset->height === null ? 'NULL' : '%d';
+        $args = [$asset->storageKey, $asset->mimeType, $asset->byteSize];
+        foreach ([$asset->width, $asset->height] as $dimension) if ($dimension !== null) $args[] = $dimension;
+        array_push($args, $asset->visibility, wp_json_encode($asset->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), UuidCodec::toBinary($asset->assetId));
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET storage_key=%s,mime_type=%s,byte_size=%d,width={$widthSql},height={$heightSql},visibility=%s,metadata_json=%s WHERE asset_uuid=%s", ...$args));
+        if ($ok !== 1) throw new MediaException('Media asset update conflict.');
         return $this->findByAssetId($asset->assetId) ?? $asset;
     }
 
@@ -60,7 +72,8 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
         if (!$row) return null;
         $mediaUuid = $this->database->get_var($this->database->prepare("SELECT canonical_uuid FROM {$this->mediaTable} WHERE id=%d LIMIT 1", (int) $row['media_id']));
         if (!is_string($mediaUuid) || strlen($mediaUuid) !== 16) return null;
-        return new MediaAsset(UuidCodec::fromBinary($row['asset_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['asset_kind'], (string) $row['storage_key'], bin2hex($row['checksum']), (string) $row['mime_type'], (int) $row['byte_size'], $row['width'] === null ? null : (int) $row['width'], $row['height'] === null ? null : (int) $row['height']);
+        $metadata = (string) ($row['metadata_json'] ?? '');
+        return new MediaAsset(UuidCodec::fromBinary($row['asset_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['asset_kind'], (string) $row['storage_key'], bin2hex($row['checksum']), (string) $row['mime_type'], (int) $row['byte_size'], $row['width'] === null ? null : (int) $row['width'], $row['height'] === null ? null : (int) $row['height'], strtoupper((string) ($row['visibility'] ?? 'PUBLIC')), $metadata === '' ? [] : json_decode($metadata, true, 512, JSON_THROW_ON_ERROR));
     }
 
     private function mediaInternalId(string $mediaUuid): ?int { $id = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->mediaTable} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($mediaUuid))); return $id === null ? null : (int) $id; }

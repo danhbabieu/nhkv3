@@ -33,21 +33,22 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   are recorded; live V2 data has not been mutated.
 - The dry-run report now provides per-type counts and skipped-reason buckets,
   rejects malformed records/checksums and marks explicit conflicts for review.
-- The local development schema is current at 7/7; Evidence metadata migration
-  and the 40-row governed backfill completed with zero conflicts.
+- The local development schema is current at 8/8; Evidence and MediaAsset
+  metadata migrations and their governed backfills completed with zero
+  conflicts. V2 PRIVATE media assets remain suppressed by public reads.
 
 ## Quality evidence
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 63 tests, 181 assertions |
+| Unit tests | PASS — 63 tests, 182 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 92 tests, 381 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 93 tests, 385 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,559 candidates, 2,414 no-write skips; local-dev ledger: 1,608 migrated, 3,365 explicit skips, 0 conflicts, including one safe URL no-op plus 3 MediaAsset, 19 Source and 40 Evidence rows |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,559 candidates, 2,414 no-write skips; local-dev ledger: 1,608 migrated, 3,365 explicit skips, 0 conflicts, including one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates

@@ -31,6 +31,7 @@ final class McpReadContractTest extends TestCase
         $assets = new class implements MediaAssetRepository {
             public function findByAssetId(string $id): ?MediaAsset { return null; }
             public function create(MediaAsset $item): MediaAsset { return $item; }
+            public function update(MediaAsset $item, int $expectedRevision = 1): MediaAsset { return $item; }
             public function listByMediaId(string $id): array { return []; }
             public function findByChecksum(string $checksum): array { return []; }
         };

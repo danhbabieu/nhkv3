@@ -30,6 +30,7 @@ final class P6PersistenceTest extends TestCase
             public array $items = [];
             public function findByAssetId(string $id): ?MediaAsset { return $this->items[$id] ?? null; }
             public function create(MediaAsset $item): MediaAsset { return $this->items[$item->assetId] = $item; }
+            public function update(MediaAsset $item, int $expectedRevision = 1): MediaAsset { return $this->items[$item->assetId] = $item; }
             public function listByMediaId(string $id): array { return array_values(array_filter($this->items, fn (MediaAsset $item): bool => $item->mediaId === $id)); }
             public function findByChecksum(string $checksum): array { return array_values(array_filter($this->items, fn (MediaAsset $item): bool => $item->checksum === $checksum)); }
         };

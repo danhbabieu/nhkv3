@@ -30,12 +30,14 @@ final class MediaVideoPageQueryTest extends TestCase
     {
         $mediaId = UuidCodec::newV7();
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/front.jpg', hash('sha256', 'image'), 'image/jpeg', 5, 1200, 800);
+        $privateAsset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/private.jpg', hash('sha256', 'private-image'), 'image/jpeg', 7, 1200, 800, 'PRIVATE', ['status' => 'private']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured');
         $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference');
-        $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready')], [$video], [$asset], [$usage]);
+        $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready')], [$video], [$asset, $privateAsset], [$usage]);
 
         $media = $query->mediaDetail($mediaId);
         self::assertSame('uploads/odo/front.jpg', $media['assets'][0]['storage_key']);
+        self::assertCount(1, $media['assets']);
         self::assertSame('wp_post', $media['usages'][0]['endpoint_type']);
         self::assertSame($video->canonicalUrl, $query->videoDetail($video->canonicalId)['url']);
         self::assertSame('dQw4w9WgXcQ', $query->videoDetail($video->canonicalId)['external_id']);
@@ -64,6 +66,7 @@ final class MediaVideoPageQueryTest extends TestCase
             public function __construct(private array $items) {}
             public function findByAssetId(string $id): ?MediaAsset { foreach ($this->items as $item) if ($item->assetId === $id) return $item; return null; }
             public function create(MediaAsset $asset): MediaAsset { return $asset; }
+            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
             public function listByMediaId(string $mediaId): array { return array_values(array_filter($this->items, static fn (MediaAsset $item): bool => $item->mediaId === $mediaId)); }
             public function findByChecksum(string $checksum): array { return array_values(array_filter($this->items, static fn (MediaAsset $item): bool => $item->checksum === $checksum)); }
         };

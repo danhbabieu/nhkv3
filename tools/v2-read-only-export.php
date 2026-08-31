@@ -183,8 +183,12 @@ foreach ($citations as $citation) {
     ];
 }
 
-$mediaAssets = $rows($db, 'SELECT id,public_id,attachment_id,status,visibility,title,mime_type,checksum,web_path,file_size,width,height,primary_subject_id FROM ' . $table('nhk_media_assets') . ' ORDER BY id');
+$mediaAssets = $rows($db, 'SELECT id,public_id,attachment_id,status,visibility,title,original_filename,public_filename,default_alt,default_caption,description,thumbnail_path,mime_type,checksum,web_path,file_size,width,height,aspect_ratio,perceptual_hash,processing_status,processing_error,watermark_applied,watermark_profile,rights_metadata,primary_subject_id,revision,provenance FROM ' . $table('nhk_media_assets') . ' ORDER BY id');
 foreach ($mediaAssets as $asset) {
+    $assetMetadata = [];
+    foreach (['title', 'original_filename', 'public_filename', 'default_alt', 'default_caption', 'description', 'thumbnail_path', 'perceptual_hash', 'processing_status', 'processing_error', 'watermark_applied', 'watermark_profile', 'rights_metadata', 'attachment_id', 'status', 'visibility', 'aspect_ratio', 'revision', 'provenance'] as $field) {
+        if ($asset[$field] !== null && $asset[$field] !== '') $assetMetadata[$field] = is_numeric($asset[$field]) && !in_array($field, ['aspect_ratio'], true) ? (int) $asset[$field] : (string) $asset[$field];
+    }
     $records[] = [
         'type' => 'legacy_media_asset',
         'stable_key' => 'media-asset:' . (string) $asset['public_id'],
@@ -199,6 +203,9 @@ foreach ($mediaAssets as $asset) {
         'width' => (int) $asset['width'],
         'height' => (int) $asset['height'],
         'media_id' => (string) $asset['primary_subject_id'],
+        'legacy_id' => (string) $asset['id'],
+        'public_id' => (string) $asset['public_id'],
+        'metadata' => $assetMetadata,
     ];
 }
 

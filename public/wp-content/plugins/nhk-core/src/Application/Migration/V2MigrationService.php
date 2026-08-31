@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.6';
+    private const MAPPER_VERSION = '6.7';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -275,9 +275,17 @@ final class V2MigrationService
         $assetId = Uuid::v5(Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8'), 'nhk-v2-media-asset:' . $publicId)->toRfc4122();
         $existing = $this->assets->findByAssetId($assetId);
         $width = (int) ($record['width'] ?? 0); $height = (int) ($record['height'] ?? 0);
-        $asset = new MediaAsset($assetId, $mediaId, 'original', $storageKey, $checksum, (string) ($record['mime_type'] ?? ''), max(0, (int) ($record['byte_size'] ?? 0)), $width > 0 ? $width : null, $height > 0 ? $height : null);
+        $visibility = strtoupper((string) ($record['visibility'] ?? 'PRIVATE'));
+        if (!in_array($visibility, ['PUBLIC', 'PRIVATE', 'HIDDEN'], true)) throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Media asset visibility is invalid.');
+        $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+        foreach (['status', 'legacy_id', 'public_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
+        $asset = new MediaAsset($assetId, $mediaId, 'original', $storageKey, $checksum, (string) ($record['mime_type'] ?? ''), max(0, (int) ($record['byte_size'] ?? 0)), $width > 0 ? $width : null, $height > 0 ? $height : null, $visibility, $metadata);
         if ($existing) {
             if ($existing->mediaId !== $asset->mediaId || $existing->storageKey !== $asset->storageKey || $existing->checksum !== $asset->checksum) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Media asset deterministic identity maps to changed storage.');
+            if ($existing->visibility !== $asset->visibility || $existing->metadata !== $asset->metadata) {
+                $this->assets->update($asset, 1);
+                return ['reason' => 'STATE_RECONCILED', 'target_type' => 'media_asset', 'target_key' => $assetId, 'target_id' => $assetId];
+            }
             return ['reason' => 'IDEMPOTENT', 'target_type' => 'media_asset', 'target_key' => $assetId, 'target_id' => $assetId];
         }
         $this->assets->create($asset);

@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, governed Source/Evidence migration checkpoint.
+Last updated: 2026-08-31, governed Media asset metadata checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -8,13 +8,13 @@ Last updated: 2026-08-31, governed Source/Evidence migration checkpoint.
 | Branch / HEAD | `main` / current local checkpoint |
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
-| DB migration | current 7 / target 7 on `nhk_v3`; Knowledge, Evidence metadata and Migration006/007 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 92 tests, 381 assertions; plugin/theme PHP lint and diff check pass |
-| Blockers | Visual QA (browser connector unavailable), external MCP transport, URL/media delivery/usages, Source/Evidence public visibility policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
+| Tests | Unit suite: 63 tests, 182 assertions; guarded WordPress suite: 93 tests, 385 assertions; plugin/theme PHP lint and diff check pass |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, media delivery/usages, Source/Evidence public visibility policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Complete field-level URL/media delivery/usages, Source/Evidence visibility, semantic projection and domain-targeted post reconciliation, review the 1,608-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,608 rows with 3,365 explicit skips |
-| Pending migrations | None; `nhk_v3` is current 7/target 7 and Migration006 ledger plus Evidence metadata are active |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,608 rows with 3,365 explicit skips |
+| Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 2,559 candidates and 2,414 skipped; local-dev apply: 1,608 migrated, 3,365 skipped, 0 conflicts |
 
 ## Checkpoint journal
@@ -205,3 +205,9 @@ Last updated: 2026-08-31, governed Source/Evidence migration checkpoint.
   `READY_NOOP` and recorded the remaining 799 URL candidates as explicit
   `INVALID_URL_MAPPING` skips. The local-dev ledger is now 1,608 migrated,
   3,365 skipped and 0 conflicts; guarded suite is 92 tests/381 assertions.
+- 2026-08-31: UP-only Migration008 added MediaAsset visibility and metadata
+  persistence. Mapper 6.7 re-exported all three V2 assets with field-level
+  metadata and reconciled them to PRIVATE in local development; public Media
+  REST/query boundaries suppress those assets. The full guarded suite passes
+  93 tests/385 assertions, route smoke passes 17/17, and the local ledger
+  remains 1,608 migrated, 3,365 skipped and 0 conflicts.

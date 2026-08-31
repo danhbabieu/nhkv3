@@ -28,7 +28,8 @@ final class ReadApi
         if ($error = $this->unavailable(!$this->status || $this->status->mediaStorageReady(), 'media')) return $error;
         $media = $this->media->findByCanonicalId((string) $request['id']);
         if (!$media) return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
-        return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'readiness' => $media->readiness, 'active' => $media->active, 'revision' => $media->revision, 'provenance' => $media->provenance, 'assets' => array_map($this->asset(...), $this->assets->listByMediaId($media->canonicalId)), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($media->canonicalId))];
+        $assets = array_values(array_filter($this->assets->listByMediaId($media->canonicalId), static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
+        return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'readiness' => $media->readiness, 'active' => $media->active, 'revision' => $media->revision, 'provenance' => $media->provenance, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($media->canonicalId))];
     }
 
     private function video(\WP_REST_Request $request): array|\WP_Error
@@ -55,7 +56,7 @@ final class ReadApi
         return ['id' => $source->canonicalId, 'stable_key' => $source->stableKey, 'title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'metadata' => $source->metadata, 'active' => $source->active, 'revision' => $source->revision, 'evidence' => array_map($this->evidence(...), $this->evidence->listBySource($source->canonicalId))];
     }
 
-    private function asset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'storage_key' => $asset->storageKey, 'checksum' => $asset->checksum, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
+    private function asset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'storage_key' => $asset->storageKey, 'checksum' => $asset->checksum, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'visibility' => $asset->visibility, 'metadata' => $asset->metadata]; }
     private function usage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
     private function evidence(Evidence $evidence): array { return ['id' => $evidence->canonicalId, 'claim_id' => $evidence->claimId, 'source_id' => $evidence->sourceId, 'relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator, 'metadata' => $evidence->metadata, 'active' => $evidence->active, 'revision' => $evidence->revision]; }
     private function unavailable(bool $ready, string $domain): ?\WP_Error { return $ready ? null : new \WP_Error('nhk_storage_unavailable', ucfirst($domain) . ' storage is not ready.', ['status' => 503]); }

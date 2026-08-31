@@ -32,8 +32,9 @@ native `wp_posts`/category mapping rather than a body projection.
 
 ## No-write dry-run
 
-The read-only exporter is `tools/v2-read-only-export.php`; it selects only
-identity, status, type and route fields and never bootstraps V2 WordPress.
+The read-only exporter is `tools/v2-read-only-export.php`; it selects bounded
+identity, status, type, route and field-level media metadata and never
+bootstraps V2 WordPress.
 Piped through `tools/v2-dry-run.php` from the full normalized backup, the
 report was:
 
@@ -59,14 +60,16 @@ migrated records and 3,365 skipped records: `DOMAIN_TARGETED` 764,
 `UNSUPPORTED_LEGACY_TYPE` 1,682; conflicts were 0. The one proven URL
 candidate is recorded as a `READY_NOOP` because its source and target paths
 are identical.
-The three V2 MediaAsset rows were imported with checksum, MIME, dimensions
-and source storage metadata. Nineteen Source rows and 40 citation Evidence
+The three V2 MediaAsset rows were imported with checksum, MIME, dimensions,
+field-level metadata and PRIVATE visibility; the local public API/query
+boundary therefore returns no asset delivery for those rows. Nineteen Source rows and 40 citation Evidence
 rows were also imported with their V2 PRIVATE state, verification state and
 citation metadata preserved; runtime media
 delivery/usages and public provenance presentation remain open reconciliation
 work.
-Subsequent runs were idempotent after the 40-row Evidence metadata backfill
-and the safe URL no-op classification.
+Subsequent runs were idempotent after the 40-row Evidence metadata backfill,
+the safe URL no-op classification and the three-row MediaAsset metadata
+reconciliation.
 Target verification found
 36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
 rows, 3 MediaAsset rows, 655 Knowledge claims, 19 Sources, 40 Evidence rows

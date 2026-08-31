@@ -14,7 +14,7 @@ migration, and unresolved rows remain explicit in the ledger.
 | Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
 | Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
 | URLs | 800 | 1 candidate | 1 | 799 | 0 | 0 | 1 | One identical source/target path is a safe `READY_NOOP`; 799 redirects remain unmapped |
-| Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions and source storage metadata imported; delivery/usages remain open |
+| Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions, field-level metadata and PRIVATE visibility imported; public delivery/usages remain open |
 | Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
 | Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints and metadata verified; imported inactive because V2 visibility is PRIVATE |
 | Semantic projections | 1,581 | 0 | 0 | 1,581 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
@@ -69,4 +69,5 @@ read-only V2 export, while actual migration remains gated by backup,
 readability/restore evidence, field-level reconciliation, approval and
 Cutover Readiness. The apply runner is `tools/v2-migrate.php`; `--offset`
 selects the next source window and Migration006 stores the durable checkpoint;
-Migration007 stores governed Evidence citation metadata.
+Migration007 stores governed Evidence citation metadata and Migration008 stores
+MediaAsset visibility/metadata. Public Media reads suppress non-PUBLIC assets.

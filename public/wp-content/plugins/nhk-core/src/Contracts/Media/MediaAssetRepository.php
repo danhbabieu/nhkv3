@@ -9,6 +9,7 @@ interface MediaAssetRepository
 {
     public function findByAssetId(string $id): ?MediaAsset;
     public function create(MediaAsset $asset): MediaAsset;
+    public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset;
     /** @return list<MediaAsset> */
     public function listByMediaId(string $mediaId): array;
     /** @return list<MediaAsset> */
