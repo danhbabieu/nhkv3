@@ -69,6 +69,13 @@ rows were also imported with their V2 PRIVATE state, verification state and
 citation metadata preserved; runtime media
 delivery/usages and public provenance presentation remain open reconciliation
 work.
+Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
+links, all matching canonical entity UUIDs: 370 active Authority entities,
+292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.9 now
+exports the 370 Authority links as deterministic canonical route targets and
+records the no-public-route Knowledge links as `DOMAIN_TARGETED`; the restored
+backup export/dry-run/apply rerun is pending local database recovery, so the
+current ledger counts above remain the accepted apply checkpoint.
 Subsequent runs were idempotent after the 40-row Evidence metadata backfill,
 the safe URL no-op classification, the 34 native-post redirect aliases and
 the three-row MediaAsset metadata reconciliation.
@@ -82,7 +89,7 @@ production mutation.
 
 ## Required follow-up
 
-URL redirects, media delivery/usages, external videos without a supported
+URL redirects not covered by the new explicit Authority links, media delivery/usages, external videos without a supported
 reference and semantic projections remain explicitly unmigrated or require a
 governed target mapping. Source/Evidence rows are stored with private state
 until their public visibility/provenance policy is reviewed. The exporter and

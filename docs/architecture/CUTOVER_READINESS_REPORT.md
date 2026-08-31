@@ -50,12 +50,13 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 95 tests, 392 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,593 candidates, 2,380 no-write skips; local-dev ledger: 1,642 migrated, 3,331 explicit skips, 0 conflicts, including 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,593 candidates, 2,380 no-write skips; local-dev ledger: 1,642 migrated, 3,331 explicit skips, 0 conflicts, including 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows; read-only metadata proves 370 additional active Authority route targets for pending Mapper 6.9 rerun |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates
 
-1. Complete field-level reconciliation for URLs, media delivery/usages,
+1. Complete field-level reconciliation for residual URLs after the Mapper 6.9
+   rerun, media delivery/usages,
    Source/Evidence public visibility, semantic projections and the 764
    domain-targeted custom/system posts; each requires a governed target or a
    documented retirement/skip decision.

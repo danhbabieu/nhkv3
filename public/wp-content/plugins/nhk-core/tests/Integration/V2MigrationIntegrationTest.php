@@ -115,11 +115,13 @@ final class V2MigrationIntegrationTest extends TestCase
         $records = [
             ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-safe', 'source_path' => '/tim-kiem/', 'target_path' => '/tim-kiem/'],
             ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-unmapped', 'source_path' => '/legacy/custom/', 'target_path' => ''],
+            ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-domain', 'source_path' => '/knowledge/no-public-route/', 'target_path' => '', 'target_reason' => 'DOMAIN_TARGETED'],
         ];
         $result = (new V2MigrationService($wpdb))->apply($records, 10, 10);
-        self::assertSame(2, $result['processed']); self::assertSame(1, $result['migrated']); self::assertSame(1, $result['skipped']); self::assertSame(0, $result['conflict']);
+        self::assertSame(3, $result['processed']); self::assertSame(1, $result['migrated']); self::assertSame(2, $result['skipped']); self::assertSame(0, $result['conflict']);
         self::assertSame('READY_NOOP', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-safe')));
         self::assertSame('INVALID_URL_MAPPING', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-unmapped')));
+        self::assertSame('DOMAIN_TARGETED', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-domain')));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-%'));
     }
 
@@ -137,5 +139,21 @@ final class V2MigrationIntegrationTest extends TestCase
         self::assertSame('/tri-thuc/migration-redirect-fixture/', get_post_meta($postId, '_nhk_v2_redirect_path', true));
         self::assertSame('READY', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-redirect')));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-redirect'));
+    }
+
+    public function test_url_mapping_persists_active_entity_redirect_alias(): void
+    {
+        global $wpdb;
+        $entityId = '650e8400-e29b-41d4-a716-446655440001';
+        $entityKey = 'nhk:brand:v2-migration-integration';
+        $previousRedirects = get_option('nhk_v2_entity_redirects', null);
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_entities WHERE canonical_uuid=%s", UuidCodec::toBinary($entityId)));
+        $service = new V2MigrationService($wpdb);
+        $service->apply([['type' => 'brand', 'stable_key' => $entityKey, 'canonical_uuid' => $entityId, 'canonical_name' => 'Entity Redirect Fixture', 'metadata' => []]], 12, 10);
+        $result = $service->apply([['type' => 'url', 'stable_key' => 'v2-migration-integration-url-entity', 'source_path' => '/brands/entity-redirect-fixture/', 'target_path' => '/brand/' . rawurlencode($entityKey) . '/', 'target_entity_type' => 'brand', 'target_entity_key' => $entityKey, 'target_entity_id' => $entityId]], 12, 10);
+        self::assertSame(1, $result['migrated']); self::assertSame(0, $result['skipped']); self::assertSame('/brand/' . rawurlencode($entityKey) . '/', get_option('nhk_v2_entity_redirects', [])['/brands/entity-redirect-fixture/'] ?? null);
+        if (is_array($previousRedirects)) update_option('nhk_v2_entity_redirects', $previousRedirects, false); else delete_option('nhk_v2_entity_redirects');
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-entity'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_entities WHERE canonical_uuid=%s", UuidCodec::toBinary($entityId)));
     }
 }

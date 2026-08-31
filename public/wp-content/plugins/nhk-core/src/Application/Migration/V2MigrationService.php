@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.8';
+    private const MAPPER_VERSION = '6.9';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -236,9 +236,29 @@ final class V2MigrationService
     {
         $sourcePath = trim((string) ($record['source_path'] ?? ''));
         $targetPath = trim((string) ($record['target_path'] ?? ''));
-        if ($sourcePath === '' || $targetPath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no governed V3 target path.');
+        if ($sourcePath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no source path.');
+        if ($targetPath === '' && strtoupper((string) ($record['target_reason'] ?? '')) === 'DOMAIN_TARGETED') throw new MigrationSkip('skipped', 'DOMAIN_TARGETED', 'Legacy URL belongs to a domain without a public V3 route.');
+        if ($targetPath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no governed V3 target path.');
         if (!str_starts_with($sourcePath, '/') || !str_starts_with($targetPath, '/') || str_contains($sourcePath, '..') || str_contains($targetPath, '..')) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL paths must be absolute local paths.');
         if ($sourcePath === $targetPath) return ['reason' => 'READY_NOOP', 'target_type' => 'wp_url', 'target_key' => $sourcePath, 'target_id' => $targetPath];
+        $entityType = trim((string) ($record['target_entity_type'] ?? ''));
+        $entityId = trim((string) ($record['target_entity_id'] ?? ''));
+        $entityKey = trim((string) ($record['target_entity_key'] ?? ''));
+        if ($entityType !== '' || $entityId !== '' || $entityKey !== '') {
+            if (!in_array($entityType, ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], true) || !preg_match('/^[0-9a-f-]{36}$/i', $entityId) || $entityKey === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'Entity URL target identity is incomplete.');
+            $entity = $this->authority->findByCanonicalId($entityId);
+            if (!$entity || $entity->entityType !== $entityType || $entity->stableKey !== $entityKey || !$entity->active()) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Entity URL target is not an active governed endpoint.');
+            $redirects = get_option('nhk_v2_entity_redirects', []);
+            $redirects = is_array($redirects) ? $redirects : [];
+            if (isset($redirects[$sourcePath]) && (string) $redirects[$sourcePath] !== $targetPath) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Legacy entity URL already points to a different target.');
+            if (($redirects[$sourcePath] ?? null) !== $targetPath) {
+                $redirects[$sourcePath] = $targetPath;
+                $updated = update_option('nhk_v2_entity_redirects', $redirects, false);
+                $stored = get_option('nhk_v2_entity_redirects', []);
+                if (!$updated && (!is_array($stored) || (string) ($stored[$sourcePath] ?? '') !== $targetPath)) throw new MigrationSkip('conflict', 'MIGRATION_FAILED', 'Entity URL redirect registry could not be persisted.');
+            }
+            return ['reason' => 'READY', 'target_type' => 'entity_redirect', 'target_key' => $entityKey, 'target_id' => $entityId, 'details' => ['target_path' => $targetPath, 'entity_type' => $entityType]];
+        }
         $legacyId = trim((string) ($record['legacy_id'] ?? ''));
         $posts = $legacyId === '' ? [] : get_posts(['post_type' => ['post', 'page'], 'post_status' => 'any', 'meta_key' => '_nhk_v2_source_key', 'meta_value' => 'wp_post:' . $legacyId, 'numberposts' => 1]);
         if (!$posts) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL target has no governed native WordPress post.');

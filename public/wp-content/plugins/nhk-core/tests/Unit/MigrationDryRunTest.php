@@ -36,6 +36,14 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('INVALID_IDENTITY', $report['items'][0]['reason']);
     }
 
+    public function test_domain_targeted_url_keeps_explicit_skip_reason(): void
+    {
+        $report = (new DryRunService())->run([['type' => 'url', 'source_path' => '/knowledge/legacy/', 'target_path' => '', 'target_reason' => 'DOMAIN_TARGETED']]);
+        self::assertSame(1, $report['skipped']);
+        self::assertSame(1, $report['skipped_by_reason']['DOMAIN_TARGETED']);
+        self::assertSame('DOMAIN_TARGETED', $report['items'][0]['reason']);
+    }
+
     public function test_invalid_checksum_and_non_record_are_not_silently_mapped(): void
     {
         $report = (new DryRunService())->run([

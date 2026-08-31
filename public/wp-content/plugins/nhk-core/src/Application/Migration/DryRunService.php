@@ -34,7 +34,12 @@ final class DryRunService
     private function inspect(array $record, array &$checksums): array
     {
         $type = (string) ($record['type'] ?? '');
-        if ($type === 'url') return trim((string) ($record['source_path'] ?? '')) !== '' && trim((string) ($record['target_path'] ?? '')) !== '' ? ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'] : ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+        if ($type === 'url') {
+            if (trim((string) ($record['source_path'] ?? '')) === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+            if (trim((string) ($record['target_path'] ?? '')) !== '') return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
+            if (strtoupper((string) ($record['target_reason'] ?? '')) === 'DOMAIN_TARGETED') return ['status' => 'skipped', 'reason' => 'DOMAIN_TARGETED'];
+            return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+        }
         if ($type === 'relation') {
             if ((string) ($record['source_key'] ?? '') === '' || (string) ($record['target_key'] ?? '') === '') return ['status' => 'skipped', 'reason' => 'INVALID_RELATION'];
             if (!empty($record['source_missing']) || !empty($record['target_missing'])) return ['status' => 'skipped', 'reason' => 'MISSING_ENDPOINT'];

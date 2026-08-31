@@ -13,7 +13,7 @@ migration, and unresolved rows remain explicit in the ledger.
 | Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; Source/Evidence joins verified; rows retain V2 private visibility |
 | Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
 | Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
-| URLs | 800 | 35 candidates | 35 | 765 | 0 | 0 | 35 | 34 native-post 301 redirects plus one identical source/target path `READY_NOOP`; 765 redirects remain unmapped |
+| URLs | 800 | 35 current candidates; 370 explicit Authority targets identified | 35 current | 765 current | 0 | 0 | 35 current | 34 native-post 301 redirects plus one identical source/target path `READY_NOOP`; Mapper 6.9 rerun will verify entity-registry redirects |
 | Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions, field-level metadata and PRIVATE visibility imported; public delivery/usages remain open |
 | Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
 | Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints and metadata verified; imported inactive because V2 visibility is PRIVATE |
@@ -71,3 +71,7 @@ Cutover Readiness. The apply runner is `tools/v2-migrate.php`; `--offset`
 selects the next source window and Migration006 stores the durable checkpoint;
 Migration007 stores governed Evidence citation metadata and Migration008 stores
 MediaAsset visibility/metadata. Public Media reads suppress non-PUBLIC assets.
+The normalized backup also proves 776 projection-to-entity UUID links. Only
+the 370 active Authority types with existing public V3 routes are emitted as
+redirect targets; Knowledge projections stay domain-targeted until a public
+claim route and provenance policy are governed.

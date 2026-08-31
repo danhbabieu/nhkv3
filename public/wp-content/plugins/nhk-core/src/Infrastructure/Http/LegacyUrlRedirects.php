@@ -16,6 +16,14 @@ final class LegacyUrlRedirects
         $requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
         if (!is_string($requestPath) || $requestPath === '') return;
         $requestPath = '/' . trim($requestPath, '/') . '/';
+        $entityRedirects = get_option('nhk_v2_entity_redirects', []);
+        if (is_array($entityRedirects) && isset($entityRedirects[$requestPath])) {
+            $targetPath = trim((string) $entityRedirects[$requestPath]);
+            if (str_starts_with($targetPath, '/') && !str_contains($targetPath, '..') && rtrim('/' . trim($targetPath, '/'), '/') !== rtrim($requestPath, '/')) {
+                wp_safe_redirect(home_url($targetPath), 301, 'NHK V2 URL migration');
+                exit;
+            }
+        }
         $posts = get_posts(['post_type' => ['post', 'page'], 'post_status' => 'any', 'meta_key' => '_nhk_v2_redirect_path', 'meta_value' => $requestPath, 'numberposts' => 1]);
         if (!$posts) return;
         $target = get_permalink((int) $posts[0]->ID);

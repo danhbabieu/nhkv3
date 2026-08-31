@@ -31,6 +31,7 @@ $rows = static function (mysqli $db, string $query): array {
 
 $records = [];
 $postIds = [];
+$urlRecords = [];
 $posts = $rows($db, 'SELECT ID,post_author,post_date,post_date_gmt,post_modified,post_type,post_status,post_name,post_title,post_excerpt,post_content,guid FROM ' . $table('posts') . ' ORDER BY ID');
 foreach ($posts as $post) {
     $id = (string) $post['ID'];
@@ -55,7 +56,7 @@ foreach ($posts as $post) {
     $targetPath = in_array((string) $post['post_type'], ['nhk_article', 'post', 'page'], true) && (string) $post['post_name'] !== ''
         ? '/' . trim((string) $post['post_name'], '/') . '/'
         : '';
-    $records[] = ['type' => 'url', 'source_path' => $sourcePath, 'target_path' => $targetPath, 'legacy_id' => $id];
+    $urlRecords[] = ['type' => 'url', 'source_path' => $sourcePath, 'target_path' => $targetPath, 'legacy_id' => $id, 'legacy_type' => (string) $post['post_type']];
 }
 
 $categories = $rows($db, 'SELECT t.term_id,t.slug,t.name,tt.taxonomy FROM ' . $table('terms') . ' t JOIN ' . $table('term_taxonomy') . ' tt ON tt.term_id=t.term_id ORDER BY t.term_id');
@@ -71,6 +72,7 @@ foreach ($categories as $category) {
 }
 
 $entityIds = [];
+$entitiesById = [];
 $entityTypesById = [];
 $entities = $rows($db, 'SELECT id,stable_key,entity_type,canonical_name,review_state,revision,metadata FROM ' . $table('nhk_entities') . ' ORDER BY id');
 $supportedEntityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge'];
@@ -84,6 +86,7 @@ $endpointType = static function (string $legacyType): string {
 foreach ($entities as $entity) {
     $id = (string) $entity['id'];
     $entityIds[$id] = true;
+    $entitiesById[$id] = $entity;
     $legacyType = (string) $entity['entity_type'];
     $type = in_array($legacyType, $supportedEntityTypes, true) ? $legacyType : 'legacy_' . $legacyType;
     $entityTypesById[$id] = $endpointType($legacyType);
@@ -101,6 +104,36 @@ foreach ($entities as $entity) {
         'metadata' => $metadata,
         'conflict' => strtoupper((string) $entity['review_state']) === 'CONFLICT',
     ];
+}
+
+$projectionEntityIdsByPost = [];
+foreach ($rows($db, 'SELECT post_id,meta_value FROM ' . $table('postmeta') . " WHERE meta_key='_nhk_projection_source_id' ORDER BY meta_id") as $meta) {
+    $postId = (string) $meta['post_id'];
+    $entityId = strtolower(trim((string) $meta['meta_value']));
+    if ($postId !== '' && preg_match('/^[0-9a-f-]{36}$/', $entityId) === 1) $projectionEntityIdsByPost[$postId] = $entityId;
+}
+
+$publicEntityRouteTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+foreach ($urlRecords as $url) {
+    $postId = (string) ($url['legacy_id'] ?? '');
+    $entityId = $projectionEntityIdsByPost[$postId] ?? '';
+    $entity = $entitiesById[$entityId] ?? null;
+    if (is_array($entity)) {
+        $entityType = (string) $entity['entity_type'];
+        $entityState = strtoupper((string) $entity['review_state']);
+        if (in_array($entityType, $publicEntityRouteTypes, true) && $entityState === 'APPROVED') {
+            $url['target_path'] = '/' . $entityType . '/' . rawurlencode((string) $entity['stable_key']) . '/';
+            $url['target_entity_type'] = $entityType;
+            $url['target_entity_key'] = (string) $entity['stable_key'];
+            $url['target_entity_id'] = $entityId;
+        } elseif ($url['target_path'] === '') {
+            $url['target_reason'] = 'DOMAIN_TARGETED';
+        }
+    } elseif ($url['target_path'] === '' && in_array((string) ($url['legacy_type'] ?? ''), ['nhk_brand', 'nhk_model', 'nhk_variant', 'nhk_movement', 'nhk_music', 'nhk_component', 'nhk_classification', 'nhk_specimen', 'nhk_product', 'nhk_knowledge'], true)) {
+        $url['target_reason'] = 'DOMAIN_TARGETED';
+    }
+    unset($url['legacy_type']);
+    $records[] = $url;
 }
 
 $relations = $rows($db, 'SELECT id,relation_type,source_id,target_id,status FROM ' . $table('nhk_relations') . ' ORDER BY id');
