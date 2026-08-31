@@ -10,9 +10,9 @@ Last updated: 2026-08-31, Migration009 projection-context checkpoint.
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
 | Tests | Unit suite: 79 tests, 241 assertions; guarded WordPress suite: 117 tests, 475 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
-| Blockers | Full responsive visual QA across every archive/detail/pagination state, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Blockers | Full visual QA for paginated states and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing the responsive route/pagination sweep and external MCP interoperability checks |
+| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing pagination/active-Video QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,960 rows and skipped 1,013 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 3,960 candidates and 1,013 skipped; projection contexts account for 1,581 newly mapped records; remaining skips are reason-coded and no conflicts were reported |
@@ -376,3 +376,9 @@ Last updated: 2026-08-31, Migration009 projection-context checkpoint.
   comparison, Authority detail or Media detail; the menu toggle exposes all
   ten navigation links. Full archive/detail/pagination visual coverage remains
   open.
+- 2026-08-31: The full public route inventory was checked at 390px and 768px
+  (38 route/viewport combinations). Theme content had no horizontal overflow
+  after the grid min-width fixes; the only remaining measured overflow was the
+  logged-in WordPress admin toolbar on the Component page, outside the public
+  theme shell. Pagination visual coverage and an active Video detail remain
+  unavailable in the current local dataset.
