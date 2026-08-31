@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, discovery comparison runtime checkpoint.
+Last updated: 2026-08-31, Media detail runtime QA checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -356,3 +356,8 @@ Last updated: 2026-08-31, discovery comparison runtime checkpoint.
   `/odo/odo-39/` return 301 to canonical Brand/Model stable-key routes; and
   `/tim-kiem/?q=Odo` returns 301 to `/?s=Odo`. The guarded suite passes 113
   tests/462 assertions and route smoke passes 20/20.
+- 2026-08-31: Active local Media detail QA passed at
+  `/media/0068236c-1033-4aef-ac97-b711a30ccb4d/` with HTTP 200, dedicated
+  title/canonical metadata and the expected fail-closed empty state for its
+  draft/PRIVATE asset. Desktop visual inspection passed; active Video detail
+  remains unverified because no active Video record is present in local data.
