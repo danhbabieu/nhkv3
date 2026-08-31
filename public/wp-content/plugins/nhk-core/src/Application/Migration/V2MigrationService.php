@@ -17,12 +17,14 @@ use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbSourceReposit
 use NHK\Core\Infrastructure\Media\WpdbMediaRepository;
 use NHK\Core\Infrastructure\Media\WpdbMediaAssetRepository;
 use NHK\Core\Infrastructure\Migration\WpdbMigrationLedgerRepository;
+use NHK\Core\Infrastructure\Migration\WpdbProjectionContextRepository;
 use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
     private const MAPPER_VERSION = '6.14';
     private WpdbMigrationLedgerRepository $ledger;
+    private WpdbProjectionContextRepository $projectionContexts;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
     private WpdbMediaAssetRepository $assets;
@@ -36,6 +38,7 @@ final class V2MigrationService
     public function __construct(private object $database)
     {
         $this->ledger = new WpdbMigrationLedgerRepository($database);
+        $this->projectionContexts = new WpdbProjectionContextRepository($database);
         $this->authority = new WpdbAuthorityRepository($database);
         $this->media = new WpdbMediaRepository($database);
         $this->assets = new WpdbMediaAssetRepository($database);
@@ -62,7 +65,9 @@ final class V2MigrationService
             if ($type === '' || $key === '') continue;
             $checksum = $this->checksum($record);
             $existing = $this->ledger->find($type, $key);
-            if ($existing && (string) ($existing['source_checksum'] ?? '') === $checksum && in_array((string) $existing['status'], ['migrated', 'skipped', 'conflict'], true)) { $processed++; if ($existing['status'] === 'migrated') $migrated++; elseif ($existing['status'] === 'conflict') $conflict++; else $skipped++; continue; }
+            $existingDetails = is_array(json_decode((string) ($existing['details_json'] ?? ''), true)) ? json_decode((string) ($existing['details_json'] ?? ''), true) : [];
+            $reprocessProjection = $type === 'legacy_semantic_projection' && ((string) ($existing['reason_code'] ?? '') === 'UNSUPPORTED_LEGACY_TYPE' || ((string) ($existing['reason_code'] ?? '') === 'CONTEXT_SINK_READY' && (int) ($existingDetails['context_schema_version'] ?? 0) < 1));
+            if ($existing && !$reprocessProjection && (string) ($existing['source_checksum'] ?? '') === $checksum && in_array((string) $existing['status'], ['migrated', 'skipped', 'conflict'], true)) { $processed++; if ($existing['status'] === 'migrated') $migrated++; elseif ($existing['status'] === 'conflict') $conflict++; else $skipped++; continue; }
             $processed++;
             try {
                 $result = $this->migrate($record, $batchNo);
@@ -94,6 +99,7 @@ final class V2MigrationService
             'knowledge' => $this->knowledgeClaim($record),
             'source' => $this->source($record),
             'evidence' => $this->evidence($record),
+            'legacy_semantic_projection' => $this->projectionContext($record),
             'url' => $this->url($record),
             'relation' => $this->relation($record),
             default => throw new MigrationSkip('skipped', 'UNSUPPORTED_LEGACY_TYPE', 'No governed V3 target for source type.'),
@@ -176,6 +182,46 @@ final class V2MigrationService
         elseif ($existing->stableKey !== $key || $existing->claimText !== $text || $existing->claimType !== $claimType || $existing->provenance !== $provenance) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Knowledge UUID maps to a changed V3 claim.');
         elseif ($existing->active !== $active) { $this->knowledge->update(new KnowledgeClaim($id, $key, $text, $claimType, $provenance, $active, $existing->revision), $existing->revision); return ['reason' => 'STATE_RECONCILED', 'target_type' => 'knowledge', 'target_key' => $key, 'target_id' => $id]; }
         return ['reason' => $existing ? 'IDEMPOTENT' : 'READY', 'target_type' => 'knowledge', 'target_key' => $key, 'target_id' => $id];
+    }
+
+    /**
+     * Preserve only bounded legacy projection metadata. This is not a
+     * canonical entity, public content, or editorial body.
+     */
+    private function projectionContext(array $record): array
+    {
+        if (array_key_exists('body', $record) || array_key_exists('content', $record) || array_key_exists('post_content', $record)) throw new MigrationSkip('skipped', 'PROJECTION_BODY_FORBIDDEN', 'Projection bodies cannot enter the V3 context sink.');
+        $sourceKey = trim((string) ($record['stable_key'] ?? ''));
+        $projectionId = trim((string) ($record['legacy_id'] ?? $sourceKey));
+        $semanticId = trim((string) ($record['semantic_id'] ?? ''));
+        if ($semanticId === '') $semanticId = preg_replace('/:projection:[^:]+$/', '', $sourceKey) ?: $sourceKey;
+        $objectId = trim((string) ($record['canonical_object_id'] ?? ''));
+        $objectType = trim((string) ($record['canonical_object_type'] ?? ''));
+        $projectionType = trim((string) ($record['legacy_type'] ?? ''));
+        if ($sourceKey === '' || $projectionId === '' || $semanticId === '' || $objectId === '' || $objectType === '' || $projectionType === '') throw new MigrationSkip('skipped', 'INVALID_PROJECTION_CONTEXT', 'Projection context is incomplete.');
+        $provenance = [
+            'context_schema_version' => 1,
+            'source_system' => 'v2',
+            'source_table' => 'nhk_semantic_projections',
+            'source_projection_id' => $projectionId,
+            'semantic_id' => $semanticId,
+            'body_migrated' => false,
+        ];
+        $this->projectionContexts->upsert([
+            'source_key' => $sourceKey,
+            'projection_id' => $projectionId,
+            'semantic_id' => $semanticId,
+            'canonical_object_id' => $objectId,
+            'canonical_object_type' => $objectType,
+            'projection_type' => $projectionType,
+            'visibility' => trim((string) ($record['visibility'] ?? 'UNKNOWN')),
+            'quality_state' => trim((string) ($record['quality_state'] ?? 'UNKNOWN')),
+            'seo_ready' => (int) !empty($record['seo_ready']),
+            'ai_ready' => (int) !empty($record['ai_ready']),
+            'stale' => (int) !empty($record['stale']),
+            'provenance' => $provenance,
+        ]);
+        return ['reason' => 'CONTEXT_SINK_READY', 'target_type' => 'projection_context', 'target_key' => $sourceKey, 'target_id' => $projectionId, 'details' => $provenance];
     }
 
     private function source(array $record): array

@@ -274,6 +274,7 @@ foreach ($projections as $projection) {
         'type' => 'legacy_semantic_projection',
         'stable_key' => $stableKey,
         'legacy_id' => (string) $projection['projection_id'],
+        'semantic_id' => $semanticId,
         'legacy_type' => (string) $projection['projection_type'],
         'canonical_object_type' => (string) $projection['canonical_object_type'],
         'canonical_object_id' => (string) $projection['canonical_object_id'],

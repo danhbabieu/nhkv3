@@ -88,4 +88,34 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame(1, $report['skipped_by_reason']['INVALID_RECORD']);
         self::assertSame('CONFLICT_REQUIRES_REVIEW', $report['items'][2]['reason']);
     }
+
+    public function test_semantic_projection_is_mapped_to_metadata_only_context_sink(): void
+    {
+        $report = (new DryRunService())->run([[
+            'type' => 'legacy_semantic_projection',
+            'stable_key' => 'sem:projection-fixture:entity_context',
+            'legacy_id' => '17',
+            'semantic_id' => 'sem:projection-fixture',
+            'legacy_type' => 'ENTITY_CONTEXT',
+            'canonical_object_type' => 'brand',
+            'canonical_object_id' => '550e8400-e29b-41d4-a716-446655440000',
+        ]]);
+        self::assertSame(1, $report['mapped']);
+        self::assertSame('READ_ONLY_CONTEXT_READY', $report['items'][0]['reason']);
+    }
+
+    public function test_semantic_projection_body_is_fail_closed(): void
+    {
+        $report = (new DryRunService())->run([[
+            'type' => 'legacy_semantic_projection',
+            'stable_key' => 'sem:body-fixture',
+            'legacy_id' => '18',
+            'legacy_type' => 'ENTITY_CONTEXT',
+            'canonical_object_type' => 'brand',
+            'canonical_object_id' => '550e8400-e29b-41d4-a716-446655440000',
+            'body' => 'must not migrate',
+        ]]);
+        self::assertSame(1, $report['skipped']);
+        self::assertSame('PROJECTION_BODY_FORBIDDEN', $report['items'][0]['reason']);
+    }
 }

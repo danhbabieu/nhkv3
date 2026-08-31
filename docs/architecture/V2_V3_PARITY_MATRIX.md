@@ -61,14 +61,14 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 The restored read-only V2 backup contains 800 posts, 1,301 entities, 2
 taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
 and 1,581 semantic projections. The expanded no-write dry-run processes 4,973
-records: 2,379 mapped candidates and 2,594 skipped candidates (747
+records: 3,960 mapped candidates and 1,013 skipped candidates (747
 `DOMAIN_TARGETED`, 42 `UNSUPPORTED_MEDIA_REFERENCE`, 3
-`RETIRED_LEGACY_GARBAGE`, 1 `INVALID_RELATION` and 1,801 unsupported legacy
+`RETIRED_LEGACY_GARBAGE`, 1 `INVALID_RELATION` and 220 unsupported legacy
 types).
-The local-dev governed apply recorded 2,379 migrated rows and 2,594 explicit
-skips (747 domain-targeted rows, 1 invalid relation, 42 unsupported media
-references, 3 retired legacy garbage and 1,801 unsupported
-legacy type) with zero conflicts. Thirty-four native-post
+The latest local-dev governed apply recorded 3,960 migrated rows and 1,013
+explicit skips with zero conflicts. Migration009 mapped all 1,581 semantic
+projections into the non-canonical context sink with body migration disabled.
+Thirty-four native-post
 redirects, one identical source/target URL, 370 canonical Authority entity
 redirects and 367 Knowledge claim redirects are migrated; three media assets
 were metadata-reconciled to
@@ -80,6 +80,6 @@ matching is forbidden. The normalized backup also proves 776 explicit
 projection-to-entity UUID links; 370 active Authority links, 292 active
 Knowledge links and 75 archived-to-active Knowledge links now have deterministic
 canonical redirect targets. Five archived/no-target Knowledge links remain
-`DOMAIN_TARGETED`; the 1,581 semantic projection rows remain unmigrated until
-a governed read-only context sink and provenance policy exist, without copying
-projection bodies into canonical domain records.
+`DOMAIN_TARGETED`; the 1,581 semantic projection rows are now preserved as
+non-canonical, provenance-bearing context metadata without copying projection
+bodies into canonical domain records.

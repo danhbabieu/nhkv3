@@ -41,25 +41,26 @@ report was:
 | Dry-run result | Count |
 |---|---:|
 | Source records | 4,973 |
-| Mapped candidates | 2,379 |
-| Skipped candidates | 2,594 |
+| Mapped candidates | 3,960 |
+| Skipped candidates | 1,013 |
 | URL mappings ready | 772 |
 | Conflicts | 0 |
 | Invalid relations | 1 |
 
 Skipped reason buckets were `DOMAIN_TARGETED` 747,
 `UNSUPPORTED_MEDIA_REFERENCE` 42, `RETIRED_LEGACY_GARBAGE` 3,
-`INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 1,801. These are no-write
+`INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 220. These are no-write
 reconciliation results, not approval to apply them.
 
 ## Local development apply checkpoint
 
 The governed `tools/v2-migrate.php` runner applied the Mapper 6.14 4,973-record
-export to `nhk_v3` after the backup/restore gate. Batch 14 contains all 4,973
-current source keys and reports 2,379
-migrated records and 2,594 skipped records: `DOMAIN_TARGETED` 747,
+export to `nhk_v3` after the backup/restore gate. Migration009 now maps all
+1,581 semantic projections into a non-canonical metadata context sink. Batch
+17 contains all 4,973 current source keys and reports 3,960
+migrated records and 1,013 skipped records: `DOMAIN_TARGETED` 747,
 `INVALID_RELATION` 1, `RETIRED_LEGACY_GARBAGE` 3, `UNSUPPORTED_MEDIA_REFERENCE` 42 and
-`UNSUPPORTED_LEGACY_TYPE` 1,801; conflicts were 0. The one proven identical
+`UNSUPPORTED_LEGACY_TYPE` 220; conflicts were 0. The one proven identical
 URL candidate is recorded as a `READY_NOOP`; 34 `nhk_article` source paths are
 stored as native postmeta aliases, 370 Authority projection paths and 367
 Knowledge claim paths are stored in the entity redirect registry, all verified
@@ -79,8 +80,8 @@ links, all matching canonical entity UUIDs: 370 active Authority entities,
 exports the 370 Authority links, 292 active Knowledge links and 75 archived
 Knowledge links with active consolidation targets as deterministic canonical
 route targets; the remaining 5 archived/no-target Knowledge links are recorded
-as `DOMAIN_TARGETED`. The Mapper 6.14 apply rerun was idempotent with the same
-2,379/2,594/0 counts, and the
+as `DOMAIN_TARGETED`. The Migration009 apply rerun was idempotent with the same
+3,960/1,013/0 counts, and the
 current ledger counts above are the accepted local-dev checkpoint.
 Subsequent runs were idempotent after the 40-row Evidence metadata backfill,
 the safe URL no-op classification, the 34 native-post redirect aliases and
@@ -95,9 +96,10 @@ production mutation.
 
 ## Required follow-up
 
-URL redirects not covered by the new explicit Authority links, MediaAsset delivery/privacy, external videos without a supported
-reference and semantic projections remain explicitly unmigrated or require a
-governed target mapping. Source/Evidence rows are stored with private state
+URL redirects not covered by the new explicit Authority links, MediaAsset delivery/privacy, and external videos without a supported
+reference remain explicitly unmigrated or require a governed target mapping.
+Semantic projections are retained only as non-canonical context metadata with
+`body_migrated=false`, not as public or canonical records. Source/Evidence rows are stored with private state
 until their public visibility/provenance policy is reviewed. The exporter and
 runner intentionally do not convert legacy custom post types into editorial
 body projections or merge identities by name.

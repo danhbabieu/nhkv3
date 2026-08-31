@@ -7,7 +7,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class DryRunService
 {
-    private const SUPPORTED_TYPES = ['wp_post', 'category', 'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge', 'source', 'evidence', 'legacy_media_asset'];
+    private const SUPPORTED_TYPES = ['wp_post', 'category', 'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge', 'source', 'evidence', 'legacy_media_asset', 'legacy_semantic_projection'];
 
     /** @param list<array<string,mixed>> $records */
     public function run(array $records): array
@@ -49,6 +49,11 @@ final class DryRunService
             if (!in_array($predicate, ['about', 'depicts'], true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
             if (!$this->validNodeReference((string) ($record['source_type'] ?? ''), (string) ($record['source_key'] ?? '')) || !$this->validNodeReference((string) ($record['target_type'] ?? ''), (string) ($record['target_key'] ?? ''))) return ['status' => 'skipped', 'reason' => 'INVALID_RELATION'];
             return ['status' => 'mapped', 'reason' => 'RELATION_READY'];
+        }
+        if ($type === 'legacy_semantic_projection') {
+            if (array_key_exists('body', $record) || array_key_exists('content', $record) || array_key_exists('post_content', $record)) return ['status' => 'skipped', 'reason' => 'PROJECTION_BODY_FORBIDDEN'];
+            foreach (['stable_key', 'canonical_object_id', 'canonical_object_type', 'legacy_type'] as $field) if (trim((string) ($record[$field] ?? '')) === '') return ['status' => 'skipped', 'reason' => 'INVALID_PROJECTION_CONTEXT'];
+            return ['status' => 'mapped', 'reason' => 'READ_ONLY_CONTEXT_READY'];
         }
         if ($type === 'wp_post') {
             $legacyType = (string) ($record['legacy_type'] ?? '');

@@ -9,6 +9,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use NHK\Core\Application\Migration\V2MigrationService;
 use NHK\Core\Infrastructure\Migration\MigrationLedger006;
+use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 
 $input = null;
 $limit = 100;
@@ -62,5 +63,6 @@ if (!in_array($database, ['nhk_v3_test', 'nhk_v3'], true)) {
     exit(3);
 }
 (new MigrationLedger006())->up();
+(new ProjectionContextMigration009())->up();
 $result = (new V2MigrationService($wpdb))->apply(array_slice($records, $offset), $batch, $limit);
 echo json_encode(['mode' => 'apply', 'database' => $database, 'offset' => $offset, 'batch' => $batch, 'limit' => $limit, 'result' => $result], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;

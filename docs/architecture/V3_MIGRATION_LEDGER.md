@@ -17,7 +17,7 @@ migration, and unresolved rows remain explicit in the ledger.
 | Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions, field-level metadata and PRIVATE visibility imported; V2 usage inventory is zero; public delivery/privacy policy remains open |
 | Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
 | Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints and metadata verified; imported inactive because V2 visibility is PRIVATE |
-| Semantic projections | 1,581 | 0 | 0 | 1,581 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed; exporter keys are collision-safe by `projection_id` |
+| Semantic projections | 1,581 | 1,581 | 1,581 | 0 | 0 | 0 | 1,581 | Migration009 stores bounded metadata/provenance in the non-canonical `nhk_legacy_projection_contexts` sink; projection bodies are forbidden and no Authority/Knowledge/wp_posts target is created |
 
 ## Read-only reference checkpoint
 
@@ -75,6 +75,7 @@ The normalized backup also proves 776 projection-to-entity UUID links. The 370
 active Authority links, 292 active Knowledge links and 75 archived Knowledge
 links with active consolidation targets are emitted as URL redirect targets;
 five archived/no-target Knowledge links remain explicitly domain-targeted.
-The 1,581 semantic projection rows themselves remain unmigrated until a
-read-only context sink and provenance policy are governed; they are not copied
-into WordPress bodies or canonical domain records.
+Migration009 now governs the 1,581 semantic projection rows as non-canonical
+read-only context. The sink retains source identity, canonical-object reference,
+quality/visibility flags and provenance only; it does not copy projection
+bodies into WordPress bodies or canonical domain records.

@@ -7,6 +7,7 @@ use NHK\Core\Application\Migration\V2MigrationService;
 use NHK\Core\Infrastructure\Migration\MigrationLedger006;
 use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
 use NHK\Core\Infrastructure\Migration\KnowledgeEvidenceMetadataMigration007;
+use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
@@ -23,6 +24,7 @@ final class V2MigrationIntegrationTest extends TestCase
         TestDatabaseGuard::requireTestDatabase();
         (new MigrationLedger006())->down(true);
         (new MigrationLedger006())->up();
+        (new ProjectionContextMigration009())->up();
     }
 
     protected function tearDown(): void
@@ -35,7 +37,9 @@ final class V2MigrationIntegrationTest extends TestCase
         foreach ($posts as $postId) wp_delete_post((int) $postId, true);
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_entities WHERE stable_key LIKE %s", 'v2-migration-integration-%'));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-%'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'sem:integration-context%'));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'wp_post:990001'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_legacy_projection_contexts WHERE source_key LIKE %s", 'sem:integration-context%'));
     }
 
     public function test_apply_is_resumable_idempotent_and_reason_coded(): void
@@ -123,6 +127,52 @@ final class V2MigrationIntegrationTest extends TestCase
         self::assertSame('INVALID_URL_MAPPING', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-unmapped')));
         self::assertSame('DOMAIN_TARGETED', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-domain')));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-%'));
+    }
+
+    public function test_semantic_projection_migrates_to_non_canonical_context_and_is_idempotent(): void
+    {
+        global $wpdb;
+        $record = [
+            'type' => 'legacy_semantic_projection',
+            'stable_key' => 'sem:integration-context:projection:990017',
+            'legacy_id' => '990017',
+            'legacy_type' => 'ENTITY_CONTEXT',
+            'canonical_object_type' => 'brand',
+            'canonical_object_id' => self::UUID,
+            'visibility' => 'PUBLIC',
+            'quality_state' => 'PUBLISHABLE',
+            'seo_ready' => 1,
+            'ai_ready' => 1,
+            'stale' => 0,
+        ];
+        $service = new V2MigrationService($wpdb);
+        $first = $service->apply([$record], 13, 10);
+        $second = $service->apply([$record], 14, 10);
+        self::assertSame(1, $first['migrated']);
+        self::assertSame(1, $second['migrated']);
+        self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_legacy_projection_contexts WHERE source_key=%s", $record['stable_key'])));
+        self::assertSame('projection_context', (string) $wpdb->get_var($wpdb->prepare("SELECT target_type FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", $record['stable_key'])));
+        self::assertSame('sem:integration-context', (string) $wpdb->get_var($wpdb->prepare("SELECT semantic_id FROM {$wpdb->prefix}nhk_legacy_projection_contexts WHERE source_key=%s", $record['stable_key'])));
+        self::assertSame('false', (string) $wpdb->get_var($wpdb->prepare("SELECT JSON_EXTRACT(provenance_json, '$.body_migrated') FROM {$wpdb->prefix}nhk_legacy_projection_contexts WHERE source_key=%s", $record['stable_key'])));
+        self::assertSame(0, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_entities WHERE stable_key=%s", $record['stable_key'])));
+    }
+
+    public function test_semantic_projection_body_is_not_persisted(): void
+    {
+        global $wpdb;
+        $record = [
+            'type' => 'legacy_semantic_projection',
+            'stable_key' => 'v2-migration-integration-projection-body',
+            'legacy_id' => '990018',
+            'legacy_type' => 'ENTITY_CONTEXT',
+            'canonical_object_type' => 'brand',
+            'canonical_object_id' => self::UUID,
+            'body' => 'forbidden projection body',
+        ];
+        $result = (new V2MigrationService($wpdb))->apply([$record], 15, 10);
+        self::assertSame(0, $result['migrated']);
+        self::assertSame('PROJECTION_BODY_FORBIDDEN', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", $record['stable_key'])));
+        self::assertSame(0, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_legacy_projection_contexts WHERE source_key=%s", $record['stable_key'])));
     }
 
     public function test_url_mapping_persists_native_post_redirect_alias(): void
