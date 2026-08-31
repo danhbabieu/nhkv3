@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.7';
+    private const MAPPER_VERSION = '6.8';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -237,8 +237,14 @@ final class V2MigrationService
         $sourcePath = trim((string) ($record['source_path'] ?? ''));
         $targetPath = trim((string) ($record['target_path'] ?? ''));
         if ($sourcePath === '' || $targetPath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no governed V3 target path.');
-        if ($sourcePath !== $targetPath) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL redirect requires an explicit native WordPress target mapping.');
-        return ['reason' => 'READY_NOOP', 'target_type' => 'wp_url', 'target_key' => $sourcePath, 'target_id' => $targetPath];
+        if (!str_starts_with($sourcePath, '/') || !str_starts_with($targetPath, '/') || str_contains($sourcePath, '..') || str_contains($targetPath, '..')) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL paths must be absolute local paths.');
+        if ($sourcePath === $targetPath) return ['reason' => 'READY_NOOP', 'target_type' => 'wp_url', 'target_key' => $sourcePath, 'target_id' => $targetPath];
+        $legacyId = trim((string) ($record['legacy_id'] ?? ''));
+        $posts = $legacyId === '' ? [] : get_posts(['post_type' => ['post', 'page'], 'post_status' => 'any', 'meta_key' => '_nhk_v2_source_key', 'meta_value' => 'wp_post:' . $legacyId, 'numberposts' => 1]);
+        if (!$posts) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL target has no governed native WordPress post.');
+        $postId = (int) $posts[0]->ID;
+        if (get_post_meta($postId, '_nhk_v2_redirect_path', true) !== $sourcePath) update_post_meta($postId, '_nhk_v2_redirect_path', $sourcePath);
+        return ['reason' => 'READY', 'target_type' => 'wp_redirect', 'target_key' => $sourcePath, 'target_id' => (string) $postId, 'details' => ['target_path' => $targetPath]];
     }
 
     private function videoEntity(array $record): array

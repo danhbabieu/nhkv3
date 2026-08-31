@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, governed Media asset metadata checkpoint.
+Last updated: 2026-08-31, governed URL/visibility checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,13 +9,13 @@ Last updated: 2026-08-31, governed Media asset metadata checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 63 tests, 182 assertions; guarded WordPress suite: 93 tests, 385 assertions; plugin/theme PHP lint and diff check pass |
-| Blockers | Visual QA (browser connector unavailable), external MCP transport, media delivery/usages, Source/Evidence public visibility policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 63 tests, 182 assertions; guarded WordPress suite: 95 tests, 392 assertions; plugin/theme PHP lint and diff check pass |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, 765 URL mappings, media delivery/usages, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Complete field-level URL/media delivery/usages, Source/Evidence visibility, semantic projection and domain-targeted post reconciliation, review the 1,608-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,608 rows with 3,365 explicit skips |
+| Next executable task | Complete the remaining 765 URL mappings, field-level media delivery/usages, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation, review the 1,642-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,642 rows with 3,331 explicit skips, including 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
-| Migration dry-run | Full restored-backup export: 4,973 records; 2,559 candidates and 2,414 skipped; local-dev apply: 1,608 migrated, 3,365 skipped, 0 conflicts |
+| Migration dry-run | Full restored-backup export: 4,973 records; 2,593 candidates and 2,380 skipped; local-dev apply: 1,642 migrated, 3,331 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -211,3 +211,14 @@ Last updated: 2026-08-31, governed Media asset metadata checkpoint.
   REST/query boundaries suppress those assets. The full guarded suite passes
   93 tests/385 assertions, route smoke passes 17/17, and the local ledger
   remains 1,608 migrated, 3,365 skipped and 0 conflicts.
+- 2026-08-31: Mapper 6.8 added governed 301 redirects for 34 `nhk_article`
+  source paths to their imported native WordPress posts. The local ledger now
+  records 1,642 migrated, 3,331 skipped and 0 conflicts; 35 URL rows are
+  migrated (34 redirects plus one safe no-op), 765 URL candidates remain
+  explicit `INVALID_URL_MAPPING` skips, and local HTTP verification returned
+  301 with the expected native target. Guarded suite is 94 tests/391
+  assertions.
+- 2026-08-31: Public Knowledge REST now fail-closes inactive PRIVATE Source
+  and Claim identities with 404; internal repositories retain private rows for
+  governed review. Full guarded suite passes 95 tests/392 assertions, local
+  route smoke remains 17/17, and no production/V2 data was changed.

@@ -46,16 +46,16 @@ Readiness evidence are complete.
 
 ## Local-dev apply evidence
 
-The latest exported JSON is `/private/tmp/nhk-v3-v2-full-export-media-6.7.json`
-(SHA-256 `1683e21e31dcb3b3d300a3acdbc9941d4cb58c420a8e68a93d4c25b31d504a11`).
-Its no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run-media-6.7.json`
-(SHA-256 `6e46c2d2cc9c1b1e34b70c7560ba6bf7129d06f5bdf236851af825a30cdc704d`).
-The latest idempotent apply result is
-`/private/tmp/nhk-v3-v2-apply-result-media-6.7-rerun.json` (SHA-256
-`b28223aa874528cb9e47fd97032df1a04ce2e75bf0d292ba0c7d8d6016005229`).
-The runner wrote 1,608 `migrated` ledger rows and 3,365 explicit skips to
+The latest exported JSON is `/private/tmp/nhk-v3-v2-full-export-url-6.7.json`
+(SHA-256 `1e550022757077164df07ee9df0acac83b37bf5c15a43bdda6ba31da3378e1bb`).
+Its no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run-url-6.7.json`
+(SHA-256 `9381d5663b3f3003f7617ddbd519793519fa6c1edae57b7d394cfeebd51a585e`).
+The latest governed apply result is
+`/private/tmp/nhk-v3-v2-apply-result-url-6.8.json` (SHA-256
+`25404566d4961de506f7bf89a98967330341f384af2f639023d66c5a201d7fed`).
+The runner wrote 1,642 `migrated` ledger rows and 3,331 explicit skips to
 `nhk_v3`, including 19 Source and 40 Evidence rows retained as inactive
 because the V2 records were PRIVATE. Migration008 persisted field-level media
-metadata and the three MediaAsset rows were reconciled to PRIVATE; the latest
-ledger has 3 `STATE_RECONCILED` media rows, one `READY_NOOP` URL and 0
-conflicts.
+metadata and the three MediaAsset rows were reconciled to PRIVATE; mapper 6.8
+added 34 native-post redirect aliases, while the latest ledger has one
+`READY_NOOP` URL and 0 conflicts.

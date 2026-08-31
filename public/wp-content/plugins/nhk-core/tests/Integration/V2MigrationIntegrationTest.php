@@ -31,6 +31,8 @@ final class V2MigrationIntegrationTest extends TestCase
         if (!isset($wpdb) || !is_object($wpdb)) return;
         $posts = $wpdb->get_col($wpdb->prepare("SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key=%s AND meta_value=%s", '_nhk_v2_source_key', 'wp_post:990001'));
         foreach ($posts as $postId) wp_delete_post((int) $postId, true);
+        $posts = $wpdb->get_col($wpdb->prepare("SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key=%s AND meta_value=%s", '_nhk_v2_source_key', 'wp_post:990002'));
+        foreach ($posts as $postId) wp_delete_post((int) $postId, true);
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_entities WHERE stable_key LIKE %s", 'v2-migration-integration-%'));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-%'));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'wp_post:990001'));
@@ -119,5 +121,21 @@ final class V2MigrationIntegrationTest extends TestCase
         self::assertSame('READY_NOOP', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-safe')));
         self::assertSame('INVALID_URL_MAPPING', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-unmapped')));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-%'));
+    }
+
+    public function test_url_mapping_persists_native_post_redirect_alias(): void
+    {
+        global $wpdb;
+        $records = [
+            ['type' => 'wp_post', 'stable_key' => 'wp_post:990002', 'legacy_id' => '990002', 'legacy_type' => 'nhk_article', 'status' => 'publish', 'post_name' => 'migration-redirect-fixture', 'post_title' => 'Migration Redirect Fixture', 'post_content' => 'Native editorial body.'],
+            ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-redirect', 'legacy_id' => '990002', 'source_path' => '/tri-thuc/migration-redirect-fixture/', 'target_path' => '/migration-redirect-fixture/'],
+        ];
+        $result = (new V2MigrationService($wpdb))->apply($records, 11, 10);
+        self::assertSame(2, $result['processed']); self::assertSame(2, $result['migrated']); self::assertSame(0, $result['skipped']);
+        $postId = (int) $wpdb->get_var($wpdb->prepare("SELECT post_id FROM {$wpdb->prefix}postmeta WHERE meta_key=%s AND meta_value=%s LIMIT 1", '_nhk_v2_source_key', 'wp_post:990002'));
+        self::assertGreaterThan(0, $postId);
+        self::assertSame('/tri-thuc/migration-redirect-fixture/', get_post_meta($postId, '_nhk_v2_redirect_path', true));
+        self::assertSame('READY', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-redirect')));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-redirect'));
     }
 }

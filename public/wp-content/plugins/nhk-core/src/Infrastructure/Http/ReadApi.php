@@ -44,7 +44,7 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
         $claim = $this->claims->findByCanonicalId((string) $request['id']);
-        if (!$claim) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
+        if (!$claim || !$claim->active) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
         return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'provenance' => $claim->provenance, 'active' => $claim->active, 'revision' => $claim->revision, 'evidence' => array_map($this->evidence(...), $this->evidence->listByClaim($claim->canonicalId))];
     }
 
@@ -52,7 +52,7 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
         $source = $this->sources->findByCanonicalId((string) $request['id']);
-        if (!$source) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
+        if (!$source || !$source->active) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
         return ['id' => $source->canonicalId, 'stable_key' => $source->stableKey, 'title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'metadata' => $source->metadata, 'active' => $source->active, 'revision' => $source->revision, 'evidence' => array_map($this->evidence(...), $this->evidence->listBySource($source->canonicalId))];
     }
 

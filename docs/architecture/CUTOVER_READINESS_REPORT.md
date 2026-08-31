@@ -36,6 +36,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - The local development schema is current at 8/8; Evidence and MediaAsset
   metadata migrations and their governed backfills completed with zero
   conflicts. V2 PRIVATE media assets remain suppressed by public reads.
+- Public Knowledge reads now fail closed for inactive PRIVATE Source and Claim
+  identities; the activation/public provenance policy remains a cutover gate.
 
 ## Quality evidence
 
@@ -45,10 +47,10 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 93 tests, 385 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 95 tests, 392 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,559 candidates, 2,414 no-write skips; local-dev ledger: 1,608 migrated, 3,365 explicit skips, 0 conflicts, including one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,593 candidates, 2,380 no-write skips; local-dev ledger: 1,642 migrated, 3,331 explicit skips, 0 conflicts, including 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates

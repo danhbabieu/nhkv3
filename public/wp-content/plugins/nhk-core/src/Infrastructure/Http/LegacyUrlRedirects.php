@@ -1,0 +1,28 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Infrastructure\Http;
+
+final class LegacyUrlRedirects
+{
+    public static function register(): void
+    {
+        add_action('template_redirect', [self::class, 'redirect'], 1);
+    }
+
+    public static function redirect(): void
+    {
+        if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli') return;
+        $requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        if (!is_string($requestPath) || $requestPath === '') return;
+        $requestPath = '/' . trim($requestPath, '/') . '/';
+        $posts = get_posts(['post_type' => ['post', 'page'], 'post_status' => 'any', 'meta_key' => '_nhk_v2_redirect_path', 'meta_value' => $requestPath, 'numberposts' => 1]);
+        if (!$posts) return;
+        $target = get_permalink((int) $posts[0]->ID);
+        if (!is_string($target) || $target === '') return;
+        $targetPath = parse_url($target, PHP_URL_PATH);
+        if (is_string($targetPath) && rtrim('/' . trim($targetPath, '/'), '/') === rtrim($requestPath, '/')) return;
+        wp_safe_redirect($target, 301, 'NHK V2 URL migration');
+        exit;
+    }
+}

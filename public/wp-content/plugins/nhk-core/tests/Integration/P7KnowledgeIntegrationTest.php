@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Knowledge\KnowledgeService;
+use NHK\Core\Domain\Knowledge\Source;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Migration\{KnowledgeEvidenceMetadataMigration007, KnowledgeMigration005};
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -44,5 +46,13 @@ final class P7KnowledgeIntegrationTest extends TestCase
         self::assertSame($claim->canonicalId, $evidence->claimId);
         self::assertCount(1, $service->evidenceForClaim($claim->canonicalId));
         self::assertSame($claim->canonicalId, $service->createClaim('p7-integration-claim', 'The clock uses a spring-driven movement.', 'technical', ['source' => 'test'])->canonicalId);
+    }
+
+    public function test_private_source_is_not_exposed_by_public_rest_read(): void
+    {
+        global $wpdb;
+        $source = (new WpdbSourceRepository($wpdb))->create(new Source(UuidCodec::newV7(), 'p7-integration-private', 'Private source', 'archive', 'https://example.test/private', [], false));
+        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $source->canonicalId));
+        self::assertSame(404, $response->get_status());
     }
 }

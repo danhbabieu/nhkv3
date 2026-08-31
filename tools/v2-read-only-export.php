@@ -52,7 +52,7 @@ foreach ($posts as $post) {
     ];
     $path = parse_url((string) $post['guid'], PHP_URL_PATH);
     $sourcePath = is_string($path) && $path !== '' ? $path : '/' . trim((string) $post['post_name'], '/') . '/';
-    $targetPath = in_array((string) $post['post_type'], ['post', 'page'], true) && (string) $post['post_name'] !== ''
+    $targetPath = in_array((string) $post['post_type'], ['nhk_article', 'post', 'page'], true) && (string) $post['post_name'] !== ''
         ? '/' . trim((string) $post['post_name'], '/') . '/'
         : '';
     $records[] = ['type' => 'url', 'source_path' => $sourcePath, 'target_path' => $targetPath, 'legacy_id' => $id];

@@ -54,7 +54,7 @@ final class McpReadHandler
     {
         if (!$this->ready('knowledge')) return null;
         $claim = $this->claims->findByCanonicalId($id);
-        return $claim ? ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'provenance' => $claim->provenance, 'active' => $claim->active, 'revision' => $claim->revision, 'evidence' => array_map($this->evidence(...), $this->evidence->listByClaim($id))] : null;
+        return $claim && $claim->active ? ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'provenance' => $claim->provenance, 'active' => $claim->active, 'revision' => $claim->revision, 'evidence' => array_map($this->evidence(...), $this->evidence->listByClaim($id))] : null;
     }
 
     public function search(string $term, int $page = 1, int $perPage = 20): array

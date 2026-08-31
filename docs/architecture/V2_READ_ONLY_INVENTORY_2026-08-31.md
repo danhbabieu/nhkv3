@@ -41,35 +41,37 @@ report was:
 | Dry-run result | Count |
 |---|---:|
 | Source records | 4,973 |
-| Mapped candidates | 2,559 |
-| Skipped candidates | 2,414 |
-| URL mappings ready | 1 |
+| Mapped candidates | 2,593 |
+| Skipped candidates | 2,380 |
+| URL mappings ready | 35 |
 | Conflicts | 0 |
 | Invalid relations | 0 |
 
-Skipped reason buckets were `INVALID_URL_MAPPING` 799 and
+Skipped reason buckets were `INVALID_URL_MAPPING` 765 and
 `UNSUPPORTED_LEGACY_TYPE` 1,615. These are no-write
 reconciliation results, not approval to apply them.
 
 ## Local development apply checkpoint
 
 The governed `tools/v2-migrate.php` runner applied the same 4,973-record
-export to `nhk_v3` after the backup/restore gate. The ledger contains 1,608
-migrated records and 3,365 skipped records: `DOMAIN_TARGETED` 764,
-`INVALID_RELATION` 1, `INVALID_URL_MAPPING` 799 and
-`UNSUPPORTED_LEGACY_TYPE` 1,682; conflicts were 0. The one proven URL
-candidate is recorded as a `READY_NOOP` because its source and target paths
-are identical.
+export to `nhk_v3` after the backup/restore gate. The ledger contains 1,642
+migrated records and 3,331 skipped records: `DOMAIN_TARGETED` 764,
+`INVALID_RELATION` 1, `INVALID_URL_MAPPING` 765 and
+`UNSUPPORTED_LEGACY_TYPE` 1,682; conflicts were 0. The one proven identical
+URL candidate is recorded as a `READY_NOOP`; 34 `nhk_article` source paths are
+stored as native postmeta aliases and verified through the local HTTP 301
+redirect path.
 The three V2 MediaAsset rows were imported with checksum, MIME, dimensions,
 field-level metadata and PRIVATE visibility; the local public API/query
-boundary therefore returns no asset delivery for those rows. Nineteen Source rows and 40 citation Evidence
+boundary therefore returns no asset delivery for those rows. Public Knowledge
+REST also returns 404 for inactive PRIVATE Source/Claim identities. Nineteen Source rows and 40 citation Evidence
 rows were also imported with their V2 PRIVATE state, verification state and
 citation metadata preserved; runtime media
 delivery/usages and public provenance presentation remain open reconciliation
 work.
 Subsequent runs were idempotent after the 40-row Evidence metadata backfill,
-the safe URL no-op classification and the three-row MediaAsset metadata
-reconciliation.
+the safe URL no-op classification, the 34 native-post redirect aliases and
+the three-row MediaAsset metadata reconciliation.
 Target verification found
 36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
 rows, 3 MediaAsset rows, 655 Knowledge claims, 19 Sources, 40 Evidence rows

@@ -22,6 +22,7 @@ use NHK\Core\Infrastructure\Http\GraphApi;
 use NHK\Core\Infrastructure\Http\PublicMediaVideoRoutes;
 use NHK\Core\Infrastructure\Http\PublicEntityRoutes;
 use NHK\Core\Infrastructure\Http\PublicEditorialRoutes;
+use NHK\Core\Infrastructure\Http\LegacyUrlRedirects;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
@@ -48,6 +49,7 @@ final class Plugin {
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
         (new PublicEditorialRoutes())->register();
+        LegacyUrlRedirects::register();
         global $wpdb;
         if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); $publicAuthority = new WpdbAuthorityRepository($wpdb); $publicMedia = new WpdbMediaRepository($wpdb); $publicVideos = new WpdbVideoRepository($wpdb); $publicEndpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos); $publicStatus = new MigrationStatus(); add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus), 'extend']); $publicClaims = new WpdbKnowledgeRepository($wpdb); add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus), 'extend'], 10, 2); $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink()); $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus); (new PublicEntityRoutes(new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus), $publicTypes))->register(); $publicAssets = new WpdbMediaAssetRepository($wpdb); $publicUsages = new WpdbMediaUsageRepository($wpdb); (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus)))->register(); }
         add_action('rest_api_init', static function (): void {
