@@ -19,6 +19,13 @@ Last updated: 2026-08-31, P11 responsive pagination checkpoint.
 
 ## Checkpoint journal
 
+- 2026-08-31: A post-fix browser sweep covered 13 known public routes at
+  390px and 768px (26 route/viewport checks), including homepage, editorial
+  archives, Authority page-two routes, Knowledge/Media/Video page-two,
+  Comparison, Product/Specimen empty states and 404. Every document/body/main
+  width matched its viewport; paginated archives retained `noindex,follow`
+  and 404 retained `index,follow`. No new responsive defect was found.
+
 - 2026-08-31: Guarded PHPUnit was rerun with the required external local
   network access using `NHK_WP_TEST_DB=nhk_v3_test` and
   `NHK_WP_TEST_PATH=public`: 135 tests and 833 assertions passed. The earlier
