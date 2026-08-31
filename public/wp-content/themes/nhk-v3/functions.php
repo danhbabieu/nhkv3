@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/inc/class-nhk-home-page-query.php';
+
 function nhk_v3_setup(): void
 {
     add_theme_support('title-tag');
