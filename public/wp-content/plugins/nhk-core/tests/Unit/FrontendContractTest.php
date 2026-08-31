@@ -46,6 +46,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('.nav-toggle:focus-visible', $style);
         self::assertStringContainsString('display:block!important', $style);
         self::assertStringContainsString('.skip-link:focus', $style);
+        self::assertStringContainsString('.entity-card-key', $style);
+        self::assertStringContainsString('overflow-wrap:anywhere', $style);
         self::assertStringContainsString("get_theme_file_uri('navigation.js')", $functions);
 
         foreach (['front-page.php', 'index.php', 'single.php', 'entity.php', 'knowledge.php', 'media.php', 'video.php', 'comparison.php', '404.php'] as $template) {
@@ -62,6 +64,14 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('$robots[\'index\'] = true', $functions);
         self::assertStringContainsString("add_filter('wp_robots', 'nhk_v3_robots', 20)", $functions);
         self::assertStringContainsString('if (is_front_page() || is_home() || is_search()) $canonical = home_url(\'/\');', $functions);
+    }
+
+    public function test_admin_contract_associates_labels_with_operational_controls(): void
+    {
+        $admin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Admin/AdminPage.php');
+        foreach (['aria-labelledby="nhk-entity-lookup-heading"', 'for="nhk-entity-type"', 'for="nhk-entity-key"', 'for="nhk-proposal-id"', 'aria-describedby="nhk-proposal-composer-help"', 'id="nhk-source-key"', 'id="nhk-target-key"', 'for="nhk-semantic-id"', 'id="nhk-graph-endpoint-key"', 'aria-live="polite"'] as $contract) {
+            self::assertStringContainsString($contract, $admin);
+        }
     }
 
     public function test_search_template_uses_unified_search_query_boundary(): void

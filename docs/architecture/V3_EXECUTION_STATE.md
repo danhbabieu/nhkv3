@@ -9,8 +9,8 @@ Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 81 tests, 265 assertions; guarded WordPress integration: 38 tests, 235 assertions; combined current suite: 119 tests, 500 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
-| Blockers | Complete visual QA beyond the sampled Model pagination state and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 82 tests, 277 assertions; guarded WordPress integration: 38 tests, 235 assertions; combined current suite: 120 tests, 512 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
+| Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,960 rows and skipped 1,013 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
@@ -412,5 +412,22 @@ Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
 - 2026-08-31: Re-ran the guarded WordPress integration outside the sandbox
   network boundary: 38 tests/235 assertions pass on `nhk_v3_test`; the
   localhost frontend route smoke also passes 20/20. Combined current test
-  evidence is 119 tests/500 assertions; no V2 live or production data was
+  evidence is 119 tests/502 assertions; no V2 live or production data was
   changed.
+- 2026-08-31: Responsive QA found a real tablet overflow on the Component
+  archive caused by long stable keys. The theme now wraps `.entity-card-key`
+  values and bumps the stylesheet cache version to 1.1.3. Browser recheck
+  covers 32 route/page-state and 390px/768px combinations with zero overflow,
+  valid main/heading landmarks, and the Component archive visually inspected
+  at both widths; active Video detail and broader screenshot coverage remain
+  open.
+- 2026-08-31: Additional mobile screenshots passed for Media pagination,
+  Video empty state, Knowledge pagination and 404. These states retain
+  usable hierarchy, controls and footer layout; remaining screenshot QA is
+  route-specific coverage beyond the inspected set and an active Video detail
+  when a valid local record exists.
+- 2026-08-31: NHK Admin operational forms now associate every lookup,
+  proposal-composer and semantic/Graph control with an explicit label/id and
+  expose form context through labelled/described regions. A source-level
+  accessibility contract test covers the associations; the unit suite is now
+  82 tests/277 assertions.

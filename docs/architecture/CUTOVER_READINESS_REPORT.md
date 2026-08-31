@@ -23,7 +23,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   Video records even when a caller knows their UUID.
 - NHK Admin exposes health, lookup, governed proposal creation and lifecycle
   actions, including Graph relation proposals, through REST with capability and
-  nonce checks.
+  nonce checks. Its operational lookup/composer controls now have explicit
+  label/id associations and labelled/described form regions.
 - MCP exposes governed eligibility and Controlled Apply handlers in addition to
   proposal lifecycle operations.
 - Native editorial aliases preserve `/tri-thuc/` and `/goc-chia-se/` route
@@ -72,7 +73,10 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   styling, and explicit decorative image alt handling. The browser runtime
   verified the 390px menu state and no overflow; the guarded integration and
   localhost route smoke were subsequently re-verified outside the sandbox
-  boundary.
+  boundary. A 32-combination browser sweep across the public page, archive
+  pagination and empty/404 states at 390px and 768px found no horizontal
+  overflow; long Component stable keys were fixed and visually rechecked at
+  both widths.
 - SEO now declares an explicit archive policy through WordPress's single
   `wp_robots` output: canonical non-search pages are `index,follow`, while
   search and paginated archive states are `noindex,follow`; custom entity,
@@ -86,14 +90,14 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 81 tests, 265 assertions |
+| Unit tests | PASS — 82 tests, 277 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 38 tests, 235 assertions; combined current suite is 119 tests, 500 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 38 tests, 235 assertions; combined current suite is 120 tests, 512 assertions |
 | Frontend route/rewrite smoke | PASS 20/20 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects, query-preserving search redirect and comparison title/canonical metadata |
 | REST/MCP runtime boundary | PASS — active Entity/Media/Knowledge/Search reads returned 200, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, local MCP `tools/list` returned 200 with 11 protocol definitions, unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
-| Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Authority archive/detail and 404 were visually inspected; browser checks at 390px/768px pass without horizontal overflow on the recorded route sweep, the menu exposes all ten links with synchronized ARIA state, while full route/pagination coverage and active Video detail remain pending |
+| Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 were visually inspected; a 32-combination browser sweep across page, archive pagination and empty/404 states at 390px/768px passes without horizontal overflow, and the menu exposes all ten links with synchronized ARIA state; remaining route-specific screenshots and active Video detail remain pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,960 candidates, 1,013 no-write skips and 0 conflicts after Migration009 maps all 1,581 projections to non-canonical context; latest local-dev apply: 3,960 migrated, 1,013 explicit skips, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
