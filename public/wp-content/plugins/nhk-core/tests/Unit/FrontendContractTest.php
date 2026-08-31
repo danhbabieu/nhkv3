@@ -58,4 +58,12 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'am-nhac' => 'music'", $routes);
         self::assertStringContainsString('nhk_entity_alias', $routes);
     }
+
+    public function test_v2_search_alias_preserves_query_and_uses_native_wordpress_search(): void
+    {
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEditorialRoutes.php');
+        self::assertStringContainsString('legacySearchRedirect', $routes);
+        self::assertStringContainsString("\$_GET['q']", $routes);
+        self::assertStringContainsString("add_query_arg('s', \$term, home_url('/'))", $routes);
+    }
 }
