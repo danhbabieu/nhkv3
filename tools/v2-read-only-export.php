@@ -151,7 +151,7 @@ foreach ($evidence as $item) {
     ];
 }
 
-$mediaAssets = $rows($db, 'SELECT id,public_id,attachment_id,status,visibility,title,mime_type,checksum FROM ' . $table('nhk_media_assets') . ' ORDER BY id');
+$mediaAssets = $rows($db, 'SELECT id,public_id,attachment_id,status,visibility,title,mime_type,checksum,web_path,file_size,width,height,primary_subject_id FROM ' . $table('nhk_media_assets') . ' ORDER BY id');
 foreach ($mediaAssets as $asset) {
     $records[] = [
         'type' => 'legacy_media_asset',
@@ -162,6 +162,11 @@ foreach ($mediaAssets as $asset) {
         'visibility' => (string) $asset['visibility'],
         'mime_type' => (string) $asset['mime_type'],
         'checksum' => (string) $asset['checksum'],
+        'storage_key' => (string) $asset['web_path'],
+        'byte_size' => (int) $asset['file_size'],
+        'width' => (int) $asset['width'],
+        'height' => (int) $asset['height'],
+        'media_id' => (string) $asset['primary_subject_id'],
     ];
 }
 

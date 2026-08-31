@@ -14,7 +14,7 @@ Status is based on code and test evidence, not commit titles.
 | P7 Knowledge + Source + Evidence + Post Graph | IN PROGRESS | Atomic claims, provenance, persistence and Post semantic links. |
 | P8 Admin + MCP operational layer | IN PROGRESS | NHK Admin console now includes semantic/Graph lookup and governed proposal composer; relation mutations, eligibility/Controlled Apply, semantic read/search APIs and MCP read/mutation contracts are wired; external transport and runtime QA pending. |
 | P9 Frontend/UI parity | IN PROGRESS | Responsive NHK editorial theme now includes HomePageQuery discovery, grouped semantic search, featured/latest/topics/semantic modules, canonical entity/related, Media gallery and Video archive/detail surfaces with SEO metadata; runtime smoke QA pending. |
-| P10 V2 → V3 Data Migration | IN PROGRESS | Versioned V2 normalize/export, guarded backup/restore, Migration006 ledger and resumable apply are implemented; local-dev checkpoint imported 1,545 rows, while URLs/media assets/source-evidence/projections and domain-targeted posts remain gated. |
+| P10 V2 → V3 Data Migration | IN PROGRESS | Versioned V2 normalize/export, guarded backup/restore, Migration006 ledger and resumable apply are implemented; local-dev checkpoint imported 1,548 rows including 3 MediaAsset metadata rows, while URLs/usages/source-evidence/projections and domain-targeted posts remain gated. |
 | P11 Reconciliation + parity + cutover readiness | IN PROGRESS / NOT READY | `CUTOVER_READINESS_REPORT.md` records implemented evidence and explicit blockers; count/semantic/UI/logic reconciliation is still gated by V2 data and WordPress runtime. |
 
 ## Locked direction

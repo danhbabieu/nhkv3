@@ -8,13 +8,14 @@ migration, and unresolved rows remain explicit in the ledger.
 |---|---:|---:|---:|---:|---:|---:|---:|---|
 | WordPress Posts | 800 | 36 | 36 | 764 | 0 | 0 | 36 | DEV ONLY; 764 domain-targeted custom/system posts |
 | Categories | 2 | 1 | 1 | 1 | 0 | 0 | 1 | DEV ONLY; non-category taxonomy is explicit skip |
-| Media entities | 242 | 242 | 242 | 0 | 0 | 0 | 242 | DEV ONLY; assets/usages remain separate |
+| Media entities | 242 | 242 | 242 | 0 | 0 | 0 | 242 | DEV ONLY; asset metadata is ledgered separately |
 | Authority entities | 370 | 370 | 370 | 0 | 0 | 0 | 370 | DEV ONLY; exact UUID/stable-key mapping |
 | Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; source/evidence joins remain open |
 | Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
 | Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
 | URLs | 800 | 1 candidate | 0 | 800 | 0 | 0 | 0 | Candidate inventory only; 301 mapping remains open |
-| Evidence / assets / projections | 1,603 | 0 | 0 | 1,603 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
+| Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions and source storage metadata imported; delivery/usages remain open |
+| Evidence / projections | 1,600 | 0 | 0 | 1,600 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
 
 ## Read-only reference checkpoint
 

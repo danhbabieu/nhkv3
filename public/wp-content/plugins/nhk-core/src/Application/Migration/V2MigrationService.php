@@ -7,20 +7,24 @@ use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityT
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Domain\Media\Media;
+use NHK\Core\Domain\Media\MediaAsset;
+use Symfony\Component\Uid\Uuid;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, InMemoryAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
 use NHK\Core\Infrastructure\Media\WpdbMediaRepository;
+use NHK\Core\Infrastructure\Media\WpdbMediaAssetRepository;
 use NHK\Core\Infrastructure\Migration\WpdbMigrationLedgerRepository;
 use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.2';
+    private const MAPPER_VERSION = '6.4';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
+    private WpdbMediaAssetRepository $assets;
     private WpdbKnowledgeRepository $knowledge;
     private \NHK\Core\Infrastructure\Video\WpdbVideoRepository $videos;
     private EntityTypeRegistry $types;
@@ -31,6 +35,7 @@ final class V2MigrationService
         $this->ledger = new WpdbMigrationLedgerRepository($database);
         $this->authority = new WpdbAuthorityRepository($database);
         $this->media = new WpdbMediaRepository($database);
+        $this->assets = new WpdbMediaAssetRepository($database);
         $this->knowledge = new WpdbKnowledgeRepository($database);
         $this->videos = new \NHK\Core\Infrastructure\Video\WpdbVideoRepository($database);
         $this->types = new EntityTypeRegistry();
@@ -79,6 +84,7 @@ final class V2MigrationService
             'wp_post' => $this->post($record),
             'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product' => $this->authorityEntity($record),
             'media' => $this->mediaEntity($record),
+            'legacy_media_asset' => $this->mediaAsset($record),
             'video' => $this->videoEntity($record),
             'knowledge' => $this->knowledgeClaim($record),
             'relation' => $this->relation($record),
@@ -185,6 +191,24 @@ final class V2MigrationService
         if ($byReference && $byReference->canonicalId !== $id) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Video external reference maps to a different canonical UUID.');
         $this->videos->create(new Video($id, $platform, $externalId, $url, (string) ($record['canonical_name'] ?? ''), $metadata, null, !$this->isArchived($record)));
         return ['reason' => 'READY', 'target_type' => 'video', 'target_key' => $id, 'target_id' => $id];
+    }
+
+    private function mediaAsset(array $record): array
+    {
+        $mediaId = (string) ($record['media_id'] ?? ''); $publicId = trim((string) ($record['stable_key'] ?? ''));
+        $storageKey = trim((string) ($record['storage_key'] ?? '')); $checksum = strtolower(trim((string) ($record['checksum'] ?? '')));
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $mediaId) || !$this->media->findByCanonicalId($mediaId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Media asset parent is not an imported Media identity.');
+        if ($publicId === '' || $storageKey === '' || preg_match('/^[0-9a-f]{64}$/', $checksum) !== 1) throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Media asset requires public id, storage path and checksum.');
+        $assetId = Uuid::v5(Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8'), 'nhk-v2-media-asset:' . $publicId)->toRfc4122();
+        $existing = $this->assets->findByAssetId($assetId);
+        $width = (int) ($record['width'] ?? 0); $height = (int) ($record['height'] ?? 0);
+        $asset = new MediaAsset($assetId, $mediaId, 'original', $storageKey, $checksum, (string) ($record['mime_type'] ?? ''), max(0, (int) ($record['byte_size'] ?? 0)), $width > 0 ? $width : null, $height > 0 ? $height : null);
+        if ($existing) {
+            if ($existing->mediaId !== $asset->mediaId || $existing->storageKey !== $asset->storageKey || $existing->checksum !== $asset->checksum) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Media asset deterministic identity maps to changed storage.');
+            return ['reason' => 'IDEMPOTENT', 'target_type' => 'media_asset', 'target_key' => $assetId, 'target_id' => $assetId];
+        }
+        $this->assets->create($asset);
+        return ['reason' => 'READY', 'target_type' => 'media_asset', 'target_key' => $assetId, 'target_id' => $assetId];
     }
 
     private function relation(array $record): array

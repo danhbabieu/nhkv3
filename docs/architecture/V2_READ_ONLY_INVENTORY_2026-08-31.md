@@ -40,32 +40,36 @@ report was:
 | Dry-run result | Count |
 |---|---:|
 | Source records | 4,933 |
-| Mapped candidates | 2,516 |
-| Skipped candidates | 2,417 |
+| Mapped candidates | 2,519 |
+| Skipped candidates | 2,414 |
 | URL mappings ready | 1 |
 | Conflicts | 0 |
 | Invalid relations | 0 |
 
 Skipped reason buckets were `INVALID_URL_MAPPING` 799 and
-`UNSUPPORTED_LEGACY_TYPE` 1,618. These are no-write
+`UNSUPPORTED_LEGACY_TYPE` 1,615. These are no-write
 reconciliation results, not approval to apply them.
 
 ## Local development apply checkpoint
 
 The governed `tools/v2-migrate.php` runner applied the same 4,933-record
-export to `nhk_v3` after the backup/restore gate. The ledger contains 1,545
-migrated records and 3,388 skipped records: `DOMAIN_TARGETED` 764,
-`INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 2,485; conflicts were 0.
+export to `nhk_v3` after the backup/restore gate. The ledger contains 1,548
+migrated records and 3,385 skipped records: `DOMAIN_TARGETED` 764,
+`INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 2,482; conflicts were 0.
+The three V2 MediaAsset rows were imported with checksum, MIME, dimensions
+and source storage metadata; runtime delivery and placement usages remain
+open reconciliation work.
 The second run was idempotent with the same counts. Target verification found
 36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
-rows, 655 Knowledge claims and 241 Graph edges imported from the ledger.
+rows, 3 MediaAsset rows, 655 Knowledge claims and 241 Graph edges imported
+from the ledger.
 This checkpoint is reversible in local development from
 `/private/tmp/nhk_v3-before-v2-apply.sql`; it does not authorize live V2 or
 production mutation.
 
 ## Required follow-up
 
-URL redirects, media assets/usages, external videos without a supported
+URL redirects, media delivery/usages, external videos without a supported
 reference, evidence/source provenance and semantic projections remain
 explicitly unmigrated or require a governed target mapping. The exporter and
 runner intentionally do not convert legacy custom post types into editorial

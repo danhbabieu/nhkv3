@@ -47,10 +47,10 @@ Readiness evidence are complete.
 ## Local-dev apply evidence
 
 The exported JSON is `/private/tmp/nhk-v3-v2-full-export.json` (SHA-256
-`105f09b5b400f0e15844a5b0d97c8f0ce988d644aefb86393fcbb2578dfef580`). Its
+`95e8a92d6a5352acfad66c2e471b684b9f41084d2f5be5525128c16c138659aa`). Its
 no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run.json` (SHA-256
-`862f469d22e6f9485c1b4798242f79b5bf0fd7b2e7da0e6b90498b134b42c1ff`). The
+`fd03abc6a594456a4b5868caa5010b87ab69e4d845aa3c81e201b908af8e51c5`). The
 apply result is `/private/tmp/nhk-v3-v2-apply-result.json` (SHA-256
-`2dcec0a043d7e97de8f56c7967ba251db20536ca15f65c77277934ad936890b8`). The
-runner wrote 1,545 `migrated` ledger rows and 3,388 explicit skips to
+`bdb62793135e962599573057c571a93941a8f8f5a69860555365b46ac38c0f8b`). The
+runner wrote 1,548 `migrated` ledger rows and 3,385 explicit skips to
 `nhk_v3`.

@@ -1,7 +1,7 @@
 # NHK V3 Cutover Readiness Report
 
 Date: 2026-08-31
-Repository: `main` at checkpoint `03a50de`
+Repository: `main` at checkpoint `pending-final-checkpoint`
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
 ## What is ready
@@ -42,15 +42,15 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 89 tests, 363 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 90 tests, 367 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,933-record export/dry-run; 2,516 candidates, 2,417 no-write skips; local-dev ledger: 1,545 migrated, 3,388 explicit skips, 0 conflicts |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,933-record export/dry-run; 2,519 candidates, 2,414 no-write skips; local-dev ledger: 1,548 migrated, 3,385 explicit skips, 0 conflicts, including 3 MediaAsset metadata rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates
 
-1. Complete field-level reconciliation for URLs, media assets/usages,
+1. Complete field-level reconciliation for URLs, media delivery/usages,
    Sources/Evidence/citations, semantic projections and the 764
    domain-targeted custom/system posts; each requires a governed target or a
    documented retirement/skip decision.

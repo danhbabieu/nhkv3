@@ -7,7 +7,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class DryRunService
 {
-    private const SUPPORTED_TYPES = ['wp_post', 'category', 'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge', 'source', 'evidence'];
+    private const SUPPORTED_TYPES = ['wp_post', 'category', 'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'media', 'video', 'knowledge', 'source', 'evidence', 'legacy_media_asset'];
 
     /** @param list<array<string,mixed>> $records */
     public function run(array $records): array
