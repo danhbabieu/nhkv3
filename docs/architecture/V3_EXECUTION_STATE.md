@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, active-only REST/MCP read checkpoint.
+Last updated: 2026-08-31, REST/MCP runtime boundary checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -301,3 +301,8 @@ Last updated: 2026-08-31, active-only REST/MCP read checkpoint.
   now fail closed for retired records, matching the active-only public page
   boundary. Unit evidence is 70 tests/210 assertions; guarded integration
   remains green at 103 tests/424 assertions.
+- 2026-08-31: Local REST smoke verified active entity/media/knowledge/search
+  reads (`200`), wrong or missing entity routes (`404`) and unauthenticated
+  Governance create/eligibility/apply (`401`). Runtime MCP registration
+  captured 11 tools, 5 governed tools and both read/governance handlers; an
+  external MCP transport is still not present or inferred.
