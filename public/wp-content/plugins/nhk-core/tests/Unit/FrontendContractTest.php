@@ -158,6 +158,10 @@ final class FrontendContractTest extends TestCase
     public function test_public_entity_payload_values_are_reader_facing(): void
     {
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString('function nhk_v3_public_type', $functions);
+        self::assertStringContainsString("'wp_post' => 'bài viết'", $functions);
+        self::assertStringContainsString('nhk_v3_public_type((string) ($item[\'type\'] ?? \'\'))', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
+        self::assertStringContainsString('nhk_v3_public_type((string) ($item[\'type\'] ?? $group))', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
         self::assertStringContainsString('function nhk_v3_public_value', $functions);
         self::assertStringContainsString("'canonical' => 'hồ sơ'", $functions);
         self::assertStringContainsString("'stable key' => 'mã ổn định'", $functions);
