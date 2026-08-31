@@ -47,7 +47,7 @@ final class EntityPageQuery
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $entity->payload, 'revision' => $entity->revision]; }
+    private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload, 'revision' => $entity->revision]; }
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }

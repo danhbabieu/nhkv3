@@ -151,6 +151,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_public_label((string) $key)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
     }
 
+    public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
+    {
+        foreach ([dirname(__DIR__, 2) . '/src/Application/Entity/EntityPageQuery.php', dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php'] as $file) {
+            self::assertStringContainsString('array_intersect_key($entity->payload', (string) file_get_contents($file), $file . ' must allowlist public entity payload fields');
+        }
+    }
+
     public function test_public_media_api_does_not_expose_asset_storage_metadata(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');

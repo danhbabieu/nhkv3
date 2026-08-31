@@ -6,6 +6,8 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Entity\EntityPageQuery;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\AuthorityEntity;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -40,5 +42,16 @@ final class EntityPageQueryTest extends TestCase
         $retired = $authority->create('brand', 'nhk:brand:retired-odo', 'Retired Odo');
         $authority->retire($retired->canonicalId, 1);
         self::assertNull($query->stableKeyForPublicSlug('brand', 'retired-odo'));
+    }
+
+    public function test_public_entity_payload_is_limited_to_registered_reader_fields(): void
+    {
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $entity = new AuthorityEntity(UuidCodec::newV7(), 'brand', 'public-payload', 'Public payload', 1, ['country' => 'Switzerland', 'private_note' => 'internal']);
+        $repository->create($entity);
+        $query = new EntityPageQuery($repository, $types);
+
+        self::assertSame(['country' => 'Switzerland'], $query->detail('brand', 'public-payload')['payload']);
     }
 }

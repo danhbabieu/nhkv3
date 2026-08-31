@@ -20,6 +20,8 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         require_once rtrim((string) getenv('NHK_WP_TEST_PATH'), '/') . '/wp-load.php';
         TestDatabaseGuard::selectTestDatabase();
         TestDatabaseGuard::requireTestDatabase();
+        require_once dirname(__DIR__, 2) . '/nhk-core.php';
+        do_action('rest_api_init');
         (new AuthorityMigration002())->up();
     }
 
@@ -59,5 +61,25 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
 
         self::assertCount(9, array_unique($ids));
         foreach ($types->all() as $definition) self::assertNotNull($repository->findByStableKey($definition->type, 'p5-integration-' . $definition->type));
+    }
+
+    public function test_public_entity_api_filters_unregistered_payload_fields(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new WpdbAuthorityRepository();
+        $entity = new \NHK\Core\Domain\Authority\AuthorityEntity(
+            \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
+            'brand',
+            'p5-integration-public-payload',
+            'Public payload',
+            1,
+            ['country' => 'Switzerland', 'private_note' => 'internal']
+        );
+        $repository->create($entity);
+        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/' . $entity->canonicalId));
+
+        self::assertSame(200, $response->get_status());
+        self::assertSame(['country' => 'Switzerland'], $response->get_data()['payload']);
     }
 }

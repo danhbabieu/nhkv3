@@ -35,5 +35,5 @@ final class EntityApi
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => count($all), 'items' => array_map($this->serialize(...), $items)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $entity->payload, 'active' => $entity->active(), 'revision' => $entity->revision]; }
+    private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload, 'active' => $entity->active(), 'revision' => $entity->revision]; }
 }
