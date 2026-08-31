@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Media/Video public surface checkpoint in progress.
+Last updated: 2026-08-31, Media/Video public surface checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `4e0252c` |
+| Branch / HEAD | `main` / `e8c4c27` |
 | Current phase | P8 Governance/Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
 | Tests | Unit suite: 58 tests, 155 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
-| Blockers | None for local code work; full suite is environment-blocked (no `NHK_WP_TEST_PATH`, one P5 bootstrap error and nine mandatory P4 failures); V2/live remains read-only |
-| Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Commit the Media/Video public surface, then add static route-contract evidence and migration handoff; run frontend/Admin runtime smoke when WordPress runtime is available; feed a read-only V2 export into `tools/v2-dry-run.php` |
+| Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
+| Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
+| Next executable task | Obtain a working local WordPress/test DB for runtime smoke and Migration005 integration; obtain V2 read-only export/backup evidence; run `tools/v2-dry-run.php` before any mapping or migration |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -107,3 +107,9 @@ Last updated: 2026-08-31, Media/Video public surface checkpoint in progress.
   renders a YouTube privacy embed from its canonical external reference;
   local MP4 copying is not introduced. Unit evidence is 58 tests/155
   assertions; runtime route smoke remains WordPress-environment gated.
+- 2026-08-31: Checkpoint `e8c4c27` was pushed with public Media/Video
+  templates, route wiring, query-service tests and the source-level frontend
+  route inventory. Unit evidence is 58 tests/155 assertions. The guarded full
+  WordPress command was attempted with `NHK_WP_TEST_DB=nhk_v3_test` and
+  `NHK_WP_TEST_PATH=public`, but local WordPress stopped at a database
+  connection error; no V2 migration or production action was performed.
