@@ -105,6 +105,7 @@ final class V2MigrationIntegrationTest extends TestCase
         self::assertSame(4, $result['processed']); self::assertSame(3, $result['migrated']); self::assertSame(1, $result['skipped']);
         self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId))));
         self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId))));
+        self::assertSame(['verification_state' => 'VERIFIED', 'visibility' => 'PRIVATE'], json_decode((string) $wpdb->get_var($wpdb->prepare("SELECT metadata_json FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId))), true));
         self::assertSame(['verification_state' => 'VERIFIED', 'visibility' => 'PRIVATE', 'excerpt_metadata' => '{"page":7}', 'legacy_id' => '77'], json_decode((string) $wpdb->get_var($wpdb->prepare("SELECT metadata_json FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId))), true));
         self::assertSame('MISSING_ENDPOINT', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2:citation-missing')));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId)));

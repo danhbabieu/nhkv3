@@ -233,6 +233,7 @@ final class V2MigrationService
         if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $title === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Source identity or title is incomplete.');
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+        foreach (['visibility', 'verification_state', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
         $sourceType = $this->sourceType((string) ($record['legacy_type'] ?? ''));
         $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
         $source = new Source($id, $key, $title, $sourceType, $locator !== '' ? $locator : null, $metadata, $active);
