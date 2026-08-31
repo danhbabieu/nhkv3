@@ -14,8 +14,8 @@ the final parity declaration.
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
-| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Governance core; UI/API pending | NO | PARTIAL | IN PROGRESS | P4 then P8 |
-| MCP | Legacy behavior pending | Not implemented | NO | NO | NOT ASSESSED | P8 |
+| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Governance core + Admin/read API surface | NO | PARTIAL | IN PROGRESS | Governed mutation API pending |
+| MCP | Legacy behavior pending | Not implemented | NO | NO | NOT ASSESSED | P8; governance adapter pending |
 | SEO / URLs / Sitemap / RSS | Legacy inventory pending | WordPress boundary | NO | NO | NOT ASSESSED | P9/P10 |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Not implemented | NO | NO | NOT ASSESSED | P6/P9 |
 

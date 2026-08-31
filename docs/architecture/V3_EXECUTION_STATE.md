@@ -6,13 +6,13 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
 | Branch / HEAD | `main` / `51ff8bf` |
-| Current phase | P7 Knowledge + Source + Evidence + P9 Frontend — vertical slices in parallel |
+| Current phase | P8 Admin/API + P7/P9 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
 | Tests | P7 unit suite: 48 tests, 110 assertions; lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
 | Blockers | None for local P6 work; V2/live remains read-only |
 | Working assumptions | Working tree was clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Add P7 integration migration evidence, then governed Admin/API vertical slice |
+| Next executable task | Add governed proposal/API mutations and MCP adapter; integration migration remains environment-gated |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | Not applicable to code-only/P4 bootstrap; required before real V2 data migration |
@@ -55,3 +55,8 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
   Warm NHK design tokens, mobile navigation, two-column desktop feed/sidebar,
   accessible labels and empty states are present; browser smoke/visual QA and
   semantic entity routes remain pending.
+- 2026-08-31: P8 read API and Admin health surface added. Read endpoints expose
+  Media, Video, Knowledge Claim and Source with nested evidence/assets/usages,
+  returning 503 until their migration storage is ready. Admin is capability
+  protected and intentionally read-only for now; governed proposal mutations
+  and MCP remain next.
