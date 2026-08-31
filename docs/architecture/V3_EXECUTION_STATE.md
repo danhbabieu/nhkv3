@@ -19,6 +19,13 @@ Last updated: 2026-09-01, P11 public URL validation checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Fresh desktop runtime QA covered 15 public routes across
+  homepage, editorial archives, all populated Authority archives, empty
+  Specimen/Product/Media/Video/Comparison states, Knowledge and 404. Every
+  route rendered an H1 without fatal-error text, horizontal overflow, broken
+  images or empty/`#` anchors. This is additional desktop evidence only; no
+  new mobile coverage is claimed.
+
 - 2026-09-01: Public data-derived URLs now pass through the shared
   `nhk_v3_public_url` HTTP(S) validator before rendering. Entity/Post related
   cards, homepage semantic modules, Video source links and Knowledge evidence
