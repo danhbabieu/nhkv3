@@ -106,6 +106,16 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_public_entity_payload_values_are_reader_facing(): void
+    {
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString('function nhk_v3_public_value', $functions);
+        self::assertStringContainsString("'canonical' => 'hồ sơ'", $functions);
+        self::assertStringContainsString("'stable key' => 'mã ổn định'", $functions);
+        self::assertStringContainsString('nhk_v3_public_value($value)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
+        self::assertStringContainsString('nhk_v3_public_label((string) $key)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

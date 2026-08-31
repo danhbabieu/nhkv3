@@ -39,6 +39,29 @@ function nhk_v3_entity_label(string $type): string
     return ['brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm'][$type] ?? 'hồ sơ';
 }
 
+function nhk_v3_public_value(mixed $value): string
+{
+    $text = is_scalar($value) ? (string) $value : (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE);
+    $replacements = [
+        'canonical ID' => 'mã hồ sơ',
+        'Brand identity' => 'danh tính thương hiệu',
+        'canonical' => 'hồ sơ',
+        'stable key' => 'mã ổn định',
+        'external reference' => 'nguồn bên ngoài',
+        'atomic claim' => 'thông tin đã kiểm chứng',
+    ];
+    return str_ireplace(array_keys($replacements), array_values($replacements), $text);
+}
+
+function nhk_v3_public_label(string $key): string
+{
+    return [
+        'description' => 'Mô tả',
+        'aliases' => 'Tên gọi khác',
+        'brand identity' => 'Danh tính thương hiệu',
+    ][strtolower(str_replace('_', ' ', $key))] ?? ucwords(str_replace('_', ' ', $key));
+}
+
 function nhk_v3_document_title(string $title): string
 {
     $entity = $GLOBALS['nhk_core_entity_context'] ?? null;

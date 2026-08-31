@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P8/P9 raw MCP interoperability checkpoint.
+Last updated: 2026-08-31, P11 public payload-language and runtime QA checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P8/P9 raw MCP interoperability checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 86 tests, 446 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 130 tests, 793 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Tests | Unit suite: 87 tests, 451 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 131 tests, 798 assertions; plugin/theme PHP lint and diff check pass; route smoke was blocked by the local HTTP listener being unavailable to the shell while browser runtime QA remained available |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,15 @@ Last updated: 2026-08-31, P8/P9 raw MCP interoperability checkpoint.
 | Migration dry-run | Full restored-backup export: 4,973 records; 3,960 candidates and 1,013 skipped; projection contexts account for 1,581 newly mapped records; remaining skips are reason-coded and no conflicts were reported |
 
 ## Checkpoint journal
+
+- 2026-08-31: Public entity payload rendering now maps technical field labels and
+  filters internal phrases such as canonical, stable key, external reference and
+  atomic claim at the theme presentation boundary without changing source data.
+  The frontend contract is now 87 unit tests/451 assertions; guarded full suite
+  passes 131 tests/798 assertions. Browser QA confirms the active Odo detail has
+  no internal payload terminology and no horizontal overflow. Route smoke was
+  attempted after this checkpoint but the shell could not reach the local HTTP
+  listener; this remains an environment evidence gap, not a route assertion.
 
 - 2026-08-31: Preflight completed. HEAD `2247c87`; existing governance edits
   preserved. Governance documents being bootstrapped.
