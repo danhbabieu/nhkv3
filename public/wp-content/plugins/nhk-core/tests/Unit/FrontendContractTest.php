@@ -160,6 +160,13 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_public_media_api_does_not_expose_provenance_blob(): void
+    {
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        $mediaMethod = substr($readApi, strpos($readApi, 'private function media'), strpos($readApi, 'private function video') - strpos($readApi, 'private function media'));
+        self::assertStringNotContainsString("'provenance' => \$media->provenance", $mediaMethod);
+    }
+
     public function test_public_media_api_does_not_expose_usage_endpoint_keys(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');

@@ -109,6 +109,9 @@ final class McpTransportIntegrationTest extends TestCase
             $assets = (new WpdbMediaAssetRepository($wpdb))->listByMediaId($media->canonicalId);
             self::assertCount(1, $assets);
             self::assertSame('PRIVATE', $assets[0]->visibility);
+            $read = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/media/' . $media->canonicalId));
+            self::assertSame(200, $read->get_status());
+            self::assertArrayNotHasKey('provenance', $read->get_data());
         } finally {
             wp_set_current_user($previousUser);
         }
