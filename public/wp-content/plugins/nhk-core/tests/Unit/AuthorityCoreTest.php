@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace NHK\Tests\Unit;
 use NHK\Core\Application\Authority\AuthorityService;
-use NHK\Core\Authority\Exception\{AuthorityRevisionConflict,InvalidPayload,StableKeyCollision};
+use NHK\Core\Authority\Exception\{AuthorityAlreadyActive,AuthorityAlreadyRetired,AuthorityRevisionConflict,InvalidPayload,StableKeyCollision};
 use NHK\Core\Domain\Authority\{EntityTypeDefinition,EntityTypeRegistry};
 use NHK\Core\Infrastructure\Graph\AuthorityEndpointResolver;
 use NHK\Core\Domain\Graph\NodeReference;
@@ -15,4 +15,6 @@ final class AuthorityCoreTest extends TestCase {
  public function test_payload_fields_are_validated():void{[$s]=$this->service();$this->expectException(InvalidPayload::class);$s->create('brand','a','A',['unknown'=>1]);}
  public function test_lifecycle_preserves_uuid_and_revision_locking():void{[$s]=$this->service();$a=$s->create('brand','a','A');$r=$s->rename($a->canonicalId,'B',1);$this->assertSame(2,$r->revision);$ret=$s->retire($r->canonicalId,2);$this->assertFalse($ret->active());$live=$s->reactivate($ret->canonicalId,3);$this->assertTrue($live->active());$this->assertSame($a->canonicalId,$live->canonicalId);$this->expectException(AuthorityRevisionConflict::class);$s->rename($live->canonicalId,'C',1);}
  public function test_generic_resolver_validates_uuid_and_retired_entities_remain_graph_endpoints():void{[$s,$r,$types]=$this->service();$a=$s->create('brand','a','A');$resolver=new AuthorityEndpointResolver($types,$r);$ref=$resolver->normalize(new NodeReference('brand',$a->canonicalId));$this->assertTrue($resolver->exists($ref));$s->retire($a->canonicalId,1);$this->assertTrue($resolver->exists($ref));}
+ public function test_already_retired_is_typed_error():void{[$s]=$this->service();$a=$s->create('brand','retired','Retired');$retired=$s->retire($a->canonicalId,1);$this->expectException(AuthorityAlreadyRetired::class);$s->retire($retired->canonicalId,2);}
+ public function test_already_active_is_typed_error():void{[$s]=$this->service();$a=$s->create('brand','active','Active');$this->expectException(AuthorityAlreadyActive::class);$s->reactivate($a->canonicalId,1);}
 }
