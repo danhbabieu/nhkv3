@@ -1,11 +1,11 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, runtime and V2 inventory checkpoint in progress.
+Last updated: 2026-08-31, runtime and V2 inventory checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `350e189` |
+| Branch / HEAD | `main` / `3e3a914` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
