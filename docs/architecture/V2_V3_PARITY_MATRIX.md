@@ -9,7 +9,7 @@ the final parity declaration.
 | Posts | Route behavior partially inventoried | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned; source counts pending |
 | Categories | Tri thức/Góc chia sẻ routes observed | Native WP categories | NO | PARTIAL | IN PROGRESS | Editorial intent only; complete V2 taxonomy inventory pending |
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
-| Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PASS | IN PROGRESS | Nine-type registry/catalog and generic persistence tested in P5; legacy data pending |
+| Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core + canonical entity read API | NO | PASS | IN PROGRESS | Nine-type registry/catalog, persistence and list/detail API tested in P5/P8; legacy data pending |
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract | NO | PASS | IN PROGRESS | Physical specimen vs commercial product distinction tested; legacy data pending |
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |

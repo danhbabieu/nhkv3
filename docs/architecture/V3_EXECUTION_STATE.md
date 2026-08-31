@@ -1,11 +1,11 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P8 search/proposal read and governed surfaces are pushed.
+Last updated: 2026-08-31, P8 entity/search/proposal surfaces are pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `c9ac981` |
+| Branch / HEAD | `main` / `cc40323` |
 | Current phase | P8 Admin/API + P7/P9 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
@@ -64,3 +64,6 @@ Last updated: 2026-08-31, P8 search/proposal read and governed surfaces are push
   semantic search were added. Search keeps native WordPress Post search and
   groups active Authority, Media, Video and Knowledge results under one API;
   capability checks remain fail-closed for mutation routes.
+- 2026-08-31: Canonical entity list/detail REST endpoints were added for the
+  nine Authority types with active-only pagination and type-safe 404 handling,
+  providing the initial data source for domain-specific frontend pages.
