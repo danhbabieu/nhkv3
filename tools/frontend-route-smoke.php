@@ -55,6 +55,7 @@ $routes = [
     '/feed/' => 200,
     '/?s=watch' => 200,
     '/?s=odo&paged=2' => 200,
+    '/category/uncategorized/' => 200,
     '/tim-kiem/?q=odo' => 301,
     '/comparison/' => 200,
     '/media/asset/00000000-0000-4000-8000-000000000000/' => 404,
