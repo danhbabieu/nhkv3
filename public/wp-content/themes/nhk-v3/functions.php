@@ -49,6 +49,13 @@ function nhk_v3_public_category_name(string $name): string
     return strcasecmp(trim($name), 'Uncategorized') === 0 ? 'Chưa phân loại' : $name;
 }
 
+function nhk_v3_public_date(?int $timestamp = null): string
+{
+    $timestamp = $timestamp ?? (int) get_post_timestamp();
+    if ($timestamp <= 0) return '';
+    return wp_date('j', $timestamp) . ' tháng ' . wp_date('n', $timestamp) . ', ' . wp_date('Y', $timestamp);
+}
+
 function nhk_v3_post_categories(string $separator = ', '): string
 {
     $categories = get_the_category();

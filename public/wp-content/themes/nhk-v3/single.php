@@ -10,7 +10,7 @@
       <p class="eyebrow"><?php echo nhk_v3_post_categories(' · '); ?></p>
       <h1><?php the_title(); ?></h1>
       <p class="standfirst"><?php echo esc_html(nhk_v3_excerpt()); ?></p>
-      <div class="article-meta"><?php echo esc_html(get_the_author()); ?> · <?php echo esc_html(get_the_date()); ?><?php if (get_the_modified_time('U') !== get_the_time('U')): ?> · Cập nhật <?php echo esc_html(get_the_modified_date()); ?><?php endif; ?></div>
+      <div class="article-meta"><?php echo esc_html(get_the_author()); ?> · <?php echo esc_html(nhk_v3_public_date()); ?><?php if (get_the_modified_time('U') !== get_the_time('U')): ?> · Cập nhật <?php echo esc_html(nhk_v3_public_date((int) get_the_modified_time('U'))); ?><?php endif; ?></div>
     </header>
     <?php if (has_post_thumbnail()): ?><figure class="article-featured"><?php the_post_thumbnail('large', ['loading' => 'eager', 'fetchpriority' => 'high', 'alt' => get_the_title()]); ?><?php if (get_the_post_thumbnail_caption()): ?><figcaption><?php echo esc_html(get_the_post_thumbnail_caption()); ?></figcaption><?php endif; ?></figure><?php endif; ?>
     <div class="article-content"><?php the_content(); ?></div>

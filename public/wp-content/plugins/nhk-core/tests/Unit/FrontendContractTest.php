@@ -173,6 +173,12 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('function nhk_v3_public_type', $functions);
         self::assertStringContainsString('function nhk_v3_public_category_name', $functions);
         self::assertStringContainsString("'Uncategorized') === 0 ? 'Chưa phân loại'", $functions);
+        self::assertStringContainsString('function nhk_v3_public_date', $functions);
+        self::assertStringContainsString("' tháng '", $functions);
+        self::assertStringContainsString('nhk_v3_public_date()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/front-page.php'));
+        self::assertStringContainsString('nhk_v3_public_date((int) get_the_modified_time', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/single.php'));
+        self::assertStringContainsString('function nhk_v3_public_date', $functions);
+        self::assertStringContainsString("' tháng '", $functions);
         self::assertStringContainsString('function nhk_v3_post_categories', $functions);
         self::assertStringContainsString('function nhk_v3_public_archive_title', $functions);
         self::assertStringContainsString('nhk_v3_public_archive_title()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
