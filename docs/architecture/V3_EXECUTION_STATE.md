@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P11 responsive pagination checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 91 tests, 494 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 135 tests, 841 assertions; plugin/theme PHP lint, route smoke 29/29 plus two data-gated detail redirects and diff check pass |
+| Tests | Unit suite: 91 tests, 526 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 135 tests, 873 assertions; plugin/theme PHP lint, route smoke 29/29 plus two data-gated detail redirects and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,14 @@ Last updated: 2026-08-31, P11 responsive pagination checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-08-31: Media detail public rendering no longer exposes internal
+  `storage_key` or operational labels; it now presents reader-facing resource,
+  profile-code, display-status and usage labels while retaining fail-closed
+  asset delivery. Runtime media detail verification confirmed the sensitive
+  storage key is absent and the honest empty state remains visible. Guarded
+  PHPUnit passed 135 tests/873 assertions, route smoke passed 29/29 and
+  composer lint/diff checks passed. No database state changed.
 
 - 2026-08-31: The reader-facing field-label contract was extended to
   `model_uuid`, `brand_uuid` and `serial_number`, preventing technical UUID
