@@ -299,7 +299,7 @@ final class V2MigrationService
             if ((!in_array($entityType, $authorityTypes, true) && $entityType !== 'knowledge') || !preg_match('/^[0-9a-f-]{36}$/i', $entityId) || $entityKey === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'Entity URL target identity is incomplete.');
             if ($entityType === 'knowledge') {
                 $claim = $this->knowledge->findByCanonicalId($entityId);
-                if (!$claim || $claim->stableKey !== $entityKey || !$claim->active) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Knowledge URL target is not an active governed claim.');
+                if (!$claim || $claim->stableKey !== $entityKey || !$claim->active || !$claim->isPublic()) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Knowledge URL target is not an active public governed claim.');
             } else {
                 $entity = $this->authority->findByCanonicalId($entityId);
                 if (!$entity || $entity->entityType !== $entityType || $entity->stableKey !== $entityKey || !$entity->active()) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Entity URL target is not an active governed endpoint.');

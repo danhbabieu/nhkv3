@@ -206,4 +206,33 @@ final class V2MigrationIntegrationTest extends TestCase
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-entity'));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_entities WHERE canonical_uuid=%s", UuidCodec::toBinary($entityId)));
     }
+
+    public function test_url_mapping_rejects_non_public_knowledge_target(): void
+    {
+        global $wpdb;
+        (new KnowledgeMigration005())->up();
+        (new KnowledgeEvidenceMetadataMigration007())->up();
+        $publicId = UuidCodec::newV7();
+        $privateId = UuidCodec::newV7();
+        $records = [
+            ['type' => 'knowledge', 'stable_key' => 'v2-migration-integration-public-claim', 'canonical_uuid' => $publicId, 'canonical_name' => 'Public migration claim', 'metadata' => ['one_sentence_definition' => 'A public migration claim.', 'verification_status' => 'VERIFIED']],
+            ['type' => 'knowledge', 'stable_key' => 'v2-migration-integration-private-claim', 'canonical_uuid' => $privateId, 'canonical_name' => 'Private migration claim', 'metadata' => ['one_sentence_definition' => 'A private migration claim.', 'verification_status' => 'UNVERIFIED']],
+        ];
+        $service = new V2MigrationService($wpdb);
+        self::assertSame(2, $service->apply($records, 16, 10)['migrated']);
+        $previousRedirects = get_option('nhk_v2_entity_redirects', null);
+        $result = $service->apply([
+            ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-public-knowledge', 'source_path' => '/legacy/public-knowledge/', 'target_path' => '/knowledge/claim/' . $publicId . '/', 'target_entity_type' => 'knowledge', 'target_entity_key' => 'v2-migration-integration-public-claim', 'target_entity_id' => $publicId],
+            ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-private-knowledge', 'source_path' => '/legacy/private-knowledge/', 'target_path' => '/knowledge/claim/' . $privateId . '/', 'target_entity_type' => 'knowledge', 'target_entity_key' => 'v2-migration-integration-private-claim', 'target_entity_id' => $privateId],
+        ], 17, 10);
+        self::assertSame(1, $result['migrated']);
+        self::assertSame(1, $result['skipped']);
+        self::assertSame('MISSING_ENDPOINT', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-private-knowledge')));
+        self::assertSame('/knowledge/claim/' . $publicId . '/', get_option('nhk_v2_entity_redirects', [])['/legacy/public-knowledge/'] ?? null);
+        if (is_array($previousRedirects)) update_option('nhk_v2_entity_redirects', $previousRedirects, false); else delete_option('nhk_v2_entity_redirects');
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid IN (%s,%s)", UuidCodec::toBinary($publicId), UuidCodec::toBinary($privateId)));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-public-%'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-private-%'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-%knowledge'));
+    }
 }
