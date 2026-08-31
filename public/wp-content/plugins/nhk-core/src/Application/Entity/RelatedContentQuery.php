@@ -20,22 +20,36 @@ final class RelatedContentQuery
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
     public function forEntity(string $type, string $id): array
     {
-        $groups = ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
+        try { return $this->forReference(new NodeReference($type, $id)); } catch (\Throwable) { return $this->emptyGroups(); }
+    }
+
+    /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
+    public function forPost(int $postId): array
+    {
+        if ($postId < 1) return $this->emptyGroups();
+        $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1;
+        try { return $this->forReference(new NodeReference('wp_post', $blogId . ':' . $postId)); } catch (\Throwable) { return $this->emptyGroups(); }
+    }
+
+    /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
+    private function forReference(NodeReference $reference): array
+    {
+        $groups = $this->emptyGroups();
         if ($this->status && !$this->status->graphStorageReady()) return $groups;
         $seen = [];
-        try {
-            $reference = new NodeReference($type, $id);
-            $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
-            foreach ($pages as $page) foreach ($page['items'] as $edge) {
-                $node = $edge->source->reference->key() === $reference->key() ? $edge->target->reference : $edge->source->reference;
-                if ($node->key() === $reference->key() || isset($seen[$node->key()])) continue;
-                $seen[$node->key()] = true; $item = $this->resolve($node);
-                if ($item === null) continue;
-                $groups[$item['group']][] = $item['value'];
-            }
-        } catch (\Throwable) { return $groups; }
+        $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
+        foreach ($pages as $page) foreach ($page['items'] as $edge) {
+            $node = $edge->source->reference->key() === $reference->key() ? $edge->target->reference : $edge->source->reference;
+            if ($node->key() === $reference->key() || isset($seen[$node->key()])) continue;
+            $seen[$node->key()] = true; $item = $this->resolve($node);
+            if ($item === null) continue;
+            $groups[$item['group']][] = $item['value'];
+        }
         return $groups;
     }
+
+    /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
+    private function emptyGroups(): array { return ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []]; }
 
     private function resolve(NodeReference $node): ?array
     {

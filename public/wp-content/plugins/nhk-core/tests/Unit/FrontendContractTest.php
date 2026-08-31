@@ -41,4 +41,12 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
         self::assertStringContainsString("home_url('/knowledge/claim/'", $index);
     }
+
+    public function test_post_template_uses_graph_related_query_boundary(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        self::assertStringContainsString("apply_filters('nhk_v3_post_related_content'", (string) file_get_contents($theme . '/single.php'));
+        self::assertStringContainsString('function (array $value, int $postId)', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php'));
+        self::assertStringContainsString('forPost', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Entity/RelatedContentQuery.php'));
+    }
 }

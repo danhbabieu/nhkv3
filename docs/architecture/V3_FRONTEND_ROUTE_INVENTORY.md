@@ -6,16 +6,17 @@ V2 URL-parity claim.
 
 | Surface | Public route contract | Query/template owner | Current evidence | Runtime status |
 |---|---|---|---|---|
-| Homepage | `/` | WordPress theme `front-page.php` and native WP queries | Real editorial query loop, no fixture content | Pending browser smoke |
+| Homepage | `/` | WordPress theme `front-page.php` and native WP queries | Real editorial query loop, no fixture content | HTTP and desktop visual smoke pass; responsive QA pending |
 | Tri thức / Góc chia sẻ | `/tri-thuc/`, `/goc-chia-se/` plus paginated aliases | Native WP category query via `PublicEditorialRoutes` | Category-aware archive and empty states; no editorial body projection | HTTP rewrite smoke passes; responsive visual QA and V2 URL reconciliation remain |
-| Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | Pending WP rewrite smoke |
-| Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | Pending WP rewrite smoke |
-| Search | Native `/?s={term}` plus `/wp-json/nhk/v1/search` | `NHK_V3_Search_Page_Query` + `SearchSemanticQuery` + `SearchApi` | Post results remain native; active Authority/Media/Video/Knowledge results are grouped and linked | Pending REST/runtime smoke |
-| Media archive | `/thu-vien/`, `/media/`, `/media/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `media.php` | Active-only archive, honest empty state | Pending WP rewrite/gallery smoke |
+| Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | HTTP smoke and desktop archive visual QA pass; responsive QA pending |
+| Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | HTTP smoke and desktop detail visual QA pass; responsive QA pending |
+| Search | Native `/?s={term}` plus `/wp-json/nhk/v1/search` | `NHK_V3_Search_Page_Query` + `SearchSemanticQuery` + `SearchApi` | Post results remain native; active Authority/Media/Video/Knowledge results are grouped and linked | REST, route and desktop browser smoke pass; responsive QA pending |
+| Post single | `/{post-slug}/` | Native WordPress single + `nhk_v3_post_related_content` | Editorial body remains native; Graph-derived related groups render only when available | HTTP and desktop visual smoke pass; Graph-related fixture coverage is unit-tested |
+| Media archive | `/thu-vien/`, `/media/`, `/media/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `media.php` | Active-only archive, honest empty state | HTTP smoke and desktop archive visual QA pass; responsive/gallery QA pending |
 | Media detail | `/media/{uuid}/` | `MediaVideoPageQuery` → `media.php` | Readiness-aware asset metadata and usage facts | HTTP/runtime smoke passes; pending asset delivery/privacy policy and responsive visual QA |
-| Video archive | `/video/`, `/video/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `video.php` | Active-only external references and empty state | Pending WP rewrite smoke |
-| Video detail | `/video/{uuid}/` | `MediaVideoPageQuery` → `video.php` | YouTube privacy embed only for validated 11-char IDs | Pending embed/browser smoke |
-| 404 / pagination | Theme 404 and route-level page links | Theme templates | Empty states and bounded pagination are implemented | Pending browser smoke |
+| Video archive | `/video/`, `/video/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `video.php` | Active-only external references and empty state | HTTP smoke and desktop empty-state visual QA pass; responsive QA pending |
+| Video detail | `/video/{uuid}/` | `MediaVideoPageQuery` → `video.php` | YouTube privacy embed only for validated 11-char IDs | Route contract and source-level embed validation pass; active-record browser coverage pending |
+| 404 / pagination | Theme 404 and route-level page links | Theme templates | Empty states and bounded pagination are implemented | Core 404/route smoke and desktop 404 visual QA pass; pagination/responsive QA pending |
 
 Admin semantic lookup covers Media, Video, Knowledge Claim, Source and Graph
 endpoints (`wp_post` included) through the existing read APIs. Governed proposal
@@ -50,9 +51,9 @@ paths remain opt-in to the smoke command because no fixture URLs are claimed.
 
 ## Pending evidence
 
-The full WordPress test command was attempted with
-`NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public`; the local WordPress
-bootstrap stopped at “Error establishing a database connection”. A real V2
-read-only export/API source is also absent. Therefore browser smoke, rewrite
-resolution, asset delivery, V2 URL redirects, counts and migration mappings
-remain open gates.
+The guarded WordPress suite and local route/runtime smoke now pass. Remaining
+evidence is intentionally bounded to responsive/tablet/mobile visual QA,
+active-record Video detail coverage, public asset/source policy, V2 URL and
+field reconciliation, and production/deployment gates. A real V2 live
+read-only API source remains absent; the recorded restored-backup artifacts
+are the authoritative local inventory evidence.

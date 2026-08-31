@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, local MCP Streamable HTTP transport checkpoint.
+Last updated: 2026-08-31, Post Graph enrichment checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, local MCP Streamable HTTP transport checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 70 tests, 210 assertions; guarded WordPress suite: 106 tests, 435 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Tests | Unit suite: 72 tests, 215 assertions; guarded WordPress suite: 108 tests, 440 assertions; plugin/theme PHP lint, route smoke and diff check pass |
 | Blockers | Responsive/tablet/mobile visual QA, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP interoperability checks |
@@ -317,3 +317,10 @@ Last updated: 2026-08-31, local MCP Streamable HTTP transport checkpoint.
   definitions, rejected an unauthenticated governed proposal call with 403,
   and rejected an invalid Origin with 403. The endpoint is local-runtime
   evidenced, not production or external-client approval.
+- 2026-08-31: Post single now requests Graph-derived related entities,
+  articles, Media and Video through `nhk_v3_post_related_content`; the theme
+  renders the groups only when active/public query results exist. The filter
+  wiring was browser-verified after catching and fixing a real argument-order
+  fatal on `/hello-world/`; desktop Post visual QA is clean, route smoke is
+  17/17, unit evidence is 72 tests/215 assertions and guarded integration is
+  108 tests/440 assertions.
