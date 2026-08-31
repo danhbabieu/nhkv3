@@ -10,7 +10,7 @@ Last updated: 2026-08-31, runtime and V2 inventory checkpoint pushed.
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
 | Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 88 tests, 351 assertions; plugin/theme PHP lint and diff check pass |
-| Blockers | V3 detail data, visual QA, external MCP transport, URL/media field reconciliation and governed migration apply remain open; V2/live remains read-only |
+| Blockers | V3 detail data, visual QA (browser connector unavailable), external MCP transport, URL/media field reconciliation and governed migration apply remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Obtain a compatible V2 backup restore path, complete field-level URL/media/identity reconciliation, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; no V2 record migrated |
@@ -172,3 +172,6 @@ Last updated: 2026-08-31, runtime and V2 inventory checkpoint pushed.
   records: 1,917 mapped, 1,169 skipped (`INVALID_URL_MAPPING` 799,
   `UNSUPPORTED_LEGACY_TYPE` 370). Temporary V2 tables were removed, the V3
   test snapshot was restored, and no V2 record was migrated.
+- 2026-08-31: Final route smoke passed 15/15 checks including `/hello-world/`.
+  Visual automation remains pending because Playwright has no browser binary
+  and the available system Chrome aborts in the headless connector.

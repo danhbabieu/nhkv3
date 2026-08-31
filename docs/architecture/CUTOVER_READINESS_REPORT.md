@@ -43,6 +43,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | `git diff --check` | PASS at checkpoints |
 | Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 88 tests, 351 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; no active V3 Authority detail rows yet |
+| Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
 | V2 data inventory/counts/mappings | PARTIAL — restored 3,086-record read-only export/dry-run; 1,917 mapped, 1,169 skipped with reason codes |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump; original dump is not MariaDB-portable without that conversion, and field-level migration evidence remains open |
 
@@ -54,8 +55,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 2. Promote the reviewed V2 restore conversion into a versioned, reproducible
    migration input, then reconcile counts, identity mappings, relations, media
    state and URL redirects using the migration ledger.
-3. Run browser smoke and visual QA for homepage, Post, entity archives/details,
-   search, Media, Video, 404, pagination and desktop/tablet/mobile states;
+3. Run browser visual QA for homepage, Post, entity archives/details, search,
+   Media, Video, 404, pagination and desktop/tablet/mobile states using a
+   working browser automation runtime;
    populate V3 detail data only through the governed migration path.
 4. Complete external MCP transport/runtime verification and close mandatory
    red rows in `V2_V3_PARITY_MATRIX.md`.
