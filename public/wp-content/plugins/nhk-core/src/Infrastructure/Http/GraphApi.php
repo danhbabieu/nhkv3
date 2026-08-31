@@ -15,7 +15,10 @@ final class GraphApi
     {
         register_rest_route('nhk/v1', '/graph/(?P<direction>outgoing|incoming)/(?P<endpoint_type>[a-z][a-z0-9_]{0,63})/(?P<endpoint_key>[^/]+)', [
             'methods' => 'GET',
-            'permission_callback' => '__return_true',
+            // Raw endpoint keys, edge state and revisions are operational Graph
+            // data. Public readers use RelatedContentQuery's display serializer;
+            // keep this diagnostic/query surface restricted to administrators.
+            'permission_callback' => static fn (): bool => current_user_can('manage_options'),
             'args' => ['predicate' => ['required' => false], 'after' => ['default' => 0], 'limit' => ['default' => 50], 'include_retired' => ['default' => false]],
             'callback' => fn (\WP_REST_Request $request) => $this->list($request),
         ]);

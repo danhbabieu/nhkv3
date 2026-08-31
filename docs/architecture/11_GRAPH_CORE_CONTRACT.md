@@ -7,6 +7,12 @@ lai. Domain không phụ thuộc WordPress hoặc `$wpdb`; Infrastructure chứa
 adapter. P2 không expose REST/MCP mutation và không tạo Media/Video/Authority/
 Knowledge/Proposal tables.
 
+Raw Graph REST reads are an administrator-only operational surface because they
+return endpoint keys, edge state and revisions. Public post/entity surfaces use
+`RelatedContentQuery`, which resolves active records into reader-facing titles and
+URLs and omits unavailable groups. This keeps the single Graph relation system
+without exposing its storage identifiers as public content API.
+
 ## Types and registries
 
 `NodeReference` gồm `endpoint_type` và `endpoint_key`. `EndpointTypeRegistry`

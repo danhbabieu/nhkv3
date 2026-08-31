@@ -219,6 +219,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('fn (Video $item): bool => $item->active &&', $searchApi);
     }
 
+    public function test_raw_graph_rest_reads_are_admin_only(): void
+    {
+        $graphApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/GraphApi.php');
+        self::assertStringNotContainsString("'permission_callback' => '__return_true'", $graphApi);
+        self::assertStringContainsString("'permission_callback' => static fn (): bool => current_user_can('manage_options')", $graphApi);
+    }
+
     public function test_public_media_readiness_gate_covers_all_discovery_boundaries(): void
     {
         foreach ([
