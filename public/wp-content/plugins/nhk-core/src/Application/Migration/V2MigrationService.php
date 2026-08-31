@@ -237,7 +237,7 @@ final class V2MigrationService
         $sourceTypeValue = trim((string) ($record['legacy_type'] ?? ''));
         if ($sourceTypeValue === '') $sourceTypeValue = trim((string) ($record['source_type'] ?? ''));
         $sourceType = $this->sourceType($sourceTypeValue);
-        $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
+        $active = !$this->isArchived($record) && !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
         $source = new Source($id, $key, $title, $sourceType, $locator !== '' ? $locator : null, $metadata, $active);
         $existing = $this->sources->findByCanonicalId($id);
         if (!$existing) {
@@ -266,7 +266,7 @@ final class V2MigrationService
         $relation = $this->evidenceRelation((string) ($record['citation_role'] ?? $record['relation'] ?? ''));
         $locator = trim((string) ($record['locator'] ?? ''));
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
-        $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
+        $active = !$this->isArchived($record) && !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
         foreach (['verification_state', 'visibility', 'excerpt_metadata', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
         $evidence = new Evidence($id, $claimId, $sourceId, $relation, $excerpt, $locator !== '' ? $locator : null, $active, 1, $metadata);

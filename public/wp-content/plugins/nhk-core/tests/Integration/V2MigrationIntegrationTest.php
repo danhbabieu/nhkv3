@@ -143,6 +143,40 @@ final class V2MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_archived_source_and_evidence_migrate_inactive_even_when_visibility_is_public(): void
+    {
+        global $wpdb;
+        (new KnowledgeMigration005())->up();
+        (new KnowledgeEvidenceMetadataMigration007())->up();
+        (new MigrationLedger006())->up();
+        $claimId = UuidCodec::newV7();
+        $sourceId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $records = [
+            ['type' => 'knowledge', 'stable_key' => 'v2-migration-integration-archived-claim', 'canonical_uuid' => $claimId, 'canonical_name' => 'Archived migration claim', 'metadata' => ['one_sentence_definition' => 'An archived claim.', 'verification_status' => 'VERIFIED']],
+            ['type' => 'source', 'stable_key' => 'v2-migration-integration-archived-source', 'canonical_uuid' => $sourceId, 'canonical_name' => 'Archived migration source', 'source_type' => 'website', 'visibility' => 'PUBLIC', 'review_state' => 'ARCHIVED'],
+            ['type' => 'evidence', 'stable_key' => 'v2-migration-integration-archived-evidence', 'canonical_uuid' => $evidenceId, 'source_id' => $sourceId, 'claim_id' => $claimId, 'citation_role' => 'PRIMARY_SUPPORT', 'excerpt' => 'An archived citation.', 'visibility' => 'PUBLIC', 'review_state' => 'RETIRED'],
+        ];
+
+        try {
+            $result = (new V2MigrationService($wpdb))->apply($records, 9, 10);
+            self::assertSame(3, $result['migrated']);
+            self::assertSame(0, (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT state FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s",
+                UuidCodec::toBinary($sourceId)
+            )));
+            self::assertSame(0, (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT state FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s",
+                UuidCodec::toBinary($evidenceId)
+            )));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid=%s", UuidCodec::toBinary($claimId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-archived-%'));
+        }
+    }
+
     public function test_url_mapping_requires_a_governed_target_and_allows_safe_noop(): void
     {
         global $wpdb;
