@@ -233,7 +233,7 @@ final class V2MigrationService
         if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $title === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Source identity or title is incomplete.');
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
-        foreach (['visibility', 'verification_state', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
+        foreach (['visibility', 'verification_state', 'review_state', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
         $sourceTypeValue = trim((string) ($record['legacy_type'] ?? ''));
         if ($sourceTypeValue === '') $sourceTypeValue = trim((string) ($record['source_type'] ?? ''));
         $sourceType = $this->sourceType($sourceTypeValue);
@@ -268,7 +268,7 @@ final class V2MigrationService
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
         $active = !$this->isArchived($record) && !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
-        foreach (['verification_state', 'visibility', 'excerpt_metadata', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
+        foreach (['verification_state', 'visibility', 'review_state', 'excerpt_metadata', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
         $evidence = new Evidence($id, $claimId, $sourceId, $relation, $excerpt, $locator !== '' ? $locator : null, $active, 1, $metadata);
         $existing = $this->evidence->findByCanonicalId($id);
         if ($existing) {

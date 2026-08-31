@@ -165,10 +165,18 @@ final class V2MigrationIntegrationTest extends TestCase
                 "SELECT state FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s",
                 UuidCodec::toBinary($sourceId)
             )));
+            self::assertSame(['visibility' => 'PUBLIC', 'review_state' => 'ARCHIVED'], json_decode((string) $wpdb->get_var($wpdb->prepare(
+                "SELECT metadata_json FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s",
+                UuidCodec::toBinary($sourceId)
+            )), true));
             self::assertSame(0, (int) $wpdb->get_var($wpdb->prepare(
                 "SELECT state FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s",
                 UuidCodec::toBinary($evidenceId)
             )));
+            self::assertSame(['visibility' => 'PUBLIC', 'review_state' => 'RETIRED'], json_decode((string) $wpdb->get_var($wpdb->prepare(
+                "SELECT metadata_json FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s",
+                UuidCodec::toBinary($evidenceId)
+            )), true));
         } finally {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId)));
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId)));
