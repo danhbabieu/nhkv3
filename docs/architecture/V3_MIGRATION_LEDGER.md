@@ -16,6 +16,15 @@ the read-only legacy inventory and dry-run exist.
 | Videos | — | — | — | — | — | — | — | NOT STARTED |
 | URLs | — | — | — | — | — | — | — | NOT STARTED; 301 mapping required for changes |
 
+## Read-only reference checkpoint
+
+`V2_REFERENCE_INVENTORY_2026-08-31.md` records the first route/UX audit of
+`demo.1945.vn`. It observed 12 visible cards on `/tri-thuc/` and 15 visible
+cards on `/thuong-hieu/`; these are page samples, not source counts. The
+sharing, video, media and specimen routes exposed honest empty states at audit
+time. V2 REST access was blocked by the browser client, so all data counts and
+identity mappings remain pending a read-only export/API/database source.
+
 ## Reason-code policy
 
 Every skipped or conflicted item in a future dry-run/actual run must record a

@@ -6,8 +6,8 @@ the final parity declaration.
 | AREA | V2 | V3 | MIGRATED? | TESTED? | PARITY STATUS | NOTES |
 |---|---|---|---|---|---|---|
 | Homepage | Reference audit pending | Responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Theme scaffold; V2 reference audit and browser smoke pending |
-| Posts | Reference audit pending | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned |
-| Categories | Reference audit pending | Native WP categories | NO | PARTIAL | IN PROGRESS | Editorial intent only |
+| Posts | Route behavior partially inventoried | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned; source counts pending |
+| Categories | Tri thức/Góc chia sẻ routes observed | Native WP categories | NO | PARTIAL | IN PROGRESS | Editorial intent only; complete V2 taxonomy inventory pending |
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
 | Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PASS | IN PROGRESS | Nine-type registry/catalog and generic persistence tested in P5; legacy data pending |
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract | NO | PASS | IN PROGRESS | Physical specimen vs commercial product distinction tested; legacy data pending |
@@ -16,7 +16,7 @@ the final parity declaration.
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Governance core + Admin/read API surface | NO | PARTIAL | IN PROGRESS | Governed mutation API pending |
 | MCP | Legacy behavior pending | Not implemented | NO | NO | NOT ASSESSED | P8; governance adapter pending |
-| SEO / URLs / Sitemap / RSS | Legacy inventory pending | WordPress boundary | NO | NO | NOT ASSESSED | P9/P10 |
+| SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary | NO | NO | NOT ASSESSED | URL/API inventory pending in P10 |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Not implemented | NO | NO | NOT ASSESSED | P6/P9 |
 
 ## Required parity inventory
