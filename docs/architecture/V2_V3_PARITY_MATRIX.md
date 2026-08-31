@@ -12,8 +12,8 @@ the final parity declaration.
 | Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PASS | IN PROGRESS | Nine-type registry/catalog and generic persistence tested in P5; legacy data pending |
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract | NO | PASS | IN PROGRESS | Physical specimen vs commercial product distinction tested; legacy data pending |
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
-| Knowledge Claim / Source / Evidence | Legacy data pending | Contract only | NO | NO | NOT ASSESSED | P7 |
-| Relations / Post Graph | Legacy data pending | Graph Core + Post endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; domain coverage pending |
+| Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
+| Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Governance core; UI/API pending | NO | PARTIAL | IN PROGRESS | P4 then P8 |
 | MCP | Legacy behavior pending | Not implemented | NO | NO | NOT ASSESSED | P8 |
 | SEO / URLs / Sitemap / RSS | Legacy inventory pending | WordPress boundary | NO | NO | NOT ASSESSED | P9/P10 |

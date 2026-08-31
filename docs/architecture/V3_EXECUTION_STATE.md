@@ -6,13 +6,13 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
 | Branch / HEAD | `main` / `51ff8bf` |
-| Current phase | P6 Media + Video — persistence and Graph integration |
+| Current phase | P7 Knowledge + Source + Evidence — persistence and Post Graph links |
 | Last accepted phase | P5 Canonical Domain Foundation |
-| DB migration | current 4 / target 4 on `nhk_v3`; MediaMigration004 UP-only applied and media/video storage ready |
-| Tests | Focused P6: 8 tests, 24 assertions; all unit: 46 tests, 106 assertions; lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
+| Tests | P7 unit suite: 48 tests, 110 assertions; lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
 | Blockers | None for local P6 work; V2/live remains read-only |
 | Working assumptions | Working tree was clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Add Media/Video repositories/services and shared Graph endpoint resolvers |
+| Next executable task | Add P7 integration migration evidence, then governed Admin/API vertical slice |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | Not applicable to code-only/P4 bootstrap; required before real V2 data migration |
@@ -44,3 +44,8 @@ Last updated: 2026-08-31, autonomous directive merged; P6 persistence is next.
   including optimistic repository updates, idempotent external references and
   Media/Video Graph endpoint resolvers. Focused and all-unit evidence passed;
   WordPress integration is environment-gated by `NHK_WP_TEST_PATH`.
+- 2026-08-31: P7 Knowledge Claim, Source and Evidence contracts, UP-only
+  Migration005, WPDB repositories, service boundary and shared Graph endpoint
+  resolvers were added. Post links use the single `about` Graph predicate and
+  never duplicate WordPress editorial body. Unit evidence remains green;
+  Migration005 is pending WordPress integration environment.

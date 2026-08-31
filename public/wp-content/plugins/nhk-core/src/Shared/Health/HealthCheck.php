@@ -23,6 +23,7 @@ final class HealthCheck {
             'governance_storage_ready' => $this->migrations->governanceStorageReady(),
             'media_storage_ready' => $this->migrations->mediaStorageReady(),
             'video_storage_ready' => $this->migrations->videoStorageReady(),
+            'knowledge_storage_ready' => $this->migrations->knowledgeStorageReady(),
         ];
     }
 }
