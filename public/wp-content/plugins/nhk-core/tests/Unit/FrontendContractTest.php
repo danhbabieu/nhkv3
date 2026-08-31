@@ -179,6 +179,13 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("'metadata' => \$evidence->metadata", $evidenceMethod);
     }
 
+    public function test_public_search_filters_retired_media_and_video(): void
+    {
+        $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
+        self::assertStringContainsString('fn (Media $item): bool => $item->active &&', $searchApi);
+        self::assertStringContainsString('fn (Video $item): bool => $item->active &&', $searchApi);
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

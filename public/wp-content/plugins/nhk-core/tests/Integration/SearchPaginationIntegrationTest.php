@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Integration;
 
+use NHK\Core\Domain\Media\Media;
+use NHK\Core\Domain\Video\Video;
+use NHK\Core\Infrastructure\Media\WpdbMediaRepository;
+use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -36,6 +41,27 @@ final class SearchPaginationIntegrationTest extends TestCase
                 count($data['groups'][$group]),
                 $data['semantic_totals'][$group]
             );
+        }
+    }
+
+    public function test_semantic_search_excludes_retired_media_and_video(): void
+    {
+        global $wpdb;
+        $suffix = bin2hex(random_bytes(5));
+        $term = 'retiredvisibility' . $suffix;
+        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'search-retired-media-' . $suffix, $term . ' media', 'ready', [], false));
+        $video = (new WpdbVideoRepository($wpdb))->create(new Video(UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', $term . ' video', [], null, false));
+        try {
+            $request = new \WP_REST_Request('GET', '/nhk/v1/search');
+            $request->set_param('q', $term);
+            $response = rest_do_request($request);
+            self::assertSame(200, $response->get_status());
+            $data = $response->get_data();
+            self::assertSame(0, $data['semantic_totals']['media']);
+            self::assertSame(0, $data['semantic_totals']['videos']);
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s", UuidCodec::toBinary($video->canonicalId)));
         }
     }
 }
