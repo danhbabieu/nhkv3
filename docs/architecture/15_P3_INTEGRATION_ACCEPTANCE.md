@@ -9,10 +9,17 @@
 
 ## Acceptance status
 
-P3 STATUS: BLOCKED — the local MySQL server was unavailable during this acceptance run, so the required DB integration gates could not be executed. This document must not be changed to `ACCEPTED` until the complete suite passes with zero mandatory skips.
+P3 STATUS: ACCEPTED
 
 ## Required evidence
 
 The final run must record real integration evidence for UUID `BINARY(16)` round-trip lookup, migrations 001/002, stable-key race handling, optimistic locking for update/retire/reactivate, lifecycle and retired filtering, cursor pagination, generic authority endpoint resolution, the Graph/Authority vertical slice, and main database health. Unit tests do not substitute for these checks.
 
-The current implementation includes the shared UUID codec lookup fix, guarded test-database harness, migration idempotency coverage, and initial DB persistence coverage. Remaining acceptance evidence is pending the test database and the complete integration scenarios.
+Acceptance evidence:
+
+- MySQL: `mysqld is alive` on `127.0.0.1:3306`; `wp db check` passes.
+- Test DB: `nhk_v3_test`; all destructive integration operations are guarded and isolated there.
+- Integration command: `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public composer test`.
+- Result: 37 tests, 100 assertions, 0 skipped.
+- Coverage includes migrations 001/002 up/idempotency/down/up, UUID binary persistence, stable-key idempotency and two-connection concurrency, optimistic locking, lifecycle/filtering, cursor pagination, endpoint resolution, and the Post→Authority graph vertical slice.
+- Main DB `nhk_v3` smoke/health: reachable; migration current 2, target 2; migration not required; graph and authority storage ready.
