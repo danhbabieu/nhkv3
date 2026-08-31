@@ -173,9 +173,11 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("home_url('/comparison/')", $home);
         self::assertStringContainsString("'/comparison/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
         $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
-        foreach (["'/tri-thuc/page/2/' => 200", "'/goc-chia-se/page/2/' => 200", "'/media/page/2/' => 200", "'/video/page/2/' => 200", "'/knowledge/page/2/' => 200"] as $route) {
+        foreach (["'/tri-thuc/page/2/' => 200", "'/goc-chia-se/page/2/' => 200", "'/media/page/2/' => 200", "'/video/page/2/' => 200", "'/knowledge/page/2/' => 200", "'/wp-sitemap.xml' => 200", "'/feed/' => 200"] as $route) {
             self::assertStringContainsString($route, $routeSmoke, 'semantic page-two route must be in smoke coverage');
         }
+        self::assertStringContainsString("'/wp-sitemap.xml' => '<sitemapindex'", $routeSmoke);
+        self::assertStringContainsString("'/feed/' => '<rss'", $routeSmoke);
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
         self::assertStringContainsString('nhk_core_comparison_context', $functions);
         self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', $functions);

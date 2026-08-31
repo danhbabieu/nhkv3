@@ -40,7 +40,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Media gallery / Video | Read-only route/behavior inventory recorded | First-class archive/detail query modules and theme templates | Responsive assets; external embeds only | PARTIAL |
 | Pagination / 404 / empty states | Read-only route inventory recorded | Route-level accessible states | No dead ends or fixture leakage | PARTIAL — all declared page-2 routes plus empty/404 states have 390px/768px metrics with no overflow; `/model/page/2/`, `/component/page/2/`, `/media/page/2/`, `/video/page/2/`, `/knowledge/page/2/` and 404 received visual inspection; broader screenshot coverage remains |
 | Desktop / tablet / mobile | Pending audit | Responsive one-to-many-column layouts | Reading comfort and Core Web Vitals considered | PARTIAL — a 32-combination browser sweep across page, archive pagination and empty/404 states passes 390px/768px overflow checks; route-specific screenshot coverage and active Video detail remain |
-| SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article, BreadcrumbList and explicit archive index/noindex policy | PARTIAL — metadata surfaces, homepage canonical and robots policy are browser-verified/contract-tested; runtime/V2 reconciliation remains |
+| SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article, BreadcrumbList and explicit archive index/noindex policy | PARTIAL — metadata surfaces, homepage canonical and robots policy are browser-verified/contract-tested; native `/wp-sitemap.xml` and `/feed/` return the expected sitemap/RSS payload markers; runtime/V2 reconciliation remains |
 
 ## Logic parity inventory
 

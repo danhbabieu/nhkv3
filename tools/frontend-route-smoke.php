@@ -40,6 +40,8 @@ $routes = [
     '/video/page/2/' => 200,
     '/thu-vien/' => 200,
     '/media/page/2/' => 200,
+    '/wp-sitemap.xml' => 200,
+    '/feed/' => 200,
     '/?s=watch' => 200,
     '/?s=odo&paged=2' => 200,
     '/comparison/' => 200,
@@ -47,6 +49,10 @@ $routes = [
     '/__nhk-route-must-404__/' => 404,
 ];
 $routes = array_merge($routes, $optionalRoutes);
+$contentMarkers = [
+    '/wp-sitemap.xml' => '<sitemapindex',
+    '/feed/' => '<rss',
+];
 $failures = 0;
 foreach ($routes as $route => $expected) {
     $url = $base . $route;
@@ -56,7 +62,7 @@ foreach ($routes as $route => $expected) {
         exit(2);
     }
     curl_setopt_array($handle, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HEADER => false, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15]);
-    curl_exec($handle);
+    $body = curl_exec($handle);
     $error = curl_error($handle);
     $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
     if ($error !== '') {
@@ -64,8 +70,12 @@ foreach ($routes as $route => $expected) {
         $failures++;
         continue;
     }
-    $ok = $status === $expected;
-    echo ($ok ? 'PASS' : 'FAIL') . " {$route}: expected {$expected}, got {$status}\n";
+    $marker = $contentMarkers[$route] ?? null;
+    $hasMarker = $marker === null || (is_string($body) && str_contains($body, $marker));
+    $ok = $status === $expected && $hasMarker;
+    $detail = $status === $expected ? "expected {$expected}, got {$status}" : "expected {$expected}, got {$status}";
+    if (!$hasMarker) $detail .= ", missing content marker {$marker}";
+    echo ($ok ? 'PASS' : 'FAIL') . " {$route}: {$detail}\n";
     if (!$ok) $failures++;
 }
 exit($failures === 0 ? 0 : 1);
