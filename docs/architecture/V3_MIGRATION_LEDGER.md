@@ -71,7 +71,10 @@ Cutover Readiness. The apply runner is `tools/v2-migrate.php`; `--offset`
 selects the next source window and Migration006 stores the durable checkpoint;
 Migration007 stores governed Evidence citation metadata and Migration008 stores
 MediaAsset visibility/metadata. Public Media reads suppress non-PUBLIC assets.
-The normalized backup also proves 776 projection-to-entity UUID links. Only
-the 370 active Authority types with existing public V3 routes are emitted as
-redirect targets; Knowledge projections stay domain-targeted until a public
-claim route and provenance policy are governed.
+The normalized backup also proves 776 projection-to-entity UUID links. The 370
+active Authority links, 292 active Knowledge links and 75 archived Knowledge
+links with active consolidation targets are emitted as URL redirect targets;
+five archived/no-target Knowledge links remain explicitly domain-targeted.
+The 1,581 semantic projection rows themselves remain unmigrated until a
+read-only context sink and provenance policy are governed; they are not copied
+into WordPress bodies or canonical domain records.

@@ -76,6 +76,9 @@ This
 does not constitute production parity. Every delta must be explained by a
 ledger reason code; identity merges require explicit evidence and name-only
 matching is forbidden. The normalized backup also proves 776 explicit
-projection-to-entity UUID links; 370 active Authority links are now eligible
-for deterministic canonical redirects, while Knowledge projections remain
-`DOMAIN_TARGETED` until a public claim route is governed.
+projection-to-entity UUID links; 370 active Authority links, 292 active
+Knowledge links and 75 archived-to-active Knowledge links now have deterministic
+canonical redirect targets. Five archived/no-target Knowledge links remain
+`DOMAIN_TARGETED`; the 1,581 semantic projection rows remain unmigrated until
+a governed read-only context sink and provenance policy exist, without copying
+projection bodies into canonical domain records.
