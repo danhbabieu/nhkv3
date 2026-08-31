@@ -49,7 +49,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | `git diff --check` | PASS at checkpoints |
 | Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 100 tests, 406 assertions |
 | Frontend route/rewrite smoke | PASS for core routes, `/hello-world/` and Knowledge archive/detail; local-dev migration populated Authority/Media/Knowledge detail data |
-| Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
+| Frontend visual QA | PARTIAL — desktop homepage, Knowledge archive/detail, Authority detail and 404 were visually inspected; tablet/mobile responsive coverage remains pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,330 candidates, 1,643 no-write skips; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
@@ -64,9 +64,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
    relation semantics, and obtain explicit approval before any live V2
    migration. The versioned normalize/export/apply chain is evidence, not
    production authorization.
-3. Run browser visual QA for homepage, Post, entity archives/details, search,
-   Media, Video, 404, pagination and desktop/tablet/mobile states using a
-   working browser automation runtime;
+3. Complete browser visual QA for homepage, Post, entity archives/details,
+   search, Media, Video, 404, pagination and tablet/mobile states; desktop
+   homepage, Knowledge, Authority and 404 surfaces are already inspected.
    populate V3 detail data only through the governed migration path; visual QA
    remains open because the available browser runtime cannot complete headless
    screenshots.
