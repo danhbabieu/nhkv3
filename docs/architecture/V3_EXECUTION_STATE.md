@@ -5,7 +5,7 @@ Last updated: 2026-08-31, governed local-dev migration checkpoint.
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / pending migration checkpoint |
+| Branch / HEAD | `main` / `03a50de` |
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |

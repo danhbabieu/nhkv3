@@ -1,7 +1,7 @@
 # NHK V3 Cutover Readiness Report
 
 Date: 2026-08-31
-Repository: `main` at checkpoint pending this migration checkpoint
+Repository: `main` at checkpoint `03a50de`
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
 ## What is ready
