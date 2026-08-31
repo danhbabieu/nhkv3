@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Migration009 projection-context checkpoint.
+Last updated: 2026-08-31, frontend accessibility checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,10 +9,10 @@ Last updated: 2026-08-31, Migration009 projection-context checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 79 tests, 241 assertions; guarded WordPress suite: 117 tests, 476 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
-| Blockers | Full visual QA for paginated states and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 80 tests, 259 assertions; guarded WordPress suite: 117 tests, 476 assertions from the last healthy DB run; plugin/theme PHP lint, route smoke 20/20 and diff check pass; current shell HTTP/integration retry is blocked by local MySQL/Apache connection refusal |
+| Blockers | Complete visual QA beyond the sampled Model pagination state and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing pagination/active-Video QA and external MCP interoperability checks |
+| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,960 rows and skipped 1,013 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 3,960 candidates and 1,013 skipped; projection contexts account for 1,581 newly mapped records; remaining skips are reason-coded and no conflicts were reported |
@@ -382,3 +382,17 @@ Last updated: 2026-08-31, Migration009 projection-context checkpoint.
   logged-in WordPress admin toolbar on the Component page, outside the public
   theme shell. Pagination visual coverage and an active Video detail remain
   unavailable in the current local dataset.
+- 2026-08-31: Pagination QA checked the declared archive page-2 routes at
+  390px and 768px (26 route/viewport combinations); all theme content was
+  overflow-free, and `/model/page/2/` received a mobile visual inspection with
+  working archive heading, filter and entity cards. Remaining pagination
+  visual coverage is the broader route/page-state sweep; the current local
+  dataset has no active Video detail to inspect.
+- 2026-08-31: Frontend accessibility/performance hardening added a skip link,
+  explicit `main` targets on all public templates, a keyboard-visible menu
+  control with `aria-controls`/synchronized `aria-expanded`, focus-visible
+  styling and decorative-card image alt handling. Browser runtime checks at
+  390px confirmed the menu exposes all ten links and no horizontal overflow;
+  `node --check`, PHP lint, unit tests (80/259) and diff check pass. A fresh
+  shell route/integration retry is currently blocked by the local service
+  connection state and is not counted as a pass.

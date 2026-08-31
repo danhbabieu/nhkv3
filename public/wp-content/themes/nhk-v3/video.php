@@ -3,7 +3,7 @@ $context = $GLOBALS['nhk_core_video_context'] ?? null;
 $archive = is_array($context) ? ($context['archive'] ?? []) : [];
 $video = is_array($context) ? ($context['video'] ?? []) : [];
 get_header();
-?><main class="site-main media-video-shell">
+?><main id="main-content" class="site-main media-video-shell">
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && $video !== []): $platform = strtolower((string) ($video['platform'] ?? '')); $externalId = (string) ($video['external_id'] ?? ''); ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url(home_url('/video/')); ?>">Video</a></p>
   <header class="archive-intro media-header"><p class="eyebrow"><?php echo esc_html($platform ?: 'External reference'); ?></p><h1><?php echo esc_html((string) ($video['title'] ?: 'Video NHK')); ?></h1><p class="archive-summary">Video là entity tham chiếu external canonical; NHK không sao chép hoặc lưu MP4 local.</p></header>

@@ -3,7 +3,7 @@ $context = $GLOBALS['nhk_core_media_context'] ?? null;
 $archive = is_array($context) ? ($context['archive'] ?? []) : [];
 $media = is_array($context) ? ($context['media'] ?? []) : [];
 get_header();
-?><main class="site-main media-video-shell">
+?><main id="main-content" class="site-main media-video-shell">
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && $media !== []): ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Thư viện</a></p>
   <header class="archive-intro media-header"><p class="eyebrow">Media canonical</p><h1><?php echo esc_html((string) ($media['name'] ?? '')); ?></h1><p class="archive-summary">Hồ sơ media và các asset được quản lý theo định danh canonical.</p></header>

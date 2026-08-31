@@ -31,6 +31,28 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('!$video->active', $readApi);
     }
 
+    public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $header = (string) file_get_contents($theme . '/header.php');
+        $style = (string) file_get_contents($theme . '/style.css');
+        $functions = (string) file_get_contents($theme . '/functions.php');
+
+        self::assertStringContainsString('class="skip-link"', $header);
+        self::assertStringContainsString('href="#main-content"', $header);
+        self::assertStringContainsString('aria-controls="primary-navigation"', $header);
+        self::assertStringContainsString('aria-expanded="false"', $header);
+        self::assertStringContainsString('id="primary-navigation"', $header);
+        self::assertStringContainsString('.nav-toggle:focus-visible', $style);
+        self::assertStringContainsString('display:block!important', $style);
+        self::assertStringContainsString('.skip-link:focus', $style);
+        self::assertStringContainsString("get_theme_file_uri('navigation.js')", $functions);
+
+        foreach (['front-page.php', 'index.php', 'single.php', 'entity.php', 'knowledge.php', 'media.php', 'video.php', 'comparison.php', '404.php'] as $template) {
+            self::assertStringContainsString('id="main-content"', (string) file_get_contents($theme . '/' . $template), $template . ' must expose the skip-link target');
+        }
+    }
+
     public function test_search_template_uses_unified_search_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

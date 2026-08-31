@@ -2,7 +2,7 @@
 $context = $GLOBALS['nhk_core_knowledge_context'] ?? null;
 $archiveUrl = is_array($context) ? (string) ($context['archive_url'] ?? home_url('/knowledge/')) : home_url('/knowledge/');
 get_header();
-?><main class="site-main knowledge-shell">
+?><main id="main-content" class="site-main knowledge-shell">
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['claim'] ?? null)): $claim = $context['claim']; ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url($archiveUrl); ?>">Tri thức</a></p>
   <article class="knowledge-article"><header class="article-header"><p class="eyebrow">Knowledge claim · <?php echo esc_html($claim['type']); ?></p><h1><?php echo esc_html($claim['text']); ?></h1><p class="article-meta">Canonical ID: <code><?php echo esc_html($claim['id']); ?></code> · Revision <?php echo esc_html((string) $claim['revision']); ?></p></header><div class="knowledge-definition"><p><?php echo esc_html($claim['text']); ?></p></div><?php if (!empty($claim['evidence'])): ?><section class="knowledge-evidence"><h2>Nguồn và bằng chứng</h2><?php foreach ($claim['evidence'] as $item): ?><article><p><?php echo esc_html($item['excerpt']); ?></p><?php if (!empty($item['locator'])): ?><a href="<?php echo esc_url($item['locator']); ?>" rel="nofollow noopener">Mở nguồn</a><?php endif; ?></article><?php endforeach; ?></section><?php else: ?><p class="knowledge-note">Bằng chứng công khai chưa được phát hành; nội dung chỉ hiển thị claim canonical đã được kiểm soát.</p><?php endif; ?></article>

@@ -4,7 +4,7 @@ $comparison = is_array($context['comparison'] ?? null) ? $context['comparison'] 
 $references = is_array($comparison['references'] ?? null) ? $comparison['references'] : ['left' => '', 'right' => ''];
 $items = is_array($comparison['items'] ?? null) ? $comparison['items'] : ['left' => null, 'right' => null];
 get_header();
-?><main class="site-main comparison-shell">
+?><main id="main-content" class="site-main comparison-shell">
   <header class="archive-intro"><p class="eyebrow">NHK discovery</p><h1>So sánh hồ sơ</h1><p class="archive-summary">Đặt hai Authority reference cạnh nhau để đọc nhanh các dữ kiện semantic đang công khai.</p></header>
   <form class="comparison-form" method="get" action="<?php echo esc_url(home_url('/comparison/')); ?>">
     <div><label for="nhk-comparison-a">Hồ sơ A</label><input id="nhk-comparison-a" name="a" type="text" value="<?php echo esc_attr((string) ($references['left'] ?? '')); ?>" placeholder="brand/nhk:brand:odo"></div>

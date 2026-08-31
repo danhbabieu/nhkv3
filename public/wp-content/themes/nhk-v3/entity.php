@@ -4,7 +4,7 @@ $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu đồng hồ', 'varia
 $type = is_array($context) ? (string) ($context['type'] ?? '') : '';
 $label = $labels[$type] ?? 'Khám phá';
 get_header();
-?><main class="site-main entity-shell">
+?><main id="main-content" class="site-main entity-shell">
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)): $entity = $context['entity']; ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url($context['archive_url']); ?>"><?php echo esc_html($label); ?></a></p>
   <header class="entity-header"><p class="eyebrow"><?php echo esc_html($label); ?></p><h1><?php echo esc_html($entity['name']); ?></h1><p class="entity-key"><?php echo esc_html($entity['stable_key']); ?></p></header>
