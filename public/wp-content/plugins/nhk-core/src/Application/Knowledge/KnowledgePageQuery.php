@@ -21,7 +21,7 @@ final class KnowledgePageQuery
             $source = $this->sources->findByCanonicalId($item->sourceId);
             return $source !== null && $source->active && $source->isPublic();
         }));
-        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'provenance' => $claim->provenance, 'revision' => $claim->revision, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
+        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'revision' => $claim->revision, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
     }
 
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */

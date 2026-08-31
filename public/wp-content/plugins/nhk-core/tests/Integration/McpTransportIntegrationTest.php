@@ -214,6 +214,7 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertCount(1, $sourceRead->get_data()['evidence']);
             self::assertArrayNotHasKey('metadata', $sourceRead->get_data());
             self::assertArrayNotHasKey('metadata', $claimRead->get_data()['evidence'][0]);
+            self::assertArrayNotHasKey('provenance', $claimRead->get_data());
         } finally {
             wp_set_current_user($previousUser);
         }

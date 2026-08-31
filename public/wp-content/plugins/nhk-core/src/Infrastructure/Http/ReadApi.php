@@ -45,7 +45,7 @@ final class ReadApi
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
         $claim = $this->claims->findByCanonicalId((string) $request['id']);
         if (!$claim || !$claim->active) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
-        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'provenance' => $claim->provenance, 'active' => $claim->active, 'revision' => $claim->revision, 'evidence' => array_map($this->evidence(...), $this->publicEvidenceByClaim($claim->canonicalId))];
+        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'active' => $claim->active, 'revision' => $claim->revision, 'evidence' => array_map($this->evidence(...), $this->publicEvidenceByClaim($claim->canonicalId))];
     }
 
     private function source(\WP_REST_Request $request): array|\WP_Error

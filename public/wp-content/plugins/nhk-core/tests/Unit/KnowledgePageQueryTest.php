@@ -42,6 +42,7 @@ final class KnowledgePageQueryTest extends TestCase
         $result = (new KnowledgePageQuery($claims, $evidence, $sources))->detail($claimId);
         self::assertNotNull($result); self::assertCount(1, $result['evidence']); self::assertSame('Public excerpt.', $result['evidence'][0]['excerpt']); self::assertSame('Public source', $result['evidence'][0]['source_title']); self::assertSame('catalog', $result['evidence'][0]['source_type']); self::assertSame('https://example.test/source', $result['evidence'][0]['source_locator']);
         self::assertArrayNotHasKey('metadata', $result['evidence'][0]);
+        self::assertArrayNotHasKey('provenance', $result);
         self::assertSame($claimId, (new KnowledgePageQuery($claims, $evidence, $sources))->detail('nhk:knowledge:query-test')['id']);
     }
 
