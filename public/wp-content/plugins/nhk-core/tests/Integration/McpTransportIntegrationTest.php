@@ -32,6 +32,30 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
+    public function test_standard_modern_initialize_accepts_protocol_version_in_params_without_custom_headers(): void
+    {
+        $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+        $request->set_header('MCP-Protocol-Version', '2026-07-28');
+        $request->set_header('Content-Type', 'application/json');
+        $request->set_header('Accept', 'application/json, text/event-stream');
+        $request->set_body(wp_json_encode(['jsonrpc' => '2.0', 'id' => 19, 'method' => 'initialize', 'params' => ['protocolVersion' => '2026-07-28', 'capabilities' => [], 'clientInfo' => ['name' => 'standard-client', 'version' => '1.0']]]));
+        $response = rest_do_request($request);
+        self::assertSame(200, $response->get_status());
+        self::assertSame('2026-07-28', $response->get_data()['result']['protocolVersion']);
+    }
+
+    public function test_standard_modern_tools_list_accepts_header_only_after_initialize(): void
+    {
+        $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+        $request->set_header('MCP-Protocol-Version', '2026-07-28');
+        $request->set_header('Content-Type', 'application/json');
+        $request->set_header('Accept', 'application/json, text/event-stream');
+        $request->set_body(wp_json_encode(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'tools/list', 'params' => []]));
+        $response = rest_do_request($request);
+        self::assertSame(200, $response->get_status());
+        self::assertCount(18, $response->get_data()['result']['tools']);
+    }
+
     public function test_modern_header_body_mismatch_is_rejected(): void
     {
         $response = $this->request('tools/list', ['id' => 2], ['Mcp-Method' => 'tools/call']);

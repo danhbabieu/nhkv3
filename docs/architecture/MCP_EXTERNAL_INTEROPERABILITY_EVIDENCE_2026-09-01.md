@@ -25,3 +25,13 @@ complete.
 Evidence was collected with limits of at most 10 Media and 5 Source/Video
 records per call. The calls were read-only and reported zero writes where the
 adapter exposes a write counter.
+
+## Local V3 wire probe
+
+The local V3 endpoint was also probed with standard Streamable HTTP JSON-RPC:
+`initialize` with `params.protocolVersion` and `tools/list` with the
+`MCP-Protocol-Version` header only both returned HTTP 200 and JSON-RPC success.
+Custom `Mcp-Method`/`Mcp-Name` headers remain supported as optional mismatch
+guards. This closes the previously observed custom `_meta`/header coupling for
+the basic initialization and tool-list exchange; external adapter mapping and
+deployment verification remain open.

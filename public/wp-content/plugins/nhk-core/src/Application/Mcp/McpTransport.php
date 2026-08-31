@@ -31,11 +31,16 @@ final class McpTransport
         if ($modern) {
             if (!$this->acceptsStreamableHttp($headers)) return $this->error($id, -32020, 'Accept header must include application/json and text/event-stream.', 400);
             $version = $this->header($headers, 'MCP-Protocol-Version');
-            $bodyVersion = (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '');
-            if (!in_array($version, [self::MODERN_VERSION], true)) return $this->error($id, -32022, 'Unsupported protocol version.', 400, ['supported' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'requested' => $version]);
-            if ($bodyVersion !== $version) return $this->error($id, -32020, 'Header mismatch: protocol version.', 400);
-            if ($this->header($headers, 'Mcp-Method') !== $method) return $this->error($id, -32020, 'Header mismatch: Mcp-Method.', 400);
-            if ($method === 'tools/call' && $this->header($headers, 'Mcp-Name') !== (string) ($params['name'] ?? '')) return $this->error($id, -32020, 'Header mismatch: Mcp-Name.', 400);
+            $metadataVersion = (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '');
+            $bodyVersion = (string) ($params['protocolVersion'] ?? '');
+            $bodyVersion = $bodyVersion !== '' ? $bodyVersion : $metadataVersion;
+            if ($version !== '' && $version !== self::MODERN_VERSION) return $this->error($id, -32022, 'Unsupported protocol version.', 400, ['supported' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'requested' => $version]);
+            if ($bodyVersion !== '' && $bodyVersion !== self::MODERN_VERSION) return $this->error($id, -32022, 'Unsupported protocol version.', 400, ['supported' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'requested' => $bodyVersion]);
+            if ($version !== '' && $bodyVersion !== '' && $bodyVersion !== $version) return $this->error($id, -32020, 'Header mismatch: protocol version.', 400);
+            $declaredMethod = $this->header($headers, 'Mcp-Method');
+            if ($declaredMethod !== '' && $declaredMethod !== $method) return $this->error($id, -32020, 'Header mismatch: Mcp-Method.', 400);
+            $declaredName = $this->header($headers, 'Mcp-Name');
+            if ($declaredName !== '' && $method === 'tools/call' && $declaredName !== (string) ($params['name'] ?? '')) return $this->error($id, -32020, 'Header mismatch: Mcp-Name.', 400);
         }
 
         if (!array_key_exists('id', $request) && str_starts_with($method, 'notifications/')) return ['status' => 202, 'body' => null];
@@ -56,7 +61,7 @@ final class McpTransport
     {
         return match ($method) {
             'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
-            'initialize' => $modern ? throw new \InvalidArgumentException('Modern MCP clients must use server/discover or per-request metadata.') : ['protocolVersion' => self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
+            'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
             'tools/list' => ['tools' => array_map(static fn (array $tool): array => ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']], McpToolCatalog::tools())],
             'tools/call' => $this->callTool($params),
             default => throw new McpMethodNotFound($method),
@@ -108,7 +113,7 @@ final class McpTransport
 
     private function isModern(array $request, array $params, array $headers): bool
     {
-        return $this->header($headers, 'MCP-Protocol-Version') !== '' || (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '') === self::MODERN_VERSION;
+        return $this->header($headers, 'MCP-Protocol-Version') !== '' || (string) ($params['protocolVersion'] ?? '') === self::MODERN_VERSION || (string) ($this->meta($request, $params)['io.modelcontextprotocol/protocolVersion'] ?? '') === self::MODERN_VERSION;
     }
 
     private function meta(array $request, array $params): array
