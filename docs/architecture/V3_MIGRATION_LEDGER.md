@@ -48,3 +48,16 @@ must emit source count, mapped, skipped, conflicts, duplicate candidates,
 invalid relations, missing endpoints and URL mappings. It must not write to V2
 or production. Media checksum matches are duplicate candidates only and never
 automatic identity merges.
+
+## No-write dry-run tooling
+
+`tools/v2-dry-run.php --input=/path/to/read-only-inventory.json` accepts a JSON
+object containing a `records` array and emits a machine-readable report. The
+`DryRunService` performs no database or filesystem writes. It classifies
+supported records, URL mappings and relations, validates canonical UUIDs and
+stable keys, and reports bounded reason codes including
+`DUPLICATE_CANDIDATE`, `INVALID_RELATION`, `MISSING_ENDPOINT`,
+`INVALID_IDENTITY` and `UNSUPPORTED_LEGACY_TYPE`. A repeated media checksum is
+evidence for review only; it never merges identities. The tool is ready for a
+read-only V2 export, while actual migration remains gated by backup,
+readability/restore evidence and resumable checkpoint design.

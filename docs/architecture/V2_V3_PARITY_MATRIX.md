@@ -14,7 +14,7 @@ the final parity declaration.
 | Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
-| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + Admin/read API | NO | PARTIAL | IN PROGRESS | Controlled Apply/Admin detail UI pending |
+| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + Admin/read API | NO | PARTIAL | IN PROGRESS | Search and governed proposal REST surfaces tested; Controlled Apply/Admin detail UI pending |
 | MCP | Legacy behavior pending | Tool catalog + governed handler contract | NO | PARTIAL | IN PROGRESS | External MCP transport and read adapters pending |
 | SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary | NO | NO | NOT ASSESSED | URL/API inventory pending in P10 |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Not implemented | NO | NO | NOT ASSESSED | P6/P9 |
@@ -50,12 +50,14 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Relations / Post semantic links | One typed Graph | IN PROGRESS |
 | Media ingestion / usage | Media identity, asset and placement separation | IN PROGRESS |
 | Video linking | Canonical external-reference entity | IN PROGRESS |
-| Knowledge / Source / Evidence | Atomic claims with provenance | NOT ASSESSED |
-| Search | Unified SearchService abstraction | NOT ASSESSED |
-| Admin / MCP | Governed operational workflows | NOT ASSESSED |
+| Knowledge / Source / Evidence | Atomic claims with provenance | IN PROGRESS |
+| Search | Unified SearchService abstraction and native WP post query | IN PROGRESS |
+| Admin / MCP | Governed operational workflows and MCP tool contract | IN PROGRESS |
 
 ## Data parity inventory
 
-Counts and mappings remain `—` until the read-only V2 inventory and dry-run
-produce evidence. Every delta must be explained by a ledger reason code;
+Counts and mappings remain `—` until a read-only V2 export/API/database source
+is available. The route audit is evidence for UX only, not source counts. The
+no-write dry-run validates inventory records and emits bounded reason codes,
+but it does not constitute migrated data. Every delta must be explained by a ledger reason code;
 identity merges require explicit evidence and name-only matching is forbidden.

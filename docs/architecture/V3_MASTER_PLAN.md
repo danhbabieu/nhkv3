@@ -12,9 +12,9 @@ Status is based on code and test evidence, not commit titles.
 | P5 Canonical Domain Foundation | ACCEPTED/CLOSED | Nine registry-backed canonical types, typed payload validation, generic persistence/lifecycle/update and Graph endpoint resolution are covered by unit/integration evidence. |
 | P6 Media + Video | IN PROGRESS | Build Media identity/asset/usage and external Video reference vertical slices. |
 | P7 Knowledge + Source + Evidence + Post Graph | IN PROGRESS | Atomic claims, provenance, persistence and Post semantic links. |
-| P8 Admin + MCP operational layer | IN PROGRESS | Admin health surface, governed proposal REST workflow and semantic read/search APIs; MCP pending. |
+| P8 Admin + MCP operational layer | IN PROGRESS | Admin health surface, governed proposal REST workflow, semantic read/search APIs and MCP tool contract; external transport pending. |
 | P9 Frontend/UI parity | IN PROGRESS | Responsive NHK editorial theme scaffold; semantic/entity routes and smoke QA pending. |
-| P10 V2 → V3 Data Migration | NOT STARTED | Backup, restore verification and dry-run gates required. |
+| P10 V2 → V3 Data Migration | IN PROGRESS | Read-only route inventory and no-write dry-run tooling added; export, backup/restore evidence and real migration remain gated. |
 | P11 Reconciliation + parity + cutover readiness | NOT STARTED | Count/semantic/UI/logic reconciliation and readiness report; stop before cutover. |
 
 ## Locked direction
