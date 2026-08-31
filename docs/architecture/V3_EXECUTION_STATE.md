@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 MCP interoperability checkpoint.
+Last updated: 2026-09-01, P11 MCP CORS interoperability checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 MCP interoperability checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 111 tests, 674 assertions; guarded WordPress integration: 54 tests, 388 assertions; combined current suite: 166 tests, 1,062 assertions; plugin/theme PHP lint, route smoke 29/29, browser public-language/SEO sweep and diff check pass |
+| Tests | Unit suite: 111 tests, 674 assertions; guarded WordPress integration: 56 tests, 391 assertions; combined current suite: 167 tests, 1,065 assertions; plugin/theme PHP lint, route smoke 29/29, browser public-language/SEO sweep and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,13 @@ Last updated: 2026-09-01, P11 MCP interoperability checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: MCP registration now extends WordPress's REST CORS allowlist with
+  `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name`, so browser-based
+  Streamable HTTP clients can complete preflight before sending the already
+  validated JSON-RPC request. Guarded MCP integration coverage and the full
+  suite passed 167 tests/1,065 assertions; the local HTTP daemon was not
+  running for a live preflight curl in this checkpoint.
 
 - 2026-09-01: MCP Streamable HTTP now accepts standard modern clients: the
   `initialize` protocol version may be declared in `params.protocolVersion`,

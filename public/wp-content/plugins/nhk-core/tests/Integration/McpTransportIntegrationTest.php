@@ -80,6 +80,14 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertNull($response->get_data());
     }
 
+    public function test_mcp_protocol_headers_are_allowed_by_wordpress_cors_filter(): void
+    {
+        $headers = apply_filters('rest_allowed_cors_headers', ['Authorization', 'Content-Type']);
+        self::assertContains('MCP-Protocol-Version', $headers);
+        self::assertContains('Mcp-Method', $headers);
+        self::assertContains('Mcp-Name', $headers);
+    }
+
     public function test_modern_header_body_mismatch_is_rejected(): void
     {
         $response = $this->request('tools/list', ['id' => 2], ['Mcp-Method' => 'tools/call']);

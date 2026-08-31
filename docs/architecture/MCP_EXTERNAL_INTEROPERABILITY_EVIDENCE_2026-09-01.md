@@ -34,5 +34,8 @@ the `MCP-Protocol-Version` header only all returned HTTP 200 and JSON-RPC
 success. `notifications/initialized` returned HTTP 202 with no body. Custom
 `Mcp-Method`/`Mcp-Name` headers remain supported as optional mismatch guards.
 This closes the previously observed custom `_meta`/header coupling for the
-basic session and tool exchange; external adapter mapping and deployment
-verification remain open.
+basic session and tool exchange. The endpoint registration also extends the
+WordPress REST CORS allowlist for `MCP-Protocol-Version`, `Mcp-Method` and
+`Mcp-Name`, covering browser preflight for those protocol headers. A live
+preflight curl was not run in this checkpoint because the local HTTP daemon was
+not running. External adapter mapping and deployment verification remain open.
