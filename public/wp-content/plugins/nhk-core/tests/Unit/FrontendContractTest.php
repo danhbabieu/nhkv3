@@ -78,6 +78,14 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_editorial_featured_images_have_meaningful_alt_fallbacks(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        self::assertStringContainsString("'alt' => get_the_title()", (string) file_get_contents($theme . '/front-page.php'));
+        self::assertStringContainsString("'alt' => get_the_title()", (string) file_get_contents($theme . '/single.php'));
+        self::assertStringContainsString("'alt' => ''", (string) file_get_contents($theme . '/template-parts/article-card.php'));
+    }
+
     public function test_theme_seo_contract_declares_archive_index_policy(): void
     {
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
