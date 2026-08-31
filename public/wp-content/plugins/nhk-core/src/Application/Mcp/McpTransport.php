@@ -90,6 +90,8 @@ final class McpTransport
             'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
+            'nhk.source.get' => $this->read->sourceGet((string) ($arguments['id'] ?? '')),
+            'nhk.evidence.get' => $this->read->evidenceGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.ingest' => $this->knowledgeIngest($arguments),
             'nhk.source.ingest' => $this->sourceIngest($arguments),
             'nhk.evidence.ingest' => $this->evidenceIngest($arguments),

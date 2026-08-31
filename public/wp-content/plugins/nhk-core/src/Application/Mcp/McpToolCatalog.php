@@ -28,6 +28,8 @@ final class McpToolCatalog
             ], ['url'], true),
             self::tool('nhk.video.get', 'Read one active canonical external Video reference.', ['id' => ['type' => 'string']], ['id']),
             self::tool('nhk.knowledge.get', 'Read one active Knowledge claim with public evidence.', ['id' => ['type' => 'string']], ['id']),
+            self::tool('nhk.source.get', 'Read one active public Knowledge source with public evidence.', ['id' => ['type' => 'string']], ['id']),
+            self::tool('nhk.evidence.get', 'Read one active public Knowledge evidence citation.', ['id' => ['type' => 'string']], ['id']),
             self::tool('nhk.knowledge.ingest', 'Create a governed atomic Knowledge claim with provenance.', [
                 'stable_key' => ['type' => 'string'],
                 'text' => ['type' => 'string'],

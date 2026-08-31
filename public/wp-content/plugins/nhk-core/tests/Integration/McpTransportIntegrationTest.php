@@ -28,7 +28,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         $data = $response->get_data();
         self::assertSame('2.0', $data['jsonrpc']);
-        self::assertCount(16, $data['result']['tools']);
+        self::assertCount(18, $data['result']['tools']);
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
@@ -218,6 +218,14 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertArrayNotHasKey('metadata', $sourceRead->get_data());
             self::assertArrayNotHasKey('metadata', $claimRead->get_data()['evidence'][0]);
             self::assertArrayNotHasKey('provenance', $claimRead->get_data());
+
+            $sourceMcp = $this->request('tools/call', ['id' => 60, 'params' => ['name' => 'nhk.source.get', 'arguments' => ['id' => $sourceRecord->canonicalId]]], ['Mcp-Name' => 'nhk.source.get']);
+            $evidenceMcp = $this->request('tools/call', ['id' => 61, 'params' => ['name' => 'nhk.evidence.get', 'arguments' => ['id' => $evidenceRecord->canonicalId]]], ['Mcp-Name' => 'nhk.evidence.get']);
+            self::assertSame(200, $sourceMcp->get_status());
+            self::assertSame(200, $evidenceMcp->get_status());
+            self::assertSame($sourceRecord->canonicalId, $sourceMcp->get_data()['result']['structuredContent']['id']);
+            self::assertSame($evidenceRecord->canonicalId, $evidenceMcp->get_data()['result']['structuredContent']['id']);
+            self::assertArrayNotHasKey('metadata', $evidenceMcp->get_data()['result']['structuredContent']);
         } finally {
             wp_set_current_user($previousUser);
         }

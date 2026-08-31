@@ -58,6 +58,30 @@ final class McpReadHandler
         return $claim && $claim->active && $claim->isPublic() ? ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'active' => $claim->active, 'revision' => $claim->revision, 'evidence' => array_map($this->publicEvidence(...), $this->publicEvidenceByClaim($id))] : null;
     }
 
+    public function sourceGet(string $id): ?array
+    {
+        if (!$this->ready('knowledge') || $this->sources === null) return null;
+        $source = $this->sources->findByCanonicalId($id);
+        if (!$source || !$source->active || !$source->isPublic()) return null;
+        $evidence = array_values(array_filter($this->evidence->listBySource($id), function (Evidence $item): bool {
+            if (!$item->active || !$item->isPublic()) return false;
+            $claim = $this->claims->findByCanonicalId($item->claimId);
+            return $claim !== null && $claim->active && $claim->isPublic();
+        }));
+        return ['id' => $source->canonicalId, 'stable_key' => $source->stableKey, 'title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'active' => $source->active, 'revision' => $source->revision, 'evidence' => array_map($this->publicEvidence(...), $evidence)];
+    }
+
+    public function evidenceGet(string $id): ?array
+    {
+        if (!$this->ready('knowledge') || $this->sources === null) return null;
+        $item = $this->evidence->findByCanonicalId($id);
+        if (!$item || !$item->active || !$item->isPublic()) return null;
+        $claim = $this->claims->findByCanonicalId($item->claimId);
+        $source = $this->sources->findByCanonicalId($item->sourceId);
+        if (!$claim || !$claim->active || !$claim->isPublic() || !$source || !$source->active || !$source->isPublic()) return null;
+        return $this->publicEvidence($item) + ['source_title' => $source->title, 'source_type' => $source->sourceType, 'source_locator' => $source->locator];
+    }
+
     public function search(string $term, int $page = 1, int $perPage = 20): array
     {
         $term = trim($term); $length = function_exists('mb_strlen') ? mb_strlen($term) : strlen($term);

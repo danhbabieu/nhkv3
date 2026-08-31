@@ -70,11 +70,11 @@ final class McpReadContractTest extends TestCase
         };
         $evidence = new class($mcpEvidence) implements EvidenceRepository {
             public function __construct(private Evidence $item) {}
-            public function findByCanonicalId(string $id): ?Evidence { return null; }
+            public function findByCanonicalId(string $id): ?Evidence { return $id === $this->item->canonicalId ? $this->item : null; }
             public function create(Evidence $item): Evidence { return $item; }
             public function update(Evidence $item, int $revision): Evidence { return $item; }
             public function listByClaim(string $id, bool $includeRetired = false): array { return $id === $this->item->claimId ? [$this->item] : []; }
-            public function listBySource(string $id, bool $includeRetired = false): array { return []; }
+            public function listBySource(string $id, bool $includeRetired = false): array { return $id === $this->item->sourceId ? [$this->item] : []; }
         };
         $sources = new class($mcpSource) implements SourceRepository {
             public function __construct(private Source $item) {}
@@ -96,6 +96,9 @@ final class McpReadContractTest extends TestCase
         $knowledgeRead = $handler->knowledgeGet($mcpClaim->canonicalId);
         self::assertArrayNotHasKey('provenance', $knowledgeRead);
         self::assertArrayNotHasKey('metadata', $knowledgeRead['evidence'][0]);
+        self::assertSame($mcpSource->canonicalId, $handler->sourceGet($mcpSource->canonicalId)['id']);
+        self::assertSame($mcpEvidence->canonicalId, $handler->evidenceGet($mcpEvidence->canonicalId)['id']);
+        self::assertArrayNotHasKey('metadata', $handler->evidenceGet($mcpEvidence->canonicalId));
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
         $retired = $authority->create('brand', 'retired', 'Retired');
         $authority->retire($retired->canonicalId, 1);
