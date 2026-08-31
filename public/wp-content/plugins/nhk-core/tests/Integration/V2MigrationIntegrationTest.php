@@ -106,4 +106,18 @@ final class V2MigrationIntegrationTest extends TestCase
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid=%s", UuidCodec::toBinary($claimId)));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-%'));
     }
+
+    public function test_url_mapping_requires_a_governed_target_and_allows_safe_noop(): void
+    {
+        global $wpdb;
+        $records = [
+            ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-safe', 'source_path' => '/tim-kiem/', 'target_path' => '/tim-kiem/'],
+            ['type' => 'url', 'stable_key' => 'v2-migration-integration-url-unmapped', 'source_path' => '/legacy/custom/', 'target_path' => ''],
+        ];
+        $result = (new V2MigrationService($wpdb))->apply($records, 10, 10);
+        self::assertSame(2, $result['processed']); self::assertSame(1, $result['migrated']); self::assertSame(1, $result['skipped']); self::assertSame(0, $result['conflict']);
+        self::assertSame('READY_NOOP', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-safe')));
+        self::assertSame('INVALID_URL_MAPPING', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2-migration-integration-url-unmapped')));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-%'));
+    }
 }

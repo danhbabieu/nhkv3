@@ -50,10 +50,10 @@ The exported JSON is `/private/tmp/nhk-v3-v2-full-export-updated.json` (SHA-256
 `a65cd0187c772c6cfd36ae81a6731a4081aa23e7a35a90e1443b3f9a824aadad`). Its
 no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run.json` (SHA-256
 `6e46c2d2cc9c1b1e34b70c7560ba6bf7129d06f5bdf236851af825a30cdc704d`). The
-apply result is `/private/tmp/nhk-v3-v2-apply-result-updated.json` (SHA-256
-`c07e13a4971e6cf2960aeb10229aeb953a6e0e0da2abe3bd6ccfb44f6b91331b`). The
-runner wrote 1,607 `migrated` ledger rows and 3,366 explicit skips to
+apply result is `/private/tmp/nhk-v3-v2-apply-result-url-6.6.json` (SHA-256
+`2dcae222080ae8809c2f7fdc2187ea991df32662427f9d19025c872a8c1e8a09`). The
+runner wrote 1,608 `migrated` ledger rows and 3,365 explicit skips to
 `nhk_v3`, including 19 Source and 40 Evidence rows retained as inactive
 because the V2 records were PRIVATE. Evidence metadata was backfilled
 idempotently after Migration007; the latest ledger includes 40
-`STATE_RECONCILED` metadata updates and 0 conflicts.
+`STATE_RECONCILED` metadata updates, one `READY_NOOP` URL and 0 conflicts.

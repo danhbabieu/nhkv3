@@ -62,8 +62,10 @@ taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
 and 1,581 semantic projections. The expanded no-write dry-run processes 4,933
 records: 2,559 mapped candidates and 2,414 skipped candidates (799 invalid URL
 maps and 1,615 unsupported legacy types). The local-dev governed apply
-recorded 1,607 migrated rows and 3,366 explicit skips (764 domain-targeted, 1
-invalid relation, 2,482 unsupported legacy type) with zero conflicts. This
+recorded 1,608 migrated rows and 3,365 explicit skips (764 domain-targeted, 1
+invalid relation, 799 invalid URL mappings, 1,682 unsupported legacy type) with
+zero conflicts. One identical source/target URL is recorded as a safe no-op.
+This
 does not constitute production parity. Every delta must be explained by a
 ledger reason code; identity merges require explicit evidence and name-only
 matching is forbidden.

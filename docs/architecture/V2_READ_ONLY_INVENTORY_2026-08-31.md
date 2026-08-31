@@ -53,16 +53,20 @@ reconciliation results, not approval to apply them.
 ## Local development apply checkpoint
 
 The governed `tools/v2-migrate.php` runner applied the same 4,973-record
-export to `nhk_v3` after the backup/restore gate. The ledger contains 1,607
-migrated records and 3,366 skipped records: `DOMAIN_TARGETED` 764,
-`INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 2,482; conflicts were 0.
+export to `nhk_v3` after the backup/restore gate. The ledger contains 1,608
+migrated records and 3,365 skipped records: `DOMAIN_TARGETED` 764,
+`INVALID_RELATION` 1, `INVALID_URL_MAPPING` 799 and
+`UNSUPPORTED_LEGACY_TYPE` 1,682; conflicts were 0. The one proven URL
+candidate is recorded as a `READY_NOOP` because its source and target paths
+are identical.
 The three V2 MediaAsset rows were imported with checksum, MIME, dimensions
 and source storage metadata. Nineteen Source rows and 40 citation Evidence
 rows were also imported with their V2 PRIVATE state, verification state and
 citation metadata preserved; runtime media
 delivery/usages and public provenance presentation remain open reconciliation
 work.
-Subsequent runs were idempotent after the 40-row Evidence metadata backfill.
+Subsequent runs were idempotent after the 40-row Evidence metadata backfill
+and the safe URL no-op classification.
 Target verification found
 36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
 rows, 3 MediaAsset rows, 655 Knowledge claims, 19 Sources, 40 Evidence rows

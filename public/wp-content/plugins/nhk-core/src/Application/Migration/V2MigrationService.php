@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.5';
+    private const MAPPER_VERSION = '6.6';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -94,6 +94,7 @@ final class V2MigrationService
             'knowledge' => $this->knowledgeClaim($record),
             'source' => $this->source($record),
             'evidence' => $this->evidence($record),
+            'url' => $this->url($record),
             'relation' => $this->relation($record),
             default => throw new MigrationSkip('skipped', 'UNSUPPORTED_LEGACY_TYPE', 'No governed V3 target for source type.'),
         };
@@ -229,6 +230,15 @@ final class V2MigrationService
         }
         $this->evidence->create($evidence);
         return ['reason' => 'READY', 'target_type' => 'evidence', 'target_key' => $key, 'target_id' => $id];
+    }
+
+    private function url(array $record): array
+    {
+        $sourcePath = trim((string) ($record['source_path'] ?? ''));
+        $targetPath = trim((string) ($record['target_path'] ?? ''));
+        if ($sourcePath === '' || $targetPath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no governed V3 target path.');
+        if ($sourcePath !== $targetPath) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL redirect requires an explicit native WordPress target mapping.');
+        return ['reason' => 'READY_NOOP', 'target_type' => 'wp_url', 'target_key' => $sourcePath, 'target_id' => $targetPath];
     }
 
     private function videoEntity(array $record): array
