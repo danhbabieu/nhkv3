@@ -1,0 +1,65 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Application\Governance;
+
+use NHK\Core\Contracts\Governance\{GovernanceAuditSink, ProposalRepository};
+use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Governance\Exception\{InvalidProposalTransition, ProposalBindingConflict, ProposalNotFound};
+
+final class GovernanceService
+{
+    public function __construct(private ProposalRepository $repository, private ?GovernanceAuditSink $audit = null) {}
+
+    public function create(Proposal $proposal): Proposal
+    {
+        $existing = $this->repository->find($proposal->id);
+        if ($existing !== null) {
+            if ($existing->bindingFingerprint() === $proposal->bindingFingerprint()) return $existing;
+            throw new ProposalBindingConflict('Proposal id is already bound to different content.');
+        }
+        $saved = $this->repository->create($proposal);
+        $this->audit?->record('created', $saved);
+        return $saved;
+    }
+
+    public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal
+    {
+        $proposal = $this->get($id);
+        if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be approved.');
+        if ($proposal->contentFingerprint !== $contentFingerprint || $proposal->dependencyFingerprint !== $dependencyFingerprint) {
+            throw new ProposalBindingConflict('Approval binding no longer matches the proposal.');
+        }
+        return $this->transition($proposal, ProposalState::APPROVED, $actor, 'approved');
+    }
+
+    public function reject(string $id, string $actor): Proposal
+    {
+        $proposal = $this->get($id);
+        if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be rejected.');
+        return $this->transition($proposal, ProposalState::REJECTED, $actor, 'rejected');
+    }
+
+    public function markApplied(string $id, int $actualRevision, string $contentFingerprint, string $dependencyFingerprint): Proposal
+    {
+        $proposal = $this->get($id);
+        if ($proposal->state !== ProposalState::APPROVED) throw new InvalidProposalTransition('Only approved proposals can be applied.');
+        if ($actualRevision !== $proposal->expectedRevision || $contentFingerprint !== $proposal->contentFingerprint || $dependencyFingerprint !== $proposal->dependencyFingerprint) {
+            throw new ProposalBindingConflict('Approved proposal is stale or has changed dependencies.');
+        }
+        return $this->transition($proposal, ProposalState::APPLIED, $proposal->decisionActor, 'applied');
+    }
+
+    private function get(string $id): Proposal
+    {
+        return $this->repository->find($id) ?? throw new ProposalNotFound('Proposal not found.');
+    }
+
+    private function transition(Proposal $proposal, ProposalState $state, ?string $actor, string $event): Proposal
+    {
+        $next = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $proposal->payload, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $state, $proposal->actor, $actor, gmdate('Y-m-d H:i:s.u'));
+        $saved = $this->repository->save($next);
+        $this->audit?->record($event, $saved);
+        return $saved;
+    }
+}
