@@ -41,7 +41,7 @@ function nhk_v3_entity_label(string $type): string
 
 function nhk_v3_public_type(string $type): string
 {
-    return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng'][$type] ?? 'nội dung liên quan';
+    return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng', 'publication' => 'ấn phẩm', 'website' => 'website', 'archive' => 'lưu trữ', 'catalog' => 'catalogue', 'interview' => 'phỏng vấn', 'fact' => 'dữ kiện', 'technical' => 'kỹ thuật', 'specification' => 'thông số'][$type] ?? 'nội dung liên quan';
 }
 
 function nhk_v3_public_value(mixed $value): string
@@ -135,7 +135,7 @@ function nhk_v3_seo_head(): void
     if (is_singular('post') && has_post_thumbnail()) echo '<meta property="og:image" content="' . esc_url(get_the_post_thumbnail_url(null, 'large')) . '">' . "\n";
     $breadcrumb = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => [['@type' => 'ListItem', 'position' => 1, 'name' => 'NHK', 'item' => home_url('/')]]];
     if (is_singular('post')) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => get_the_title(), 'item' => get_permalink()];
-    if (is_array($context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => (string) ($context['type'] ?? 'Entity'), 'item' => home_url('/' . (string) ($context['type'] ?? '') . '/')];
+    if (is_array($context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => nhk_v3_entity_label((string) ($context['type'] ?? '')), 'item' => home_url('/' . (string) ($context['type'] ?? '') . '/')];
     if (is_array($media_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Thư viện media', 'item' => home_url('/thu-vien/')];
     if (is_array($video_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Video', 'item' => home_url('/video/')];
     if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/knowledge/')];

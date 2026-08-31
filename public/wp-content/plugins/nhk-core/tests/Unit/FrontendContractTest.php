@@ -162,6 +162,10 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'wp_post' => 'bài viết'", $functions);
         self::assertStringContainsString('nhk_v3_public_type((string) ($item[\'type\'] ?? \'\'))', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
         self::assertStringContainsString('nhk_v3_public_type((string) ($item[\'type\'] ?? $group))', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
+        self::assertStringContainsString('nhk_v3_public_type((string) ($item[\'type\'] ?? \'\'))', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/single.php'));
+        self::assertStringContainsString('nhk_v3_public_type((string) $item[\'type\'])', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/front-page.php'));
+        self::assertStringContainsString('nhk_v3_public_type((string) $claim[\'type\'])', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/knowledge.php'));
+        self::assertStringContainsString("'catalog' => 'catalogue'", $functions);
         self::assertStringContainsString('function nhk_v3_public_value', $functions);
         self::assertStringContainsString("'canonical' => 'hồ sơ'", $functions);
         self::assertStringContainsString("'stable key' => 'mã ổn định'", $functions);
