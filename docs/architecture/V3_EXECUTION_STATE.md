@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P7 governed Knowledge/Source/Evidence HTTP checkpoint.
+Last updated: 2026-08-31, P9 semantic search pagination integration checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P7 governed Knowledge/Source/Evidence HTTP checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 83 tests, 322 assertions; guarded WordPress integration: 43 tests, 328 assertions; combined current suite: 126 tests, 650 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
+| Tests | Unit suite: 84 tests, 327 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 128 tests, 674 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -481,3 +481,11 @@ Last updated: 2026-08-31, P7 governed Knowledge/Source/Evidence HTTP checkpoint.
   current evidence is 83 unit tests/322 assertions and 43 integration tests/328
   assertions, combined 126/650. Public Source/Evidence activation policy and V2
   provenance reconciliation remain cutover gates.
+- 2026-08-31: Semantic search was bounded per page in both the theme query and
+  REST API, with per-group totals exposed for navigation. WordPress search page
+  2 now remains HTTP 200 when native Post results are exhausted but semantic
+  results continue; browser verification for `/?s=odo&paged=2` shows 12 cards
+  per group, 17 navigation pages and no horizontal overflow. Unit evidence is
+  84 tests/327 assertions; guarded integration is 44 tests/347 assertions after
+  adding the REST bounded-page contract test; combined current suite is
+  128/674.

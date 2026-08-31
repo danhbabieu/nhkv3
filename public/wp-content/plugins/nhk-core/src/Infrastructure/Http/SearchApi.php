@@ -35,7 +35,13 @@ final class SearchApi
         $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
         $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $this->matches($term, $item->title, $item->externalVideoId, $item->canonicalUrl)))) : [];
         $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $this->matches($term, $item->claimText, $item->stableKey)))) : [];
-        return ['query' => $term, 'page' => $page, 'per_page' => $perPage, 'post_total' => (int) $posts->found_posts, 'groups' => $groups];
+        $semanticTotals = [];
+        $semanticOffset = ($page - 1) * $perPage;
+        foreach (['entities', 'media', 'videos', 'knowledge'] as $group) {
+            $semanticTotals[$group] = count($groups[$group]);
+            $groups[$group] = array_slice($groups[$group], $semanticOffset, $perPage);
+        }
+        return ['query' => $term, 'page' => $page, 'per_page' => $perPage, 'post_total' => (int) $posts->found_posts, 'semantic_totals' => $semanticTotals, 'groups' => $groups];
     }
 
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }

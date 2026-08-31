@@ -96,12 +96,12 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 83 tests, 322 assertions |
+| Unit tests | PASS — 84 tests, 327 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 43 tests, 328 assertions; combined current suite is 126 tests, 650 assertions; governed MCP Media/Video/Knowledge/Source/Evidence ingest lifecycles, Video REST read and Streamable HTTP Accept validation are included |
-| Frontend route/rewrite smoke | PASS 20/20 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects, query-preserving search redirect and comparison title/canonical metadata |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 44 tests, 347 assertions; combined current suite is 128 tests, 674 assertions; governed MCP Media/Video/Knowledge/Source/Evidence ingest lifecycles, Video REST read, Streamable HTTP Accept validation and bounded semantic search pagination are included |
+| Frontend route/rewrite smoke | PASS 21/21 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, semantic search page 2, Knowledge archive/detail and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects, query-preserving search redirect and comparison title/canonical metadata |
 | REST/MCP runtime boundary | PASS — active Entity/Media/Knowledge/Search reads returned 200, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, local MCP `tools/list` returned 200 with 16 protocol definitions (10 governed), unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
 | Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 plus mobile homepage/editorial archive/Post/Authority detail/Media detail were visually inspected; a 32-combination browser sweep across page, archive pagination and empty/404 states at 390px/768px passes without horizontal overflow, and the menu exposes all ten links with synchronized ARIA state; remaining route-specific screenshots and active Video detail remain pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,960 candidates, 1,013 no-write skips and 0 conflicts after Migration009 maps all 1,581 projections to non-canonical context; latest local-dev apply: 3,960 migrated, 1,013 explicit skips, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |

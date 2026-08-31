@@ -72,7 +72,8 @@ a concrete physical object; Product is a listing/offer and may link to a
 Specimen. Video pages/modules show thumbnail, title, platform and available
 metadata and embed the external platform without normal-flow MP4 downloads.
 
-Archives provide appropriate search/filter/pagination, metadata and empty
+Semantic search groups are bounded per page and expose totals so pagination
+continues even when native WordPress Post results are exhausted. Archives provide appropriate search/filter/pagination, metadata and empty
 states. They must not force every domain into one generic card layout.
 
 ## Component and application boundaries

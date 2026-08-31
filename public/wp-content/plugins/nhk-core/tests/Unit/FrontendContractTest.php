@@ -63,6 +63,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('$robots[\'noindex\'] = true', $functions);
         self::assertStringContainsString('$robots[\'index\'] = true', $functions);
         self::assertStringContainsString("add_filter('wp_robots', 'nhk_v3_robots', 20)", $functions);
+        self::assertStringContainsString('nhk_v3_allow_semantic_search_pages', $functions);
+        self::assertStringContainsString("add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2)", $functions);
         self::assertStringContainsString('if (is_front_page() || is_home() || is_search()) $canonical = home_url(\'/\');', $functions);
     }
 
