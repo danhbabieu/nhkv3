@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, final media persistence and local-dev migration checkpoint.
+Last updated: 2026-08-31, governed Source/Evidence migration checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,13 +9,13 @@ Last updated: 2026-08-31, final media persistence and local-dev migration checkp
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 90 tests, 367 assertions; plugin/theme PHP lint and diff check pass |
-| Blockers | Visual QA (browser connector unavailable), external MCP transport, URL/media/source/evidence reconciliation, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 91 tests, 373 assertions; plugin/theme PHP lint and diff check pass |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, URL/media delivery/usages, Source/Evidence public visibility policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Complete field-level URL/media delivery/usages/source/evidence/semantic projection reconciliation, review the 1,548-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; local-dev ledger imported 1,548 rows with 3,385 explicit skips |
+| Next executable task | Complete field-level URL/media delivery/usages, Source/Evidence visibility, semantic projection and domain-targeted post reconciliation, review the 1,607-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,607 rows with 3,366 explicit skips |
 | Pending migrations | None; `nhk_v3` is current 6/target 6 and Migration006 ledger is active |
-| Migration dry-run | Full restored-backup export: 4,933 records; 2,519 candidates and 2,414 skipped; local-dev apply: 1,548 migrated, 3,385 skipped, 0 conflicts |
+| Migration dry-run | Full restored-backup export: 4,973 records; 2,559 candidates and 2,414 skipped; local-dev apply: 1,607 migrated, 3,366 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -190,3 +190,9 @@ Last updated: 2026-08-31, final media persistence and local-dev migration checkp
   V2 MediaAsset rows are present with verified parent IDs. Checkpoint
   `da748fd` is committed locally and this documentation checkpoint is
   `3854448`; production/live migration remains blocked.
+- 2026-08-31: The V2 exporter now emits 19 governed Source records and 40
+  citation Evidence records, preserving source metadata, citation excerpts,
+  endpoint identity and V2 PRIVATE visibility. The local-dev apply reached
+  1,607 migrated, 3,366 skipped and 0 conflicts; all 40 Evidence rows join a
+  migrated Knowledge claim and Source. Guarded suite is 91 tests/373
+  assertions; staging test DB was restored and has no `nhkv2_*` tables.

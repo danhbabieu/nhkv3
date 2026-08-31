@@ -26,12 +26,12 @@ This is staging inventory evidence, not permission to apply V2 data into V3.
 ## Guarded V3 test snapshot rehearsal
 
 Before the latest rehearsal, `nhk_v3_test` was dumped to a temporary file with
-SHA-256 `96814e84ae55e30b78d399fefbc32ed403101263ba171a639528bf9260a8d736`.
+SHA-256 `13537f9d523a5dff8587fdfa7d9c07961f242cfb5401c6a310274d57bd4be8b4`.
 The V2 restore was attempted only against `nhk_v3_test`, never `nhk_v3` or
 production. The temporary V2 tables were then removed, and the original test
 snapshot was restored after omitting only incompatible `GTID_PURGED` metadata.
-Post-restore checks reported zero `nhkv2_*` tables and 16 V3 NHK tables; the
-guarded suite then passed with 88 tests and 351 assertions.
+Post-restore checks reported zero `nhkv2_*` tables and 17 V3 NHK tables; the
+guarded suite then passed with 91 tests and 373 assertions.
 
 The reproducible restore input is generated with:
 
@@ -47,10 +47,11 @@ Readiness evidence are complete.
 ## Local-dev apply evidence
 
 The exported JSON is `/private/tmp/nhk-v3-v2-full-export.json` (SHA-256
-`95e8a92d6a5352acfad66c2e471b684b9f41084d2f5be5525128c16c138659aa`). Its
+`3ab709e28cf7a70c1e44c26dabeaad2ac78030ef54d30e7b308a291efc72ecf2`). Its
 no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run.json` (SHA-256
-`fd03abc6a594456a4b5868caa5010b87ab69e4d845aa3c81e201b908af8e51c5`). The
+`6e46c2d2cc9c1b1e34b70c7560ba6bf7129d06f5bdf236851af825a30cdc704d`). The
 apply result is `/private/tmp/nhk-v3-v2-apply-result.json` (SHA-256
-`bdb62793135e962599573057c571a93941a8f8f5a69860555365b46ac38c0f8b`). The
-runner wrote 1,548 `migrated` ledger rows and 3,385 explicit skips to
-`nhk_v3`.
+`720ffd8adbb8eec44dab692227d42c521e8ec41c0274f8854eb05ac7b24d754b`). The
+runner wrote 1,607 `migrated` ledger rows and 3,366 explicit skips to
+`nhk_v3`, including 19 Source and 40 Evidence rows retained as inactive
+because the V2 records were PRIVATE.

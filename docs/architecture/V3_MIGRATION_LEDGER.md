@@ -10,12 +10,14 @@ migration, and unresolved rows remain explicit in the ledger.
 | Categories | 2 | 1 | 1 | 1 | 0 | 0 | 1 | DEV ONLY; non-category taxonomy is explicit skip |
 | Media entities | 242 | 242 | 242 | 0 | 0 | 0 | 242 | DEV ONLY; asset metadata is ledgered separately |
 | Authority entities | 370 | 370 | 370 | 0 | 0 | 0 | 370 | DEV ONLY; exact UUID/stable-key mapping |
-| Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; source/evidence joins remain open |
+| Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; Source/Evidence joins verified; rows retain V2 private visibility |
 | Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
 | Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
 | URLs | 800 | 1 candidate | 0 | 800 | 0 | 0 | 0 | Candidate inventory only; 301 mapping remains open |
 | Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions and source storage metadata imported; delivery/usages remain open |
-| Evidence / projections | 1,600 | 0 | 0 | 1,600 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
+| Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
+| Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints verified; imported inactive because V2 visibility is PRIVATE |
+| Semantic projections | 1,581 | 0 | 0 | 1,581 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
 
 ## Read-only reference checkpoint
 

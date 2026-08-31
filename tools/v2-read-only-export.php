@@ -139,15 +139,46 @@ foreach ($knowledgeRelations as $relation) {
     ];
 }
 
-$evidence = $rows($db, 'SELECT id,evidence_type,title,source_identity,source_location,verification_state FROM ' . $table('nhk_knowledge_evidence') . ' ORDER BY id');
+$evidence = $rows($db, 'SELECT id,evidence_type,title,source_identity,source_location,creator_publisher,source_date,media_entity_id,notes,verification_state,visibility,revision FROM ' . $table('nhk_knowledge_evidence') . ' ORDER BY id');
 foreach ($evidence as $item) {
     $records[] = [
-        'type' => 'evidence',
-        'stable_key' => 'evidence:' . (string) $item['id'],
+        'type' => 'source',
+        'stable_key' => 'v2:evidence:' . (string) $item['id'],
         'canonical_uuid' => (string) $item['id'],
         'legacy_type' => (string) $item['evidence_type'],
-        'canonical_name' => (string) $item['title'],
+        'canonical_name' => (string) ($item['source_identity'] !== '' ? $item['source_identity'] : $item['title']),
+        'locator' => (string) $item['source_location'],
+        'visibility' => (string) $item['visibility'],
         'verification_state' => (string) $item['verification_state'],
+        'metadata' => [
+            'legacy_evidence_id' => (string) $item['id'],
+            'evidence_title' => (string) $item['title'],
+            'creator_publisher' => (string) $item['creator_publisher'],
+            'source_date' => (string) $item['source_date'],
+            'media_entity_id' => (string) $item['media_entity_id'],
+            'notes' => (string) $item['notes'],
+            'verification_state' => (string) $item['verification_state'],
+            'visibility' => (string) $item['visibility'],
+            'revision' => (int) $item['revision'],
+        ],
+    ];
+}
+
+$citations = $rows($db, 'SELECT id,evidence_id,target_type,target_id,citation_role,locator,excerpt_metadata,verification_state FROM ' . $table('nhk_knowledge_citations') . ' ORDER BY id');
+foreach ($citations as $citation) {
+    $records[] = [
+        'type' => 'evidence',
+        'stable_key' => 'v2:citation:' . (string) $citation['id'],
+        'canonical_uuid' => (string) $citation['id'],
+        'source_id' => (string) $citation['evidence_id'],
+        'claim_id' => (string) $citation['target_id'],
+        'target_type' => (string) $citation['target_type'],
+        'citation_role' => (string) $citation['citation_role'],
+        'excerpt' => (string) $citation['locator'],
+        'locator' => '',
+        'verification_state' => (string) $citation['verification_state'],
+        'visibility' => 'PRIVATE',
+        'excerpt_metadata' => (string) $citation['excerpt_metadata'],
     ];
 }
 

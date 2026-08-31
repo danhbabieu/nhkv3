@@ -39,8 +39,8 @@ report was:
 
 | Dry-run result | Count |
 |---|---:|
-| Source records | 4,933 |
-| Mapped candidates | 2,519 |
+| Source records | 4,973 |
+| Mapped candidates | 2,559 |
 | Skipped candidates | 2,414 |
 | URL mappings ready | 1 |
 | Conflicts | 0 |
@@ -52,17 +52,19 @@ reconciliation results, not approval to apply them.
 
 ## Local development apply checkpoint
 
-The governed `tools/v2-migrate.php` runner applied the same 4,933-record
-export to `nhk_v3` after the backup/restore gate. The ledger contains 1,548
-migrated records and 3,385 skipped records: `DOMAIN_TARGETED` 764,
+The governed `tools/v2-migrate.php` runner applied the same 4,973-record
+export to `nhk_v3` after the backup/restore gate. The ledger contains 1,607
+migrated records and 3,366 skipped records: `DOMAIN_TARGETED` 764,
 `INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 2,482; conflicts were 0.
 The three V2 MediaAsset rows were imported with checksum, MIME, dimensions
-and source storage metadata; runtime delivery and placement usages remain
-open reconciliation work.
+and source storage metadata. Nineteen Source rows and 40 citation Evidence
+rows were also imported with their V2 PRIVATE state preserved; runtime media
+delivery/usages and public provenance presentation remain open reconciliation
+work.
 The second run was idempotent with the same counts. Target verification found
 36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
-rows, 3 MediaAsset rows, 655 Knowledge claims and 241 Graph edges imported
-from the ledger.
+rows, 3 MediaAsset rows, 655 Knowledge claims, 19 Sources, 40 Evidence rows
+and 241 Graph edges imported from the ledger.
 This checkpoint is reversible in local development from
 `/private/tmp/nhk_v3-before-v2-apply.sql`; it does not authorize live V2 or
 production mutation.
@@ -70,7 +72,8 @@ production mutation.
 ## Required follow-up
 
 URL redirects, media delivery/usages, external videos without a supported
-reference, evidence/source provenance and semantic projections remain
-explicitly unmigrated or require a governed target mapping. The exporter and
+reference and semantic projections remain explicitly unmigrated or require a
+governed target mapping. Source/Evidence rows are stored with private state
+until their public visibility/provenance policy is reviewed. The exporter and
 runner intentionally do not convert legacy custom post types into editorial
 body projections or merge identities by name.

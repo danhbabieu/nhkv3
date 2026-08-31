@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Migration;
 
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
-use NHK\Core\Domain\Knowledge\KnowledgeClaim;
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Media\MediaAsset;
 use Symfony\Component\Uid\Uuid;
@@ -13,6 +13,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, InMemoryAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
+use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\WpdbMediaRepository;
 use NHK\Core\Infrastructure\Media\WpdbMediaAssetRepository;
 use NHK\Core\Infrastructure\Migration\WpdbMigrationLedgerRepository;
@@ -20,12 +21,14 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.4';
+    private const MAPPER_VERSION = '6.5';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
     private WpdbMediaAssetRepository $assets;
     private WpdbKnowledgeRepository $knowledge;
+    private WpdbSourceRepository $sources;
+    private WpdbEvidenceRepository $evidence;
     private \NHK\Core\Infrastructure\Video\WpdbVideoRepository $videos;
     private EntityTypeRegistry $types;
     private GraphService $graph;
@@ -37,6 +40,8 @@ final class V2MigrationService
         $this->media = new WpdbMediaRepository($database);
         $this->assets = new WpdbMediaAssetRepository($database);
         $this->knowledge = new WpdbKnowledgeRepository($database);
+        $this->sources = new WpdbSourceRepository($database);
+        $this->evidence = new WpdbEvidenceRepository($database);
         $this->videos = new \NHK\Core\Infrastructure\Video\WpdbVideoRepository($database);
         $this->types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($this->types);
@@ -87,6 +92,8 @@ final class V2MigrationService
             'legacy_media_asset' => $this->mediaAsset($record),
             'video' => $this->videoEntity($record),
             'knowledge' => $this->knowledgeClaim($record),
+            'source' => $this->source($record),
+            'evidence' => $this->evidence($record),
             'relation' => $this->relation($record),
             default => throw new MigrationSkip('skipped', 'UNSUPPORTED_LEGACY_TYPE', 'No governed V3 target for source type.'),
         };
@@ -166,6 +173,56 @@ final class V2MigrationService
         elseif ($existing->stableKey !== $key || $existing->claimText !== $text || $existing->claimType !== $claimType || $existing->provenance !== $provenance) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Knowledge UUID maps to a changed V3 claim.');
         elseif ($existing->active !== $active) { $this->knowledge->update(new KnowledgeClaim($id, $key, $text, $claimType, $provenance, $active, $existing->revision), $existing->revision); return ['reason' => 'STATE_RECONCILED', 'target_type' => 'knowledge', 'target_key' => $key, 'target_id' => $id]; }
         return ['reason' => $existing ? 'IDEMPOTENT' : 'READY', 'target_type' => 'knowledge', 'target_key' => $key, 'target_id' => $id];
+    }
+
+    private function source(array $record): array
+    {
+        $id = (string) ($record['canonical_uuid'] ?? '');
+        $key = (string) ($record['stable_key'] ?? '');
+        $title = trim((string) ($record['canonical_name'] ?? ''));
+        $locator = trim((string) ($record['locator'] ?? ''));
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $title === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Source identity or title is incomplete.');
+        if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
+        $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+        $sourceType = $this->sourceType((string) ($record['legacy_type'] ?? ''));
+        $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
+        $source = new Source($id, $key, $title, $sourceType, $locator !== '' ? $locator : null, $metadata, $active);
+        $existing = $this->sources->findByCanonicalId($id);
+        if (!$existing) {
+            $this->sources->create($source);
+            return ['reason' => 'READY', 'target_type' => 'source', 'target_key' => $key, 'target_id' => $id];
+        }
+        if ($existing->stableKey !== $key || $existing->title !== $title || $existing->sourceType !== $sourceType || $existing->locator !== $source->locator || $existing->metadata !== $metadata) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Source UUID maps to changed source metadata.');
+        if ($existing->active !== $active) {
+            $this->sources->update(new Source($id, $key, $title, $sourceType, $source->locator, $metadata, $active, $existing->revision), $existing->revision);
+            return ['reason' => 'STATE_RECONCILED', 'target_type' => 'source', 'target_key' => $key, 'target_id' => $id];
+        }
+        return ['reason' => 'IDEMPOTENT', 'target_type' => 'source', 'target_key' => $key, 'target_id' => $id];
+    }
+
+    private function evidence(array $record): array
+    {
+        $id = (string) ($record['canonical_uuid'] ?? '');
+        $key = (string) ($record['stable_key'] ?? '');
+        $claimId = (string) ($record['claim_id'] ?? '');
+        $sourceId = (string) ($record['source_id'] ?? '');
+        $excerpt = trim((string) ($record['excerpt'] ?? ''));
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || !preg_match('/^[0-9a-f-]{36}$/i', $claimId) || !preg_match('/^[0-9a-f-]{36}$/i', $sourceId) || $excerpt === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Evidence requires citation, claim, source and excerpt identities.');
+        if (strtolower((string) ($record['target_type'] ?? 'knowledge')) !== 'knowledge') throw new MigrationSkip('skipped', 'UNSUPPORTED_LEGACY_TYPE', 'V3 Evidence targets Knowledge claims only.');
+        if (!$this->knowledge->findByCanonicalId($claimId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Evidence claim endpoint was not imported.');
+        if (!$this->sources->findByCanonicalId($sourceId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Evidence source endpoint was not imported.');
+        $relation = $this->evidenceRelation((string) ($record['citation_role'] ?? $record['relation'] ?? ''));
+        $locator = trim((string) ($record['locator'] ?? ''));
+        if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
+        $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
+        $evidence = new Evidence($id, $claimId, $sourceId, $relation, $excerpt, $locator !== '' ? $locator : null, $active);
+        $existing = $this->evidence->findByCanonicalId($id);
+        if ($existing) {
+            if ($existing->claimId !== $evidence->claimId || $existing->sourceId !== $evidence->sourceId || $existing->relation !== $evidence->relation || $existing->excerpt !== $evidence->excerpt || $existing->locator !== $evidence->locator) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Evidence UUID maps to changed citation content.');
+            return ['reason' => 'IDEMPOTENT', 'target_type' => 'evidence', 'target_key' => $key, 'target_id' => $id];
+        }
+        $this->evidence->create($evidence);
+        return ['reason' => 'READY', 'target_type' => 'evidence', 'target_key' => $key, 'target_id' => $id];
     }
 
     private function videoEntity(array $record): array
@@ -248,6 +305,8 @@ final class V2MigrationService
         return $payload;
     }
     private function claimType(array $metadata): string { $kind = strtolower((string) ($metadata['claim_type'] ?? $metadata['semantic_type'] ?? '')); return str_contains($kind, 'history') ? 'history' : (str_contains($kind, 'technical') || str_contains($kind, 'spec') ? 'technical' : 'fact'); }
+    private function sourceType(string $type): string { $type = strtoupper($type); return str_contains($type, 'ARCHIVE') || str_contains($type, 'REGISTRY') || str_contains($type, 'HISTORICAL') ? 'archive' : (str_contains($type, 'PRESS') || str_contains($type, 'AD') ? 'publication' : (str_contains($type, 'TECHNICAL') || str_contains($type, 'PRODUCT') ? 'website' : 'other')); }
+    private function evidenceRelation(string $role): string { $role = strtoupper($role); return str_contains($role, 'CONTRADICT') ? 'contradicts' : (str_contains($role, 'QUALIF') || str_contains($role, 'PARTIAL') || str_contains($role, 'CORRECTION') || str_contains($role, 'BOUND') ? 'qualifies' : 'supports'); }
     private function sourceKey(array $record): string { return (string) ($record['stable_key'] ?? ($record['source_key'] ?? ($record['type'] ?? '') . ':' . ($record['legacy_id'] ?? ($record['canonical_uuid'] ?? '')))); }
     private function isArchived(array $record): bool { return in_array(strtoupper((string) ($record['review_state'] ?? '')), ['ARCHIVED', 'RETIRED'], true); }
     private function contentEquivalent(string $target, string $source): bool { return $target === $source || (function_exists('wp_specialchars_decode') && wp_specialchars_decode($target, ENT_QUOTES) === $source); }

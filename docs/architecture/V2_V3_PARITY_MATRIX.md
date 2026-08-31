@@ -12,7 +12,7 @@ the final parity declaration.
 | Brand / Model / Variant / Movement / Music / Component / Classification | 4 / 30 / 42 / 18 / 11 / 91 / 174 entity rows | Authority registry/core + canonical entity read API + frontend routes | DEV ONLY: exact counts | PARTIAL | IN PROGRESS | Exact UUID/stable-key rows imported into local dev; semantic field review remains |
 | Specimen / Product | No rows found in selected full V2 backup | Registry-backed Authority contract + frontend routes | NO | PARTIAL | IN PROGRESS | Absence is recorded from this backup; source/API confirmation and retirement reason remain pending |
 | Media / Video | 242 media entities, 3 assets, 0 usage and 0 visual-video rows | P6 domain/persistence + public archive/detail routes | DEV ONLY: 242 Media + 3 assets | PASS | IN PROGRESS | Media identities and asset metadata imported; delivery/usages and video delivery remain pending |
-| Knowledge Claim / Source / Evidence | 655 knowledge entities, 19 evidence, 40 citations, 242 Knowledge relations | P7 contracts, schema and service | DEV ONLY: 655 claims | PASS | IN PROGRESS | Claims imported; explicit Source/Evidence citation mapping remains pending |
+| Knowledge Claim / Source / Evidence | 655 knowledge entities, 19 evidence, 40 citations, 242 Knowledge relations | P7 contracts, schema and service | DEV ONLY: 655 claims + 19 sources + 40 evidence | PASS | IN PROGRESS | Claims, sources and citation evidence imported; all source/evidence rows retain V2 PRIVATE state pending public provenance policy |
 | Relations / Post Graph | 185 Graph relation rows plus 242 Knowledge relations | Graph Core + Post/Knowledge endpoint + governed relation proposals | DEV ONLY: 241 | PARTIAL | IN PROGRESS | 241 explicit `about` relations imported; 186 legacy/invalid relation rows remain skipped |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + grouped semantic search + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search combines native Posts with active semantic groups; guarded lifecycle integration passes, but V2 behavior reconciliation remains pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
@@ -60,9 +60,9 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 The restored read-only V2 backup contains 800 posts, 1,301 entities, 2
 taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
 and 1,581 semantic projections. The expanded no-write dry-run processes 4,933
-records: 2,519 mapped candidates and 2,414 skipped candidates (799 invalid URL
+records: 2,559 mapped candidates and 2,414 skipped candidates (799 invalid URL
 maps and 1,615 unsupported legacy types). The local-dev governed apply
-recorded 1,548 migrated rows and 3,385 explicit skips (764 domain-targeted, 1
+recorded 1,607 migrated rows and 3,366 explicit skips (764 domain-targeted, 1
 invalid relation, 2,482 unsupported legacy type) with zero conflicts. This
 does not constitute production parity. Every delta must be explained by a
 ledger reason code; identity merges require explicit evidence and name-only
