@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P9 public language parity checkpoint.
+Last updated: 2026-08-31, P9 complete public language parity checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P9 public language parity checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 86 tests, 404 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 130 tests, 751 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Tests | Unit suite: 86 tests, 446 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 130 tests, 793 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -511,3 +511,8 @@ Last updated: 2026-08-31, P9 public language parity checkpoint.
   contract remains covered by the frontend unit suite; current evidence is
   86 unit tests/404 assertions, 44 guarded integration tests/347 assertions and
   combined 130/751.
+- 2026-08-31: The public terminology contract was extended to every primary
+  template, including homepage, entity detail/archive and native Post related
+  video cards. Technical wording is absent from rendered public copy; full
+  verification is 86 unit tests/446 assertions, 44 guarded integration
+  tests/347 assertions, combined 130/793, lint pass and route smoke 21/21.
