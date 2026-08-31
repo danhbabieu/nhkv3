@@ -11,10 +11,13 @@ use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
+use NHK\Core\Infrastructure\Http\SearchApi;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
+use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
@@ -30,6 +33,9 @@ final class Plugin {
             if (!isset($wpdb) || !is_object($wpdb)) return;
             (new ReadApi(new WpdbMediaRepository($wpdb), new WpdbMediaAssetRepository($wpdb), new WpdbMediaUsageRepository($wpdb), new WpdbVideoRepository($wpdb), new WpdbKnowledgeRepository($wpdb), new WpdbSourceRepository($wpdb), new WpdbEvidenceRepository($wpdb), new MigrationStatus()))->register();
             (new GovernanceApi())->register();
+            $types = new EntityTypeRegistry();
+            CanonicalEntityTypeCatalog::registerInto($types);
+            (new SearchApi(new WpdbMediaRepository($wpdb), new WpdbVideoRepository($wpdb), new WpdbKnowledgeRepository($wpdb), new WpdbAuthorityRepository($wpdb), $types))->register();
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
     }
