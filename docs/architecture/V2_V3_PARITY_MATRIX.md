@@ -9,8 +9,8 @@ the final parity declaration.
 | Posts | Reference audit pending | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned |
 | Categories | Reference audit pending | Native WP categories | NO | PARTIAL | IN PROGRESS | Editorial intent only |
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | NO | NOT ASSESSED | P9 |
-| Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PARTIAL | IN PROGRESS | Brand implemented in P3; expansion is P5 |
-| Specimen / Product | Legacy data pending | Contract only | NO | NO | NOT ASSESSED | Distinction locked in P2 |
+| Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PASS | IN PROGRESS | Nine-type registry/catalog and generic persistence tested in P5; legacy data pending |
+| Specimen / Product | Legacy data pending | Registry-backed Authority contract | NO | PASS | IN PROGRESS | Physical specimen vs commercial product distinction tested; legacy data pending |
 | Media / Video | Legacy data pending | Contract only | NO | NO | NOT ASSESSED | P6 |
 | Knowledge Claim / Source / Evidence | Legacy data pending | Contract only | NO | NO | NOT ASSESSED | P7 |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; domain coverage pending |

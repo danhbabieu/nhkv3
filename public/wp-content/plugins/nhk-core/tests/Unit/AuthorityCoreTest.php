@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Authority\Exception\{AuthorityAlreadyActive,AuthorityAlreadyRetired,AuthorityRevisionConflict,InvalidPayload,StableKeyCollision};
-use NHK\Core\Domain\Authority\{EntityTypeDefinition,EntityTypeRegistry};
+use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog,EntityTypeDefinition,EntityTypeRegistry};
 use NHK\Core\Infrastructure\Graph\AuthorityEndpointResolver;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
@@ -17,4 +17,7 @@ final class AuthorityCoreTest extends TestCase {
  public function test_generic_resolver_validates_uuid_and_retired_entities_remain_graph_endpoints():void{[$s,$r,$types]=$this->service();$a=$s->create('brand','a','A');$resolver=new AuthorityEndpointResolver($types,$r);$ref=$resolver->normalize(new NodeReference('brand',$a->canonicalId));$this->assertTrue($resolver->exists($ref));$s->retire($a->canonicalId,1);$this->assertTrue($resolver->exists($ref));}
  public function test_already_retired_is_typed_error():void{[$s]=$this->service();$a=$s->create('brand','retired','Retired');$retired=$s->retire($a->canonicalId,1);$this->expectException(AuthorityAlreadyRetired::class);$s->retire($retired->canonicalId,2);}
  public function test_already_active_is_typed_error():void{[$s]=$this->service();$a=$s->create('brand','active','Active');$this->expectException(AuthorityAlreadyActive::class);$s->reactivate($a->canonicalId,1);}
+ public function test_canonical_catalog_registers_all_target_types_with_explicit_schema_contracts():void{$registry=new EntityTypeRegistry();CanonicalEntityTypeCatalog::registerInto($registry);self::assertSame(['brand','model','variant','movement','music','component','classification','specimen','product'],array_map(static fn(EntityTypeDefinition $d):string=>$d->type,$registry->all()));foreach($registry->all() as $definition){self::assertTrue($definition->graphEnabled);self::assertSame($definition->allowedFields,array_keys($definition->fieldTypes));}}
+ public function test_registry_rejects_conflicting_duplicate_and_invalid_schema_definitions():void{$registry=new EntityTypeRegistry();$definition=new EntityTypeDefinition('brand',1,true,['description'],[],['description'=>'string']);$registry->register($definition);$registry->register($definition);$this->expectException(\InvalidArgumentException::class);$registry->register(new EntityTypeDefinition('brand',2,true,['description'],[],['description'=>'string']));}
+ public function test_canonical_payload_field_types_are_validated():void{$registry=new EntityTypeRegistry();CanonicalEntityTypeCatalog::registerInto($registry);$service=new AuthorityService(new InMemoryAuthorityRepository(),$registry);$this->expectException(InvalidPayload::class);$service->create('movement','caliber-1','Caliber',['frequency_hz'=>'wrong']);}
 }
