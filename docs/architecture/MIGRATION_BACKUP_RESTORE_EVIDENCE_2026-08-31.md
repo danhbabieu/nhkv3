@@ -46,16 +46,28 @@ Readiness evidence are complete.
 
 ## Local-dev apply evidence
 
-The latest exported JSON is `/private/tmp/nhk-v3-v2-full-export-url-6.7.json`
-(SHA-256 `1e550022757077164df07ee9df0acac83b37bf5c15a43bdda6ba31da3378e1bb`).
-Its no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run-url-6.7.json`
-(SHA-256 `9381d5663b3f3003f7617ddbd519793519fa6c1edae57b7d394cfeebd51a585e`).
+The latest exported JSON is `/private/tmp/nhk-v3-v2-full-export-url-6.9.json`
+(SHA-256 `79060099741e1685aabb8cb5836f2cf6e0baf41e5131b96eb70ce00a602c5482`).
+Its no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run-url-6.9.json`
+(SHA-256 `c2d7ad4d5a46d0d94bb0a214b3d31719034e0be984558880748c4efdf5e79fc2`).
 The latest governed apply result is
-`/private/tmp/nhk-v3-v2-apply-result-url-6.8.json` (SHA-256
-`25404566d4961de506f7bf89a98967330341f384af2f639023d66c5a201d7fed`).
-The runner wrote 1,642 `migrated` ledger rows and 3,331 explicit skips to
+`/private/tmp/nhk-v3-v2-apply-result-url-6.9.json` (SHA-256
+`4ff0c4e98ce613bb4d3f30d3ffd3134a4178d3052bf7b72e6a9e9f323982a7af`).
+The runner wrote 2,012 `migrated` ledger rows and 2,961 explicit skips to
 `nhk_v3`, including 19 Source and 40 Evidence rows retained as inactive
 because the V2 records were PRIVATE. Migration008 persisted field-level media
-metadata and the three MediaAsset rows were reconciled to PRIVATE; mapper 6.8
-added 34 native-post redirect aliases, while the latest ledger has one
-`READY_NOOP` URL and 0 conflicts.
+metadata and the three MediaAsset rows were reconciled to PRIVATE; Mapper 6.9
+added 370 entity-registry redirects alongside the 34 native-post aliases and
+one `READY_NOOP` URL, with 0 conflicts. A second full apply produced the same
+2,012/2,961/0 counts, confirming idempotency.
+
+The Mapper 6.9 dry-run reported 4,973 source records, 2,963 mapped, 2,010
+skipped and 405 URL mappings. Its explicit skip buckets were 372
+`DOMAIN_TARGETED`, 23 `INVALID_URL_MAPPING` and 1,615
+`UNSUPPORTED_LEGACY_TYPE`. The staging database was then cleaned of exactly
+the 53 `nhkv2_*` tables and restored from the clean V3 snapshot; post-restore
+checks reported 0 `nhkv2_*` tables and 17 V3 tables in `nhk_v3_test`.
+After the full guarded suite, staging was restored once more and migrations
+005–008 were applied UP-only; final checks report 0 `nhkv2_*` tables and
+`nhk_core_migration_current/target` `8/8` in `nhk_v3_test`. The full guarded
+suite passed 97 tests and 399 assertions.

@@ -9,13 +9,13 @@ Last updated: 2026-08-31, canonical projection URL-target checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 63 tests, 182 assertions; guarded WordPress suite: 95 tests, 392 assertions; plugin/theme PHP lint and diff check pass |
-| Blockers | Visual QA (browser connector unavailable), external MCP transport, current 765 URL mappings pending Mapper 6.9 rerun, media delivery/usages, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 64 tests, 185 assertions; guarded WordPress suite: 97 tests, 399 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, 395 residual URL candidates, media delivery/usages, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Rerun the restored-backup export/dry-run/apply with Mapper 6.9, verify the 370 explicit active Authority URL targets and resulting ledger, then continue field-level media delivery/usages, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,642 rows with 3,331 explicit skips, including 34 native-post redirects |
+| Next executable task | Reconcile the 395 residual URL candidates, then continue field-level media delivery/usages, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,012 rows with 2,961 explicit skips, including 370 entity redirects and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
-| Migration dry-run | Full restored-backup export: 4,973 records; 2,593 candidates and 2,380 skipped; local-dev apply: 1,642 migrated, 3,331 skipped, 0 conflicts |
+| Migration dry-run | Full restored-backup export: 4,973 records; 2,963 candidates and 2,010 skipped; local-dev apply: 2,012 migrated, 2,961 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -227,4 +227,8 @@ Last updated: 2026-08-31, canonical projection URL-target checkpoint.
   canonical entity UUIDs. Mapper 6.9 now emits redirects for the 370 active
   Authority entities with public V3 routes, stores entity aliases in a
   fail-closed WordPress option registry, and classifies Knowledge/no-route
-  projections as `DOMAIN_TARGETED`; guarded rerun is pending local DB recovery.
+  projections as `DOMAIN_TARGETED`; the guarded export/dry-run/apply rerun
+  completed at 2,012 migrated, 2,961 skipped and 0 conflicts. The URL ledger
+  now has 405 migrated rows (370 entity redirects, 34 native-post redirects
+  and one `READY_NOOP`), 372 `DOMAIN_TARGETED` rows and 23 invalid mappings;
+  the rerun was idempotent and staging was restored to a V3-only snapshot.

@@ -43,20 +43,20 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 63 tests, 182 assertions |
+| Unit tests | PASS — 64 tests, 185 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 95 tests, 392 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 97 tests, 399 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,593 candidates, 2,380 no-write skips; local-dev ledger: 1,642 migrated, 3,331 explicit skips, 0 conflicts, including 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows; read-only metadata proves 370 additional active Authority route targets for pending Mapper 6.9 rerun |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,963 candidates, 2,010 no-write skips; local-dev ledger: 2,012 migrated, 2,961 explicit skips, 0 conflicts, including 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates
 
-1. Complete field-level reconciliation for residual URLs after the Mapper 6.9
-   rerun, media delivery/usages,
+1. Complete field-level reconciliation for the 395 residual URLs, media
+   delivery/usages,
    Source/Evidence public visibility, semantic projections and the 764
    domain-targeted custom/system posts; each requires a governed target or a
    documented retirement/skip decision.
