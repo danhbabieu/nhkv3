@@ -55,9 +55,11 @@ automatic identity merges.
 object containing a `records` array and emits a machine-readable report. The
 `DryRunService` performs no database or filesystem writes. It classifies
 supported records, URL mappings and relations, validates canonical UUIDs and
-stable keys, and reports bounded reason codes including
-`DUPLICATE_CANDIDATE`, `INVALID_RELATION`, `MISSING_ENDPOINT`,
-`INVALID_IDENTITY` and `UNSUPPORTED_LEGACY_TYPE`. A repeated media checksum is
+stable keys, reports per-type source/mapped counts and skipped-reason counts,
+and emits bounded reason codes including `DUPLICATE_CANDIDATE`,
+`INVALID_RELATION`, `MISSING_ENDPOINT`, `INVALID_IDENTITY`, `INVALID_RECORD`,
+`CONFLICT_REQUIRES_REVIEW` and `UNSUPPORTED_LEGACY_TYPE`. Invalid checksums
+and malformed records are not silently mapped. A repeated media checksum is
 evidence for review only; it never merges identities. The tool is ready for a
 read-only V2 export, while actual migration remains gated by backup,
 readability/restore evidence and resumable checkpoint design.

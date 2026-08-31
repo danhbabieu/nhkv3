@@ -30,12 +30,14 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   mutations delegate to Governance.
 - The V2 dry-run tool is no-write and emits bounded reason codes. No V2 data
   has been migrated.
+- The dry-run report now provides per-type counts and skipped-reason buckets,
+  rejects malformed records/checksums and marks explicit conflicts for review.
 
 ## Quality evidence
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 59 tests, 160 assertions |
+| Unit tests | PASS — 63 tests, 181 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
