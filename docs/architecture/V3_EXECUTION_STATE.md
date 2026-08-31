@@ -65,6 +65,12 @@ Last updated: 2026-09-01, P11 Admin migration review checkpoint.
   recovery, retirement-only disposition or not classified. The panel remains
   read-only. Full guarded PHPUnit passed 173 tests/1,122 assertions.
 
+- 2026-09-01: Browser visual QA added 390px and 1440px Comparison screenshots,
+  plus structural checks for nine remaining archive/detail/alias routes at
+  390px, 768px and 1440px. All 27 route-size checks had H1, no overflow,
+  broken images or empty/`#` anchors; active Video detail remains unavailable
+  because the local dataset has no active Video row.
+
 - 2026-09-01: Route smoke now asserts title/canonical metadata for the two
   editorial archives, the default category archive and the 404 route, including
   the 404 `noindex, follow` contract. The enhanced smoke passes 30/30; no
