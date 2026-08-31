@@ -100,7 +100,7 @@ final class FrontendContractTest extends TestCase
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
         foreach (['comparison.php', 'knowledge.php', 'media.php', 'video.php', 'index.php'] as $template) {
             $contents = (string) file_get_contents($theme . '/' . $template);
-            foreach (['Authority reference', 'Knowledge claim', 'Canonical ID', 'entity Video', 'Semantic search'] as $internalTerm) {
+            foreach (['Authority reference', 'Knowledge claim', 'Canonical ID', 'entity Video', 'Semantic search', 'Hồ sơ canonical', 'External references', 'media canonical', 'Kho claim canonical', 'atomic claim', 'Revision', 'dữ liệu canonical', 'Trang semantic', 'external reference'] as $internalTerm) {
                 self::assertStringNotContainsString($internalTerm, $contents, $template . ' exposes internal term: ' . $internalTerm);
             }
         }

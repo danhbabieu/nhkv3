@@ -12,6 +12,6 @@ get_header();
     <aside class="media-facts"><h2>Thông tin</h2><dl class="entity-facts"><dt>Stable key</dt><dd><?php echo esc_html((string) ($media['stable_key'] ?? '')); ?></dd><dt>Readiness</dt><dd><?php echo esc_html((string) ($media['readiness'] ?? '')); ?></dd><dt>Usage</dt><dd><?php echo esc_html((string) count((array) ($media['usages'] ?? []))); ?></dd></dl></aside>
   </div>
 <?php elseif (is_array($context) && is_array($archive)): ?>
-  <header class="archive-intro"><p class="eyebrow">Thư viện</p><h1>Hình ảnh & media</h1><p class="archive-summary">Các hồ sơ media canonical đang hoạt động trong kho NHK.</p></header>
+  <header class="archive-intro"><p class="eyebrow">Thư viện</p><h1>Hình ảnh & media</h1><p class="archive-summary">Các hồ sơ hình ảnh đang hoạt động trong kho NHK.</p></header>
   <?php if (!empty($archive['items'])): ?><div class="media-card-grid"><?php foreach ($archive['items'] as $item): ?><article class="media-card"><p class="eyebrow">Media</p><h2><a href="<?php echo esc_url(home_url('/media/' . rawurlencode((string) $item['id']) . '/')); ?>"><?php echo esc_html((string) ($item['title'] ?? '')); ?></a></h2><p class="entity-card-key"><?php echo esc_html((string) ($item['stable_key'] ?? '')); ?></p></article><?php endforeach; ?></div><?php else: ?><div class="empty media-empty"><h2>Chưa có media public</h2><p>Thư viện sẽ hiển thị sau khi asset và readiness được kiểm định.</p></div><?php endif; ?>
-<?php else: ?><div class="empty"><h1>Thư viện chưa sẵn sàng</h1><p>Không thể tải dữ liệu media canonical.</p></div><?php endif; ?></main><?php get_footer();
+<?php else: ?><div class="empty"><h1>Thư viện chưa sẵn sàng</h1><p>Không thể tải dữ liệu hình ảnh.</p></div><?php endif; ?></main><?php get_footer();
