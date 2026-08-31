@@ -71,6 +71,12 @@ $locationMarkers = [
     '/tim-kiem/?q=odo' => '/?s=odo',
     ...$optionalRedirects,
 ];
+$metadataMarkers = [
+    '/tri-thuc/' => ['<title>Tri thức — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/tri-thuc/"'],
+    '/goc-chia-se/' => ['<title>Góc chia sẻ — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/goc-chia-se/"'],
+    '/category/uncategorized/' => ['<title>Chủ đề: Chưa phân loại — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/category/uncategorized/"'],
+    '/__nhk-route-must-404__/' => ['<title>Không tìm thấy trang — Đồng Hồ Nhà Kho</title>', 'noindex, follow'],
+];
 $failures = 0;
 foreach ($routes as $route => $expected) {
     $url = $base . $route;
@@ -93,10 +99,16 @@ foreach ($routes as $route => $expected) {
     $hasMarker = $marker === null || (is_string($body) && str_contains($body, $marker));
     $expectedLocation = $locationMarkers[$route] ?? null;
     $hasLocation = $expectedLocation === null || str_contains($location, $expectedLocation);
-    $ok = $status === $expected && $hasMarker && $hasLocation;
+    $metadataFailures = [];
+    foreach ($metadataMarkers[$route] ?? [] as $metadataMarker) {
+        if (!is_string($body) || !str_contains($body, $metadataMarker)) $metadataFailures[] = $metadataMarker;
+    }
+    $hasMetadata = $metadataFailures === [];
+    $ok = $status === $expected && $hasMarker && $hasLocation && $hasMetadata;
     $detail = $status === $expected ? "expected {$expected}, got {$status}" : "expected {$expected}, got {$status}";
     if (!$hasMarker) $detail .= ", missing content marker {$marker}";
     if (!$hasLocation) $detail .= ", expected Location containing {$expectedLocation}, got {$location}";
+    if (!$hasMetadata) $detail .= ', missing metadata marker(s) ' . implode(', ', $metadataFailures);
     echo ($ok ? 'PASS' : 'FAIL') . " {$route}: {$detail}\n";
     if (!$ok) $failures++;
 }

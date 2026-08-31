@@ -19,6 +19,11 @@ Last updated: 2026-09-01, P11 editorial archive SEO checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Route smoke now asserts title/canonical metadata for the two
+  editorial archives, the default category archive and the 404 route, including
+  the 404 `noindex, follow` contract. The enhanced smoke passes 30/30; no
+  runtime or data state changed.
+
 - 2026-09-01: 404 pages now emit the reader-facing title `Không tìm thấy
   trang — Đồng Hồ Nhà Kho`, a bounded description, canonical homepage URL and
   `noindex, follow`; browser verification passed at 390px with no technical
