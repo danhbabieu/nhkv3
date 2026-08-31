@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
+Last updated: 2026-08-31, P11 residual-gate runtime audit checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -93,6 +93,12 @@ Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
   delegates all calls to the existing read/Governance handlers. Guarded
   transport tests and local HTTP smoke pass; external client/deployment
   interoperability remains open.
+- 2026-08-31: P11 residual-gate audit re-ran the current quality gates after
+  restoring the local MySQL runtime: unit 82/286, guarded WordPress
+  integration 41/260, plugin/theme PHP lint and route smoke 20/20 all pass.
+  The Cutover Report was corrected to record the current 12-tool MCP catalog;
+  V2 field-level/policy decisions, active Video coverage and external MCP
+  interoperability remain open, so production cutover stays unauthorized.
 - 2026-08-31: Canonical entity frontend routes now cover archive, filtered
   archive pagination and stable-key/UUID detail for all nine Authority types.
   `EntityPageQuery` owns repository access; the theme only presents the
