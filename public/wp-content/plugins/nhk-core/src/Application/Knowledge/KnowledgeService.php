@@ -55,10 +55,10 @@ final class KnowledgeService
     public function retireEvidence(string $id, int $revision): Evidence { return $this->changeEvidenceState($id, $revision, false); }
     public function reactivateEvidence(string $id, int $revision): Evidence { return $this->changeEvidenceState($id, $revision, true); }
 
-    public function cite(string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null): Evidence
+    public function cite(string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null, array $metadata = []): Evidence
     {
         if (!$this->claims->findByCanonicalId($claimId) || !$this->sources->findByCanonicalId($sourceId)) throw new KnowledgeException('Evidence endpoint does not exist.');
-        return $this->evidence->create(new Evidence(UuidCodec::newV7(), $claimId, $sourceId, $relation, $excerpt, $locator));
+        return $this->evidence->create(new Evidence(UuidCodec::newV7(), $claimId, $sourceId, $relation, $excerpt, $locator, true, 1, $metadata));
     }
 
     /** @return list<Evidence> */

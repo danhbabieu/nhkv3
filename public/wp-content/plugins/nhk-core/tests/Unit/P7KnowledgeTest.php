@@ -41,9 +41,10 @@ final class P7KnowledgeTest extends TestCase
         $claim = $service->createClaim('odo-history-1', 'The clock was made in the early twentieth century.', 'history', ['origin' => 'catalog']);
         $source = $service->createSource('catalog-1', 'Archive catalogue', 'catalog', 'https://example.test/catalog/1');
         $sameClaim = $service->createClaim('odo-history-1', 'The clock was made in the early twentieth century.', 'history', ['origin' => 'catalog']);
-        $citation = $service->cite($claim->canonicalId, $source->canonicalId, 'Early twentieth century', 'supports');
+        $citation = $service->cite($claim->canonicalId, $source->canonicalId, 'Early twentieth century', 'supports', null, ['visibility' => 'PUBLIC']);
         self::assertSame($claim->canonicalId, $sameClaim->canonicalId);
         self::assertSame($claim->canonicalId, $citation->claimId);
+        self::assertSame(['visibility' => 'PUBLIC'], $citation->metadata);
         self::assertCount(1, $service->evidenceForClaim($claim->canonicalId));
 
         $claim = $service->updateClaim($claim->canonicalId, 'The clock was made around 1905.', 'history', ['origin' => 'catalog', 'reviewed' => true], 1);
@@ -91,5 +92,15 @@ final class P7KnowledgeTest extends TestCase
         self::assertTrue((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:verified', 'Verified claim.', 'fact', ['metadata' => ['verification_status' => 'VERIFIED']]))->isPublic());
         self::assertFalse((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:unverified', 'Unverified claim.', 'fact', ['metadata' => ['verification_status' => 'UNVERIFIED']]))->isPublic());
         self::assertFalse((new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:needs-confirmation', 'Needs confirmation claim.', 'fact', ['metadata' => ['knowledge_status' => 'NEEDS_CONFIRMATION']]))->isPublic());
+    }
+
+    public function test_source_and_evidence_default_to_private_until_explicitly_published(): void
+    {
+        $sourceId = UuidCodec::newV7();
+        $claimId = UuidCodec::newV7();
+        self::assertFalse((new Source($sourceId, 'nhk:source:private-by-default', 'Private by default'))->isPublic());
+        self::assertFalse((new Evidence(UuidCodec::newV7(), $claimId, $sourceId, 'supports', 'Private by default'))->isPublic());
+        self::assertTrue((new Source($sourceId, 'nhk:source:explicit-public', 'Explicit public', 'website', null, ['visibility' => 'PUBLIC']))->isPublic());
+        self::assertTrue((new Evidence(UuidCodec::newV7(), $claimId, $sourceId, 'supports', 'Explicit public', null, true, 1, ['visibility' => 'PUBLIC']))->isPublic());
     }
 }

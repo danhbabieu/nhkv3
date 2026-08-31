@@ -14,6 +14,6 @@ final readonly class Source
 
     public function isPublic(): bool
     {
-        return strtoupper(trim((string) ($this->metadata['visibility'] ?? 'PUBLIC'))) === 'PUBLIC';
+        return strtoupper(trim((string) ($this->metadata['visibility'] ?? 'PRIVATE'))) === 'PUBLIC';
     }
 }

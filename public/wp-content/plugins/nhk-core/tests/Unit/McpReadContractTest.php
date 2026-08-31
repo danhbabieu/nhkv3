@@ -28,8 +28,8 @@ final class McpReadContractTest extends TestCase
         $mcpUsage = new MediaUsage(UuidCodec::newV7(), $mcpMedia->canonicalId, 'wp_post', '1:42', 'gallery', 1);
         $mcpVideo = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'MCP video', ['private' => 'metadata']);
         $mcpClaim = new KnowledgeClaim(UuidCodec::newV7(), 'mcp-public-claim', 'MCP public claim', 'fact', ['metadata' => ['verification_status' => 'VERIFIED', 'private' => 'provenance']]);
-        $mcpSource = new Source(UuidCodec::newV7(), 'mcp-public-source', 'MCP public source');
-        $mcpEvidence = new Evidence(UuidCodec::newV7(), $mcpClaim->canonicalId, $mcpSource->canonicalId, 'supports', 'MCP public excerpt', null, true, 1, ['private' => 'metadata']);
+        $mcpSource = new Source(UuidCodec::newV7(), 'mcp-public-source', 'MCP public source', 'website', null, ['visibility' => 'PUBLIC']);
+        $mcpEvidence = new Evidence(UuidCodec::newV7(), $mcpClaim->canonicalId, $mcpSource->canonicalId, 'supports', 'MCP public excerpt', null, true, 1, ['visibility' => 'PUBLIC', 'private' => 'metadata']);
         $media = new class($mcpMedia) implements MediaRepository {
             public function __construct(private Media $item) {}
             public function findByCanonicalId(string $id): ?Media { return $id === $this->item->canonicalId ? $this->item : null; }

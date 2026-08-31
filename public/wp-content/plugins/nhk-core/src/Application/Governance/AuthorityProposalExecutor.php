@@ -84,7 +84,7 @@ final class AuthorityProposalExecutor
         if (in_array($proposal->operation, ['create', 'ingest'], true)) return match ($proposal->entityType) {
             'knowledge' => $this->knowledge->createClaim((string) ($payload['stable_key'] ?? ''), (string) ($payload['text'] ?? $payload['claim_text'] ?? ''), (string) ($payload['claim_type'] ?? $payload['type'] ?? 'fact'), is_array($payload['provenance'] ?? null) ? $payload['provenance'] : []),
             'source' => $this->knowledge->createSource((string) ($payload['stable_key'] ?? ''), (string) ($payload['title'] ?? ''), (string) ($payload['source_type'] ?? $payload['type'] ?? 'website'), isset($payload['locator']) ? (string) $payload['locator'] : null, is_array($payload['metadata'] ?? null) ? $payload['metadata'] : []),
-            'evidence' => $this->knowledge->cite((string) ($payload['claim_id'] ?? ''), (string) ($payload['source_id'] ?? ''), (string) ($payload['excerpt'] ?? ''), (string) ($payload['relation'] ?? 'supports'), isset($payload['locator']) ? (string) $payload['locator'] : null),
+            'evidence' => $this->knowledge->cite((string) ($payload['claim_id'] ?? ''), (string) ($payload['source_id'] ?? ''), (string) ($payload['excerpt'] ?? ''), (string) ($payload['relation'] ?? 'supports'), isset($payload['locator']) ? (string) $payload['locator'] : null, is_array($payload['metadata'] ?? null) ? $payload['metadata'] : []),
         };
         return match ($proposal->entityType) {
             'knowledge' => match ($proposal->operation) {

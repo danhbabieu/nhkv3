@@ -129,7 +129,7 @@ final class McpTransportIntegrationTest extends TestCase
             $create = $this->request('tools/call', ['id' => 9, 'params' => ['name' => 'nhk.video.ingest', 'arguments' => [
                 'url' => 'https://youtu.be/' . $videoId,
                 'title' => 'MCP video ' . $videoId,
-                'metadata' => ['source' => 'mcp-integration-test'],
+                'metadata' => ['source' => 'mcp-integration-test', 'visibility' => 'PUBLIC'],
             ]]], ['Mcp-Name' => 'nhk.video.ingest']);
             self::assertSame(200, $create->get_status(), (string) wp_json_encode($create->get_data()));
             $created = $create->get_data()['result']['structuredContent'];
@@ -180,7 +180,7 @@ final class McpTransportIntegrationTest extends TestCase
                 'title' => 'MCP source ' . $suffix,
                 'source_type' => 'catalog',
                 'locator' => 'https://example.test/mcp/' . $suffix,
-                'metadata' => ['source' => 'mcp-integration-test'],
+                'metadata' => ['source' => 'mcp-integration-test', 'visibility' => 'PUBLIC'],
             ], 30);
             $claim = $this->governedIngest('nhk.knowledge.ingest', [
                 'stable_key' => 'mcp-claim-' . $suffix,
@@ -194,7 +194,7 @@ final class McpTransportIntegrationTest extends TestCase
                 'excerpt' => 'Spring-driven movement',
                 'relation' => 'supports',
                 'locator' => 'https://example.test/mcp/' . $suffix . '#movement',
-                'metadata' => ['source' => 'mcp-integration-test'],
+                'metadata' => ['source' => 'mcp-integration-test', 'visibility' => 'PUBLIC'],
             ], 50);
 
             self::assertNotEmpty($evidence['result_entity_uuid']);
