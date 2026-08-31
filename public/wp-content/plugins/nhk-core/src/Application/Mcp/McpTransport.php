@@ -73,6 +73,7 @@ final class McpTransport
         $capability = match ($name) {
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
+            'nhk.video.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
@@ -85,6 +86,7 @@ final class McpTransport
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments),
+            'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
             'nhk.proposal.create' => $this->proposal($this->governance->createFromArguments($arguments)),
@@ -144,6 +146,20 @@ final class McpTransport
             'usages' => is_array($arguments['usages'] ?? null) ? $arguments['usages'] : [],
         ];
         return $this->proposal($this->governance->createFromArguments($mediaArguments));
+    }
+
+    private function videoIngest(array $arguments): array
+    {
+        $videoArguments = $arguments;
+        $videoArguments['operation'] = 'ingest';
+        $videoArguments['entity_type'] = 'video';
+        $videoArguments['payload'] = [
+            'url' => (string) ($arguments['url'] ?? ''),
+            'title' => (string) ($arguments['title'] ?? ''),
+            'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+            'thumbnail_media_id' => (string) ($arguments['thumbnail_media_id'] ?? ''),
+        ];
+        return $this->proposal($this->governance->createFromArguments($videoArguments));
     }
 
     private function proposal(\NHK\Core\Domain\Governance\Proposal $proposal): array

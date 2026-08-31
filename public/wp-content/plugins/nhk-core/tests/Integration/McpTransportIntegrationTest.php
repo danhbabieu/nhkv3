@@ -27,7 +27,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         $data = $response->get_data();
         self::assertSame('2.0', $data['jsonrpc']);
-        self::assertCount(12, $data['result']['tools']);
+        self::assertCount(13, $data['result']['tools']);
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string']], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
@@ -108,6 +108,54 @@ final class McpTransportIntegrationTest extends TestCase
             $assets = (new WpdbMediaAssetRepository($wpdb))->listByMediaId($media->canonicalId);
             self::assertCount(1, $assets);
             self::assertSame('PRIVATE', $assets[0]->visibility);
+        } finally {
+            wp_set_current_user($previousUser);
+        }
+    }
+
+    public function test_authenticated_video_ingest_runs_through_governed_lifecycle(): void
+    {
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        GovernanceCapabilities::register();
+        $previousUser = get_current_user_id();
+        wp_set_current_user((int) $users[0]->ID);
+        global $wpdb;
+        $videoId = substr(bin2hex(random_bytes(8)), 0, 11);
+        try {
+            $create = $this->request('tools/call', ['id' => 9, 'params' => ['name' => 'nhk.video.ingest', 'arguments' => [
+                'url' => 'https://youtu.be/' . $videoId,
+                'title' => 'MCP video ' . $videoId,
+                'metadata' => ['source' => 'mcp-integration-test'],
+            ]]], ['Mcp-Name' => 'nhk.video.ingest']);
+            self::assertSame(200, $create->get_status(), (string) wp_json_encode($create->get_data()));
+            $created = $create->get_data()['result']['structuredContent'];
+            self::assertFalse($create->get_data()['result']['isError']);
+            self::assertSame('video', $created['entity_type']);
+            self::assertSame('ingest', $created['operation']);
+            $proposalId = (string) $created['id'];
+            $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
+            self::assertNotNull($proposal);
+
+            $submit = $this->request('tools/call', ['id' => 10, 'params' => ['name' => 'nhk.proposal.submit', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.submit']);
+            self::assertSame(200, $submit->get_status());
+            $approve = $this->request('tools/call', ['id' => 11, 'params' => ['name' => 'nhk.proposal.approve', 'arguments' => ['id' => $proposalId, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint]]], ['Mcp-Name' => 'nhk.proposal.approve']);
+            self::assertSame(200, $approve->get_status());
+            $apply = $this->request('tools/call', ['id' => 12, 'params' => ['name' => 'nhk.proposal.apply', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.apply']);
+            self::assertSame(200, $apply->get_status());
+            $applied = $apply->get_data()['result']['structuredContent'];
+            self::assertFalse($apply->get_data()['result']['isError'], (string) wp_json_encode($apply->get_data()));
+            self::assertNotEmpty($applied['result_entity_uuid']);
+
+            $video = (new \NHK\Core\Infrastructure\Video\WpdbVideoRepository($wpdb))->findByCanonicalId((string) $applied['result_entity_uuid']);
+            self::assertNotNull($video);
+            self::assertSame('youtube', $video->platform);
+            self::assertSame($videoId, $video->externalVideoId);
+            self::assertTrue($video->active);
+            $read = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/video/' . $video->canonicalId));
+            self::assertSame(200, $read->get_status());
+            self::assertSame($video->canonicalId, $read->get_data()['id']);
+            self::assertSame($videoId, $read->get_data()['external_id']);
         } finally {
             wp_set_current_user($previousUser);
         }

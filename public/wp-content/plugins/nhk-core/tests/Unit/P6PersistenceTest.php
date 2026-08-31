@@ -102,6 +102,33 @@ final class P6PersistenceTest extends TestCase
         self::assertCount(1, $repo->items);
     }
 
+    public function test_video_proposals_use_governance_executor_for_ingest_and_state_lifecycle(): void
+    {
+        $repo = new class implements VideoRepository {
+            public array $items = [];
+            public function findByCanonicalId(string $id): ?Video { return $this->items[$id] ?? null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { foreach ($this->items as $item) if ($item->platform === $platform && $item->externalVideoId === $id) return $item; return null; }
+            public function create(Video $item): Video { return $this->items[$item->canonicalId] = $item; }
+            public function update(Video $item, int $revision): Video { if (($this->items[$item->canonicalId]->revision ?? 0) !== $revision) throw new \RuntimeException('stale'); return $this->items[$item->canonicalId] = new Video($item->canonicalId, $item->platform, $item->externalVideoId, $item->canonicalUrl, $item->title, $item->metadata, $item->thumbnailMediaId, $item->active, $revision + 1); }
+            public function list(bool $includeRetired = false): array { return array_values($this->items); }
+        };
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $service = new VideoService($repo);
+        $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), $types), null, null, $service);
+        $video = $executor(new Proposal('video-ingest-1', 'video', 'ingest', ['url' => 'https://youtu.be/9bZkp7q19f0', 'title' => 'Canonical video', 'metadata' => ['source' => 'test']], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-video-ingest', 1, null, null, null, 'video'));
+        self::assertInstanceOf(Video::class, $video);
+        self::assertSame('youtube', $video->platform);
+        self::assertSame('Canonical video', $video->title);
+
+        $updated = $executor(new Proposal('video-update-1', $video->canonicalId, 'update', ['title' => 'Updated video', 'metadata' => ['reviewed' => true]], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-video-update', 1, null, null, $video->canonicalId, 'video'));
+        self::assertSame('Updated video', $updated->title);
+        self::assertSame(2, $updated->revision);
+        $retired = $executor(new Proposal('video-retire-1', $video->canonicalId, 'retire', [], 'content', 2, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-video-retire', 1, null, null, $video->canonicalId, 'video'));
+        self::assertFalse($retired->active);
+        self::assertSame(3, $retired->revision);
+    }
+
     public function test_media_and_video_are_real_graph_endpoints_and_retired_records_remain_resolvable(): void
     {
         $id = UuidCodec::newV7();

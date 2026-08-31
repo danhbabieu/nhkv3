@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P11 residual-gate runtime audit checkpoint.
+Last updated: 2026-08-31, P6/P8 governed Video HTTP checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P11 residual-gate runtime audit checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 82 tests, 286 assertions; guarded WordPress integration: 41 tests, 260 assertions; combined current suite: 123 tests, 546 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
+| Tests | Unit suite: 83 tests, 300 assertions; guarded WordPress integration: 42 tests, 282 assertions; combined current suite: 125 tests, 582 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -99,6 +99,31 @@ Last updated: 2026-08-31, P11 residual-gate runtime audit checkpoint.
   The Cutover Report was corrected to record the current 12-tool MCP catalog;
   V2 field-level/policy decisions, active Video coverage and external MCP
   interoperability remain open, so production cutover stays unauthorized.
+- 2026-08-31: Browser visual QA added real-data mobile checks for the homepage,
+  editorial empty archive, native Post, active Authority detail and active
+  Media detail; DOM inspection confirmed one main landmark and one footer on
+  the long homepage. Local read-only DB inspection confirms 242 Media rows,
+  3 assets and 0 Video rows, so no artificial Video detail fixture was added.
+  Route inventory and Cutover evidence now reflect the healthy local runtime;
+  broader route screenshots, active Video detail and policy/data gates remain
+  open.
+- 2026-08-31: Canonical Video ingest is now a governed vertical slice: the
+  executor delegates validated YouTube URL ingestion, update, retire and
+  reactivate to VideoService; MCP exposes `nhk.video.ingest` with capability
+  gating, and Admin exposes a labelled Video URL control. Unit and guarded
+  integration evidence now passes at 83/298 and 42/279 respectively, including
+  Video create → submit → approve → apply; active public Video data is still
+  absent locally, so no browser fixture was created.
+- 2026-08-31: The guarded Video lifecycle test now also verifies the active
+  canonical Video through `GET /nhk/v1/video/{uuid}` after apply. Current
+  evidence is 83 unit tests/300 assertions and 42 integration tests/282
+  assertions; combined evidence is 125 tests/582 assertions. Public active
+  Video browser QA remains data-gated because `nhk_v3` has zero Video rows.
+- 2026-08-31: Local HTTP verification after Video wiring returned 20/20
+  expected public route statuses; a real `/wp-json/nhk/v1/mcp` POST returned
+  the 13-tool catalog and included `nhk.video.ingest`. Unit/integration/lint
+  evidence remains green, while external deployment interoperability and V2
+  reconciliation are still separate cutover gates.
 - 2026-08-31: Canonical entity frontend routes now cover archive, filtered
   archive pagination and stable-key/UUID detail for all nine Authority types.
   `EntityPageQuery` owns repository access; the theme only presents the

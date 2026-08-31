@@ -69,9 +69,11 @@ final class FrontendContractTest extends TestCase
     public function test_admin_contract_associates_labels_with_operational_controls(): void
     {
         $admin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Admin/AdminPage.php');
-        foreach (['aria-labelledby="nhk-entity-lookup-heading"', 'for="nhk-entity-type"', 'for="nhk-entity-key"', 'for="nhk-proposal-id"', 'aria-describedby="nhk-proposal-composer-help"', 'id="nhk-source-key"', 'id="nhk-target-key"', 'for="nhk-semantic-id"', 'id="nhk-graph-endpoint-key"', 'aria-live="polite"'] as $contract) {
+        foreach (['aria-labelledby="nhk-entity-lookup-heading"', 'for="nhk-entity-type"', 'for="nhk-entity-key"', 'for="nhk-proposal-id"', 'aria-describedby="nhk-proposal-composer-help"', 'id="nhk-source-key"', 'id="nhk-target-key"', 'for="nhk-semantic-id"', 'id="nhk-graph-endpoint-key"', 'id="nhk-video-url"', 'value="video"', 'aria-live="polite"'] as $contract) {
             self::assertStringContainsString($contract, $admin);
         }
+        self::assertStringContainsString("echo '<option value=\"video\">video</option>';", $admin);
+        self::assertStringContainsString('payload.operation==="ingest"&&payload.entity_type==="video"', $admin);
     }
 
     public function test_search_template_uses_unified_search_query_boundary(): void

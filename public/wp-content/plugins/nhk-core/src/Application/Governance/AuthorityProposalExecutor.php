@@ -6,17 +6,19 @@ namespace NHK\Core\Application\Governance;
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Media\MediaService;
+use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Graph\GraphEdge;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Domain\Media\Media;
+use NHK\Core\Domain\Video\Video;
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video
     {
         if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
             if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
@@ -29,6 +31,26 @@ final class AuthorityProposalExecutor
                 is_array($payload['assets'] ?? null) ? $payload['assets'] : [],
                 is_array($payload['usages'] ?? null) ? $payload['usages'] : [],
             );
+        }
+        if ($proposal->entityType === 'video' && $proposal->operation === 'ingest') {
+            if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
+            $payload = $proposal->payload;
+            return $this->video->ingestUrl(
+                (string) ($payload['url'] ?? ''),
+                (string) ($payload['title'] ?? ''),
+                is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                isset($payload['thumbnail_media_id']) && (string) $payload['thumbnail_media_id'] !== '' ? (string) $payload['thumbnail_media_id'] : null,
+            );
+        }
+        if ($proposal->entityType === 'video' && in_array($proposal->operation, ['update', 'retire', 'reactivate'], true)) {
+            if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
+            $payload = $proposal->payload;
+            $target = $proposal->targetUuid ?: $proposal->subjectId;
+            return match ($proposal->operation) {
+                'update' => $this->video->update($target, (string) ($payload['title'] ?? ''), is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [], isset($payload['thumbnail_media_id']) && (string) $payload['thumbnail_media_id'] !== '' ? (string) $payload['thumbnail_media_id'] : null, $proposal->expectedRevision),
+                'retire' => $this->video->retire($target, $proposal->expectedRevision),
+                'reactivate' => $this->video->reactivate($target, $proposal->expectedRevision),
+            };
         }
         if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
             return $this->relation($proposal);

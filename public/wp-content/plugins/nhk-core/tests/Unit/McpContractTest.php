@@ -14,8 +14,10 @@ final class McpContractTest extends TestCase
         self::assertNotEmpty($tools);
         foreach ($tools as $tool) self::assertSame($tool['kind'] === 'mutation', $tool['governed']);
         self::assertContains('nhk.media.ingest', array_column($tools, 'name'));
+        self::assertContains('nhk.video.ingest', array_column($tools, 'name'));
         self::assertFalse(McpToolCatalog::isGoverned('nhk.search'));
         self::assertTrue(McpToolCatalog::isGoverned('nhk.media.ingest'));
+        self::assertTrue(McpToolCatalog::isGoverned('nhk.video.ingest'));
         self::assertTrue(McpToolCatalog::isGoverned('nhk.proposal.create'));
         self::assertFalse(McpToolCatalog::isGoverned('nhk.unknown'));
     }

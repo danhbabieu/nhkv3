@@ -20,6 +20,12 @@ final class McpToolCatalog
                 'assets' => ['type' => 'array', 'items' => ['type' => 'object']],
                 'usages' => ['type' => 'array', 'items' => ['type' => 'object']],
             ], ['stable_key', 'name'], true),
+            self::tool('nhk.video.ingest', 'Create a governed canonical external Video reference from a validated YouTube URL.', [
+                'url' => ['type' => 'string'],
+                'title' => ['type' => 'string'],
+                'metadata' => ['type' => 'object'],
+                'thumbnail_media_id' => ['type' => 'string'],
+            ], ['url'], true),
             self::tool('nhk.video.get', 'Read one active canonical external Video reference.', ['id' => ['type' => 'string']], ['id']),
             self::tool('nhk.knowledge.get', 'Read one active Knowledge claim with public evidence.', ['id' => ['type' => 'string']], ['id']),
             self::tool('nhk.proposal.create', 'Create a governed semantic proposal.', ['operation' => ['type' => 'string'], 'entity_type' => ['type' => 'string'], 'payload' => ['type' => 'object']], ['operation', 'payload'], true),

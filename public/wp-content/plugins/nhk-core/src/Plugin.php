@@ -42,6 +42,7 @@ use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, RelatedContentQuery};
 use NHK\Core\Application\Media\{MediaService, MediaVideoPageQuery};
+use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
@@ -73,7 +74,7 @@ final class Plugin {
             $proposalRepository = new WpdbProposalRepository($wpdb); $governanceAudit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb); $transactionManager = new WpdbTransactionManager($wpdb); $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository));
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, new MediaService($media, $assets, $usages)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, new MediaService($media, $assets, $usages), new VideoService($videos)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, new MigrationStatus()))->register();
             (new EntityApi($authority, $types))->register();

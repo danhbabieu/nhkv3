@@ -27,9 +27,10 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   label/id associations and labelled/described form regions.
 - MCP exposes governed eligibility and Controlled Apply handlers in addition to
   proposal lifecycle operations. `nhk.media.ingest` provides a governed fast
-  ingestion path for a complete Media identity/asset/usage packet; the local
-  end-to-end lifecycle preserves PRIVATE asset visibility until publication is
-  explicitly approved.
+  ingestion path for a complete Media identity/asset/usage packet, while
+  `nhk.video.ingest` persists validated YouTube external references; local
+  end-to-end lifecycles preserve PRIVATE asset visibility and canonical Video
+  identity until publication or further mutation is explicitly approved.
 - Native editorial aliases preserve `/tri-thuc/` and `/goc-chia-se/` route
   contracts while continuing to query WordPress categories/posts.
 - V2 search `/tim-kiem/?q=...` now redirects with its query preserved to the
@@ -93,14 +94,14 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 82 tests, 286 assertions |
+| Unit tests | PASS — 83 tests, 300 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 41 tests, 260 assertions; combined current suite is 123 tests, 546 assertions; governed MCP Media ingest lifecycle and Streamable HTTP Accept validation are included |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 42 tests, 282 assertions; combined current suite is 125 tests, 582 assertions; governed MCP Media/Video ingest lifecycles, Video REST read and Streamable HTTP Accept validation are included |
 | Frontend route/rewrite smoke | PASS 20/20 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects, query-preserving search redirect and comparison title/canonical metadata |
-| REST/MCP runtime boundary | PASS — active Entity/Media/Knowledge/Search reads returned 200, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, local MCP `tools/list` returned 200 with 12 protocol definitions, unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
-| Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 were visually inspected; a 32-combination browser sweep across page, archive pagination and empty/404 states at 390px/768px passes without horizontal overflow, and the menu exposes all ten links with synchronized ARIA state; remaining route-specific screenshots and active Video detail remain pending |
+| REST/MCP runtime boundary | PASS — active Entity/Media/Knowledge/Search reads returned 200, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, local MCP `tools/list` returned 200 with 13 protocol definitions, unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
+| Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 plus mobile homepage/editorial archive/Post/Authority detail/Media detail were visually inspected; a 32-combination browser sweep across page, archive pagination and empty/404 states at 390px/768px passes without horizontal overflow, and the menu exposes all ten links with synchronized ARIA state; remaining route-specific screenshots and active Video detail remain pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,960 candidates, 1,013 no-write skips and 0 conflicts after Migration009 maps all 1,581 projections to non-canonical context; latest local-dev apply: 3,960 migrated, 1,013 explicit skips, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
