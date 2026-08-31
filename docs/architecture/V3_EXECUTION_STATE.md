@@ -31,6 +31,11 @@ Last updated: 2026-09-01, P11 public MediaAsset delivery-boundary checkpoint.
   identifiers. Internal governance repositories remain available on their
   governed paths; focused contract coverage verifies the reader-safe shape.
 
+- 2026-09-01: MCP Video reads now omit persisted metadata and expose only the
+  validated external-reference display fields already used by the public
+  REST/theme contract. Focused MCP coverage verifies metadata cannot cross the
+  unauthenticated read boundary.
+
 - 2026-09-01: Read-only external NHK abilities were probed with bounded
   Source/Media/Video list calls and recorded in
   MCP_EXTERNAL_INTEROPERABILITY_EVIDENCE_2026-09-01.md. The adapter was

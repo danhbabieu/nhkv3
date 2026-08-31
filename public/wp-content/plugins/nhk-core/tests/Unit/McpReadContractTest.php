@@ -26,6 +26,7 @@ final class McpReadContractTest extends TestCase
         $mcpMedia = new Media(UuidCodec::newV7(), 'mcp-ready-media', 'MCP ready media', 'ready', ['private' => 'provenance']);
         $mcpAsset = new MediaAsset(UuidCodec::newV7(), $mcpMedia->canonicalId, 'original', 'private/storage.webp', hash('sha256', 'mcp'), 'image/webp', 3, 10, 10, 'PUBLIC', ['private' => 'metadata']);
         $mcpUsage = new MediaUsage(UuidCodec::newV7(), $mcpMedia->canonicalId, 'wp_post', '1:42', 'gallery', 1);
+        $mcpVideo = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'MCP video', ['private' => 'metadata']);
         $media = new class($mcpMedia) implements MediaRepository {
             public function __construct(private Media $item) {}
             public function findByCanonicalId(string $id): ?Media { return $id === $this->item->canonicalId ? $this->item : null; }
@@ -48,8 +49,9 @@ final class McpReadContractTest extends TestCase
             public function listByMediaId(string $id, ?string $role = null): array { return $id === $this->item->mediaId ? [$this->item] : []; }
             public function listByEndpoint(string $type, string $key, ?string $role = null): array { return []; }
         };
-        $videos = new class implements VideoRepository {
-            public function findByCanonicalId(string $id): ?Video { return null; }
+        $videos = new class($mcpVideo) implements VideoRepository {
+            public function __construct(private Video $item) {}
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->item->canonicalId ? $this->item : null; }
             public function findByExternalReference(string $platform, string $id): ?Video { return null; }
             public function create(Video $item): Video { return $item; }
             public function update(Video $item, int $expectedRevision): Video { return $item; }
@@ -76,6 +78,8 @@ final class McpReadContractTest extends TestCase
         self::assertArrayNotHasKey('provenance', $mediaRead);
         self::assertArrayNotHasKey('storage_key', $mediaRead['assets'][0]);
         self::assertArrayNotHasKey('endpoint_type', $mediaRead['usages'][0]);
+        $videoRead = $handler->videoGet($mcpVideo->canonicalId);
+        self::assertArrayNotHasKey('metadata', $videoRead);
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
         $retired = $authority->create('brand', 'retired', 'Retired');
         $authority->retire($retired->canonicalId, 1);
