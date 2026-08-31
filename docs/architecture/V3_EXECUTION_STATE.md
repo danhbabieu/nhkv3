@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 public MediaAsset delivery-boundary checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 103 tests, 571 assertions; guarded WordPress integration: 48 tests, 367 assertions; combined current suite: 151 tests, 938 assertions; plugin/theme PHP lint, route smoke 29/29 plus two data-gated detail redirects and diff check pass |
+| Tests | Unit suite: 103 tests, 572 assertions; guarded WordPress integration: 48 tests, 367 assertions; combined current suite: 151 tests, 939 assertions; plugin/theme PHP lint, route smoke 29/29 plus two data-gated detail redirects and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,12 @@ Last updated: 2026-09-01, P11 public MediaAsset delivery-boundary checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: MCP Authority entity reads now allowlist payload keys through
+  the registered canonical entity definition, matching REST/theme public
+  entity reads; legacy/internal fields cannot cross the read adapter.
+  Focused contract coverage verifies the allowed field survives and a private
+  field is removed.
 
 - 2026-09-01: Read-only external NHK abilities were probed with bounded
   Source/Media/Video list calls and recorded in

@@ -8,9 +8,11 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -18,9 +20,9 @@ final class McpReadContractTest extends TestCase
 {
     public function test_entity_read_adapter_is_non_mutating_and_type_safe(): void
     {
-        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, ['country']));
         $authority = new \NHK\Core\Application\Authority\AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
-        $entity = $authority->create('brand', 'odo', 'Odo');
+        $entity = $authorityRepository->create(new AuthorityEntity(UuidCodec::newV7(), 'brand', 'odo', 'Odo', 1, ['country' => 'Switzerland', 'private_note' => 'internal']));
         $media = new class implements MediaRepository {
             public function findByCanonicalId(string $id): ?Media { return null; }
             public function findByStableKey(string $key): ?Media { return null; }
@@ -63,6 +65,7 @@ final class McpReadContractTest extends TestCase
         };
         $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence);
         self::assertSame($entity->canonicalId, $handler->entityGet('brand', $entity->canonicalId)['id']);
+        self::assertSame(['country' => 'Switzerland'], $handler->entityGet('brand', $entity->canonicalId)['payload']);
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
         $retired = $authority->create('brand', 'retired', 'Retired');
         $authority->retire($retired->canonicalId, 1);
