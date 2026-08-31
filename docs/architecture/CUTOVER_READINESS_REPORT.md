@@ -227,12 +227,12 @@ route smoke 30/30 pass.
    relation semantics, and obtain explicit approval before any live V2
    migration. The versioned normalize/export/apply chain is evidence, not
    production authorization.
-3. Complete browser visual QA for homepage, Post, entity archives/details,
-   search, Media, Video, 404, pagination and tablet/mobile states; desktop
-   homepage, Knowledge, Authority and 404 surfaces are already inspected.
-   populate V3 detail data only through the governed migration path; visual QA
-   remains open because the available browser runtime cannot complete headless
-   screenshots.
+3. Complete the remaining browser visual QA for active Video detail and any
+   newly populated data-gated detail routes. Homepage, Post, entity
+   archives/details, Search, Comparison, Media, Video empty state, Knowledge,
+   404, pagination and 390px/768px/1440px structural states have already been
+   inspected; the current local dataset has no active Video row, so no fixture
+   is created and the detail gate remains open.
 4. Complete external MCP client/deployment interoperability verification and close mandatory
    red rows in `V2_V3_PARITY_MATRIX.md`.
 
