@@ -34,7 +34,7 @@ final class McpReadSearchPaginationTest extends TestCase
                 public function findByStableKey(string $key): ?Media { return null; }
                 public function create(Media $item): Media { return $item; }
                 public function update(Media $item, int $expectedRevision): Media { return $item; }
-                public function list(bool $includeRetired = false): array { return []; }
+                public function list(bool $includeRetired = false): array { return [new Media(UuidCodec::newV7(), 'mcp-search-ready-media', 'Clock media', 'ready'), new Media(UuidCodec::newV7(), 'mcp-search-draft-media', 'Clock draft media', 'draft')]; }
             },
             new class implements MediaAssetRepository {
                 public function findByAssetId(string $id): ?MediaAsset { return null; }
@@ -80,5 +80,6 @@ final class McpReadSearchPaginationTest extends TestCase
         self::assertSame(14, $result['semantic_totals']['entities']);
         self::assertCount(1, $result['groups']['knowledge']);
         self::assertSame(6, $result['semantic_totals']['knowledge']);
+        self::assertSame(1, $result['semantic_totals']['media']);
     }
 }

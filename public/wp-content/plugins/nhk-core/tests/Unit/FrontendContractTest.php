@@ -215,6 +215,7 @@ final class FrontendContractTest extends TestCase
             dirname(__DIR__, 2) . '/src/Application/Entity/RelatedContentQuery.php' => '$media->active && $media->readiness === \'ready\'',
             dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php' => '!$media->active || $media->readiness !== \'ready\'',
             dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php' => '!$media->active || $media->readiness !== \'ready\'',
+            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php' => '$media->active && $media->readiness === \'ready\' &&',
         ] as $file => $needle) {
             self::assertStringContainsString($needle, (string) file_get_contents($file), $file . ' must apply the public Media readiness boundary');
         }
