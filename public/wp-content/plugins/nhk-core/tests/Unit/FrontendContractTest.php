@@ -151,6 +151,15 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_public_label((string) $key)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
     }
 
+    public function test_public_media_api_does_not_expose_asset_storage_metadata(): void
+    {
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        $assetMethod = substr($readApi, strpos($readApi, 'private function asset'), strpos($readApi, 'private function usage') - strpos($readApi, 'private function asset'));
+        foreach (["'storage_key'", "'checksum'", "'visibility'", "'metadata'"] as $field) {
+            self::assertStringNotContainsString($field, $assetMethod, 'public media API exposes internal asset field: ' . $field);
+        }
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
