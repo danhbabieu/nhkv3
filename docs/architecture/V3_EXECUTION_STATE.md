@@ -1,11 +1,11 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, editorial routes and Admin semantic lookup checkpoint in progress.
+Last updated: 2026-08-31, route/Admin readiness documentation checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `41cc81a` |
+| Branch / HEAD | `main` / `a694a89` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
@@ -140,3 +140,6 @@ Last updated: 2026-08-31, editorial routes and Admin semantic lookup checkpoint 
   Admin semantic lookup now covers Media, Video, Knowledge, Source and Graph
   endpoints. Checkpoint `41cc81a` is pushed; runtime rewrite/REST smoke is
   still gated by the local database connection.
+- 2026-08-31: Route/Admin readiness documentation checkpoint `a694a89` is
+  pushed to `origin/main`; execution state is being closed against the next
+  actual HEAD checkpoint.
