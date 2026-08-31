@@ -70,9 +70,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - The public theme now has a skip link and explicit main targets, a keyboard-
   accessible responsive menu with synchronized ARIA state, visible focus
   styling, and explicit decorative image alt handling. The browser runtime
-  verified the 390px menu state and no overflow; fresh shell route/integration
-  retries were refused by the current local service state and do not replace
-  the earlier recorded 20/20 and 117/476 evidence.
+  verified the 390px menu state and no overflow; the guarded integration and
+  localhost route smoke were subsequently re-verified outside the sandbox
+  boundary.
 - SEO now declares an explicit archive policy through WordPress's single
   `wp_robots` output: canonical non-search pages are `index,follow`, while
   search and paginated archive states are `noindex,follow`; custom entity,
@@ -90,7 +90,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 117 tests, 476 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --testsuite 'NHK Integration'`; 38 tests, 235 assertions; combined current suite is 119 tests, 500 assertions |
 | Frontend route/rewrite smoke | PASS 20/20 for core routes, V2 archive aliases, `/comparison/`, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local HTTP also verified V2 detail 301 redirects, query-preserving search redirect and comparison title/canonical metadata |
 | REST/MCP runtime boundary | PASS — active Entity/Media/Knowledge/Search reads returned 200, invalid entity routes returned 404, unauthenticated Governance mutations/eligibility returned 401, local MCP `tools/list` returned 200 with 11 protocol definitions, unauthenticated governed MCP call returned 403 and invalid Origin returned 403; external interoperability/deployment remains pending |
 | Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Authority archive/detail and 404 were visually inspected; browser checks at 390px/768px pass without horizontal overflow on the recorded route sweep, the menu exposes all ten links with synchronized ARIA state, while full route/pagination coverage and active Video detail remain pending |

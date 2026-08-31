@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, long-title responsive checkpoint.
+Last updated: 2026-08-31, guarded runtime re-verification checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, long-title responsive checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 81 tests, 265 assertions; guarded WordPress suite: 117 tests, 476 assertions from the last healthy DB run; plugin/theme PHP lint, route smoke 20/20 and diff check pass; current shell HTTP/integration retry is blocked by local MySQL/Apache connection refusal |
+| Tests | Unit suite: 81 tests, 265 assertions; guarded WordPress integration: 38 tests, 235 assertions; combined current suite: 119 tests, 500 assertions; plugin/theme PHP lint, route smoke 20/20 and diff check pass |
 | Blockers | Complete visual QA beyond the sampled Model pagination state and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -409,3 +409,8 @@ Last updated: 2026-08-31, long-title responsive checkpoint.
   semantic, entity, media, knowledge and related cards, plus a zero-width
   filter input constraint. Unit tests remain 81/265, PHP lint and diff check
   pass; full route smoke remains subject to the local service gate.
+- 2026-08-31: Re-ran the guarded WordPress integration outside the sandbox
+  network boundary: 38 tests/235 assertions pass on `nhk_v3_test`; the
+  localhost frontend route smoke also passes 20/20. Combined current test
+  evidence is 119 tests/500 assertions; no V2 live or production data was
+  changed.
