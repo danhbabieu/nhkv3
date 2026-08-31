@@ -31,6 +31,10 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - V2 archive aliases `/thuong-hieu/`, `/hien-vat/` and `/am-nhac/` now resolve
   to canonical V3 Authority archive contexts while emitting canonical V3 links
   and metadata.
+- V2 detail slugs now have a fail-closed compatibility resolver: a unique active
+  Brand slug redirects to `/brand/{stable-key}/`, and a unique active
+  Brand/Model pair redirects to `/model/{stable-key}/`; native WordPress
+  content and ambiguous names are never overridden.
 - Post single pages now consume Graph-derived related entities, articles, Media
   and Video through an application query boundary; empty or unavailable
   related groups are omitted without changing the editorial body.
@@ -57,7 +61,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 70 tests, 210 assertions |
+| Unit tests | PASS — 74 tests, 223 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |

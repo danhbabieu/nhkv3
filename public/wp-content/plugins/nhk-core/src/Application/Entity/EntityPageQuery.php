@@ -20,6 +20,20 @@ final class EntityPageQuery
         return $serialized;
     }
 
+    /** Return a canonical stable key for a legacy visitor-facing slug only when the match is unambiguous. */
+    public function stableKeyForPublicSlug(string $type, string $slug): ?string
+    {
+        if (!$this->types->has($type) || !$this->available()) return null;
+        $slug = trim($slug);
+        if ($slug === '') return null;
+        $matches = [];
+        foreach ($this->authority->listByType($type) as $entity) {
+            if (!$entity->active() || $this->publicSlug($entity->canonicalName) !== $slug) continue;
+            $matches[] = $entity->stableKey;
+        }
+        return count($matches) === 1 ? $matches[0] : null;
+    }
+
     /** @return array{type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
     public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
     {
@@ -37,4 +51,11 @@ final class EntityPageQuery
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
+    private function publicSlug(string $value): string
+    {
+        if (function_exists('sanitize_title')) return (string) sanitize_title($value);
+        $value = strtolower(trim($value));
+        $value = (string) preg_replace('/[^a-z0-9]+/', '-', $value);
+        return trim($value, '-');
+    }
 }

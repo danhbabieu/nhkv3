@@ -10,7 +10,7 @@ V2 URL-parity claim.
 | Tri thức / Góc chia sẻ | `/tri-thuc/`, `/goc-chia-se/` plus paginated aliases | Native WP category query via `PublicEditorialRoutes` | Category-aware archive and empty states; no editorial body projection | HTTP rewrite smoke passes; responsive visual QA and V2 URL reconciliation remain |
 | Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | HTTP smoke and desktop archive visual QA pass; responsive QA pending |
 | Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | HTTP smoke and desktop detail visual QA pass; responsive QA pending |
-| V2 archive aliases | `/thuong-hieu/`, `/hien-vat/`, `/am-nhac/` | `PublicEntityRoutes` → canonical Authority type context | Compatibility aliases preserve discoverability while canonical links remain `/brand/`, `/specimen/`, `/music/` | HTTP smoke passes; dedicated V2 detail slug mapping remains ledger-gated |
+| V2 archive/detail aliases | `/thuong-hieu/`, `/hien-vat/`, `/am-nhac/`; `/{brand-slug}/`, `/{brand-slug}/{model-slug}/` | `PublicEntityRoutes` → canonical Authority type context or fail-closed slug resolver | Archive aliases preserve discoverability while canonical links remain `/brand/`, `/specimen/`, `/music/`; a detail slug redirects only for one active match and never overrides a native WP route | Archive HTTP smoke passes; detail compatibility is unit-tested and runtime evidence remains dependent on local WordPress availability |
 | Search | Native `/?s={term}` plus `/wp-json/nhk/v1/search` | `NHK_V3_Search_Page_Query` + `SearchSemanticQuery` + `SearchApi` | Post results remain native; active Authority/Media/Video/Knowledge results are grouped and linked | REST, route and desktop browser smoke pass; responsive QA pending |
 | Post single | `/{post-slug}/` | Native WordPress single + `nhk_v3_post_related_content` | Editorial body remains native; Graph-derived related groups render only when available | HTTP and desktop visual smoke pass; Graph-related fixture coverage is unit-tested |
 | Media archive | `/thu-vien/`, `/media/`, `/media/page/{n}/` | `MediaVideoPageQuery` → `PublicMediaVideoRoutes` → `media.php` | Active-only archive, honest empty state | HTTP smoke and desktop archive visual QA pass; responsive/gallery QA pending |
@@ -38,7 +38,9 @@ the rewrite file, empty-editorial handling and V2 archive aliases were added,
 the current smoke covers homepage, editorial aliases, all Authority archives,
 V2 archive aliases, Video, Media, Knowledge and deliberate 404. Concrete
 post/brand/model detail paths remain opt-in to the smoke command because no
-fixture URLs are claimed; `/hello-world/` is used as the native Post smoke.
+fixture URLs are claimed; `/hello-world/` is used as the native Post smoke. V2
+detail slugs are resolved only from active Authority names and remain
+fail-closed when a native WordPress route or ambiguous identity is present.
 
 ## Guardrails
 

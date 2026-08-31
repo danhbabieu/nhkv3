@@ -16,8 +16,8 @@ mutated.
 | `/video/` | Video archive | H1 `Thư viện video`, explicit public empty state | First-class external Video archive with honest empty state |
 | `/thu-vien/` | Media library | H1 `Video & Ảnh đồng hồ cổ`, media type filters, explicit empty states | Media archive/gallery with type filters and pagination |
 | `/hien-vat/` | Specimen archive | H1 `Hồ sơ hiện vật`, explicit public empty state | Separate physical specimen route from Product |
-| `/odo/` | Brand detail | H1 `Odo`, identity page with breadcrumb and related navigation | V3 canonical `/brand/{stable-key}/`; legacy slug mapping requires verified URL ledger evidence |
-| `/odo/odo-39/` | Model detail | H1 `Odo 39`, breadcrumb back to Odo and identity content | V3 canonical `/model/{stable-key}/`; no name-only identity merge |
+| `/odo/` | Brand detail | H1 `Odo`, identity page with breadcrumb and related navigation | V3 canonical `/brand/{stable-key}/`; V3 redirects only when exactly one active Brand has the public slug and no native WP content owns the path |
+| `/odo/odo-39/` | Model detail | H1 `Odo 39`, breadcrumb back to Odo and identity content | V3 canonical `/model/{stable-key}/`; resolver requires one active Brand slug and one active Model slug, with no name-only identity merge or native WP override |
 | `/tri-thuc/{slug}/` | Editorial article detail | H1, overview/body, breadcrumb and previous/next article navigation | Native WordPress Post single with Graph-derived related content and no body projection |
 | `/tim-kiem/?q=Odo` | Unified search | Grouped canonical Odo/Model results with search pagination | V3 uses native `/?s=` plus grouped semantic results through the application boundary |
 

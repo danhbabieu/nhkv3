@@ -25,4 +25,20 @@ final class EntityPageQueryTest extends TestCase
         self::assertNull($query->detail('brand', 'retired'));
         self::assertNull($query->detail('model', 'odo'));
     }
+
+    public function test_legacy_public_slug_resolves_only_to_one_active_entity(): void
+    {
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new AuthorityService($repository = new InMemoryAuthorityRepository(), $types);
+        $brand = $authority->create('brand', 'nhk:brand:o-do', 'Odo');
+        $query = new EntityPageQuery($repository, $types);
+
+        self::assertSame($brand->stableKey, $query->stableKeyForPublicSlug('brand', 'odo'));
+        $authority->create('brand', 'nhk:brand:odo-duplicate', 'Odo');
+        self::assertNull($query->stableKeyForPublicSlug('brand', 'odo'));
+        self::assertNull($query->stableKeyForPublicSlug('model', 'odo'));
+        $retired = $authority->create('brand', 'nhk:brand:retired-odo', 'Retired Odo');
+        $authority->retire($retired->canonicalId, 1);
+        self::assertNull($query->stableKeyForPublicSlug('brand', 'retired-odo'));
+    }
 }
