@@ -7,11 +7,15 @@ use NHK\Core\Contracts\Shared\TransactionManager;
 
 final class WpdbTransactionManager implements TransactionManager
 {
+    /** @var array<int, true> */
+    private static array $active = [];
+
     public function __construct(private ?object $database = null) {}
     private function db(): object { global $wpdb; return $this->database ?? $wpdb; }
-    public function begin(): void { if ($this->db()->query('START TRANSACTION') === false) throw new \RuntimeException('TRANSACTION_BEGIN_FAILED'); }
-    public function commit(): void { if ($this->db()->query('COMMIT') === false) throw new \RuntimeException('TRANSACTION_COMMIT_FAILED'); }
-    public function rollback(): void { $this->db()->query('ROLLBACK'); }
+    public function begin(): void { if ($this->db()->query('START TRANSACTION') === false) throw new \RuntimeException('TRANSACTION_BEGIN_FAILED'); self::$active[spl_object_id($this->db())] = true; }
+    public function commit(): void { if ($this->db()->query('COMMIT') === false) throw new \RuntimeException('TRANSACTION_COMMIT_FAILED'); unset(self::$active[spl_object_id($this->db())]); }
+    public function rollback(): void { $this->db()->query('ROLLBACK'); unset(self::$active[spl_object_id($this->db())]); }
+    public static function isActive(object $database): bool { return isset(self::$active[spl_object_id($database)]); }
     public function transactional(callable $callback): mixed
     {
         $this->begin();

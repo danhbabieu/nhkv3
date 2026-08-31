@@ -7,11 +7,11 @@ use NHK\Core\Application\Migration\DryRunService;
 
 $input = null;
 foreach (array_slice($argv, 1) as $argument) if (str_starts_with($argument, '--input=')) $input = substr($argument, 8);
-if ($input === null || $input === '' || !is_readable($input)) {
+if ($input === null || $input === '' || ($input !== '-' && !is_readable($input))) {
     fwrite(STDERR, "Usage: php tools/v2-dry-run.php --input=/path/to/read-only-inventory.json\n");
     exit(2);
 }
-$decoded = json_decode((string) file_get_contents($input), true);
+$decoded = json_decode((string) file_get_contents($input === '-' ? 'php://stdin' : $input), true);
 if (!is_array($decoded) || !is_array($decoded['records'] ?? null)) {
     fwrite(STDERR, "Input must be JSON object with a records array.\n");
     exit(2);

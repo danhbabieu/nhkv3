@@ -16,9 +16,10 @@ final class WpdbSourceRepository implements SourceRepository
     public function create(Source $source): Source
     {
         $locatorSql = $source->locator === null ? 'NULL' : '%s';
-        $args = [UuidCodec::toBinary($source->canonicalId), $source->stableKey, $source->title, $source->sourceType, $source->active ? 1 : 0, $source->revision, gmdate('Y-m-d H:i:s.u'), gmdate('Y-m-d H:i:s.u')];
-        array_splice($args, 5, 0, [wp_json_encode($source->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
-        if ($source->locator !== null) array_splice($args, 5, 0, [$source->locator]);
+        $args = [UuidCodec::toBinary($source->canonicalId), $source->stableKey, $source->title, $source->sourceType];
+        if ($source->locator !== null) $args[] = $source->locator;
+        $args[] = wp_json_encode($source->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        array_push($args, $source->active ? 1 : 0, $source->revision, gmdate('Y-m-d H:i:s.u'), gmdate('Y-m-d H:i:s.u'));
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (canonical_uuid,stable_key,title,source_type,locator,metadata_json,state,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,{$locatorSql},%s,%d,%d,%s,%s)", ...$args));
         if ($ok === false) { $existing = $this->findByStableKey($source->stableKey); if ($existing && $existing->canonicalId === $source->canonicalId && $existing->title === $source->title) return $existing; throw new KnowledgeException('Source identity already exists.'); }
         return $this->findByCanonicalId($source->canonicalId) ?? $source;
@@ -33,5 +34,5 @@ final class WpdbSourceRepository implements SourceRepository
         return $this->findByCanonicalId($source->canonicalId) ?? $source;
     }
     public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_map(fn (array $row): Source => $this->hydrate($row), $rows ?: []); }
-    private function hydrate(?array $row): ?Source { if (!$row) return null; return new Source(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['title'], (string) $row['source_type'], $row['locator'] === null ? null : (string) $row['locator'], json_decode((string) $row['metadata_json'], true, 512, JSON_THROW_ON_ERROR), (int) $row['state'] === 1, (int) $row['revision']); }
+    private function hydrate(?array $row): ?Source { if (!$row) return null; $metadata = (string) ($row['metadata_json'] ?? ''); return new Source(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['title'], (string) $row['source_type'], $row['locator'] === null ? null : (string) $row['locator'], $metadata === '' ? [] : json_decode($metadata, true, 512, JSON_THROW_ON_ERROR), (int) $row['state'] === 1, (int) $row['revision']); }
 }

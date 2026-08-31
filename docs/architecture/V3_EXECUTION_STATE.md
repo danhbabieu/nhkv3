@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, migration dry-run reconciliation checkpoint pushed.
+Last updated: 2026-08-31, runtime and V2 inventory checkpoint in progress.
 
 | Field | Current value |
 |---|---|
@@ -9,11 +9,11 @@ Last updated: 2026-08-31, migration dry-run reconciliation checkpoint pushed.
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 63 tests, 181 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
-| Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
-| Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
-| Next executable task | Resolve local WordPress HTTP/DB runtime, rerun frontend route smoke and mandatory integration/Admin/Graph workflows, then feed a real V2 read-only export through granular dry-run and obtain backup/restore evidence before any mapping or migration |
-| Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
+| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 88 tests, 351 assertions; plugin/theme PHP lint and diff check pass |
+| Blockers | V3 detail data, visual QA, external MCP transport, URL/media field reconciliation and governed migration apply remain open; V2/live remains read-only |
+| Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
+| Next executable task | Obtain a compatible V2 backup restore path, complete field-level URL/media/identity reconciliation, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; no V2 record migrated |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
 
@@ -163,3 +163,12 @@ Last updated: 2026-08-31, migration dry-run reconciliation checkpoint pushed.
   type, skipped reasons, malformed records and explicit conflict review while
   preserving no-write behavior and checksum non-merge semantics. Checkpoint
   `350e189` is pushed; unit evidence is 63 tests/181 assertions.
+- 2026-08-31: Local MySQL/MariaDB TCP and Apache runtime were restored for V3;
+  the guarded suite passed 88 tests and 351 assertions. A standard local
+  WordPress rewrite file and empty-editorial alias handling made core frontend
+  smoke pass, including a real `/hello-world/` post route.
+- 2026-08-31: The V2 backup was restored into guarded staging with a reviewed
+  MariaDB compatibility conversion. Read-only export/dry-run produced 3,086
+  records: 1,917 mapped, 1,169 skipped (`INVALID_URL_MAPPING` 799,
+  `UNSUPPORTED_LEGACY_TYPE` 370). Temporary V2 tables were removed, the V3
+  test snapshot was restored, and no V2 record was migrated.

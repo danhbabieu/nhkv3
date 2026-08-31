@@ -29,7 +29,8 @@ final class RelatedContentQueryTest extends TestCase
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
         $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId);
-        self::assertSame([['type' => 'model', 'id' => $model->canonicalId, 'title' => 'Calibre 1', 'url' => '/model/calibre-1/']], $related['entities']);
+        $expectedUrl = function_exists('home_url') ? home_url('/model/calibre-1/') : '/model/calibre-1/';
+        self::assertSame([['type' => 'model', 'id' => $model->canonicalId, 'title' => 'Calibre 1', 'url' => $expectedUrl]], $related['entities']);
         self::assertSame([], $related['articles']); self::assertSame([], $related['media']); self::assertSame([], $related['videos']);
     }
 }

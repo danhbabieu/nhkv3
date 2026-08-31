@@ -1,7 +1,7 @@
 # NHK V3 Cutover Readiness Report
 
-Date: 2026-08-31  
-Repository: `main` at checkpoint `16ea31a`  
+Date: 2026-08-31
+Repository: `main` at current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
 ## What is ready
@@ -28,8 +28,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   contracts while continuing to query WordPress categories/posts.
 - A transport-neutral MCP registration seam exists; read adapters are real and
   mutations delegate to Governance.
-- The V2 dry-run tool is no-write and emits bounded reason codes. No V2 data
-  has been migrated.
+- The V2 dry-run tool is no-write and emits bounded reason codes. A local
+  read-only V2 inventory is recorded; no V2 data has been migrated.
 - The dry-run report now provides per-type counts and skipped-reason buckets,
   rejects malformed records/checksums and marks explicit conflicts for review.
 
@@ -41,24 +41,23 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | BLOCKED — `NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test` bootstrap stopped with “Error establishing a database connection” |
-| Frontend browser/rewrite smoke | PENDING — no working local WordPress runtime |
-| V2 data inventory/counts/mappings | PENDING — no read-only V2 export/API/database source |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 88 tests, 351 assertions |
+| Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; no active V3 Authority detail rows yet |
+| V2 data inventory/counts/mappings | PARTIAL — restored 3,086-record read-only export/dry-run; 1,917 mapped, 1,169 skipped with reason codes |
+| V2 backup restore | PARTIAL — reviewed staging conversion restores the dump; original dump is not MariaDB-portable without that conversion, and field-level migration evidence remains open |
 
 ## Blocking gates
 
-1. Restore a working local WordPress/test database and run Migration005 plus
-   all mandatory integration tests against the exact guarded database
-   `nhk_v3_test`.
-2. Complete read-only V2 inventory for posts, categories, attachments/media,
+1. Complete field-level read-only V2 inventory for posts, categories, attachments/media,
    all Authority types, Knowledge, Sources, Evidence, relations, Videos and
    URLs; feed it to `tools/v2-dry-run.php`.
-3. Produce backup, readability and documented restore evidence before any
-   real-data mutation. Reconcile counts, identity mappings, relations, media
+2. Promote the reviewed V2 restore conversion into a versioned, reproducible
+   migration input, then reconcile counts, identity mappings, relations, media
    state and URL redirects using the migration ledger.
-4. Run browser smoke and visual QA for homepage, Post, entity archives/details,
-   search, Media, Video, 404, pagination and desktop/tablet/mobile states.
-5. Complete external MCP transport/runtime verification and close mandatory
+3. Run browser smoke and visual QA for homepage, Post, entity archives/details,
+   search, Media, Video, 404, pagination and desktop/tablet/mobile states;
+   populate V3 detail data only through the governed migration path.
+4. Complete external MCP transport/runtime verification and close mandatory
    red rows in `V2_V3_PARITY_MATRIX.md`.
 
 Until every blocking gate is evidenced and the parity matrix is reconciled,

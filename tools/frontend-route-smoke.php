@@ -2,8 +2,20 @@
 declare(strict_types=1);
 
 $base = 'http://localhost';
+$optionalRoutes = [];
 foreach (array_slice($argv, 1) as $argument) {
-    if (str_starts_with($argument, '--base-url=')) $base = rtrim(substr($argument, 11), '/');
+    if (str_starts_with($argument, '--base-url=')) {
+        $base = rtrim(substr($argument, 11), '/');
+        continue;
+    }
+    foreach (['post-url', 'brand-url', 'model-url'] as $option) {
+        $prefix = "--{$option}=";
+        if (str_starts_with($argument, $prefix)) {
+            $route = trim(substr($argument, strlen($prefix)));
+            if ($route !== '') $optionalRoutes[$route] = 200;
+            break;
+        }
+    }
 }
 
 $routes = [
@@ -22,6 +34,7 @@ $routes = [
     '/?s=watch' => 200,
     '/__nhk-route-must-404__/' => 404,
 ];
+$routes = array_merge($routes, $optionalRoutes);
 $failures = 0;
 foreach ($routes as $route => $expected) {
     $url = $base . $route;

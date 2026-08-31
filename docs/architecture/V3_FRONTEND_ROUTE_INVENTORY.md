@@ -22,14 +22,20 @@ endpoints (`wp_post` included) through the existing read APIs. Governed proposal
 composer covers entity and Graph relation commands; lifecycle application still
 requires capability, approval, eligibility and Controlled Apply.
 
-The read-only smoke harness is php tools/frontend-route-smoke.php
---base-url=http://localhost. It expects 200 for the core public routes and 404
-for a deliberately unknown route; it reports connection failures instead of
-turning an unavailable runtime into a false pass.
+The read-only smoke harness is `php tools/frontend-route-smoke.php
+--base-url=http://localhost`. Representative concrete routes can be added
+without fixture assumptions, for example
+`--post-url=/a-real-post/ --brand-url=/brand/a-real-brand/
+--model-url=/model/a-real-model/`. It expects 200 for the core public routes
+and 404 for a deliberately unknown route; it reports connection failures
+instead of turning an unavailable runtime into a false pass.
 
-It was attempted on 2026-08-31 against http://localhost; every route failed
-with connection refused because no local HTTP listener is running. This is a
-recorded blocker, not a route failure classification.
+It was attempted on 2026-08-31 against `http://localhost` before the local
+WordPress rewrite file was present; the core entity/media/video routes then
+returned Apache 404. After the local rewrite file and empty-editorial alias
+handling were added, homepage, editorial aliases, all Authority archives,
+Video, Media and deliberate 404 passed. Concrete post/brand/model detail
+paths remain opt-in to the smoke command because no fixture URLs are claimed.
 
 ## Guardrails
 
