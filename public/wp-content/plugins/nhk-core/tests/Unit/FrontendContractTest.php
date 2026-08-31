@@ -173,6 +173,17 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_public_label((string) $key)', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php'));
     }
 
+    public function test_public_detail_templates_do_not_render_operational_identifiers(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['entity.php', 'media.php', 'knowledge.php', 'video.php', 'comparison.php'] as $template) {
+            $contents = (string) file_get_contents($theme . '/' . $template);
+            foreach (['Mã hồ sơ', 'Phiên bản', 'Mã video', 'entity-key', 'entity-card-key'] as $technicalLabel) {
+                self::assertStringNotContainsString($technicalLabel, $contents, $template . ' renders operational identifier: ' . $technicalLabel);
+            }
+        }
+    }
+
     public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
     {
         foreach ([dirname(__DIR__, 2) . '/src/Application/Entity/EntityPageQuery.php', dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php'] as $file) {

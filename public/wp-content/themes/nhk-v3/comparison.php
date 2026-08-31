@@ -15,7 +15,7 @@ get_header();
     <?php if (is_array($items['left'] ?? null) && is_array($items['right'] ?? null)): ?>
       <section class="compare-grid" aria-label="Kết quả so sánh">
         <?php foreach (['left', 'right'] as $side): $item = $items[$side]; ?>
-          <article class="compare-card"><p class="eyebrow"><?php echo esc_html(strtoupper($side)); ?> · <?php echo esc_html((string) $item['type']); ?></p><h2><?php echo esc_html((string) $item['name']); ?></h2><p class="entity-key"><?php echo esc_html((string) $item['stable_key']); ?></p><dl class="entity-facts"><dt>Mã hồ sơ</dt><dd><code><?php echo esc_html((string) $item['id']); ?></code></dd><?php foreach ($item['payload'] as $key => $value): ?><dt><?php echo esc_html(ucwords(str_replace('_', ' ', (string) $key))); ?></dt><dd><?php echo esc_html(is_scalar($value) ? (string) $value : (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE)); ?></dd><?php endforeach; ?></dl></article>
+          <article class="compare-card"><p class="eyebrow"><?php echo esc_html(strtoupper($side)); ?> · <?php echo esc_html((string) $item['type']); ?></p><h2><?php echo esc_html((string) $item['name']); ?></h2><dl class="entity-facts"><?php foreach ($item['payload'] as $key => $value): ?><dt><?php echo esc_html(nhk_v3_public_label((string) $key)); ?></dt><dd><?php echo esc_html(nhk_v3_public_value($value)); ?></dd><?php endforeach; ?></dl></article>
         <?php endforeach; ?>
       </section>
     <?php else: ?><div class="empty"><h2>Chưa đủ hồ sơ để so sánh</h2><p>Chỉ hồ sơ đang hoạt động mới được hiển thị. Dùng dạng <code>type/stable-key</code>.</p></div><?php endif; ?>
