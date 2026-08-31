@@ -57,6 +57,10 @@ final class SearchSemanticQueryTest extends TestCase
         self::assertCount(5, $result['entities']);
         self::assertSame('Clock 6', $result['entities'][0]['title']);
         self::assertSame(14, $result['_totals']['entities']);
+
+        $empty = $query->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], '   ');
+        self::assertSame(0, $empty['_totals']['entities']);
+        self::assertSame([], $empty['entities']);
     }
 
     public function test_semantic_search_does_not_match_unregistered_payload_fields(): void
