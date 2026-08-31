@@ -9,7 +9,7 @@ foreach (array_slice($argv, 1) as $argument) {
         $base = rtrim(substr($argument, 11), '/');
         continue;
     }
-    foreach (['post-url', 'brand-url', 'model-url', 'claim-url'] as $option) {
+    foreach (['post-url', 'brand-url', 'model-url', 'claim-url', 'media-url', 'video-url'] as $option) {
         $prefix = "--{$option}=";
         if (str_starts_with($argument, $prefix)) {
             $route = trim(substr($argument, strlen($prefix)));

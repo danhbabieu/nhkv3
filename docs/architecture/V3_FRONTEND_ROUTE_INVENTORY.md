@@ -30,7 +30,8 @@ The read-only smoke harness is `php tools/frontend-route-smoke.php
 --base-url=http://localhost`. Representative concrete routes can be added
 without fixture assumptions, for example
 `--post-url=/a-real-post/ --brand-url=/brand/a-real-brand/
---model-url=/model/a-real-model/`. It also accepts data-gated detail-alias
+--model-url=/model/a-real-model/ --media-url=/media/a-real-media-uuid/
+--video-url=/video/a-real-video-uuid/`. It also accepts data-gated detail-alias
 checks in the form `--brand-alias=/legacy/|/brand/canonical/` or
 `--model-alias=/legacy/model/|/model/canonical/`; these expect HTTP 301 and
 verify the `Location` target. It expects 200 for the core public routes and
