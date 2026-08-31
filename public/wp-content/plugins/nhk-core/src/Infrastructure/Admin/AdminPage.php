@@ -21,7 +21,7 @@ final class AdminPage
         if (!current_user_can('manage_options')) wp_die('You do not have permission to view this page.');
         $status = new MigrationStatus();
         echo '<div class="wrap"><h1>NHK V3</h1><p>Trung tâm vận hành domain canonical, Graph, Governance và dữ liệu semantic.</p>';
-        self::renderHealth((new HealthCheck($status))->read()); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
+        self::renderHealth((new HealthCheck($status))->read()); self::renderMigrationLedgerSummary(); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
         echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p></div>';
         self::scripts(); self::readScripts();
     }
@@ -30,6 +30,28 @@ final class AdminPage
     {
         echo '<h2>Health</h2><table class="widefat striped"><tbody>';
         foreach ($health as $key => $value) echo '<tr><th scope="row">' . esc_html((string) $key) . '</th><td>' . esc_html(is_bool($value) ? ($value ? 'OK' : 'NO') : (string) $value) . '</td></tr>';
+        echo '</tbody></table>';
+    }
+
+    private static function renderMigrationLedgerSummary(): void
+    {
+        global $wpdb;
+        if (!isset($wpdb) || !is_object($wpdb)) return;
+        $table = $wpdb->prefix . 'nhk_migration_ledger';
+        if ((string) $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) {
+            echo '<p class="notice notice-warning">Migration ledger chưa sẵn sàng.</p>';
+            return;
+        }
+        $rows = $wpdb->get_results("SELECT source_type,status,COALESCE(reason_code,'') AS reason_code,COUNT(*) AS record_count FROM {$table} GROUP BY source_type,status,reason_code ORDER BY source_type,status,reason_code", ARRAY_A);
+        echo '<h2 id="nhk-migration-ledger-heading">Migration ledger summary</h2><p id="nhk-migration-ledger-help">Tổng hợp read-only theo loại nguồn, trạng thái và reason code; mọi bản ghi skipped/conflict vẫn cần quyết định được quản trị.</p>';
+        if (!is_array($rows) || $rows === []) {
+            echo '<p class="notice notice-info">Chưa có bản ghi migration ledger.</p>';
+            return;
+        }
+        echo '<table class="widefat striped" aria-labelledby="nhk-migration-ledger-heading" aria-describedby="nhk-migration-ledger-help"><thead><tr><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Reason code</th><th scope="col">Records</th></tr></thead><tbody>';
+        foreach ($rows as $row) {
+            echo '<tr><td>' . esc_html((string) ($row['source_type'] ?? '')) . '</td><td>' . esc_html((string) ($row['status'] ?? '')) . '</td><td><code>' . esc_html((string) ($row['reason_code'] ?? '')) . '</code></td><td>' . esc_html((string) ($row['record_count'] ?? '0')) . '</td></tr>';
+        }
         echo '</tbody></table>';
     }
 
