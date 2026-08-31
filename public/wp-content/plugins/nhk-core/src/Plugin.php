@@ -6,13 +6,14 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Infrastructure\Migration\GraphMigration001;
 use NHK\Core\Infrastructure\Migration\AuthorityMigration002;
 use NHK\Core\Infrastructure\Migration\GovernanceMigration003;
+use NHK\Core\Infrastructure\Migration\MediaMigration004;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', GovernanceMigration003::VERSION, false);
+        update_option('nhk_core_migration_target', MediaMigration004::VERSION, false);
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
@@ -26,6 +27,7 @@ final class Plugin {
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
+        (new MediaMigration004())->up();
         GovernanceCapabilities::register();
     }
     public static function deactivate(): void {}

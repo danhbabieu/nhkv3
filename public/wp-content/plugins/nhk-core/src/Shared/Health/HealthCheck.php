@@ -21,6 +21,8 @@ final class HealthCheck {
             'graph_storage_ready' => $this->migrations->graphStorageReady(),
             'authority_storage_ready' => $this->migrations->authorityStorageReady(),
             'governance_storage_ready' => $this->migrations->governanceStorageReady(),
+            'media_storage_ready' => $this->migrations->mediaStorageReady(),
+            'video_storage_ready' => $this->migrations->videoStorageReady(),
         ];
     }
 }

@@ -5,14 +5,14 @@ Last updated: 2026-08-31, initial autonomous bootstrap.
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `49b6d47` |
+| Branch / HEAD | `main` / `6eac802` |
 | Current phase | P6 Media + Video — foundation design |
 | Last accepted phase | P5 Canonical Domain Foundation |
-| DB migration | current 3 / target 3; Migration003 UP-only applied to `nhk_v3` |
-| Tests | P4/P3 regression: 56 tests, 167 assertions, 0 skipped; lint and diff check pass |
+| DB migration | current 4 / target 4 on `nhk_v3`; MediaMigration004 UP-only applied and media/video storage ready |
+| Tests | P6 foundation: 67 tests, 260 assertions, 0 skipped; lint, diff check and secret scan pass |
 | Blockers | None for local P5 work; `git fetch` required elevated filesystem access and then succeeded |
 | Working assumptions | Existing five-file working-tree diff is user-owned and must be preserved; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Define Media/MediaAsset/MediaUsage and Video external-reference contracts |
+| Next executable task | Add Media/Video persistence services and shared Graph endpoint resolvers |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | Not applicable to code-only/P4 bootstrap; required before real V2 data migration |
@@ -29,3 +29,8 @@ Last updated: 2026-08-31, initial autonomous bootstrap.
 - 2026-08-31: P5 canonical catalog added for nine target types with explicit
   field schemas and validation; unit/integration evidence is 60 tests, 234
   assertions, 0 skipped. P5 is ready to close and P6 is next.
+- 2026-08-31: P6 domain contracts and Migration004 added; `P6MigrationIntegrationTest`
+  passes on `nhk_v3_test`.
+- 2026-08-31: MediaMigration004 applied UP-only to `nhk_v3`; runtime health
+  reports migration 4/4 and media/video storage ready. P6 persistence services
+  and Graph relations remain the next executable work.
