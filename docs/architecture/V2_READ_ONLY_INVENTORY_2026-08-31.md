@@ -75,11 +75,11 @@ provenance presentation remain open reconciliation work. The V2 media usage
 inventory is exactly zero, so no usage rows require migration.
 Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
 links, all matching canonical entity UUIDs: 370 active Authority entities,
-292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.13 now
+292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.14 now
 exports the 370 Authority links, 292 active Knowledge links and 75 archived
 Knowledge links with active consolidation targets as deterministic canonical
 route targets; the remaining 5 archived/no-target Knowledge links are recorded
-as `DOMAIN_TARGETED`. The Mapper 6.13 apply rerun was idempotent with the same
+as `DOMAIN_TARGETED`. The Mapper 6.14 apply rerun was idempotent with the same
 2,379/2,594/0 counts, and the
 current ledger counts above are the accepted local-dev checkpoint.
 Subsequent runs were idempotent after the 40-row Evidence metadata backfill,

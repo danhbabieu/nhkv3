@@ -55,7 +55,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 ## Blocking gates
 
-1. Complete field-level reconciliation and final retirement/target approval for the 28 residual URLs (now explicitly classified as 5
+1. Complete field-level reconciliation and final retirement/target approval using `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` for the 28 residual URLs (now explicitly classified as 5
    `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE` and 2
    `RETIRED_LEGACY_GARBAGE`), MediaAsset
    delivery/privacy policy,
