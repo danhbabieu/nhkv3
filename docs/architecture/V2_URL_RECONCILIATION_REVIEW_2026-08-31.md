@@ -43,3 +43,26 @@ Expected residual count: 28
 Until these decisions are recorded in a governed migration decision or an
 approved target mapping, the records remain explicit skips and Cutover stays
 `NOT READY`.
+
+## Read-only candidate mappings for the five domain URLs
+
+The restored export contains an exact title match between each residual
+`nhk_knowledge` post and an existing V3 Knowledge claim. This is stronger than
+a name-only guess because the legacy post title and the claim's
+`canonical_name` are identical. The table is still a proposal aid only; it does
+not approve a redirect or migrate an editorial body.
+
+| V2 ID | Legacy path | Exact V3 claim candidate | Candidate stable key | Required governed check |
+|---:|---|---|---|---|
+| 810 | `/tri-thuc/sua-article-cu-phai-giu-identity-va-nang-chuan-bien-tap/` | Sửa Article cũ phải giữ identity và nâng chuẩn biên tập | `nhk:knowledge:editorial.article.legacy-rewrite` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
+| 811 | `/tri-thuc/luat-article-phai-co-ket-qua-tiep-thu-ro-rang/` | Luật Article phải có kết quả tiếp thu rõ ràng | `nhk:knowledge:editorial.article.learning-outcome` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
+| 812 | `/tri-thuc/khong-mac-dinh-moi-cau-hoi-tao-mot-article/` | Không mặc định mỗi câu hỏi tạo một Article | `nhk:knowledge:editorial.article.question-cluster` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
+| 813 | `/tri-thuc/article-la-narrative-projection-danh-cho-nguoi-doc/` | Article là narrative projection dành cho người đọc | `nhk:knowledge:editorial.article.narrative-projection` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
+| 814 | `/tri-thuc/moi-article-phai-co-anh-chinh-va-chu-dong-xin-them-anh-khi-can/` | Mọi Article phải có ảnh chính và chủ động xin thêm ảnh khi cần | `nhk:knowledge:editorial.article.media-required` | Verify claim UUID/revision/provenance and decide whether the legacy URL is a redirect or retirement |
+
+The candidate matches reduce the uncertainty for these five records, but the
+legacy posts have empty `post_content` in the restored export and their
+editorial URL/body policy is not equivalent to a Knowledge claim automatically.
+The candidate target must therefore pass the same governed review as any other
+redirect, while WordPress `wp_posts` remains the sole editorial body and URL
+authority.

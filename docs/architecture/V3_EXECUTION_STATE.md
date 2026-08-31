@@ -10,7 +10,7 @@ Last updated: 2026-08-31, P11 route visual QA and homepage copy checkpoint.
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
 | Tests | Unit suite: 87 tests, 452 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 131 tests, 799 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
-| Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (the 5 domain-targeted records now have exact read-only Knowledge candidates, while 21 are unsupported media references and 2 are retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,960 rows and skipped 1,013 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
@@ -51,6 +51,13 @@ Last updated: 2026-08-31, P11 route visual QA and homepage copy checkpoint.
   deterministic legacy-post-to-semantic-ID field, so name/slug joins remain
   prohibited; governed target mappings or retirement decisions are still
   required before redirects or body migration.
+
+- 2026-08-31: Read-only title reconciliation found exact one-to-one candidates
+  for all five residual `DOMAIN_TARGETED` URLs in
+  `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md`, mapping them to existing
+  `nhk:knowledge:editorial.article.*` claims. The matches reduce ambiguity but
+  remain pending UUID/revision/provenance and governed redirect-or-retire
+  decisions; no migration or redirect was applied.
 
 - 2026-08-31: Preflight completed. HEAD `2247c87`; existing governance edits
   preserved. Governance documents being bootstrapped.
