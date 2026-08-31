@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 semantic-search privacy checkpoint.
+Last updated: 2026-09-01, P11 public-route smoke revalidation checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,11 @@ Last updated: 2026-09-01, P11 semantic-search privacy checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: The official `tools/frontend-route-smoke.php` was re-run against
+  localhost after the semantic-search privacy checkpoint: all 29 declared
+  public, alias, page-two, sitemap/RSS, redirect and fail-closed routes passed.
+  No database or V2 data changed.
 
 - 2026-09-01: Public semantic search in REST, theme and MCP now indexes only
   canonical entity fields registered in `allowedFields`; unregistered legacy or
