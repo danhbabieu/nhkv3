@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P11 readiness evidence synchronization checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 88 tests, 455 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 132 tests, 802 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Tests | Unit suite: 89 tests, 460 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 133 tests, 807 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -20,11 +20,19 @@ Last updated: 2026-08-31, P11 readiness evidence synchronization checkpoint.
 ## Checkpoint journal
 
 - 2026-08-31: Cutover readiness and master-plan evidence were synchronized
-  with the current guarded suite (88 unit tests/455 assertions; 132 combined
-  tests/802 assertions) and the policy-normalized migration checkpoint
+  with the current guarded suite (89 unit tests/460 assertions; 133 combined
+  tests/807 assertions) and the policy-normalized migration checkpoint
   (3,961 mapped, 1,012 skipped, 0 conflicts, 27 residual URL candidates).
   No implementation or database state changed in this documentation-only
   checkpoint; the repository remains pre-cutover.
+
+- 2026-08-31: Media, Video and Knowledge archive templates now render bounded
+  page links from their query-service totals, covering the semantic archive
+  pagination contract without introducing a second data source. The focused
+  frontend contract is green at 13 tests/211 assertions; full suite evidence
+  is 133 tests/807 assertions. Local route smoke was retried after an Apache
+  graceful restart but localhost:80 still had no listener, so prior 21/21
+  runtime evidence remains the latest successful route checkpoint.
 
 - 2026-08-31: Public entity payload rendering now maps technical field labels and
   filters internal phrases such as canonical, stable key, external reference and

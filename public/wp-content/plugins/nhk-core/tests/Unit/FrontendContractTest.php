@@ -96,6 +96,16 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'semantic_totals' => \$semanticTotals", $searchApi);
     }
 
+    public function test_semantic_archives_render_pagination_from_query_totals(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['media.php', 'video.php', 'knowledge.php'] as $template) {
+            $contents = (string) file_get_contents($theme . '/' . $template);
+            self::assertStringContainsString('entity-pagination', $contents, $template . ' must render archive pagination');
+            self::assertStringContainsString('$pages', $contents, $template . ' must derive page count');
+        }
+    }
+
     public function test_public_templates_do_not_expose_internal_domain_terms(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
