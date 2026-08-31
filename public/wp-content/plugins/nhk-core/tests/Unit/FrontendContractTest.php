@@ -51,6 +51,7 @@ final class FrontendContractTest extends TestCase
         foreach (['--ink:', '--line:', '--paper:', '--max:'] as $legacyToken) {
             self::assertStringNotContainsString($legacyToken, $style);
         }
+        self::assertStringContainsString('Version: 1.1.4', $style);
     }
 
     public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
