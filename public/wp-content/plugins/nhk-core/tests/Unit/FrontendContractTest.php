@@ -168,6 +168,15 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("'endpoint_key'", $usageMethod);
     }
 
+    public function test_public_knowledge_api_does_not_expose_provenance_metadata_blob(): void
+    {
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        $sourceMethod = substr($readApi, strpos($readApi, 'private function source'), strpos($readApi, 'private function asset') - strpos($readApi, 'private function source'));
+        $evidenceMethod = substr($readApi, strpos($readApi, 'private function evidence'), strpos($readApi, 'private function publicEvidenceByClaim') - strpos($readApi, 'private function evidence'));
+        self::assertStringNotContainsString("'metadata' => \$source->metadata", $sourceMethod);
+        self::assertStringNotContainsString("'metadata' => \$evidence->metadata", $evidenceMethod);
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

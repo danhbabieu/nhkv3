@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P11 responsive entity-route QA checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 93 tests, 532 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 137 tests, 879 assertions; plugin/theme PHP lint, route smoke 29/29 plus two data-gated detail redirects and diff check pass |
+| Tests | Unit suite: 94 tests, 535 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 138 tests, 882 assertions; plugin/theme PHP lint, route smoke 29/29 plus two data-gated detail redirects and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,15 @@ Last updated: 2026-08-31, P11 responsive entity-route QA checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-08-31: Public Knowledge payloads now omit persisted Source/Evidence
+  metadata blobs, which may contain legacy IDs, verification internals or
+  visibility controls; reader-facing title/type/locator/excerpt fields remain
+  available, while MCP/internal repositories retain the full metadata for
+  governed review. Contract and query tests cover the boundary. Guarded
+  PHPUnit passed 138 tests/882 assertions with no warnings, route smoke
+  remained 29/29, lint/diff-check and secret review passed, and no database
+  state changed. Public provenance approval remains a cutover gate.
 
 - 2026-08-31: The public REST Media serializer now omits internal usage
   endpoint type/key values while retaining only the usage identity, reader-

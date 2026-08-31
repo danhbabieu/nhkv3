@@ -34,5 +34,5 @@ final class KnowledgePageQuery
     }
 
     private function available(): bool { return !$this->status || $this->status->knowledgeStorageReady(); }
-    private function evidence(Evidence $item, ?Source $source = null): array { return ['id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'metadata' => $item->metadata, 'revision' => $item->revision]; }
+    private function evidence(Evidence $item, ?Source $source = null): array { return ['id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'revision' => $item->revision]; }
 }
