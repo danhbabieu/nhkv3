@@ -70,11 +70,17 @@ final class McpReadHandler
             $postTotal = (int) $query->found_posts;
         } else $postTotal = 0;
         $groups = ['posts' => $posts, 'entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []];
-        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) if ($this->matches($term, $entity->canonicalName, $entity->stableKey, $this->json($entity->payload))) $groups['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'stable_key' => $entity->stableKey];
-        if ($this->ready('media')) foreach ($this->media->list() as $media) if ($this->matches($term, $media->canonicalName, $media->stableKey)) $groups['media'][] = ['type' => 'media', 'id' => $media->canonicalId, 'title' => $media->canonicalName, 'stable_key' => $media->stableKey];
-        if ($this->ready('video')) foreach ($this->videos->list() as $video) if ($this->matches($term, $video->title, $video->externalVideoId, $video->canonicalUrl)) $groups['videos'][] = ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'platform' => $video->platform, 'url' => $video->canonicalUrl];
-        if ($this->ready('knowledge')) foreach ($this->claims->list() as $claim) if ($this->matches($term, $claim->claimText, $claim->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'id' => $claim->canonicalId, 'title' => $claim->claimText, 'stable_key' => $claim->stableKey];
-        return ['query' => $term, 'page' => $page, 'per_page' => $perPage, 'post_total' => $postTotal, 'groups' => $groups];
+        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) if ($entity->active() && $this->matches($term, $entity->canonicalName, $entity->stableKey, $this->json($entity->payload))) $groups['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'stable_key' => $entity->stableKey];
+        if ($this->ready('media')) foreach ($this->media->list() as $media) if ($media->active && $this->matches($term, $media->canonicalName, $media->stableKey)) $groups['media'][] = ['type' => 'media', 'id' => $media->canonicalId, 'title' => $media->canonicalName, 'stable_key' => $media->stableKey];
+        if ($this->ready('video')) foreach ($this->videos->list() as $video) if ($video->active && $this->matches($term, $video->title, $video->externalVideoId, $video->canonicalUrl)) $groups['videos'][] = ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'platform' => $video->platform, 'url' => $video->canonicalUrl];
+        if ($this->ready('knowledge')) foreach ($this->claims->list() as $claim) if ($claim->active && $this->matches($term, $claim->claimText, $claim->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'id' => $claim->canonicalId, 'title' => $claim->claimText, 'stable_key' => $claim->stableKey];
+        $semanticTotals = [];
+        $semanticOffset = ($page - 1) * $perPage;
+        foreach (['entities', 'media', 'videos', 'knowledge'] as $group) {
+            $semanticTotals[$group] = count($groups[$group]);
+            $groups[$group] = array_slice($groups[$group], $semanticOffset, $perPage);
+        }
+        return ['query' => $term, 'page' => $page, 'per_page' => $perPage, 'post_total' => $postTotal, 'semantic_totals' => $semanticTotals, 'groups' => $groups];
     }
 
     private function ready(string $domain): bool

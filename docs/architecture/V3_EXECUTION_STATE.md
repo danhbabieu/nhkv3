@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P9 semantic search pagination integration checkpoint.
+Last updated: 2026-08-31, P9 MCP semantic search pagination checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, P9 semantic search pagination integration checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 84 tests, 327 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 128 tests, 674 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Tests | Unit suite: 85 tests, 332 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 129 tests, 679 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy and domain-targeted post reconciliation while completing remaining pagination/active-Video QA and external MCP interoperability checks |
@@ -489,3 +489,8 @@ Last updated: 2026-08-31, P9 semantic search pagination integration checkpoint.
   84 tests/327 assertions; guarded integration is 44 tests/347 assertions after
   adding the REST bounded-page contract test; combined current suite is
   128/674.
+- 2026-08-31: MCP `nhk.search` now exposes optional `page`/`per_page` inputs,
+  returns semantic group totals and bounds each group per page while excluding
+  retired Authority records. Unit evidence is 85 tests/332 assertions; guarded
+  integration remains 44 tests/347 assertions; combined current suite is
+  129/679.

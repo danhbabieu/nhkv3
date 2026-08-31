@@ -9,7 +9,7 @@ final class McpToolCatalog
     public static function tools(): array
     {
         return [
-            self::tool('nhk.search', 'Search native editorial posts and active semantic records.', ['q' => ['type' => 'string']], ['q']),
+            self::tool('nhk.search', 'Search native editorial posts and active semantic records with bounded pagination.', ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['q']),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string'], 'id' => ['type' => 'string']], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => ['type' => 'string']], ['id']),
             self::tool('nhk.media.ingest', 'Create a governed Media identity with complete asset and usage metadata; binary delivery remains separately verified.', [
