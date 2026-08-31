@@ -16,7 +16,7 @@ the final parity declaration.
 | Relations / Post Graph | 185 Graph relation rows plus 242 Knowledge relations | Graph Core + Post/Knowledge endpoint + governed relation proposals | DEV ONLY: 241 | PARTIAL | IN PROGRESS | 241 explicit `about` relations imported; Post single now consumes Graph-derived related entities/articles/Media/Video through a query boundary; 186 legacy/invalid relation rows remain skipped |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + grouped semantic search + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search combines native Posts with active semantic groups, bounds each group per page and exposes totals for pagination even when native Posts are exhausted; REST/theme/MCP reads suppress retired Authority/Media/Video records; public templates avoid internal Authority/Proposal/Knowledge Claim terminology; guarded lifecycle integration passes including governed MCP Media, Video, Knowledge, Source and Evidence ingest; Admin operational forms expose explicit label/id associations, but V2 behavior reconciliation remains pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers + local Streamable HTTP endpoint | NO | PARTIAL | IN PROGRESS | Runtime registration and local MCP POST expose 16 protocol tool definitions (10 governed, including governed Media, Video, Knowledge, Source and Evidence ingest); raw HTTP probes confirm `200 application/json` modern `tools/list` and bounded `nhk.search` page 2; semantic search is bounded per page with totals; modern header/body/Accept validation, invalid Origin rejection, unauthenticated governed-call rejection and authenticated semantic create→submit→approve→apply are tested; external client/deployment interoperability and V2 behavior reconciliation remain pending |
-| SEO / URLs / Sitemap / RSS | 800 source URL candidates; apply has 772 mapped, 28 skipped | WordPress boundary + native postmeta/entity-registry 301 redirects + V2 archive/detail/search aliases + theme metadata/JSON-LD | DEV ONLY: 772 | PARTIAL | IN PROGRESS | 292 active Knowledge, 75 archived-to-active Knowledge and 370 active Authority projection links now redirect to canonical routes; `/thuong-hieu/`, `/hien-vat/` and `/am-nhac/` compatibility archives emit canonical V3 links; unique active V2 detail slugs such as `/odo/` and `/odo/odo-39/` resolve to canonical stable-key routes, while native posts and ambiguous names fail closed; `/tim-kiem/?q=...` preserves `q` when redirecting to native `s`; 34 legacy article redirects and one safe no-op verified; all 28 residual URLs have bounded reasons: 5 `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE` and 2 `RETIRED_LEGACY_GARBAGE`; the five domain-targeted rows now have exact read-only Knowledge candidates documented in `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md`, but UUID/revision/provenance and governed redirect-or-retire approval remain open |
+| SEO / URLs / Sitemap / RSS | 800 source URL candidates; policy-normalized apply has 773 mapped, 27 skipped | WordPress boundary + native postmeta/entity-registry 301 redirects + V2 archive/detail/search aliases + theme metadata/JSON-LD | DEV ONLY: 773 | PARTIAL | IN PROGRESS | 292 active Knowledge, 75 archived-to-active Knowledge and 370 active Authority projection links now redirect to canonical routes; `/thuong-hieu/`, `/hien-vat/` and `/am-nhac/` compatibility archives emit canonical V3 links; unique active V2 detail slugs such as `/odo/` and `/odo/odo-39/` resolve to canonical stable-key routes, while native posts and ambiguous names fail closed; `/tim-kiem/?q=...` preserves `q` when redirecting to native `s`; 34 legacy article redirects and two safe no-ops (including native homepage `/`) verified; all 27 residual URLs have bounded reasons: 5 `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE` and 1 `RETIRED_LEGACY_GARBAGE`; the five domain-targeted rows now have exact read-only Knowledge candidates documented in `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md`, but UUID/revision/provenance and governed redirect-or-retire approval remain open |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages, Graph-derived related sections and Media gallery surface | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes, related groups, media archive/detail and readiness-aware asset states exist; public templates and entity payload presentation use reader-facing labels without internal domain terminology; active Media detail 200 and desktop empty-state visual QA pass, while V2 inventory, approved asset delivery/privacy policy and runtime gallery coverage remain |
 
 ## Required parity inventory
@@ -60,16 +60,17 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 
 The restored read-only V2 backup contains 800 posts, 1,301 entities, 2
 taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
-and 1,581 semantic projections. The expanded no-write dry-run processes 4,973
-records: 3,960 mapped candidates and 1,013 skipped candidates (747
+and 1,581 semantic projections. The baseline expanded no-write dry-run
+processes 4,973 records: 3,960 mapped candidates and 1,013 skipped candidates
+(747
 `DOMAIN_TARGETED`, 42 `UNSUPPORTED_MEDIA_REFERENCE`, 3
 `RETIRED_LEGACY_GARBAGE`, 1 `INVALID_RELATION` and 220 unsupported legacy
 types).
-The latest local-dev governed apply recorded 3,960 migrated rows and 1,013
-explicit skips with zero conflicts. Migration009 mapped all 1,581 semantic
+The latest policy-normalized local-dev governed apply recorded 3,961 migrated
+rows and 1,012 explicit skips with zero conflicts. Migration009 mapped all 1,581 semantic
 projections into the non-canonical context sink with body migration disabled.
 Thirty-four native-post
-redirects, one identical source/target URL, 370 canonical Authority entity
+redirects, two identical source/target URL no-ops, 370 canonical Authority entity
 redirects and 367 Knowledge claim redirects are migrated; three media assets
 were metadata-reconciled to
 PRIVATE and are not publicly delivered.

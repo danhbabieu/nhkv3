@@ -48,10 +48,23 @@ final class MigrationDryRunTest extends TestCase
     {
         $report = (new DryRunService())->run([
             ['type' => 'url', 'source_path' => '/wp-content/uploads/missing.jpg', 'target_path' => '', 'target_reason' => 'UNSUPPORTED_MEDIA_REFERENCE'],
-            ['type' => 'url', 'source_path' => '/', 'target_path' => '', 'target_reason' => 'RETIRED_LEGACY_GARBAGE'],
+            ['type' => 'url', 'source_path' => '/wp-global-styles-nhk-v2/', 'target_path' => '', 'target_reason' => 'RETIRED_LEGACY_GARBAGE'],
         ]);
         self::assertSame(1, $report['skipped_by_reason']['UNSUPPORTED_MEDIA_REFERENCE']);
         self::assertSame(1, $report['skipped_by_reason']['RETIRED_LEGACY_GARBAGE']);
+    }
+
+    public function test_native_homepage_url_is_a_safe_noop_when_legacy_target_is_empty(): void
+    {
+        $report = (new DryRunService())->run([[
+            'type' => 'url',
+            'source_path' => '/',
+            'target_path' => '',
+            'target_reason' => 'RETIRED_LEGACY_GARBAGE',
+        ]]);
+        self::assertSame(1, $report['mapped']);
+        self::assertSame('READY_NOOP', $report['items'][0]['reason']);
+        self::assertSame(1, $report['url_mapping']);
     }
 
     public function test_dry_run_matches_apply_boundaries_for_posts_categories_and_relations(): void

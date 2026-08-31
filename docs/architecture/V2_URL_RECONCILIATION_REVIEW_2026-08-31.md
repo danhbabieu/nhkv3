@@ -1,13 +1,13 @@
 # V2 URL Reconciliation Review — 2026-08-31
 
-This is a review artifact for the 28 V2 URL records that remain without a
+This is a review artifact for the 27 V2 URL records that remain without a
 canonical V3 target after Mapper 6.14. It does not approve a redirect,
 retirement, media import, or source-data mutation. No V2 or production data
 was changed while producing this list.
 
 Source artifact: `/private/tmp/nhk-v3-v2-full-export-url-6.14.json`  
 Source SHA-256: `061b2b647407c888de890b3f34bc3be7c80803f3c1e923372de409d278e5deac`  
-Expected residual count: 28
+Expected residual count after the native-homepage no-op classification: 27
 
 | Reason | V2 ID | Legacy path | Required governed decision |
 |---|---:|---|---|
@@ -38,9 +38,18 @@ Expected residual count: 28
 | `UNSUPPORTED_MEDIA_REFERENCE` | 851 | `/wp-content/uploads/2026/08/IMG_3612-2.jpg` | Confirm whether a governed MediaAsset mapping is required; otherwise retire the legacy URL |
 | `UNSUPPORTED_MEDIA_REFERENCE` | 852 | `/wp-content/uploads/2026/08/IMG_4413.jpg` | Confirm whether a governed MediaAsset mapping is required; otherwise retire the legacy URL |
 | `RETIRED_LEGACY_GARBAGE` | 6 | `/wp-global-styles-nhk-v2/` | Approve permanent retirement with no V3 target |
-| `RETIRED_LEGACY_GARBAGE` | 758 | `/` | Resolve against the native V3 homepage policy; do not create a duplicate redirect |
 
-Until these decisions are recorded in a governed migration decision or an
+## Resolved no-op
+
+| V2 ID | Legacy path | V3 result | Evidence |
+|---:|---|---|---|
+| 758 | `/` | `READY_NOOP` to the native V3 homepage `/` | Route smoke returns HTTP 200 for `/`; governed local-dev apply recorded `READY_NOOP` with no redirect, deletion or duplicate post |
+
+The root URL is not included in the 27 residual count. The source record was
+normalized by the exporter and migration URL boundary to target `/` when the
+legacy source is `/` and no target path was supplied.
+
+Until the remaining decisions are recorded in a governed migration decision or an
 approved target mapping, the records remain explicit skips and Cutover stays
 `NOT READY`.
 

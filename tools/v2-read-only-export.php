@@ -150,6 +150,10 @@ foreach ($urlRecords as $url) {
     } elseif ($url['target_path'] === '' && in_array((string) ($url['legacy_type'] ?? ''), ['nhk_brand', 'nhk_model', 'nhk_variant', 'nhk_movement', 'nhk_music', 'nhk_component', 'nhk_classification', 'nhk_specimen', 'nhk_product', 'nhk_knowledge'], true)) {
         $url['target_reason'] = 'DOMAIN_TARGETED';
     }
+    if ((string) ($url['source_path'] ?? '') === '/' && (string) ($url['target_path'] ?? '') === '') {
+        $url['target_path'] = '/';
+        $url['target_reason'] = 'READY_NOOP';
+    }
     if ($url['target_path'] === '' && (string) ($url['legacy_type'] ?? '') === 'attachment') $url['target_reason'] = 'UNSUPPORTED_MEDIA_REFERENCE';
     if ($url['target_path'] === '' && (string) ($url['legacy_type'] ?? '') === 'post' && (string) ($url['source_path'] ?? '') === '/') $url['target_reason'] = 'RETIRED_LEGACY_GARBAGE';
     if ($url['target_path'] === '' && (string) ($url['legacy_type'] ?? '') === 'wp_global_styles') $url['target_reason'] = 'RETIRED_LEGACY_GARBAGE';

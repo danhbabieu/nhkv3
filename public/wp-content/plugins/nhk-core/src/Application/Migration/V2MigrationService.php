@@ -286,6 +286,7 @@ final class V2MigrationService
         $targetPath = trim((string) ($record['target_path'] ?? ''));
         if ($sourcePath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no source path.');
         $targetReason = strtoupper((string) ($record['target_reason'] ?? ''));
+        if ($sourcePath === '/' && $targetPath === '') $targetPath = '/';
         if ($targetPath === '' && in_array($targetReason, ['DOMAIN_TARGETED', 'UNSUPPORTED_MEDIA_REFERENCE', 'RETIRED_LEGACY_GARBAGE'], true)) throw new MigrationSkip('skipped', $targetReason, match ($targetReason) { 'UNSUPPORTED_MEDIA_REFERENCE' => 'Legacy attachment has no governed V3 MediaAsset target.', 'RETIRED_LEGACY_GARBAGE' => 'Legacy URL belongs to a retired non-editorial record.', default => 'Legacy URL belongs to a domain without a public V3 route.' });
         if ($targetPath === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL has no governed V3 target path.');
         if (!str_starts_with($sourcePath, '/') || !str_starts_with($targetPath, '/') || str_contains($sourcePath, '..') || str_contains($targetPath, '..')) throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'URL paths must be absolute local paths.');

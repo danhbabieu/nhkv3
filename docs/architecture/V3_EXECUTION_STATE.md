@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P11 route visual QA and homepage copy checkpoint.
+Last updated: 2026-08-31, P11 native homepage URL no-op reconciliation checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,13 +9,13 @@ Last updated: 2026-08-31, P11 route visual QA and homepage copy checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 87 tests, 452 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 131 tests, 799 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
-| Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 28 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 2 are retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 88 tests, 455 assertions; guarded WordPress integration: 44 tests, 347 assertions; combined current suite: 132 tests, 802 assertions; plugin/theme PHP lint, route smoke 21/21 and diff check pass |
+| Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,960 rows and skipped 1,013 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
+| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,961 rows and skipped 1,012 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
-| Migration dry-run | Full restored-backup export: 4,973 records; 3,960 candidates and 1,013 skipped; projection contexts account for 1,581 newly mapped records; remaining skips are reason-coded and no conflicts were reported |
+| Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
 
@@ -64,6 +64,13 @@ Last updated: 2026-08-31, P11 route visual QA and homepage copy checkpoint.
   `ARCHIVED_OPERATIONAL_NOT_PUBLIC_KNOWLEDGE` and have no active target. They
   are identity matches, not public redirect targets; governed retirement or a
   separately approved active target is required.
+
+- 2026-08-31: Native homepage URL V2 ID 758 (`/`) was normalized to `/` and
+  applied locally as `READY_NOOP`; route smoke confirms HTTP 200 with no
+  redirect or duplicate editorial record. URL reconciliation now has 27
+  residual candidates; policy-normalized dry-run totals are 3,961 mapped,
+  1,012 skipped and 0 conflicts. The change is limited to local `nhk_v3` and
+  does not modify V2 or production.
 
 - 2026-08-31: Preflight completed. HEAD `2247c87`; existing governance edits
   preserved. Governance documents being bootstrapped.

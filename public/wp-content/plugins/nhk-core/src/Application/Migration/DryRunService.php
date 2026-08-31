@@ -25,7 +25,7 @@ final class DryRunService
             if ($result['reason'] === 'DUPLICATE_CANDIDATE') $report['duplicate_candidate']++;
             if ($result['reason'] === 'INVALID_RELATION') $report['invalid_relation']++;
             if ($result['reason'] === 'MISSING_ENDPOINT') $report['missing_endpoint']++;
-            if ($result['reason'] === 'URL_MAPPING_READY') $report['url_mapping']++;
+            if (in_array($result['reason'], ['URL_MAPPING_READY', 'READY_NOOP'], true)) $report['url_mapping']++;
         }
         return $report;
     }
@@ -36,8 +36,11 @@ final class DryRunService
         $type = (string) ($record['type'] ?? '');
         if (!empty($record['conflict'])) return ['status' => 'conflict', 'reason' => 'CONFLICT_REQUIRES_REVIEW'];
         if ($type === 'url') {
-            if (trim((string) ($record['source_path'] ?? '')) === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
-            if (trim((string) ($record['target_path'] ?? '')) !== '') return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
+            $sourcePath = trim((string) ($record['source_path'] ?? ''));
+            $targetPath = trim((string) ($record['target_path'] ?? ''));
+            if ($sourcePath === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+            if ($sourcePath === '/' && $targetPath === '') return ['status' => 'mapped', 'reason' => 'READY_NOOP'];
+            if ($targetPath !== '') return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
             $targetReason = strtoupper((string) ($record['target_reason'] ?? ''));
             if (in_array($targetReason, ['DOMAIN_TARGETED', 'UNSUPPORTED_MEDIA_REFERENCE', 'RETIRED_LEGACY_GARBAGE'], true)) return ['status' => 'skipped', 'reason' => $targetReason];
             return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
