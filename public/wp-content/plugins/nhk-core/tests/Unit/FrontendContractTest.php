@@ -114,6 +114,14 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_pagination_wraps_without_horizontal_overflow(): void
+    {
+        $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.css');
+        self::assertStringContainsString('.entity-pagination{', $style);
+        self::assertStringContainsString('flex-wrap:wrap', $style);
+        self::assertStringContainsString('max-width:100%', $style);
+    }
+
     public function test_public_templates_do_not_expose_internal_domain_terms(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

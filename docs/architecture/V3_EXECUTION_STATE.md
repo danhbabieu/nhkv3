@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, P11 V2 detail-alias smoke checkpoint.
+Last updated: 2026-08-31, P11 responsive pagination checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,15 @@ Last updated: 2026-08-31, P11 V2 detail-alias smoke checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-08-31: Responsive browser QA found horizontal overflow from the
+  unwrapped `.entity-pagination` rule in the later-loaded `entity.css`:
+  Knowledge page 2 reached 1,057px and Media page 2 reached 447px at 390px.
+  The owning stylesheet now wraps and bounds pagination, and its enqueue
+  version was bumped to `1.0.2` for cache invalidation. Browser recheck at
+  390px and 768px reports document widths equal to the viewport for both
+  routes; mobile screenshots were visually inspected. Focused frontend
+  contract is green at 15 tests/233 assertions. No data changed.
 
 - 2026-08-31: The route smoke harness gained explicit data-gated
   `--brand-alias=/legacy/|/canonical/` and
