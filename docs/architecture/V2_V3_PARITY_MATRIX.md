@@ -5,7 +5,7 @@ the final parity declaration.
 
 | AREA | V2 | V3 | MIGRATED? | TESTED? | PARITY STATUS | NOTES |
 |---|---|---|---|---|---|---|
-| Homepage | Reference audit pending | HomePageQuery-driven responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Featured/latest/category/topics plus real Authority/Media/Video modules; desktop visual inspection passes, responsive visual QA and V2 reference audit remain |
+| Homepage | Reference audit pending | HomePageQuery-driven responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Featured/latest/category/topics plus real Authority/Media/Video modules; desktop and tablet visual inspection pass, mobile/tablet route metrics are overflow-free, and V2 reference audit remains |
 | Posts | 800 rows in restored read-only backup; 34 `nhk_article` rows plus native/system rows | Native `wp_posts` boundary | DEV ONLY: 36 | PARTIAL | IN PROGRESS | 36 safe native post/page rows imported; 764 domain-targeted rows remain explicit skips |
 | Categories | 2 taxonomy rows in restored backup | Native WP categories | DEV ONLY: 1 | PARTIAL | IN PROGRESS | One native category imported; non-category taxonomy skipped; URL ledger pending |
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
@@ -31,7 +31,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Surface | V2 reference | V3 target | Improvement / contract | Tested |
 |---|---|---|---|---|
 | Homepage | Pending read-only audit | Editorial discovery homepage | Real query services; no public fixtures or fake metrics | NO |
-| Header / footer / navigation | Pending audit | NHK responsive shell | Domain language for visitors; keyboard/mobile usable | NO |
+| Header / footer / navigation | Pending audit | NHK responsive shell | Domain language for visitors; keyboard/mobile usable | PARTIAL — desktop/tablet shell and mobile/tablet menu toggle checked |
 | Search / empty search | Pending audit | Unified semantic search | Posts plus canonical entities, media, videos and knowledge | PARTIAL |
 | Comparison | V2 navigation contract / behavior reconciliation pending | Read-only `/comparison/` over two active Authority references | Native Authority query boundary; no duplicate comparison persistence or editorial body projection | PARTIAL — HTTP 200 and desktop visual smoke pass |
 | Post / Tri thức / Góc chia sẻ | Pending audit | Native WordPress editorial routes | Post single now enriches from Graph-derived entities, articles, Media and Video without body duplication; desktop Post smoke passes | PARTIAL |
@@ -39,7 +39,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Specimen / Product | Pending audit | Separate physical-object/listing pages | Explicit identity distinction | PARTIAL |
 | Media gallery / Video | Pending audit | First-class archive/detail query modules and theme templates | Responsive assets; external embeds only | PARTIAL |
 | Pagination / 404 / empty states | Pending audit | Route-level accessible states | No dead ends or fixture leakage | NO |
-| Desktop / tablet / mobile | Pending audit | Responsive one-to-many-column layouts | Reading comfort and Core Web Vitals considered | NO |
+| Desktop / tablet / mobile | Pending audit | Responsive one-to-many-column layouts | Reading comfort and Core Web Vitals considered | PARTIAL — 390px/768px overflow metrics pass on homepage, search, comparison, Authority detail and Media detail; full route/pagination visual sweep remains |
 | SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article and BreadcrumbList | PARTIAL |
 
 ## Logic parity inventory
