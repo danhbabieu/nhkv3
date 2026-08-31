@@ -154,7 +154,7 @@ final class V2MigrationIntegrationTest extends TestCase
         $evidenceId = UuidCodec::newV7();
         $records = [
             ['type' => 'knowledge', 'stable_key' => 'v2-migration-integration-archived-claim', 'canonical_uuid' => $claimId, 'canonical_name' => 'Archived migration claim', 'metadata' => ['one_sentence_definition' => 'An archived claim.', 'verification_status' => 'VERIFIED']],
-            ['type' => 'source', 'stable_key' => 'v2-migration-integration-archived-source', 'canonical_uuid' => $sourceId, 'canonical_name' => 'Archived migration source', 'source_type' => 'website', 'visibility' => 'PUBLIC', 'review_state' => 'ARCHIVED'],
+            ['type' => 'source', 'stable_key' => 'v2-migration-integration-archived-source', 'canonical_uuid' => $sourceId, 'canonical_name' => 'Archived migration source', 'source_type' => 'website', 'visibility' => 'PUBLIC', 'metadata' => ['review_state' => 'ARCHIVED']],
             ['type' => 'evidence', 'stable_key' => 'v2-migration-integration-archived-evidence', 'canonical_uuid' => $evidenceId, 'source_id' => $sourceId, 'claim_id' => $claimId, 'citation_role' => 'PRIMARY_SUPPORT', 'excerpt' => 'An archived citation.', 'visibility' => 'PUBLIC', 'review_state' => 'RETIRED'],
         ];
 
@@ -165,7 +165,7 @@ final class V2MigrationIntegrationTest extends TestCase
                 "SELECT state FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s",
                 UuidCodec::toBinary($sourceId)
             )));
-            self::assertSame(['visibility' => 'PUBLIC', 'review_state' => 'ARCHIVED'], json_decode((string) $wpdb->get_var($wpdb->prepare(
+            self::assertSame(['review_state' => 'ARCHIVED', 'visibility' => 'PUBLIC'], json_decode((string) $wpdb->get_var($wpdb->prepare(
                 "SELECT metadata_json FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s",
                 UuidCodec::toBinary($sourceId)
             )), true));

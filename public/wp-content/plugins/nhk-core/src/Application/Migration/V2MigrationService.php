@@ -423,7 +423,12 @@ final class V2MigrationService
     }
     private function evidenceRelation(string $role): string { $role = strtoupper($role); return str_contains($role, 'CONTRADICT') ? 'contradicts' : (str_contains($role, 'QUALIF') || str_contains($role, 'PARTIAL') || str_contains($role, 'CORRECTION') || str_contains($role, 'BOUND') ? 'qualifies' : 'supports'); }
     private function sourceKey(array $record): string { return (string) ($record['stable_key'] ?? ($record['source_key'] ?? ($record['type'] ?? '') . ':' . ($record['legacy_id'] ?? ($record['canonical_uuid'] ?? '')))); }
-    private function isArchived(array $record): bool { return in_array(strtoupper((string) ($record['review_state'] ?? '')), ['ARCHIVED', 'RETIRED'], true); }
+    private function isArchived(array $record): bool
+    {
+        $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+        $reviewState = $record['review_state'] ?? ($metadata['review_state'] ?? '');
+        return in_array(strtoupper(trim((string) $reviewState)), ['ARCHIVED', 'RETIRED'], true);
+    }
     private function contentEquivalent(string $target, string $source): bool { return $target === $source || (function_exists('wp_specialchars_decode') && wp_specialchars_decode($target, ENT_QUOTES) === $source); }
     private function checksum(array $record): string { return hash('sha256', (string) wp_json_encode(['mapper' => self::MAPPER_VERSION, 'record' => $record], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); }
 }

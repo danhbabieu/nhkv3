@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 Source/Evidence provenance checkpoint.
+Last updated: 2026-09-01, P11 normalized provenance-state checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,11 @@ Last updated: 2026-09-01, P11 Source/Evidence provenance checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Migration state resolution now checks V2 `review_state` in both
+  normalized top-level fields and the metadata envelope, while preserving the
+  value and keeping archived/retired Source/Evidence inactive. Full guarded
+  PHPUnit passed 158 tests/979 assertions; no V2/live data changed.
 
 - 2026-09-01: Read-only MediaAsset recovery audit confirmed that the V2
   storage root recorded by all three imported assets is absent on the current
