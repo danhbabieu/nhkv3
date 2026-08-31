@@ -45,9 +45,16 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
             self::assertTrue($resolver->supports($definition->type));
             self::assertTrue($resolver->exists($reference));
             $retired = $service->retire($entity->canonicalId, 1);
-            $reactivated = $service->reactivate($retired->canonicalId, 2);
+            $updated = $retired;
+            $reactivationRevision = 2;
+            if ($definition->type === 'movement') {
+                $updated = $service->update($retired->canonicalId, ['frequency_hz' => 28800.0], 2);
+                self::assertSame($entity->canonicalId, $updated->canonicalId);
+                $reactivationRevision = 3;
+            }
+            $reactivated = $service->reactivate($updated->canonicalId, $reactivationRevision);
             self::assertSame($entity->canonicalId, $reactivated->canonicalId);
-            self::assertSame(3, $reactivated->revision);
+            self::assertSame($definition->type === 'movement' ? 4 : 3, $reactivated->revision);
         }
 
         self::assertCount(9, array_unique($ids));

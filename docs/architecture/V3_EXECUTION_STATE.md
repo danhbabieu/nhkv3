@@ -6,13 +6,13 @@ Last updated: 2026-08-31, initial autonomous bootstrap.
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
 | Branch / HEAD | `main` / `49b6d47` |
-| Current phase | P5 Canonical Domain Foundation — registry expansion |
-| Last accepted phase | P4 Governance Core |
+| Current phase | P6 Media + Video — foundation design |
+| Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 3 / target 3; Migration003 UP-only applied to `nhk_v3` |
 | Tests | P4/P3 regression: 56 tests, 167 assertions, 0 skipped; lint and diff check pass |
 | Blockers | None for local P5 work; `git fetch` required elevated filesystem access and then succeeded |
 | Working assumptions | Existing five-file working-tree diff is user-owned and must be preserved; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Audit Authority registry/schema boundaries and add the first controlled P5 entity types |
+| Next executable task | Define Media/MediaAsset/MediaUsage and Video external-reference contracts |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | Not applicable to code-only/P4 bootstrap; required before real V2 data migration |
@@ -28,4 +28,4 @@ Last updated: 2026-08-31, initial autonomous bootstrap.
   to `origin/main`; P5 catalog/registry implementation is next.
 - 2026-08-31: P5 canonical catalog added for nine target types with explicit
   field schemas and validation; unit/integration evidence is 60 tests, 234
-  assertions, 0 skipped. P5 remains active for the next domain vertical slice.
+  assertions, 0 skipped. P5 is ready to close and P6 is next.

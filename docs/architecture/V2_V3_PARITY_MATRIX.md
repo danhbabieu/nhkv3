@@ -11,7 +11,7 @@ the final parity declaration.
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | NO | NOT ASSESSED | P9 |
 | Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core | NO | PASS | IN PROGRESS | Nine-type registry/catalog and generic persistence tested in P5; legacy data pending |
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract | NO | PASS | IN PROGRESS | Physical specimen vs commercial product distinction tested; legacy data pending |
-| Media / Video | Legacy data pending | Contract only | NO | NO | NOT ASSESSED | P6 |
+| Media / Video | Legacy data pending | P6 foundation pending | NO | NO | IN PROGRESS | Media identity/asset/usage and external Video reference are next |
 | Knowledge Claim / Source / Evidence | Legacy data pending | Contract only | NO | NO | NOT ASSESSED | P7 |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; domain coverage pending |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Governance core; UI/API pending | NO | PARTIAL | IN PROGRESS | P4 then P8 |

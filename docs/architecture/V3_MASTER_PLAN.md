@@ -9,8 +9,8 @@ Status is based on code and test evidence, not commit titles.
 | P2 Graph Core | ACCEPTED/CLOSED | `12_P2_ACCEPTANCE_MATRIX.md`. |
 | P3 Authority Core | ACCEPTED/CLOSED | `14_P3_ACCEPTANCE_MATRIX.md`, `15_P3_INTEGRATION_ACCEPTANCE.md`. |
 | P4 Governance Core | ACCEPTED/CLOSED | All acceptance rows pass; Migration003 UP-only applied to `nhk_v3`; health is 3/3. |
-| P5 Canonical Domain Foundation | IN PROGRESS | Define registry-backed canonical types and contracts for the next vertical slice. |
-| P6 Media + Video | NOT STARTED | Media identity/asset/usage and external Video reference vertical slices. |
+| P5 Canonical Domain Foundation | ACCEPTED/CLOSED | Nine registry-backed canonical types, typed payload validation, generic persistence/lifecycle/update and Graph endpoint resolution are covered by unit/integration evidence. |
+| P6 Media + Video | IN PROGRESS | Build Media identity/asset/usage and external Video reference vertical slices. |
 | P7 Knowledge + Source + Evidence + Post Graph | NOT STARTED | Atomic claims, provenance and Post semantic links. |
 | P8 Admin + MCP operational layer | NOT STARTED | Governed read/mutation workflows. |
 | P9 Frontend/UI parity | NOT STARTED | V2 route/function inventory and V3 assembly. |

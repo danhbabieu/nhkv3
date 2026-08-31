@@ -22,6 +22,14 @@ commercial listing or offer and may refer to a specimen through a semantic Graph
 relation or a typed payload reference. Product is never treated as the physical
 object's identity.
 
+## Acceptance evidence
+
+`P5CanonicalDomainIntegrationTest` verifies all nine types through the existing
+Authority table, unique canonical UUIDs, stable-key lookup, Graph resolver
+registration, retire/reactivate lifecycle and payload update behavior. The unit
+suite verifies catalog completeness, conflicting registry definitions, payload
+field types and optimistic update locking.
+
 ## Migration decision
 
 No P5 schema migration is required. `nhk_entities` already stores the generic
