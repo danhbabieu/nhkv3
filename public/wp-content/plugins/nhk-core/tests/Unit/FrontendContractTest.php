@@ -172,6 +172,10 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('name="a"', $template);
         self::assertStringContainsString("home_url('/comparison/')", $home);
         self::assertStringContainsString("'/comparison/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
+        $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
+        foreach (["'/media/page/2/' => 200", "'/video/page/2/' => 200", "'/knowledge/page/2/' => 200"] as $route) {
+            self::assertStringContainsString($route, $routeSmoke, 'semantic page-two route must be in smoke coverage');
+        }
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
         self::assertStringContainsString('nhk_core_comparison_context', $functions);
         self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', $functions);
