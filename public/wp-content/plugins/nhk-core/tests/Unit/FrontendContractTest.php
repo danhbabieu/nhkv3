@@ -203,6 +203,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("if (\$url === '') continue", (string) file_get_contents($theme . '/index.php'));
         self::assertStringContainsString('function nhk_v3_public_url', (string) file_get_contents($theme . '/functions.php'));
         self::assertStringContainsString('nhk_v3_public_url($item[\'locator\']', (string) file_get_contents($theme . '/knowledge.php'));
+        self::assertStringContainsString('nhk_v3_public_url($section[\'url\']', (string) file_get_contents($theme . '/front-page.php'));
+        self::assertStringContainsString('nhk_v3_public_url(get_category_link($topic))', (string) file_get_contents($theme . '/front-page.php'));
     }
 
     public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
