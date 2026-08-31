@@ -8,7 +8,7 @@ foreach (array_slice($argv, 1) as $argument) {
         $base = rtrim(substr($argument, 11), '/');
         continue;
     }
-    foreach (['post-url', 'brand-url', 'model-url'] as $option) {
+    foreach (['post-url', 'brand-url', 'model-url', 'claim-url'] as $option) {
         $prefix = "--{$option}=";
         if (str_starts_with($argument, $prefix)) {
             $route = trim(substr($argument, strlen($prefix)));
@@ -29,6 +29,7 @@ $routes = [
     '/component/' => 200,
     '/specimen/' => 200,
     '/product/' => 200,
+    '/knowledge/' => 200,
     '/video/' => 200,
     '/thu-vien/' => 200,
     '/?s=watch' => 200,

@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.9';
+    private const MAPPER_VERSION = '6.10';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -245,9 +245,15 @@ final class V2MigrationService
         $entityId = trim((string) ($record['target_entity_id'] ?? ''));
         $entityKey = trim((string) ($record['target_entity_key'] ?? ''));
         if ($entityType !== '' || $entityId !== '' || $entityKey !== '') {
-            if (!in_array($entityType, ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], true) || !preg_match('/^[0-9a-f-]{36}$/i', $entityId) || $entityKey === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'Entity URL target identity is incomplete.');
-            $entity = $this->authority->findByCanonicalId($entityId);
-            if (!$entity || $entity->entityType !== $entityType || $entity->stableKey !== $entityKey || !$entity->active()) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Entity URL target is not an active governed endpoint.');
+            $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
+            if ((!in_array($entityType, $authorityTypes, true) && $entityType !== 'knowledge') || !preg_match('/^[0-9a-f-]{36}$/i', $entityId) || $entityKey === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'Entity URL target identity is incomplete.');
+            if ($entityType === 'knowledge') {
+                $claim = $this->knowledge->findByCanonicalId($entityId);
+                if (!$claim || $claim->stableKey !== $entityKey || !$claim->active) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Knowledge URL target is not an active governed claim.');
+            } else {
+                $entity = $this->authority->findByCanonicalId($entityId);
+                if (!$entity || $entity->entityType !== $entityType || $entity->stableKey !== $entityKey || !$entity->active()) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Entity URL target is not an active governed endpoint.');
+            }
             $redirects = get_option('nhk_v2_entity_redirects', []);
             $redirects = is_array($redirects) ? $redirects : [];
             if (isset($redirects[$sourcePath]) && (string) $redirects[$sourcePath] !== $targetPath) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Legacy entity URL already points to a different target.');

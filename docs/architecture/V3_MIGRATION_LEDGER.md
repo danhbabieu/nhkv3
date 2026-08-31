@@ -13,7 +13,7 @@ migration, and unresolved rows remain explicit in the ledger.
 | Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; Source/Evidence joins verified; rows retain V2 private visibility |
 | Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
 | Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
-| URLs | 800 | 405 | 405 | 395 | 0 | 0 | 405 | 370 entity-registry 301 redirects, 34 native-post 301 redirects and one identical source/target `READY_NOOP`; residual skips are 372 `DOMAIN_TARGETED` and 23 invalid mappings |
+| URLs | 800 | 697 | 697 | 103 | 0 | 0 | 697 | 292 Knowledge claim UUID redirects, 370 Authority entity redirects, 34 native-post redirects and one identical source/target `READY_NOOP`; residual skips are 80 `DOMAIN_TARGETED` and 23 invalid mappings |
 | Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions, field-level metadata and PRIVATE visibility imported; public delivery/usages remain open |
 | Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
 | Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints and metadata verified; imported inactive because V2 visibility is PRIVATE |

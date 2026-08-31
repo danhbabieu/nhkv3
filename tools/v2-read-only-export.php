@@ -126,6 +126,11 @@ foreach ($urlRecords as $url) {
             $url['target_entity_type'] = $entityType;
             $url['target_entity_key'] = (string) $entity['stable_key'];
             $url['target_entity_id'] = $entityId;
+        } elseif ($entityType === 'knowledge' && $entityState === 'APPROVED') {
+            $url['target_path'] = '/knowledge/claim/' . $entityId . '/';
+            $url['target_entity_type'] = 'knowledge';
+            $url['target_entity_key'] = (string) $entity['stable_key'];
+            $url['target_entity_id'] = $entityId;
         } elseif ($url['target_path'] === '') {
             $url['target_reason'] = 'DOMAIN_TARGETED';
         }
