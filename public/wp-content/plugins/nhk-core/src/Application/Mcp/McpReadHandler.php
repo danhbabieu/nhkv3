@@ -39,9 +39,9 @@ final class McpReadHandler
     {
         if (!$this->ready('media')) return null;
         $media = $this->media->findByCanonicalId($id);
-        if (!$media || !$media->active) return null;
+        if (!$media || !$media->active || $media->readiness !== 'ready') return null;
         $assets = array_values(array_filter($this->assets->listByMediaId($id), static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
-        return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'readiness' => $media->readiness, 'active' => $media->active, 'revision' => $media->revision, 'provenance' => $media->provenance, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($id))];
+        return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'readiness' => $media->readiness, 'active' => $media->active, 'revision' => $media->revision, 'assets' => array_map($this->publicAsset(...), $assets), 'usages' => array_map($this->publicUsage(...), $this->usages->listByMediaId($id))];
     }
 
     public function videoGet(string $id): ?array
@@ -93,6 +93,8 @@ final class McpReadHandler
     private function entity(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload, 'active' => $entity->active(), 'revision' => $entity->revision]; }
     private function asset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'storage_key' => $asset->storageKey, 'checksum' => $asset->checksum, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'visibility' => $asset->visibility, 'metadata' => $asset->metadata]; }
     private function usage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
+    private function publicAsset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
+    private function publicUsage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
     private function evidence(Evidence $evidence): array { return ['id' => $evidence->canonicalId, 'claim_id' => $evidence->claimId, 'source_id' => $evidence->sourceId, 'relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator, 'metadata' => $evidence->metadata, 'active' => $evidence->active, 'revision' => $evidence->revision]; }
     private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic() || $this->sources === null) return false; $source = $this->sources->findByCanonicalId($item->sourceId); $claim = $this->claims->findByCanonicalId($item->claimId); return $source !== null && $source->active && $source->isPublic() && $claim !== null && $claim->active && $claim->isPublic(); })); }
 }

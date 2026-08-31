@@ -23,23 +23,29 @@ final class McpReadContractTest extends TestCase
         $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, ['country']));
         $authority = new \NHK\Core\Application\Authority\AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
         $entity = $authorityRepository->create(new AuthorityEntity(UuidCodec::newV7(), 'brand', 'odo', 'Odo', 1, ['country' => 'Switzerland', 'private_note' => 'internal']));
-        $media = new class implements MediaRepository {
-            public function findByCanonicalId(string $id): ?Media { return null; }
+        $mcpMedia = new Media(UuidCodec::newV7(), 'mcp-ready-media', 'MCP ready media', 'ready', ['private' => 'provenance']);
+        $mcpAsset = new MediaAsset(UuidCodec::newV7(), $mcpMedia->canonicalId, 'original', 'private/storage.webp', hash('sha256', 'mcp'), 'image/webp', 3, 10, 10, 'PUBLIC', ['private' => 'metadata']);
+        $mcpUsage = new MediaUsage(UuidCodec::newV7(), $mcpMedia->canonicalId, 'wp_post', '1:42', 'gallery', 1);
+        $media = new class($mcpMedia) implements MediaRepository {
+            public function __construct(private Media $item) {}
+            public function findByCanonicalId(string $id): ?Media { return $id === $this->item->canonicalId ? $this->item : null; }
             public function findByStableKey(string $key): ?Media { return null; }
             public function create(Media $item): Media { return $item; }
             public function update(Media $item, int $expectedRevision): Media { return $item; }
             public function list(bool $includeRetired = false): array { return []; }
         };
-        $assets = new class implements MediaAssetRepository {
+        $assets = new class($mcpAsset) implements MediaAssetRepository {
+            public function __construct(private MediaAsset $item) {}
             public function findByAssetId(string $id): ?MediaAsset { return null; }
             public function create(MediaAsset $item): MediaAsset { return $item; }
             public function update(MediaAsset $item, int $expectedRevision = 1): MediaAsset { return $item; }
-            public function listByMediaId(string $id): array { return []; }
+            public function listByMediaId(string $id): array { return $id === $this->item->mediaId ? [$this->item] : []; }
             public function findByChecksum(string $checksum): array { return []; }
         };
-        $usages = new class implements MediaUsageRepository {
+        $usages = new class($mcpUsage) implements MediaUsageRepository {
+            public function __construct(private MediaUsage $item) {}
             public function create(MediaUsage $item): MediaUsage { return $item; }
-            public function listByMediaId(string $id, ?string $role = null): array { return []; }
+            public function listByMediaId(string $id, ?string $role = null): array { return $id === $this->item->mediaId ? [$this->item] : []; }
             public function listByEndpoint(string $type, string $key, ?string $role = null): array { return []; }
         };
         $videos = new class implements VideoRepository {
@@ -66,6 +72,10 @@ final class McpReadContractTest extends TestCase
         $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence);
         self::assertSame($entity->canonicalId, $handler->entityGet('brand', $entity->canonicalId)['id']);
         self::assertSame(['country' => 'Switzerland'], $handler->entityGet('brand', $entity->canonicalId)['payload']);
+        $mediaRead = $handler->mediaGet($mcpMedia->canonicalId);
+        self::assertArrayNotHasKey('provenance', $mediaRead);
+        self::assertArrayNotHasKey('storage_key', $mediaRead['assets'][0]);
+        self::assertArrayNotHasKey('endpoint_type', $mediaRead['usages'][0]);
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
         $retired = $authority->create('brand', 'retired', 'Retired');
         $authority->retire($retired->canonicalId, 1);
