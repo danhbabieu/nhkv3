@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Graph read API and migration dry-run checkpoint pushed.
+Last updated: 2026-08-31, MCP read adapter bridge checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `27ce072` |
-| Current phase | P8 Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
+| Branch / HEAD | `main` / `6ea8362` |
+| Current phase | P8 Governance/Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 52 tests, 133 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| Tests | Unit suite: 54 tests, 140 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
 | Blockers | None for local code work; full suite is environment-blocked (no `NHK_WP_TEST_PATH`, one P5 bootstrap error and nine mandatory P4 failures); V2/live remains read-only |
 | Working assumptions | Working tree is clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Feed a read-only V2 export into `tools/v2-dry-run.php`, then close remaining frontend/admin/MCP adapters; browser/DB integration remains environment-gated |
+| Next executable task | Build domain-specific frontend/admin surfaces and route smoke coverage; feed a read-only V2 export into `tools/v2-dry-run.php`; browser/DB integration remains environment-gated |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -76,3 +76,13 @@ Last updated: 2026-08-31, Graph read API and migration dry-run checkpoint pushed
   reads no longer materialize missing graph nodes. A no-write V2 dry-run CLI
   and reason-code service were added; checksum collisions remain review-only
   duplicate candidates. Checkpoint `27ce072` is pushed to `origin/main`.
+- 2026-08-31: Governance REST now exposes capability-protected eligibility and
+  Controlled Apply. Authority proposal execution supports create/ingest,
+  rename, update, retire and reactivate through the existing transaction,
+  revision, idempotency and audit boundaries. Checkpoint `74ed7eb` is pushed to
+  `origin/main`; WP integration remains environment-gated.
+- 2026-08-31: MCP read adapter now exposes real Authority, Media, Video,
+  Knowledge and native WordPress Post query methods, while the mutation bridge
+  remains delegated to GovernanceService. A `nhk_mcp_register_tools` hook
+  provides a transport-neutral registration seam. Checkpoint `6ea8362` is
+  pushed to `origin/main`; external transport is still not fabricated.
