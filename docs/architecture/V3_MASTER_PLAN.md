@@ -15,7 +15,7 @@ Status is based on code and test evidence, not commit titles.
 | P8 Admin + MCP operational layer | IN PROGRESS | NHK Admin console, governed proposal REST workflow including eligibility/Controlled Apply, semantic read/search APIs and MCP read/mutation contracts; external transport and runtime QA pending. |
 | P9 Frontend/UI parity | IN PROGRESS | Responsive NHK editorial theme now includes canonical entity, related, Media gallery and Video archive/detail surfaces with SEO metadata; runtime smoke QA pending. |
 | P10 V2 → V3 Data Migration | IN PROGRESS | Source-level V3 route inventory and no-write dry-run tooling added; V2 export, backup/restore evidence, URL ledger and real migration remain gated. |
-| P11 Reconciliation + parity + cutover readiness | NOT STARTED | Count/semantic/UI/logic reconciliation and readiness report; stop before cutover. |
+| P11 Reconciliation + parity + cutover readiness | IN PROGRESS / NOT READY | `CUTOVER_READINESS_REPORT.md` records implemented evidence and explicit blockers; count/semantic/UI/logic reconciliation is still gated by V2 data and WordPress runtime. |
 
 ## Locked direction
 

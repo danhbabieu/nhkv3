@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Media/Video public surface checkpoint pushed.
+Last updated: 2026-08-31, Admin governed proposal composer checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `e8c4c27` |
-| Current phase | P8 Governance/Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
+| Branch / HEAD | `main` / `16ea31a` |
+| Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
 | Tests | Unit suite: 58 tests, 155 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
 | Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
-| Next executable task | Obtain a working local WordPress/test DB for runtime smoke and Migration005 integration; obtain V2 read-only export/backup evidence; run `tools/v2-dry-run.php` before any mapping or migration |
+| Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -113,3 +113,13 @@ Last updated: 2026-08-31, Media/Video public surface checkpoint pushed.
   WordPress command was attempted with `NHK_WP_TEST_DB=nhk_v3_test` and
   `NHK_WP_TEST_PATH=public`, but local WordPress stopped at a database
   connection error; no V2 migration or production action was performed.
+- 2026-08-31: NHK Admin gained a capability-gated governed proposal composer
+  for create/ingest/rename/update/retire/reactivate. The form sends only to
+  the Governance REST boundary with a WP nonce; it does not write domain
+  tables directly. Checkpoint `16ea31a` is pushed; runtime lifecycle smoke is
+  still blocked by the local WordPress database connection.
+- 2026-08-31: P11 readiness audit started. `CUTOVER_READINESS_REPORT.md`
+  records the green local unit/lint gates and the unresolved WordPress DB,
+  browser smoke, V2 inventory, backup/restore, URL reconciliation and
+  external MCP transport gates. Decision is NOT READY; production cutover was
+  not performed.
