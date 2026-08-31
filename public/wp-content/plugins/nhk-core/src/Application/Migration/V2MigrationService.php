@@ -215,10 +215,16 @@ final class V2MigrationService
         $locator = trim((string) ($record['locator'] ?? ''));
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
         $active = !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
-        $evidence = new Evidence($id, $claimId, $sourceId, $relation, $excerpt, $locator !== '' ? $locator : null, $active);
+        $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+        foreach (['verification_state', 'visibility', 'excerpt_metadata', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
+        $evidence = new Evidence($id, $claimId, $sourceId, $relation, $excerpt, $locator !== '' ? $locator : null, $active, 1, $metadata);
         $existing = $this->evidence->findByCanonicalId($id);
         if ($existing) {
             if ($existing->claimId !== $evidence->claimId || $existing->sourceId !== $evidence->sourceId || $existing->relation !== $evidence->relation || $existing->excerpt !== $evidence->excerpt || $existing->locator !== $evidence->locator) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Evidence UUID maps to changed citation content.');
+            if ($existing->metadata !== $evidence->metadata || $existing->active !== $evidence->active) {
+                $this->evidence->update($evidence, $existing->revision);
+                return ['reason' => 'STATE_RECONCILED', 'target_type' => 'evidence', 'target_key' => $key, 'target_id' => $id];
+            }
             return ['reason' => 'IDEMPOTENT', 'target_type' => 'evidence', 'target_key' => $key, 'target_id' => $id];
         }
         $this->evidence->create($evidence);

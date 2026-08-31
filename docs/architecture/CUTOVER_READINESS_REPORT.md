@@ -33,6 +33,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   are recorded; live V2 data has not been mutated.
 - The dry-run report now provides per-type counts and skipped-reason buckets,
   rejects malformed records/checksums and marks explicit conflicts for review.
+- The local development schema is current at 7/7; Evidence metadata migration
+  and the 40-row governed backfill completed with zero conflicts.
 
 ## Quality evidence
 
@@ -42,7 +44,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 91 tests, 373 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 91 tests, 375 assertions |
 | Frontend route/rewrite smoke | PASS for core routes and `/hello-world/`; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,559 candidates, 2,414 no-write skips; local-dev ledger: 1,607 migrated, 3,366 explicit skips, 0 conflicts, including 3 MediaAsset, 19 Source and 40 Evidence rows |

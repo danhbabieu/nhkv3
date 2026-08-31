@@ -169,6 +169,7 @@ foreach ($citations as $citation) {
     $records[] = [
         'type' => 'evidence',
         'stable_key' => 'v2:citation:' . (string) $citation['id'],
+        'legacy_id' => (string) $citation['id'],
         'canonical_uuid' => (string) $citation['id'],
         'source_id' => (string) $citation['evidence_id'],
         'claim_id' => (string) $citation['target_id'],

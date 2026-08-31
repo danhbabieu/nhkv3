@@ -16,7 +16,7 @@ migration, and unresolved rows remain explicit in the ledger.
 | URLs | 800 | 1 candidate | 0 | 800 | 0 | 0 | 0 | Candidate inventory only; 301 mapping remains open |
 | Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions and source storage metadata imported; delivery/usages remain open |
 | Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
-| Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints verified; imported inactive because V2 visibility is PRIVATE |
+| Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints and metadata verified; imported inactive because V2 visibility is PRIVATE |
 | Semantic projections | 1,581 | 0 | 0 | 1,581 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
 
 ## Read-only reference checkpoint
@@ -68,4 +68,5 @@ evidence for review only; it never merges identities. The tool is ready for a
 read-only V2 export, while actual migration remains gated by backup,
 readability/restore evidence, field-level reconciliation, approval and
 Cutover Readiness. The apply runner is `tools/v2-migrate.php`; `--offset`
-selects the next source window and Migration006 stores the durable checkpoint.
+selects the next source window and Migration006 stores the durable checkpoint;
+Migration007 stores governed Evidence citation metadata.

@@ -8,13 +8,13 @@ Last updated: 2026-08-31, governed Source/Evidence migration checkpoint.
 | Branch / HEAD | `main` / current local checkpoint |
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
-| DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 91 tests, 373 assertions; plugin/theme PHP lint and diff check pass |
+| DB migration | current 7 / target 7 on `nhk_v3`; Knowledge, Evidence metadata and Migration006/007 are UP-only applied; media/video storage ready |
+| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 91 tests, 375 assertions; plugin/theme PHP lint and diff check pass |
 | Blockers | Visual QA (browser connector unavailable), external MCP transport, URL/media delivery/usages, Source/Evidence public visibility policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Complete field-level URL/media delivery/usages, Source/Evidence visibility, semantic projection and domain-targeted post reconciliation, review the 1,607-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 1,607 rows with 3,366 explicit skips |
-| Pending migrations | None; `nhk_v3` is current 6/target 6 and Migration006 ledger is active |
+| Pending migrations | None; `nhk_v3` is current 7/target 7 and Migration006 ledger plus Evidence metadata are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 2,559 candidates and 2,414 skipped; local-dev apply: 1,607 migrated, 3,366 skipped, 0 conflicts |
 
 ## Checkpoint journal
@@ -196,3 +196,8 @@ Last updated: 2026-08-31, governed Source/Evidence migration checkpoint.
   1,607 migrated, 3,366 skipped and 0 conflicts; all 40 Evidence rows join a
   migrated Knowledge claim and Source. Guarded suite is 91 tests/373
   assertions; staging test DB was restored and has no `nhkv2_*` tables.
+- 2026-08-31: Evidence metadata persistence was extended with UP-only
+  Migration007. Verification state, visibility, excerpt metadata and legacy
+  citation IDs now survive the Evidence repository boundary; the 40 local-dev
+  rows were idempotently backfilled with 0 conflicts. Guarded suite is 91
+  tests/375 assertions and `nhk_v3` reports migration 7/7.

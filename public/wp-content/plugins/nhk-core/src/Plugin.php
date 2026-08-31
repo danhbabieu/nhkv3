@@ -9,6 +9,7 @@ use NHK\Core\Infrastructure\Migration\GovernanceMigration003;
 use NHK\Core\Infrastructure\Migration\MediaMigration004;
 use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
 use NHK\Core\Infrastructure\Migration\MigrationLedger006;
+use NHK\Core\Infrastructure\Migration\KnowledgeEvidenceMetadataMigration007;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpToolCatalog};
@@ -41,7 +42,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', MigrationLedger006::VERSION, false);
+        update_option('nhk_core_migration_target', KnowledgeEvidenceMetadataMigration007::VERSION, false);
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
@@ -71,13 +72,14 @@ final class Plugin {
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', MigrationLedger006::VERSION, '', false);
+        add_option('nhk_core_migration_target', KnowledgeEvidenceMetadataMigration007::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
         (new MediaMigration004())->up();
         (new KnowledgeMigration005())->up();
         (new MigrationLedger006())->up();
+        (new KnowledgeEvidenceMetadataMigration007())->up();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }

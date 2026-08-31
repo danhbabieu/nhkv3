@@ -33,6 +33,7 @@ final class P7KnowledgeTest extends TestCase
             public array $items = [];
             public function findByCanonicalId(string $id): ?Evidence { return $this->items[$id] ?? null; }
             public function create(Evidence $item): Evidence { return $this->items[$item->canonicalId] = $item; }
+            public function update(Evidence $item, int $revision): Evidence { return $this->items[$item->canonicalId] = $item; }
             public function listByClaim(string $claimId, bool $includeRetired = false): array { return array_values(array_filter($this->items, fn (Evidence $item): bool => $item->claimId === $claimId)); }
             public function listBySource(string $sourceId, bool $includeRetired = false): array { return array_values(array_filter($this->items, fn (Evidence $item): bool => $item->sourceId === $sourceId)); }
         };
@@ -65,6 +66,7 @@ final class P7KnowledgeTest extends TestCase
         $evidence = new class implements EvidenceRepository {
             public function findByCanonicalId(string $id): ?Evidence { return null; }
             public function create(Evidence $item): Evidence { return $item; }
+            public function update(Evidence $item, int $revision): Evidence { return $item; }
             public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
             public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
         };

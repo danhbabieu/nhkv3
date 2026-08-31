@@ -9,6 +9,7 @@ interface EvidenceRepository
 {
     public function findByCanonicalId(string $id): ?Evidence;
     public function create(Evidence $evidence): Evidence;
+    public function update(Evidence $evidence, int $expectedRevision): Evidence;
     /** @return list<Evidence> */
     public function listByClaim(string $claimId, bool $includeRetired = false): array;
     /** @return list<Evidence> */

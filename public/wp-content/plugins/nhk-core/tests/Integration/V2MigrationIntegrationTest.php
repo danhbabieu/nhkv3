@@ -6,6 +6,7 @@ namespace NHK\Tests\Integration;
 use NHK\Core\Application\Migration\V2MigrationService;
 use NHK\Core\Infrastructure\Migration\MigrationLedger006;
 use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
+use NHK\Core\Infrastructure\Migration\KnowledgeEvidenceMetadataMigration007;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
@@ -84,17 +85,21 @@ final class V2MigrationIntegrationTest extends TestCase
     {
         global $wpdb;
         (new KnowledgeMigration005())->up();
+        (new KnowledgeEvidenceMetadataMigration007())->up();
+        (new MigrationLedger006())->up();
+        self::assertSame(7, (int) get_option('nhk_core_migration_current'));
         $claimId = UuidCodec::newV7(); $sourceId = UuidCodec::newV7(); $evidenceId = UuidCodec::newV7();
         $records = [
             ['type' => 'knowledge', 'stable_key' => 'v2-migration-integration-claim', 'canonical_uuid' => $claimId, 'canonical_name' => 'Migration claim', 'metadata' => ['one_sentence_definition' => 'A migrated claim.']],
             ['type' => 'source', 'stable_key' => 'v2:evidence:' . $sourceId, 'canonical_uuid' => $sourceId, 'legacy_type' => 'OFFICIAL_ARCHIVE', 'canonical_name' => 'Migration source', 'locator' => 'https://example.com/source', 'visibility' => 'PRIVATE', 'metadata' => ['verification_state' => 'VERIFIED']],
-            ['type' => 'evidence', 'stable_key' => 'v2:citation:' . $evidenceId, 'canonical_uuid' => $evidenceId, 'source_id' => $sourceId, 'claim_id' => $claimId, 'citation_role' => 'PRIMARY_SUPPORT', 'excerpt' => 'A bounded citation excerpt.', 'visibility' => 'PRIVATE'],
+            ['type' => 'evidence', 'stable_key' => 'v2:citation:' . $evidenceId, 'legacy_id' => '77', 'canonical_uuid' => $evidenceId, 'source_id' => $sourceId, 'claim_id' => $claimId, 'citation_role' => 'PRIMARY_SUPPORT', 'excerpt' => 'A bounded citation excerpt.', 'visibility' => 'PRIVATE', 'verification_state' => 'VERIFIED', 'excerpt_metadata' => '{"page":7}'],
             ['type' => 'evidence', 'stable_key' => 'v2:citation-missing', 'canonical_uuid' => UuidCodec::newV7(), 'source_id' => UuidCodec::newV7(), 'claim_id' => $claimId, 'citation_role' => 'PRIMARY_SUPPORT', 'excerpt' => 'No source endpoint.'],
         ];
         $result = (new V2MigrationService($wpdb))->apply($records, 9, 10);
         self::assertSame(4, $result['processed']); self::assertSame(3, $result['migrated']); self::assertSame(1, $result['skipped']);
         self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId))));
         self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId))));
+        self::assertSame(['verification_state' => 'VERIFIED', 'visibility' => 'PRIVATE', 'excerpt_metadata' => '{"page":7}', 'legacy_id' => '77'], json_decode((string) $wpdb->get_var($wpdb->prepare("SELECT metadata_json FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId))), true));
         self::assertSame('MISSING_ENDPOINT', (string) $wpdb->get_var($wpdb->prepare("SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", 'v2:citation-missing')));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidenceId)));
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($sourceId)));

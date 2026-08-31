@@ -56,6 +56,7 @@ final class McpReadContractTest extends TestCase
         $evidence = new class implements EvidenceRepository {
             public function findByCanonicalId(string $id): ?Evidence { return null; }
             public function create(Evidence $item): Evidence { return $item; }
+            public function update(Evidence $item, int $revision): Evidence { return $item; }
             public function listByClaim(string $id, bool $includeRetired = false): array { return []; }
             public function listBySource(string $id, bool $includeRetired = false): array { return []; }
         };

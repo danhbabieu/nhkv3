@@ -5,7 +5,7 @@ namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
-use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
+use NHK\Core\Infrastructure\Migration\{KnowledgeEvidenceMetadataMigration007, KnowledgeMigration005};
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -19,6 +19,7 @@ final class P7KnowledgeIntegrationTest extends TestCase
         TestDatabaseGuard::requireTestDatabase();
         (new KnowledgeMigration005())->down();
         (new KnowledgeMigration005())->up();
+        (new KnowledgeEvidenceMetadataMigration007())->up();
     }
 
     protected function tearDown(): void

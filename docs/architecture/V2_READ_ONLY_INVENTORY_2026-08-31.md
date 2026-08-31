@@ -58,10 +58,12 @@ migrated records and 3,366 skipped records: `DOMAIN_TARGETED` 764,
 `INVALID_RELATION` 1 and `UNSUPPORTED_LEGACY_TYPE` 2,482; conflicts were 0.
 The three V2 MediaAsset rows were imported with checksum, MIME, dimensions
 and source storage metadata. Nineteen Source rows and 40 citation Evidence
-rows were also imported with their V2 PRIVATE state preserved; runtime media
+rows were also imported with their V2 PRIVATE state, verification state and
+citation metadata preserved; runtime media
 delivery/usages and public provenance presentation remain open reconciliation
 work.
-The second run was idempotent with the same counts. Target verification found
+Subsequent runs were idempotent after the 40-row Evidence metadata backfill.
+Target verification found
 36 native WordPress posts, 4/30/42/18/11/91/174 Authority rows, 242 Media
 rows, 3 MediaAsset rows, 655 Knowledge claims, 19 Sources, 40 Evidence rows
 and 241 Graph edges imported from the ledger.
