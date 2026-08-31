@@ -80,8 +80,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   non-canonical context metadata with provenance and `body_migrated=false`;
   projection bodies are rejected and no Authority, Knowledge or WordPress
   editorial record is created.
-- Public Knowledge reads now fail closed for inactive PRIVATE Source and Claim
-  identities; the activation/public provenance policy remains a cutover gate.
+- Public Knowledge reads now fail closed for inactive identities and for
+  active Source/Evidence records carrying explicit non-PUBLIC visibility;
+  the activation/public provenance policy remains a cutover gate.
 - The public theme now has a skip link and explicit main targets, a keyboard-
   accessible responsive menu with synchronized ARIA state, visible focus
   styling, and explicit decorative image alt handling. The browser runtime

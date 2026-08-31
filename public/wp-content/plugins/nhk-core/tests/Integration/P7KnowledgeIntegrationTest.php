@@ -51,7 +51,7 @@ final class P7KnowledgeIntegrationTest extends TestCase
     public function test_private_source_is_not_exposed_by_public_rest_read(): void
     {
         global $wpdb;
-        $source = (new WpdbSourceRepository($wpdb))->create(new Source(UuidCodec::newV7(), 'p7-integration-private', 'Private source', 'archive', 'https://example.test/private', [], false));
+        $source = (new WpdbSourceRepository($wpdb))->create(new Source(UuidCodec::newV7(), 'p7-integration-private', 'Private source', 'archive', 'https://example.test/private', ['visibility' => 'PRIVATE']));
         $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $source->canonicalId));
         self::assertSame(404, $response->get_status());
     }

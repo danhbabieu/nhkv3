@@ -17,9 +17,9 @@ final class KnowledgePageQuery
         $claim = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->claims->findByCanonicalId($key) : $this->claims->findByStableKey($key);
         if (!$claim || !$claim->active) return null;
         $evidence = array_values(array_filter($this->evidence->listByClaim($claim->canonicalId), function (Evidence $item): bool {
-            if (!$item->active) return false;
+            if (!$item->active || !$item->isPublic()) return false;
             $source = $this->sources->findByCanonicalId($item->sourceId);
-            return $source !== null && $source->active;
+            return $source !== null && $source->active && $source->isPublic();
         }));
         return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'provenance' => $claim->provenance, 'revision' => $claim->revision, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
     }

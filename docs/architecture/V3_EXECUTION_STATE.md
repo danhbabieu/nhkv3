@@ -28,6 +28,15 @@ Last updated: 2026-08-31, P11 responsive entity-route QA checkpoint.
   changed. Source/Evidence public provenance policy remains intentionally
   open and was not bypassed.
 
+- 2026-08-31: Source/Evidence public reads now fail closed when an active
+  record carries explicit `visibility=PRIVATE` (or any non-PUBLIC value) in
+  its persisted metadata. The same gate is applied to Knowledge evidence
+  filtering, Source REST detail and MCP Knowledge reads; records without a
+  visibility field retain the existing V3-compatible public default. Unit
+  and guarded integration coverage passed 137 tests/879 assertions, route
+  smoke remained 29/29, and no database state changed. This safety gate does
+  not approve the outstanding public provenance policy.
+
 - 2026-08-31: Browser QA extended the mobile route evidence to nine remaining
   archive/detail/alias surfaces (`brand`, `model`, `music`, `component`,
   `specimen`, `product`, `/hien-vat/`, `/am-nhac/` and Góc chia sẻ page 2).

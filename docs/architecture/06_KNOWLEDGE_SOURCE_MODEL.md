@@ -11,3 +11,9 @@ source supports, contradicts or qualifies the claim. `PostKnowledgeLinkService`
 connects a WordPress Post to a Knowledge claim through the single Graph using
 the `about` predicate; it does not copy claim text into the Post body and does
 not create an Article Authority.
+
+Public read boundaries require active records and fail closed when persisted
+Source or Evidence metadata explicitly declares a non-`PUBLIC` visibility
+(including `PRIVATE` and `HIDDEN`). A missing visibility value preserves the
+existing V3-compatible default, but does not constitute approval of imported
+V2 provenance; the final publication policy remains a cutover gate.

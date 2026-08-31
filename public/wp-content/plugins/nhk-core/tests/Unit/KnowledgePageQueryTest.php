@@ -25,7 +25,7 @@ final class KnowledgePageQueryTest extends TestCase
         };
         $sources = new class($sourceId, $privateSourceId) implements SourceRepository {
             public function __construct(private string $activeId, private string $privateId) {}
-            public function findByCanonicalId(string $id): ?Source { return $id === $this->activeId ? new Source($id, 'nhk:source:public', 'Public source', 'catalog', 'https://example.test/source') : ($id === $this->privateId ? new Source($id, 'nhk:source:private', 'Private source', 'catalog', null, [], false) : null); }
+            public function findByCanonicalId(string $id): ?Source { return $id === $this->activeId ? new Source($id, 'nhk:source:public', 'Public source', 'catalog', 'https://example.test/source') : ($id === $this->privateId ? new Source($id, 'nhk:source:private', 'Private source', 'catalog', null, ['visibility' => 'PRIVATE']) : null); }
             public function findByStableKey(string $key): ?Source { return null; }
             public function create(Source $source): Source { return $source; }
             public function update(Source $source, int $expectedRevision): Source { return $source; }
@@ -36,7 +36,7 @@ final class KnowledgePageQueryTest extends TestCase
             public function findByCanonicalId(string $id): ?Evidence { return null; }
             public function create(Evidence $evidence): Evidence { return $evidence; }
             public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
-            public function listByClaim(string $claimId, bool $includeRetired = false): array { return [new Evidence(UuidCodec::newV7(), $this->claimId, $this->activeSourceId, 'supports', 'Public excerpt.'), new Evidence(UuidCodec::newV7(), $this->claimId, $this->privateSourceId, 'supports', 'Private excerpt.', null, true), new Evidence(UuidCodec::newV7(), $this->claimId, $this->activeSourceId, 'supports', 'Retired excerpt.', null, false)]; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return [new Evidence(UuidCodec::newV7(), $this->claimId, $this->activeSourceId, 'supports', 'Public excerpt.'), new Evidence(UuidCodec::newV7(), $this->claimId, $this->privateSourceId, 'supports', 'Private source excerpt.'), new Evidence(UuidCodec::newV7(), $this->claimId, $this->activeSourceId, 'supports', 'Private evidence excerpt.', null, true, 1, ['visibility' => 'PRIVATE']), new Evidence(UuidCodec::newV7(), $this->claimId, $this->activeSourceId, 'supports', 'Retired excerpt.', null, false)]; }
             public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
         };
         $result = (new KnowledgePageQuery($claims, $evidence, $sources))->detail($claimId);

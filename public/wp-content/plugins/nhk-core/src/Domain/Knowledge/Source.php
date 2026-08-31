@@ -11,4 +11,9 @@ final readonly class Source
         if (!in_array($sourceType, ['publication', 'website', 'archive', 'catalog', 'interview', 'other'], true) || $revision < 1) throw new KnowledgeException('Source type or revision is invalid.');
         if ($locator !== null && filter_var($locator, FILTER_VALIDATE_URL) === false && trim($locator) === '') throw new KnowledgeException('Source locator is invalid.');
     }
+
+    public function isPublic(): bool
+    {
+        return strtoupper(trim((string) ($this->metadata['visibility'] ?? 'PUBLIC'))) === 'PUBLIC';
+    }
 }

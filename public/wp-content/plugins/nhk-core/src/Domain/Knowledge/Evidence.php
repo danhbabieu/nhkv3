@@ -11,4 +11,9 @@ final readonly class Evidence
         if (!preg_match($uuid, $canonicalId) || !preg_match($uuid, $claimId) || !preg_match($uuid, $sourceId) || trim($excerpt) === '') throw new KnowledgeException('Evidence identity or excerpt is invalid.');
         if (!in_array($relation, ['supports', 'contradicts', 'qualifies'], true) || $revision < 1) throw new KnowledgeException('Evidence relation or revision is invalid.');
     }
+
+    public function isPublic(): bool
+    {
+        return strtoupper(trim((string) ($this->metadata['visibility'] ?? 'PUBLIC'))) === 'PUBLIC';
+    }
 }
