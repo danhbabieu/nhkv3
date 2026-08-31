@@ -161,6 +161,8 @@ final class FrontendContractTest extends TestCase
                 self::assertStringNotContainsString($internalTerm, $contents, $template . ' exposes internal term: ' . $internalTerm);
             }
         }
+        self::assertStringNotContainsString('NHK editorial archive', (string) file_get_contents($theme . '/index.php'));
+        self::assertStringNotContainsString('NHK discovery', (string) file_get_contents($theme . '/comparison.php'));
     }
 
     public function test_public_entity_payload_values_are_reader_facing(): void

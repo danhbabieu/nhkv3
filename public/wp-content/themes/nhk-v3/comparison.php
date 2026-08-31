@@ -5,7 +5,7 @@ $references = is_array($comparison['references'] ?? null) ? $comparison['referen
 $items = is_array($comparison['items'] ?? null) ? $comparison['items'] : ['left' => null, 'right' => null];
 get_header();
 ?><main id="main-content" class="site-main comparison-shell">
-  <header class="archive-intro"><p class="eyebrow">NHK discovery</p><h1>So sánh hồ sơ</h1><p class="archive-summary">Đặt hai hồ sơ cạnh nhau để đọc nhanh các dữ kiện đang công khai.</p></header>
+  <header class="archive-intro"><p class="eyebrow">Khám phá NHK</p><h1>So sánh hồ sơ</h1><p class="archive-summary">Đặt hai hồ sơ cạnh nhau để đọc nhanh các dữ kiện đang công khai.</p></header>
   <form class="comparison-form" method="get" action="<?php echo esc_url(home_url('/comparison/')); ?>">
     <div><label for="nhk-comparison-a">Hồ sơ A</label><input id="nhk-comparison-a" name="a" type="text" value="<?php echo esc_attr((string) ($references['left'] ?? '')); ?>" placeholder="Ví dụ hồ sơ thương hiệu"></div>
     <div><label for="nhk-comparison-b">Hồ sơ B</label><input id="nhk-comparison-b" name="b" type="text" value="<?php echo esc_attr((string) ($references['right'] ?? '')); ?>" placeholder="Ví dụ hồ sơ mẫu đồng hồ"></div>
