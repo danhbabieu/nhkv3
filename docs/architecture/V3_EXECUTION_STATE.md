@@ -19,6 +19,11 @@ Last updated: 2026-09-01, P11 normalized provenance-state checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Source migration now resolves normalized `source_type` from
+  top-level or metadata fields after legacy-type fallback, preserving the
+  canonical V3 vocabulary across exporter shapes. Full guarded PHPUnit passed
+  158 tests/979 assertions and plugin lint passed; no V2/live data changed.
+
 - 2026-09-01: Migration state resolution now checks V2 `review_state` in both
   normalized top-level fields and the metadata envelope, while preserving the
   value and keeping archived/retired Source/Evidence inactive. Full guarded

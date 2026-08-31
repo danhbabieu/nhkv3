@@ -236,6 +236,7 @@ final class V2MigrationService
         foreach (['visibility', 'verification_state', 'review_state', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
         $sourceTypeValue = trim((string) ($record['legacy_type'] ?? ''));
         if ($sourceTypeValue === '') $sourceTypeValue = trim((string) ($record['source_type'] ?? ''));
+        if ($sourceTypeValue === '') $sourceTypeValue = trim((string) ($metadata['source_type'] ?? ''));
         $sourceType = $this->sourceType($sourceTypeValue);
         $active = !$this->isArchived($record) && !in_array(strtoupper((string) ($record['visibility'] ?? '')), ['PRIVATE', 'HIDDEN'], true);
         $source = new Source($id, $key, $title, $sourceType, $locator !== '' ? $locator : null, $metadata, $active);

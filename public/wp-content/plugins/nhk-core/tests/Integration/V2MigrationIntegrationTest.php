@@ -126,8 +126,8 @@ final class V2MigrationIntegrationTest extends TestCase
             'stable_key' => 'v2-migration-integration-normalized-source',
             'canonical_uuid' => $sourceId,
             'canonical_name' => 'Normalized migration source',
-            'source_type' => 'catalog',
             'visibility' => 'PRIVATE',
+            'metadata' => ['source_type' => 'catalog'],
         ];
 
         try {
