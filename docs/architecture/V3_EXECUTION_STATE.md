@@ -1,15 +1,15 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, route/Admin readiness documentation checkpoint pushed.
+Last updated: 2026-08-31, Media/Video SEO and frontend contract checkpoint pushed.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `a694a89` |
+| Branch / HEAD | `main` / `e9ea590` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 59 tests, 160 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
+| Tests | Unit suite: 61 tests, 170 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
 | Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
 | Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke including homepage/Admin/Graph workflows, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
@@ -140,6 +140,10 @@ Last updated: 2026-08-31, route/Admin readiness documentation checkpoint pushed.
   Admin semantic lookup now covers Media, Video, Knowledge, Source and Graph
   endpoints. Checkpoint `41cc81a` is pushed; runtime rewrite/REST smoke is
   still gated by the local database connection.
-- 2026-08-31: Route/Admin readiness documentation checkpoint `a694a89` is
-  pushed to `origin/main`; execution state is being closed against the next
-  actual HEAD checkpoint.
+- 2026-08-31: Route/Admin readiness documentation checkpoint `a694a89` and
+  state closure `6f65b4a` are pushed to `origin/main`; runtime rewrite/REST
+  smoke remains pending until the local WordPress database is available.
+- 2026-08-31: Media/Video SEO now has document titles, canonical/OpenGraph,
+  breadcrumbs and `VideoObject`; frontend contract tests enforce the
+  HomePageQuery boundary and these metadata surfaces. Checkpoint `e9ea590` is
+  pushed; unit evidence is 61 tests/170 assertions.
