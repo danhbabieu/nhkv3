@@ -46,24 +46,25 @@ Readiness evidence are complete.
 
 ## Local-dev apply evidence
 
-The latest exported JSON is `/private/tmp/nhk-v3-v2-full-export-url-6.10.json`
-(SHA-256 `86d74a37fb1a531c32b042bd67fea16bd5df464614d6c48533bc8dfdccc1efb3`).
-Its no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run-url-6.10.json`
-(SHA-256 `3dbdb39d6aed058e6a767142736926f134c380e573156dffe47f4fda5e6736a5`).
+The latest exported JSON is `/private/tmp/nhk-v3-v2-full-export-url-6.11.json`
+(SHA-256 `a3717e5b90d5b87fb7a1681d87e8740a7037328a3e53acde991e25c599ae292a`).
+Its no-write dry-run is `/private/tmp/nhk-v3-v2-full-dry-run-url-6.11.json`
+(SHA-256 `846ca99113e94f4ba81733b5aaf8ba49dbddc2e9af5c83849c615feb753d4f26`).
 The latest governed apply result is
-`/private/tmp/nhk-v3-v2-apply-result-url-6.10.json` (SHA-256
-`5fc30a4b463df82d92f622bd69e5bc42ed4c3313b77bfde55baae2f564d9b8d4`).
-The runner wrote 2,304 `migrated` ledger rows and 2,669 explicit skips to
+`/private/tmp/nhk-v3-v2-apply-result-url-6.11.json` (SHA-256
+`49fd5553842c93431a6f387bdce872e8ffeb3b8a342e05364ec5f0b79c2ff989`).
+The runner wrote 2,379 `migrated` ledger rows and 2,594 explicit skips to
 `nhk_v3`, including 19 Source and 40 Evidence rows retained as inactive
 because the V2 records were PRIVATE. Migration008 persisted field-level media
-metadata and the three MediaAsset rows were reconciled to PRIVATE; Mapper 6.10
-added 292 Knowledge claim UUID redirects and 370 entity-registry redirects
-alongside the 34 native-post aliases and one `READY_NOOP` URL, with 0
-conflicts. A second full apply produced the same 2,304/2,669/0 counts,
+metadata and the three MediaAsset rows were reconciled to PRIVATE; Mapper 6.11
+added 367 Knowledge claim UUID redirects (including 75 archived-to-active
+consolidations) and 370 entity-registry redirects alongside the 34 native-post
+aliases and one `READY_NOOP` URL, with 0 conflicts. A second full apply
+produced the same 2,379/2,594/0 counts,
 confirming idempotency.
 
-The Mapper 6.10 dry-run reported 4,973 source records, 3,255 mapped, 1,718
-skipped and 697 URL mappings. Its explicit skip buckets were 80
+The Mapper 6.11 dry-run reported 4,973 source records, 3,330 mapped, 1,643
+skipped and 772 URL mappings. Its explicit skip buckets were 5
 `DOMAIN_TARGETED`, 23 `INVALID_URL_MAPPING` and 1,615
 `UNSUPPORTED_LEGACY_TYPE`. The staging database was then cleaned of exactly
 the 53 `nhkv2_*` tables and restored from the clean V3 snapshot; post-restore

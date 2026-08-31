@@ -41,25 +41,25 @@ report was:
 | Dry-run result | Count |
 |---|---:|
 | Source records | 4,973 |
-| Mapped candidates | 3,255 |
-| Skipped candidates | 1,718 |
-| URL mappings ready | 697 |
+| Mapped candidates | 3,330 |
+| Skipped candidates | 1,643 |
+| URL mappings ready | 772 |
 | Conflicts | 0 |
 | Invalid relations | 0 |
 
-Skipped reason buckets were `DOMAIN_TARGETED` 372, `INVALID_URL_MAPPING` 23
+Skipped reason buckets were `DOMAIN_TARGETED` 5, `INVALID_URL_MAPPING` 23
 and `UNSUPPORTED_LEGACY_TYPE` 1,615. These are no-write
 reconciliation results, not approval to apply them.
 
 ## Local development apply checkpoint
 
-The governed `tools/v2-migrate.php` runner applied the Mapper 6.10 4,973-record
-export to `nhk_v3` after the backup/restore gate. The ledger contains 2,304
-migrated records and 2,669 skipped records: `DOMAIN_TARGETED` 844,
+The governed `tools/v2-migrate.php` runner applied the Mapper 6.11 4,973-record
+export to `nhk_v3` after the backup/restore gate. The ledger contains 2,379
+migrated records and 2,594 skipped records: `DOMAIN_TARGETED` 769,
 `INVALID_RELATION` 1, `INVALID_URL_MAPPING` 23 and
 `UNSUPPORTED_LEGACY_TYPE` 1,682; conflicts were 0. The one proven identical
 URL candidate is recorded as a `READY_NOOP`; 34 `nhk_article` source paths are
-stored as native postmeta aliases, 370 Authority projection paths and 292
+stored as native postmeta aliases, 370 Authority projection paths and 367
 Knowledge claim paths are stored in the entity redirect registry, all verified
 through local HTTP 301 redirect behavior; one canonical entity target returned
 HTTP 200.
@@ -73,11 +73,12 @@ delivery/usages and public provenance presentation remain open reconciliation
 work.
 Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
 links, all matching canonical entity UUIDs: 370 active Authority entities,
-292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.10 now
-exports the 370 Authority links and 292 active Knowledge links as deterministic
-canonical route targets and records the 80 archived/no-route Knowledge links as
-`DOMAIN_TARGETED`. The Mapper 6.10 apply rerun was idempotent with the same
-2,304/2,669/0 counts, and the
+292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.11 now
+exports the 370 Authority links, 292 active Knowledge links and 75 archived
+Knowledge links with active consolidation targets as deterministic canonical
+route targets; the remaining 5 archived/no-target Knowledge links are recorded
+as `DOMAIN_TARGETED`. The Mapper 6.11 apply rerun was idempotent with the same
+2,379/2,594/0 counts, and the
 current ledger counts above are the accepted local-dev checkpoint.
 Subsequent runs were idempotent after the 40-row Evidence metadata backfill,
 the safe URL no-op classification, the 34 native-post redirect aliases and

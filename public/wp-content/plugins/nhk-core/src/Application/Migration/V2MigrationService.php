@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.10';
+    private const MAPPER_VERSION = '6.11';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;

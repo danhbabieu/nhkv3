@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, public Knowledge URL-target checkpoint.
+Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -10,12 +10,12 @@ Last updated: 2026-08-31, public Knowledge URL-target checkpoint.
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
 | Tests | Unit suite: 66 tests, 190 assertions; guarded WordPress suite: 99 tests, 404 assertions; plugin/theme PHP lint, route smoke and diff check pass |
-| Blockers | Visual QA (browser connector unavailable), external MCP transport, 103 residual URL candidates, media delivery/usages, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, 28 residual URL candidates, media delivery/usages, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Reconcile the 103 residual URL candidates, then continue field-level media delivery/usages, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,304 rows with 2,669 explicit skips, including 292 Knowledge, 370 Authority and 34 native-post redirects |
+| Next executable task | Reconcile the 28 residual URL candidates, then continue field-level media delivery/usages, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,379 rows with 2,594 explicit skips, including 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
-| Migration dry-run | Full restored-backup export: 4,973 records; 3,255 candidates and 1,718 skipped; local-dev apply: 2,304 migrated, 2,669 skipped, 0 conflicts |
+| Migration dry-run | Full restored-backup export: 4,973 records; 3,330 candidates and 1,643 skipped; local-dev apply: 2,379 migrated, 2,594 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -232,10 +232,11 @@ Last updated: 2026-08-31, public Knowledge URL-target checkpoint.
   now has 405 migrated rows (370 entity redirects, 34 native-post redirects
   and one `READY_NOOP`), 372 `DOMAIN_TARGETED` rows and 23 invalid mappings;
   the rerun was idempotent and staging was restored to a V3-only snapshot.
-- 2026-08-31: Mapper 6.10 added a public UUID claim route for active Knowledge
-  records. The restored export/dry-run/apply reached 3,255 mapped, 1,718
-  skipped, 2,304 migrated and 0 conflicts; URL reconciliation is now 697
-  migrated (292 Knowledge, 370 Authority, 34 native-post and one no-op), with
-  80 archived/no-route Knowledge URLs and 23 malformed/system URLs explicitly
-  skipped. Knowledge evidence remains fail-closed unless both Evidence and its
-  Source are active; staging was restored to V3 migration 8/8.
+- 2026-08-31: Mapper 6.11 added governed redirects for 75 archived Knowledge
+  URLs with active consolidation targets. The restored export/dry-run/apply
+  reached 3,330 mapped, 1,643 skipped, 2,379 migrated and 0 conflicts; URL
+  reconciliation is now 772 migrated (367 Knowledge, 370 Authority, 34
+  native-post and one no-op), with 5 archived/no-target Knowledge URLs and 23
+  malformed/system URLs explicitly skipped. Knowledge evidence remains
+  fail-closed unless both Evidence and its Source are active; staging was
+  restored to V3 migration 8/8.

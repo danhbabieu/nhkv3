@@ -131,6 +131,19 @@ foreach ($urlRecords as $url) {
             $url['target_entity_type'] = 'knowledge';
             $url['target_entity_key'] = (string) $entity['stable_key'];
             $url['target_entity_id'] = $entityId;
+        } elseif ($entityType === 'knowledge' && $entityState === 'ARCHIVED') {
+            $metadata = json_decode((string) ($entity['metadata'] ?? ''), true);
+            $consolidation = is_array($metadata) && is_array($metadata['consolidation'] ?? null) ? $metadata['consolidation'] : [];
+            $targetId = strtolower(trim((string) ($consolidation['target_id'] ?? '')));
+            $target = $entitiesById[$targetId] ?? null;
+            if (is_array($target) && (string) ($target['entity_type'] ?? '') === 'knowledge' && strtoupper((string) ($target['review_state'] ?? '')) === 'APPROVED') {
+                $url['target_path'] = '/knowledge/claim/' . $targetId . '/';
+                $url['target_entity_type'] = 'knowledge';
+                $url['target_entity_key'] = (string) $target['stable_key'];
+                $url['target_entity_id'] = $targetId;
+            } elseif ($url['target_path'] === '') {
+                $url['target_reason'] = 'DOMAIN_TARGETED';
+            }
         } elseif ($url['target_path'] === '') {
             $url['target_reason'] = 'DOMAIN_TARGETED';
         }

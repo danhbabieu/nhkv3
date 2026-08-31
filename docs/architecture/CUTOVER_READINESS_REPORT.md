@@ -50,12 +50,12 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 | Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 99 tests, 404 assertions |
 | Frontend route/rewrite smoke | PASS for core routes, `/hello-world/` and Knowledge archive/detail; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PENDING — route HTTP smoke passes, but Playwright has no bundled browser and system Chrome aborts in the headless connector |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,255 candidates, 1,718 no-write skips; local-dev ledger: 2,304 migrated, 2,669 explicit skips, 0 conflicts, including 292 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,330 candidates, 1,643 no-write skips; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates
 
-1. Complete field-level reconciliation for the 103 residual URLs, media
+1. Complete field-level reconciliation for the 28 residual URLs, media
    delivery/usages,
    Source/Evidence public visibility, semantic projections and the 764
    domain-targeted custom/system posts; each requires a governed target or a
