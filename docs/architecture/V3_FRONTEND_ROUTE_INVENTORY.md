@@ -50,8 +50,10 @@ fail-closed when a native WordPress route or ambiguous identity is present.
 ## Guardrails
 
 - Templates consume application contexts; they do not query database tables.
-- Media binary storage keys are displayed as metadata until a public delivery
-  policy and migrated asset mapping are verified.
+- Media binary delivery is fail-closed until the publication/privacy policy and
+  migrated asset mapping are verified; when enabled, the parent Media must be
+  active and ready and the file must pass MIME, containment, size and checksum
+  validation.
 - Video remains a canonical external-reference entity. The public template
   does not introduce local MP4 storage or download behavior.
 - Rewrite registration is conditional on a usable WordPress `$wpdb`; activation

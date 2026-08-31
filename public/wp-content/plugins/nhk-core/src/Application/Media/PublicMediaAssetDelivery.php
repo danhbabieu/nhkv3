@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\MediaAssetRepository;
+use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Domain\Media\MediaAsset;
 
 final class PublicMediaAssetDelivery
@@ -13,13 +14,15 @@ final class PublicMediaAssetDelivery
         'audio/mpeg', 'audio/ogg', 'audio/wav', 'video/mp4',
     ];
 
-    public function __construct(private MediaAssetRepository $assets, private string $storageRoot) {}
+    public function __construct(private MediaAssetRepository $assets, private MediaRepository $media, private string $storageRoot) {}
 
     /** @return array{asset:MediaAsset,path:string}|null */
     public function resolve(string $assetId): ?array
     {
         $asset = $this->assets->findByAssetId($assetId);
         if (!$asset || $asset->visibility !== 'PUBLIC' || !in_array(strtolower($asset->mimeType), self::SAFE_MIME_TYPES, true)) return null;
+        $media = $this->media->findByCanonicalId($asset->mediaId);
+        if (!$media || !$media->active || $media->readiness !== 'ready') return null;
         $root = realpath($this->storageRoot);
         if ($root === false || !is_dir($root)) return null;
         $storageKey = trim($asset->storageKey);
