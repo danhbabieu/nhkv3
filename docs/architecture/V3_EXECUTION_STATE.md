@@ -1,21 +1,21 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, governed local-dev migration checkpoint.
+Last updated: 2026-08-31, final media persistence and local-dev migration checkpoint.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `03a50de` |
+| Branch / HEAD | `main` / `da748fd` |
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 6 / target 6 on `nhk_v3`; Knowledge and Migration006 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 89 tests, 363 assertions; plugin/theme PHP lint and diff check pass |
+| Tests | Unit suite: 63 tests, 181 assertions; guarded WordPress suite: 90 tests, 367 assertions; plugin/theme PHP lint and diff check pass |
 | Blockers | Visual QA (browser connector unavailable), external MCP transport, URL/media/source/evidence reconciliation, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Complete field-level URL/media/source/evidence/semantic projection reconciliation, review the 1,545-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
-| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; local-dev ledger imported 1,545 rows with 3,388 explicit skips |
+| Next executable task | Complete field-level URL/media delivery/usages/source/evidence/semantic projection reconciliation, review the 1,548-row local-dev apply ledger, then run detail-route visual QA and external MCP transport checks before Cutover Readiness can close |
+| Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets, 1,581 semantic projections; local-dev ledger imported 1,548 rows with 3,385 explicit skips |
 | Pending migrations | None; `nhk_v3` is current 6/target 6 and Migration006 ledger is active |
-| Migration dry-run | Full restored-backup export: 4,933 records; 2,516 candidates and 2,417 skipped; local-dev apply: 1,545 migrated, 3,388 skipped, 0 conflicts |
+| Migration dry-run | Full restored-backup export: 4,933 records; 2,519 candidates and 2,414 skipped; local-dev apply: 1,548 migrated, 3,385 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -182,3 +182,10 @@ Last updated: 2026-08-31, governed local-dev migration checkpoint.
   local `nhk_v3`: 1,545 migrated, 3,388 explicit skips, 0 conflicts. A second
   run produced the same counts and no duplicate targets. The guarded test DB
   was restored from snapshot and remains free of `nhkv2_*` tables.
+- 2026-08-31: MediaAsset persistence was corrected at the repository boundary:
+  V3 keeps BIGINT internal Media foreign keys while repositories resolve
+  canonical Media UUIDs on write/read. Focused media regression and the
+  guarded full suite pass at 90 tests/367 assertions. The final governed
+  local-dev apply is 1,548 migrated, 3,385 skipped and 0 conflicts; all three
+  V2 MediaAsset rows are present with verified parent IDs. Checkpoint
+  `da748fd` is committed locally; production/live migration remains blocked.
