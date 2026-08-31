@@ -21,7 +21,9 @@ foreach (array_slice($argv, 1) as $argument) {
 $routes = [
     '/' => 200,
     '/tri-thuc/' => 200,
+    '/tri-thuc/page/2/' => 200,
     '/goc-chia-se/' => 200,
+    '/goc-chia-se/page/2/' => 200,
     '/brand/' => 200,
     '/thuong-hieu/' => 200,
     '/model/' => 200,
