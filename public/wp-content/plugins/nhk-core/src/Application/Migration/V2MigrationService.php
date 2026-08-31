@@ -21,7 +21,7 @@ use NHK\Core\Application\Graph\GraphService;
 
 final class V2MigrationService
 {
-    private const MAPPER_VERSION = '6.12';
+    private const MAPPER_VERSION = '6.14';
     private WpdbMigrationLedgerRepository $ledger;
     private WpdbAuthorityRepository $authority;
     private WpdbMediaRepository $media;
@@ -113,6 +113,8 @@ final class V2MigrationService
     private function post(array $record): array
     {
         $legacyType = (string) ($record['legacy_type'] ?? '');
+        if ($legacyType === 'attachment') throw new MigrationSkip('skipped', 'UNSUPPORTED_MEDIA_REFERENCE', 'Legacy attachment has no governed V3 MediaAsset target.');
+        if ($legacyType === 'wp_global_styles') throw new MigrationSkip('skipped', 'RETIRED_LEGACY_GARBAGE', 'Legacy WordPress global styles are replaced by the V3 theme token system.');
         if (!in_array($legacyType, ['nhk_article', 'post', 'page'], true)) throw new MigrationSkip('skipped', 'DOMAIN_TARGETED', 'Legacy custom post type is represented by its canonical domain.');
         $sourceKey = $this->sourceKey($record);
         $existing = get_posts(['post_type' => ['post', 'page'], 'post_status' => 'any', 'meta_key' => '_nhk_v2_source_key', 'meta_value' => $sourceKey, 'numberposts' => 1]);

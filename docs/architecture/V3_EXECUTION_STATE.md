@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
+Last updated: 2026-08-31, Mapper 6.13 URL reason checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,13 +9,13 @@ Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 67 tests, 192 assertions; guarded WordPress suite: 100 tests, 406 assertions; plugin/theme PHP lint, route smoke and diff check pass |
-| Blockers | Responsive/tablet/mobile visual QA, external MCP transport, 28 residual URL candidates, MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 68 tests, 199 assertions; guarded WordPress suite: 101 tests, 413 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Resolve the 28 explicitly skipped URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
+| Next executable task | Obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,379 rows with 2,594 explicit skips, including 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
-| Migration dry-run | Full restored-backup export: 4,973 records; 3,330 candidates and 1,643 skipped; local-dev apply: 2,379 migrated, 2,594 skipped, 0 conflicts |
+| Migration dry-run | Full restored-backup export: 4,973 records; 2,379 candidates and 2,594 skipped; buckets match apply (747 domain-targeted, 42 unsupported media, 3 retired garbage, 1 invalid relation, 1,801 unsupported legacy); local-dev apply: 2,379 migrated, 2,594 skipped, 0 conflicts |
 
 ## Checkpoint journal
 
@@ -249,6 +249,20 @@ Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
   `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE`, 1
   `RETIRED_LEGACY_GARBAGE` and 1 `INVALID_URL_MAPPING`; the full rerun stayed
   idempotent.
+- 2026-08-31: Mapper 6.13 classified the remaining WordPress global-style URL
+  as `RETIRED_LEGACY_GARBAGE`. Full-artifact dry-run remained 3,330 mapped /
+  1,643 skipped; local-dev apply and rerun remained 2,379 migrated /
+  2,594 skipped / 0 conflicts with URL skips now 5 `DOMAIN_TARGETED`, 21
+  `UNSUPPORTED_MEDIA_REFERENCE` and 2 `RETIRED_LEGACY_GARBAGE`. Apply output
+  hashes matched across both runs.
+- 2026-08-31: Mapper 6.14 made `legacy_semantic_projection` stable keys
+  collision-safe by retaining the historical semantic key for the first row
+  and suffixing later duplicates with their `projection_id`. Dry-run now
+  mirrors apply boundaries for custom/system posts, categories and relation
+  predicates: 2,379 mapped / 2,594 skipped / 0 conflicts. Batch 14 contains
+  all 4,973 source keys with matching reason buckets, and its apply rerun
+  hash matched exactly. Staging was restored to 0 V2 tables, 17 V3 tables and
+  migration 8/8.
 - 2026-08-31: Browser visual QA succeeded for desktop homepage, Knowledge
   archive/detail, Authority detail and 404 surfaces. Responsive/tablet/mobile
   coverage remains pending; the browser connector is available for follow-up.

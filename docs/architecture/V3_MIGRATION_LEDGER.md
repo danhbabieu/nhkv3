@@ -6,18 +6,18 @@ migration, and unresolved rows remain explicit in the ledger.
 
 | Data type | Source count | Mapped | Migrated | Skipped | Duplicate | Conflict | Verified | Status / reason codes |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| WordPress Posts | 800 | 36 | 36 | 764 | 0 | 0 | 36 | DEV ONLY; 764 domain-targeted custom/system posts |
+| WordPress Posts | 800 | 36 | 36 | 764 | 0 | 0 | 36 | DEV ONLY; 742 domain-targeted custom posts, 21 unsupported attachment references and 1 retired global-style post |
 | Categories | 2 | 1 | 1 | 1 | 0 | 0 | 1 | DEV ONLY; non-category taxonomy is explicit skip |
 | Media entities | 242 | 242 | 242 | 0 | 0 | 0 | 242 | DEV ONLY; asset metadata is ledgered separately |
 | Authority entities | 370 | 370 | 370 | 0 | 0 | 0 | 370 | DEV ONLY; exact UUID/stable-key mapping |
 | Knowledge claims | 655 | 655 | 655 | 0 | 0 | 0 | 655 | DEV ONLY; Source/Evidence joins verified; rows retain V2 private visibility |
-| Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; governed `about` relations only |
+| Relations | 427 | 241 | 241 | 186 | 0 | 0 | 241 | DEV ONLY; 185 unsupported predicates and 1 invalid endpoint are explicit skips |
 | Videos | 0 | 0 | 0 | 0 | 0 | 0 | 0 | No source rows in selected backup |
-| URLs | 800 | 772 | 772 | 28 | 0 | 0 | 772 | 367 Knowledge claim UUID redirects (292 active plus 75 archived-to-active consolidations), 370 Authority entity redirects, 34 native-post redirects and one identical source/target `READY_NOOP`; residual skips are 5 `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE`, 1 `RETIRED_LEGACY_GARBAGE` and 1 invalid mapping |
+| URLs | 800 | 772 | 772 | 28 | 0 | 0 | 772 | 367 Knowledge claim UUID redirects (292 active plus 75 archived-to-active consolidations), 370 Authority entity redirects, 34 native-post redirects and one identical source/target `READY_NOOP`; residual skips are 5 `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE` and 2 `RETIRED_LEGACY_GARBAGE` |
 | Media assets | 3 | 3 | 3 | 0 | 0 | 0 | 3 | DEV ONLY; checksum, dimensions, field-level metadata and PRIVATE visibility imported; V2 usage inventory is zero; public delivery/privacy policy remains open |
 | Sources | 19 | 19 | 19 | 0 | 0 | 0 | 19 | DEV ONLY; imported inactive because V2 visibility is PRIVATE |
 | Evidence | 40 | 40 | 40 | 0 | 0 | 0 | 40 | DEV ONLY; citation endpoints and metadata verified; imported inactive because V2 visibility is PRIVATE |
-| Semantic projections | 1,581 | 0 | 0 | 1,581 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed |
+| Semantic projections | 1,581 | 0 | 0 | 1,581 | 0 | 0 | 0 | Explicitly unsupported until target mapping/provenance is governed; exporter keys are collision-safe by `projection_id` |
 
 ## Read-only reference checkpoint
 

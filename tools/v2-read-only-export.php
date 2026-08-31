@@ -152,6 +152,7 @@ foreach ($urlRecords as $url) {
     }
     if ($url['target_path'] === '' && (string) ($url['legacy_type'] ?? '') === 'attachment') $url['target_reason'] = 'UNSUPPORTED_MEDIA_REFERENCE';
     if ($url['target_path'] === '' && (string) ($url['legacy_type'] ?? '') === 'post' && (string) ($url['source_path'] ?? '') === '/') $url['target_reason'] = 'RETIRED_LEGACY_GARBAGE';
+    if ($url['target_path'] === '' && (string) ($url['legacy_type'] ?? '') === 'wp_global_styles') $url['target_reason'] = 'RETIRED_LEGACY_GARBAGE';
     unset($url['legacy_type']);
     $records[] = $url;
 }
@@ -263,10 +264,16 @@ foreach ($mediaAssets as $asset) {
 }
 
 $projections = $rows($db, 'SELECT projection_id,semantic_id,canonical_object_id,canonical_object_type,projection_type,visibility,quality_state,seo_ready,ai_ready,stale FROM ' . $table('nhk_semantic_projections') . ' ORDER BY projection_id');
+$projectionKeys = [];
 foreach ($projections as $projection) {
+    $semanticId = (string) $projection['semantic_id'];
+    $stableKey = $semanticId;
+    if (isset($projectionKeys[$semanticId])) $stableKey .= ':projection:' . (string) $projection['projection_id'];
+    $projectionKeys[$semanticId] = true;
     $records[] = [
         'type' => 'legacy_semantic_projection',
-        'stable_key' => (string) $projection['semantic_id'],
+        'stable_key' => $stableKey,
+        'legacy_id' => (string) $projection['projection_id'],
         'legacy_type' => (string) $projection['projection_type'],
         'canonical_object_type' => (string) $projection['canonical_object_type'],
         'canonical_object_id' => (string) $projection['canonical_object_id'],

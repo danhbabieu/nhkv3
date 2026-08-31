@@ -34,6 +34,7 @@ final class DryRunService
     private function inspect(array $record, array &$checksums): array
     {
         $type = (string) ($record['type'] ?? '');
+        if (!empty($record['conflict'])) return ['status' => 'conflict', 'reason' => 'CONFLICT_REQUIRES_REVIEW'];
         if ($type === 'url') {
             if (trim((string) ($record['source_path'] ?? '')) === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
             if (trim((string) ($record['target_path'] ?? '')) !== '') return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
@@ -44,10 +45,19 @@ final class DryRunService
         if ($type === 'relation') {
             if ((string) ($record['source_key'] ?? '') === '' || (string) ($record['target_key'] ?? '') === '') return ['status' => 'skipped', 'reason' => 'INVALID_RELATION'];
             if (!empty($record['source_missing']) || !empty($record['target_missing'])) return ['status' => 'skipped', 'reason' => 'MISSING_ENDPOINT'];
+            $predicate = (string) ($record['predicate'] ?? $record['relation_type'] ?? '');
+            if (!in_array($predicate, ['about', 'depicts'], true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
+            if (!$this->validNodeReference((string) ($record['source_type'] ?? ''), (string) ($record['source_key'] ?? '')) || !$this->validNodeReference((string) ($record['target_type'] ?? ''), (string) ($record['target_key'] ?? ''))) return ['status' => 'skipped', 'reason' => 'INVALID_RELATION'];
             return ['status' => 'mapped', 'reason' => 'RELATION_READY'];
         }
+        if ($type === 'wp_post') {
+            $legacyType = (string) ($record['legacy_type'] ?? '');
+            if ($legacyType === 'attachment') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_MEDIA_REFERENCE'];
+            if ($legacyType === 'wp_global_styles') return ['status' => 'skipped', 'reason' => 'RETIRED_LEGACY_GARBAGE'];
+            if (!in_array($legacyType, ['nhk_article', 'post', 'page'], true)) return ['status' => 'skipped', 'reason' => 'DOMAIN_TARGETED'];
+        }
+        if ($type === 'category' && (string) ($record['taxonomy'] ?? '') !== 'category') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
         if (!in_array($type, self::SUPPORTED_TYPES, true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
-        if (!empty($record['conflict'])) return ['status' => 'conflict', 'reason' => 'CONFLICT_REQUIRES_REVIEW'];
         if (isset($record['canonical_uuid'])) {
             try { UuidCodec::toBinary((string) $record['canonical_uuid']); } catch (\Throwable) { return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY']; }
         }
@@ -59,5 +69,14 @@ final class DryRunService
             $checksums[$checksum][] = (string) ($record['stable_key'] ?? '');
         }
         return ['status' => 'mapped', 'reason' => 'READY'];
+    }
+
+    private function validNodeReference(string $type, string $key): bool
+    {
+        $map = ['article' => 'wp_post', 'wp_post' => 'wp_post', 'brand' => 'brand', 'model' => 'model', 'variant' => 'variant', 'movement' => 'movement', 'music' => 'music', 'component' => 'component', 'classification' => 'classification', 'specimen' => 'specimen', 'product' => 'product', 'media' => 'media', 'knowledge' => 'knowledge'];
+        if (!isset($map[$type])) return false;
+        return $map[$type] === 'wp_post'
+            ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $key) === 1
+            : preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $key) === 1;
     }
 }

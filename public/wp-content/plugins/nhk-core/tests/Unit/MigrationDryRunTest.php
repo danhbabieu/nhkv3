@@ -54,6 +54,26 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame(1, $report['skipped_by_reason']['RETIRED_LEGACY_GARBAGE']);
     }
 
+    public function test_dry_run_matches_apply_boundaries_for_posts_categories_and_relations(): void
+    {
+        $uuid = UuidCodec::newV7();
+        $report = (new DryRunService())->run([
+            ['type' => 'wp_post', 'stable_key' => 'wp_post:1', 'legacy_type' => 'attachment'],
+            ['type' => 'wp_post', 'stable_key' => 'wp_post:2', 'legacy_type' => 'wp_global_styles'],
+            ['type' => 'wp_post', 'stable_key' => 'wp_post:3', 'legacy_type' => 'nhk_brand'],
+            ['type' => 'category', 'stable_key' => 'tag:one', 'taxonomy' => 'post_tag'],
+            ['type' => 'relation', 'source_key' => $uuid, 'source_type' => 'article', 'relation_type' => 'about', 'target_key' => $uuid, 'target_type' => 'brand'],
+            ['type' => 'relation', 'source_key' => $uuid, 'source_type' => 'knowledge', 'relation_type' => 'authority.brand-model', 'target_key' => $uuid, 'target_type' => 'brand'],
+        ]);
+        self::assertSame(0, $report['mapped']);
+        self::assertSame(6, $report['skipped']);
+        self::assertSame(1, $report['skipped_by_reason']['UNSUPPORTED_MEDIA_REFERENCE']);
+        self::assertSame(1, $report['skipped_by_reason']['RETIRED_LEGACY_GARBAGE']);
+        self::assertSame(1, $report['skipped_by_reason']['DOMAIN_TARGETED']);
+        self::assertSame(1, $report['skipped_by_reason']['INVALID_RELATION']);
+        self::assertSame(2, $report['skipped_by_reason']['UNSUPPORTED_LEGACY_TYPE']);
+    }
+
     public function test_invalid_checksum_and_non_record_are_not_silently_mapped(): void
     {
         $report = (new DryRunService())->run([

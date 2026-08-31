@@ -43,19 +43,21 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 67 tests, 192 assertions |
+| Unit tests | PASS — 68 tests, 199 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 100 tests, 406 assertions |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 101 tests, 413 assertions |
 | Frontend route/rewrite smoke | PASS for core routes, `/hello-world/` and Knowledge archive/detail; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PARTIAL — desktop homepage, Knowledge archive/detail, Authority detail and 404 were visually inspected; tablet/mobile responsive coverage remains pending |
-| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 3,330 candidates, 1,643 no-write skips; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
+| V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,379 candidates, 2,594 no-write skips with buckets matching apply; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 ## Blocking gates
 
-1. Complete field-level reconciliation for the 28 residual URLs, MediaAsset
+1. Complete field-level reconciliation and final retirement/target approval for the 28 residual URLs (now explicitly classified as 5
+   `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE` and 2
+   `RETIRED_LEGACY_GARBAGE`), MediaAsset
    delivery/privacy policy,
    Source/Evidence public visibility, semantic projections and the 764
    domain-targeted custom/system posts; each requires a governed target or a

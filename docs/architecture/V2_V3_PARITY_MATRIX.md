@@ -16,7 +16,7 @@ the final parity declaration.
 | Relations / Post Graph | 185 Graph relation rows plus 242 Knowledge relations | Graph Core + Post/Knowledge endpoint + governed relation proposals | DEV ONLY: 241 | PARTIAL | IN PROGRESS | 241 explicit `about` relations imported; 186 legacy/invalid relation rows remain skipped |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + grouped semantic search + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search combines native Posts with active semantic groups; guarded lifecycle integration passes, but V2 behavior reconciliation remains pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
-| SEO / URLs / Sitemap / RSS | 800 source URL candidates; apply has 772 mapped, 28 skipped | WordPress boundary + native postmeta/entity-registry 301 redirects + theme metadata/JSON-LD | DEV ONLY: 772 | PARTIAL | IN PROGRESS | 292 active Knowledge, 75 archived-to-active Knowledge and 370 active Authority projection links now redirect to canonical routes; 34 legacy article redirects and one safe no-op verified; 28 residual URLs remain explicitly skipped pending route/retirement reconciliation |
+| SEO / URLs / Sitemap / RSS | 800 source URL candidates; apply has 772 mapped, 28 skipped | WordPress boundary + native postmeta/entity-registry 301 redirects + theme metadata/JSON-LD | DEV ONLY: 772 | PARTIAL | IN PROGRESS | 292 active Knowledge, 75 archived-to-active Knowledge and 370 active Authority projection links now redirect to canonical routes; 34 legacy article redirects and one safe no-op verified; all 28 residual URLs have bounded reasons: 5 `DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE` and 2 `RETIRED_LEGACY_GARBAGE`; final retirement/target policy remains open |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages, Graph-derived related sections and Media gallery surface | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes, related groups, media archive/detail and readiness-aware asset states exist; V2 inventory and runtime gallery QA remain |
 
 ## Required parity inventory
@@ -60,13 +60,13 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 The restored read-only V2 backup contains 800 posts, 1,301 entities, 2
 taxonomy rows, 427 relations, 19 evidence rows, 40 citations, 3 media assets
 and 1,581 semantic projections. The expanded no-write dry-run processes 4,973
-records: 3,330 mapped candidates and 1,643 skipped candidates (5
-`DOMAIN_TARGETED`, 21 `UNSUPPORTED_MEDIA_REFERENCE`, 1
-`RETIRED_LEGACY_GARBAGE`, 1 invalid URL map and 1,615 unsupported legacy
+records: 2,379 mapped candidates and 2,594 skipped candidates (747
+`DOMAIN_TARGETED`, 42 `UNSUPPORTED_MEDIA_REFERENCE`, 3
+`RETIRED_LEGACY_GARBAGE`, 1 `INVALID_RELATION` and 1,801 unsupported legacy
 types).
 The local-dev governed apply recorded 2,379 migrated rows and 2,594 explicit
-skips (769 domain-targeted rows, 1 invalid relation, 21 unsupported media
-references, 1 retired legacy garbage, 1 invalid URL mapping, 1,682 unsupported
+skips (747 domain-targeted rows, 1 invalid relation, 42 unsupported media
+references, 3 retired legacy garbage and 1,801 unsupported
 legacy type) with zero conflicts. Thirty-four native-post
 redirects, one identical source/target URL, 370 canonical Authority entity
 redirects and 367 Knowledge claim redirects are migrated; three media assets
