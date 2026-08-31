@@ -55,4 +55,15 @@ final class P7KnowledgeIntegrationTest extends TestCase
         $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $source->canonicalId));
         self::assertSame(404, $response->get_status());
     }
+
+    public function test_private_evidence_is_not_exposed_by_public_rest_read(): void
+    {
+        global $wpdb;
+        $service = new KnowledgeService(new WpdbKnowledgeRepository($wpdb), new WpdbSourceRepository($wpdb), new WpdbEvidenceRepository($wpdb));
+        $claim = $service->createClaim('p7-integration-private-claim', 'Private claim for REST boundary.', 'fact', ['metadata' => ['verification_status' => 'UNVERIFIED']]);
+        $source = $service->createSource('p7-integration-private-evidence-source', 'Private evidence source', 'archive', 'https://example.test/private-evidence');
+        $evidence = $service->cite($claim->canonicalId, $source->canonicalId, 'Private excerpt');
+        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/evidence/' . $evidence->canonicalId));
+        self::assertSame(404, $response->get_status());
+    }
 }
