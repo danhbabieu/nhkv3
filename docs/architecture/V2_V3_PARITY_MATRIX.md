@@ -11,7 +11,7 @@ the final parity declaration.
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
 | Brand / Model / Variant / Movement / Music / Component / Classification | 4 / 30 / 42 / 18 / 11 / 91 / 174 entity rows | Authority registry/core + canonical entity read API + frontend routes | DEV ONLY: exact counts | PARTIAL | IN PROGRESS | Exact UUID/stable-key rows imported into local dev; semantic field review remains |
 | Specimen / Product | No rows found in selected full V2 backup | Registry-backed Authority contract + frontend routes | NO | PARTIAL | IN PROGRESS | Absence is recorded from this backup; source/API confirmation and retirement reason remain pending |
-| Media / Video | 242 media entities, 3 assets, 0 usage and 0 visual-video rows | P6 domain/persistence + public archive/detail routes | DEV ONLY: 242 Media + 3 assets | PASS | IN PROGRESS | Media identities and field-level asset metadata/PRIVATE visibility imported; public boundaries suppress all three assets until delivery policy/usages are reconciled; video delivery remains pending |
+| Media / Video | 242 media entities, 3 assets, 0 usage and 0 visual-video rows | P6 domain/persistence + public archive/detail routes | DEV ONLY: 242 Media + 3 assets | PASS | IN PROGRESS | Media identities and field-level asset metadata/PRIVATE visibility imported; public boundaries suppress all three assets until delivery/privacy policy is approved; V2 usage inventory is exactly zero; video delivery remains pending |
 | Knowledge Claim / Source / Evidence | 655 knowledge entities, 19 evidence, 40 citations, 242 Knowledge relations | P7 contracts, schema and service | DEV ONLY: 655 claims + 19 sources + 40 evidence | PASS | IN PROGRESS | Claims, sources and citation evidence imported with endpoint, verification and citation metadata; all source/evidence rows retain V2 PRIVATE state pending public provenance policy |
 | Relations / Post Graph | 185 Graph relation rows plus 242 Knowledge relations | Graph Core + Post/Knowledge endpoint + governed relation proposals | DEV ONLY: 241 | PARTIAL | IN PROGRESS | 241 explicit `about` relations imported; 186 legacy/invalid relation rows remain skipped |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + grouped semantic search + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search combines native Posts with active semantic groups; guarded lifecycle integration passes, but V2 behavior reconciliation remains pending |
@@ -49,7 +49,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Entity create/update/retire/reactivate | Authority + optimistic revision | IN PROGRESS |
 | Proposal/submit/approval/eligibility/apply | Governance-controlled mutation | IN PROGRESS |
 | Relations / Post semantic links | One typed Graph | IN PROGRESS |
-| Media ingestion / usage | Media identity, asset and placement separation | IN PROGRESS |
+| Media ingestion / usage | Media identity, asset and placement separation | PASS — V2 usage inventory is exactly zero; V3 usage contract is covered |
 | Video linking | Canonical external-reference entity | IN PROGRESS |
 | Knowledge / Source / Evidence | Atomic claims with provenance | IN PROGRESS |
 | Search | Unified SearchService abstraction and native WP post query | IN PROGRESS |

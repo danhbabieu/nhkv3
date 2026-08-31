@@ -10,9 +10,9 @@ Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
 | Tests | Unit suite: 66 tests, 190 assertions; guarded WordPress suite: 99 tests, 404 assertions; plugin/theme PHP lint, route smoke and diff check pass |
-| Blockers | Visual QA (browser connector unavailable), external MCP transport, 28 residual URL candidates, media delivery/usages, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Blockers | Visual QA (browser connector unavailable), external MCP transport, 28 residual URL candidates, MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Reconcile the 28 residual URL candidates, then continue field-level media delivery/usages, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
+| Next executable task | Reconcile the 28 residual URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before visual QA and external MCP transport checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,379 rows with 2,594 explicit skips, including 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 8/target 8 and Migration006 ledger plus Evidence and MediaAsset metadata are active |
 | Migration dry-run | Full restored-backup export: 4,973 records; 3,330 candidates and 1,643 skipped; local-dev apply: 2,379 migrated, 2,594 skipped, 0 conflicts |
@@ -240,3 +240,7 @@ Last updated: 2026-08-31, archived Knowledge consolidation URL checkpoint.
   malformed/system URLs explicitly skipped. Knowledge evidence remains
   fail-closed unless both Evidence and its Source are active; staging was
   restored to V3 migration 8/8.
+- 2026-08-31: V2 media usage audit confirmed exactly 0 rows in
+  `nhkv2_nhk_media_usage`; no usage rows require migration. Media parity is
+  therefore recorded as usage-contract PASS, while the three imported PRIVATE
+  MediaAsset rows remain gated on delivery/privacy policy approval.

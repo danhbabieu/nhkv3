@@ -55,8 +55,8 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 ## Blocking gates
 
-1. Complete field-level reconciliation for the 28 residual URLs, media
-   delivery/usages,
+1. Complete field-level reconciliation for the 28 residual URLs, MediaAsset
+   delivery/privacy policy,
    Source/Evidence public visibility, semantic projections and the 764
    domain-targeted custom/system posts; each requires a governed target or a
    documented retirement/skip decision.

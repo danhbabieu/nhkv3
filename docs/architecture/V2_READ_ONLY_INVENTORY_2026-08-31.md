@@ -68,9 +68,9 @@ field-level metadata and PRIVATE visibility; the local public API/query
 boundary therefore returns no asset delivery for those rows. Public Knowledge
 REST also returns 404 for inactive PRIVATE Source/Claim identities. Nineteen Source rows and 40 citation Evidence
 rows were also imported with their V2 PRIVATE state, verification state and
-citation metadata preserved; runtime media
-delivery/usages and public provenance presentation remain open reconciliation
-work.
+citation metadata preserved; runtime MediaAsset delivery/privacy and public
+provenance presentation remain open reconciliation work. The V2 media usage
+inventory is exactly zero, so no usage rows require migration.
 Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
 links, all matching canonical entity UUIDs: 370 active Authority entities,
 292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.11 now
@@ -93,7 +93,7 @@ production mutation.
 
 ## Required follow-up
 
-URL redirects not covered by the new explicit Authority links, media delivery/usages, external videos without a supported
+URL redirects not covered by the new explicit Authority links, MediaAsset delivery/privacy, external videos without a supported
 reference and semantic projections remain explicitly unmigrated or require a
 governed target mapping. Source/Evidence rows are stored with private state
 until their public visibility/provenance policy is reviewed. The exporter and
