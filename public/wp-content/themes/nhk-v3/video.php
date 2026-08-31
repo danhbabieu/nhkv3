@@ -1,0 +1,15 @@
+<?php
+$context = $GLOBALS['nhk_core_video_context'] ?? null;
+$archive = is_array($context) ? ($context['archive'] ?? []) : [];
+$video = is_array($context) ? ($context['video'] ?? []) : [];
+get_header();
+?><main class="site-main media-video-shell">
+<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && $video !== []): $platform = strtolower((string) ($video['platform'] ?? '')); $externalId = (string) ($video['external_id'] ?? ''); ?>
+  <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url(home_url('/video/')); ?>">Video</a></p>
+  <header class="archive-intro media-header"><p class="eyebrow"><?php echo esc_html($platform ?: 'External reference'); ?></p><h1><?php echo esc_html((string) ($video['title'] ?: 'Video NHK')); ?></h1><p class="archive-summary">Video là entity tham chiếu external canonical; NHK không sao chép hoặc lưu MP4 local.</p></header>
+  <?php if ($platform === 'youtube' && preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)): ?><div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/<?php echo esc_attr($externalId); ?>" title="<?php echo esc_attr((string) ($video['title'] ?: 'Video NHK')); ?>" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><?php endif; ?>
+  <div class="video-facts"><dl class="entity-facts"><dt>Nền tảng</dt><dd><?php echo esc_html($platform); ?></dd><dt>External ID</dt><dd><code><?php echo esc_html($externalId); ?></code></dd><dt>Canonical URL</dt><dd><a class="text-link" href="<?php echo esc_url((string) ($video['url'] ?? '')); ?>" rel="noopener noreferrer">Mở nguồn video ↗</a></dd></dl></div>
+<?php elseif (is_array($context) && is_array($archive)): ?>
+  <header class="archive-intro"><p class="eyebrow">External references</p><h1>Video</h1><p class="archive-summary">Các video tham chiếu canonical được kiểm soát qua entity Video.</p></header>
+  <?php if (!empty($archive['items'])): ?><div class="media-card-grid"><?php foreach ($archive['items'] as $item): ?><article class="media-card"><p class="eyebrow"><?php echo esc_html((string) ($item['platform'] ?? 'Video')); ?></p><h2><a href="<?php echo esc_url(home_url('/video/' . rawurlencode((string) $item['id']) . '/')); ?>"><?php echo esc_html((string) ($item['title'] ?: 'Video NHK')); ?></a></h2><p><a class="text-link" href="<?php echo esc_url((string) ($item['url'] ?? '')); ?>" rel="noopener noreferrer">Nguồn external ↗</a></p></article><?php endforeach; ?></div><?php else: ?><div class="empty media-empty"><h2>Chưa có video public</h2><p>Video chỉ xuất hiện sau khi external reference hợp lệ và active.</p></div><?php endif; ?>
+<?php else: ?><div class="empty"><h1>Video chưa sẵn sàng</h1><p>Không thể tải dữ liệu video canonical.</p></div><?php endif; ?></main><?php get_footer();

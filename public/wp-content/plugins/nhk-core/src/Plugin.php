@@ -16,6 +16,7 @@ use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
 use NHK\Core\Infrastructure\Http\EntityApi;
 use NHK\Core\Infrastructure\Http\GraphApi;
+use NHK\Core\Infrastructure\Http\PublicMediaVideoRoutes;
 use NHK\Core\Infrastructure\Http\PublicEntityRoutes;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
@@ -30,6 +31,7 @@ use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttempt
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Application\Entity\{EntityPageQuery, RelatedContentQuery};
+use NHK\Core\Application\Media\MediaVideoPageQuery;
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
@@ -40,7 +42,7 @@ final class Plugin {
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
         global $wpdb;
-        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); $publicAuthority = new WpdbAuthorityRepository($wpdb); $publicMedia = new WpdbMediaRepository($wpdb); $publicVideos = new WpdbVideoRepository($wpdb); $publicEndpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos); $publicStatus = new MigrationStatus(); $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink()); $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus); (new PublicEntityRoutes(new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus), $publicTypes))->register(); }
+        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); $publicAuthority = new WpdbAuthorityRepository($wpdb); $publicMedia = new WpdbMediaRepository($wpdb); $publicVideos = new WpdbVideoRepository($wpdb); $publicEndpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos); $publicStatus = new MigrationStatus(); $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink()); $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus); (new PublicEntityRoutes(new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus), $publicTypes))->register(); $publicAssets = new WpdbMediaAssetRepository($wpdb); $publicUsages = new WpdbMediaUsageRepository($wpdb); (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus)))->register(); }
         add_action('rest_api_init', static function (): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;

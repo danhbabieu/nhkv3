@@ -11,13 +11,13 @@ the final parity declaration.
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
 | Brand / Model / Variant / Movement / Music / Component / Classification | Legacy data pending | Authority registry/core + canonical entity read API + frontend routes | NO | PARTIAL | IN PROGRESS | Nine-type registry/catalog, persistence, API and route/query contract tested; runtime smoke and legacy data pending |
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract + frontend routes | NO | PARTIAL | IN PROGRESS | Physical specimen vs commercial product distinction and route/query contract tested; runtime smoke and legacy data pending |
-| Media / Video | Legacy data pending | P6 domain contracts + migration 004 | NO | PASS | IN PROGRESS | Identity/asset/usage separation, checksum candidate semantics, schema readiness and YouTube external reference tested; repositories/relations/data migration pending |
+| Media / Video | Legacy data pending | P6 domain/persistence + public archive/detail routes | NO | PASS | IN PROGRESS | Identity/asset/usage separation, active-only query services, schema readiness, responsive media template and YouTube external reference tested; V2 data, runtime smoke and binary storage delivery pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search, eligibility, governed proposal/Controlled Apply REST and Admin console implemented; runtime QA and V2 behavior reconciliation pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
 | SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary + theme metadata/JSON-LD | NO | PARTIAL | IN PROGRESS | Canonical, description, OpenGraph, Article and BreadcrumbList hooks added; sitemap/RSS remain native and runtime audit pending |
-| Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages implemented; related/media/gallery modules pending | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes and semantic facts exist; Graph-derived related content and galleries remain |
+| Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages, Graph-derived related sections and Media gallery surface | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes, related groups, media archive/detail and readiness-aware asset states exist; V2 inventory and runtime gallery QA remain |
 
 ## Required parity inventory
 
@@ -36,7 +36,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Post / Tri thức / Góc chia sẻ | Pending audit | Native WordPress editorial routes | Enriched by Graph/Knowledge without body duplication | NO |
 | Brand / Model / Movement / Music / Component | Pending audit | Domain-specific archive/single pages | Graph-backed sections and pagination | PARTIAL |
 | Specimen / Product | Pending audit | Separate physical-object/listing pages | Explicit identity distinction | PARTIAL |
-| Media gallery / Video | Pending audit | First-class query modules | Responsive assets; external embeds only | NO |
+| Media gallery / Video | Pending audit | First-class archive/detail query modules and theme templates | Responsive assets; external embeds only | PARTIAL |
 | Pagination / 404 / empty states | Pending audit | Route-level accessible states | No dead ends or fixture leakage | NO |
 | Desktop / tablet / mobile | Pending audit | Responsive one-to-many-column layouts | Reading comfort and Core Web Vitals considered | NO |
 | SEO metadata / structured data | Pending audit | WordPress/theme metadata hooks | Canonical, OpenGraph, Article and BreadcrumbList | PARTIAL |

@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, canonical entity frontend routes checkpoint pushed.
+Last updated: 2026-08-31, Media/Video public surface checkpoint in progress.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `dea84fd` |
+| Branch / HEAD | `main` / `4e0252c` |
 | Current phase | P8 Governance/Graph/Admin/API + P7/P9/P10 vertical slices in parallel |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 55 tests, 145 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| Tests | Unit suite: 58 tests, 155 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
 | Blockers | None for local code work; full suite is environment-blocked (no `NHK_WP_TEST_PATH`, one P5 bootstrap error and nine mandatory P4 failures); V2/live remains read-only |
-| Working assumptions | Working tree is clean at checkpoint; `nhk_v3_test` is the only destructive integration target |
-| Next executable task | Expand daily Admin console and related Graph/media/video sections; run frontend route smoke when WordPress runtime is available; feed a read-only V2 export into `tools/v2-dry-run.php` |
+| Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target |
+| Next executable task | Commit the Media/Video public surface, then add static route-contract evidence and migration handoff; run frontend/Admin runtime smoke when WordPress runtime is available; feed a read-only V2 export into `tools/v2-dry-run.php` |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -92,3 +92,18 @@ Last updated: 2026-08-31, canonical entity frontend routes checkpoint pushed.
   context, with responsive empty states and semantic facts. Checkpoint
   `dea84fd` is pushed to `origin/main`; runtime route smoke and related Graph,
   media and video modules remain pending.
+- 2026-08-31: NHK Admin now provides capability-gated entity/proposal lookup,
+  health, proposal state/revision/dependency visibility, eligibility and
+  submit/approve/reject/Controlled Apply actions through REST with WP nonce;
+  apply attempt history is visible. Checkpoint `59bb952` is pushed to
+  `origin/main`; runtime browser smoke remains environment-gated.
+- 2026-08-31: Theme SEO hooks now emit canonical, description, OpenGraph,
+  BreadcrumbList and Article metadata for editorial/entity surfaces, while
+  WordPress remains the sitemap/RSS owner. Checkpoint `4e0252c` is pushed to
+  `origin/main`; runtime metadata validation remains environment-gated.
+- 2026-08-31: Media/Video public query services and rewrite/template routes
+  were added for `/video/`, `/video/{uuid}`, `/thu-vien/`, `/media/` and
+  `/media/{uuid}`. Media renders readiness-aware asset metadata and Video
+  renders a YouTube privacy embed from its canonical external reference;
+  local MP4 copying is not introduced. Unit evidence is 58 tests/155
+  assertions; runtime route smoke remains WordPress-environment gated.
