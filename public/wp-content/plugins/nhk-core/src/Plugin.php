@@ -6,6 +6,7 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Infrastructure\Migration\GraphMigration001;
 use NHK\Core\Infrastructure\Migration\AuthorityMigration002;
 use NHK\Core\Infrastructure\Migration\GovernanceMigration003;
+use NHK\Core\Application\Governance\GovernanceCapabilities;
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
@@ -19,6 +20,7 @@ final class Plugin {
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
+        GovernanceCapabilities::register();
     }
     public static function deactivate(): void {}
 }

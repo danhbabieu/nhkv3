@@ -23,6 +23,10 @@ final readonly class Proposal
         public int $revision = 1,
         public ?string $submittedAt = null,
         public ?string $appliedAt = null,
+        public ?string $targetUuid = null,
+        public string $entityType = '',
+        public ?string $createdAt = null,
+        public ?string $updatedAt = null,
     ) {
         if ($id === '' || $subjectId === '' || $operation === '' || $contentFingerprint === '' || $dependencyFingerprint === '') {
             throw new InvalidArgumentException('Proposal identity and binding fields are required.');
@@ -35,6 +39,6 @@ final readonly class Proposal
 
     public function bindingFingerprint(): string
     {
-        return hash('sha256', $this->subjectId . "\n" . $this->operation . "\n" . $this->contentFingerprint . "\n" . $this->expectedRevision . "\n" . $this->dependencyFingerprint);
+        return hash('sha256', ($this->entityType ?: $this->subjectId) . "\n" . $this->operation . "\n" . ($this->targetUuid ?: $this->subjectId) . "\n" . $this->contentFingerprint . "\n" . $this->expectedRevision . "\n" . $this->dependencyFingerprint);
     }
 }

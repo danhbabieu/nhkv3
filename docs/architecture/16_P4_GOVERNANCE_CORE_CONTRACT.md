@@ -1,5 +1,9 @@
 # NHK V3 P4 Governance Core Contract
 
+## Status
+
+P4 remains `BLOCKED`, not `ACCEPTED`: the persistence/eligibility foundation and Migration 003 schema are present, but controlled transactional apply, durable approval/attempt lifecycle, real MySQL concurrency/rollback/retry coverage, and capability integration are not yet implemented and therefore cannot be certified.
+
 P4 giữ governance ở application/domain boundary, không public mutation endpoint và không phụ thuộc UI.
 
 Proposal phải bind `subject_id`, operation, canonical payload fingerprint, expected revision và dependency-closure fingerprint. Replay cùng binding là idempotent; cùng proposal id với binding khác bị từ chối.
