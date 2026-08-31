@@ -12,6 +12,7 @@ use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -59,7 +60,7 @@ final class McpReadSearchPaginationTest extends TestCase
                 public function findByStableKey(string $key): ?KnowledgeClaim { return null; }
                 public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; }
                 public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; }
-                public function list(bool $includeRetired = false): array { return []; }
+                public function list(bool $includeRetired = false): array { $claims = []; for ($index = 1; $index <= 6; $index++) $claims[] = new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:mcp-public-clock-' . $index, 'Public clock fact ' . $index . '.'); $claims[] = new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:mcp-unverified-clock', 'Unverified clock fact.', 'fact', ['metadata' => ['verification_status' => 'UNVERIFIED']]); return $claims; }
             },
             new class implements EvidenceRepository {
                 public function findByCanonicalId(string $id): ?Evidence { return null; }
@@ -77,5 +78,7 @@ final class McpReadSearchPaginationTest extends TestCase
         self::assertCount(5, $result['groups']['entities']);
         self::assertSame('Clock 6', $result['groups']['entities'][0]['title']);
         self::assertSame(14, $result['semantic_totals']['entities']);
+        self::assertCount(1, $result['groups']['knowledge']);
+        self::assertSame(6, $result['semantic_totals']['knowledge']);
     }
 }
