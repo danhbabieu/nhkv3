@@ -11,4 +11,7 @@ interface ProposalRepository
     public function find(string $id): ?Proposal;
     public function findByIdempotencyKey(string $key): ?Proposal;
     public function save(Proposal $proposal): Proposal;
+    public function findForUpdate(string $id): ?Proposal;
+    public function recordApproval(Proposal $proposal, string $actor): void;
+    public function latestApproval(string $proposalId): ?array;
 }

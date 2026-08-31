@@ -14,7 +14,7 @@ final class CommandCanonicalizer
             foreach ($value as $key => $item) $value[$key] = $normalize($item);
             return $value;
         };
-        return json_encode($normalize($command), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        return json_encode($normalize($command), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);
     }
 
     public static function fingerprint(string $operation, string $entityType, ?string $targetUuid, ?int $expectedRevision, array $command, array $dependencyUuids): string

@@ -18,6 +18,11 @@ final class WpdbAuditSink implements GovernanceAuditSink
     public function recordEvent(string $eventType, string $objectType, string $objectKey, ?int $actorUserId, array $context = []): void
     {
         global $wpdb;
-        $wpdb->query($wpdb->prepare('INSERT INTO ' . $wpdb->prefix . 'nhk_audit_events (event_uuid,event_type,object_type,object_key,actor_user_id,context_json,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)', UuidCodec::toBinary(UuidCodec::newV7()), substr($eventType, 0, 96), substr($objectType, 0, 64), substr($objectKey, 0, 191), $actorUserId, wp_json_encode($context, JSON_UNESCAPED_SLASHES), gmdate('Y-m-d H:i:s.u')));
+        $safe = static function (mixed $value) use (&$safe): mixed {
+            if (is_array($value)) return array_map($safe, $value);
+            if (!is_string($value)) return $value;
+            return preg_match('/password|token|secret|private.?key|api.?key/i', $value) ? '[REDACTED]' : substr($value, 0, 512);
+        };
+        $wpdb->query($wpdb->prepare('INSERT INTO ' . $wpdb->prefix . 'nhk_audit_events (event_uuid,event_type,object_type,object_key,actor_user_id,context_json,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)', UuidCodec::toBinary(UuidCodec::newV7()), substr($eventType, 0, 96), substr($objectType, 0, 64), substr($objectKey, 0, 191), $actorUserId, wp_json_encode($safe($context), JSON_UNESCAPED_SLASHES), gmdate('Y-m-d H:i:s.u')));
     }
 }

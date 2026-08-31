@@ -27,6 +27,10 @@ final readonly class Proposal
         public string $entityType = '',
         public ?string $createdAt = null,
         public ?string $updatedAt = null,
+        public ?string $cancelledAt = null,
+        public ?string $rejectedAt = null,
+        public ?string $supersededAt = null,
+        public ?string $supersededByProposalId = null,
     ) {
         if ($id === '' || $subjectId === '' || $operation === '' || $contentFingerprint === '' || $dependencyFingerprint === '') {
             throw new InvalidArgumentException('Proposal identity and binding fields are required.');
@@ -40,5 +44,11 @@ final readonly class Proposal
     public function bindingFingerprint(): string
     {
         return hash('sha256', ($this->entityType ?: $this->subjectId) . "\n" . $this->operation . "\n" . ($this->targetUuid ?: $this->subjectId) . "\n" . $this->contentFingerprint . "\n" . $this->expectedRevision . "\n" . $this->dependencyFingerprint);
+    }
+
+    public function transition(ProposalState $state, ?string $decisionActor = null, ?string $at = null): self
+    {
+        $when=$at ?? gmdate('Y-m-d H:i:s.u');
+        return new self($this->id, $this->subjectId, $this->operation, $this->payload, $this->contentFingerprint, $this->expectedRevision, $this->dependencyFingerprint, $state, $this->actor, $decisionActor ?? $this->decisionActor, $when, $this->idempotencyKey, $this->revision + 1, $this->submittedAt ?? ($state === ProposalState::SUBMITTED ? $when : null), $state === ProposalState::APPLIED ? $when : $this->appliedAt, $this->targetUuid, $this->entityType, $this->createdAt, gmdate('Y-m-d H:i:s.u'), $state === ProposalState::CANCELLED ? $when : $this->cancelledAt, $state === ProposalState::REJECTED ? $when : $this->rejectedAt, $state === ProposalState::SUPERSEDED ? $when : $this->supersededAt, $this->supersededByProposalId);
     }
 }

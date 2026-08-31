@@ -10,6 +10,9 @@ use NHK\Core\Application\Governance\GovernanceCapabilities;
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
+        // Keep an already-installed site aware of the code's migration target;
+        // activation is not required for an upgrade health check to be honest.
+        update_option('nhk_core_migration_target', GovernanceMigration003::VERSION, false);
         add_action('rest_api_init', static function (): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
         });

@@ -2,7 +2,7 @@
 
 ## Status
 
-P4 remains `BLOCKED`, not `ACCEPTED`: the persistence/eligibility foundation and Migration 003 schema are present, but controlled transactional apply, durable approval/attempt lifecycle, real MySQL concurrency/rollback/retry coverage, and capability integration are not yet implemented and therefore cannot be certified.
+P4 remains `BLOCKED`, not `ACCEPTED`: transactional Controlled Apply, durable approval/apply-attempt persistence, rollback/failure/retry behavior, and a real DB regression test are now present. True concurrent apply/idempotency races, complete dependency/lifecycle/authorization/editorial coverage, and complete durable-audit acceptance remain uncertified.
 
 P4 giữ governance ở application/domain boundary, không public mutation endpoint và không phụ thuộc UI.
 

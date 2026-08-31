@@ -6,10 +6,11 @@ namespace NHK\Core\Application\Governance;
 use NHK\Core\Contracts\Governance\{GovernanceAuditSink, ProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Governance\Exception\{InvalidProposalTransition, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalNotFound};
+use NHK\Core\Contracts\Shared\TransactionManager;
 
 final class GovernanceService
 {
-    public function __construct(private ProposalRepository $repository, private ?GovernanceAuditSink $audit = null) {}
+    public function __construct(private ProposalRepository $repository, private ?GovernanceAuditSink $audit = null, private ?TransactionManager $transactions = null) {}
 
     public function create(Proposal $proposal): Proposal
     {
@@ -39,11 +40,15 @@ final class GovernanceService
     public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal
     {
         $proposal = $this->get($id);
-        if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be approved.');
-        if ($proposal->contentFingerprint !== $contentFingerprint || $proposal->dependencyFingerprint !== $dependencyFingerprint) {
-            throw new ProposalBindingConflict('Approval binding no longer matches the proposal.');
-        }
-        return $this->transition($proposal, ProposalState::APPROVED, $actor, 'approved');
+        $approve = function () use ($id, $contentFingerprint, $dependencyFingerprint, $actor, $proposal): Proposal {
+            $proposal = $this->repository->findForUpdate($id) ?? throw new ProposalNotFound('Proposal not found.');
+            if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be approved.');
+            if ($proposal->contentFingerprint !== $contentFingerprint || $proposal->dependencyFingerprint !== $dependencyFingerprint) throw new ProposalBindingConflict('Approval binding no longer matches the proposal.');
+            $saved = $this->transition($proposal, ProposalState::APPROVED, $actor, 'approved');
+            if (method_exists($this->repository, 'recordApproval')) $this->repository->recordApproval($saved, $actor);
+            return $saved;
+        };
+        return $this->transactions ? $this->transactions->transactional($approve) : $approve();
     }
 
     public function reject(string $id, string $actor): Proposal
@@ -51,6 +56,21 @@ final class GovernanceService
         $proposal = $this->get($id);
         if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be rejected.');
         return $this->transition($proposal, ProposalState::REJECTED, $actor, 'rejected');
+    }
+
+    public function cancel(string $id, string $actor): Proposal
+    {
+        $proposal=$this->get($id);
+        if(in_array($proposal->state,[ProposalState::APPLIED,ProposalState::REJECTED,ProposalState::CANCELLED,ProposalState::SUPERSEDED],true))throw new InvalidProposalTransition('Terminal proposals cannot be cancelled.');
+        return $this->transition($proposal,ProposalState::CANCELLED,$actor,'cancelled');
+    }
+
+    public function supersede(string $id, string $replacementId, string $actor): Proposal
+    {
+        $proposal=$this->get($id);
+        if(in_array($proposal->state,[ProposalState::APPLIED,ProposalState::REJECTED,ProposalState::CANCELLED,ProposalState::SUPERSEDED],true))throw new InvalidProposalTransition('Terminal proposals cannot be superseded.');
+        $this->get($replacementId);
+        return $this->transition($proposal,ProposalState::SUPERSEDED,$actor,'superseded');
     }
 
     public function markApplied(string $id, int $actualRevision, string $contentFingerprint, string $dependencyFingerprint): Proposal
@@ -70,7 +90,7 @@ final class GovernanceService
 
     private function transition(Proposal $proposal, ProposalState $state, ?string $actor, string $event): Proposal
     {
-        $next = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $proposal->payload, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $state, $proposal->actor, $actor, gmdate('Y-m-d H:i:s.u'));
+        $next = $proposal->transition($state, $actor, gmdate('Y-m-d H:i:s.u'));
         $saved = $this->repository->save($next);
         $this->audit?->record($event, $saved);
         return $saved;
