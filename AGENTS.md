@@ -69,3 +69,31 @@ The end state is V2 functional, data, UI, logic, administration, media, video,
 knowledge, MCP, SEO and URL parity or better, represented in the parity matrix.
 Intentional differences and retired legacy data must be documented; parity is
 not declared while mandatory matrix items are red.
+
+## Autonomous execution addendum
+
+The repository is authorized to proceed through P6, P7, P8, P9, P10 and P11
+without per-step confirmation. Work must continue through coherent vertical
+slices, with tests, lint, diff checks, secret review, execution-state updates,
+logical checkpoint commits and quality-gated pushes. The only human gates are
+the stop conditions above, including V2/live modification, destructive real
+data operations, identity-risking merges, missing credentials, and final
+production cutover.
+
+V2 and `demo.1945.vn` are read-only behavioral, route and data references.
+`tinhte.vn` may inform information architecture and interaction patterns only;
+its branding, assets, markup, styles and proprietary content must not be copied.
+
+The public experience must be an editorial NHK discovery surface: WordPress
+Posts remain the editorial body and URL truth, while Authority, Knowledge,
+Graph, Media and Video are queried through application services. Public UI must
+not expose internal terms such as Authority, Proposal or Knowledge Claim, must
+not expose fixtures, and must hide unavailable modules rather than inventing
+metrics or content.
+
+Frontend work may proceed in parallel once contracts are stable enough. Use a
+clean custom or controlled block theme, reusable accessible components,
+responsive layouts, semantic HTML, performance-aware media, and real V3 query
+services. Before real V2 migration, complete read-only inventory, mapping and
+dry-run evidence; actual migration is resumable, idempotent, ledgered and
+backup/restore-gated.

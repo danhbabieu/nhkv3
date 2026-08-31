@@ -23,3 +23,22 @@ WordPress owns article content; Authority owns canonical entities; Knowledge
 owns atomic claims; one Graph connects semantic endpoints; Governance controls
 durable semantic mutation; Media is first-class; Video is an external reference.
 V2 implementation and schema are reference material, not a template.
+
+## Autonomous delivery direction
+
+The remaining phases are executed as tested vertical slices and are not paused
+for per-phase confirmation. The public target is functional, data and UI/UX
+parity or better with V2, while retaining the clean V3 boundaries. The NHK
+frontend is a discovery-oriented editorial surface with warm, restrained,
+classic visual cues and modern responsive interaction. It uses real query and
+application services, never hard-coded public fixtures or raw database access
+from templates.
+
+P6 must finish Media/MediaAsset/MediaUsage and canonical external Video
+persistence plus shared Graph endpoint coverage. P7 adds Knowledge, Source and
+Evidence and Post semantic links. P8 adds daily-operational Admin and governed
+read/mutation APIs including MCP. P9 builds the responsive frontend and route
+inventory. P10 performs read-only V2 inventory and dry-run first, then only a
+backup-gated resumable migration. P11 reconciles counts, semantics, routes,
+logic, UI, SEO and URLs and produces Cutover Readiness; production cutover
+remains human-gated.

@@ -14,7 +14,23 @@ This document is the operating protocol for future Codex sessions.
 5. Continue to the next phase automatically while no stop condition applies.
 6. Before actual V2 data migration, require backup/restore evidence and a
    dry-run. Before final production cutover, generate the readiness report and
-   request human approval.
+request human approval.
+
+## Persistent directive
+
+This protocol also covers the NHK frontend and parity surfaces. Inspect the
+current theme before fixing design tokens; build the design system and route
+scaffolding as soon as domain contracts are stable enough, in parallel with
+data work. The public header, homepage, archives, entity pages, Post pages,
+search, media/video modules, mobile navigation, accessibility, performance,
+SEO and empty/error states are first-class acceptance scope. V2 and Tinhte are
+reference inputs only, never implementation sources.
+
+Do not stop after closing Governance, Domain, Admin or Homepage. Continue until
+the required logic, data and frontend parity matrices are reconciled, critical
+route smoke tests pass, migration ledger entries are explained, and a Cutover
+Readiness Report exists. Stop immediately before production cutover or other
+listed human-gated operations.
 
 ## Required quality gate
 

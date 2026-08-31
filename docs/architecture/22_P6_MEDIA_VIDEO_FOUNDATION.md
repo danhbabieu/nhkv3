@@ -3,8 +3,9 @@
 ## Current status
 
 The domain boundary and schema migration are implemented and migration 004 is
-applied to `nhk_v3`; persistence services, Graph relations and legacy data
-mapping remain in progress.
+applied to `nhk_v3`. Persistence services and Media/Video Graph endpoint
+resolvers are now implemented and covered by focused unit evidence; WordPress
+database integration and legacy data mapping remain in progress.
 
 ## Media contract
 
@@ -26,3 +27,18 @@ download MP4 files or create a local binary implicitly.
 Migration `004` creates `nhk_media`, `nhk_media_assets`, `nhk_media_usages` and
 `nhk_videos`. It is idempotent, UP-only on `nhk_v3`, and DOWN-guarded to
 `nhk_v3_test`. No V2 data has been migrated.
+
+## Persistence slice evidence
+
+`MediaService` owns creation, idempotent identity lookup, optimistic updates,
+lifecycle changes, asset registration and usage registration. `VideoService`
+owns canonical external-reference ingestion, deduplication by platform/id,
+optimistic updates and lifecycle changes. `Wpdb*Repository` implementations
+persist the four P6 tables without treating checksum matches as merges.
+`MediaEndpointResolver` and `VideoEndpointResolver` make canonical UUIDs
+available to the shared Graph endpoint registry while retaining retired
+records as resolvable identities.
+
+Focused P6 evidence: 8 tests, 24 assertions; all unit evidence: 46 tests, 106
+assertions; PHP lint and `git diff --check` pass. WordPress integration tests
+require `NHK_WP_TEST_PATH` and were not runnable in the current shell.

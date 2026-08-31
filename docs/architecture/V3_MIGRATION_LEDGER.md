@@ -29,3 +29,13 @@ Read-only inventory → identity mapping → dry-run report → backup/readabili
 restore evidence → resumable checkpointed migration → count and semantic
 reconciliation. Production/live data migration and final cutover require the
 separate stop conditions in `AGENTS.md`.
+
+## Inventory and dry-run deliverables
+
+Before any mutation, the migration work must record read-only counts and
+mapping coverage for Posts, categories, attachments/media, all Authority
+types, Knowledge, Sources, Evidence, relations, Videos and URLs. The dry-run
+must emit source count, mapped, skipped, conflicts, duplicate candidates,
+invalid relations, missing endpoints and URL mappings. It must not write to V2
+or production. Media checksum matches are duplicate candidates only and never
+automatic identity merges.

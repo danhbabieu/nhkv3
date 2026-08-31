@@ -1,0 +1,105 @@
+# NHK V3 Frontend Design Contract
+
+Status: contract for P9 implementation; visual choices remain subject to
+read-only theme/demo audit and route evidence.
+
+## Product direction
+
+NHK is a curated knowledge and collecting archive for vintage clocks. The
+experience is editorial and exploratory: a visitor should move naturally from
+an article to an entity, media, video or related article. The visual language
+is warm, restrained and sophisticated rather than faux-vintage or commerce-led.
+Use bright warm-neutral surfaces, strong readable text, large imagery, generous
+but efficient spacing, and serif display typography only where it improves
+hierarchy. Sans-serif remains the default for body and controls.
+
+V2/demo is used for route and behavior research. Tinhte is used only to study
+information density, feed rhythm, featured hierarchy, topic discovery and
+reading comfort. Do not copy either site's branding, assets, markup, CSS,
+icons or proprietary text.
+
+## Tokens
+
+The theme must define and consume these tokens from a single source:
+
+```css
+:root {
+  --nhk-bg: ...;
+  --nhk-surface: ...;
+  --nhk-text: ...;
+  --nhk-muted: ...;
+  --nhk-border: ...;
+  --nhk-accent: ...;
+  --nhk-accent-secondary: ...;
+  --nhk-radius: ...;
+  --nhk-shadow: ...;
+  --nhk-content-width: ...;
+  --nhk-wide-width: ...;
+}
+```
+
+Concrete values are selected after inspecting the current theme and must be
+documented with contrast checks. Tokens are responsive-safe and must not be
+redeclared ad hoc in templates.
+
+## Shell and navigation
+
+Desktop navigation exposes visitor language: Tri thức, Thương hiệu, Mẫu, Bộ
+máy, Bản nhạc, So sánh, Linh kiện, Hiện vật, Video and Góc chia sẻ. Global
+semantic search is prominent and searches Posts, Brands, Models, Movements,
+Music, Components, Classifications, Specimens/Products and Videos through a
+unified application service. On small screens the shell becomes hamburger,
+search and logo with touch-sized controls; no critical action is hover-only.
+
+## Page contracts
+
+The homepage is a discovery gateway, not a static landing page. It may contain
+a concise hero/search, quick discovery links, featured editorial, latest feed,
+Góc chia sẻ, Tri thức, featured entities, Video, collection/specimen content
+and derived popular topics. Modules use real V3 query services and hide when
+there is no content or metric evidence.
+
+Post pages remain WordPress editorial truth: breadcrumb, category, H1,
+standfirst, author/date, featured media, body, semantic entity chips, optional
+TOC, inline media, source presentation, related entities/posts/videos and
+sharing. Body text is constrained to roughly 720–800px; images may break out.
+
+Brand, Model, Movement, Music, Component, Specimen and Product pages use
+domain-specific `EntityPageQuery` data and Graph-backed sections. Specimen is
+a concrete physical object; Product is a listing/offer and may link to a
+Specimen. Video pages/modules show thumbnail, title, platform and available
+metadata and embed the external platform without normal-flow MP4 downloads.
+
+Archives provide appropriate search/filter/pagination, metadata and empty
+states. They must not force every domain into one generic card layout.
+
+## Component and application boundaries
+
+Reusable presentation primitives include Container, SectionHeading, Card,
+ArticleCard, EntityCard, MediaCard, VideoCard, Badge, Breadcrumb, Pagination,
+Search, Filter, Tabs, Gallery, RelatedSection and EmptyState. Templates do not
+query raw database tables. Use HomePageQuery, EntityPageQuery, ArchiveQuery,
+RelatedContentQuery, SearchQuery, MediaGalleryQuery and VideoQuery (or
+equivalent application services), avoiding N+1 queries and requiring
+pagination for large collections.
+
+## Accessibility, performance and SEO
+
+Use semantic HTML, a valid heading hierarchy, keyboard navigation, visible
+focus, accessible names, meaningful alt text, distinguishable links/buttons
+and sufficient contrast. Images carry dimensions and responsive sizes; below-
+fold media is lazy-loaded; JavaScript stays small. Validate long titles,
+missing images, empty archives, large galleries and long articles.
+
+Preserve editorial URLs where possible. Implement canonical URLs, title and
+description metadata, OpenGraph, appropriate structured data, breadcrumbs,
+sitemap/RSS compatibility and an explicit archive index/noindex policy. Any
+changed URL is recorded in the migration ledger/redirect mapping.
+
+## Acceptance
+
+Critical route smoke tests cover homepage, Post, Brand archive/single, Model
+archive/single, Movement, Music, Component, search, Video and 404 behavior.
+Visual QA covers wide desktop, laptop, tablet and mobile plus overflow,
+broken-image, no-image, empty-state, gallery and long-content cases. Fixture
+labels and hard-coded entity lists must never leak into public-facing output.
