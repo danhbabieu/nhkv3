@@ -10,6 +10,7 @@ use NHK\Core\Infrastructure\Migration\MediaMigration004;
 use NHK\Core\Infrastructure\Migration\KnowledgeMigration005;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Infrastructure\Http\ReadApi;
+use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
@@ -28,6 +29,7 @@ final class Plugin {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
             (new ReadApi(new WpdbMediaRepository($wpdb), new WpdbMediaAssetRepository($wpdb), new WpdbMediaUsageRepository($wpdb), new WpdbVideoRepository($wpdb), new WpdbKnowledgeRepository($wpdb), new WpdbSourceRepository($wpdb), new WpdbEvidenceRepository($wpdb), new MigrationStatus()))->register();
+            (new GovernanceApi())->register();
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
     }
