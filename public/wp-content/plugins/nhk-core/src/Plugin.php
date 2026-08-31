@@ -16,6 +16,7 @@ use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
 use NHK\Core\Infrastructure\Http\EntityApi;
 use NHK\Core\Infrastructure\Http\GraphApi;
+use NHK\Core\Infrastructure\Http\PublicEntityRoutes;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
@@ -28,6 +29,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink,
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
+use NHK\Core\Application\Entity\EntityPageQuery;
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
@@ -37,6 +39,8 @@ final class Plugin {
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
+        global $wpdb;
+        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); (new PublicEntityRoutes(new EntityPageQuery(new WpdbAuthorityRepository($wpdb), $publicTypes), $publicTypes))->register(); }
         add_action('rest_api_init', static function (): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
@@ -67,6 +71,7 @@ final class Plugin {
         (new MediaMigration004())->up();
         (new KnowledgeMigration005())->up();
         GovernanceCapabilities::register();
+        flush_rewrite_rules(false);
     }
     public static function deactivate(): void {}
 }
