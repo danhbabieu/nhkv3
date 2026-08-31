@@ -37,5 +37,6 @@ This closes the previously observed custom `_meta`/header coupling for the
 basic session and tool exchange. The endpoint registration also extends the
 WordPress REST CORS allowlist for `MCP-Protocol-Version`, `Mcp-Method` and
 `Mcp-Name`, covering browser preflight for those protocol headers. A live
-preflight curl was not run in this checkpoint because the local HTTP daemon was
-not running. External adapter mapping and deployment verification remain open.
+preflight curl against `http://localhost/wp-json/nhk/v1/mcp` returned HTTP 200,
+echoed the requesting origin and listed all three protocol headers. External
+adapter mapping and deployment verification remain open.

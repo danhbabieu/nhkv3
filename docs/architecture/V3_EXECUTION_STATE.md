@@ -76,6 +76,12 @@ Last updated: 2026-09-01, P11 Admin migration review checkpoint.
   existing skip inventory remains actionable without a database backfill.
   Full guarded PHPUnit passed 173 tests/1,125 assertions.
 
+- 2026-09-01: Live localhost MCP verification passed CORS preflight with all
+  protocol assertion headers allowlisted; standard `initialize` and
+  header-only `tools/list` returned HTTP 200 JSON-RPC responses with the 18
+  registered tools. External adapter mapping/deployment remains a separate
+  open gate.
+
 - 2026-09-01: Route smoke now asserts title/canonical metadata for the two
   editorial archives, the default category archive and the 404 route, including
   the 404 `noindex, follow` contract. The enhanced smoke passes 30/30; no
