@@ -170,6 +170,8 @@ final class FrontendContractTest extends TestCase
     public function test_public_entity_payload_values_are_reader_facing(): void
     {
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString('function nhk_v3_public_language_attributes', $functions);
+        self::assertStringContainsString("add_filter('language_attributes', 'nhk_v3_public_language_attributes')", $functions);
         self::assertStringContainsString('function nhk_v3_public_type', $functions);
         self::assertStringContainsString('function nhk_v3_public_category_name', $functions);
         self::assertStringContainsString("'Uncategorized') === 0 ? 'Chưa phân loại'", $functions);

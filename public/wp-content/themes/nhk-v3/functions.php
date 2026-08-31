@@ -13,6 +13,13 @@ function nhk_v3_setup(): void
 }
 add_action('after_setup_theme', 'nhk_v3_setup');
 
+function nhk_v3_public_language_attributes(string $attributes): string
+{
+    $localized = preg_replace('/\blang=(["\']).*?\1/i', 'lang="vi"', $attributes);
+    return is_string($localized) ? $localized : $attributes . ' lang="vi"';
+}
+add_filter('language_attributes', 'nhk_v3_public_language_attributes');
+
 function nhk_v3_allow_semantic_search_pages(mixed $handled, \WP_Query $query): mixed
 {
     // WordPress marks a search page as 404 when its native post paginator is
