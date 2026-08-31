@@ -19,6 +19,10 @@ final readonly class Proposal
         public ?string $actor = null,
         public ?string $decisionActor = null,
         public ?string $decidedAt = null,
+        public string $idempotencyKey = '',
+        public int $revision = 1,
+        public ?string $submittedAt = null,
+        public ?string $appliedAt = null,
     ) {
         if ($id === '' || $subjectId === '' || $operation === '' || $contentFingerprint === '' || $dependencyFingerprint === '') {
             throw new InvalidArgumentException('Proposal identity and binding fields are required.');
@@ -26,6 +30,7 @@ final readonly class Proposal
         if ($expectedRevision < 1) {
             throw new InvalidArgumentException('Expected revision must be positive.');
         }
+        if ($revision < 1) throw new InvalidArgumentException('Proposal revision must be positive.');
     }
 
     public function bindingFingerprint(): string

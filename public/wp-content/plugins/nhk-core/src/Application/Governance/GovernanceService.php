@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Contracts\Governance\{GovernanceAuditSink, ProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
-use NHK\Core\Governance\Exception\{InvalidProposalTransition, ProposalBindingConflict, ProposalNotFound};
+use NHK\Core\Governance\Exception\{InvalidProposalTransition, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalNotFound};
 
 final class GovernanceService
 {
@@ -13,6 +13,12 @@ final class GovernanceService
 
     public function create(Proposal $proposal): Proposal
     {
+        if ($proposal->idempotencyKey === '') throw new ProposalBindingConflict('Idempotency key is required.');
+        $byKey = $this->repository->findByIdempotencyKey($proposal->idempotencyKey);
+        if ($byKey !== null) {
+            if ($byKey->bindingFingerprint() === $proposal->bindingFingerprint()) return $byKey;
+            throw new ProposalIdempotencyConflict('Idempotency key is already bound to different content.');
+        }
         $existing = $this->repository->find($proposal->id);
         if ($existing !== null) {
             if ($existing->bindingFingerprint() === $proposal->bindingFingerprint()) return $existing;
@@ -23,10 +29,17 @@ final class GovernanceService
         return $saved;
     }
 
+    public function submit(string $id): Proposal
+    {
+        $proposal = $this->get($id);
+        if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be submitted.');
+        return $this->transition($proposal, ProposalState::SUBMITTED, $proposal->actor, 'submitted');
+    }
+
     public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal
     {
         $proposal = $this->get($id);
-        if ($proposal->state !== ProposalState::DRAFT) throw new InvalidProposalTransition('Only draft proposals can be approved.');
+        if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be approved.');
         if ($proposal->contentFingerprint !== $contentFingerprint || $proposal->dependencyFingerprint !== $dependencyFingerprint) {
             throw new ProposalBindingConflict('Approval binding no longer matches the proposal.');
         }

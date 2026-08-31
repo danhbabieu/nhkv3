@@ -7,3 +7,5 @@ Proposal phải bind `subject_id`, operation, canonical payload fingerprint, exp
 State machine tối thiểu: `draft → approved → applied` hoặc `draft → rejected`. Approval chỉ hợp lệ khi cả content và dependency closure khớp. Apply chỉ hợp lệ khi binding khớp và actual revision bằng expected revision; stale proposal phải fail closed.
 
 Audit là port bắt buộc tùy chọn ở core boundary. Persistence adapter và public transport sẽ được bổ sung sau khi contract này được acceptance bằng integration test.
+
+Migration 003 tạo normalized proposal, dependency, approval, apply-attempt và append-only audit tables. `READY`/`BLOCKED` không được lưu; `ProposalEligibilityService` trả reason codes máy đọc được và kiểm tra approval state, target revision, target existence và dependency closure.

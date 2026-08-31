@@ -12,5 +12,6 @@ final class InMemoryProposalRepository implements ProposalRepository
     private array $items = [];
     public function create(Proposal $proposal): Proposal { $this->items[$proposal->id] = $proposal; return $proposal; }
     public function find(string $id): ?Proposal { return $this->items[$id] ?? null; }
+    public function findByIdempotencyKey(string $key): ?Proposal { foreach ($this->items as $item) if ($item->idempotencyKey === $key) return $item; return null; }
     public function save(Proposal $proposal): Proposal { $this->items[$proposal->id] = $proposal; return $proposal; }
 }

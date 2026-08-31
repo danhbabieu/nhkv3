@@ -20,6 +20,7 @@ final class HealthCheck {
             'migration_required' => $migration['current'] < $migration['target'],
             'graph_storage_ready' => $this->migrations->graphStorageReady(),
             'authority_storage_ready' => $this->migrations->authorityStorageReady(),
+            'governance_storage_ready' => $this->migrations->governanceStorageReady(),
         ];
     }
 }
