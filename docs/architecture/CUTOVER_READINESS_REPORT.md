@@ -13,8 +13,14 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 - Public entity archive/detail routes cover all nine Authority types.
 - Public Media and Video archive/detail routes and responsive templates exist;
   Video embeds only validated YouTube external references.
+- Homepage discovery is query-driven: featured/latest/category/topic modules
+  use WordPress services, while Authority/Media/Video modules come from the
+  plugin semantic query boundary and disappear when storage is unavailable.
 - NHK Admin exposes health, lookup, governed proposal creation and lifecycle
-  actions through REST with capability and nonce checks.
+  actions, including Graph relation proposals, through REST with capability and
+  nonce checks.
+- MCP exposes governed eligibility and Controlled Apply handlers in addition to
+  proposal lifecycle operations.
 - A transport-neutral MCP registration seam exists; read adapters are real and
   mutations delegate to Governance.
 - The V2 dry-run tool is no-write and emits bounded reason codes. No V2 data
@@ -24,7 +30,7 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 58 tests, 155 assertions |
+| Unit tests | PASS — 59 tests, 160 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |

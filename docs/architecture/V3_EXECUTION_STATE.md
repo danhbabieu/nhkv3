@@ -1,18 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Cutover Readiness audit checkpoint pushed.
+Last updated: 2026-08-31, governed relations and homepage query checkpoint in progress.
 
 | Field | Current value |
 |---|---|
 | Workspace | `/Users/imac24-2125d/Developer/nhk-v3` |
-| Branch / HEAD | `main` / `86e5838` |
+| Branch / HEAD | `main` / `ee09ad4` |
 | Current phase | P11 readiness audit in progress; P7/P8/P9/P10 gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 4 / target 5 on `nhk_v3`; Migration005 is pending integration gate; media/video storage ready |
-| Tests | Unit suite: 58 tests, 155 assertions; plugin/theme PHP lint and diff check pass; WP integration requires `NHK_WP_TEST_PATH` |
+| Tests | Unit suite: 59 tests, 160 assertions; plugin/theme PHP lint and diff check pass; WP integration requires a working WordPress database |
 | Blockers | None for local code work; unit suite is green, but WordPress integration bootstrap fails with “Error establishing a database connection” even with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; route inventory is source-level until runtime returns |
-| Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
+| Next executable task | Resolve local WordPress/test DB, run mandatory integration/runtime smoke including homepage/Admin/Graph workflows, then obtain V2 read-only export and backup/restore evidence before any mapping or migration |
 | Last parity count | Not yet inventoried; matrix initialized as NOT ASSESSED |
 | Pending migrations | None for P4; future P5 migrations require their own gate |
 | Migration dry-run | No-write service and CLI are ready; no V2 export has been provided, so no source counts or mappings are claimed |
@@ -126,3 +126,12 @@ Last updated: 2026-08-31, Cutover Readiness audit checkpoint pushed.
 - 2026-08-31: Cutover Readiness Report checkpoint `86e5838` is pushed to
   `origin/main`. The repository is clean and remains explicitly pre-cutover;
   external/runtime gates are documented rather than inferred as passed.
+- 2026-08-31: Governed relation proposals now support Graph create, retire and
+  reactivate with endpoint/predicate validation and edge revision checks;
+  Controlled Apply records Graph edge IDs and avoids nested transaction commits.
+  MCP exposes governed `proposal.apply`; the Admin composer can author relation
+  proposals. Checkpoint `9ba07a5` is pushed to `origin/main`.
+- 2026-08-31: Homepage data access moved into `NHK_V3_Home_Page_Query`, with
+  featured/latest/category/topic modules and a plugin semantic filter for real
+  Authority/Media/Video data. Empty storage hides semantic modules. Checkpoint
+  `ee09ad4` is pushed; browser smoke remains blocked by the local DB.

@@ -5,7 +5,7 @@ the final parity declaration.
 
 | AREA | V2 | V3 | MIGRATED? | TESTED? | PARITY STATUS | NOTES |
 |---|---|---|---|---|---|---|
-| Homepage | Reference audit pending | Responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Theme scaffold; V2 reference audit and browser smoke pending |
+| Homepage | Reference audit pending | HomePageQuery-driven responsive WordPress editorial discovery surface | N/A | PARTIAL | IN PROGRESS | Featured/latest/category/topics plus real Authority/Media/Video modules; V2 reference audit and browser smoke pending |
 | Posts | Route behavior partially inventoried | Native `wp_posts` boundary | NO | PARTIAL | IN PROGRESS | Body remains WordPress-owned; source counts pending |
 | Categories | Tri thức/Góc chia sẻ routes observed | Native WP categories | NO | PARTIAL | IN PROGRESS | Editorial intent only; complete V2 taxonomy inventory pending |
 | Tri thức / Góc chia sẻ / Tin tức | Reference audit pending | WP category contract | NO | PARTIAL | IN PROGRESS | Category-aware sections scaffolded; route audit pending |
@@ -13,8 +13,8 @@ the final parity declaration.
 | Specimen / Product | Legacy data pending | Registry-backed Authority contract + frontend routes | NO | PARTIAL | IN PROGRESS | Physical specimen vs commercial product distinction and route/query contract tested; runtime smoke and legacy data pending |
 | Media / Video | Legacy data pending | P6 domain/persistence + public archive/detail routes | NO | PASS | IN PROGRESS | Identity/asset/usage separation, active-only query services, schema readiness, responsive media template and YouTube external reference tested; V2 data, runtime smoke and binary storage delivery pending |
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
-| Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
-| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search, eligibility, governed proposal/Controlled Apply REST and Admin console implemented; runtime QA and V2 behavior reconciliation pending |
+| Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint + governed relation proposals | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; Post links and relation create/retire/reactivate proposals are covered locally; V2 data/runtime pending |
+| Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + NHK Admin/read API | NO | PARTIAL | IN PROGRESS | Search, entity/relation proposal composer, eligibility and governed Controlled Apply are implemented; runtime QA and V2 behavior reconciliation pending |
 | MCP | Legacy behavior pending | Tool catalog + governed read/mutation handlers | NO | PARTIAL | IN PROGRESS | Read adapters and governed mutation bridge are available; external MCP transport remains pending |
 | SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary + theme metadata/JSON-LD | NO | PARTIAL | IN PROGRESS | Canonical, description, OpenGraph, Article and BreadcrumbList hooks added; sitemap/RSS remain native and runtime audit pending |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Entity pages, Graph-derived related sections and Media gallery surface | NO | PARTIAL | IN PROGRESS | Entity archive/detail routes, related groups, media archive/detail and readiness-aware asset states exist; V2 inventory and runtime gallery QA remain |
