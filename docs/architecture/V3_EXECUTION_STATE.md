@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Mapper 6.13 URL reason checkpoint.
+Last updated: 2026-08-31, Search Knowledge canonical-link runtime checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-08-31, Mapper 6.13 URL reason checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 68 tests, 199 assertions; guarded WordPress suite: 101 tests, 413 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Tests | Unit suite: 68 tests, 200 assertions; guarded WordPress suite: 101 tests, 413 assertions; plugin/theme PHP lint, route smoke and diff check pass |
 | Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
@@ -266,3 +266,8 @@ Last updated: 2026-08-31, Mapper 6.13 URL reason checkpoint.
 - 2026-08-31: Browser visual QA succeeded for desktop homepage, Knowledge
   archive/detail, Authority detail and 404 surfaces. Responsive/tablet/mobile
   coverage remains pending; the browser connector is available for follow-up.
+- 2026-08-31: Browser verification found Knowledge cards in unified Search
+  rendering placeholder `#` links despite active claim data. The theme now
+  maps active Knowledge results to canonical `/knowledge/claim/{UUID}/` URLs,
+  with a frontend contract regression assertion; Search `Odo` has zero
+  Knowledge `#` links and the read-only route smoke passes 16/16.

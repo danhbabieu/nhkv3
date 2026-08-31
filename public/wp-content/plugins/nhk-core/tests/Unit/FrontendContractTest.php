@@ -33,5 +33,6 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('NHK_V3_Search_Page_Query', $index);
         self::assertStringNotContainsString('new WP_Query', $index);
         self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
+        self::assertStringContainsString("home_url('/knowledge/claim/'", $index);
     }
 }
