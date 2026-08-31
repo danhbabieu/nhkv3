@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 editorial archive SEO checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 111 tests, 692 assertions; guarded WordPress integration: 56 tests, 391 assertions; combined current suite: 167 tests, 1,083 assertions; plugin/theme PHP lint, route smoke 30/30, browser public-language/SEO sweep and diff check pass |
+| Tests | Unit suite: 111 tests, 695 assertions; guarded WordPress integration: 56 tests, 391 assertions; combined current suite: 167 tests, 1,086 assertions; plugin/theme PHP lint, route smoke 30/30, browser public-language/SEO sweep and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,12 @@ Last updated: 2026-09-01, P11 editorial archive SEO checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: 404 pages now emit the reader-facing title `Không tìm thấy
+  trang — Đồng Hồ Nhà Kho`, a bounded description, canonical homepage URL and
+  `noindex, follow`; browser verification passed at 390px with no technical
+  copy or overflow. Full guarded PHPUnit passed 167 tests/1,086 assertions and
+  route smoke passed 30/30.
 
 - 2026-09-01: Editorial archive routes `/tri-thuc/` and `/goc-chia-se/` now
   emit visitor-facing document/OpenGraph titles, descriptions and canonical

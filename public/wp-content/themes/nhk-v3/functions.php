@@ -151,6 +151,7 @@ function nhk_v3_document_title(string $title): string
     $editorialLabel = nhk_v3_public_editorial_label((string) get_query_var('nhk_editorial_route'));
     if ($editorialLabel !== '') return $editorialLabel . ' — Đồng Hồ Nhà Kho';
     if (is_category() || is_tag() || is_author()) return nhk_v3_public_archive_title() . ' — Đồng Hồ Nhà Kho';
+    if (is_404()) return 'Không tìm thấy trang — Đồng Hồ Nhà Kho';
     if (is_front_page() || is_home()) return 'Đồng Hồ Nhà Kho — Kho tri thức và sưu tầm';
     return $title;
 }
@@ -165,6 +166,11 @@ function nhk_v3_seo_head(): void
     $knowledge_context = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     $comparison_context = $GLOBALS['nhk_core_comparison_context'] ?? null;
     $title = wp_get_document_title(); $description = get_bloginfo('description'); $canonical = '';
+    if (is_404()) {
+        $title = 'Không tìm thấy trang — Đồng Hồ Nhà Kho';
+        $description = 'Trang bạn tìm kiếm không tồn tại hoặc đã được chuyển sang địa chỉ khác trong kho NHK.';
+        $canonical = home_url('/');
+    }
     if (is_front_page()) $description = 'Khám phá bài viết, thương hiệu, mẫu đồng hồ và hiện vật trong kho tri thức NHK.';
     if (is_search()) {
         $term = trim((string) get_search_query());
@@ -246,7 +252,7 @@ function nhk_v3_robots(array $robots): array
             break;
         }
     }
-    if (is_search() || $isPaginated) {
+    if (is_404() || is_search() || $isPaginated) {
         unset($robots['index']);
         $robots['noindex'] = true;
     } else {
