@@ -29,7 +29,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink,
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
-use NHK\Core\Application\Entity\EntityPageQuery;
+use NHK\Core\Application\Entity\{EntityPageQuery, RelatedContentQuery};
 
 final class Plugin {
     public static function boot(string $pluginFile): void {
@@ -40,7 +40,7 @@ final class Plugin {
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
         global $wpdb;
-        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); (new PublicEntityRoutes(new EntityPageQuery(new WpdbAuthorityRepository($wpdb), $publicTypes), $publicTypes))->register(); }
+        if (isset($wpdb) && is_object($wpdb)) { $publicTypes = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($publicTypes); $publicAuthority = new WpdbAuthorityRepository($wpdb); $publicMedia = new WpdbMediaRepository($wpdb); $publicVideos = new WpdbVideoRepository($wpdb); $publicEndpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos); $publicStatus = new MigrationStatus(); $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink()); $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus); (new PublicEntityRoutes(new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus), $publicTypes))->register(); }
         add_action('rest_api_init', static function (): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
