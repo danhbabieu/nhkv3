@@ -15,7 +15,7 @@ the final parity declaration.
 | Knowledge Claim / Source / Evidence | Legacy data pending | P7 contracts, schema and service | NO | PASS | IN PROGRESS | WPDB migration and legacy data pending |
 | Relations / Post Graph | Legacy data pending | Graph Core + Post/Knowledge endpoint | NO | PARTIAL | IN PROGRESS | P2/P3 graph evidence; P7 Post link service added |
 | Search / Admin / Proposal / Approval / Controlled Apply | Legacy behavior pending | Unified Search API + Governance core + Admin/read API | NO | PARTIAL | IN PROGRESS | Controlled Apply/Admin detail UI pending |
-| MCP | Legacy behavior pending | Not implemented | NO | NO | NOT ASSESSED | P8; governance adapter pending |
+| MCP | Legacy behavior pending | Tool catalog + governed handler contract | NO | PARTIAL | IN PROGRESS | External MCP transport and read adapters pending |
 | SEO / URLs / Sitemap / RSS | Route inventory partial | WordPress boundary | NO | NO | NOT ASSESSED | URL/API inventory pending in P10 |
 | Images / Related content / entity pages / galleries | Legacy inventory pending | Not implemented | NO | NO | NOT ASSESSED | P6/P9 |
 

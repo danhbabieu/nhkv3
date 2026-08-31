@@ -67,3 +67,7 @@ Last updated: 2026-08-31, P8 entity/search/proposal surfaces are pushed.
 - 2026-08-31: Canonical entity list/detail REST endpoints were added for the
   nine Authority types with active-only pagination and type-safe 404 handling,
   providing the initial data source for domain-specific frontend pages.
+- 2026-08-31: MCP tool catalog and Governance handler were added. Read tools
+  are explicitly non-mutating; every mutation tool is marked governed and
+  delegates to `GovernanceService` for authorization, idempotency and lifecycle
+  policy. External MCP transport wiring remains pending.
