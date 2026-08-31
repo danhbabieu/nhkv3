@@ -35,7 +35,9 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
   rejects malformed records/checksums and marks explicit conflicts for review.
 - The local development schema is current at 8/8; Evidence and MediaAsset
   metadata migrations and their governed backfills completed with zero
-  conflicts. V2 PRIVATE media assets remain suppressed by public reads.
+  conflicts. V2 PRIVATE media assets remain suppressed by public reads; the
+  public asset route is fail-closed on visibility, MIME, storage-root,
+  checksum and byte-size checks.
 - Public Knowledge reads now fail closed for inactive PRIVATE Source and Claim
   identities; the activation/public provenance policy remains a cutover gate.
 
@@ -43,12 +45,12 @@ Decision: **NOT READY — production cutover is not authorized or performed.**
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 68 tests, 199 assertions |
+| Unit tests | PASS — 70 tests, 205 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
-| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 101 tests, 413 assertions |
-| Frontend route/rewrite smoke | PASS for core routes, `/hello-world/` and Knowledge archive/detail; local-dev migration populated Authority/Media/Knowledge detail data |
+| Guarded WordPress integration | PASS — `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test composer test`; 103 tests, 419 assertions |
+| Frontend route/rewrite smoke | PASS 17/17 for core routes, `/hello-world/`, Knowledge archive/detail and unknown MediaAsset 404; local-dev migration populated Authority/Media/Knowledge detail data |
 | Frontend visual QA | PARTIAL — desktop homepage, Knowledge archive/detail, Authority detail and 404 were visually inspected; tablet/mobile responsive coverage remains pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record export/dry-run; 2,379 candidates, 2,594 no-write skips with buckets matching apply; local-dev ledger: 2,379 migrated, 2,594 explicit skips, 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, one safe URL no-op, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |

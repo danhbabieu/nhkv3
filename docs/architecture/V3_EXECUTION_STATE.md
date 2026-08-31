@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-08-31, Search Knowledge canonical-link runtime checkpoint.
+Last updated: 2026-08-31, fail-closed MediaAsset delivery checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,8 +9,8 @@ Last updated: 2026-08-31, Search Knowledge canonical-link runtime checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 8 / target 8 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007 and MediaAsset metadata/visibility are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 68 tests, 200 assertions; guarded WordPress suite: 101 tests, 413 assertions; plugin/theme PHP lint, route smoke and diff check pass |
-| Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Tests | Unit suite: 70 tests, 205 assertions; guarded WordPress suite: 103 tests, 419 assertions; plugin/theme PHP lint, route smoke and diff check pass |
+| Blockers | Responsive/tablet/mobile visual QA, external MCP transport, final retirement/target approval for 28 explicitly classified URL candidates (5 domain-targeted, 21 unsupported media references, 2 retired legacy garbage), MediaAsset publication/privacy policy and source-file availability, Source/Evidence activation/public provenance policy, semantic projections and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 28 explicitly classified URL candidates, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, semantic projection and domain-targeted post reconciliation before responsive visual QA and external MCP transport checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; local-dev ledger imported 2,379 rows with 2,594 explicit skips, including 367 Knowledge, 370 Authority and 34 native-post redirects |
@@ -275,3 +275,12 @@ Last updated: 2026-08-31, Search Knowledge canonical-link runtime checkpoint.
   candidates from the hashed Mapper 6.14 export. It records the five
   domain-targeted posts, 21 unsupported media references and two retired
   legacy paths without changing their explicit-skip status or V2/V3 data.
+- 2026-08-31: A fail-closed MediaAsset delivery boundary was added. It serves
+  only PUBLIC assets whose MIME type is allowlisted, whose resolved file stays
+  under the configured current storage root, and whose size and SHA-256 match
+  persisted metadata; PRIVATE/HIDDEN, legacy absolute-path and missing assets
+  return 404. Unit evidence is 70 tests/205 assertions and route smoke is
+  17/17, including an unknown asset route.
+- 2026-08-31: Guarded WordPress integration passed after the delivery boundary
+  and rewrite registration changes: `nhk_v3_test` remains migration 8/8 and
+  the suite is 103 tests/419 assertions with no V2 tables restored.

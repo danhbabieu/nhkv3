@@ -33,6 +33,7 @@ $routes = [
     '/video/' => 200,
     '/thu-vien/' => 200,
     '/?s=watch' => 200,
+    '/media/asset/00000000-0000-4000-8000-000000000000/' => 404,
     '/__nhk-route-must-404__/' => 404,
 ];
 $routes = array_merge($routes, $optionalRoutes);

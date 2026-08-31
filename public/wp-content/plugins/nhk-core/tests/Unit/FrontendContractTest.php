@@ -23,6 +23,7 @@ final class FrontendContractTest extends TestCase
         foreach (['pre_get_document_title', 'wp_get_canonical_url', 'og:title', 'BreadcrumbList', 'VideoObject', 'nhk_core_media_context', 'nhk_core_video_context'] as $contract) {
             self::assertStringContainsString($contract, $functions);
         }
+        self::assertStringContainsString('PublicMediaAssetRoutes', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php'));
     }
 
     public function test_search_template_uses_unified_search_query_boundary(): void
