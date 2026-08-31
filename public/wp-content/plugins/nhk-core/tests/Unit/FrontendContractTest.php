@@ -95,6 +95,17 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'semantic_totals' => \$semanticTotals", $searchApi);
     }
 
+    public function test_public_templates_do_not_expose_internal_domain_terms(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['comparison.php', 'knowledge.php', 'media.php', 'video.php', 'index.php'] as $template) {
+            $contents = (string) file_get_contents($theme . '/' . $template);
+            foreach (['Authority reference', 'Knowledge claim', 'Canonical ID', 'entity Video', 'Semantic search'] as $internalTerm) {
+                self::assertStringNotContainsString($internalTerm, $contents, $template . ' exposes internal term: ' . $internalTerm);
+            }
+        }
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
