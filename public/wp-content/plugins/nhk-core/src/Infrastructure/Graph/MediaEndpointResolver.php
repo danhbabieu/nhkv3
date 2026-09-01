@@ -7,6 +7,7 @@ use NHK\Core\Contracts\Graph\EndpointResolver;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Graph\Exception\InvalidEndpointReference;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class MediaEndpointResolver implements EndpointResolver
 {
@@ -18,7 +19,7 @@ final class MediaEndpointResolver implements EndpointResolver
 
     public function normalize(NodeReference $reference): NodeReference
     {
-        if (!$this->supports($reference->endpoint_type) || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $reference->endpoint_key) !== 1) throw new InvalidEndpointReference('Media endpoint key must be UUID.');
+        if (!$this->supports($reference->endpoint_type) || !UuidCodec::isValid($reference->endpoint_key)) throw new InvalidEndpointReference('Media endpoint key must be UUID.');
         return $reference;
     }
 

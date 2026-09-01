@@ -5,7 +5,7 @@ Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
 Latest verification: guarded WordPress suite 89 tests/479 assertions (234
-tests/1,337 assertions combined);
+tests/1,338 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -25,6 +25,9 @@ IDs before repository access and returns empty groups when Graph lookup fails.
 
 Migration dry-run and apply now share strict UUID validation, including
 rejection of nil UUIDs as bounded `INVALID_IDENTITY` records.
+
+Graph endpoint resolvers now use the same strict codec for canonical
+Authority, Media, Video, Knowledge, Source and Evidence references.
 
 The current KnowledgeClaim hydration checkpoint brings the guarded suite to
 75 integration tests / 449 assertions (215 tests / 1,295 assertions combined).

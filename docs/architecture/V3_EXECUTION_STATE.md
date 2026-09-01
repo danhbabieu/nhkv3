@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 145 tests, 858 assertions; guarded WordPress integration: 89 tests, 479 assertions; combined current suite: 234 tests, 1,337 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
+| Tests | Unit suite: 145 tests, 859 assertions; guarded WordPress integration: 89 tests, 479 assertions; combined current suite: 234 tests, 1,338 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Graph endpoint resolvers now use the shared strict UUID codec
+  instead of duplicated shape-only checks, so nil/malformed Authority, Media,
+  Video, Knowledge, Source and Evidence graph keys fail as invalid endpoint
+  references. Unit verification is 145 tests / 859 assertions and guarded
+  integration remains 89 tests / 479 assertions.
 
 - 2026-09-01: Unified migration UUID checks with the strict shared codec:
   dry-run and V2 migration now reject nil/malformed canonical UUIDs through

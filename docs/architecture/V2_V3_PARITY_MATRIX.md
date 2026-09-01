@@ -31,12 +31,16 @@ the separate V2 data/publication gates below.
 
 Governance Proposal and ApplyAttempt reads also omit out-of-range persisted
 numeric states instead of coercing them to defaults; current combined
- verification is 234 tests / 1,337 assertions.
+ verification is 234 tests / 1,338 assertions.
 
 Public REST, MCP, theme detail queries and asset delivery now share strict
 canonical UUID validation; UUID-shaped but invalid inputs fail closed before
 WPDB conversion, with the boundary covered by Unit and guarded integration
 tests.
+
+Graph endpoint resolvers also use the shared strict codec for canonical
+Authority, Media, Video, Knowledge, Source and Evidence keys, rejecting nil
+UUIDs before endpoint resolution.
 
 Raw persisted state validation is strict across Authority, Media, Video and
 Knowledge hydrators; malformed values are omitted before public or governed
