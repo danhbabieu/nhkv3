@@ -5,6 +5,7 @@ namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState};
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\AuthorityEndpointResolver;
@@ -106,5 +107,38 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         self::assertSame($baseline + 1, $data['total']);
         self::assertContains($active->canonicalId, array_column($data['items'], 'id'));
         self::assertNotContains($retired->canonicalId, array_column($data['items'], 'id'));
+    }
+
+    public function test_authority_repository_rejects_duplicate_identity_with_changed_state(): void
+    {
+        $repository = new WpdbAuthorityRepository();
+        $entity = new AuthorityEntity(
+            \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
+            'brand',
+            'p5-integration-repository-conflict-' . bin2hex(random_bytes(4)),
+            'Repository conflict',
+            1,
+            ['country' => 'Switzerland'],
+        );
+        $repository->create($entity);
+
+        try {
+            $repository->create(new AuthorityEntity(
+                $entity->canonicalId,
+                $entity->entityType,
+                $entity->stableKey,
+                $entity->canonicalName,
+                $entity->schemaVersion,
+                $entity->payload,
+                AuthorityState::RETIRED,
+                $entity->revision,
+            ));
+            self::fail('Expected a same-identity Authority entity with changed state to be rejected.');
+        } catch (\NHK\Core\Authority\Exception\StableKeyCollision $exception) {
+            self::assertSame('Stable key already exists.', $exception->getMessage());
+        } finally {
+            global $wpdb;
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_entities WHERE canonical_uuid=%s', \NHK\Core\Shared\Uuid\UuidCodec::toBinary($entity->canonicalId)));
+        }
     }
 }
