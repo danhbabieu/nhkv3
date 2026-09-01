@@ -33,6 +33,21 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
+    public function test_mcp_registration_initializes_semantic_context_resolver_and_serves_read_tool(): void
+    {
+        $response = $this->request('tools/call', [
+            'id' => 101,
+            'params' => [
+                'name' => 'nhk.semantic.resolve',
+                'arguments' => ['context' => []],
+            ],
+        ], ['Mcp-Name' => 'nhk.semantic.resolve']);
+
+        self::assertSame(200, $response->get_status(), (string) wp_json_encode($response->get_data()));
+        self::assertFalse($response->get_data()['result']['isError'] ?? true, (string) wp_json_encode($response->get_data()));
+        self::assertSame(['resolved' => [], 'candidates' => [], 'ambiguities' => [], 'missing' => [], 'conflicts' => [], 'relations' => []], $response->get_data()['result']['structuredContent']);
+    }
+
     public function test_tools_call_enforces_required_and_uuid_schema_arguments(): void
     {
         $missing = $this->request('tools/call', ['id' => 22, 'params' => ['name' => 'nhk.entity.get', 'arguments' => ['type' => 'brand']]], ['Mcp-Name' => 'nhk.entity.get']);

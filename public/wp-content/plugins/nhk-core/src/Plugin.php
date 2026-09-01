@@ -14,7 +14,7 @@ use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
 use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
-use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpToolCatalog, McpTransport};
+use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
