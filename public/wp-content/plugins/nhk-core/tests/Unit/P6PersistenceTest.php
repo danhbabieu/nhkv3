@@ -50,6 +50,7 @@ final class P6PersistenceTest extends TestCase
         $asset = $service->addAsset($created->canonicalId, 'original', 'uploads/odo-front.jpg', hash('sha256', 'binary'), 'image/jpeg', 6, 1200, 800);
         $usage = $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured');
         self::assertSame($created->canonicalId, $asset->mediaId);
+        self::assertSame('PRIVATE', $asset->visibility);
         self::assertSame($created->canonicalId, $usage->mediaId);
         self::assertCount(1, $service->assets($created->canonicalId));
         self::assertCount(1, $service->usages($created->canonicalId));

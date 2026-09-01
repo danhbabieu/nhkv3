@@ -95,10 +95,10 @@ final class MediaService
         return $this->changeState($id, $revision, true);
     }
 
-    public function addAsset(string $mediaId, string $kind, string $storageKey, string $checksum, string $mimeType, int $byteSize, ?int $width = null, ?int $height = null): MediaAsset
+    public function addAsset(string $mediaId, string $kind, string $storageKey, string $checksum, string $mimeType, int $byteSize, ?int $width = null, ?int $height = null, string $visibility = 'PRIVATE', array $metadata = []): MediaAsset
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        return $this->assets->create(new MediaAsset(UuidCodec::newV7(), $mediaId, $kind, $storageKey, $checksum, $mimeType, $byteSize, $width, $height));
+        return $this->assets->create(new MediaAsset(UuidCodec::newV7(), $mediaId, $kind, $storageKey, $checksum, $mimeType, $byteSize, $width, $height, strtoupper($visibility), $metadata));
     }
 
     public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0): MediaUsage
