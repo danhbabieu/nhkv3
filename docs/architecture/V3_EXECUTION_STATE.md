@@ -123,6 +123,11 @@ Last updated: 2026-09-01, P11 Governance command hydration checkpoint.
   Current verification is Unit 140 tests / 849 assertions and guarded
   integration 78 tests / 456 assertions.
 
+- 2026-09-01: Dry-run relation and URL target validation now uses the same
+  shared UUID/RFC 4122 boundary as apply, rejecting nil or malformed UUIDs
+  before they can appear as mapped candidates. Current verification is Unit
+  141 tests / 852 assertions and guarded integration 78 tests / 456 assertions.
+
 - 2026-09-01: Closed the Authority domain identity boundary: `AuthorityEntity`
   now validates canonical UUID format before any repository or Graph operation.
   Malformed identity construction is fail-closed with a typed endpoint error;

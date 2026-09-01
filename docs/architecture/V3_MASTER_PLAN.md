@@ -36,6 +36,10 @@ V2 migration identity validation now applies the shared codec and strict RFC
 reason-coded `INVALID_IDENTITY`, with latest coverage at 218 tests / 1,305
 assertions combined.
 
+Dry-run relation and URL target validation now uses the same strict UUID
+boundary before reporting mapped candidates; latest coverage is 219 tests /
+1,308 assertions combined.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

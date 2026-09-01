@@ -58,7 +58,7 @@ final class DryRunService
                 $entityKey = trim((string) ($record['target_entity_key'] ?? ''));
                 if ($entityType !== '' || $entityId !== '' || $entityKey !== '') {
                     $types = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'knowledge'];
-                    if (!in_array($entityType, $types, true) || preg_match('/^[0-9a-f-]{36}$/i', $entityId) !== 1 || $entityKey === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
+                    if (!in_array($entityType, $types, true) || !$this->validUuid($entityId) || $entityKey === '') return ['status' => 'skipped', 'reason' => 'INVALID_URL_MAPPING'];
                 }
                 return ['status' => 'mapped', 'reason' => 'URL_MAPPING_READY'];
             }
@@ -109,6 +109,16 @@ final class DryRunService
         if (!isset($map[$type])) return false;
         return $map[$type] === 'wp_post'
             ? preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $key) === 1
-            : preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $key) === 1;
+            : $this->validUuid($key);
+    }
+
+    private function validUuid(string $value): bool
+    {
+        try {
+            UuidCodec::toBinary($value);
+            return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

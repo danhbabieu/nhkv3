@@ -37,6 +37,10 @@ V2 migration semantic and URL target UUIDs now use shared codec plus strict
 RFC 4122 validation; malformed UUID-shaped records are explicitly ledgered as
 `INVALID_IDENTITY`, covered by 78 guarded integration tests / 456 assertions.
 
+Dry-run relation and URL target candidates apply the same strict UUID boundary,
+with nil/malformed UUIDs rejected before mapping; latest Unit coverage is 141
+tests / 852 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

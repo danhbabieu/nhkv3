@@ -31,6 +31,10 @@ Migration UUID validation now uses the shared codec and strict RFC 4122
 version/variant checks, ledgering invalid UUID-shaped records as
 `INVALID_IDENTITY`; latest combined coverage is 218 tests / 1,305 assertions.
 
+Dry-run relation and URL target identity checks now share that strict UUID
+boundary, rejecting nil/malformed UUIDs before mapping candidates are emitted;
+latest combined coverage is 219 tests / 1,308 assertions.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping
