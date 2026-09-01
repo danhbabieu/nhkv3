@@ -51,6 +51,9 @@ integration coverage is 79 tests / 457 assertions.
 Governance dependency reads now fail closed on invalid UUID rows before cycle
 evaluation; latest guarded integration coverage is 80 tests / 458 assertions.
 
+Graph edge reads now omit malformed persisted rows from single/paginated
+results; latest guarded integration coverage is 81 tests / 460 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

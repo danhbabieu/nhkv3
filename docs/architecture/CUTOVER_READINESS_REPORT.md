@@ -46,6 +46,9 @@ rows; latest combined verification is 220 tests / 1,309 assertions.
 Governance dependency reads now omit invalid UUID rows before closure/cycle
 evaluation; latest combined verification is 221 tests / 1,310 assertions.
 
+Graph edge hydration now omits malformed persisted rows from single and
+paginated reads; latest combined verification is 222 tests / 1,312 assertions.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

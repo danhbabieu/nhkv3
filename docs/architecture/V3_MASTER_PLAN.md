@@ -51,6 +51,10 @@ assertions.
 Dependency repository reads now omit invalid UUID rows before closure/cycle
 evaluation; latest combined verification is 221 tests / 1,310 assertions.
 
+Graph edge hydration now fails closed for malformed persisted edge/node/state
+data before Post Graph and relation APIs consume it; latest combined
+verification is 222 tests / 1,312 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge
