@@ -22,8 +22,9 @@ malformed or non-array persistence rows; guarded integration is 75 tests / 449
 assertions and combined coverage is 215 tests / 1,295 assertions.
 
 Current verification supersedes the historical checkpoint counts above: the
-guarded suite is 94 tests / 517 assertions and the combined suite is 246 tests /
-1,435 assertions. V2 Video migration and its dry-run now canonicalize supported
+guarded suite is 94 tests / 517 assertions and the combined current evidence is
+247 tests / 1,451 assertions from the Unit suite plus guarded integration
+evidence. V2 Video migration and its dry-run now canonicalize supported
 YouTube URL forms, require the canonical UUID boundary, validate apply-backed
 domain identities, reject non-Knowledge Evidence targets and record URL/external-ID
 disagreement as a review conflict. MCP Source/Evidence ingest now exposes an
@@ -121,7 +122,9 @@ modified.
 The 764 non-editorial domain-post records now have a reproducible read-only
 classification: 742 `STRUCTURE_REFERENCE`, 21 attachment `REQUIRES_REVIEW`
 and one `RETIRE` `wp_global_styles` record. No identity mapping, redirect or
-body import is applied.
+body import is applied. Each item also carries a bounded target/identity/
+relation/action/retirement policy packet for governed review; no policy is
+applied automatically.
 
 Admin/REST/MCP proposal creation now treats an empty optional target UUID as
 null while retaining strict validation for non-empty values; the REST path is

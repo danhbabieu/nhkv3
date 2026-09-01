@@ -15,7 +15,7 @@ Video detail remains unavailable because the local query has no active Video row
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 152 tests, 918 assertions; guarded WordPress integration: 94 tests, 517 assertions; combined current suite: 246 tests, 1,435 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
+| Tests | Unit suite: 153 tests, 934 assertions; guarded WordPress integration: 94 tests, 517 assertions; combined current evidence: 247 tests, 1,451 assertions (Unit + latest guarded evidence); Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -87,6 +87,14 @@ Video detail remains unavailable because the local query has no active Video row
   `mapping_applied=false`; no body, identity, redirect or V2/V3 record was
   changed. The next gate is governed mapping/retirement approval for the
   structural and recovery lanes.
+
+- 2026-09-01: The domain classifier now emits a bounded policy packet for
+  every lane: V3 target boundary, legacy identity proof, governed relation
+  shape, migration action and retirement rule. TDD coverage verifies the
+  Authority packet; this remains review evidence and applies no identity,
+  relation, redirect or retirement decision. Unit verification is 153 tests /
+  934 assertions; guarded integration evidence remains 94 tests / 517
+  assertions.
 
 - 2026-09-01: Admin proposal detail now reads and displays direct dependency
   UUIDs alongside the dependency binding fingerprint through the existing

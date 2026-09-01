@@ -30,6 +30,10 @@ final class V2DomainPostClassifierTest extends TestCase
         self::assertSame('DOMAIN_IDENTITY_REQUIRES_EXPLICIT_MAPPING', $report['items'][0]['reason_code']);
         self::assertTrue($report['items'][0]['editorial_import_forbidden']);
         self::assertFalse($report['items'][0]['mapping_applied']);
+        self::assertSame('authority.brand', $report['items'][0]['mapping_policy']['target_boundary']);
+        self::assertSame('legacy_post_id_to_canonical_uuid', $report['items'][0]['mapping_policy']['identity_rule']);
+        self::assertSame('governed_about_edges_only', $report['items'][0]['mapping_policy']['relation_rule']);
+        self::assertSame('review_then_governed_mapping', $report['items'][0]['mapping_policy']['migration_action']);
         self::assertSame('REQUIRES_REVIEW', $report['items'][3]['classification']);
         self::assertSame('MEDIA_SOURCE_RECOVERY_OR_RETIREMENT_REQUIRED', $report['items'][3]['reason_code']);
         self::assertSame('RETIRE', $report['items'][4]['classification']);

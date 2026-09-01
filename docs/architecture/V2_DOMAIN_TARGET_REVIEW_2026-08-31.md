@@ -69,6 +69,14 @@ records, 21 `REQUIRES_REVIEW` attachment records and one `RETIRE`
 `mapping_applied=false`; the tool performs no body import, identity mapping,
 redirect creation or data mutation.
 
+Each classified item also emits a machine-readable policy packet: V3 target
+boundary, required identity proof, allowed relation shape, migration action and
+retirement rule. Authority rows require a legacy-post-to-canonical UUID
+binding and governed `about` edges; Knowledge rows require a claim UUID;
+attachments require checksum/provenance verification before MediaAsset reuse;
+and `wp_global_styles` has no semantic target. This is review evidence, not an
+applied mapping or retirement decision.
+
 ## Editorial boundary
 
 The 34 `nhk_article` records are handled separately as native editorial posts

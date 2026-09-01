@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 94 tests/517 assertions (246
-tests/1,435 assertions combined);
+Latest verification: guarded WordPress suite 94 tests/517 assertions (247
+tests/1,451 assertions combined by current Unit + guarded evidence);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -42,6 +42,11 @@ classified by `tools/v2-domain-post-classify.php`: 742
 `STRUCTURE_REFERENCE`, 21 attachment `REQUIRES_REVIEW` records and one
 `RETIRE` `wp_global_styles` record. All retain `mapping_applied=false`; governed
 identity and retirement decisions remain open.
+
+The classifier also emits a bounded policy packet per item covering V3 target,
+identity proof, relation shape, migration action and retirement rule. This is
+structural-gate evidence only; no mapping, relation, redirect or retirement is
+applied.
 
 The latest local revalidation reproduced those same migration and domain-audit
 totals after the Admin checkpoint; it remained read-only and made no database

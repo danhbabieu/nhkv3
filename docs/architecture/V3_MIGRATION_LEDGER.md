@@ -54,6 +54,12 @@ aggregates for governed skip dispositions. It must not write to V2
 or production. Media checksum matches are duplicate candidates only and never
 automatic identity merges.
 
+The separate read-only domain-post classifier emits the same bounded review
+discipline for the 764 non-editorial skips, including target boundary, identity
+proof, relation rule, migration action and retirement rule. Its
+`mapping_applied=false` marker is mandatory evidence that the policy has not
+mutated migration state.
+
 ## No-write dry-run tooling
 
 `tools/v2-dry-run.php --input=/path/to/read-only-inventory.json` accepts a JSON

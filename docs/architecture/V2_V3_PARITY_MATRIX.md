@@ -32,13 +32,18 @@ Latest P11 persistence evidence also covers fail-closed KnowledgeClaim
 provenance hydration; guarded integration is 75 tests / 449 assertions.
 
 Current verification supersedes the historical count above: guarded integration
-is 94 tests / 517 assertions and combined coverage is 246 tests / 1,435
-assertions. Video migration and dry-run now require canonical UUIDs, canonicalize
+is 94 tests / 517 assertions and combined current evidence is 247 tests / 1,451
+assertions from the Unit suite plus guarded integration evidence. Video migration and dry-run now require canonical UUIDs, canonicalize
 supported YouTube URL forms, validate apply-backed domain identities, reject
 non-Knowledge Evidence targets and record URL/external-ID disagreement as a
 reason-coded conflict before persistence. MCP Source/Evidence ingest now makes
 visibility explicit and rejects conflicting visibility declarations before
 Governance proposal creation.
+
+The V2 domain classifier now emits a bounded structural mapping policy packet
+for each skipped record (target boundary, identity proof, relation shape,
+migration action and retirement rule); this remains read-only acceptance
+evidence and does not apply any mapping or retirement.
 
 The persistence hydration boundary now also covers malformed Authority,
 Knowledge Source/Claim/Evidence and MediaUsage domain rows; current combined
