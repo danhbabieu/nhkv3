@@ -140,8 +140,14 @@ final class McpTransport
         if (!$valid) throw new \InvalidArgumentException('Argument has invalid type: ' . $key . '.');
         if (($schema['format'] ?? '') === 'uuid' && (!is_string($value) || !UuidCodec::isValid($value))) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
+        if (isset($schema['enum']) && !in_array($value, (array) $schema['enum'], true)) throw new \InvalidArgumentException('Argument has invalid value: ' . $key . '.');
         if (isset($schema['minimum']) && is_int($value) && $value < (int) $schema['minimum']) throw new \InvalidArgumentException('Argument is below minimum: ' . $key . '.');
         if (isset($schema['maximum']) && is_int($value) && $value > (int) $schema['maximum']) throw new \InvalidArgumentException('Argument is above maximum: ' . $key . '.');
+        if (($schema['type'] ?? '') === 'object') {
+            foreach ((array) ($schema['required'] ?? []) as $required) if (!array_key_exists((string) $required, $value)) throw new \InvalidArgumentException('Missing required argument: ' . $key . '.' . $required . '.');
+            if (($schema['additionalProperties'] ?? true) === false) foreach (array_keys($value) as $property) if (!array_key_exists((string) $property, (array) ($schema['properties'] ?? []))) throw new \InvalidArgumentException('Unknown argument: ' . $key . '.' . $property . '.');
+            foreach ((array) ($schema['properties'] ?? []) as $property => $propertySchema) if (array_key_exists($property, $value)) $this->validateArgumentValue($key . '.' . $property, $value[$property], is_array($propertySchema) ? $propertySchema : []);
+        }
         if (($schema['type'] ?? '') === 'array' && isset($schema['items']) && is_array($schema['items'])) foreach ($value as $item) $this->validateArgumentValue($key . '[]', $item, $schema['items']);
     }
 

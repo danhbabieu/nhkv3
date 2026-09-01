@@ -17,8 +17,8 @@ final class McpToolCatalog
                 'name' => ['type' => 'string'],
                 'readiness' => ['type' => 'string'],
                 'provenance' => ['type' => 'object'],
-                'assets' => ['type' => 'array', 'items' => ['type' => 'object']],
-                'usages' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'assets' => ['type' => 'array', 'items' => self::mediaAssetField()],
+                'usages' => ['type' => 'array', 'items' => self::mediaUsageField()],
             ], ['stable_key', 'name'], true),
             self::tool('nhk.video.ingest', 'Create a governed canonical external Video reference from a validated YouTube URL.', [
                 'url' => ['type' => 'string'],
@@ -92,5 +92,40 @@ final class McpToolCatalog
     private static function uuidField(): array
     {
         return ['type' => 'string', 'format' => 'uuid', 'pattern' => '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$'];
+    }
+
+    private static function mediaAssetField(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'kind' => ['type' => 'string', 'enum' => ['original', 'derivative']],
+                'storage_key' => ['type' => 'string'],
+                'checksum' => ['type' => 'string', 'pattern' => '^[0-9A-Fa-f]{64}$'],
+                'mime_type' => ['type' => 'string'],
+                'byte_size' => ['type' => 'integer', 'minimum' => 0],
+                'width' => ['type' => 'integer', 'minimum' => 1],
+                'height' => ['type' => 'integer', 'minimum' => 1],
+                'visibility' => ['type' => 'string', 'enum' => ['PUBLIC', 'PRIVATE', 'HIDDEN']],
+                'metadata' => ['type' => 'object'],
+            ],
+            'required' => ['kind', 'storage_key', 'checksum', 'mime_type', 'byte_size'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function mediaUsageField(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'endpoint_type' => ['type' => 'string', 'pattern' => '^[a-z][a-z0-9_]{0,63}$'],
+                'endpoint_key' => ['type' => 'string'],
+                'role' => ['type' => 'string', 'enum' => ['featured', 'inline', 'gallery', 'thumbnail', 'source']],
+                'sort_order' => ['type' => 'integer', 'minimum' => 0],
+            ],
+            'required' => ['endpoint_type', 'endpoint_key', 'role'],
+            'additionalProperties' => false,
+        ];
     }
 }

@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 91 tests/491 assertions (237
-tests/1,368 assertions combined);
+Latest verification: guarded WordPress suite 91 tests/491 assertions (238
+tests/1,374 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -333,7 +333,7 @@ and active-data parity therefore remain explicit gates.
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 146 tests, 877 assertions |
+| Unit tests | PASS — 147 tests, 883 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |

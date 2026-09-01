@@ -42,4 +42,16 @@ final class McpContractTest extends TestCase
         self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.proposal.create']['inputSchema']['properties']['dependency_ids']['items']['pattern']);
         self::assertSame(1, $tools['nhk.proposal.create']['inputSchema']['properties']['expected_revision']['minimum']);
     }
+
+    public function test_media_ingest_declares_complete_nested_asset_and_usage_contracts(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        $schema = $tools['nhk.media.ingest']['inputSchema']['properties'];
+        self::assertSame(['kind', 'storage_key', 'checksum', 'mime_type', 'byte_size'], $schema['assets']['items']['required']);
+        self::assertFalse($schema['assets']['items']['additionalProperties']);
+        self::assertSame('^[0-9A-Fa-f]{64}$', $schema['assets']['items']['properties']['checksum']['pattern']);
+        self::assertSame(['endpoint_type', 'endpoint_key', 'role'], $schema['usages']['items']['required']);
+        self::assertFalse($schema['usages']['items']['additionalProperties']);
+        self::assertSame(['featured', 'inline', 'gallery', 'thumbnail', 'source'], $schema['usages']['items']['properties']['role']['enum']);
+    }
 }

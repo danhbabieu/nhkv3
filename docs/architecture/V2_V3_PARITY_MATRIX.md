@@ -138,6 +138,11 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 
 ## Logic parity inventory
 
+MCP Media ingest now declares complete nested asset/usage schemas and the
+transport recursively validates required fields, enums, patterns, numeric
+bounds and unknown properties; generic provenance/metadata objects remain open
+by design.
+
 | Workflow | V3 contract | Status |
 |---|---|---|
 | WordPress Post publish | Native WP editorial lifecycle | IN PROGRESS |
