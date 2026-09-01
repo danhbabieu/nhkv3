@@ -89,6 +89,9 @@ final class McpReadContractTest extends TestCase
         self::assertSame(['country' => 'Switzerland'], $handler->entityGet('brand', $entity->canonicalId)['payload']);
         $mediaRead = $handler->mediaGet($mcpMedia->canonicalId);
         self::assertArrayNotHasKey('provenance', $mediaRead);
+        self::assertArrayNotHasKey('readiness', $mediaRead);
+        self::assertArrayNotHasKey('active', $mediaRead);
+        self::assertArrayNotHasKey('revision', $mediaRead);
         self::assertArrayNotHasKey('storage_key', $mediaRead['assets'][0]);
         self::assertSame('/media/asset/' . $mcpAsset->assetId . '/', $mediaRead['assets'][0]['public_url']);
         self::assertArrayNotHasKey('endpoint_type', $mediaRead['usages'][0]);

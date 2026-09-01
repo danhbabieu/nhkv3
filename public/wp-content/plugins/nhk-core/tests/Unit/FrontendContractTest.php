@@ -316,6 +316,20 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'public_url' => '/media/asset/'", $assetMethod);
     }
 
+    public function test_public_media_serializers_do_not_expose_lifecycle_fields(): void
+    {
+        foreach ([
+            dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php',
+            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
+            dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php',
+        ] as $path) {
+            $contents = (string) file_get_contents($path);
+            self::assertStringNotContainsString("'readiness' => \$media->readiness", $contents, $path . ' exposes Media readiness');
+            self::assertStringNotContainsString("'active' => \$media->active", $contents, $path . ' exposes Media active state');
+            self::assertStringNotContainsString("'revision' => \$media->revision", $contents, $path . ' exposes Media revision');
+        }
+    }
+
     public function test_media_detail_renders_reader_safe_image_asset_url(): void
     {
         $query = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/media.php');
