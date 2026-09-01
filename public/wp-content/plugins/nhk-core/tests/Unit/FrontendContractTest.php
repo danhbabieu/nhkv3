@@ -51,7 +51,7 @@ final class FrontendContractTest extends TestCase
         foreach (['--ink:', '--line:', '--paper:', '--max:'] as $legacyToken) {
             self::assertStringNotContainsString($legacyToken, $style);
         }
-        self::assertStringContainsString('Version: 1.1.6', $style);
+        self::assertStringContainsString('Version: 1.1.7', $style);
     }
 
     public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
@@ -82,6 +82,7 @@ final class FrontendContractTest extends TestCase
     {
         $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/style.css');
         self::assertStringContainsString('.card h3 a{color:var(--nhk-text)}', $style);
+        self::assertStringContainsString('.semantic-card strong{color:var(--nhk-text)}', $style);
         self::assertStringContainsString('.entity-card h2 a,.media-card h2 a,.knowledge-card h2 a,.related-card strong{color:var(--nhk-text)}', $style);
         self::assertStringContainsString('.site-footer a{color:#e9e0d5}', $style);
         self::assertStringContainsString('.site-footer a:hover,.site-footer a:focus{color:var(--nhk-accent-secondary)}', $style);
