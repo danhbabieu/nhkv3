@@ -22,6 +22,10 @@ dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
 skipped, 0 conflicts and 742 explicit mapping-review candidates. No V2/live
 data was modified.
 
+The latest local revalidation reproduced those same migration and domain-audit
+totals after the Admin checkpoint; it remained read-only and made no database
+changes.
+
 The latest domain checkpoint also rejects malformed optional Governance
 proposal `targetUuid` values before persistence while retaining semantic
 subject IDs.

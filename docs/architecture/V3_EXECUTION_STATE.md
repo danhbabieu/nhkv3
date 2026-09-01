@@ -40,6 +40,11 @@ Last updated: 2026-09-01, P11 runtime, MCP validation and migration audit checkp
   assertions; guarded integration remains 92 tests / 506 assertions; combined
   verification is 240 tests / 1,410 assertions.
 
+- 2026-09-01: Read-only migration revalidation against the retained full V2
+  export reproduced 4,973 source records, 3,961 mapped, 1,012 skipped and
+  zero conflicts; the independent domain-target audit reproduced 742 explicit
+  candidates. No V2/live or local database state was modified.
+
 - 2026-09-01: Fresh read-only revalidation after the MCP validation checkpoint
   passed all 34 declared frontend routes and all nine MCP wire checks,
   including CORS protocol headers, modern initialize/tools exchange, invalid
