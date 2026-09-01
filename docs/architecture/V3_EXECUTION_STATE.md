@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-02, P0 runtime hydration reliability checkpoint.
+Last updated: 2026-09-02, approved Brand backbone staged-contract evidence checkpoint.
 
 P0 implementation is in progress. The approved change separates Authority
 row-level malformed-data omission from infrastructure/programming failures:
@@ -27,6 +27,18 @@ secrets from the process environment, fails closed when required values are
 missing, and contains no credentials. Staging server repair and HTTP evidence
 remain pending because this workspace has no SSH/server shell access.
 
+The approved Brand backbone staged contract is documented in
+`BRAND_BACKBONE_STRUCTURAL_CONTRACT_EVIDENCE_2026-09-02.md`,
+`BRAND_BACKBONE_STRUCTURAL_DESIGN_SPEC_2026-09-02.md`, and
+`BRAND_BACKBONE_STRUCTURAL_ACCEPTANCE_MATRIX_2026-09-02.md`, with the
+implementation plan at
+`docs/superpowers/plans/2026-09-02-brand-backbone-structural-contract.md`.
+The package records `model_of` and `variant_of` as `REGISTRY_GAP`s, identifies
+payload-driven parent fields/routes as a `CONSTITUTION_CONFLICT` when treated
+as canonical structure, and records absent physical backbone edges as a
+separate `DATA_COMPATIBILITY_GAP`. This checkpoint is read-only: no predicate,
+entity, payload, relation, redirect, or legacy article body was changed.
+
 Fresh read-only in-app browser visual QA checked `/`, `/tri-thuc/` and `/video/`.
 The visitor-facing hero, navigation, discovery panel and honest empty states
 rendered successfully; browser console error/warning logs were empty. Active
@@ -51,8 +63,8 @@ Video detail remains unavailable because the local query has no active Video row
 
 | Queue field | Current value |
 |---|---|
-| `ACTIVE_GATE` | V2 Structural Mapping / Retirement |
-| `NEXT_ACTIONABLE_GATE` | Apply the residual URL decision matrix to separate deterministic RETAIN/RETIRE/RULE cases from ambiguous URL targets, then verify SEO/redirect behavior without applying human-gated decisions |
+| `ACTIVE_GATE` | Approved Brand Backbone Structural Contract / V2 Structural Mapping |
+| `NEXT_ACTIONABLE_GATE` | Implement contract tests and registry/query changes for `model_of`/`variant_of` only after package review; keep physical relation repair as a separate governed data gate |
 | `TEMPORARILY_BLOCKED_GATES` | MCP local wire/runtime evidence: HTTP harness is not responding at `http://localhost:80` or `http://wordpress.local:8080`; retry `php tools/mcp-wire-smoke.php --base-url=http://localhost` after restoring the existing WordPress/Apache vhost |
 | `HUMAN_BLOCKED_GATES` | Only case-level `AMBIGUOUS_REQUIRES_HUMAN` identity/provenance/publication/retirement decisions after deterministic evidence; production-scale legacy migration backup/restore; final cutover |
 | `COMPLETED_GATES` | Visibility contract; 764-record classifier; structural mapping policy packet and concept/relation evidence matrix; MCP resolver implementation and transport contract |
