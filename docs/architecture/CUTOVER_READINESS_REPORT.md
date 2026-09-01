@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 90 tests/485 assertions (236
-tests/1,362 assertions combined);
+Latest verification: guarded WordPress suite 90 tests/489 assertions (236
+tests/1,366 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -36,6 +36,8 @@ MCP transport now validates tool-call arguments against those schemas before
 dispatch; missing, malformed or unknown arguments return JSON-RPC `-32602`.
 Canonical UUID fields advertise `format=uuid` with case-compatible patterns,
 and runtime validates semantic UUIDs before dispatch.
+Guarded integration also proves uppercase canonical UUID acceptance while nil
+UUIDs remain rejected with JSON-RPC `-32602`.
 
 Proposal create now declares the linked subject/target/dependency and binding
 fields supported by the governed handler, so valid linked proposals remain

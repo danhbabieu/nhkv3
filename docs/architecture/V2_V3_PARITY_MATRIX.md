@@ -31,7 +31,7 @@ the separate V2 data/publication gates below.
 
 Governance Proposal and ApplyAttempt reads also omit out-of-range persisted
 numeric states instead of coercing them to defaults; current combined
-verification is 236 tests / 1,362 assertions.
+verification is 236 tests / 1,366 assertions.
 
 Public REST, MCP, theme detail queries and asset delivery now share strict
 canonical UUID validation; UUID-shaped but invalid inputs fail closed before

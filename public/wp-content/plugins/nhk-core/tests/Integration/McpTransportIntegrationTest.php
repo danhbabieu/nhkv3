@@ -41,6 +41,10 @@ final class McpTransportIntegrationTest extends TestCase
         $invalid = $this->request('tools/call', ['id' => 23, 'params' => ['name' => 'nhk.entity.get', 'arguments' => ['type' => 'brand', 'id' => '00000000-0000-0000-0000-000000000000']]], ['Mcp-Name' => 'nhk.entity.get']);
         self::assertSame(400, $invalid->get_status());
         self::assertSame(-32602, $invalid->get_data()['error']['code']);
+        $uppercase = $this->request('tools/call', ['id' => 24, 'params' => ['name' => 'nhk.entity.get', 'arguments' => ['type' => 'brand', 'id' => '550E8400-E29B-41D4-A716-446655440000']]], ['Mcp-Name' => 'nhk.entity.get']);
+        self::assertSame(200, $uppercase->get_status());
+        self::assertFalse($uppercase->get_data()['result']['isError']);
+        self::assertNull($uppercase->get_data()['result']['structuredContent']);
     }
 
     public function test_standard_modern_initialize_accepts_protocol_version_in_params_without_custom_headers(): void
