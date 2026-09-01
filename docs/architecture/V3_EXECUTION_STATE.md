@@ -1,6 +1,18 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, staging bootstrap repair checkpoint.
+Last updated: 2026-09-02, P0 runtime hydration reliability checkpoint.
+
+P0 implementation is in progress. The approved change separates Authority
+row-level malformed-data omission from infrastructure/programming failures:
+`AuthorityRowHydrator` catches only bounded row-data exceptions, while
+`Error`, `TypeError`, missing runtime dependencies and unexpected failures
+propagate. Registry-driven Authority parity and layered HealthCheck are now
+covered by focused TDD tests. `tools/deployment-preflight.php` is the
+read-only release gate for root Composer runtime, WordPress/nhk-core bootstrap,
+migration state, Authority hydration and REST initialization. No database,
+Graph edge or legacy data was changed. Staging synchronization remains blocked
+until server shell access is available; the unrelated server
+`public/error_log` must be preserved.
 
 The repository now tracks the runtime-safe `config/application.php` required
 by the staging `public/wp-config.php` bootstrap. It reads deployment values and

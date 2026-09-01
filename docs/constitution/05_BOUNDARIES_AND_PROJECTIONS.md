@@ -1,5 +1,15 @@
 # 05 — Boundaries and Projections
 
+## Runtime and deployment boundary
+
+Composer lock plus the root installed runtime are part of the release
+contract. Storage presence, Authority hydration, repository query and public
+projection are separate health layers; a valid zero-row entity type is not a
+failure. Semantic fail-closed validation may omit malformed individual rows,
+but it must never convert infrastructure, autoload, `Error`, `TypeError` or
+unexpected programming failures into an empty collection. Deployment must run
+the read-only preflight and verify Authority hydration before traffic.
+
 ## 1. Authority / Knowledge / Graph
 
 - Authority sở hữu canonical semantic entities theo runtime contract.
