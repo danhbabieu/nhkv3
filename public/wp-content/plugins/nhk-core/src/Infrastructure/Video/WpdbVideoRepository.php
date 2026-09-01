@@ -67,13 +67,19 @@ final class WpdbVideoRepository implements VideoRepository
     {
         $state = $includeRetired ? '' : ' WHERE state=1';
         $rows = $this->database->get_results("SELECT * FROM {$this->table}{$state} ORDER BY id", ARRAY_A);
-        return array_map(fn (array $row): Video => $this->hydrate($row), $rows ?: []);
+        return array_values(array_filter(array_map(fn (array $row): ?Video => $this->hydrate($row), $rows ?: []), static fn (?Video $video): bool => $video !== null));
     }
 
     private function hydrate(?array $row): ?Video
     {
         if (!$row) return null;
-        return new Video(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['platform'], (string) $row['external_video_id'], (string) $row['canonical_url'], (string) $row['title'], json_decode((string) $row['metadata_json'], true, 512, JSON_THROW_ON_ERROR), $row['thumbnail_media_uuid'] === null ? null : UuidCodec::fromBinary($row['thumbnail_media_uuid']), (int) $row['state'] === 1, (int) $row['revision']);
+        try {
+            $metadata = json_decode((string) ($row['metadata_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+        if (!is_array($metadata)) return null;
+        return new Video(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['platform'], (string) $row['external_video_id'], (string) $row['canonical_url'], (string) $row['title'], $metadata, $row['thumbnail_media_uuid'] === null ? null : UuidCodec::fromBinary($row['thumbnail_media_uuid']), (int) $row['state'] === 1, (int) $row['revision']);
     }
 
     private function sameVideo(Video $left, Video $right): bool

@@ -60,13 +60,19 @@ final class WpdbMediaRepository implements MediaRepository
     {
         $state = $includeRetired ? '' : ' WHERE state=1';
         $rows = $this->database->get_results("SELECT * FROM {$this->table}{$state} ORDER BY id", ARRAY_A);
-        return array_map(fn (array $row): Media => $this->hydrate($row), $rows ?: []);
+        return array_values(array_filter(array_map(fn (array $row): ?Media => $this->hydrate($row), $rows ?: []), static fn (?Media $media): bool => $media !== null));
     }
 
     private function hydrate(?array $row): ?Media
     {
         if (!$row) return null;
-        return new Media(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['canonical_name'], (string) $row['readiness'], json_decode((string) $row['provenance_json'], true, 512, JSON_THROW_ON_ERROR), (int) $row['state'] === 1, (int) $row['revision']);
+        try {
+            $provenance = json_decode((string) ($row['provenance_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+        if (!is_array($provenance)) return null;
+        return new Media(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['canonical_name'], (string) $row['readiness'], $provenance, (int) $row['state'] === 1, (int) $row['revision']);
     }
 
     private function sameMedia(Media $left, Media $right): bool

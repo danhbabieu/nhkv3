@@ -96,6 +96,30 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_media_and_video_repositories_ignore_corrupt_json_rows(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        (new MediaAssetMetadataMigration008())->up();
+        $mediaRepository = new WpdbMediaRepository($wpdb);
+        $videoRepository = new WpdbVideoRepository($wpdb);
+        $media = $mediaRepository->create(new Media(UuidCodec::newV7(), 'integration-media-corrupt-provenance-' . bin2hex(random_bytes(4)), 'Corrupt provenance media', 'ready', ['source' => 'test']));
+        $video = $videoRepository->create(Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Corrupt metadata video'));
+
+        try {
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_media SET provenance_json=%s WHERE canonical_uuid=%s", '"not-an-object"', UuidCodec::toBinary($media->canonicalId)));
+            self::assertNull($mediaRepository->findByCanonicalId($media->canonicalId));
+            self::assertSame([], $mediaRepository->list());
+
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_videos SET metadata_json=%s WHERE canonical_uuid=%s", '"not-an-object"', UuidCodec::toBinary($video->canonicalId)));
+            self::assertNull($videoRepository->findByCanonicalId($video->canonicalId));
+            self::assertSame([], $videoRepository->list());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s", UuidCodec::toBinary($video->canonicalId)));
+        }
+    }
+
     public function test_malformed_media_asset_is_skipped_with_invalid_identity_reason(): void
     {
         global $wpdb;
