@@ -27,6 +27,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
   The read-only domain-target audit still reports 742 unique same-domain
   candidates, all requiring explicit mapping evidence and approval.
 
+- 2026-09-01: Hardened ApplyAttempt persistence hydration: malformed UUID,
+  non-positive attempt number, invalid state or result identity rows are now
+  omitted from `find()`/proposal collections instead of leaking domain errors
+  into Controlled Apply or Admin. Current verification is Unit 141 tests / 852
+  assertions and guarded integration 79 tests / 457 assertions.
+
 - 2026-09-01: Closed the Governance command hydration boundary: proposal
   repository reads now omit malformed or non-array `command_json` rows from
   `find()` and idempotency lookup instead of leaking a `TypeError` into Admin

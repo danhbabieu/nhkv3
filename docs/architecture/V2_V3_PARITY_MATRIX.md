@@ -45,6 +45,9 @@ Fresh MCP wire smoke and complete frontend route smoke pass on canonical
 `http://localhost`; the domain candidate audit remains 742 explicit review
 items, with no automatic identity mapping.
 
+ApplyAttempt reads now fail closed on malformed durable rows; latest guarded
+integration coverage is 79 tests / 457 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

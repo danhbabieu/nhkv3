@@ -40,6 +40,9 @@ declared frontend route smoke checks on canonical `http://localhost`; the
 read-only domain audit still finds 742 unique candidates requiring governed
 mapping evidence, so no V2 identity or URL decision was inferred.
 
+ApplyAttempt persistence hydration now also fails closed for malformed durable
+rows; latest combined verification is 220 tests / 1,309 assertions.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

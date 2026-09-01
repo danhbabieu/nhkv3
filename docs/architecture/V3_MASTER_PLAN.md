@@ -44,6 +44,10 @@ Fresh local-dev MCP wire and frontend route smoke revalidation passed on the
 canonical host; the read-only domain-target audit remains 742 explicit mapping
 review candidates.
 
+ApplyAttempt repository reads now omit malformed durable rows before Controlled
+Apply/Admin consumption; latest combined verification is 220 tests / 1,309
+assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

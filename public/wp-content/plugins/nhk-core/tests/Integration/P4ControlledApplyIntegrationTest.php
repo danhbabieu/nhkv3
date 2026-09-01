@@ -6,7 +6,7 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\{ControlledApplyService,GovernanceService};
 use NHK\Core\Contracts\Governance\ApplyExecutionHook;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition,EntityTypeRegistry};
-use NHK\Core\Domain\Governance\{Proposal,ProposalState};
+use NHK\Core\Domain\Governance\{ApplyAttempt,Proposal,ProposalState};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook,WpdbApplyAttemptRepository,WpdbAuditSink,WpdbProposalRepository};
@@ -87,6 +87,24 @@ final class P4ControlledApplyIntegrationTest extends TestCase
         try { (new GovernanceService(new WpdbProposalRepository($wpdb)))->create($p); self::fail('Conflicting idempotency command was accepted.'); } catch (ProposalIdempotencyConflict) { self::assertTrue(true); }
         self::assertSame(1, (int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.$wpdb->prefix.'nhk_proposals WHERE idempotency_key=%s',$key)));
         foreach($files as $file) @unlink($file); $wpdb->query($wpdb->prepare('DELETE FROM '.$wpdb->prefix.'nhk_proposals WHERE idempotency_key=%s',$key));
+    }
+
+    public function test_apply_attempt_repository_omits_corrupt_rows(): void
+    {
+        global $wpdb;
+        $proposal = new Proposal(UuidCodec::newV7(), 'corrupt-attempt', 'rename', ['name' => 'x'], str_repeat('1', 64), 1, 'deps', ProposalState::DRAFT, '1', null, null, 'corrupt-attempt-' . bin2hex(random_bytes(4)), 1, null, null, null, 'brand');
+        $proposal = (new GovernanceService(new WpdbProposalRepository($wpdb), new WpdbAuditSink(), new WpdbTransactionManager()))->create($proposal);
+        $repository = new WpdbApplyAttemptRepository($wpdb);
+        $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposal->id, 1, 'running');
+
+        try {
+            $repository->createRunning($attempt);
+            $wpdb->query($wpdb->prepare('UPDATE ' . $wpdb->prefix . 'nhk_apply_attempts SET attempt_no=%d WHERE attempt_uuid=%s', 0, UuidCodec::toBinary($attempt->id)));
+            self::assertSame([], $repository->findByProposal($proposal->id));
+        } finally {
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_apply_attempts WHERE attempt_uuid=%s', UuidCodec::toBinary($attempt->id)));
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_proposals WHERE proposal_uuid=%s', UuidCodec::toBinary($proposal->id)));
+        }
     }
 
     public function test_proposal_repository_preflight_is_idempotent_and_rejects_changed_content(): void
