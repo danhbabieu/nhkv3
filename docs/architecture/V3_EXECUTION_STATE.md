@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 public link contrast checkpoint.
+Last updated: 2026-09-01, P11 V2 route recheck checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,14 @@ Last updated: 2026-09-01, P11 public link contrast checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: A second read-only V2 route pass recorded concrete reference
+  outcomes: homepage and brand/model archive are populated, while V2
+  `/model/` and `/tim-kiem/?s=odo` resolve to 404; Video, Media and Sharing
+  archives expose honest empty states. The authenticated reference session's
+  WordPress admin toolbar was excluded from public comparison. This evidence
+  is recorded in `V2_REFERENCE_INVENTORY_2026-08-31.md`; no V2 or database state
+  changed, and parity remains open.
 
 - 2026-09-01: A route-wide computed-style audit found remaining browser-default
   blue on quick links, pagination and semantic anchor wrappers. The theme now

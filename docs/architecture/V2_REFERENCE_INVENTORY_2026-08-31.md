@@ -40,3 +40,22 @@ the separate restored-backup inventory records 800 posts, 1,301 entities,
 relations, sources, evidence, media assets and URL candidates with explicit
 migration reason codes. No page sample is used to infer migration counts, and
 no V2 mutation was performed.
+
+## 2026-09-01 route recheck
+
+A second read-only Browser pass captured concrete route outcomes for the
+public-reference session:
+
+| Route | Observed outcome | V3 implication |
+|---|---|---|
+| `/` | Discovery homepage; H1 `Khám phá đồng hồ cổ từ nhiều điểm bắt đầu`; 30 images and 164 links observed | Use the V2 shell as behavioral reference only; V3 keeps its own NHK editorial contract |
+| `/thuong-hieu/` | Brand/model archive; H1 `Thương hiệu & Model`; 18 images and 118 links observed | Confirms the archive information architecture behind V3's canonical `/brand/` and `/model/` routes |
+| `/model/` | V2 404; title `Không tìm thấy trang này – Đồng Hồ Nhà Kho`, H1 `Trang này không còn ở đây` | V3's working model archive is an intentional improvement and must not regress to the V2 dead end |
+| `/tim-kiem/?s=odo` | V2 404 with the same not-found title/H1 | V3's native `/?s=` search plus grouped semantic results is an intentional functional improvement |
+| `/video/` | Video archive; H1 `Thư viện video`; explicit empty state | Preserve honest empty-state behavior until active Video data exists |
+| `/thu-vien/` | Media library; H1 `Video & Ảnh đồng hồ cổ`; explicit empty state | Preserve media type/navigation intent while keeping publication fail-closed |
+| `/goc-chia-se/` | Sharing archive; H1 `Góc chia sẻ`; explicit empty state | Preserve the visitor-facing route and empty state without fixtures |
+
+The reference session was authenticated and displayed the WordPress admin
+toolbar; that toolbar is excluded from public-surface comparison. This pass was
+read-only and does not revise any migration count or parity status.
