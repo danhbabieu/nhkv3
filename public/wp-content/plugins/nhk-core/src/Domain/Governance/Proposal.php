@@ -35,6 +35,9 @@ final readonly class Proposal
         if ($id === '' || $subjectId === '' || $operation === '' || $contentFingerprint === '' || $dependencyFingerprint === '') {
             throw new InvalidArgumentException('Proposal identity and binding fields are required.');
         }
+        if ($targetUuid !== null && !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $targetUuid)) {
+            throw new InvalidArgumentException('Proposal target UUID is invalid.');
+        }
         if ($expectedRevision < 1) {
             throw new InvalidArgumentException('Expected revision must be positive.');
         }

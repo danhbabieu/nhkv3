@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 Graph predicate boundary checkpoint.
+Last updated: 2026-09-01, P11 Proposal target UUID boundary checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,12 @@ Last updated: 2026-09-01, P11 Graph predicate boundary checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Closed the optional Governance proposal target identity
+  boundary: `Proposal` now rejects malformed RFC 4122 `targetUuid` values
+  before persistence while preserving semantic subject IDs. Unit PHPUnit
+  passed 139 tests/845 assertions and guarded integration passed 69 tests/434
+  assertions; Composer PHP lint passed.
 
 - 2026-09-01: Revalidated local runtime readiness without writes: `php
   tools/mcp-wire-smoke.php` passed CORS preflight, `initialize`, 18-tool

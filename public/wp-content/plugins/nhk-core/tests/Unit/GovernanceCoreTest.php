@@ -21,6 +21,12 @@ final class GovernanceCoreTest extends TestCase
         new ApplyAttempt('not-a-uuid', 'not-a-proposal', 0, 'unknown');
     }
 
+    public function test_proposal_rejects_malformed_target_uuid(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new Proposal('proposal-1', 'brand', 'rename', ['name' => 'Name'], 'content', 1, 'deps', ProposalState::DRAFT, null, null, null, 'key-1', 1, null, null, 'not-a-uuid', 'brand');
+    }
+
     public function test_approval_binds_content_and_dependency_closure_and_apply_requires_expected_revision(): void
     {
         $service = new GovernanceService($repo = new InMemoryProposalRepository());
