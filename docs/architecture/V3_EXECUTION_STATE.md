@@ -19,6 +19,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Read-only reference QA revalidated V2 `/tri-thuc/` (12 cards),
+  `/thuong-hieu/` (15 cards), honest empty states for `/thu-vien/` and
+  `/goc-chia-se/`, plus a representative article's breadcrumb/body/related
+  navigation. Tinhte was inspected only for dense feed, featured hierarchy
+  and quick-view patterns; no external branding or markup was copied.
+
 - 2026-09-01: Canonical UUID route boundaries are now case-compatible across
   REST routes, public rewrites and the V2 read-only exporter, matching the
   shared semantic codec and MCP contract. Guarded Integration proves an

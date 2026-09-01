@@ -21,6 +21,13 @@ the final parity declaration.
 
 ## Required parity inventory
 
+Read-only reference QA was revalidated on 2026-09-01: V2 `/tri-thuc/`
+rendered 12 cards, `/thuong-hieu/` rendered 15 cards, `/thu-vien/` and
+`/goc-chia-se/` retained empty states, and a representative article exposed
+breadcrumb, standfirst, long-form body and adjacent-article navigation.
+Tinhte observations were limited to feed density, featured hierarchy and
+quick-view rhythm; no branding or implementation was copied.
+
 Latest P11 persistence evidence also covers fail-closed KnowledgeClaim
 provenance hydration; guarded integration is 75 tests / 449 assertions.
 

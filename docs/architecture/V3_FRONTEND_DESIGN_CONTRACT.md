@@ -18,6 +18,13 @@ information density, feed rhythm, featured hierarchy, topic discovery and
 reading comfort. Do not copy either site's branding, assets, markup, CSS,
 icons or proprietary text.
 
+The 2026-09-01 read-only reference check confirmed V2 samples of 12 Tri thức
+cards and 15 Brand/Model cards, honest empty states for Video/Ảnh and Góc
+chia sẻ, and a representative article with breadcrumb, standfirst, long-form
+body and adjacent-article navigation. A Tinhte homepage check confirmed dense
+feed rhythm, featured hierarchy and compact quick-view content; these are
+interaction references only, not implementation or branding inputs.
+
 ## Tokens
 
 The theme must define and consume these tokens from a single source:

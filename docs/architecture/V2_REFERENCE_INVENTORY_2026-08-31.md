@@ -59,3 +59,10 @@ public-reference session:
 The reference session was authenticated and displayed the WordPress admin
 toolbar; that toolbar is excluded from public-surface comparison. This pass was
 read-only and does not revise any migration count or parity status.
+
+The same pass revalidated `/tri-thuc/` with 12 article cards and
+`/thuong-hieu/` with 15 visible entity cards. A representative Tri thức
+article exposed breadcrumb, category label, H1, standfirst, long-form body,
+section heading and previous/next article navigation. A Tinhte homepage check
+was limited to dense feed rhythm, featured hierarchy and compact quick-view
+content; no external branding, assets, markup, CSS or iconography was copied.
