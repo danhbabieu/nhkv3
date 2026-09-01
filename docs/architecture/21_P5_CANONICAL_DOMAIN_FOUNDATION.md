@@ -10,7 +10,8 @@ All types use the same generic Authority storage and service contract:
 
 - immutable canonical UUID (UUIDv7 for new records; legacy UUIDs round-trip);
 - immutable scoped stable key `(entity_type, stable_key)`;
-- deterministic, allow-listed payload fields with field-type validation;
+- deterministic, allow-listed payload fields with field-type and declared
+  format validation; relation UUIDs and Product HTTP(S) URLs fail closed;
 - optimistic revision for rename, update and lifecycle changes;
 - active/retired lifecycle with typed state errors;
 - registry-backed Graph endpoint registration when `graphEnabled` is true.
@@ -28,7 +29,7 @@ object's identity.
 Authority table, unique canonical UUIDs, stable-key lookup, Graph resolver
 registration, retire/reactivate lifecycle and payload update behavior. The unit
 suite verifies catalog completeness, conflicting registry definitions, payload
-field types and optimistic update locking.
+field types and format validation, and optimistic update locking.
 
 ## Migration decision
 
