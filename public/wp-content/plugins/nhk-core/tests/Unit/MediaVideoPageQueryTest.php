@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\MediaVideoPageQuery;
+use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
@@ -61,6 +62,26 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertSame(0, $query->videoArchive()['total']);
     }
 
+    public function test_media_detail_omits_public_assets_that_binary_delivery_cannot_resolve(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-public-media-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $contents = 'valid-image';
+        file_put_contents($root . '/valid.jpg', $contents);
+        $mediaId = UuidCodec::newV7();
+        $valid = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'valid.jpg', hash('sha256', $contents), 'image/jpeg', strlen($contents));
+        $missing = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'missing.jpg', hash('sha256', 'missing'), 'image/jpeg', 7);
+        try {
+            $assetRepository = $this->assetRepository([$valid, $missing]);
+            $mediaRepository = $this->mediaRepository([new Media($mediaId, 'public-assets', 'Public assets', 'ready')]);
+            $query = new MediaVideoPageQuery($mediaRepository, $assetRepository, $this->usageRepository([]), $this->videoRepository([]), null, new PublicMediaAssetDelivery($assetRepository, $mediaRepository, $root));
+            self::assertSame([$valid->assetId], array_column($query->mediaDetail($mediaId)['assets'], 'id'));
+        } finally {
+            unlink($root . '/valid.jpg');
+            rmdir($root);
+        }
+    }
+
     /** @param list<Media> $media @param list<Video> $videos @param list<MediaAsset> $assets @param list<MediaUsage> $usages */
     private function query(array $media, array $videos, array $assets = [], array $usages = []): MediaVideoPageQuery
     {
@@ -95,5 +116,51 @@ final class MediaVideoPageQueryTest extends TestCase
             public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
         };
         return new MediaVideoPageQuery($mediaRepository, $assetRepository, $usageRepository, $videoRepository);
+    }
+
+    private function mediaRepository(array $items): MediaRepository
+    {
+        return new class ($items) implements MediaRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Media { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByStableKey(string $stableKey): ?Media { return null; }
+            public function create(Media $media): Media { return $media; }
+            public function update(Media $media, int $expectedRevision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+    }
+
+    private function assetRepository(array $items): MediaAssetRepository
+    {
+        return new class ($items) implements MediaAssetRepository {
+            public function __construct(private array $items) {}
+            public function findByAssetId(string $id): ?MediaAsset { foreach ($this->items as $item) if ($item->assetId === $id) return $item; return null; }
+            public function create(MediaAsset $asset): MediaAsset { return $asset; }
+            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
+            public function listByMediaId(string $mediaId): array { return array_values(array_filter($this->items, static fn (MediaAsset $item): bool => $item->mediaId === $mediaId)); }
+            public function findByChecksum(string $checksum): array { return []; }
+        };
+    }
+
+    private function usageRepository(array $items): MediaUsageRepository
+    {
+        return new class ($items) implements MediaUsageRepository {
+            public function __construct(private array $items) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return []; }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return []; }
+        };
+    }
+
+    private function videoRepository(array $items): VideoRepository
+    {
+        return new class ($items) implements VideoRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
     }
 }

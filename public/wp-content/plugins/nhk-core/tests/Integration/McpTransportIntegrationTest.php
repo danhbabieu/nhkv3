@@ -177,6 +177,11 @@ final class McpTransportIntegrationTest extends TestCase
     {
         global $wpdb;
         $media = (new WpdbMediaRepository($wpdb))->create(new Media(\NHK\Core\Shared\Uuid\UuidCodec::newV7(), 'mcp-public-media-' . bin2hex(random_bytes(4)), 'Public Media', 'ready'));
+        $upload = wp_upload_dir();
+        $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
+        $assetDirectory = $mediaRoot . '/public';
+        wp_mkdir_p($assetDirectory);
+        file_put_contents($assetDirectory . '/asset.jpg', 'public-asset');
         $asset = (new WpdbMediaAssetRepository($wpdb))->create(new \NHK\Core\Domain\Media\MediaAsset(\NHK\Core\Shared\Uuid\UuidCodec::newV7(), $media->canonicalId, 'original', 'public/asset.jpg', hash('sha256', 'public-asset'), 'image/jpeg', 12, 20, 10, 'PUBLIC'));
         try {
             $read = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/media/' . $media->canonicalId));
@@ -184,6 +189,7 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame('/media/asset/' . $asset->assetId . '/', $read->get_data()['assets'][0]['public_url']);
             self::assertArrayNotHasKey('storage_key', $read->get_data()['assets'][0]);
         } finally {
+            unlink($assetDirectory . '/asset.jpg');
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE asset_uuid=%s", \NHK\Core\Shared\Uuid\UuidCodec::toBinary($asset->assetId)));
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", \NHK\Core\Shared\Uuid\UuidCodec::toBinary($media->canonicalId)));
         }

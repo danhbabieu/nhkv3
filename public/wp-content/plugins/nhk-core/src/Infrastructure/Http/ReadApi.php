@@ -10,10 +10,11 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 
 final class ReadApi
 {
-    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null) {}
+    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function register(): void
     {
@@ -29,7 +30,7 @@ final class ReadApi
         if ($error = $this->unavailable(!$this->status || $this->status->mediaStorageReady(), 'media')) return $error;
         $media = $this->media->findByCanonicalId((string) $request['id']);
         if (!$media || !$media->active || $media->readiness !== 'ready') return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
-        $assets = array_values(array_filter($this->assets->listByMediaId($media->canonicalId), static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
+        $assets = array_values(array_filter($this->assets->listByMediaId($media->canonicalId), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
         return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($media->canonicalId))];
     }
 

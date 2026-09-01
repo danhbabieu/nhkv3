@@ -16,6 +16,16 @@ final class PublicMediaAssetDelivery
 
     public function __construct(private MediaAssetRepository $assets, private MediaRepository $media, private string $storageRoot) {}
 
+    public static function fromEnvironment(MediaAssetRepository $assets, MediaRepository $media): ?self
+    {
+        $root = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
+        if ($root === '' && function_exists('wp_upload_dir')) {
+            $upload = wp_upload_dir();
+            $root = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
+        }
+        return $root !== '' || function_exists('wp_upload_dir') ? new self($assets, $media, $root) : null;
+    }
+
     /** @return array{asset:MediaAsset,path:string}|null */
     public function resolve(string $assetId): ?array
     {

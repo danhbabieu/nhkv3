@@ -12,6 +12,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 
 final class McpReadHandler
 {
@@ -26,7 +27,8 @@ final class McpReadHandler
         private EvidenceRepository $evidence,
         private ?MigrationStatus $status = null,
         private ?SourceRepository $sources = null,
-    ) {}
+        private ?PublicMediaAssetDelivery $delivery = null,
+    ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
     {
@@ -40,7 +42,7 @@ final class McpReadHandler
         if (!$this->ready('media')) return null;
         $media = $this->media->findByCanonicalId($id);
         if (!$media || !$media->active || $media->readiness !== 'ready') return null;
-        $assets = array_values(array_filter($this->assets->listByMediaId($id), static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
+        $assets = array_values(array_filter($this->assets->listByMediaId($id), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
         return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'assets' => array_map($this->publicAsset(...), $assets), 'usages' => array_map($this->publicUsage(...), $this->usages->listByMediaId($id))];
     }
 
