@@ -130,14 +130,16 @@ final class McpTransport
 
     private function validateArgumentValue(string $key, mixed $value, array $schema): void
     {
-        $type = (string) ($schema['type'] ?? '');
-        $valid = match ($type) {
-            'string' => is_string($value),
-            'integer' => is_int($value),
-            'object', 'array' => is_array($value),
+        $types = (array) ($schema['type'] ?? '');
+        $valid = match (true) {
+            $value === null => in_array('null', $types, true),
+            in_array('string', $types, true) => is_string($value),
+            in_array('integer', $types, true) => is_int($value),
+            in_array('object', $types, true), in_array('array', $types, true) => is_array($value),
             default => true,
         };
         if (!$valid) throw new \InvalidArgumentException('Argument has invalid type: ' . $key . '.');
+        if ($value === null) return;
         if (($schema['format'] ?? '') === 'uuid' && (!is_string($value) || !UuidCodec::isValid($value))) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (($schema['format'] ?? '') === 'uri' && (!is_string($value) || filter_var($value, FILTER_VALIDATE_URL) === false)) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');

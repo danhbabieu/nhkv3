@@ -127,6 +127,13 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(-32003, $response->get_data()['error']['code']);
     }
 
+    public function test_nullable_optional_mcp_uuid_fields_pass_schema_validation_before_capability_check(): void
+    {
+        $response = $this->request('tools/call', ['id' => 26, 'params' => ['name' => 'nhk.proposal.create', 'arguments' => ['operation' => 'create', 'payload' => [], 'target_uuid' => null]]], ['Mcp-Name' => 'nhk.proposal.create']);
+        self::assertSame(403, $response->get_status());
+        self::assertSame(-32003, $response->get_data()['error']['code']);
+    }
+
     public function test_rest_proposal_create_normalizes_empty_optional_target_uuid(): void
     {
         $users = get_users(['role' => 'administrator', 'number' => 1]);

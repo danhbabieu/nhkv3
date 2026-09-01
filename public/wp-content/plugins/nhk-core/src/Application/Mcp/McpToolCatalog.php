@@ -24,7 +24,7 @@ final class McpToolCatalog
                 'url' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1],
                 'title' => ['type' => 'string'],
                 'metadata' => ['type' => 'object'],
-                'thumbnail_media_id' => self::uuidField(),
+                'thumbnail_media_id' => self::uuidField(true),
             ], ['url'], true),
             self::tool('nhk.video.get', 'Read one active canonical external Video reference.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.knowledge.get', 'Read one active Knowledge claim with public evidence.', ['id' => self::uuidField()], ['id']),
@@ -57,7 +57,7 @@ final class McpToolCatalog
                 'subject_id' => ['type' => 'string'],
                 'payload' => ['type' => 'object'],
                 'expected_revision' => ['type' => 'integer', 'minimum' => 1],
-                'target_uuid' => self::uuidField(),
+                'target_uuid' => self::uuidField(true),
                 'dependency_ids' => ['type' => 'array', 'items' => self::uuidField()],
                 'content_fingerprint' => ['type' => 'string'],
                 'dependency_fingerprint' => ['type' => 'string'],
@@ -88,10 +88,10 @@ final class McpToolCatalog
         ];
     }
 
-    /** @return array{type:string,pattern:string} */
-    private static function uuidField(): array
+    /** @return array{type:string|list<string>,format:string,pattern:string} */
+    private static function uuidField(bool $nullable = false): array
     {
-        return ['type' => 'string', 'format' => 'uuid', 'pattern' => '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$'];
+        return ['type' => $nullable ? ['string', 'null'] : 'string', 'format' => 'uuid', 'pattern' => '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$'];
     }
 
     private static function mediaAssetField(): array

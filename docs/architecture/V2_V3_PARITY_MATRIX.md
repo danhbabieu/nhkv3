@@ -105,6 +105,10 @@ Current Admin proposal detail also exposes direct dependency UUIDs and binding,
 latest Apply status, and inline eligibility/block reason codes; the Eligibility
 response remains available in the operator result panel.
 
+MCP optional `target_uuid` and `thumbnail_media_id` now explicitly support
+`null` in the advertised schema and transport boundary while preserving strict
+UUID validation for non-null values.
+
 V2 migration semantic and URL target UUIDs now use shared codec plus strict
 RFC 4122 validation; malformed UUID-shaped records are explicitly ledgered as
 `INVALID_IDENTITY`, covered by 78 guarded integration tests / 456 assertions.
