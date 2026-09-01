@@ -22,10 +22,16 @@ final class WpdbMediaUsageRepository implements MediaUsageRepository
     {
         $mediaId = $this->mediaInternalId($usage->mediaId);
         if ($mediaId === null) throw new MediaException('Media parent not found.');
+        $existingByIdentity = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE media_id=%d AND endpoint_type=%s AND endpoint_key=%s AND usage_role=%s LIMIT 1", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role), ARRAY_A);
+        if (is_array($existingByIdentity)) {
+            $existing = $this->hydrate($existingByIdentity);
+            if ($existing->sortOrder === $usage->sortOrder) return $existing;
+            throw new MediaException('Media usage identity already exists.');
+        }
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (usage_uuid,media_id,endpoint_type,endpoint_key,usage_role,sort_order,created_at) VALUES (%s,%d,%s,%s,%s,%d,%s)", UuidCodec::toBinary($usage->usageId), $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, gmdate('Y-m-d H:i:s.u')));
         if ($ok === false) {
             $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE media_id=%d AND endpoint_type=%s AND endpoint_key=%s AND usage_role=%s LIMIT 1", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role), ARRAY_A);
-            if (is_array($existing)) return $this->hydrate($existing);
+            if (is_array($existing) && (int) $existing['sort_order'] === $usage->sortOrder) return $this->hydrate($existing);
             throw new MediaException('Media usage identity already exists.');
         }
         $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE usage_uuid=%s LIMIT 1", UuidCodec::toBinary($usage->usageId)), ARRAY_A);
