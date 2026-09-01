@@ -41,7 +41,13 @@ final class WpdbProposalRepository implements ProposalRepository
                 $supersededBy = $replacementUuid ? UuidCodec::fromBinary((string) $replacementUuid) : null;
             }
         }
-        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], json_decode((string) $row['command_json'], true, 512, JSON_THROW_ON_ERROR), bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
+        try {
+            $payload = json_decode((string) ($row['command_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+        if (!is_array($payload)) return null;
+        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
     }
     public function create(Proposal $proposal): Proposal {
         $db = $this->db();

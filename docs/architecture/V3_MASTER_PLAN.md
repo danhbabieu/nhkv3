@@ -21,6 +21,9 @@ P11 latest checkpoint: KnowledgeClaim provenance hydration is fail-closed for
 malformed or non-array persistence rows; guarded integration is 75 tests / 449
 assertions and combined coverage is 215 tests / 1,295 assertions.
 
+Governance proposal `command_json` hydration is also fail-closed for malformed
+or non-array rows; latest combined coverage is 216 tests / 1,297 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

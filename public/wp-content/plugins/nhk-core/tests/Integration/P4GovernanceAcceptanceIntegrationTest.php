@@ -75,6 +75,22 @@ final class P4GovernanceAcceptanceIntegrationTest extends TestCase
         $graph->add($leaf->id, $root->id);
     }
 
+    public function test_proposal_repository_ignores_corrupt_command_json(): void
+    {
+        global $wpdb;
+        $repository = new WpdbProposalRepository();
+        $proposal = $repository->create($this->proposal('corrupt-command'));
+
+        $wpdb->query($wpdb->prepare(
+            'UPDATE ' . $wpdb->prefix . 'nhk_proposals SET command_json=%s WHERE proposal_uuid=%s',
+            '"not-an-object"',
+            UuidCodec::toBinary($proposal->id)
+        ));
+
+        self::assertNull($repository->find($proposal->id));
+        self::assertNull($repository->findByIdempotencyKey($proposal->idempotencyKey));
+    }
+
     public function test_eligibility_reports_dependency_and_revision_reason_codes(): void
     {
         $service = $this->service();
