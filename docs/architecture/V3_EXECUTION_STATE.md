@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 dry-run review summary checkpoint.
+Last updated: 2026-09-01, P11 Media reader-safe asset rendering checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 dry-run review summary checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 117 tests, 732 assertions; guarded WordPress integration: 57 tests, 404 assertions; combined current suite: 174 tests, 1,136 assertions; plugin/theme PHP lint, MCP wire smoke, route smoke 30/30, browser public-language/SEO sweep and diff check pass |
+| Tests | Guarded WordPress suite: 175 tests, 1,140 assertions; Composer PHP lint, MCP wire smoke, route smoke 30/30 and diff check pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,13 @@ Last updated: 2026-09-01, P11 dry-run review summary checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Media detail now exposes only a reader-safe `/media/asset/{uuid}/`
+  URL for each serialized asset; image assets render lazily in the public theme,
+  while the binary route remains fail-closed on active/ready Media, public
+  visibility, MIME, storage-root, SHA-256 and byte-size checks. Contract tests
+  and guarded PHPUnit passed 175 tests/1,140 assertions; MCP wire smoke, route
+  smoke 30/30, Composer lint and diff checks passed. No database state changed.
 
 - 2026-09-01: The public theme now emits `<html lang="vi">` while preserving
   WordPress's other language attributes. Browser verification confirmed the

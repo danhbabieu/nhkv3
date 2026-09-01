@@ -4,10 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: unit 117 tests/732 assertions; guarded integration 57
-tests/404 assertions; combined 174 tests/1,136 assertions; Composer lint,
-MCP wire smoke and
-route smoke 30/30 pass.
+Latest verification: guarded WordPress suite 175 tests/1,140 assertions;
+Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
 
 ## What is ready
 
@@ -76,7 +74,9 @@ route smoke 30/30 pass.
   full V2 claim population remains retained internally for policy review.
 - Theme-facing Media detail data now uses the same reader-safe serializer as
   public Media REST, omitting provenance, storage, checksum, visibility,
-  metadata and Graph endpoint identifiers while retaining display facts.
+  metadata and Graph endpoint identifiers while retaining display facts; image
+  assets now receive a reader-safe `/media/asset/{uuid}/` URL and render lazily
+  through the public theme.
 - Public REST semantic search now excludes retired Media and Video records
   from both result groups and totals; guarded runtime coverage verifies this
   with disposable integration fixtures.
@@ -127,6 +127,10 @@ route smoke 30/30 pass.
   conflicts. V2 PRIVATE media assets remain suppressed by public reads; the
   public asset route is fail-closed on visibility, MIME, storage-root,
   checksum and byte-size checks.
+- The Media detail image URL is only a reader-facing route; binary delivery
+  still validates the parent Media readiness, asset visibility and file
+  integrity, so missing or non-public source bytes remain an honest 404/empty
+  state rather than an invented image.
 - A read-only `nhk_v3` inventory now confirms the three imported MediaAsset
   rows are PRIVATE but their absolute storage keys still point into the V2
   upload tree; none of those source files exists under the V3 upload root, so

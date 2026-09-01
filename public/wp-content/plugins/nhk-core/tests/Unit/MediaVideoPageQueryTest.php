@@ -39,6 +39,7 @@ final class MediaVideoPageQueryTest extends TestCase
 
         $media = $query->mediaDetail($mediaId);
         self::assertSame('image/jpeg', $media['assets'][0]['mime_type']);
+        self::assertSame('/media/asset/' . $asset->assetId . '/', $media['assets'][0]['public_url']);
         self::assertArrayNotHasKey('provenance', $media);
         self::assertArrayNotHasKey('storage_key', $media['assets'][0]);
         self::assertArrayNotHasKey('metadata', $media['assets'][0]);

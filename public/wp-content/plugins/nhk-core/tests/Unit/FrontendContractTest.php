@@ -304,6 +304,14 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_media_detail_renders_reader_safe_image_asset_url(): void
+    {
+        $query = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/media.php');
+        self::assertStringContainsString("str_starts_with(strtolower((string) (\$asset['mime_type'] ?? '')), 'image/')", $query);
+        self::assertStringContainsString("home_url((string) \$asset['public_url'])", $query);
+        self::assertStringContainsString('loading="lazy"', $query);
+    }
+
     public function test_public_media_api_does_not_expose_provenance_blob(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
