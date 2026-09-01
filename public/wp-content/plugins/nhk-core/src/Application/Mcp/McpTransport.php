@@ -139,6 +139,7 @@ final class McpTransport
         };
         if (!$valid) throw new \InvalidArgumentException('Argument has invalid type: ' . $key . '.');
         if (($schema['format'] ?? '') === 'uuid' && (!is_string($value) || !UuidCodec::isValid($value))) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
+        if (($schema['format'] ?? '') === 'uri' && (!is_string($value) || filter_var($value, FILTER_VALIDATE_URL) === false)) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['enum']) && !in_array($value, (array) $schema['enum'], true)) throw new \InvalidArgumentException('Argument has invalid value: ' . $key . '.');
         if (isset($schema['minLength']) && is_string($value) && strlen($value) < (int) $schema['minLength']) throw new \InvalidArgumentException('Argument is too short: ' . $key . '.');

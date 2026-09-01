@@ -86,6 +86,9 @@ MCP ingest schemas also reject empty required strings and invalid domain enum
 values before dispatch, matching the domain contracts for Media, Video,
 Knowledge, Source and Evidence.
 
+Stable-key fields now publish and enforce the canonical lowercase stable-key
+shape, while Video ingest URLs publish and enforce URI format before dispatch.
+
 Nested Media packets additionally require non-empty storage, MIME and
 endpoint-key strings.
 

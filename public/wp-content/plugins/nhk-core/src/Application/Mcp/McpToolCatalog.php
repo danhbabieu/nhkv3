@@ -13,7 +13,7 @@ final class McpToolCatalog
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.media.ingest', 'Create a governed Media identity with complete asset and usage metadata; binary delivery remains separately verified.', [
-                'stable_key' => ['type' => 'string', 'minLength' => 1],
+                'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'name' => ['type' => 'string', 'minLength' => 1],
                 'readiness' => ['type' => 'string', 'enum' => ['draft', 'ready', 'blocked']],
                 'provenance' => ['type' => 'object'],
@@ -21,7 +21,7 @@ final class McpToolCatalog
                 'usages' => ['type' => 'array', 'items' => self::mediaUsageField()],
             ], ['stable_key', 'name'], true),
             self::tool('nhk.video.ingest', 'Create a governed canonical external Video reference from a validated YouTube URL.', [
-                'url' => ['type' => 'string', 'minLength' => 1],
+                'url' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1],
                 'title' => ['type' => 'string'],
                 'metadata' => ['type' => 'object'],
                 'thumbnail_media_id' => self::uuidField(),
@@ -31,13 +31,13 @@ final class McpToolCatalog
             self::tool('nhk.source.get', 'Read one active public Knowledge source with public evidence.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.evidence.get', 'Read one active public Knowledge evidence citation.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.knowledge.ingest', 'Create a governed atomic Knowledge claim with provenance.', [
-                'stable_key' => ['type' => 'string', 'minLength' => 1],
+                'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'text' => ['type' => 'string', 'minLength' => 1],
                 'claim_type' => ['type' => 'string', 'enum' => ['fact', 'specification', 'history', 'technical', 'provenance', 'other']],
                 'provenance' => ['type' => 'object'],
             ], ['stable_key', 'text'], true),
             self::tool('nhk.source.ingest', 'Create a governed Knowledge source with a durable locator and metadata.', [
-                'stable_key' => ['type' => 'string', 'minLength' => 1],
+                'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'title' => ['type' => 'string', 'minLength' => 1],
                 'source_type' => ['type' => 'string', 'enum' => ['publication', 'website', 'archive', 'catalog', 'interview', 'other']],
                 'locator' => ['type' => 'string'],
