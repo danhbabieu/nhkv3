@@ -71,3 +71,10 @@ The result is reproducible with the repository's no-write command
 `php tools/mcp-wire-smoke.php`, which passes CORS preflight, `initialize`,
 `tools/list` (18 tools), invalid-Origin rejection (403) and the 202
 response/no-body notification contract.
+
+## Current revalidation
+
+On the current local runtime, the same wire smoke passed all eight checks and
+the frontend route smoke passed 34/34. A fresh bounded external probe returned
+Media total 242, three draft Source records on page 1, and zero Video records
+with `VIDEO_STORAGE_READY`; all three calls reported zero writes.

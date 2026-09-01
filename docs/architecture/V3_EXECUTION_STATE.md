@@ -19,6 +19,14 @@ Last updated: 2026-09-01, P11 Graph predicate boundary checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Revalidated local runtime readiness without writes: `php
+  tools/mcp-wire-smoke.php` passed CORS preflight, `initialize`, 18-tool
+  `tools/list`, invalid-Origin rejection and initialized notification; the
+  frontend route smoke passed 34/34. External read-only Media/Source/Video
+  probes returned Media total 242, draft Source records and zero Video rows
+  with `VIDEO_STORAGE_READY`, all reporting zero writes. External adapter
+  schema/mapping and active-data parity remain open.
+
 - 2026-09-01: Hardened `PredicateDefinition` endpoint contracts: source and
   target type lists must be non-empty typed lists with valid endpoint names;
   predicate key and cardinality validation remain fail-closed. Unit PHPUnit
