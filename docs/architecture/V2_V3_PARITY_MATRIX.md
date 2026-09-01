@@ -31,7 +31,7 @@ the separate V2 data/publication gates below.
 
 Governance Proposal and ApplyAttempt reads also omit out-of-range persisted
 numeric states instead of coercing them to defaults; current combined
- verification is 235 tests / 1,351 assertions.
+ verification is 236 tests / 1,357 assertions.
 
 Public REST, MCP, theme detail queries and asset delivery now share strict
 canonical UUID validation; UUID-shaped but invalid inputs fail closed before
@@ -45,6 +45,10 @@ UUIDs before endpoint resolution.
 MCP `tools/list` now declares canonical UUID patterns for public read,
 evidence-ingest and Proposal ID fields, with runtime nil/malformed validation
 remaining authoritative.
+
+MCP transport enforces the advertised required/type/bounds/pattern and
+additional-property rules before dispatch, returning JSON-RPC `-32602` for
+invalid tool arguments.
 
 Domain constructors and migration/dependency readers now share the same strict
 UUID validator, preventing shape-only canonical identity acceptance.

@@ -32,6 +32,9 @@ Authority, Media, Video, Knowledge, Source and Evidence references.
 MCP tool schemas now expose canonical UUID patterns for public read, evidence
 ingest and Proposal ID fields, matching the runtime fail-closed boundary.
 
+MCP transport now validates tool-call arguments against those schemas before
+dispatch; missing, malformed or unknown arguments return JSON-RPC `-32602`.
+
 Canonical UUID validation is now shared by domain constructors and migration/
 dependency readers, including nil UUID rejection.
 

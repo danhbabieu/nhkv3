@@ -33,6 +33,16 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
+    public function test_tools_call_enforces_required_and_uuid_schema_arguments(): void
+    {
+        $missing = $this->request('tools/call', ['id' => 22, 'params' => ['name' => 'nhk.entity.get', 'arguments' => ['type' => 'brand']]], ['Mcp-Name' => 'nhk.entity.get']);
+        self::assertSame(400, $missing->get_status());
+        self::assertSame(-32602, $missing->get_data()['error']['code']);
+        $invalid = $this->request('tools/call', ['id' => 23, 'params' => ['name' => 'nhk.entity.get', 'arguments' => ['type' => 'brand', 'id' => '00000000-0000-0000-0000-000000000000']]], ['Mcp-Name' => 'nhk.entity.get']);
+        self::assertSame(400, $invalid->get_status());
+        self::assertSame(-32602, $invalid->get_data()['error']['code']);
+    }
+
     public function test_standard_modern_initialize_accepts_protocol_version_in_params_without_custom_headers(): void
     {
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');

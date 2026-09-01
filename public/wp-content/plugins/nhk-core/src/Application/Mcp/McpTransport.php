@@ -87,6 +87,7 @@ final class McpTransport
             default => null,
         };
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
+        $this->validateArguments($definition['inputSchema'], $arguments);
         $result = match ($name) {
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
@@ -109,6 +110,36 @@ final class McpTransport
         };
         $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
+    }
+
+    private function validateArguments(array $schema, array $arguments): void
+    {
+        foreach ((array) ($schema['required'] ?? []) as $key) {
+            if (!array_key_exists((string) $key, $arguments)) throw new \InvalidArgumentException('Missing required argument: ' . $key . '.');
+        }
+        if (($schema['additionalProperties'] ?? true) === false) {
+            foreach (array_keys($arguments) as $key) if (!array_key_exists((string) $key, (array) ($schema['properties'] ?? []))) throw new \InvalidArgumentException('Unknown argument: ' . $key . '.');
+        }
+        foreach ((array) ($schema['properties'] ?? []) as $key => $property) {
+            if (!array_key_exists($key, $arguments)) continue;
+            $this->validateArgumentValue((string) $key, $arguments[$key], is_array($property) ? $property : []);
+        }
+    }
+
+    private function validateArgumentValue(string $key, mixed $value, array $schema): void
+    {
+        $type = (string) ($schema['type'] ?? '');
+        $valid = match ($type) {
+            'string' => is_string($value),
+            'integer' => is_int($value),
+            'object', 'array' => is_array($value),
+            default => true,
+        };
+        if (!$valid) throw new \InvalidArgumentException('Argument has invalid type: ' . $key . '.');
+        if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
+        if (isset($schema['minimum']) && is_int($value) && $value < (int) $schema['minimum']) throw new \InvalidArgumentException('Argument is below minimum: ' . $key . '.');
+        if (isset($schema['maximum']) && is_int($value) && $value > (int) $schema['maximum']) throw new \InvalidArgumentException('Argument is above maximum: ' . $key . '.');
+        if (($schema['type'] ?? '') === 'array' && isset($schema['items']) && is_array($schema['items'])) foreach ($value as $item) $this->validateArgumentValue($key . '[]', $item, $schema['items']);
     }
 
     private function isModern(array $request, array $params, array $headers): bool
