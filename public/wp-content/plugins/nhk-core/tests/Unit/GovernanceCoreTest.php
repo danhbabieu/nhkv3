@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Contracts\Governance\GovernanceAuthorizer;
-use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Governance\{ApplyAttempt, Proposal, ProposalState};
 use NHK\Core\Governance\Exception\ProposalBindingConflict;
 use NHK\Core\Governance\Exception\GovernancePermissionDenied;
 use NHK\Core\Domain\Governance\DependencyGraph;
@@ -15,6 +15,12 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernanceCoreTest extends TestCase
 {
+    public function test_apply_attempt_rejects_invalid_identity_state_and_number(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new ApplyAttempt('not-a-uuid', 'not-a-proposal', 0, 'unknown');
+    }
+
     public function test_approval_binds_content_and_dependency_closure_and_apply_requires_expected_revision(): void
     {
         $service = new GovernanceService($repo = new InMemoryProposalRepository());
