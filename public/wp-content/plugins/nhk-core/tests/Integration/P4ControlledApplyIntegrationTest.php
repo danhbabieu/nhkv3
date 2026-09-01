@@ -88,4 +88,25 @@ final class P4ControlledApplyIntegrationTest extends TestCase
         self::assertSame(1, (int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM '.$wpdb->prefix.'nhk_proposals WHERE idempotency_key=%s',$key)));
         foreach($files as $file) @unlink($file); $wpdb->query($wpdb->prepare('DELETE FROM '.$wpdb->prefix.'nhk_proposals WHERE idempotency_key=%s',$key));
     }
+
+    public function test_proposal_repository_preflight_is_idempotent_and_rejects_changed_content(): void
+    {
+        global $wpdb;
+        $key = 'p4-preflight-' . bin2hex(random_bytes(5));
+        $proposal = new Proposal(UuidCodec::newV7(), 'brand', 'rename', ['name' => 'Preflight'], str_repeat('e', 64), 1, 'deps', ProposalState::DRAFT, '1', null, null, $key, 1, null, null, null, 'brand');
+        $repository = new WpdbProposalRepository($wpdb);
+        $repository->create($proposal);
+
+        try {
+            $same = $repository->create(new Proposal(UuidCodec::newV7(), $proposal->subjectId, $proposal->operation, $proposal->payload, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, $proposal->actor, null, null, $key, 1, null, null, null, $proposal->entityType));
+            self::assertSame($proposal->id, $same->id);
+
+            $repository->create(new Proposal(UuidCodec::newV7(), 'brand', 'rename', ['name' => 'Changed'], str_repeat('f', 64), 1, 'deps', ProposalState::DRAFT, '1', null, null, $key, 1, null, null, null, 'brand'));
+            self::fail('Expected changed proposal content to be rejected for an existing idempotency key.');
+        } catch (ProposalIdempotencyConflict $exception) {
+            self::assertSame('Idempotency key is already bound to different content.', $exception->getMessage());
+        } finally {
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_proposals WHERE idempotency_key=%s', $key));
+        }
+    }
 }
