@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Knowledge;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class KnowledgePageQuery
 {
@@ -14,6 +15,7 @@ final class KnowledgePageQuery
     public function detail(string $key): ?array
     {
         if (!$this->available()) return null;
+        if (preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 && !UuidCodec::isValid($key)) return null;
         $claim = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->claims->findByCanonicalId($key) : $this->claims->findByStableKey($key);
         if (!$claim || !$claim->active || !$claim->isPublic()) return null;
         $evidence = array_values(array_filter($this->evidence->listByClaim($claim->canonicalId), function (Evidence $item): bool {

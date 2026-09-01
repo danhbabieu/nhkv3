@@ -11,6 +11,21 @@ use PHPUnit\Framework\TestCase;
 
 final class KnowledgePageQueryTest extends TestCase
 {
+    public function test_uuid_shaped_but_invalid_claim_key_fails_closed(): void
+    {
+        $claims = new class implements KnowledgeRepository {
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { throw new \RuntimeException('invalid UUID reached repository'); }
+            public function findByStableKey(string $key): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $sources = new class implements SourceRepository { public function findByCanonicalId(string $id): ?Source { return null; } public function findByStableKey(string $key): ?Source { return null; } public function create(Source $source): Source { return $source; } public function update(Source $source, int $expectedRevision): Source { return $source; } public function list(bool $includeRetired = false): array { return []; } };
+        $evidence = new class implements EvidenceRepository { public function findByCanonicalId(string $id): ?Evidence { return null; } public function create(Evidence $evidence): Evidence { return $evidence; } public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; } public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; } public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; } };
+
+        self::assertNull((new KnowledgePageQuery($claims, $evidence, $sources))->detail('00000000-0000-0000-0000-000000000000'));
+    }
+
     public function test_public_query_returns_active_claims_and_hides_private_or_unlinked_evidence(): void
     {
         $claimId = UuidCodec::newV7(); $sourceId = UuidCodec::newV7(); $privateSourceId = UuidCodec::newV7();
