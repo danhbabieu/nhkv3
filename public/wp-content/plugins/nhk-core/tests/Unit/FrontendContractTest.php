@@ -123,6 +123,17 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('payload.operation==="ingest"&&payload.entity_type==="video"', $admin);
     }
 
+    public function test_mcp_wire_smoke_is_read_only_and_covers_protocol_negotiation(): void
+    {
+        $tool = (string) file_get_contents(dirname(__DIR__, 4) . '/../../tools/mcp-wire-smoke.php');
+        self::assertStringContainsString('CORS preflight', $tool);
+        self::assertStringContainsString("'initialize'", $tool);
+        self::assertStringContainsString("'tools/list'", $tool);
+        self::assertStringContainsString("'notifications/initialized'", $tool);
+        self::assertStringNotContainsString("'tools/call'", $tool);
+        self::assertStringNotContainsString('--apply', $tool);
+    }
+
     public function test_search_template_uses_unified_search_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

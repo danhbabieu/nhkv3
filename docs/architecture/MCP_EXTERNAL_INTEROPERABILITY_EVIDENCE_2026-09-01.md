@@ -40,3 +40,7 @@ WordPress REST CORS allowlist for `MCP-Protocol-Version`, `Mcp-Method` and
 preflight curl against `http://localhost/wp-json/nhk/v1/mcp` returned HTTP 200,
 echoed the requesting origin and listed all three protocol headers. External
 adapter mapping and deployment verification remain open.
+
+The result is reproducible with the repository's no-write command
+`php tools/mcp-wire-smoke.php`, which passes CORS preflight, `initialize`,
+`tools/list` (18 tools) and the 202 response/no-body notification contract.
