@@ -100,6 +100,17 @@ final class McpReadContractTest extends TestCase
         self::assertSame($mcpEvidence->canonicalId, $handler->evidenceGet($mcpEvidence->canonicalId)['id']);
         self::assertArrayNotHasKey('metadata', $handler->evidenceGet($mcpEvidence->canonicalId));
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
+        $invalidVideo = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
+        $invalidVideos = new class($invalidVideo) implements VideoRepository {
+            public function __construct(private Video $item) {}
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->item->canonicalId ? $this->item : null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $item): Video { return $item; }
+            public function update(Video $item, int $expectedRevision): Video { return $item; }
+            public function list(bool $includeRetired = false): array { return [$this->item]; }
+        };
+        $invalidHandler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $invalidVideos, $claims, $evidence, null, $sources);
+        self::assertNull($invalidHandler->videoGet($invalidVideo->canonicalId));
         $retired = $authority->create('brand', 'retired', 'Retired');
         $authority->retire($retired->canonicalId, 1);
         self::assertNull($handler->entityGet('brand', $retired->canonicalId));

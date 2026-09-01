@@ -37,7 +37,7 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->videoStorageReady(), 'video')) return $error;
         $video = $this->videos->findByCanonicalId((string) $request['id']);
-        if (!$video || !$video->active) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
+        if (!$video || !$video->active || !$video->hasValidPublicReference()) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
         return ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision];
     }
 

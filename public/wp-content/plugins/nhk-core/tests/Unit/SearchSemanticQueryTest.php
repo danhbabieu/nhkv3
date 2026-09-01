@@ -75,4 +75,22 @@ final class SearchSemanticQueryTest extends TestCase
         $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $emptyVideo, $emptyKnowledge, $types))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'do-not-index');
         self::assertSame(0, $result['_totals']['entities']);
     }
+
+    public function test_semantic_search_hides_invalid_public_video_references(): void
+    {
+        $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'clock');
+        $videos = new class($invalid) implements VideoRepository {
+            public function __construct(private Video $item) {}
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $item): Video { return $item; }
+            public function update(Video $item, int $expectedRevision): Video { return $item; }
+            public function list(bool $includeRetired = false): array { return [$this->item]; }
+        };
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $item): Media { return $item; } public function update(Media $item, int $expectedRevision): Media { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyKnowledge = new class implements KnowledgeRepository { public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; } public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+        $result = (new SearchSemanticQuery(new InMemoryAuthorityRepository(), $emptyMedia, $videos, $emptyKnowledge, new EntityTypeRegistry()))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'clock');
+        self::assertSame([], $result['videos']);
+        self::assertSame(0, $result['_totals']['videos']);
+    }
 }

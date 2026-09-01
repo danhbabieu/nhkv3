@@ -360,7 +360,9 @@ final class FrontendContractTest extends TestCase
     {
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
         self::assertStringContainsString('fn (Media $item): bool => $item->active && $item->readiness === \'ready\' &&', $searchApi);
-        self::assertStringContainsString('fn (Video $item): bool => $item->active &&', $searchApi);
+        self::assertStringContainsString('fn (Video $item): bool => $item->active && $item->hasValidPublicReference() &&', $searchApi);
+        self::assertStringContainsString('hasValidPublicReference()', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php'));
+        self::assertStringContainsString('hasValidPublicReference()', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php'));
     }
 
     public function test_raw_graph_rest_reads_are_admin_only(): void

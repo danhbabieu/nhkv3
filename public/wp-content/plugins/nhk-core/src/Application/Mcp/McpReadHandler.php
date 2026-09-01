@@ -48,7 +48,7 @@ final class McpReadHandler
     {
         if (!$this->ready('video')) return null;
         $video = $this->videos->findByCanonicalId($id);
-        return $video && $video->active ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision] : null;
+        return $video && $video->active && $video->hasValidPublicReference() ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision] : null;
     }
 
     public function knowledgeGet(string $id): ?array
@@ -96,7 +96,7 @@ final class McpReadHandler
         $groups = ['posts' => $posts, 'entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []];
         if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) { $publicPayload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); if ($entity->active() && $this->matches($term, $entity->canonicalName, $entity->stableKey, $this->json($publicPayload))) $groups['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'stable_key' => $entity->stableKey]; }
         if ($this->ready('media')) foreach ($this->media->list() as $media) if ($media->active && $media->readiness === 'ready' && $this->matches($term, $media->canonicalName, $media->stableKey)) $groups['media'][] = ['type' => 'media', 'id' => $media->canonicalId, 'title' => $media->canonicalName, 'stable_key' => $media->stableKey];
-        if ($this->ready('video')) foreach ($this->videos->list() as $video) if ($video->active && $this->matches($term, $video->title, $video->externalVideoId, $video->canonicalUrl)) $groups['videos'][] = ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'platform' => $video->platform, 'url' => $video->canonicalUrl];
+        if ($this->ready('video')) foreach ($this->videos->list() as $video) if ($video->active && $video->hasValidPublicReference() && $this->matches($term, $video->title, $video->externalVideoId, $video->canonicalUrl)) $groups['videos'][] = ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'platform' => $video->platform, 'url' => $video->canonicalUrl];
         if ($this->ready('knowledge')) foreach ($this->claims->list() as $claim) if ($claim->active && $claim->isPublic() && $this->matches($term, $claim->claimText, $claim->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'id' => $claim->canonicalId, 'title' => $claim->claimText, 'stable_key' => $claim->stableKey];
         $semanticTotals = [];
         $semanticOffset = ($page - 1) * $perPage;

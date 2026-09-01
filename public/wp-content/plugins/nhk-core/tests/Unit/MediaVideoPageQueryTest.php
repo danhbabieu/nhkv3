@@ -52,6 +52,15 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertArrayNotHasKey('metadata', $query->videoDetail($video->canonicalId));
     }
 
+    public function test_video_detail_and_archive_hide_invalid_persisted_external_references(): void
+    {
+        $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
+        $query = $this->query([], [$invalid]);
+
+        self::assertNull($query->videoDetail($invalid->canonicalId));
+        self::assertSame(0, $query->videoArchive()['total']);
+    }
+
     /** @param list<Media> $media @param list<Video> $videos @param list<MediaAsset> $assets @param list<MediaUsage> $usages */
     private function query(array $media, array $videos, array $assets = [], array $usages = []): MediaVideoPageQuery
     {

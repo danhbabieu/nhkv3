@@ -51,6 +51,18 @@ final class MediaVideoCoreTest extends TestCase
         self::assertNull($watch->thumbnailMediaId);
     }
 
+    public function test_public_video_reference_is_fail_closed_for_unsupported_or_mismatched_values(): void
+    {
+        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ');
+        self::assertTrue($valid->hasValidPublicReference());
+
+        $unsupported = new Video($valid->canonicalId, 'vimeo', 'dQw4w9WgXcQ', 'https://vimeo.com/dQw4w9WgXcQ');
+        self::assertFalse($unsupported->hasValidPublicReference());
+
+        $mismatched = new Video($valid->canonicalId, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=AAAAAAAAAAA');
+        self::assertFalse($mismatched->hasValidPublicReference());
+    }
+
     public function test_non_youtube_or_malformed_reference_is_rejected(): void
     {
         $this->expectException(InvalidVideoReference::class);

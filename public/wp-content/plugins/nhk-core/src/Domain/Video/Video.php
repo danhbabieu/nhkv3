@@ -37,4 +37,16 @@ final readonly class Video
         if (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]{11}$/', $id)) throw new InvalidVideoReference('Only a valid YouTube external video reference is supported.');
         return new self(UuidCodec::newV7(), 'youtube', $id, 'https://www.youtube.com/watch?v=' . $id, $title, $metadata, $thumbnailMediaId);
     }
+
+    public function hasValidPublicReference(): bool
+    {
+        if ($this->platform !== 'youtube' || !preg_match('/^[A-Za-z0-9_-]{11}$/', $this->externalVideoId)) return false;
+        try {
+            $normalized = self::fromUrl($this->canonicalUrl);
+        } catch (InvalidVideoReference) {
+            return false;
+        }
+        return $normalized->externalVideoId === $this->externalVideoId
+            && $normalized->canonicalUrl === $this->canonicalUrl;
+    }
 }
