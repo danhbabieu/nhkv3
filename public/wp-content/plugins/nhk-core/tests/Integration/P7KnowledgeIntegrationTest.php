@@ -66,4 +66,21 @@ final class P7KnowledgeIntegrationTest extends TestCase
         $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/evidence/' . $evidence->canonicalId));
         self::assertSame(404, $response->get_status());
     }
+
+    public function test_source_repository_rejects_same_identity_with_changed_metadata(): void
+    {
+        global $wpdb;
+        $repository = new WpdbSourceRepository($wpdb);
+        $source = new Source(UuidCodec::newV7(), 'p7-integration-source-conflict', 'Conflict source', 'catalog', 'https://example.test/catalog', ['visibility' => 'PRIVATE']);
+        $repository->create($source);
+
+        try {
+            $repository->create(new Source($source->canonicalId, $source->stableKey, $source->title, $source->sourceType, $source->locator, ['visibility' => 'PUBLIC']));
+            self::fail('Expected a same-identity Source with changed metadata to be rejected.');
+        } catch (\NHK\Core\Domain\Knowledge\KnowledgeException $exception) {
+            self::assertSame('Source identity already exists.', $exception->getMessage());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($source->canonicalId)));
+        }
+    }
 }
