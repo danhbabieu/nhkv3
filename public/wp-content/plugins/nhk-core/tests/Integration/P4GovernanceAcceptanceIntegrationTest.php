@@ -75,6 +75,25 @@ final class P4GovernanceAcceptanceIntegrationTest extends TestCase
         $graph->add($leaf->id, $root->id);
     }
 
+    public function test_dependency_repository_omits_invalid_uuid_rows(): void
+    {
+        global $wpdb;
+        $proposal = $this->service()->create($this->proposal('corrupt-dependency'));
+        $proposalDbId = (int) $wpdb->get_var($wpdb->prepare(
+            'SELECT id FROM ' . $wpdb->prefix . 'nhk_proposals WHERE proposal_uuid=%s',
+            UuidCodec::toBinary($proposal->id)
+        ));
+
+        $wpdb->query($wpdb->prepare(
+            'INSERT INTO ' . $wpdb->prefix . 'nhk_proposal_dependencies (proposal_id,depends_on_proposal_id,created_at) VALUES (%d,%s,%s)',
+            $proposalDbId,
+            str_repeat("\0", 16),
+            gmdate('Y-m-d H:i:s.u')
+        ));
+
+        self::assertSame([], (new WpdbDependencyRepository())->directDependencies($proposal->id));
+    }
+
     public function test_proposal_repository_ignores_corrupt_command_json(): void
     {
         global $wpdb;

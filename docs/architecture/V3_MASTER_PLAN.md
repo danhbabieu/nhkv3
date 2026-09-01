@@ -48,6 +48,9 @@ ApplyAttempt repository reads now omit malformed durable rows before Controlled
 Apply/Admin consumption; latest combined verification is 220 tests / 1,309
 assertions.
 
+Dependency repository reads now omit invalid UUID rows before closure/cycle
+evaluation; latest combined verification is 221 tests / 1,310 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

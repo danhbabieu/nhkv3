@@ -19,7 +19,16 @@ final class WpdbDependencyRepository implements DependencyRepository
         $id = $db->get_var($db->prepare('SELECT id FROM '.$this->proposals().' WHERE proposal_uuid=%s', UuidCodec::toBinary($proposalId)));
         if (!$id) return [];
         $rows = $db->get_col($db->prepare('SELECT depends_on_proposal_id FROM '.$this->dependencies().' WHERE proposal_id=%d ORDER BY id', (int) $id));
-        return array_map(static fn (string $uuid): string => UuidCodec::fromBinary($uuid), $rows ?: []);
+        $dependencies = [];
+        foreach ($rows ?: [] as $uuid) {
+            try {
+                $canonical = UuidCodec::fromBinary((string) $uuid);
+                if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $canonical) === 1) $dependencies[] = $canonical;
+            } catch (\Throwable) {
+                // A corrupt dependency must not poison closure or cycle reads.
+            }
+        }
+        return $dependencies;
     }
 
     public function add(string $proposalId, string $dependencyUuid): void

@@ -101,6 +101,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
   passed 139 tests/845 assertions and guarded integration passed 69 tests/434
   assertions.
 
+- 2026-09-01: Hardened Governance dependency reads: invalid dependency UUID
+  rows are omitted before closure/cycle evaluation, preventing corrupt
+  persistence from poisoning eligibility or Controlled Apply. Current
+  verification is Unit 141 tests / 852 assertions and guarded integration 80
+  tests / 458 assertions.
+
 - 2026-09-01: Extended the Governance proposal hydration boundary: rows with
   invalid durable domain fields (such as non-positive revision) are now omitted
   from repository reads instead of leaking domain-construction exceptions into
