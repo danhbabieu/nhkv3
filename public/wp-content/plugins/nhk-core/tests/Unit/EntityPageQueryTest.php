@@ -53,5 +53,7 @@ final class EntityPageQueryTest extends TestCase
         $query = new EntityPageQuery($repository, $types);
 
         self::assertSame(['country' => 'Switzerland'], $query->detail('brand', 'public-payload')['payload']);
+        self::assertSame(0, $query->archive('brand', 1, 24, 'internal')['total']);
+        self::assertSame(1, $query->archive('brand', 1, 24, 'Switzerland')['total']);
     }
 }
