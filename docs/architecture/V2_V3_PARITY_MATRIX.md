@@ -101,6 +101,10 @@ non-positive revisions; latest guarded integration is 77 tests / 452 assertions.
 NHK Admin entity/proposal lookup forms now fail closed on malformed UUID input;
 latest Unit coverage is 140 tests / 849 assertions.
 
+Current Admin proposal detail also exposes direct dependency UUIDs and binding,
+latest Apply status, and inline eligibility/block reason codes; the Eligibility
+response remains available in the operator result panel.
+
 V2 migration semantic and URL target UUIDs now use shared codec plus strict
 RFC 4122 validation; malformed UUID-shaped records are explicitly ledgered as
 `INVALID_IDENTITY`, covered by 78 guarded integration tests / 456 assertions.

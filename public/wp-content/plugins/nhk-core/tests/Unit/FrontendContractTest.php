@@ -143,6 +143,10 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'ALREADY_APPLIED'", $admin);
         self::assertStringContainsString('typeof result.data.ready==="boolean"', $admin);
         self::assertStringContainsString('"BLOCKED: "+(result.data.reasons||[]).join(", ")', $admin);
+        self::assertStringContainsString('WpdbDependencyRepository', $admin);
+        self::assertStringContainsString('dependencyDisplay', $admin);
+        self::assertStringContainsString('<strong>IDs:</strong>', $admin);
+        self::assertStringContainsString('<strong>Binding:</strong>', $admin);
     }
 
     public function test_mcp_wire_smoke_is_read_only_and_covers_protocol_negotiation(): void

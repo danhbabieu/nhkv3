@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Admin;
 
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
-use NHK\Core\Infrastructure\Governance\{WpdbApplyAttemptRepository, WpdbProposalRepository};
+use NHK\Core\Infrastructure\Governance\{WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbProposalRepository};
 use NHK\Core\Shared\Health\HealthCheck;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -85,6 +85,8 @@ final class AdminPage
         $proposal = (new WpdbProposalRepository())->find($id); if (!$proposal) { echo '<p class="notice notice-info">Không tìm thấy proposal.</p>'; return; }
         $base = rest_url('nhk/v1/governance/proposals/' . rawurlencode($proposal->id)); $payload = wp_json_encode(['content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint], JSON_UNESCAPED_SLASHES);
         $attempts = (new WpdbApplyAttemptRepository())->findByProposal($proposal->id);
+        $dependencyIds = (new WpdbDependencyRepository())->directDependencies($proposal->id);
+        $dependencyDisplay = $dependencyIds === [] ? 'none' : implode(', ', $dependencyIds);
         $lastAttempt = $attempts !== [] ? $attempts[count($attempts) - 1] : null;
         $applyStatus = $lastAttempt?->state ?? 'not_started';
         $eligibilityHint = match ($proposal->state->value) {
@@ -93,7 +95,7 @@ final class AdminPage
             'submitted' => 'APPROVAL_MISSING',
             default => 'NOT_APPROVED',
         };
-        echo '<table class="widefat striped"><tbody><tr><th>State</th><td>' . esc_html($proposal->state->value) . '</td></tr><tr><th>Subject</th><td><code>' . esc_html($proposal->subjectId) . '</code></td></tr><tr><th>Operation</th><td>' . esc_html($proposal->operation) . '</td></tr><tr><th>Expected revision</th><td>' . esc_html((string) $proposal->expectedRevision) . '</td></tr><tr><th>Proposal revision</th><td>' . esc_html((string) $proposal->revision) . '</td></tr><tr><th>Dependencies</th><td><code>' . esc_html($proposal->dependencyFingerprint) . '</code></td></tr><tr><th>Apply status</th><td><strong>' . esc_html($applyStatus) . '</strong></td></tr><tr><th>Eligibility / block reason</th><td><span id="nhk-eligibility-summary">' . esc_html($eligibilityHint) . ' — bấm Eligibility để tải reason code đầy đủ.</span></td></tr></tbody></table><p class="nhk-governance-actions">';
+        echo '<table class="widefat striped"><tbody><tr><th>State</th><td>' . esc_html($proposal->state->value) . '</td></tr><tr><th>Subject</th><td><code>' . esc_html($proposal->subjectId) . '</code></td></tr><tr><th>Operation</th><td>' . esc_html($proposal->operation) . '</td></tr><tr><th>Expected revision</th><td>' . esc_html((string) $proposal->expectedRevision) . '</td></tr><tr><th>Proposal revision</th><td>' . esc_html((string) $proposal->revision) . '</td></tr><tr><th>Dependencies</th><td><div><strong>IDs:</strong> <code>' . esc_html($dependencyDisplay) . '</code></div><div><strong>Binding:</strong> <code>' . esc_html($proposal->dependencyFingerprint) . '</code></div></td></tr><tr><th>Apply status</th><td><strong>' . esc_html($applyStatus) . '</strong></td></tr><tr><th>Eligibility / block reason</th><td><span id="nhk-eligibility-summary">' . esc_html($eligibilityHint) . ' — bấm Eligibility để tải reason code đầy đủ.</span></td></tr></tbody></table><p class="nhk-governance-actions">';
         self::button('Eligibility', $base . '/eligibility', 'GET'); self::button('Submit', $base . '/submit', 'POST', 'nhk_submit_proposals'); self::button('Approve', $base . '/approve', 'POST', 'nhk_approve_proposals', $payload); self::button('Reject', $base . '/reject', 'POST', 'nhk_approve_proposals'); self::button('Controlled Apply', $base . '/apply', 'POST', 'nhk_apply_proposals');
         echo '</p><pre class="nhk-governance-result" aria-live="polite"></pre>';
         if ($attempts) { echo '<h3>Apply attempts</h3><table class="widefat striped"><thead><tr><th>#</th><th>State</th><th>Error code</th><th>Result</th></tr></thead><tbody>'; foreach ($attempts as $attempt) echo '<tr><td>' . esc_html((string) $attempt->number) . '</td><td>' . esc_html($attempt->state) . '</td><td>' . esc_html((string) ($attempt->errorCode ?? '')) . '</td><td>' . esc_html((string) ($attempt->resultEntityUuid ?? '')) . '</td></tr>'; echo '</tbody></table>'; }
