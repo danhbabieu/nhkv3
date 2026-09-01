@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 Authority payload hydration checkpoint.
+Last updated: 2026-09-01, P11 Knowledge provenance hydration checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,12 @@ Last updated: 2026-09-01, P11 Authority payload hydration checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Closed the KnowledgeClaim provenance hydration boundary: WPDB
+  repository reads now omit malformed or non-array provenance rows from
+  canonical lookup and collections instead of leaking a `TypeError` into
+  semantic search or public readers. Current verification is Unit 140 tests /
+  846 assertions and guarded integration 75 tests / 449 assertions.
 
 - 2026-09-01: Closed the Authority payload hydration boundary: WPDB
   repository reads now omit malformed or non-array payload rows from canonical

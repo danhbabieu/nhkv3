@@ -17,6 +17,10 @@ Status is based on code and test evidence, not commit titles.
 | P10 V2 → V3 Data Migration | IN PROGRESS | Versioned V2 normalize/export, guarded backup/restore, Migration006 ledger, Migration007 Evidence metadata, Migration008 MediaAsset metadata/visibility, Migration009 non-canonical projection context, governed native-post/entity/Knowledge URL redirects and resumable apply are implemented; policy-normalized local-dev checkpoint imported 3,961 rows including 1,581 bounded projection contexts, field-level PRIVATE MediaAsset metadata, 367 Knowledge redirects, 370 entity redirects, 34 native-post redirects, two safe URL no-ops and Source/Evidence citation rows, while 27 explicitly classified URL candidates, MediaAsset delivery/privacy policy and domain-targeted posts remain gated; V2 media usage inventory is zero. |
 | P11 Reconciliation + parity + cutover readiness | IN PROGRESS / NOT READY | `CUTOVER_READINESS_REPORT.md` records implemented evidence and explicit blockers; latest guarded suite is 214 tests/1,293 assertions, all-nine-type core route smoke is 34/34, opt-in real Authority detail smoke is 41/41, and MCP wire smoke passes; Proposal optional target UUID validation, MediaAsset PRIVATE-by-default construction/hydration/schema, Source/Evidence fail-closed metadata hydration, Media/Video fail-closed JSON hydration, and Authority fail-closed payload hydration are covered; read-only domain candidate audit covers all 742 skipped domain posts without automatic mapping; count/semantic/UI/logic reconciliation is still gated by V2 data and WordPress runtime. |
 
+P11 latest checkpoint: KnowledgeClaim provenance hydration is fail-closed for
+malformed or non-array persistence rows; guarded integration is 75 tests / 449
+assertions and combined coverage is 215 tests / 1,295 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

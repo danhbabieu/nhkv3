@@ -95,6 +95,26 @@ final class P7KnowledgeIntegrationTest extends TestCase
         self::assertSame([], $evidenceRepository->listByClaim($claim->canonicalId));
     }
 
+    public function test_knowledge_repository_ignores_corrupt_provenance_rows(): void
+    {
+        global $wpdb;
+        $repository = new WpdbKnowledgeRepository($wpdb);
+        $claim = $repository->create(new KnowledgeClaim(UuidCodec::newV7(), 'p7-integration-corrupt-provenance', 'Corrupt provenance claim.', 'fact', ['source' => 'test']));
+
+        try {
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$wpdb->prefix}nhk_knowledge_claims SET provenance_json=%s WHERE canonical_uuid=%s",
+                '"not-an-object"',
+                UuidCodec::toBinary($claim->canonicalId)
+            ));
+
+            self::assertNull($repository->findByCanonicalId($claim->canonicalId));
+            self::assertNotContains($claim->canonicalId, array_column(array_map(static fn (KnowledgeClaim $item): array => ['id' => $item->canonicalId], $repository->list()), 'id'));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid=%s", UuidCodec::toBinary($claim->canonicalId)));
+        }
+    }
+
     public function test_source_repository_rejects_same_identity_with_changed_metadata(): void
     {
         global $wpdb;

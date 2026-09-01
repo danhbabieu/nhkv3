@@ -12,6 +12,9 @@ The latest domain checkpoint also rejects malformed optional Governance
 proposal `targetUuid` values before persistence while retaining semantic
 subject IDs.
 
+The current KnowledgeClaim hydration checkpoint brings the guarded suite to
+75 integration tests / 449 assertions (215 tests / 1,295 assertions combined).
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

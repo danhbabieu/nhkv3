@@ -21,6 +21,9 @@ the final parity declaration.
 
 ## Required parity inventory
 
+Latest P11 persistence evidence also covers fail-closed KnowledgeClaim
+provenance hydration; guarded integration is 75 tests / 449 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical
