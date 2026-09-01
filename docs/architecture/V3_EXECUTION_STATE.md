@@ -18,7 +18,7 @@ Video detail remains unavailable because the local query has no active Video row
 | Tests | Unit suite: 153 tests, 934 assertions; guarded WordPress integration: 94 tests, 517 assertions; combined current evidence: 247 tests, 1,451 assertions (Unit + latest guarded evidence); Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
+| Next executable task | Wire the read-only `McpSemanticContextResolver` into the MCP read contract and transport, then collect local wire evidence; it must preserve exact UUID/stable-key/name-or-alias ordering and fail closed on ambiguity before continuing external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,961 rows and skipped 1,012 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
@@ -95,6 +95,14 @@ Video detail remains unavailable because the local query has no active Video row
   relation, redirect or retirement decision. Unit verification is 153 tests /
   934 assertions; guarded integration evidence remains 94 tests / 517
   assertions.
+
+- 2026-09-01: Added the read-only `McpSemanticContextResolver` foundation for
+  the MCP semantic-context gate. It resolves Authority context by canonical
+  UUID first, stable key second, then exact canonical name/alias; ambiguous
+  name matches are returned as candidates and are never auto-resolved. The
+  resolver emits missing/conflict/empty relation buckets and performs no
+  mutation. Focused TDD coverage passes 1 test / 7 assertions; MCP transport
+  wiring and wire evidence remain the next executable boundary.
 
 - 2026-09-01: Admin proposal detail now reads and displays direct dependency
   UUIDs alongside the dependency binding fingerprint through the existing
