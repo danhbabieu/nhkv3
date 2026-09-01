@@ -86,7 +86,10 @@ final class McpReadContractTest extends TestCase
         };
         $handler = new McpReadHandler($authorityRepository, $types, $media, $assets, $usages, $videos, $claims, $evidence, null, $sources);
         self::assertSame($entity->canonicalId, $handler->entityGet('brand', $entity->canonicalId)['id']);
-        self::assertSame(['country' => 'Switzerland'], $handler->entityGet('brand', $entity->canonicalId)['payload']);
+        $entityRead = $handler->entityGet('brand', $entity->canonicalId);
+        self::assertSame(['country' => 'Switzerland'], $entityRead['payload']);
+        self::assertArrayNotHasKey('active', $entityRead);
+        self::assertArrayNotHasKey('revision', $entityRead);
         $mediaRead = $handler->mediaGet($mcpMedia->canonicalId);
         self::assertArrayNotHasKey('provenance', $mediaRead);
         self::assertArrayNotHasKey('readiness', $mediaRead);

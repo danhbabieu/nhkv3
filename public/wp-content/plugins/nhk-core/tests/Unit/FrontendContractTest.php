@@ -392,6 +392,19 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("'revision' => \$item->revision", $query);
     }
 
+    public function test_public_entity_serializers_do_not_expose_lifecycle_fields(): void
+    {
+        foreach ([
+            dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php',
+            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
+            dirname(__DIR__, 2) . '/src/Application/Entity/EntityPageQuery.php',
+        ] as $path) {
+            $contents = (string) file_get_contents($path);
+            self::assertStringNotContainsString("'active' => \$entity->active", $contents, $path . ' exposes Entity active state');
+            self::assertStringNotContainsString("'revision' => \$entity->revision", $contents, $path . ' exposes Entity revision');
+        }
+    }
+
     public function test_public_search_filters_retired_media_and_video(): void
     {
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');

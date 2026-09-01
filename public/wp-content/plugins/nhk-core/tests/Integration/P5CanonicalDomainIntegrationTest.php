@@ -81,6 +81,8 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
 
         self::assertSame(200, $response->get_status());
         self::assertSame(['country' => 'Switzerland'], $response->get_data()['payload']);
+        self::assertArrayNotHasKey('active', $response->get_data());
+        self::assertArrayNotHasKey('revision', $response->get_data());
     }
 
     public function test_public_entity_api_list_excludes_retired_entities_before_pagination(): void
