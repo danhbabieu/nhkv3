@@ -241,7 +241,7 @@ final class McpTransport
             'title' => (string) ($arguments['title'] ?? ''),
             'source_type' => (string) ($arguments['source_type'] ?? 'website'),
             'locator' => isset($arguments['locator']) ? (string) $arguments['locator'] : null,
-            'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+            'metadata' => $this->withVisibility($arguments),
         ];
         return $this->proposal($this->governance->createFromArguments($sourceArguments));
     }
@@ -257,7 +257,7 @@ final class McpTransport
             'excerpt' => (string) ($arguments['excerpt'] ?? ''),
             'relation' => (string) ($arguments['relation'] ?? 'supports'),
             'locator' => isset($arguments['locator']) ? (string) $arguments['locator'] : null,
-            'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+            'metadata' => $this->withVisibility($arguments),
         ];
         return $this->proposal($this->governance->createFromArguments($evidenceArguments));
     }
@@ -265,6 +265,19 @@ final class McpTransport
     private function proposal(\NHK\Core\Domain\Governance\Proposal $proposal): array
     {
         return ['id' => $proposal->id, 'subject_id' => $proposal->subjectId, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'payload' => $proposal->payload, 'state' => $proposal->state->value, 'expected_revision' => $proposal->expectedRevision, 'revision' => $proposal->revision, 'idempotency_key' => $proposal->idempotencyKey, 'target_uuid' => $proposal->targetUuid];
+    }
+
+    /** @return array<string,mixed> */
+    private function withVisibility(array $arguments): array
+    {
+        $metadata = is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [];
+        if (!array_key_exists('visibility', $arguments)) return $metadata;
+        $visibility = (string) $arguments['visibility'];
+        if (array_key_exists('visibility', $metadata) && strtoupper(trim((string) $metadata['visibility'])) !== $visibility) {
+            throw new \InvalidArgumentException('Top-level visibility conflicts with metadata.visibility.');
+        }
+        $metadata['visibility'] = $visibility;
+        return $metadata;
     }
 
     /** @return array{status:int,body:array} */

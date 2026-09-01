@@ -329,7 +329,8 @@ final class McpTransportIntegrationTest extends TestCase
                 'title' => 'MCP source ' . $suffix,
                 'source_type' => 'catalog',
                 'locator' => 'https://example.test/mcp/' . $suffix,
-                'metadata' => ['source' => 'mcp-integration-test', 'visibility' => 'PUBLIC'],
+                'visibility' => 'PUBLIC',
+                'metadata' => ['source' => 'mcp-integration-test'],
             ], 30);
             $claim = $this->governedIngest('nhk.knowledge.ingest', [
                 'stable_key' => 'mcp-claim-' . $suffix,
@@ -343,7 +344,8 @@ final class McpTransportIntegrationTest extends TestCase
                 'excerpt' => 'Spring-driven movement',
                 'relation' => 'supports',
                 'locator' => 'https://example.test/mcp/' . $suffix . '#movement',
-                'metadata' => ['source' => 'mcp-integration-test', 'visibility' => 'PUBLIC'],
+                'visibility' => 'PUBLIC',
+                'metadata' => ['source' => 'mcp-integration-test'],
             ], 50);
 
             self::assertNotEmpty($evidence['result_entity_uuid']);
@@ -355,8 +357,10 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertNotNull($evidenceRecord);
             self::assertSame('technical', $claimRecord->claimType);
             self::assertSame('catalog', $sourceRecord->sourceType);
+            self::assertTrue($sourceRecord->isPublic());
             self::assertSame($claimRecord->canonicalId, $evidenceRecord->claimId);
             self::assertSame($sourceRecord->canonicalId, $evidenceRecord->sourceId);
+            self::assertTrue($evidenceRecord->isPublic());
 
             $claimRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/claim/' . $claimRecord->canonicalId));
             $sourceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $sourceRecord->canonicalId));
@@ -380,6 +384,15 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame($sourceRecord->canonicalId, $sourceMcp->get_data()['result']['structuredContent']['id']);
             self::assertSame($evidenceRecord->canonicalId, $evidenceMcp->get_data()['result']['structuredContent']['id']);
             self::assertArrayNotHasKey('metadata', $evidenceMcp->get_data()['result']['structuredContent']);
+
+            $conflict = $this->request('tools/call', ['id' => 62, 'params' => ['name' => 'nhk.source.ingest', 'arguments' => [
+                'stable_key' => 'mcp-source-conflict-' . $suffix,
+                'title' => 'Conflicting visibility',
+                'visibility' => 'PUBLIC',
+                'metadata' => ['visibility' => 'PRIVATE'],
+            ]]], ['Mcp-Name' => 'nhk.source.ingest']);
+            self::assertSame(400, $conflict->get_status());
+            self::assertSame(-32602, $conflict->get_data()['error']['code']);
         } finally {
             wp_set_current_user($previousUser);
         }

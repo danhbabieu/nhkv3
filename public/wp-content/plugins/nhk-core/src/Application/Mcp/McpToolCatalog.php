@@ -41,6 +41,7 @@ final class McpToolCatalog
                 'title' => ['type' => 'string', 'minLength' => 1],
                 'source_type' => ['type' => 'string', 'enum' => ['publication', 'website', 'archive', 'catalog', 'interview', 'other']],
                 'locator' => ['type' => 'string'],
+                'visibility' => ['type' => 'string', 'enum' => ['PUBLIC', 'PRIVATE', 'HIDDEN']],
                 'metadata' => ['type' => 'object'],
             ], ['stable_key', 'title'], true),
             self::tool('nhk.evidence.ingest', 'Create governed evidence linking an existing claim to an existing source.', [
@@ -49,6 +50,7 @@ final class McpToolCatalog
                 'excerpt' => ['type' => 'string', 'minLength' => 1],
                 'relation' => ['type' => 'string', 'enum' => ['supports', 'contradicts', 'qualifies']],
                 'locator' => ['type' => 'string'],
+                'visibility' => ['type' => 'string', 'enum' => ['PUBLIC', 'PRIVATE', 'HIDDEN']],
                 'metadata' => ['type' => 'object'],
             ], ['claim_id', 'source_id', 'excerpt'], true),
             self::tool('nhk.proposal.create', 'Create a governed semantic proposal.', [

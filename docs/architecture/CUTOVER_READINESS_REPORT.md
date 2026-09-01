@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 94 tests/512 assertions (246
-tests/1,428 assertions combined);
+Latest verification: guarded WordPress suite 94 tests/517 assertions (246
+tests/1,435 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -27,9 +27,10 @@ The migration boundary now canonicalizes supported YouTube URL forms before
 Video persistence and records URL/external-ID disagreement as a reason-coded
 conflict, and dry-run now requires the same canonical UUID boundary plus the
 required identity/content fields for apply-backed domains and rejects Evidence
-targets outside Knowledge. The dry-run
+targets outside Knowledge. MCP Source/Evidence ingest now exposes explicit
+visibility with conflict rejection before Governance. The dry-run
 regression is covered by the unit suite and the migration regression by the
-guarded suite; full verification is now 246 tests/1,428 assertions.
+guarded suite; full verification is now 246 tests/1,435 assertions.
 
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
@@ -361,7 +362,7 @@ and active-data parity therefore remain explicit gates.
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 152 tests, 916 assertions |
+| Unit tests | PASS — 152 tests, 918 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
@@ -372,8 +373,8 @@ and active-data parity therefore remain explicit gates.
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record baseline export/dry-run had 3,960 candidates and 1,013 skips; policy-normalized homepage `/` no-op brings the local-dev checkpoint to 3,961 migrated, 1,012 explicit skips and 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, two safe URL no-ops, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
-Current quality-count supersession: guarded integration is 94 tests / 512
-assertions and the combined suite is 246 tests / 1,428 assertions. The longer
+Current quality-count supersession: guarded integration is 94 tests / 517
+assertions and the combined suite is 246 tests / 1,435 assertions. The longer
 integration row above retains the detailed historical coverage description; this
 checkpoint count is authoritative.
 

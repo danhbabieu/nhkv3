@@ -72,6 +72,12 @@ The result is reproducible with the repository's no-write command
 `tools/list` (18 tools), invalid-Origin rejection (403) and the 202
 response/no-body notification contract.
 
+The local governed ingest contract now also advertises explicit Source/Evidence
+`visibility` values (`PUBLIC`, `PRIVATE`, `HIDDEN`). The transport normalizes a
+top-level value into the proposal metadata boundary and rejects a conflicting
+`metadata.visibility`; this remains a local V3 contract result and does not
+close external adapter mapping or deployment verification.
+
 ## Current revalidation
 
 On the current local runtime, the same wire smoke passed all eight checks and

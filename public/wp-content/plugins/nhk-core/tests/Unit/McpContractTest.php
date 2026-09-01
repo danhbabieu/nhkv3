@@ -63,5 +63,7 @@ final class McpContractTest extends TestCase
         self::assertSame('uri', $tools['nhk.video.ingest']['inputSchema']['properties']['url']['format']);
         self::assertSame(['draft', 'ready', 'blocked'], $tools['nhk.media.ingest']['inputSchema']['properties']['readiness']['enum']);
         self::assertSame(['supports', 'contradicts', 'qualifies'], $tools['nhk.evidence.ingest']['inputSchema']['properties']['relation']['enum']);
+        self::assertSame(['PUBLIC', 'PRIVATE', 'HIDDEN'], $tools['nhk.source.ingest']['inputSchema']['properties']['visibility']['enum']);
+        self::assertSame(['PUBLIC', 'PRIVATE', 'HIDDEN'], $tools['nhk.evidence.ingest']['inputSchema']['properties']['visibility']['enum']);
     }
 }
