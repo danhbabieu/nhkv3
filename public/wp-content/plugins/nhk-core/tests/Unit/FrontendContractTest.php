@@ -51,7 +51,7 @@ final class FrontendContractTest extends TestCase
         foreach (['--ink:', '--line:', '--paper:', '--max:'] as $legacyToken) {
             self::assertStringNotContainsString($legacyToken, $style);
         }
-        self::assertStringContainsString('Version: 1.1.4', $style);
+        self::assertStringContainsString('Version: 1.1.5', $style);
     }
 
     public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
@@ -76,6 +76,14 @@ final class FrontendContractTest extends TestCase
         foreach (['front-page.php', 'index.php', 'single.php', 'entity.php', 'knowledge.php', 'media.php', 'video.php', 'comparison.php', '404.php'] as $template) {
             self::assertStringContainsString('id="main-content"', (string) file_get_contents($theme . '/' . $template), $template . ' must expose the skip-link target');
         }
+    }
+
+    public function test_theme_card_and_footer_links_use_nhk_color_tokens(): void
+    {
+        $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/style.css');
+        self::assertStringContainsString('.entity-card h2 a,.media-card h2 a,.knowledge-card h2 a,.related-card strong{color:var(--nhk-text)}', $style);
+        self::assertStringContainsString('.site-footer a{color:#e9e0d5}', $style);
+        self::assertStringContainsString('.site-footer a:hover,.site-footer a:focus{color:var(--nhk-accent-secondary)}', $style);
     }
 
     public function test_editorial_featured_images_have_meaningful_alt_fallbacks(): void

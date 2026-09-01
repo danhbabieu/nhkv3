@@ -4,7 +4,7 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 175 tests/1,140 assertions;
+Latest verification: guarded WordPress suite 176 tests/1,143 assertions;
 Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
 
 ## What is ready
@@ -77,6 +77,9 @@ Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
   metadata and Graph endpoint identifiers while retaining display facts; image
   assets now receive a reader-safe `/media/asset/{uuid}/` URL and render lazily
   through the public theme.
+- Responsive archive/detail QA now confirms card and footer links use the NHK
+  palette instead of browser-default blue, with visible accent-secondary
+  hover/focus states; the stylesheet cache-busting version is synchronized.
 - Public REST semantic search now excludes retired Media and Video records
   from both result groups and totals; guarded runtime coverage verifies this
   with disposable integration fixtures.
