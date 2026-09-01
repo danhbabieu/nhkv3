@@ -313,6 +313,7 @@ final class FrontendContractTest extends TestCase
         foreach (["'storage_key'", "'checksum'", "'visibility'", "'metadata'"] as $field) {
             self::assertStringNotContainsString($field, $assetMethod, 'public media API exposes internal asset field: ' . $field);
         }
+        self::assertStringContainsString("'public_url' => '/media/asset/'", $assetMethod);
     }
 
     public function test_media_detail_renders_reader_safe_image_asset_url(): void
