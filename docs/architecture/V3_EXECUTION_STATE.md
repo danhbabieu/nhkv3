@@ -19,6 +19,12 @@ Last updated: 2026-09-01, P11 Entity archive boundary checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Synchronized `V3_MASTER_PLAN.md` with the current P5–P11
+  evidence: public Entity active/type/payload boundaries, Media binary
+  deliverability filtering, lifecycle-free public semantic serializers and
+  the current 188-test/1,229-assertion verification baseline. No runtime or
+  database state changed.
+
 - 2026-09-01: Theme-facing Entity archive now explicitly requests retired
   records and applies its own `active()` filter before matching, counting and
   paginating. This keeps the public boundary fail-closed even if a repository
