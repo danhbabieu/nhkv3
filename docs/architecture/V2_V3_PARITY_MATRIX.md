@@ -31,7 +31,7 @@ the separate V2 data/publication gates below.
 
 Governance Proposal and ApplyAttempt reads also omit out-of-range persisted
 numeric states instead of coercing them to defaults; current combined
- verification is 234 tests / 1,338 assertions.
+ verification is 235 tests / 1,351 assertions.
 
 Public REST, MCP, theme detail queries and asset delivery now share strict
 canonical UUID validation; UUID-shaped but invalid inputs fail closed before
@@ -41,6 +41,10 @@ tests.
 Graph endpoint resolvers also use the shared strict codec for canonical
 Authority, Media, Video, Knowledge, Source and Evidence keys, rejecting nil
 UUIDs before endpoint resolution.
+
+MCP `tools/list` now declares canonical UUID patterns for public read,
+evidence-ingest and Proposal ID fields, with runtime nil/malformed validation
+remaining authoritative.
 
 Raw persisted state validation is strict across Authority, Media, Video and
 Knowledge hydrators; malformed values are omitted before public or governed

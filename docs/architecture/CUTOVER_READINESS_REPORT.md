@@ -29,6 +29,9 @@ rejection of nil UUIDs as bounded `INVALID_IDENTITY` records.
 Graph endpoint resolvers now use the same strict codec for canonical
 Authority, Media, Video, Knowledge, Source and Evidence references.
 
+MCP tool schemas now expose canonical UUID patterns for public read, evidence
+ingest and Proposal ID fields, matching the runtime fail-closed boundary.
+
 The current KnowledgeClaim hydration checkpoint brings the guarded suite to
 75 integration tests / 449 assertions (215 tests / 1,295 assertions combined).
 

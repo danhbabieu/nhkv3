@@ -27,4 +27,14 @@ final class McpContractTest extends TestCase
         self::assertTrue(McpToolCatalog::isGoverned('nhk.proposal.create'));
         self::assertFalse(McpToolCatalog::isGoverned('nhk.unknown'));
     }
+
+    public function test_canonical_id_tool_fields_declare_uuid_shape_validation(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        foreach (['nhk.entity.get', 'nhk.media.get', 'nhk.video.get', 'nhk.knowledge.get', 'nhk.source.get', 'nhk.evidence.get', 'nhk.proposal.submit', 'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility', 'nhk.proposal.apply'] as $name) {
+            self::assertSame('^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', $tools[$name]['inputSchema']['properties']['id']['pattern'], $name);
+        }
+        self::assertSame('^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', $tools['nhk.evidence.ingest']['inputSchema']['properties']['claim_id']['pattern']);
+        self::assertSame('^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', $tools['nhk.evidence.ingest']['inputSchema']['properties']['source_id']['pattern']);
+    }
 }
