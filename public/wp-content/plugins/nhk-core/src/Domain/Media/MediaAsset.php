@@ -15,7 +15,7 @@ final readonly class MediaAsset
         public int $byteSize,
         public ?int $width = null,
         public ?int $height = null,
-        public string $visibility = 'PUBLIC',
+        public string $visibility = 'PRIVATE',
         public array $metadata = [],
     ) {
         if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $assetId) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $mediaId)) throw new InvalidMedia('Media asset identity is invalid.');

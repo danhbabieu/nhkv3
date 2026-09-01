@@ -19,7 +19,7 @@ final class MediaAssetDeliveryTest extends TestCase
         mkdir($root);
         $contents = 'public-image';
         file_put_contents($root . '/image.webp', $contents);
-        $asset = new MediaAsset(UuidCodec::newV7(), UuidCodec::newV7(), 'original', 'image.webp', hash('sha256', $contents), 'image/webp', strlen($contents));
+        $asset = new MediaAsset(UuidCodec::newV7(), UuidCodec::newV7(), 'original', 'image.webp', hash('sha256', $contents), 'image/webp', strlen($contents), null, null, 'PUBLIC');
         try {
             $resolved = (new PublicMediaAssetDelivery($this->repository($asset), $this->mediaRepository(new Media($asset->mediaId, 'ready-media', 'Ready media', 'ready')), $root))->resolve($asset->assetId);
             self::assertIsArray($resolved);
@@ -54,7 +54,7 @@ final class MediaAssetDeliveryTest extends TestCase
         $contents = 'public-image';
         file_put_contents($root . '/image.webp', $contents);
         $mediaId = UuidCodec::newV7();
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'image.webp', hash('sha256', $contents), 'image/webp', strlen($contents));
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'image.webp', hash('sha256', $contents), 'image/webp', strlen($contents), null, null, 'PUBLIC');
         try {
             foreach ([new Media($mediaId, 'draft-media', 'Draft media'), new Media($mediaId, 'retired-media', 'Retired media', 'ready', [], false)] as $media) {
                 self::assertNull((new PublicMediaAssetDelivery($this->repository($asset), $this->mediaRepository($media), $root))->resolve($asset->assetId));

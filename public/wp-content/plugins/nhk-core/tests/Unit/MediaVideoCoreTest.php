@@ -23,6 +23,13 @@ final class MediaVideoCoreTest extends TestCase
         self::assertSame('featured', $usage->role);
     }
 
+    public function test_media_assets_default_to_private_until_explicitly_published(): void
+    {
+        $asset = new MediaAsset(UuidCodec::newV7(), UuidCodec::newV7(), 'original', 'uploads/private.jpg', hash('sha256', 'private'), 'image/jpeg', 7);
+
+        self::assertSame('PRIVATE', $asset->visibility);
+    }
+
     public function test_checksum_is_a_duplicate_candidate_not_a_semantic_identity(): void
     {
         $checksum = hash('sha256', 'same-binary');

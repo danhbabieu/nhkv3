@@ -32,7 +32,7 @@ final class MediaVideoPageQueryTest extends TestCase
     public function test_media_detail_contains_assets_and_usages_but_video_detail_keeps_external_reference(): void
     {
         $mediaId = UuidCodec::newV7();
-        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/front.jpg', hash('sha256', 'image'), 'image/jpeg', 5, 1200, 800);
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/front.jpg', hash('sha256', 'image'), 'image/jpeg', 5, 1200, 800, 'PUBLIC');
         $privateAsset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/private.jpg', hash('sha256', 'private-image'), 'image/jpeg', 7, 1200, 800, 'PRIVATE', ['status' => 'private']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured');
         $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', ['source' => 'internal-test']);
@@ -69,7 +69,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $contents = 'valid-image';
         file_put_contents($root . '/valid.jpg', $contents);
         $mediaId = UuidCodec::newV7();
-        $valid = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'valid.jpg', hash('sha256', $contents), 'image/jpeg', strlen($contents));
+        $valid = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'valid.jpg', hash('sha256', $contents), 'image/jpeg', strlen($contents), null, null, 'PUBLIC');
         $missing = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'missing.jpg', hash('sha256', 'missing'), 'image/jpeg', 7);
         try {
             $assetRepository = $this->assetRepository([$valid, $missing]);
