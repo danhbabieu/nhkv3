@@ -39,16 +39,16 @@ final class RelatedContentQueryTest extends TestCase
 
     public function test_related_entities_are_derived_from_graph_in_both_directions(): void
     {
-        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, [])); $types->register(new EntityTypeDefinition('model', 1, true, []));
+        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, [])); $types->register(new EntityTypeDefinition('model', 1, true, ['brand_uuid']));
         $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
-        $brand = $authority->create('brand', 'odo', 'Odo'); $model = $authority->create('model', 'calibre-1', 'Calibre 1');
+        $brand = $authority->create('brand', 'odo', 'Odo'); $model = $authority->create('model', 'calibre-1', 'Calibre 1', ['brand_uuid' => $brand->canonicalId]);
         $endpoints = new EndpointTypeRegistry(); $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId])); $endpoints->register('model', new FakeEndpointResolver('model', [$model->canonicalId]));
         $graph = new GraphService($graphRepository = new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
         $graph->create(new NodeReference('brand', $brand->canonicalId), 'about', new NodeReference('model', $model->canonicalId));
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
         $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId);
-        $expectedUrl = function_exists('home_url') ? home_url('/model/calibre-1/') : '/model/calibre-1/';
+        $expectedUrl = function_exists('home_url') ? home_url('/odo/calibre-1/') : '/odo/calibre-1/';
         self::assertSame([['type' => 'model', 'id' => $model->canonicalId, 'title' => 'Calibre 1', 'url' => $expectedUrl]], $related['entities']);
         self::assertSame([], $related['articles']); self::assertSame([], $related['media']); self::assertSame([], $related['videos']);
     }
@@ -68,7 +68,7 @@ final class RelatedContentQueryTest extends TestCase
 
         $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forPost(42);
 
-        self::assertSame([['type' => 'brand', 'id' => $brand->canonicalId, 'title' => 'Odo', 'url' => function_exists('home_url') ? home_url('/brand/odo/') : '/brand/odo/']], $related['entities']);
+        self::assertSame([['type' => 'brand', 'id' => $brand->canonicalId, 'title' => 'Odo', 'url' => function_exists('home_url') ? home_url('/odo/') : '/odo/']], $related['entities']);
         self::assertSame([], $related['articles']);
     }
 

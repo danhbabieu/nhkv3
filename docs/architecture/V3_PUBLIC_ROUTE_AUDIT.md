@@ -1,18 +1,18 @@
 # NHK V3 Public Route / SEO Audit
 
-Date: 2026-09-01  
-Status: canonical Authority routing implemented; non-Authority public identity
-surfaces remain explicitly open gates.
+Date: 2026-09-01
+Status: canonical Authority and Video routing implemented; Media and atomic
+Knowledge remain non-indexable where no governed public projection exists.
 
 ## Constitution conflict register
 
-`CONSTITUTION_CONFLICT`: the previous implementation exposed technical entity
-types and stable keys in canonical links (`/brand/{stable-key}/`,
-`/model/{stable-key}/`, `/media/{uuid}/`, `/video/{uuid}/` and
-`/knowledge/claim/{uuid}/`). This violated the public URL law's no-identity
-leak invariant. Authority Brand/Model/Variant routing now uses the central
-resolver and public slugs; Media, Video and Knowledge require a follow-up
-slug-contract slice before their UUID routes can be retired safely.
+`CONSTITUTION_CONFLICT`: legacy technical links existed for Media, Video and
+Knowledge. Authority and Video now have presentation routes. Media UUID detail
+routes are retired because Media has no legitimate standalone public entity
+projection; MediaAsset delivery remains separate. Atomic Knowledge Claims are
+also non-indexable and consumed through semantic/Post projections. The only
+remaining conflict is historical legacy URLs still present in external data;
+they require read-only inventory and governed redirect/retirement review.
 
 ## Route inventory
 
@@ -29,9 +29,9 @@ slug-contract slice before their UUID routes can be retired safely.
 | `/specimen/{stable-key}/` | Specimen detail | English namespace and stable key | `/hien-vat/{slug}/` | compatibility pending | `PublicRouteResolver` |
 | `/product/{stable-key}/` | Product detail | English namespace and stable key | `/san-pham/{slug}/` | compatibility pending | `PublicRouteResolver` |
 | `/comparison/` | Comparison surface | English namespace | `/so-sanh/` | pending route alias | `PublicComparisonRoutes` |
-| `/knowledge/claim/{uuid}/` | Knowledge detail | UUID leak | `/tri-thuc/{slug}/` | pending slug source | `PublicKnowledgeRoutes` |
-| `/media/{uuid}/` | Media detail | UUID leak | `/thu-vien/{slug}/` | pending slug source | `PublicMediaVideoRoutes` |
-| `/video/{uuid}/` | Video detail | UUID leak | `/video/{slug}/` | pending slug source | `PublicMediaVideoRoutes` |
+| `/knowledge/claim/{uuid}/` | Atomic Claim | No public entity projection | none; consume in related projections | 404/non-indexable | `PublicKnowledgeRoutes` |
+| `/media/{uuid}/` | Media identity | No standalone public entity page | none; use related entity/Post and asset URL | 404/non-indexable | `PublicMediaVideoRoutes` |
+| `/video/{uuid}/` | Video detail | Legacy internal identity | `/video/{title-slug}-{external-id}/` | 301 one hop | `PublicMediaVideoRoutes` |
 | `/tim-kiem/?q=` | Search compatibility | Legacy query shape | `/?s=` | 301 | `PublicEditorialRoutes` |
 
 ## Implemented invariants
@@ -46,11 +46,27 @@ slug-contract slice before their UUID routes can be retired safely.
   resolver's URL instead of constructing stable-key links.
 - WordPress editorial permalink/body/category authority is unchanged.
 
+## Coverage matrix
+
+| Object | Public page | Canonical pattern | Slug source | Indexable | Legacy | Resolver/tests |
+|---|---|---|---|---|---|---|
+| Brand | Yes | `/{brand}/` | canonical name | Yes | 301 | Yes / unit |
+| Model | Yes | `/{brand}/{model}/` | canonical name + parent | Yes | 301 | Yes / unit |
+| Variant | Yes | `/{brand}/{model}/{variant}/` | canonical name + parents | Yes | 301 | Yes / unit |
+| Movement | Yes when active | `/bo-may/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
+| Music | Yes when active | `/ban-nhac/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
+| Component | Yes when active | `/linh-kien/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
+| Classification | Yes when active | `/phan-loai/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
+| Specimen | Yes when active | `/hien-vat/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
+| Product | Yes when active | `/san-pham/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
+| Video | Yes when valid/public | `/video/{title}-{external-id}/` | title + external ID | Yes | 301 UUID | Yes / unit + smoke |
+| Knowledge Claim | No atomic page | none | none | No | 404 | No public resolver |
+| Media | No standalone page | none | none | No | 404 | Asset route only |
+| Post | Yes | native WordPress permalink | WordPress editorial slug | Yes by WP status | native WP | WordPress |
+
 ## Open acceptance gates
 
-1. Add slug-bearing public serializers for Media, Video and Knowledge, then
-   redirect UUID routes in one hop.
-2. Add `/so-sanh/` and canonical collection aliases without overriding native
+1. Add `/so-sanh/` and canonical collection aliases without overriding native
    WordPress routes.
 3. Verify sitemap output contains only final canonical URLs and no private or
    hidden semantic records.

@@ -106,7 +106,9 @@ final class PublicEntityRoutes
 
     private function redirectCanonical(string $type, string $stableKey): void
     {
-        wp_safe_redirect(home_url('/' . $type . '/' . rawurlencode($stableKey) . '/'), 301, 'NHK V2 entity compatibility');
+        $target = $this->query->publicPathForKey($type, $stableKey);
+        if ($target === null) return;
+        wp_safe_redirect(home_url($target), 301, 'NHK canonical public route');
         exit;
     }
 }

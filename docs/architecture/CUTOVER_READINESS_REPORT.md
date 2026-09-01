@@ -4,7 +4,16 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 94 tests/517 assertions (247
+Latest verification: unit suite 163 tests/970 assertions; guarded WordPress
+integration invocation reached the bootstrap but failed because the local
+database connection is unavailable. PHP lint and `git diff --check` pass.
+
+The public route completion slice now uses one slug contract, canonical Video
+title/external-ID routes, and no standalone Media or atomic Knowledge Claim
+index pages. Direct push of accepted checkpoint 27c79ae was rejected by the
+host security reviewer; no remote state was changed.
+
+Earlier guarded WordPress suite: 94 tests/517 assertions (247
 tests/1,451 assertions combined by current Unit + guarded evidence);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.

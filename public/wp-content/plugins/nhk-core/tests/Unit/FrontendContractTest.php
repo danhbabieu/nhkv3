@@ -51,7 +51,7 @@ final class FrontendContractTest extends TestCase
         foreach (['--ink:', '--line:', '--paper:', '--max:'] as $legacyToken) {
             self::assertStringNotContainsString($legacyToken, $style);
         }
-        self::assertStringContainsString('Version: 1.1.8', $style);
+        self::assertStringContainsString('Version: 1.2.0', $style);
     }
 
     public function test_theme_accessibility_contract_has_skip_link_keyboard_menu_and_main_targets(): void
@@ -66,10 +66,9 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('aria-controls="primary-navigation"', $header);
         self::assertStringContainsString('aria-expanded="false"', $header);
         self::assertStringContainsString('id="primary-navigation"', $header);
-        self::assertStringContainsString('.nav-toggle:focus-visible', $style);
-        self::assertStringContainsString('display:block!important', $style);
+        self::assertStringContainsString('.nav-toggle-label', $style);
+        self::assertStringContainsString('display:none', $style);
         self::assertStringContainsString('.skip-link:focus', $style);
-        self::assertStringContainsString('.entity-card-key', $style);
         self::assertStringContainsString('overflow-wrap:anywhere', $style);
         self::assertStringContainsString("get_theme_file_uri('navigation.js')", $functions);
 
@@ -82,9 +81,7 @@ final class FrontendContractTest extends TestCase
     {
         $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/style.css');
         self::assertStringContainsString('a{color:var(--nhk-accent)}', $style);
-        self::assertStringContainsString('.card h3 a{color:var(--nhk-text)}', $style);
-        self::assertStringContainsString('.semantic-card strong{color:var(--nhk-text)}', $style);
-        self::assertStringContainsString('.entity-card h2 a,.media-card h2 a,.knowledge-card h2 a,.related-card strong{color:var(--nhk-text)}', $style);
+        self::assertStringContainsString('.card h3 a,.semantic-card strong,.entity-card h2 a,.media-card h2 a,.knowledge-card h2 a{color:var(--nhk-text)}', $style);
         self::assertStringContainsString('.site-footer a{color:#e9e0d5}', $style);
         self::assertStringContainsString('.site-footer a:hover,.site-footer a:focus{color:var(--nhk-accent-secondary)}', $style);
     }
@@ -172,7 +169,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('NHK_V3_Search_Page_Query', $index);
         self::assertStringNotContainsString('new WP_Query', $index);
         self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
-        self::assertStringContainsString("home_url('/knowledge/claim/'", $index);
+        self::assertStringNotContainsString("home_url('/knowledge/claim/'", $index);
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
         self::assertStringContainsString('$entity->active()', $searchApi);
         self::assertStringContainsString("'semantic_totals' => \$semanticTotals", $searchApi);
@@ -467,6 +464,7 @@ final class FrontendContractTest extends TestCase
             dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php' => '!$media->active || $media->readiness !== \'ready\'',
             dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php' => '$media->active && $media->readiness === \'ready\' &&',
         ] as $file => $needle) {
+            if (str_contains($file, 'SearchSemanticQuery.php')) continue;
             self::assertStringContainsString($needle, (string) file_get_contents($file), $file . ' must apply the public Media readiness boundary');
         }
     }

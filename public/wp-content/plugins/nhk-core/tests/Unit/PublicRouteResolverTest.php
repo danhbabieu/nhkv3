@@ -46,4 +46,28 @@ final class PublicRouteResolverTest extends TestCase
         self::assertNull($resolver->path($reserved));
         self::assertNull($resolver->resolve('brand', ['shared']));
     }
+
+    public function test_slug_contract_is_shared_and_collision_safe_for_siblings(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $brand = $authority->create('brand', 'nhk:brand:slug', 'Vê Đét');
+        $first = $authority->create('model', 'nhk:model:first', 'Mẫu Chung', ['brand_uuid' => $brand->canonicalId]);
+        $second = $authority->create('model', 'nhk:model:second', 'Mẫu Chung', ['brand_uuid' => $brand->canonicalId]);
+
+        self::assertSame('ve-det', PublicRouteResolver::slug(' Vê Đét '));
+        self::assertNull($resolver->path($first));
+        self::assertNull($resolver->path($second));
+        self::assertSame('/ve-det/', $resolver->path($brand));
+    }
+
+    public function test_every_registered_cross_brand_type_has_a_vietnamese_archive(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+        foreach (['movement' => '/bo-may/', 'music' => '/ban-nhac/', 'component' => '/linh-kien/', 'classification' => '/phan-loai/', 'specimen' => '/hien-vat/', 'product' => '/san-pham/'] as $type => $path) {
+            self::assertSame($path, $resolver->archivePath($type));
+        }
+    }
 }

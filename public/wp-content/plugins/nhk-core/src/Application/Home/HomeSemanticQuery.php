@@ -29,14 +29,16 @@ final class HomeSemanticQuery
         if ($this->ready('media')) {
             foreach ($this->media->list() as $item) {
                 if (!$item->active || $item->readiness !== 'ready') continue;
-                $modules['media'][] = ['id' => $item->canonicalId, 'title' => $item->canonicalName, 'url' => home_url('/media/' . rawurlencode($item->canonicalId) . '/')];
+                $path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId); if ($path === null) continue;
+                $modules['media'][] = ['id' => $item->canonicalId, 'title' => $item->canonicalName, 'url' => home_url($path)];
                 if (count($modules['media']) >= 4) break;
             }
         }
         if ($this->ready('video')) {
             foreach ($this->videos->list() as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
-                $modules['videos'][] = ['id' => $item->canonicalId, 'title' => $item->title ?: 'Video NHK', 'platform' => $item->platform, 'url' => home_url('/video/' . rawurlencode($item->canonicalId) . '/')];
+                $path = PublicRouteResolver::videoPath($item->title, $item->externalVideoId); if ($path === null) continue;
+                $modules['videos'][] = ['id' => $item->canonicalId, 'title' => $item->title ?: 'Video NHK', 'platform' => $item->platform, 'url' => home_url($path)];
                 if (count($modules['videos']) >= 4) break;
             }
         }

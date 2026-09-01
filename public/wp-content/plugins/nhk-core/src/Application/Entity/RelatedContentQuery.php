@@ -73,7 +73,7 @@ final class RelatedContentQuery
         }
         return null;
     }
-    private function mediaValue(Media $media): array { $path = '/media/' . rawurlencode($media->canonicalId) . '/'; return ['type' => 'media', 'id' => $media->canonicalId, 'title' => $media->canonicalName, 'url' => function_exists('home_url') ? home_url($path) : $path]; }
-    private function videoValue(Video $video): array { return ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'url' => $video->canonicalUrl]; }
-    private function entityUrl(AuthorityEntity $entity): string { $path = '/' . $entity->entityType . '/' . rawurlencode($entity->stableKey) . '/'; return function_exists('home_url') ? home_url($path) : $path; }
+    private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'id' => $media->canonicalId, 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
+    private function videoValue(Video $video): array { $path = PublicRouteResolver::videoPath($video->title, $video->externalVideoId); return ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
+    private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path); }
 }

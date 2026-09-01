@@ -13,6 +13,12 @@ final class EntityPageQuery
     public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null) {}
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
+    public function publicPathForKey(string $type, string $key): ?string
+    {
+        if (!$this->types->has($type) || !$this->available()) return null;
+        $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
+        return $entity && $entity->entityType === $type && $entity->active() ? $this->publicPath($entity) : null;
+    }
     /** @param list<string> $segments */
     public function resolvePublic(string $type, array $segments): ?AuthorityEntity { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->resolve($type, $segments); }
 
@@ -61,9 +67,6 @@ final class EntityPageQuery
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
     private function publicSlug(string $value): string
     {
-        if (function_exists('sanitize_title')) return (string) sanitize_title($value);
-        $value = strtolower(trim($value));
-        $value = (string) preg_replace('/[^a-z0-9]+/', '-', $value);
-        return trim($value, '-');
+        return PublicRouteResolver::slug($value);
     }
 }

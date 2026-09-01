@@ -31,17 +31,17 @@ final class PublicRouteResolver
         if (!$this->types->has($entity->entityType) || !$entity->active()) return null;
         $slug = self::slug($entity->canonicalName);
         if ($slug === '') return null;
-        if ($entity->entityType === 'brand') return in_array($slug, self::RESERVED_ROOTS, true) ? null : '/' . $slug . '/';
+        if ($entity->entityType === 'brand') return in_array($slug, self::RESERVED_ROOTS, true) || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) ? null : '/' . $slug . '/';
         if ($entity->entityType === 'model') {
             $brand = $this->parent($entity, 'brand_uuid', 'brand');
-            return $brand ? $this->path($brand) . $slug . '/' : null;
+            return $brand && $this->uniqueChildAvailable($entity->entityType, $slug, 'brand_uuid', $brand->canonicalId, $entity->canonicalId) ? $this->path($brand) . $slug . '/' : null;
         }
         if ($entity->entityType === 'variant') {
             $model = $this->parent($entity, 'model_uuid', 'model');
-            return $model ? $this->path($model) . $slug . '/' : null;
+            return $model && $this->uniqueChildAvailable($entity->entityType, $slug, 'model_uuid', $model->canonicalId, $entity->canonicalId) ? $this->path($model) . $slug . '/' : null;
         }
         $namespace = self::NAMESPACES[$entity->entityType] ?? null;
-        return $namespace === null ? null : '/' . $namespace . '/' . $slug . '/';
+        return $namespace === null || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) ? null : '/' . $namespace . '/' . $slug . '/';
     }
 
     public function archivePath(string $type): ?string
@@ -49,6 +49,22 @@ final class PublicRouteResolver
         if ($type === 'brand' || $type === 'model' || $type === 'variant') return null;
         $namespace = self::NAMESPACES[$type] ?? null;
         return $namespace === null ? null : '/' . $namespace . '/';
+    }
+
+    public static function existingSemanticPath(string $type, string $id): ?string
+    {
+        if (!UuidCodec::isValid($id)) return null;
+        return match ($type) {
+            'media', 'knowledge', 'video' => null,
+            default => null,
+        };
+    }
+
+    public static function videoPath(string $title, string $externalId): ?string
+    {
+        if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)) return null;
+        $slug = self::slug($title);
+        return '/video/' . ($slug !== '' ? $slug . '-' . strtolower($externalId) : 'video-' . strtolower($externalId)) . '/';
     }
 
     /** @param list<string> $segments */
@@ -90,10 +106,26 @@ final class PublicRouteResolver
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    private function uniqueChild(string $type, string $slug, string $field, string $parentId): ?AuthorityEntity
+    private function uniqueChild(string $type, string $slug, string $field, string $parentId, ?string $excludeId = null): ?AuthorityEntity
     {
-        $matches = array_values(array_filter($this->authority->listByType($type), static fn (AuthorityEntity $item): bool => $item->active() && self::slug($item->canonicalName) === $slug && (string) ($item->payload[$field] ?? '') === $parentId));
+        $matches = array_values(array_filter($this->authority->listByType($type), static fn (AuthorityEntity $item): bool => $item->active() && self::slug($item->canonicalName) === $slug && (string) ($item->payload[$field] ?? '') === $parentId && ($excludeId === null || $item->canonicalId !== $excludeId)));
         return count($matches) === 1 ? $matches[0] : null;
+    }
+
+    private function uniqueEntity(string $type, string $slug, string $id): bool
+    {
+        foreach ($this->authority->listByType($type) as $item) {
+            if ($item->active() && $item->canonicalId !== $id && self::slug($item->canonicalName) === $slug) return false;
+        }
+        return true;
+    }
+
+    private function uniqueChildAvailable(string $type, string $slug, string $field, string $parentId, string $id): bool
+    {
+        foreach ($this->authority->listByType($type) as $item) {
+            if ($item->active() && $item->canonicalId !== $id && self::slug($item->canonicalName) === $slug && (string) ($item->payload[$field] ?? '') === $parentId) return false;
+        }
+        return true;
     }
 
     private function parent(AuthorityEntity $entity, string $field, string $type): ?AuthorityEntity
