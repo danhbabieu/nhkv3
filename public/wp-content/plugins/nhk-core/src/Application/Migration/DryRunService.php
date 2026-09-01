@@ -93,6 +93,22 @@ final class DryRunService
         if (!in_array($type, self::SUPPORTED_TYPES, true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
         if (isset($record['canonical_uuid']) && !UuidCodec::isValid((string) $record['canonical_uuid'])) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         if ((string) ($record['stable_key'] ?? '') === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        if ($type === 'media' && (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || trim((string) ($record['canonical_name'] ?? '')) === '')) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        if ($type === 'knowledge') {
+            $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+            $claimText = trim((string) ($metadata['one_sentence_definition'] ?? $record['canonical_name'] ?? ''));
+            if (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || $claimText === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        }
+        if ($type === 'source' && (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || trim((string) ($record['canonical_name'] ?? '')) === '')) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        if ($type === 'evidence' && (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || !UuidCodec::isValid((string) ($record['claim_id'] ?? '')) || !UuidCodec::isValid((string) ($record['source_id'] ?? '')) || trim((string) ($record['excerpt'] ?? '')) === '')) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        if ($type === 'legacy_media_asset') {
+            $mediaId = (string) ($record['media_id'] ?? '');
+            $storageKey = trim((string) ($record['storage_key'] ?? ''));
+            $checksum = strtolower(trim((string) ($record['checksum'] ?? '')));
+            $mimeType = trim((string) ($record['mime_type'] ?? ''));
+            $visibility = strtoupper((string) ($record['visibility'] ?? 'PRIVATE'));
+            if (!UuidCodec::isValid($mediaId) || $storageKey === '' || preg_match('/^[a-f0-9]{64}$/', $checksum) !== 1 || $mimeType === '' || !in_array($visibility, ['PUBLIC', 'PRIVATE', 'HIDDEN'], true)) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        }
         if ($type === 'video') {
             if (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid'])) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
             $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];

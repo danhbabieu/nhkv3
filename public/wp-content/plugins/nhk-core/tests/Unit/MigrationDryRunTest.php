@@ -14,8 +14,8 @@ final class MigrationDryRunTest extends TestCase
         $checksum = hash('sha256', 'same');
         $report = (new DryRunService())->run([
             ['type' => 'brand', 'stable_key' => 'odo', 'canonical_uuid' => UuidCodec::newV7()],
-            ['type' => 'media', 'stable_key' => 'front-a', 'checksum' => $checksum],
-            ['type' => 'media', 'stable_key' => 'front-b', 'checksum' => $checksum],
+            ['type' => 'media', 'stable_key' => 'front-a', 'canonical_uuid' => UuidCodec::newV7(), 'canonical_name' => 'Front A', 'checksum' => $checksum],
+            ['type' => 'media', 'stable_key' => 'front-b', 'canonical_uuid' => UuidCodec::newV7(), 'canonical_name' => 'Front B', 'checksum' => $checksum],
             ['type' => 'legacy_widget', 'stable_key' => 'x'],
             ['type' => 'relation', 'source_key' => 'wp_post:1:2'],
             ['type' => 'url', 'source_path' => '/old', 'target_path' => '/new'],
@@ -59,6 +59,20 @@ final class MigrationDryRunTest extends TestCase
 
         self::assertSame(1, $report['skipped']);
         self::assertSame('INVALID_IDENTITY', $report['items'][0]['reason']);
+    }
+
+    public function test_dry_run_enforces_required_identity_fields_for_apply_backed_domains(): void
+    {
+        $report = (new DryRunService())->run([
+            ['type' => 'media', 'stable_key' => 'media-missing-name', 'canonical_uuid' => UuidCodec::newV7()],
+            ['type' => 'knowledge', 'stable_key' => 'claim-missing-text', 'canonical_uuid' => UuidCodec::newV7(), 'metadata' => []],
+            ['type' => 'source', 'stable_key' => 'source-missing-title', 'canonical_uuid' => UuidCodec::newV7()],
+            ['type' => 'evidence', 'stable_key' => 'evidence-missing-excerpt', 'canonical_uuid' => UuidCodec::newV7(), 'claim_id' => UuidCodec::newV7(), 'source_id' => UuidCodec::newV7()],
+            ['type' => 'legacy_media_asset', 'stable_key' => 'asset-missing-mime', 'media_id' => UuidCodec::newV7(), 'storage_key' => 'uploads/missing.webp', 'checksum' => hash('sha256', 'asset')],
+        ]);
+
+        self::assertSame(5, $report['skipped']);
+        self::assertSame(5, $report['skipped_by_reason']['INVALID_IDENTITY']);
     }
 
     public function test_nil_canonical_uuid_is_skipped_with_bounded_reason(): void
