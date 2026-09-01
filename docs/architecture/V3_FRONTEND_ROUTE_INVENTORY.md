@@ -1,4 +1,4 @@
-# NHK V3 Frontend Route Inventory — 2026-08-31
+# NHK V3 Frontend Route Inventory — 2026-09-01
 
 This is a source-level route inventory. It records the intended public
 contracts and implementation evidence; it is not a browser smoke pass or a
@@ -9,7 +9,7 @@ V2 URL-parity claim.
 | Homepage | `/` | WordPress theme `front-page.php` and native WP queries | Real editorial query loop, no fixture content | HTTP and desktop/mobile visual smoke pass; 390px/768px route metrics and tablet visual check pass; homepage canonical `/` and `index,follow` verified |
 | Tri thức / Góc chia sẻ | `/tri-thuc/`, `/goc-chia-se/` plus paginated aliases | Native WP category query via `PublicEditorialRoutes` | Category-aware archive and empty states; no editorial body projection | HTTP rewrite smoke, 390px/768px route metrics and mobile empty-state visual check pass; V2 URL reconciliation remains |
 | Authority archive | `/{type}/`, `/{type}/page/{n}/` for nine registered types | `EntityPageQuery` → `PublicEntityRoutes` → `entity.php` | Active-only pagination and type catalog | HTTP smoke and desktop archive visual QA pass; all declared page-2 routes have 390px/768px metrics with no overflow, long title/key wrapping guards are in the theme, and `/model/page/2/` plus `/component/page/2/` visual checks pass at mobile/tablet; broader route-specific screenshots remain |
-| Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | HTTP smoke and desktop/mobile detail visual QA pass for a real active Brand; 390px/768px route metrics pass |
+| Authority detail | `/{type}/{stable-key}/` and UUID detail | `EntityPageQuery` → `entity.php` | Stable-key/UUID lookup, semantic facts, Graph-related groups | HTTP smoke and desktop/mobile detail visual QA pass for a real active Brand; fresh 35-route HTTP sweep passed real active Brand, Model, Movement, Music and Component stable-key details; 390px/768px route metrics pass |
 | V2 archive/detail aliases | `/thuong-hieu/`, `/hien-vat/`, `/am-nhac/`; `/{brand-slug}/`, `/{brand-slug}/{model-slug}/` | `PublicEntityRoutes` → canonical Authority type context or fail-closed slug resolver | Archive aliases preserve discoverability while canonical links remain `/brand/`, `/specimen/`, `/music/`; a detail slug redirects only for one active match and never overrides a native WP route | Archive HTTP smoke and detail 301 runtime checks pass; canonical links remain fail-closed |
 | Search | Native `/?s={term}` with `paged` semantic pagination, V2 alias `/tim-kiem/?q={term}`, plus `/wp-json/nhk/v1/search?page={n}` | `NHK_V3_Search_Page_Query` + `SearchSemanticQuery` + `SearchApi` + `PublicEditorialRoutes` compatibility redirect | Post results remain native; V2 `q` is preserved as native `s`; active Authority/Media/Video/Knowledge results are grouped, bounded per page and linked; semantic totals drive navigation even when native posts are exhausted | Native route/REST, alias 301, semantic page-2 HTTP/browser smoke and desktop browser smoke pass; 390px/768px route metrics pass |
 | Comparison | `/comparison/?a={type/stable-key}&b={type/stable-key}` | `ComparisonPageQuery` → `PublicComparisonRoutes` → `comparison.php` | Read-only side-by-side semantic facts from two active Authority references; no comparison table or editorial body is persisted | HTTP 200, dedicated metadata and desktop/mobile visual smoke pass; 390px/768px route metrics pass |
@@ -41,6 +41,13 @@ checks in the form `--brand-alias=/legacy/|/brand/canonical/` or
 verify the `Location` target. It expects 200 for the core public routes and
 404 for a deliberately unknown route; it reports connection failures instead
 of turning an unavailable runtime into a false pass.
+
+On 2026-09-01, the opt-in sweep used active local-dev rows
+`nhk:brand:junghans`, `nhk:model:ffr.69`, `nhk:movement:o-do.36`,
+`nhk:music:ave-maria-lourdes` and `nhk:component:odo.hand.54`; all five
+canonical stable-key detail routes returned HTTP 200 and the complete sweep
+passed 35/35. Specimen/Product/Video detail remain data-gated because no
+active local row was available; this is runtime evidence, not a parity claim.
 
 An initial attempt on 2026-08-31 against `http://localhost` occurred before
 the local WordPress rewrite file was present and returned Apache 404. After
