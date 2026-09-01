@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 148 tests, 893 assertions; guarded WordPress integration: 92 tests, 500 assertions; combined current suite: 240 tests, 1,393 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
+| Tests | Unit suite: 148 tests, 893 assertions; guarded WordPress integration: 92 tests, 506 assertions; combined current suite: 240 tests, 1,399 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -72,7 +72,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 - 2026-09-01: MCP ingest schemas now also publish and enforce domain-shaped
   stable keys and URI format for Video URLs before governed dispatch. Unit
   verification is 148 tests / 893 assertions; guarded integration is 92 tests /
-  500 assertions; combined verification is 240 tests / 1,393 assertions.
+  502 assertions; combined verification is 240 tests / 1,395 assertions.
+
+- 2026-09-01: Guarded MCP integration now proves malformed stable keys and
+  non-URI Video URLs fail at schema validation before governed dispatch. Unit
+  verification is 148 tests / 893 assertions; guarded integration is 92 tests /
+  506 assertions; combined verification is 240 tests / 1,399 assertions.
 
 - 2026-09-01: Guarded MCP integration now proves a valid uppercase canonical
   UUID passes the advertised schema and semantic transport validation while a

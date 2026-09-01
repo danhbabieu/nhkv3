@@ -180,6 +180,13 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame(400, $invalid->get_status());
             self::assertSame(-32602, $invalid->get_data()['error']['code']);
 
+            $invalidStableKey = $this->request('tools/call', ['id' => 51, 'params' => ['name' => 'nhk.media.ingest', 'arguments' => [
+                'stable_key' => 'Invalid Stable Key',
+                'name' => 'Invalid stable key media',
+            ]]], ['Mcp-Name' => 'nhk.media.ingest']);
+            self::assertSame(400, $invalidStableKey->get_status());
+            self::assertSame(-32602, $invalidStableKey->get_data()['error']['code']);
+
             $create = $this->request('tools/call', ['id' => 5, 'params' => ['name' => 'nhk.media.ingest', 'arguments' => [
                 'stable_key' => $stableKey,
                 'name' => 'MCP ' . $stableKey,
@@ -252,6 +259,12 @@ final class McpTransportIntegrationTest extends TestCase
         global $wpdb;
         $videoId = substr(bin2hex(random_bytes(8)), 0, 11);
         try {
+            $invalidUrl = $this->request('tools/call', ['id' => 8, 'params' => ['name' => 'nhk.video.ingest', 'arguments' => [
+                'url' => 'not-a-uri',
+            ]]], ['Mcp-Name' => 'nhk.video.ingest']);
+            self::assertSame(400, $invalidUrl->get_status());
+            self::assertSame(-32602, $invalidUrl->get_data()['error']['code']);
+
             $create = $this->request('tools/call', ['id' => 9, 'params' => ['name' => 'nhk.video.ingest', 'arguments' => [
                 'url' => 'https://youtu.be/' . $videoId,
                 'title' => 'MCP video ' . $videoId,
