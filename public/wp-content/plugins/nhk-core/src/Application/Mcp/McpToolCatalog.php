@@ -100,9 +100,9 @@ final class McpToolCatalog
             'type' => 'object',
             'properties' => [
                 'kind' => ['type' => 'string', 'enum' => ['original', 'derivative']],
-                'storage_key' => ['type' => 'string'],
+                'storage_key' => ['type' => 'string', 'minLength' => 1],
                 'checksum' => ['type' => 'string', 'pattern' => '^[0-9A-Fa-f]{64}$'],
-                'mime_type' => ['type' => 'string'],
+                'mime_type' => ['type' => 'string', 'minLength' => 1],
                 'byte_size' => ['type' => 'integer', 'minimum' => 0],
                 'width' => ['type' => 'integer', 'minimum' => 1],
                 'height' => ['type' => 'integer', 'minimum' => 1],
@@ -120,7 +120,7 @@ final class McpToolCatalog
             'type' => 'object',
             'properties' => [
                 'endpoint_type' => ['type' => 'string', 'pattern' => '^[a-z][a-z0-9_]{0,63}$'],
-                'endpoint_key' => ['type' => 'string'],
+                'endpoint_key' => ['type' => 'string', 'minLength' => 1],
                 'role' => ['type' => 'string', 'enum' => ['featured', 'inline', 'gallery', 'thumbnail', 'source']],
                 'sort_order' => ['type' => 'integer', 'minimum' => 0],
             ],
