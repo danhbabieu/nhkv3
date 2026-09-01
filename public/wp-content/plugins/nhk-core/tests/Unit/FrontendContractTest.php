@@ -405,6 +405,20 @@ final class FrontendContractTest extends TestCase
         }
     }
 
+    public function test_public_video_reference_gate_covers_all_discovery_boundaries(): void
+    {
+        foreach ([
+            dirname(__DIR__, 2) . '/src/Application/Home/HomeSemanticQuery.php',
+            dirname(__DIR__, 2) . '/src/Application/Search/SearchSemanticQuery.php',
+            dirname(__DIR__, 2) . '/src/Application/Entity/RelatedContentQuery.php',
+            dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php',
+            dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php',
+            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
+        ] as $file) {
+            self::assertStringContainsString('hasValidPublicReference()', (string) file_get_contents($file), $file . ' must apply the public Video reference boundary');
+        }
+    }
+
     public function test_post_template_uses_graph_related_query_boundary(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

@@ -13,6 +13,7 @@ use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeRefer
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryGraphRepository};
 use PHPUnit\Framework\TestCase;
 
@@ -51,5 +52,32 @@ final class RelatedContentQueryTest extends TestCase
 
         self::assertSame([['type' => 'brand', 'id' => $brand->canonicalId, 'title' => 'Odo', 'url' => function_exists('home_url') ? home_url('/brand/odo/') : '/brand/odo/']], $related['entities']);
         self::assertSame([], $related['articles']);
+    }
+
+    public function test_related_query_hides_invalid_public_video_references(): void
+    {
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
+        $brand = $authority->create('brand', 'odo', 'Odo');
+        $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId]));
+        $endpoints->register('video', new FakeEndpointResolver('video', [$invalid->canonicalId]));
+        $graph = new GraphService($graphRepository = new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $graph->create(new NodeReference('brand', $brand->canonicalId), 'about', new NodeReference('video', $invalid->canonicalId));
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
+        $videos = new class($invalid) implements VideoRepository {
+            public function __construct(private Video $item) {}
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->item->canonicalId ? $this->item : null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return [$this->item]; }
+        };
+
+        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $videos, $types))->forEntity('brand', $brand->canonicalId);
+
+        self::assertSame([], $related['videos']);
     }
 }

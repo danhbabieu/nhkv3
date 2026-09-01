@@ -33,7 +33,7 @@ final class HomeSemanticQuery
         }
         if ($this->ready('video')) {
             foreach ($this->videos->list() as $item) {
-                if (!$item->active) continue;
+                if (!$item->active || !$item->hasValidPublicReference()) continue;
                 $modules['videos'][] = ['id' => $item->canonicalId, 'title' => $item->title ?: 'Video NHK', 'platform' => $item->platform, 'url' => home_url('/video/' . rawurlencode($item->canonicalId) . '/')];
                 if (count($modules['videos']) >= 4) break;
             }
