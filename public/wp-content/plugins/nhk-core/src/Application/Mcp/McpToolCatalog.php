@@ -91,6 +91,6 @@ final class McpToolCatalog
     /** @return array{type:string,pattern:string} */
     private static function uuidField(): array
     {
-        return ['type' => 'string', 'pattern' => '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'];
+        return ['type' => 'string', 'format' => 'uuid', 'pattern' => '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$'];
     }
 }

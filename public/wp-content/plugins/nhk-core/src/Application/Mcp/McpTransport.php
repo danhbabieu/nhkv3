@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Mcp;
 
+use NHK\Core\Shared\Uuid\UuidCodec;
+
 final class McpTransport
 {
     public const MODERN_VERSION = '2026-07-28';
@@ -136,6 +138,7 @@ final class McpTransport
             default => true,
         };
         if (!$valid) throw new \InvalidArgumentException('Argument has invalid type: ' . $key . '.');
+        if (($schema['format'] ?? '') === 'uuid' && (!is_string($value) || !UuidCodec::isValid($value))) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['minimum']) && is_int($value) && $value < (int) $schema['minimum']) throw new \InvalidArgumentException('Argument is below minimum: ' . $key . '.');
         if (isset($schema['maximum']) && is_int($value) && $value > (int) $schema['maximum']) throw new \InvalidArgumentException('Argument is above maximum: ' . $key . '.');
