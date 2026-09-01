@@ -77,3 +77,19 @@ active consolidation target in the export. The legacy posts also have empty
 Knowledge claim automatically. A governed retirement or separately approved
 active target is therefore required, while WordPress `wp_posts` remains the
 sole editorial body and URL authority.
+
+## Decision classification matrix
+
+| Case set | Count | Resolution class | Safe rule/evidence | Current action |
+|---|---:|---|---|---|
+| Native homepage `/` | 1 | `RETAIN` / `RULE_RESOLVABLE` | Exact native V3 route and recorded `READY_NOOP` | No redirect or mutation |
+| Legacy `wp_global_styles` URL | 1 | `RETIRE` / `RULE_RESOLVABLE` | Non-editorial implementation record has no V3 semantic target | Await governed retirement recording |
+| Attachment URLs with explicit Media identity | 3 | `EVIDENCE_RESOLVABLE` | IDs 818, 849 and 852 have canonical Media/asset provenance | Preserve provenance; publication remains governed |
+| Attachment URLs without semantic identity | 15 | `AMBIGUOUS_REQUIRES_HUMAN` | Bytes/path/checksum do not establish intended semantic usage | Keep skip; recover evidence or retire case-by-case |
+| Unavailable thumbnail URLs | 3 | `DEFERRED` | Exact V2 paths return 404; no bytes to verify | Recover from approved source or retire |
+| Five legacy Knowledge URLs with exact claim candidates | 5 | `EVIDENCE_RESOLVABLE` identity, `AMBIGUOUS_REQUIRES_HUMAN` disposition | Exact candidate exists, but every target is archived, unverified and non-public | Approve active target or retire; never redirect to hidden claim |
+
+This matrix prevents the residual count from being treated as 27 human
+decisions. Only case-level ambiguous target/publication/retirement decisions
+require human review; deterministic no-op, retirement rule and explicit
+provenance evidence are recorded without applying mutation.

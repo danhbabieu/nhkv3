@@ -60,6 +60,14 @@ proof, relation rule, migration action and retirement rule. Its
 `mapping_applied=false` marker is mandatory evidence that the policy has not
 mutated migration state.
 
+Residual URL/media review is likewise case-classified: the native homepage is
+`RETAIN/RULE_RESOLVABLE`, the global-styles URL is `RETIRE/RULE_RESOLVABLE`,
+three attachment identities are `EVIDENCE_RESOLVABLE`, 15 attachment usages
+are `AMBIGUOUS_REQUIRES_HUMAN`, three missing thumbnails are `DEFERRED`, and
+the five exact Knowledge candidates remain identity-evidence-resolvable but
+publication/retirement-ambiguous. No redirect or retirement is applied by
+this classification.
+
 ## No-write dry-run tooling
 
 `tools/v2-dry-run.php --input=/path/to/read-only-inventory.json` accepts a JSON

@@ -80,6 +80,21 @@ intended public usage. For the three explicitly mapped files, identity is
 known but publication, asset-variant semantics and source-byte handling remain
 governed decisions.
 
+## Resolution classes
+
+The 21 attachment cases are not one undifferentiated human gate:
+
+| Case set | Count | Class | Evidence |
+|---|---:|---|---|
+| Explicit canonical Media identity and source provenance | 3 | `EVIDENCE_RESOLVABLE` | Attachments 818, 849 and 852 have canonical Media/asset mappings |
+| Available bytes without semantic usage identity | 15 | `AMBIGUOUS_REQUIRES_HUMAN` | HTTP/MIME/size/checksum evidence exists, but no deterministic Media/Specimen/Product usage target |
+| Unavailable thumbnail paths | 3 | `DEFERRED` | Exact source paths return 404; recovery artifact is missing |
+
+The three evidence-resolvable cases still require governed privacy/publication
+and asset-variant decisions; they are not identity blockers. The 15 ambiguous
+cases and any unrecovered 404 cases remain explicit skips. No checksum-only
+merge or binary import is performed.
+
 ## Required next gate
 
 For the 18 HTTP-200 candidates, preserve the original V2 backup, capture a

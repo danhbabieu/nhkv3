@@ -28,9 +28,9 @@ Video detail remains unavailable because the local query has no active Video row
 | Queue field | Current value |
 |---|---|
 | `ACTIVE_GATE` | V2 Structural Mapping / Retirement |
-| `NEXT_ACTIONABLE_GATE` | Produce governed structural mapping evidence for Brand → Model → Variant and the remaining Authority/Knowledge/Media/WordPress relation lanes, without applying identity mappings |
+| `NEXT_ACTIONABLE_GATE` | Apply the residual URL decision matrix to separate deterministic RETAIN/RETIRE/RULE cases from ambiguous URL targets, then verify SEO/redirect behavior without applying human-gated decisions |
 | `TEMPORARILY_BLOCKED_GATES` | MCP local wire/runtime evidence: HTTP harness is not responding at `http://localhost:80` or `http://wordpress.local:8080`; retry `php tools/mcp-wire-smoke.php --base-url=http://localhost` after restoring the existing WordPress/Apache vhost |
-| `HUMAN_BLOCKED_GATES` | Only case-level `AMBIGUOUS_REQUIRES_HUMAN` identity/provenance/retirement decisions after deterministic evidence; production-scale legacy migration backup/restore; final cutover |
+| `HUMAN_BLOCKED_GATES` | Only case-level `AMBIGUOUS_REQUIRES_HUMAN` identity/provenance/publication/retirement decisions after deterministic evidence; production-scale legacy migration backup/restore; final cutover |
 | `COMPLETED_GATES` | Visibility contract; 764-record classifier; structural mapping policy packet and concept/relation evidence matrix; MCP resolver implementation and transport contract |
 | `DEFERRED_NONCRITICAL_WORK` | Unrequested defensive hardening, new indexes/caches without evidence, cosmetic redesign outside the frontend acceptance sweep |
 
