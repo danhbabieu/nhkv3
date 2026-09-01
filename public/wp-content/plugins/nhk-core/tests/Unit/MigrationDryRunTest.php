@@ -36,6 +36,12 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('INVALID_IDENTITY', $report['items'][0]['reason']);
     }
 
+    public function test_nil_canonical_uuid_is_skipped_with_bounded_reason(): void
+    {
+        $report = (new DryRunService())->run([['type' => 'brand', 'stable_key' => 'odo', 'canonical_uuid' => '00000000-0000-0000-0000-000000000000']]);
+        self::assertSame('INVALID_IDENTITY', $report['items'][0]['reason']);
+    }
+
     public function test_domain_targeted_url_keeps_explicit_skip_reason(): void
     {
         $report = (new DryRunService())->run([['type' => 'url', 'source_path' => '/knowledge/legacy/', 'target_path' => '', 'target_reason' => 'DOMAIN_TARGETED']]);

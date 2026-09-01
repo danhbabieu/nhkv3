@@ -90,9 +90,7 @@ final class DryRunService
         }
         if ($type === 'category' && (string) ($record['taxonomy'] ?? '') !== 'category') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
         if (!in_array($type, self::SUPPORTED_TYPES, true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
-        if (isset($record['canonical_uuid'])) {
-            try { UuidCodec::toBinary((string) $record['canonical_uuid']); } catch (\Throwable) { return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY']; }
-        }
+        if (isset($record['canonical_uuid']) && !UuidCodec::isValid((string) $record['canonical_uuid'])) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         if ((string) ($record['stable_key'] ?? '') === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         $checksum = strtolower((string) ($record['checksum'] ?? ''));
         if ($checksum !== '' && preg_match('/^[a-f0-9]{64}$/', $checksum) !== 1) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];

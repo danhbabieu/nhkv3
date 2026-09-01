@@ -462,7 +462,7 @@ final class V2MigrationService
     }
     private function evidenceRelation(string $role): string { $role = strtoupper($role); return str_contains($role, 'CONTRADICT') ? 'contradicts' : (str_contains($role, 'QUALIF') || str_contains($role, 'PARTIAL') || str_contains($role, 'CORRECTION') || str_contains($role, 'BOUND') ? 'qualifies' : 'supports'); }
     private function sourceKey(array $record): string { return (string) ($record['stable_key'] ?? ($record['source_key'] ?? ($record['type'] ?? '') . ':' . ($record['legacy_id'] ?? ($record['canonical_uuid'] ?? '')))); }
-    private function validUuid(string $value): bool { try { UuidCodec::toBinary($value); return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value); } catch (\Throwable) { return false; } }
+    private function validUuid(string $value): bool { return UuidCodec::isValid($value); }
     private function isArchived(array $record): bool
     {
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
