@@ -19,6 +19,24 @@ use PHPUnit\Framework\TestCase;
 
 final class RelatedContentQueryTest extends TestCase
 {
+    public function test_invalid_canonical_entity_input_fails_closed_before_graph_lookup(): void
+    {
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $throwingAuthority = new class implements \NHK\Core\Contracts\Authority\AuthorityRepository {
+            public function findByCanonicalId(string $id): ?\NHK\Core\Domain\Authority\AuthorityEntity { throw new \RuntimeException('invalid UUID reached authority'); }
+            public function findByStableKey(string $type, string $key): ?\NHK\Core\Domain\Authority\AuthorityEntity { return null; }
+            public function create(\NHK\Core\Domain\Authority\AuthorityEntity $entity): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
+            public function update(\NHK\Core\Domain\Authority\AuthorityEntity $entity, int $expectedRevision): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
+            public function listByType(string $type, bool $includeRetired = false): array { return []; }
+        };
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
+        $graph = new GraphService(new InMemoryGraphRepository(), new EndpointTypeRegistry(), new PredicateRegistry(), new InMemoryAuditSink());
+
+        self::assertSame(['entities' => [], 'articles' => [], 'media' => [], 'videos' => []], (new RelatedContentQuery($graph, $throwingAuthority, $emptyMedia, $emptyVideos, $types))->forEntity('brand', '00000000-0000-0000-0000-000000000000'));
+    }
+
     public function test_related_entities_are_derived_from_graph_in_both_directions(): void
     {
         $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, [])); $types->register(new EntityTypeDefinition('model', 1, true, []));

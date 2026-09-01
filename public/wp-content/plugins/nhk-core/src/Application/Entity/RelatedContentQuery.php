@@ -12,6 +12,7 @@ use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class RelatedContentQuery
 {
@@ -20,6 +21,7 @@ final class RelatedContentQuery
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
     public function forEntity(string $type, string $id): array
     {
+        if ($this->types->has($type) && !UuidCodec::isValid($id)) return $this->emptyGroups();
         try { return $this->forReference(new NodeReference($type, $id)); } catch (\Throwable) { return $this->emptyGroups(); }
     }
 
@@ -37,7 +39,11 @@ final class RelatedContentQuery
         $groups = $this->emptyGroups();
         if ($this->status && !$this->status->graphStorageReady()) return $groups;
         $seen = [];
-        $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
+        try {
+            $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
+        } catch (\Throwable) {
+            return $groups;
+        }
         foreach ($pages as $page) foreach ($page['items'] as $edge) {
             $node = $edge->source->reference->key() === $reference->key() ? $edge->target->reference : $edge->source->reference;
             if ($node->key() === $reference->key() || isset($seen[$node->key()])) continue;
@@ -53,6 +59,7 @@ final class RelatedContentQuery
 
     private function resolve(NodeReference $node): ?array
     {
+        if (($this->types->has($node->endpoint_type) || in_array($node->endpoint_type, ['media', 'video'], true)) && !UuidCodec::isValid($node->endpoint_key)) return null;
         if ($this->types->has($node->endpoint_type)) {
             $entity = $this->authority->findByCanonicalId($node->endpoint_key);
             if (!$entity || !$entity->active()) return null;
