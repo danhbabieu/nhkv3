@@ -67,6 +67,34 @@ final class P7KnowledgeIntegrationTest extends TestCase
         self::assertSame(404, $response->get_status());
     }
 
+    public function test_source_and_evidence_repositories_ignore_corrupt_metadata_rows(): void
+    {
+        global $wpdb;
+        $sourceRepository = new WpdbSourceRepository($wpdb);
+        $source = $sourceRepository->create(new Source(UuidCodec::newV7(), 'p7-integration-corrupt-source', 'Corrupt source', 'archive'));
+        $service = new KnowledgeService(new WpdbKnowledgeRepository($wpdb), $sourceRepository, new WpdbEvidenceRepository($wpdb));
+        $claim = $service->createClaim('p7-integration-corrupt-evidence-claim', 'Corrupt evidence claim.', 'fact');
+        $evidence = $service->cite($claim->canonicalId, $source->canonicalId, 'Corrupt evidence excerpt');
+        $evidenceRepository = new WpdbEvidenceRepository($wpdb);
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}nhk_sources SET metadata_json=%s WHERE canonical_uuid=%s",
+            '"not-an-object"',
+            UuidCodec::toBinary($source->canonicalId)
+        ));
+        self::assertNull($sourceRepository->findByCanonicalId($source->canonicalId));
+        self::assertSame([], $sourceRepository->list());
+
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->prefix}nhk_evidence SET metadata_json=%s WHERE evidence_uuid=%s",
+            '"not-an-object"',
+            UuidCodec::toBinary($evidence->canonicalId)
+        ));
+
+        self::assertNull($evidenceRepository->findByCanonicalId($evidence->canonicalId));
+        self::assertSame([], $evidenceRepository->listByClaim($claim->canonicalId));
+    }
+
     public function test_source_repository_rejects_same_identity_with_changed_metadata(): void
     {
         global $wpdb;

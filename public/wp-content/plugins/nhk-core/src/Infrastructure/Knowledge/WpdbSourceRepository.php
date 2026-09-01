@@ -43,8 +43,8 @@ final class WpdbSourceRepository implements SourceRepository
         if ($ok !== 1) throw new KnowledgeException('Source revision conflict.');
         return $this->findByCanonicalId($source->canonicalId) ?? $source;
     }
-    public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_map(fn (array $row): Source => $this->hydrate($row), $rows ?: []); }
-    private function hydrate(?array $row): ?Source { if (!$row) return null; $metadata = (string) ($row['metadata_json'] ?? ''); return new Source(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['title'], (string) $row['source_type'], $row['locator'] === null ? null : (string) $row['locator'], $metadata === '' ? [] : json_decode($metadata, true, 512, JSON_THROW_ON_ERROR), (int) $row['state'] === 1, (int) $row['revision']); }
+    public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_values(array_filter(array_map(fn (array $row): ?Source => $this->hydrate($row), $rows ?: []), static fn (?Source $source): bool => $source !== null)); }
+    private function hydrate(?array $row): ?Source { if (!$row) return null; $metadata = (string) ($row['metadata_json'] ?? ''); if ($metadata === '') { $decodedMetadata = []; } else { try { $decodedMetadata = json_decode($metadata, true, 512, JSON_THROW_ON_ERROR); } catch (\JsonException) { return null; } if (!is_array($decodedMetadata)) return null; } return new Source(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['title'], (string) $row['source_type'], $row['locator'] === null ? null : (string) $row['locator'], $decodedMetadata, (int) $row['state'] === 1, (int) $row['revision']); }
 
     private function sameSource(Source $left, Source $right): bool
     {
