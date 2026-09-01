@@ -19,6 +19,7 @@ use NHK\Core\Infrastructure\Media\WpdbMediaAssetRepository;
 use NHK\Core\Infrastructure\Migration\WpdbMigrationLedgerRepository;
 use NHK\Core\Infrastructure\Migration\WpdbProjectionContextRepository;
 use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class V2MigrationService
 {
@@ -173,7 +174,7 @@ final class V2MigrationService
     private function authorityEntity(array $record): array
     {
         $type = (string) $record['type']; $id = (string) ($record['canonical_uuid'] ?? ''); $key = (string) ($record['stable_key'] ?? ''); $name = trim((string) ($record['canonical_name'] ?? ''));
-        if (!isset($record['canonical_uuid']) || !preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $name === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Authority identity is incomplete.');
+        if (!isset($record['canonical_uuid']) || !$this->validUuid($id) || $key === '' || $name === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Authority identity is incomplete.');
         if (!$this->types->has($type)) throw new MigrationSkip('skipped', 'UNSUPPORTED_LEGACY_TYPE', 'Authority type is not registered.');
         $payload = $this->authorityPayload($type, is_array($record['metadata'] ?? null) ? $record['metadata'] : []);
         $state = $this->isArchived($record) ? AuthorityState::RETIRED : AuthorityState::ACTIVE;
@@ -195,7 +196,7 @@ final class V2MigrationService
     private function mediaEntity(array $record): array
     {
         $id = (string) ($record['canonical_uuid'] ?? ''); $key = (string) ($record['stable_key'] ?? ''); $name = trim((string) ($record['canonical_name'] ?? ''));
-        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $name === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Media identity is incomplete.');
+        if (!$this->validUuid($id) || $key === '' || $name === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Media identity is incomplete.');
         $provenance = ['source' => 'v2', 'legacy_type' => 'media', 'metadata' => $record['metadata'] ?? []];
         $active = !$this->isArchived($record);
         $existing = $this->media->findByCanonicalId($id);
@@ -209,7 +210,7 @@ final class V2MigrationService
     {
         $id = (string) ($record['canonical_uuid'] ?? ''); $key = (string) ($record['stable_key'] ?? ''); $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
         $text = trim((string) ($metadata['one_sentence_definition'] ?? $record['canonical_name'] ?? ''));
-        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $text === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Knowledge identity or claim text is incomplete.');
+        if (!$this->validUuid($id) || $key === '' || $text === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Knowledge identity or claim text is incomplete.');
         $claimType = $this->claimType($metadata); $provenance = ['source' => 'v2', 'metadata' => $metadata];
         $active = !$this->isArchived($record);
         $existing = $this->knowledge->findByCanonicalId($id);
@@ -265,7 +266,7 @@ final class V2MigrationService
         $key = (string) ($record['stable_key'] ?? '');
         $title = trim((string) ($record['canonical_name'] ?? ''));
         $locator = trim((string) ($record['locator'] ?? ''));
-        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || $title === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Source identity or title is incomplete.');
+        if (!$this->validUuid($id) || $key === '' || $title === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Source identity or title is incomplete.');
         if ($locator !== '' && filter_var($locator, FILTER_VALIDATE_URL) === false) $locator = '';
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
         foreach (['visibility', 'verification_state', 'review_state', 'legacy_id'] as $field) if (array_key_exists($field, $record)) $metadata[$field] = $record[$field];
@@ -295,7 +296,7 @@ final class V2MigrationService
         $claimId = (string) ($record['claim_id'] ?? '');
         $sourceId = (string) ($record['source_id'] ?? '');
         $excerpt = trim((string) ($record['excerpt'] ?? ''));
-        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $key === '' || !preg_match('/^[0-9a-f-]{36}$/i', $claimId) || !preg_match('/^[0-9a-f-]{36}$/i', $sourceId) || $excerpt === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Evidence requires citation, claim, source and excerpt identities.');
+        if (!$this->validUuid($id) || $key === '' || !$this->validUuid($claimId) || !$this->validUuid($sourceId) || $excerpt === '') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Evidence requires citation, claim, source and excerpt identities.');
         if (strtolower((string) ($record['target_type'] ?? 'knowledge')) !== 'knowledge') throw new MigrationSkip('skipped', 'UNSUPPORTED_LEGACY_TYPE', 'V3 Evidence targets Knowledge claims only.');
         if (!$this->knowledge->findByCanonicalId($claimId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Evidence claim endpoint was not imported.');
         if (!$this->sources->findByCanonicalId($sourceId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Evidence source endpoint was not imported.');
@@ -335,7 +336,7 @@ final class V2MigrationService
         $entityKey = trim((string) ($record['target_entity_key'] ?? ''));
         if ($entityType !== '' || $entityId !== '' || $entityKey !== '') {
             $authorityTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];
-            if ((!in_array($entityType, $authorityTypes, true) && $entityType !== 'knowledge') || !preg_match('/^[0-9a-f-]{36}$/i', $entityId) || $entityKey === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'Entity URL target identity is incomplete.');
+            if ((!in_array($entityType, $authorityTypes, true) && $entityType !== 'knowledge') || !$this->validUuid($entityId) || $entityKey === '') throw new MigrationSkip('skipped', 'INVALID_URL_MAPPING', 'Entity URL target identity is incomplete.');
             if ($entityType === 'knowledge') {
                 $claim = $this->knowledge->findByCanonicalId($entityId);
                 if (!$claim || $claim->stableKey !== $entityKey || !$claim->active || !$claim->isPublic()) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Knowledge URL target is not an active public governed claim.');
@@ -369,7 +370,7 @@ final class V2MigrationService
         $url = trim((string) ($metadata['canonical_url'] ?? $metadata['url'] ?? $metadata['source_url'] ?? ''));
         $platform = strtolower(trim((string) ($metadata['platform'] ?? 'youtube')));
         $externalId = trim((string) ($metadata['external_video_id'] ?? $metadata['video_id'] ?? ''));
-        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $id)) throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video identity is incomplete.');
+        if (!$this->validUuid($id)) throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video identity is incomplete.');
         if ($url === '' && $externalId !== '' && $platform === 'youtube') $url = 'https://www.youtube.com/watch?v=' . $externalId;
         if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false || $platform !== 'youtube') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video has no supported external reference.');
         if ($externalId === '') {
@@ -391,7 +392,7 @@ final class V2MigrationService
     {
         $mediaId = (string) ($record['media_id'] ?? ''); $publicId = trim((string) ($record['stable_key'] ?? ''));
         $storageKey = trim((string) ($record['storage_key'] ?? '')); $checksum = strtolower(trim((string) ($record['checksum'] ?? '')));
-        if (!preg_match('/^[0-9a-f-]{36}$/i', $mediaId) || !$this->media->findByCanonicalId($mediaId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Media asset parent is not an imported Media identity.');
+        if (!$this->validUuid($mediaId) || !$this->media->findByCanonicalId($mediaId)) throw new MigrationSkip('skipped', 'MISSING_ENDPOINT', 'Media asset parent is not an imported Media identity.');
         if ($publicId === '' || $storageKey === '' || preg_match('/^[0-9a-f]{64}$/', $checksum) !== 1) throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Media asset requires public id, storage path and checksum.');
         $assetId = Uuid::v5(Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8'), 'nhk-v2-media-asset:' . $publicId)->toRfc4122();
         $existing = $this->assets->findByAssetId($assetId);
@@ -461,6 +462,7 @@ final class V2MigrationService
     }
     private function evidenceRelation(string $role): string { $role = strtoupper($role); return str_contains($role, 'CONTRADICT') ? 'contradicts' : (str_contains($role, 'QUALIF') || str_contains($role, 'PARTIAL') || str_contains($role, 'CORRECTION') || str_contains($role, 'BOUND') ? 'qualifies' : 'supports'); }
     private function sourceKey(array $record): string { return (string) ($record['stable_key'] ?? ($record['source_key'] ?? ($record['type'] ?? '') . ':' . ($record['legacy_id'] ?? ($record['canonical_uuid'] ?? '')))); }
+    private function validUuid(string $value): bool { try { UuidCodec::toBinary($value); return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value); } catch (\Throwable) { return false; } }
     private function isArchived(array $record): bool
     {
         $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];

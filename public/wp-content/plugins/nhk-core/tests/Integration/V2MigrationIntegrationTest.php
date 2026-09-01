@@ -87,6 +87,30 @@ final class V2MigrationIntegrationTest extends TestCase
         self::assertSame([], json_decode((string) $wpdb->get_var($wpdb->prepare("SELECT payload FROM {$wpdb->prefix}nhk_entities WHERE stable_key=%s", 'v2-migration-integration-brand')), true)['private_notes'] ?? []);
     }
 
+    public function test_invalid_uuid_shape_is_skipped_as_invalid_identity(): void
+    {
+        global $wpdb;
+        $record = [
+            'type' => 'brand',
+            'stable_key' => 'v2-migration-integration-invalid-uuid',
+            'canonical_uuid' => '00000000-0000-0000-0000-000000000000',
+            'canonical_name' => 'Invalid UUID fixture',
+        ];
+
+        try {
+            $result = (new V2MigrationService($wpdb))->apply([$record], 10, 10);
+            self::assertSame(1, $result['processed']);
+            self::assertSame(1, $result['skipped']);
+            self::assertSame(0, $result['conflict']);
+            self::assertSame('INVALID_IDENTITY', (string) $wpdb->get_var($wpdb->prepare(
+                "SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s",
+                $record['stable_key']
+            )));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", $record['stable_key']));
+        }
+    }
+
     public function test_skipped_domain_records_retain_structured_review_metadata(): void
     {
         global $wpdb;

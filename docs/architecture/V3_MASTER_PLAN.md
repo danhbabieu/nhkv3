@@ -31,6 +31,11 @@ NHK Admin entity/proposal UUID lookups now canonicalize through the shared
 codec and reject malformed values before repository access; latest combined
 coverage is 217 tests / 1,301 assertions.
 
+V2 migration identity validation now applies the shared codec and strict RFC
+4122 checks across semantic and URL targets; invalid UUID-shaped records are
+reason-coded `INVALID_IDENTITY`, with latest coverage at 218 tests / 1,305
+assertions combined.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

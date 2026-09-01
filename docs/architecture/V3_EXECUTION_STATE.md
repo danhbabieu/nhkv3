@@ -116,6 +116,13 @@ Last updated: 2026-09-01, P11 Governance command hydration checkpoint.
   136 tests/842 assertions and guarded integration passed 69 tests/434
   assertions.
 
+- 2026-09-01: Migration identity validation now uses the shared UUID codec
+  plus RFC 4122 version/variant checks for Authority, Media, Knowledge,
+  Source, Evidence, Video, MediaAsset and URL targets. Invalid UUID-shaped
+  records are ledgered as `INVALID_IDENTITY` rather than `MIGRATION_FAILED`.
+  Current verification is Unit 140 tests / 849 assertions and guarded
+  integration 78 tests / 456 assertions.
+
 - 2026-09-01: Closed the Authority domain identity boundary: `AuthorityEntity`
   now validates canonical UUID format before any repository or Graph operation.
   Malformed identity construction is fail-closed with a typed endpoint error;
