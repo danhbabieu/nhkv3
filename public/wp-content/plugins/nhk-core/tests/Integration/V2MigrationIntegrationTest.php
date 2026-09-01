@@ -255,6 +255,38 @@ final class V2MigrationIntegrationTest extends TestCase
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s", 'v2-migration-integration-url-%'));
     }
 
+    public function test_video_migration_normalizes_supported_youtube_urls_before_public_persistence(): void
+    {
+        global $wpdb;
+        (new \NHK\Core\Infrastructure\Migration\MediaMigration004())->up();
+        $id = UuidCodec::newV7();
+        $record = [
+            'type' => 'video',
+            'stable_key' => 'v2-migration-integration-video-normalized',
+            'canonical_uuid' => $id,
+            'canonical_name' => 'Normalized migration video',
+            'metadata' => ['canonical_url' => 'https://youtu.be/dQw4w9WgXcQ?t=42', 'platform' => 'youtube'],
+        ];
+
+        try {
+            $result = (new V2MigrationService($wpdb))->apply([$record], 18, 10);
+            self::assertSame(1, $result['migrated']);
+            self::assertSame('https://www.youtube.com/watch?v=dQw4w9WgXcQ', (string) $wpdb->get_var($wpdb->prepare(
+                "SELECT canonical_url FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s",
+                UuidCodec::toBinary($id)
+            )));
+            self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s AND canonical_url=%s AND external_video_id=%s",
+                UuidCodec::toBinary($id),
+                'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                'dQw4w9WgXcQ'
+            )));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s", UuidCodec::toBinary($id)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", $record['stable_key']));
+        }
+    }
+
     public function test_semantic_projection_migrates_to_non_canonical_context_and_is_idempotent(): void
     {
         global $wpdb;

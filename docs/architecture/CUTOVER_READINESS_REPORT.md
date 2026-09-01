@@ -23,6 +23,12 @@ rendered successfully with no browser console errors or warnings. This does not
 upgrade active Video detail QA: no active local Video row exists, so that route
 remains data-gated.
 
+The migration boundary now canonicalizes supported YouTube URL forms before
+Video persistence and records URL/external-ID disagreement as a reason-coded
+conflict. Unit verification passed 148 tests/906 assertions. The targeted
+guarded integration retry could not reach PHPUnit because the WordPress
+runtime failed to establish its test database connection.
+
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
 skipped, 0 conflicts and 742 explicit mapping-review candidates. No V2/live

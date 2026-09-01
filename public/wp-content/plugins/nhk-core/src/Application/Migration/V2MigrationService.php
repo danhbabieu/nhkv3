@@ -373,9 +373,14 @@ final class V2MigrationService
         if (!$this->validUuid($id)) throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video identity is incomplete.');
         if ($url === '' && $externalId !== '' && $platform === 'youtube') $url = 'https://www.youtube.com/watch?v=' . $externalId;
         if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false || $platform !== 'youtube') throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video has no supported external reference.');
-        if ($externalId === '') {
-            try { $externalId = Video::fromUrl($url)->externalVideoId; } catch (\Throwable) { throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video URL has no supported external identifier.'); }
+        try {
+            $normalized = Video::fromUrl($url);
+        } catch (\Throwable) {
+            throw new MigrationSkip('skipped', 'INVALID_IDENTITY', 'Video URL has no supported external identifier.');
         }
+        if ($externalId !== '' && $externalId !== $normalized->externalVideoId) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Video URL and external identifier disagree.');
+        $externalId = $normalized->externalVideoId;
+        $url = $normalized->canonicalUrl;
         $existing = $this->videos->findByCanonicalId($id);
         if ($existing) {
             if ($existing->platform !== $platform || $existing->externalVideoId !== $externalId || $existing->canonicalUrl !== $url) throw new MigrationSkip('conflict', 'CONFLICT_REQUIRES_REVIEW', 'Video UUID maps to a different external reference.');

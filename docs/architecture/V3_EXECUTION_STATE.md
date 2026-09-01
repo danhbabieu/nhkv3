@@ -1,7 +1,7 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 runtime, MCP validation, migration audit and
-browser visual QA checkpoint.
+Last updated: 2026-09-01, P11 runtime, MCP validation, migration audit,
+browser visual QA and Video migration normalization checkpoint.
 
 Fresh read-only in-app browser visual QA checked `/`, `/tri-thuc/` and `/video/`.
 The visitor-facing hero, navigation, discovery panel and honest empty states
@@ -24,6 +24,15 @@ Video detail remains unavailable because the local query has no active Video row
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: V2 Video migration now parses every supported YouTube URL,
+  rejects an explicit external-ID mismatch as a review conflict, and persists
+  the canonical `https://www.youtube.com/watch?v=...` URL. This prevents valid
+  `youtu.be`, `/shorts/` and `/embed/` references from being migrated into a
+  form that the public-reference predicate would later hide. Unit verification
+  remains 148 tests / 906 assertions; the targeted guarded integration retry
+  was environment-blocked before PHPUnit because the WordPress runtime could
+  not establish its database connection.
 
 - 2026-09-01: MCP optional UUID fields now advertise JSON Schema
   `type=[string,null]` and transport validation accepts explicit null before
