@@ -45,10 +45,10 @@ for each skipped record (target boundary, identity proof, relation shape,
 migration action and retirement rule); this remains read-only acceptance
 evidence and does not apply any mapping or retirement.
 
-MCP now has a tested read-only semantic-context resolver foundation with
-canonical UUID, stable-key and exact name/alias matching plus fail-closed
-ambiguity reporting; transport exposure and external interoperability remain
-pending.
+MCP now has a tested read-only semantic-context resolver exposed as
+`nhk.semantic.resolve`, with canonical UUID, stable-key and exact name/alias
+matching plus fail-closed ambiguity reporting; local wire evidence and
+external interoperability remain pending.
 
 The persistence hydration boundary now also covers malformed Authority,
 Knowledge Source/Claim/Evidence and MediaUsage domain rows; current combined

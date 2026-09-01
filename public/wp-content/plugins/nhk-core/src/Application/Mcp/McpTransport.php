@@ -92,6 +92,7 @@ final class McpTransport
         $this->validateArguments($definition['inputSchema'], $arguments);
         $result = match ($name) {
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
+            'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments),

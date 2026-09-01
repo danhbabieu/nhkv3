@@ -48,10 +48,11 @@ identity proof, relation shape, migration action and retirement rule. This is
 structural-gate evidence only; no mapping, relation, redirect or retirement is
 applied.
 
-A read-only MCP semantic-context resolver foundation now enforces the match
-order canonical UUID, stable key, then exact name/alias, while returning
-ambiguities as candidates and avoiding auto-resolution. MCP tool/transport
-wiring and local wire evidence remain open.
+A read-only MCP semantic-context resolver now enforces the match order
+canonical UUID, stable key, then exact name/alias, while returning ambiguities
+as candidates and avoiding auto-resolution. It is exposed through the
+`nhk.semantic.resolve` read tool; local wire evidence and external client
+interoperability remain open.
 
 The latest local revalidation reproduced those same migration and domain-audit
 totals after the Admin checkpoint; it remained read-only and made no database

@@ -29,6 +29,7 @@ final class McpReadHandler
         private ?MigrationStatus $status = null,
         private ?SourceRepository $sources = null,
         private ?PublicMediaAssetDelivery $delivery = null,
+        private ?McpSemanticContextResolver $resolver = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -83,6 +84,12 @@ final class McpReadHandler
         $source = $this->sources->findByCanonicalId($item->sourceId);
         if (!$claim || !$claim->active || !$claim->isPublic() || !$source || !$source->active || !$source->isPublic()) return null;
         return $this->publicEvidence($item) + ['source_title' => $source->title, 'source_type' => $source->sourceType, 'source_locator' => $source->locator];
+    }
+
+    public function semanticResolve(array $context): array
+    {
+        if ($this->resolver === null) throw new \InvalidArgumentException('Semantic context resolver is unavailable.');
+        return $this->resolver->resolve($context);
     }
 
     public function search(string $term, int $page = 1, int $perPage = 20): array

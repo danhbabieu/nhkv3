@@ -102,7 +102,8 @@ Video detail remains unavailable because the local query has no active Video row
   name matches are returned as candidates and are never auto-resolved. The
   resolver emits missing/conflict/empty relation buckets and performs no
   mutation. Focused TDD coverage passes 1 test / 7 assertions; MCP transport
-  wiring and wire evidence remain the next executable boundary.
+  wiring is now exposed as `nhk.semantic.resolve`; local wire evidence remains
+  the next executable boundary.
 
 - 2026-09-01: Admin proposal detail now reads and displays direct dependency
   UUIDs alongside the dependency binding fingerprint through the existing

@@ -80,7 +80,7 @@ final class Plugin {
             (new SearchApi($media, $videos, $claims, $authority, $types, new MigrationStatus()))->register();
             (new EntityApi($authority, $types, new MigrationStatus()))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
-            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources);
+            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
