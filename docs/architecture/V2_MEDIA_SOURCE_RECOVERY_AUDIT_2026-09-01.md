@@ -46,6 +46,22 @@ evidence for deduplication/review only; they must not be used to merge
 semantic identities or replace the source records. HTTP availability also does
 not prove ownership, intended usage, or permission to republish.
 
+## V2 REST metadata cross-check
+
+The read-only WordPress REST API was queried for all 18 HTTP-200 attachment
+IDs. Every response reported the same MIME and `media_details.filesize` as the
+downloaded response. The API returned `post=null` for 17 attachments; ID 845
+returned `post=819`, which is the V2 logo attachment, not an editorial post or
+semantic usage relation. Several responses returned `source_url=false` even
+though the exact upload path returned HTTP 200, so the path/bytes table above is
+the authoritative recovery evidence. The API exposed no deterministic
+Media/Specimen/Product usage mapping for these candidates.
+
+Consequently, even the available files remain recovery candidates rather than
+approved imports. In particular, matching filenames, equal hashes or a V2
+attachment's own detail page cannot establish semantic identity or intended
+public usage.
+
 ## Required next gate
 
 For the 18 HTTP-200 candidates, preserve the original V2 backup, capture a
