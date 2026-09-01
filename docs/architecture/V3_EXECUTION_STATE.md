@@ -1,7 +1,12 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 runtime, MCP validation, migration audit,
-browser visual QA and Video migration normalization checkpoint.
+Last updated: 2026-09-01, staging bootstrap repair checkpoint.
+
+The repository now tracks the runtime-safe `config/application.php` required
+by the staging `public/wp-config.php` bootstrap. It reads deployment values and
+secrets from the process environment, fails closed when required values are
+missing, and contains no credentials. Staging server repair and HTTP evidence
+remain pending because this workspace has no SSH/server shell access.
 
 Fresh read-only in-app browser visual QA checked `/`, `/tri-thuc/` and `/video/`.
 The visitor-facing hero, navigation, discovery panel and honest empty states
