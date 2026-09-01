@@ -96,6 +96,11 @@ Video detail remains unavailable because the local query has no active Video row
   934 assertions; guarded integration evidence remains 94 tests / 517
   assertions.
 
+- 2026-09-01: The read-only MCP wire smoke now checks the 19-tool catalog and
+  calls `nhk.semantic.resolve` with a non-mutating context packet. The local
+  harness endpoint was unavailable during this checkpoint, so runtime PASS
+  evidence is still pending; no mutation tool is invoked by the smoke.
+
 - 2026-09-01: Added the read-only `McpSemanticContextResolver` foundation for
   the MCP semantic-context gate. It resolves Authority context by canonical
   UUID first, stable key second, then exact canonical name/alias; ambiguous

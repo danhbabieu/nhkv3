@@ -57,10 +57,16 @@ try {
     $tools = request($url, 'POST', $common, json_encode(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list', 'params' => []], JSON_THROW_ON_ERROR));
     expectStatus($tools, 200, 'tools/list');
     $toolsBody = json_decode($tools['body'], true);
-    if (count($toolsBody['result']['tools'] ?? []) !== 18) fail('tools/list did not return the registered 18-tool catalog');
+    if (count($toolsBody['result']['tools'] ?? []) !== 19) fail('tools/list did not return the registered 19-tool catalog');
     pass('tools/list catalog');
 
-    $invalidOrigin = request($url, 'POST', [...$common, 'Origin: https://invalid.example'], json_encode(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/list', 'params' => []], JSON_THROW_ON_ERROR));
+    $resolve = request($url, 'POST', $common, json_encode(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.semantic.resolve', 'arguments' => ['context' => ['brand' => ['name' => 'Odo']]]]], JSON_THROW_ON_ERROR));
+    expectStatus($resolve, 200, 'semantic context resolver');
+    $resolveBody = json_decode($resolve['body'], true);
+    if (!isset($resolveBody['result']['structuredContent']['resolved'], $resolveBody['result']['structuredContent']['missing'], $resolveBody['result']['structuredContent']['ambiguities'])) fail('semantic resolver returned an incomplete context bundle');
+    pass('semantic context resolver contract');
+
+    $invalidOrigin = request($url, 'POST', [...$common, 'Origin: https://invalid.example'], json_encode(['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/list', 'params' => []], JSON_THROW_ON_ERROR));
     expectStatus($invalidOrigin, 403, 'invalid Origin rejection');
 
     $notification = request($url, 'POST', $common, json_encode(['jsonrpc' => '2.0', 'method' => 'notifications/initialized', 'params' => []], JSON_THROW_ON_ERROR));
