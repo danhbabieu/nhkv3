@@ -82,4 +82,27 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         self::assertSame(['country' => 'Switzerland'], $response->get_data()['payload']);
     }
+
+    public function test_public_entity_api_list_excludes_retired_entities_before_pagination(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new WpdbAuthorityRepository();
+        $service = new AuthorityService($repository, $types);
+        $baseline = count($repository->listByType('brand'));
+        $active = $service->create('brand', 'p5-integration-active-list', 'Active list item');
+        $retired = $service->create('brand', 'p5-integration-retired-list', 'Retired list item');
+        $service->retire($retired->canonicalId, 1);
+
+        $request = new \WP_REST_Request('GET', '/nhk/v1/entity/brand');
+        $request->set_param('page', 1);
+        $request->set_param('per_page', 100);
+        $response = rest_do_request($request);
+
+        self::assertSame(200, $response->get_status());
+        $data = $response->get_data();
+        self::assertSame($baseline + 1, $data['total']);
+        self::assertContains($active->canonicalId, array_column($data['items'], 'id'));
+        self::assertNotContains($retired->canonicalId, array_column($data['items'], 'id'));
+    }
 }

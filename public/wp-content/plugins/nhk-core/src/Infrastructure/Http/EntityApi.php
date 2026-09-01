@@ -33,7 +33,7 @@ final class EntityApi
         $type = (string) $request['type'];
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
         $page = max(1, (int) $request['page']); $perPage = min(100, max(1, (int) $request['per_page']));
-        $all = $this->authority->listByType($type);
+        $all = array_values(array_filter($this->authority->listByType($type), static fn (AuthorityEntity $entity): bool => $entity->active()));
         $items = array_slice($all, ($page - 1) * $perPage, $perPage);
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => count($all), 'items' => array_map($this->serialize(...), $items)];
     }
