@@ -136,6 +136,11 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('catch (\\Throwable)', $admin);
         self::assertStringContainsString('$canonicalUuid = self::canonicalUuid($key)', $admin);
         self::assertStringContainsString('target_uuid:(String(form.get("target_uuid")||"").trim()||null)', $admin);
+        self::assertStringContainsString('Apply status', $admin);
+        self::assertStringContainsString('Eligibility / block reason', $admin);
+        self::assertStringContainsString('nhk-eligibility-summary', $admin);
+        self::assertStringContainsString("'APPROVAL_MISSING'", $admin);
+        self::assertStringContainsString("'ALREADY_APPLIED'", $admin);
     }
 
     public function test_mcp_wire_smoke_is_read_only_and_covers_protocol_negotiation(): void
