@@ -33,6 +33,11 @@ Last updated: 2026-09-01, P11 complete Authority route smoke checkpoint.
   area was confirmed as normal page height/padding rather than a duplicate
   footer. No data or runtime code changed.
 
+- 2026-09-01: Re-ran the read-only local HTTP route smoke from the current
+  checkpoint. All 34 core routes passed, including Variant and Classification
+  archive/page-two routes; the two real active detail routes also returned
+  HTTP 200. No database or production state changed.
+
 - 2026-09-01: Added read-only `DomainTargetCandidateAudit` and CLI
   `tools/v2-domain-target-audit.php`. TDD coverage proves same-domain exact
   title/slug matches remain review candidates, cross-domain matches are
