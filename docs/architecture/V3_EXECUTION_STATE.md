@@ -39,6 +39,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
   147 tests / 883 assertions; guarded integration remains 91 tests / 494
   assertions; combined verification is 238 tests / 1,377 assertions.
 
+- 2026-09-01: Read-only revalidation against the retained full V2 export
+  reproduced the policy-normalized dry-run: 4,973 source records, 3,961
+  mapped, 1,012 skipped and 0 conflicts. The independent domain-target audit
+  reproduced 742 candidate posts; all remain explicit-review items and no V2
+  or live data was modified.
+
 - 2026-09-01: Post-push runtime revalidation passed all 34 declared frontend
   routes and all MCP wire checks (CORS, protocol negotiation, 18-tool catalog,
   invalid-Origin rejection and initialized notification); the smoke commands

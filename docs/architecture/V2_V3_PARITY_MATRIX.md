@@ -75,6 +75,9 @@ The latest read-only revalidation still reports MCP wire smoke PASS, frontend
 route smoke 34/34, dry-run 3,961 mapped / 1,012 skipped / 0 conflicts and 742
 domain-target candidates requiring explicit mapping evidence.
 
+The retained full V2 export independently reproduces those no-write totals and
+the 742-candidate audit; no V2/live records were changed.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 

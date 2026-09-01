@@ -12,6 +12,11 @@ opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 Post-push read-only runtime revalidation again passed all 34 frontend routes
 and the complete MCP wire smoke; no database state changed.
 
+The retained full V2 export was independently re-run through the no-write
+dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
+skipped, 0 conflicts and 742 explicit mapping-review candidates. No V2/live
+data was modified.
+
 The latest domain checkpoint also rejects malformed optional Governance
 proposal `targetUuid` values before persistence while retaining semantic
 subject IDs.

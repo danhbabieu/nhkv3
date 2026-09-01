@@ -106,6 +106,10 @@ remain green (34/34 routes); the current dry-run remains 3,961 mapped / 1,012
 skipped / 0 conflicts, with 742 domain-target candidates awaiting governed
 decisions.
 
+An independent no-write rerun against the retained full V2 export reproduced
+those migration totals and the 742-candidate domain audit; no V2/live data was
+modified.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge
