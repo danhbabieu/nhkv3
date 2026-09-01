@@ -45,6 +45,12 @@ for each skipped record (target boundary, identity proof, relation shape,
 migration action and retirement rule); this remains read-only acceptance
 evidence and does not apply any mapping or retirement.
 
+The structural evidence matrix now records V2→V3 concept boundaries,
+relation direction/cardinality and Odo/Vedette multi-brand fixtures. It
+distinguishes `AUTO_RESOLVABLE`, `EVIDENCE_RESOLVABLE`, `RULE_RESOLVABLE`,
+`AMBIGUOUS_REQUIRES_HUMAN`, `DEFERRED` and `RETIRE`; only the ambiguous
+case-level class is human-blocked.
+
 MCP now has a tested read-only semantic-context resolver exposed as
 `nhk.semantic.resolve`, with canonical UUID, stable-key and exact name/alias
 matching plus fail-closed ambiguity reporting; local wire evidence and

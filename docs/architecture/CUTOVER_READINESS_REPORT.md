@@ -48,6 +48,12 @@ identity proof, relation shape, migration action and retirement rule. This is
 structural-gate evidence only; no mapping, relation, redirect or retirement is
 applied.
 
+Structural evidence is now recorded separately in
+`V2_STRUCTURAL_MAPPING_EVIDENCE_2026-09-01.md`, including the canonical target
+boundary, relation direction/cardinality rules, Odo and Vedette fixtures, and
+resolution classes. This narrows human review to case-level ambiguity after
+deterministic UUID/stable-key/explicit-relation checks; it does not apply data.
+
 A read-only MCP semantic-context resolver now enforces the match order
 canonical UUID, stable key, then exact name/alias, while returning ambiguities
 as candidates and avoiding auto-resolution. It is exposed through the
