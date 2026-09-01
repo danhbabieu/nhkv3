@@ -124,7 +124,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('$reason === \'RETIRED_LEGACY_GARBAGE\'', $admin);
         self::assertStringContainsString('Explicit mapping required', $admin);
         self::assertStringContainsString('Review action', $admin);
-        foreach (['aria-labelledby="nhk-entity-lookup-heading"', 'for="nhk-entity-type"', 'for="nhk-entity-key"', 'for="nhk-proposal-id"', 'aria-describedby="nhk-proposal-composer-help"', 'id="nhk-source-key"', 'id="nhk-target-key"', 'for="nhk-semantic-id"', 'id="nhk-graph-endpoint-key"', 'id="nhk-video-url"', 'value="video"', 'value="knowledge"', 'value="source"', 'value="evidence"', 'aria-live="polite"'] as $contract) {
+        foreach (['aria-labelledby="nhk-entity-lookup-heading"', 'for="nhk-entity-type"', 'for="nhk-entity-key"', 'for="nhk-proposal-id"', 'aria-describedby="nhk-proposal-composer-help"', 'id="nhk-source-key"', 'id="nhk-target-key"', 'for="nhk-semantic-id"', 'id="nhk-graph-endpoint-key"', 'id="nhk-video-url"', 'value="video"', 'value="knowledge"', 'value="source"', 'value="evidence"', 'value="knowledge/evidence"', 'aria-live="polite"'] as $contract) {
             self::assertStringContainsString($contract, $admin);
         }
         self::assertStringContainsString("echo '<option value=\"video\">video</option>';", $admin);
