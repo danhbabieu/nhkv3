@@ -26,6 +26,20 @@ Evidence was collected with limits of at most 10 Media and 5 Source/Video
 records per call. The calls were read-only and reported zero writes where the
 adapter exposes a write counter.
 
+## Canonical identity cross-check
+
+Read-only calls by canonical ID confirmed that three external Media records
+(`839ba38c-d60e-4029-ad90-245bd73a267a`,
+`6c1783b3-d49e-4664-bec0-256d91db79b9` and
+`11f5eb62-076e-44b6-a34a-740963e5c50c`) resolve to the same canonical IDs in
+the local V3 database. Local public REST returns `404 nhk_media_not_found` for
+all three because their parent Media is draft and/or the processed asset is
+not currently deliverable; this is the intended V3 fail-closed policy, not an
+identity mismatch. The external adapter exposes the records as PRIVATE with
+ready processed assets, so its richer response cannot be forwarded directly to
+the V3 public serializer. The source/usage mapping and explicit policy for
+bridging this state remain open.
+
 ## Local V3 wire probe
 
 The local V3 endpoint was also probed with standard Streamable HTTP JSON-RPC:

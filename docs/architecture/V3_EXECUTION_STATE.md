@@ -44,6 +44,13 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
   because the export lacks a legacy-post identity link and governed approval.
   No URL, body or semantic identity was changed.
 
+- 2026-09-01: External MCP canonical-ID cross-check resolved three Media IDs
+  in both the external adapter and local V3 database. Local public REST
+  returned the expected fail-closed 404 for each because the parent Media is
+  draft or its processed asset is not deliverable; this is a policy gate, not
+  an identity mismatch. The external adapter still exposes richer PRIVATE
+  payloads, so wire-level mapping/deployment parity remains open.
+
 - 2026-09-01: Read-only V2 REST metadata cross-check covered all 18 available
   attachment IDs and matched API MIME/filesize to the observed bytes; it
   exposed no deterministic usage mapping for 15 candidates (`post=null`),
