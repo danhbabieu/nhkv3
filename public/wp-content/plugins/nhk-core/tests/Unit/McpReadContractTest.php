@@ -93,6 +93,9 @@ final class McpReadContractTest extends TestCase
         self::assertArrayNotHasKey('endpoint_type', $mediaRead['usages'][0]);
         $videoRead = $handler->videoGet($mcpVideo->canonicalId);
         self::assertArrayNotHasKey('metadata', $videoRead);
+        self::assertArrayNotHasKey('thumbnail_media_id', $videoRead);
+        self::assertArrayNotHasKey('active', $videoRead);
+        self::assertArrayNotHasKey('revision', $videoRead);
         $knowledgeRead = $handler->knowledgeGet($mcpClaim->canonicalId);
         self::assertArrayNotHasKey('provenance', $knowledgeRead);
         self::assertArrayNotHasKey('metadata', $knowledgeRead['evidence'][0]);

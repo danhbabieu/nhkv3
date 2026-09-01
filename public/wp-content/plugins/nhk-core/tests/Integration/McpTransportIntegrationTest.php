@@ -216,6 +216,9 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame($video->canonicalId, $read->get_data()['id']);
             self::assertSame($videoId, $read->get_data()['external_id']);
             self::assertArrayNotHasKey('metadata', $read->get_data());
+            self::assertArrayNotHasKey('thumbnail_media_id', $read->get_data());
+            self::assertArrayNotHasKey('active', $read->get_data());
+            self::assertArrayNotHasKey('revision', $read->get_data());
         } finally {
             wp_set_current_user($previousUser);
         }

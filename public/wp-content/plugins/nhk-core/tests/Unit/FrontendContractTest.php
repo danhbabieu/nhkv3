@@ -362,7 +362,15 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('fn (Media $item): bool => $item->active && $item->readiness === \'ready\' &&', $searchApi);
         self::assertStringContainsString('fn (Video $item): bool => $item->active && $item->hasValidPublicReference() &&', $searchApi);
         self::assertStringContainsString('hasValidPublicReference()', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php'));
-        self::assertStringContainsString('hasValidPublicReference()', (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php'));
+        $readApiSource = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        self::assertStringContainsString('hasValidPublicReference()', $readApiSource);
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        $mcpRead = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php');
+        $videoMethod = substr($readApi, strpos($readApi, 'private function video'), strpos($readApi, 'private function claim') - strpos($readApi, 'private function video'));
+        self::assertStringNotContainsString("'thumbnail_media_id' => \$video->thumbnailMediaId", $videoMethod);
+        self::assertStringNotContainsString("'active' => \$video->active", $videoMethod);
+        self::assertStringNotContainsString("'revision' => \$video->revision", $videoMethod);
+        self::assertStringNotContainsString("'thumbnail_media_id' => \$video->thumbnailMediaId", $mcpRead);
     }
 
     public function test_raw_graph_rest_reads_are_admin_only(): void

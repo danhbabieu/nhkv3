@@ -48,7 +48,7 @@ final class McpReadHandler
     {
         if (!$this->ready('video')) return null;
         $video = $this->videos->findByCanonicalId($id);
-        return $video && $video->active && $video->hasValidPublicReference() ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title, 'thumbnail_media_id' => $video->thumbnailMediaId, 'active' => $video->active, 'revision' => $video->revision] : null;
+        return $video && $video->active && $video->hasValidPublicReference() ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title] : null;
     }
 
     public function knowledgeGet(string $id): ?array
