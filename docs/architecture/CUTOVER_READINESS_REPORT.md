@@ -72,6 +72,10 @@ Governance Proposal and ApplyAttempt reads now also omit out-of-range persisted
 numeric states instead of coercing them to defaults; current verification is
 Unit 141/852 and Integration 88/478 (229/1,330 combined).
 
+Authority, Media, Video and Knowledge hydrators also validate the raw persisted
+state representation before casting, preventing malformed values from being
+silently interpreted as active or retired records.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

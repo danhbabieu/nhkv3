@@ -19,6 +19,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Persistence hydrators now validate raw numeric state values
+  before casting: non-domain values cannot silently become RETIRED or ACTIVE
+  records. Authority, Media, Video, Source, Knowledge Claim and Evidence
+  reads now omit malformed state rows. Unit verification remains 141 tests /
+  852 assertions and guarded integration is 88 tests / 478 assertions.
+
 - 2026-09-01: Closed the Governance state hydration boundary: out-of-range
   persisted numeric states for ApplyAttempt and Proposal are now omitted
   rather than silently coerced to a default state. Current verification is

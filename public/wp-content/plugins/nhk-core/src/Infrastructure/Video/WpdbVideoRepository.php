@@ -80,6 +80,7 @@ final class WpdbVideoRepository implements VideoRepository
         }
         if (!is_array($metadata)) return null;
         try {
+            if (preg_match('/^[01]$/', (string) ($row['state'] ?? '')) !== 1) return null;
             return new Video(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['platform'], (string) $row['external_video_id'], (string) $row['canonical_url'], (string) $row['title'], $metadata, $row['thumbnail_media_uuid'] === null ? null : UuidCodec::fromBinary($row['thumbnail_media_uuid']), (int) $row['state'] === 1, (int) $row['revision']);
         } catch (\Throwable) {
             return null;

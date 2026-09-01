@@ -33,6 +33,10 @@ Governance Proposal and ApplyAttempt reads also omit out-of-range persisted
 numeric states instead of coercing them to defaults; current combined
 verification is 229 tests / 1,330 assertions.
 
+Raw persisted state validation is strict across Authority, Media, Video and
+Knowledge hydrators; malformed values are omitted before public or governed
+domain consumption.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 

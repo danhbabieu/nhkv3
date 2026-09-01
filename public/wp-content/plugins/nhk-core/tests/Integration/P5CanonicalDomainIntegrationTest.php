@@ -153,8 +153,9 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
 
         try {
             $wpdb->query($wpdb->prepare(
-                'UPDATE ' . $wpdb->prefix . 'nhk_entities SET revision=%d WHERE canonical_uuid=%s',
-                0,
+                'UPDATE ' . $wpdb->prefix . 'nhk_entities SET state=%d, revision=%d WHERE canonical_uuid=%s',
+                2,
+                1,
                 \NHK\Core\Shared\Uuid\UuidCodec::toBinary($entity->canonicalId)
             ));
 

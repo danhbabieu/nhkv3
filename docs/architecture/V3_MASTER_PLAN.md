@@ -76,6 +76,10 @@ Governance Proposal and ApplyAttempt hydration now also omits out-of-range
 numeric state rows instead of coercing them to defaults; latest combined
 verification is 229 tests / 1,330 assertions.
 
+Raw numeric state validation is now strict across Authority, Media, Video and
+Knowledge persistence hydrators; malformed state values are omitted before
+domain construction.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge
