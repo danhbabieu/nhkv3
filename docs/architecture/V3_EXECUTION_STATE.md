@@ -10,7 +10,7 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
 | Tests | Unit suite: 129 tests, 804 assertions; guarded WordPress integration: 59 tests, 425 assertions; combined current suite: 188 tests, 1,229 assertions; Composer PHP lint, MCP wire smoke, core route smoke 30/30 and opt-in real Authority detail route smoke 35/35 pass; browser public-language/SEO and responsive route sweep remains recorded below |
-| Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
+| Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,961 rows and skipped 1,012 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
@@ -18,6 +18,14 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Read-only V2 endpoint recovery audit found 18/21 exact legacy
+  upload paths returning HTTP 200 with allowlisted image MIME/size and three
+  `wp1-thumbnail-*` paths returning 404. Temporary downloads were hashed for
+  evidence and removed; no bytes, identities, mappings or publication state
+  were written to V3. The candidates and SHA-256 values are recorded in
+  `V2_MEDIA_SOURCE_RECOVERY_AUDIT_2026-09-01.md`; governed MediaAsset mapping,
+  usage resolution, backup/restore and privacy approval remain required.
 
 - 2026-09-01: A fresh HTTP route sweep passed 35/35 using active local-dev
   stable keys for Brand `nhk:brand:junghans`, Model `nhk:model:ffr.69`,
@@ -412,11 +420,12 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
   value and keeping archived/retired Source/Evidence inactive. Full guarded
   PHPUnit passed 158 tests/979 assertions; no V2/live data changed.
 
-- 2026-09-01: Read-only MediaAsset recovery audit confirmed that the V2
-  storage root recorded by all three imported assets is absent on the current
-  host, and exact legacy filenames are absent from the V3 upload root and known
-  local artifact root. No byte/checksum evidence exists for a governed mapping;
-  public delivery remains fail-closed and no asset was rewritten or published.
+- 2026-09-01: The earlier local-filesystem MediaAsset audit confirmed that the
+  V2 storage root recorded by all three imported assets is absent on the current
+  host and that no exact legacy filename exists in the V3 upload root or known
+  local artifact root. A later read-only V2 endpoint audit found 18/21 paths
+  available, but this still provides no governed identity/usage mapping; public
+  delivery remains fail-closed and no asset was rewritten or published.
 
 - 2026-09-01: Source/Evidence migration now retains top-level V2
   `review_state` inside the durable metadata envelope as well as using it to

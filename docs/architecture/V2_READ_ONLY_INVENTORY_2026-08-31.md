@@ -91,6 +91,11 @@ were also checked for the exact legacy filenames from the 21 attachment URL
 records and the three imported MediaAsset storage keys; no matching source file
 was found. This is evidence that the bytes are unavailable in the current
 workspace, not permission to infer, re-encode, publish or replace any asset.
+This local-filesystem result does not establish that the public V2 endpoint is
+empty: a later read-only HTTP audit found 18 of the 21 exact upload paths
+available on `demo.1945.vn` and three `wp1-thumbnail-*` paths returning 404.
+Those endpoint responses are recovery candidates only; their status, MIME,
+size and hashes are recorded in `V2_MEDIA_SOURCE_RECOVERY_AUDIT_2026-09-01.md`.
 Read-only projection metadata analysis found 776 `_nhk_projection_source_id`
 links, all matching canonical entity UUIDs: 370 active Authority entities,
 292 active Knowledge claims and 80 archived Knowledge claims. Mapper 6.14 now

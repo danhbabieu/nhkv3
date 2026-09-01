@@ -142,10 +142,13 @@ Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
   checksum and byte-size verification cannot pass. The public asset route also
   requires the parent Media identity to be active and `readiness=ready`. No asset was published or
   rewritten as a workaround.
-- A follow-up read-only host audit found the referenced V2 root absent and no
-  exact legacy filenames in the known V3 upload or local artifact roots; this
-  confirms missing bytes rather than a safe mapping opportunity. Asset delivery
-  remains fail-closed pending source recovery and governed privacy approval.
+- A follow-up read-only endpoint audit found 18 of the 21 exact legacy upload
+  paths available on `demo.1945.vn` with allowlisted image MIME/size and three
+  `wp1-thumbnail-*` paths returning 404. The available bytes are recovery
+  candidates, not governed mappings: identity/usage, backup/restore and
+  publication/privacy approval remain open. The complete status and hashes are
+  recorded in `V2_MEDIA_SOURCE_RECOVERY_AUDIT_2026-09-01.md`; asset delivery
+  remains fail-closed.
 - Migration009 preserves all 1,581 legacy semantic projections as bounded,
   non-canonical context metadata with provenance and `body_migrated=false`;
   projection bodies are rejected and no Authority, Knowledge or WordPress
