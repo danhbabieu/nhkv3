@@ -31,6 +31,12 @@ quick-view rhythm; no branding or implementation was copied.
 Latest P11 persistence evidence also covers fail-closed KnowledgeClaim
 provenance hydration; guarded integration is 75 tests / 449 assertions.
 
+Current verification supersedes the historical count above: guarded integration
+is 94 tests / 512 assertions and combined coverage is 242 tests / 1,418
+assertions. Video migration now canonicalizes supported YouTube URL forms and
+records URL/external-ID disagreement as a reason-coded conflict before
+persistence.
+
 The persistence hydration boundary now also covers malformed Authority,
 Knowledge Source/Claim/Evidence and MediaUsage domain rows; current combined
 verification is 228 tests / 1,328 assertions. This hardening does not change
