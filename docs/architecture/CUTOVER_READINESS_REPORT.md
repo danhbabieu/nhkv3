@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 93 tests/509 assertions (241
-tests/1,415 assertions combined);
+Latest verification: guarded WordPress suite 94 tests/512 assertions (242
+tests/1,418 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -25,9 +25,8 @@ remains data-gated.
 
 The migration boundary now canonicalizes supported YouTube URL forms before
 Video persistence and records URL/external-ID disagreement as a reason-coded
-conflict. Unit verification passed 148 tests/906 assertions. The targeted
-guarded integration retry could not reach PHPUnit because the WordPress
-runtime failed to establish its test database connection.
+conflict. The new migration regression is covered by the guarded suite; full
+verification is now 242 tests/1,418 assertions.
 
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
