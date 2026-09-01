@@ -4,7 +4,7 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 176 tests/1,145 assertions;
+Latest verification: guarded WordPress suite 176 tests/1,146 assertions;
 Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
 
 ## What is ready
@@ -77,10 +77,10 @@ Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
   metadata and Graph endpoint identifiers while retaining display facts; image
   assets now receive a reader-safe `/media/asset/{uuid}/` URL and render lazily
   through the public theme.
-- Responsive archive/detail/search QA now confirms editorial/entity/media/
-  knowledge/semantic cards and footer links use the NHK palette instead of
-  browser-default blue, with visible accent-secondary hover/focus states;
-  stylesheet cache-busting is synchronized.
+- Responsive archive/detail/search QA now confirms public anchors, editorial/
+  entity/media/knowledge/semantic cards and footer links use the NHK palette
+  instead of browser-default blue, with visible accent-secondary hover/focus
+  states; stylesheet cache-busting is synchronized.
 - Public REST semantic search now excludes retired Media and Video records
   from both result groups and totals; guarded runtime coverage verifies this
   with disposable integration fixtures.
@@ -182,7 +182,7 @@ Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
   archive metadata.
 - Theme design tokens now have one NHK source; the legacy token/rule block was
   removed, contract coverage checks all 11 required tokens, the asset version
-  is synchronized to 1.1.7, and cache-busting browser verification confirms no
+  is synchronized to 1.1.8, and cache-busting browser verification confirms no
   legacy tokens or horizontal overflow.
 - Blank or whitespace-only semantic searches now fail closed instead of
   matching every record; unit regression and browser verification of `/?s=`
@@ -206,7 +206,7 @@ Composer lint, MCP wire smoke and route smoke 30/30 pass; diff check is clean.
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 119 tests, 741 assertions |
+| Unit tests | PASS — 119 tests, 742 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |

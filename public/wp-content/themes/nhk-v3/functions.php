@@ -28,7 +28,7 @@ function nhk_v3_allow_semantic_search_pages(mixed $handled, \WP_Query $query): m
 }
 add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2);
 
-function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.1.7'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.2'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); }
+function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.1.8'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.2'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); }
 add_action('wp_enqueue_scripts', 'nhk_v3_assets');
 
 function nhk_v3_nav_fallback(): void
