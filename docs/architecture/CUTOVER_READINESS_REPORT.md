@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 87 tests/476 assertions (228
-tests/1,328 assertions combined);
+Latest verification: guarded WordPress suite 88 tests/478 assertions (229
+tests/1,330 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -67,6 +67,10 @@ Source/Claim/Evidence and MediaUsage as well: malformed UUID, state, revision,
 relation and endpoint/domain rows are omitted from repository reads and
 collections. Latest verification is Unit 141/852 and Integration 87/476
 (228/1,328 combined).
+
+Governance Proposal and ApplyAttempt reads now also omit out-of-range persisted
+numeric states instead of coercing them to defaults; current verification is
+Unit 141/852 and Integration 88/478 (229/1,330 combined).
 
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,

@@ -28,7 +28,10 @@ final class WpdbProposalRepository implements ProposalRepository
     private function hydrate(?array $row): ?Proposal {
         if (!$row) return null;
         try {
-            $state = ProposalState::cases()[max(0, (int) $row['state'] - 1)] ?? ProposalState::DRAFT;
+            $stateValue = (int) $row['state'];
+            $states = ProposalState::cases();
+            if ($stateValue < 1 || $stateValue > count($states)) return null;
+            $state = $states[$stateValue - 1];
             $targetBinary = (string) ($row['target_uuid'] ?? '');
             $target = $targetBinary !== '' && trim($targetBinary, "\0") !== '' ? UuidCodec::fromBinary($targetBinary) : null;
             $decisionActor = null;

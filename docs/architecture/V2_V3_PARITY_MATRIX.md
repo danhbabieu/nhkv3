@@ -29,6 +29,10 @@ Knowledge Source/Claim/Evidence and MediaUsage domain rows; current combined
 verification is 228 tests / 1,328 assertions. This hardening does not change
 the separate V2 data/publication gates below.
 
+Governance Proposal and ApplyAttempt reads also omit out-of-range persisted
+numeric states instead of coercing them to defaults; current combined
+verification is 229 tests / 1,330 assertions.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 

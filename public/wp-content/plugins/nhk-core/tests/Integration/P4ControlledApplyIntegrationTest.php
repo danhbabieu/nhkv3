@@ -107,6 +107,28 @@ final class P4ControlledApplyIntegrationTest extends TestCase
         }
     }
 
+    public function test_governance_repositories_omit_out_of_range_state_rows(): void
+    {
+        global $wpdb;
+        $proposal = new Proposal(UuidCodec::newV7(), 'invalid-state', 'rename', ['name' => 'x'], str_repeat('2', 64), 1, 'deps', ProposalState::DRAFT, '1', null, null, 'invalid-state-' . bin2hex(random_bytes(4)), 1, null, null, null, 'brand');
+        $proposalRepository = new WpdbProposalRepository($wpdb);
+        $proposal = (new GovernanceService($proposalRepository, new WpdbAuditSink(), new WpdbTransactionManager()))->create($proposal);
+        $attemptRepository = new WpdbApplyAttemptRepository($wpdb);
+        $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposal->id, 1, 'running');
+
+        try {
+            $attemptRepository->createRunning($attempt);
+            $wpdb->query($wpdb->prepare('UPDATE ' . $wpdb->prefix . 'nhk_apply_attempts SET state=%d WHERE attempt_uuid=%s', 9, UuidCodec::toBinary($attempt->id)));
+            $wpdb->query($wpdb->prepare('UPDATE ' . $wpdb->prefix . 'nhk_proposals SET state=%d WHERE proposal_uuid=%s', 99, UuidCodec::toBinary($proposal->id)));
+
+            self::assertSame([], $attemptRepository->findByProposal($proposal->id));
+            self::assertNull($proposalRepository->find($proposal->id));
+        } finally {
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_apply_attempts WHERE attempt_uuid=%s', UuidCodec::toBinary($attempt->id)));
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_proposals WHERE proposal_uuid=%s', UuidCodec::toBinary($proposal->id)));
+        }
+    }
+
     public function test_proposal_repository_preflight_is_idempotent_and_rejects_changed_content(): void
     {
         global $wpdb;

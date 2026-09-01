@@ -72,6 +72,10 @@ Authority, Knowledge Source/Claim/Evidence and MediaUsage domain rows; latest
 verification is 141 Unit tests / 852 assertions and 87 guarded Integration
 tests / 476 assertions (228 / 1,328 combined).
 
+Governance Proposal and ApplyAttempt hydration now also omits out-of-range
+numeric state rows instead of coercing them to defaults; latest combined
+verification is 229 tests / 1,330 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge
