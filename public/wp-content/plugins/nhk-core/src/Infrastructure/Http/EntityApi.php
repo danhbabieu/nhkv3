@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Http;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EntityApi
 {
@@ -22,6 +23,7 @@ final class EntityApi
         if ($error = $this->unavailable()) return $error;
         $type = (string) $request['type'];
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
+        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_entity_not_found', 'Entity was not found.', ['status' => 404]);
         $entity = $this->authority->findByCanonicalId((string) $request['id']);
         if (!$entity || $entity->entityType !== $type || !$entity->active()) return new \WP_Error('nhk_entity_not_found', 'Entity was not found.', ['status' => 404]);
         return $this->serialize($entity);

@@ -166,6 +166,12 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         }
     }
 
+    public function test_entity_rest_detail_fails_closed_for_uuid_shaped_but_invalid_id(): void
+    {
+        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/00000000-0000-0000-0000-000000000000'));
+        self::assertSame(404, $response->get_status());
+    }
+
     public function test_authority_repository_rejects_duplicate_identity_with_changed_state(): void
     {
         $repository = new WpdbAuthorityRepository();

@@ -10,6 +10,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 
 final class ReadApi
@@ -28,6 +29,7 @@ final class ReadApi
     private function media(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->mediaStorageReady(), 'media')) return $error;
+        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
         $media = $this->media->findByCanonicalId((string) $request['id']);
         if (!$media || !$media->active || $media->readiness !== 'ready') return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
         $assets = array_values(array_filter($this->assets->listByMediaId($media->canonicalId), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
@@ -37,6 +39,7 @@ final class ReadApi
     private function video(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->videoStorageReady(), 'video')) return $error;
+        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
         $video = $this->videos->findByCanonicalId((string) $request['id']);
         if (!$video || !$video->active || !$video->hasValidPublicReference()) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
         return ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title];
@@ -45,6 +48,7 @@ final class ReadApi
     private function claim(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
+        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
         $claim = $this->claims->findByCanonicalId((string) $request['id']);
         if (!$claim || !$claim->active || !$claim->isPublic()) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
         return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map($this->evidence(...), $this->publicEvidenceByClaim($claim->canonicalId))];
@@ -53,6 +57,7 @@ final class ReadApi
     private function source(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
+        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
         $source = $this->sources->findByCanonicalId((string) $request['id']);
         if (!$source || !$source->active || !$source->isPublic()) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
         return ['id' => $source->canonicalId, 'stable_key' => $source->stableKey, 'title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'evidence' => array_map($this->evidence(...), array_values(array_filter($this->evidence->listBySource($source->canonicalId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $claim = $this->claims->findByCanonicalId($item->claimId); return $claim !== null && $claim->active && $claim->isPublic(); })) )];
@@ -61,6 +66,7 @@ final class ReadApi
     private function evidenceRead(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
+        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_evidence_not_found', 'Evidence was not found.', ['status' => 404]);
         $item = $this->evidence->findByCanonicalId((string) $request['id']);
         if (!$item || !$item->active || !$item->isPublic()) return new \WP_Error('nhk_evidence_not_found', 'Evidence was not found.', ['status' => 404]);
         $claim = $this->claims->findByCanonicalId($item->claimId);

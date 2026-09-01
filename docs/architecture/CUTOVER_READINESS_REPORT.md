@@ -4,14 +4,18 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 88 tests/478 assertions (229
-tests/1,330 assertions combined);
+Latest verification: guarded WordPress suite 89 tests/479 assertions (231
+tests/1,334 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
 The latest domain checkpoint also rejects malformed optional Governance
 proposal `targetUuid` values before persistence while retaining semantic
 subject IDs.
+
+The public UUID boundary is now shared across REST, MCP, theme detail queries
+and asset delivery. UUID-shaped but invalid inputs fail closed as 404/empty
+responses before WPDB conversion.
 
 The current KnowledgeClaim hydration checkpoint brings the guarded suite to
 75 integration tests / 449 assertions (215 tests / 1,295 assertions combined).

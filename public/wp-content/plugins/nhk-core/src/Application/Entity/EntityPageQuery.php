@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EntityPageQuery
 {
@@ -14,6 +15,7 @@ final class EntityPageQuery
     public function detail(string $type, string $key): ?array
     {
         if (!$this->types->has($type) || !$this->available()) return null;
+        if (preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 && !UuidCodec::isValid($key)) return null;
         $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
         if (!$entity || $entity->entityType !== $type || !$entity->active()) return null;
         $serialized = $this->serialize($entity); $serialized['related'] = $this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];

@@ -12,6 +12,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 
 final class McpReadHandler
@@ -32,14 +33,14 @@ final class McpReadHandler
 
     public function entityGet(string $type, string $id): ?array
     {
-        if (!$this->types->has($type) || !$this->ready('authority')) return null;
+        if (!$this->types->has($type) || !$this->ready('authority') || !UuidCodec::isValid($id)) return null;
         $entity = $this->authority->findByCanonicalId($id);
         return $entity && $entity->entityType === $type && $entity->active() ? $this->entity($entity) : null;
     }
 
     public function mediaGet(string $id): ?array
     {
-        if (!$this->ready('media')) return null;
+        if (!$this->ready('media') || !UuidCodec::isValid($id)) return null;
         $media = $this->media->findByCanonicalId($id);
         if (!$media || !$media->active || $media->readiness !== 'ready') return null;
         $assets = array_values(array_filter($this->assets->listByMediaId($id), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
@@ -48,21 +49,21 @@ final class McpReadHandler
 
     public function videoGet(string $id): ?array
     {
-        if (!$this->ready('video')) return null;
+        if (!$this->ready('video') || !UuidCodec::isValid($id)) return null;
         $video = $this->videos->findByCanonicalId($id);
         return $video && $video->active && $video->hasValidPublicReference() ? ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title] : null;
     }
 
     public function knowledgeGet(string $id): ?array
     {
-        if (!$this->ready('knowledge')) return null;
+        if (!$this->ready('knowledge') || !UuidCodec::isValid($id)) return null;
         $claim = $this->claims->findByCanonicalId($id);
         return $claim && $claim->active && $claim->isPublic() ? ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map($this->publicEvidence(...), $this->publicEvidenceByClaim($id))] : null;
     }
 
     public function sourceGet(string $id): ?array
     {
-        if (!$this->ready('knowledge') || $this->sources === null) return null;
+        if (!$this->ready('knowledge') || $this->sources === null || !UuidCodec::isValid($id)) return null;
         $source = $this->sources->findByCanonicalId($id);
         if (!$source || !$source->active || !$source->isPublic()) return null;
         $evidence = array_values(array_filter($this->evidence->listBySource($id), function (Evidence $item): bool {
@@ -75,7 +76,7 @@ final class McpReadHandler
 
     public function evidenceGet(string $id): ?array
     {
-        if (!$this->ready('knowledge') || $this->sources === null) return null;
+        if (!$this->ready('knowledge') || $this->sources === null || !UuidCodec::isValid($id)) return null;
         $item = $this->evidence->findByCanonicalId($id);
         if (!$item || !$item->active || !$item->isPublic()) return null;
         $claim = $this->claims->findByCanonicalId($item->claimId);

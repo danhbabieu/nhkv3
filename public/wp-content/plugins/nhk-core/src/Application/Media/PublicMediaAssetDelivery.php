@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Media;
 use NHK\Core\Contracts\Media\MediaAssetRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Domain\Media\MediaAsset;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class PublicMediaAssetDelivery
 {
@@ -29,6 +30,7 @@ final class PublicMediaAssetDelivery
     /** @return array{asset:MediaAsset,path:string}|null */
     public function resolve(string $assetId): ?array
     {
+        if (!UuidCodec::isValid($assetId)) return null;
         $asset = $this->assets->findByAssetId($assetId);
         if (!$asset || $asset->visibility !== 'PUBLIC' || !in_array(strtolower($asset->mimeType), self::SAFE_MIME_TYPES, true)) return null;
         $media = $this->media->findByCanonicalId($asset->mediaId);
