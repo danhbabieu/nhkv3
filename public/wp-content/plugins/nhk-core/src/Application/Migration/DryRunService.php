@@ -94,6 +94,7 @@ final class DryRunService
         if (isset($record['canonical_uuid']) && !UuidCodec::isValid((string) $record['canonical_uuid'])) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         if ((string) ($record['stable_key'] ?? '') === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         if ($type === 'video') {
+            if (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid'])) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
             $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
             $platform = strtolower(trim((string) ($metadata['platform'] ?? 'youtube')));
             $url = trim((string) ($metadata['canonical_url'] ?? $metadata['url'] ?? $metadata['source_url'] ?? ''));

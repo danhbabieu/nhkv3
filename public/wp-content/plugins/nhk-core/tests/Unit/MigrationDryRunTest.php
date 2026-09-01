@@ -49,6 +49,18 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('CONFLICT_REQUIRES_REVIEW', $report['items'][1]['reason']);
     }
 
+    public function test_video_dry_run_requires_the_same_canonical_uuid_as_apply(): void
+    {
+        $report = (new DryRunService())->run([[
+            'type' => 'video',
+            'stable_key' => 'video-missing-uuid',
+            'metadata' => ['canonical_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+        ]]);
+
+        self::assertSame(1, $report['skipped']);
+        self::assertSame('INVALID_IDENTITY', $report['items'][0]['reason']);
+    }
+
     public function test_nil_canonical_uuid_is_skipped_with_bounded_reason(): void
     {
         $report = (new DryRunService())->run([['type' => 'brand', 'stable_key' => 'odo', 'canonical_uuid' => '00000000-0000-0000-0000-000000000000']]);

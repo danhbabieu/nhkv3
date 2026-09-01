@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 94 tests/512 assertions (243
-tests/1,422 assertions combined);
+Latest verification: guarded WordPress suite 94 tests/512 assertions (244
+tests/1,424 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -25,9 +25,9 @@ remains data-gated.
 
 The migration boundary now canonicalizes supported YouTube URL forms before
 Video persistence and records URL/external-ID disagreement as a reason-coded
-conflict. The dry-run regression is covered by the unit suite and the migration
-regression by the guarded suite; full verification is now 243 tests/1,422
-assertions.
+conflict, and dry-run now requires the same canonical UUID boundary. The dry-run
+regression is covered by the unit suite and the migration regression by the
+guarded suite; full verification is now 244 tests/1,424 assertions.
 
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
@@ -359,7 +359,7 @@ and active-data parity therefore remain explicit gates.
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 149 tests, 910 assertions |
+| Unit tests | PASS — 150 tests, 912 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
@@ -371,7 +371,7 @@ and active-data parity therefore remain explicit gates.
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 Current quality-count supersession: guarded integration is 94 tests / 512
-assertions and the combined suite is 243 tests / 1,422 assertions. The longer
+assertions and the combined suite is 244 tests / 1,424 assertions. The longer
 integration row above retains the detailed historical coverage description; this
 checkpoint count is authoritative.
 
