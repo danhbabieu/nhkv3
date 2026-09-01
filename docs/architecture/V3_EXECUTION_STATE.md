@@ -14,6 +14,13 @@ Graph edge or legacy data was changed. Staging synchronization remains blocked
 until server shell access is available; the unrelated server
 `public/error_log` must be preserved.
 
+Latest local P0 evidence: Unit suite 165 tests / 982 assertions; Composer PHP
+lint and `git diff --check` pass. `composer preflight` exits 1 as designed:
+Git HEAD, composer.lock, root autoload, Symfony UID and NHK runtime classes pass;
+WordPress bootstrap, schema, Authority hydration and REST checks fail because
+the local WordPress database is unavailable. No database or semantic data was
+changed. Origin push and staging deployment remain pending external access.
+
 The repository now tracks the runtime-safe `config/application.php` required
 by the staging `public/wp-config.php` bootstrap. It reads deployment values and
 secrets from the process environment, fails closed when required values are

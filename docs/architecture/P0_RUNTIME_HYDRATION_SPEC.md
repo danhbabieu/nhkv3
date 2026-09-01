@@ -33,9 +33,11 @@ programming failures surface explicitly instead of becoming an empty result.
 
 `WpdbAuthorityRepository::listByType()` continues to return only valid active
 domain objects (or valid retired objects when requested). It delegates row
-decoding to an explicit hydrator. The hydrator accepts a row and returns either
-an `AuthorityEntity` or a row-level failure result; it never catches
-`Throwable` broadly.
+decoding to an explicit hydrator. The hydrator accepts a row and returns an
+`AuthorityEntity`, throwing the explicit `MalformedAuthorityRow` exception for
+row-level failure; it never catches `Throwable` broadly. Collection callers
+omit that exception and may record its bounded reason code, while programming
+and infrastructure failures propagate.
 
 The parity audit consumes `EntityTypeRegistry::all()` and returns a list of
 records shaped as:

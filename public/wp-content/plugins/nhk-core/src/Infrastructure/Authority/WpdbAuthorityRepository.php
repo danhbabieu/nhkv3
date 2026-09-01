@@ -7,7 +7,7 @@ use NHK\Core\Authority\Exception\{AuthorityRevisionConflict,StableKeyCollision};
 use NHK\Core\Shared\Uuid\UuidCodec;
 final class WpdbAuthorityRepository implements AuthorityRepository {
  private AuthorityRowHydrator $hydrator;
- /** @param callable(string, string|null): void|null $rowErrorSink */
+ /** @param callable(string, string|null, array|null): void|null $rowErrorSink */
  public function __construct(mixed $hydrator=null, private $rowErrorSink=null){$this->hydrator=$hydrator instanceof AuthorityRowHydrator?$hydrator:new AuthorityRowHydrator();}
  private function table():string{global $wpdb;return $wpdb->prefix.'nhk_entities';}
  private function row(?array $r):?AuthorityEntity{if(!$r)return null;try{return $this->hydrator->hydrate($r);}catch(MalformedAuthorityRow $error){if(is_callable($this->rowErrorSink))($this->rowErrorSink)($error->reasonCode,$error->stableKey,$r);return null;}}

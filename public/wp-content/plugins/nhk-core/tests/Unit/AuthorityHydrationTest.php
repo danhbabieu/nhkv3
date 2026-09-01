@@ -43,6 +43,16 @@ final class AuthorityHydrationTest extends TestCase
         $hydrator->hydrate($this->row('018f0f4e-7b4d-7c72-9b18-5c2b3f3d6f11', 'brand', 'valid-brand', 'Valid Brand'));
     }
 
+    public function test_malformed_json_has_a_precise_row_reason_code(): void
+    {
+        $row = $this->row('018f0f4e-7b4d-7c72-9b18-5c2b3f3d6f11', 'brand', 'broken-json', 'Broken JSON');
+        $row['payload'] = '{';
+
+        $result = (new AuthorityRowHydrator())->hydrateMany([$row]);
+
+        self::assertSame('INVALID_JSON', $result['errors'][0]['reason_code']);
+    }
+
     private function row(string $uuid, string $type, string $key, string $name): array
     {
         return [
