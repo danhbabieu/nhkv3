@@ -242,7 +242,7 @@ function nhk_v3_seo_head(): void
     if (is_array($context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => nhk_v3_entity_label((string) ($context['type'] ?? '')), 'item' => home_url('/' . (string) ($context['type'] ?? '') . '/')];
     if (is_array($media_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Thư viện media', 'item' => home_url('/thu-vien/')];
     if (is_array($video_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Video', 'item' => home_url('/video/')];
-    if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/knowledge/')];
+    if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/tri-thuc/')];
     if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/comparison/')];
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";

@@ -1,6 +1,6 @@
 <?php
 $context = $GLOBALS['nhk_core_knowledge_context'] ?? null;
-$archiveUrl = is_array($context) ? (string) ($context['archive_url'] ?? home_url('/knowledge/')) : home_url('/knowledge/');
+$archiveUrl = is_array($context) ? (string) ($context['archive_url'] ?? home_url('/tri-thuc/')) : home_url('/tri-thuc/');
 get_header();
 ?><main id="main-content" class="site-main knowledge-shell">
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['claim'] ?? null)): $claim = $context['claim']; ?>

@@ -11,13 +11,14 @@ final class PublicKnowledgeRoutes
 
     public function register(): void
     {
-        add_filter('query_vars', function (array $vars): array { foreach (['nhk_knowledge_key', 'nhk_knowledge_page'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
+        add_filter('query_vars', function (array $vars): array { foreach (['nhk_knowledge_key', 'nhk_knowledge_slug', 'nhk_knowledge_page'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
         add_action('init', [$this, 'rewrite']);
         add_filter('template_include', [$this, 'template']);
     }
 
     public function rewrite(): void
     {
+        add_rewrite_rule('^tri-thuc/([^/]+)/?$', 'index.php?nhk_knowledge_slug=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/claim/([0-9A-Fa-f-]{36})/?$', 'index.php?nhk_knowledge_key=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/page/([1-9][0-9]*)/?$', 'index.php?nhk_knowledge_page=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/?$', 'index.php?nhk_knowledge_page=1', 'top');
@@ -26,13 +27,18 @@ final class PublicKnowledgeRoutes
     public function template(string $template): string
     {
         $key = (string) get_query_var('nhk_knowledge_key');
+        $slug = (string) get_query_var('nhk_knowledge_slug');
         $page = get_query_var('nhk_knowledge_page');
-        if ($key !== '') {
+        if ($slug !== '') {
+            $claim = $this->query->bySlug(rawurldecode($slug));
+            if ($claim === null) { $this->set404(); return get_404_template(); }
+            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'detail', 'claim' => $claim, 'archive_url' => home_url('/tri-thuc/')];
+        } elseif ($key !== '') {
             $claim = $this->query->detail(rawurldecode($key));
             if ($claim === null) { $this->set404(); return get_404_template(); }
-            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'detail', 'claim' => $claim, 'archive_url' => home_url('/knowledge/')];
+            $target = (string) ($claim['url'] ?? ''); if ($target === '') { $this->set404(); return get_404_template(); } wp_safe_redirect(home_url($target), 301, 'NHK canonical knowledge route'); exit;
         } elseif ($page !== '') {
-            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'archive', 'archive' => $this->query->archive(max(1, (int) $page)), 'archive_url' => home_url('/knowledge/')];
+            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'archive', 'archive' => $this->query->archive(max(1, (int) $page)), 'archive_url' => home_url('/tri-thuc/')];
         } else return $template;
         $found = locate_template('knowledge.php');
         return $found !== '' ? $found : $template;
