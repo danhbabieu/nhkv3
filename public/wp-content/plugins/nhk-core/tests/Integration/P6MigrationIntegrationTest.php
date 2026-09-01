@@ -114,6 +114,22 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_media_repository_ignores_invalid_domain_rows(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        $repository = new WpdbMediaRepository($wpdb);
+        $media = $repository->create(new Media(UuidCodec::newV7(), 'integration-media-invalid-row-' . bin2hex(random_bytes(4)), 'Invalid media row', 'ready'));
+
+        try {
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_media SET readiness=%s WHERE canonical_uuid=%s", 'invalid', UuidCodec::toBinary($media->canonicalId)));
+            self::assertNull($repository->findByCanonicalId($media->canonicalId));
+            self::assertSame([], $repository->list());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
+
     public function test_media_and_video_repositories_ignore_corrupt_json_rows(): void
     {
         global $wpdb;

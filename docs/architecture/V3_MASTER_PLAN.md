@@ -59,6 +59,10 @@ MediaAsset hydration now fails closed for malformed persisted domain rows before
 public delivery/query consumption; latest combined verification is 223 tests /
 1,314 assertions.
 
+Media identity hydration now fails closed for malformed persisted domain rows
+before public Media query consumption; latest combined verification is 224 tests
+/ 1,316 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

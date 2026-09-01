@@ -72,7 +72,11 @@ final class WpdbMediaRepository implements MediaRepository
             return null;
         }
         if (!is_array($provenance)) return null;
-        return new Media(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['canonical_name'], (string) $row['readiness'], $provenance, (int) $row['state'] === 1, (int) $row['revision']);
+        try {
+            return new Media(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['canonical_name'], (string) $row['readiness'], $provenance, (int) $row['state'] === 1, (int) $row['revision']);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function sameMedia(Media $left, Media $right): bool

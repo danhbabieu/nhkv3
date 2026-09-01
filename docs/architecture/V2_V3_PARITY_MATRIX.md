@@ -58,6 +58,9 @@ MediaAsset reads now omit malformed persisted domain rows before public
 delivery/query use; latest guarded integration coverage is 82 tests / 462
 assertions.
 
+Media identity reads now omit malformed persisted domain rows before public
+query use; latest guarded integration coverage is 83 tests / 464 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical
