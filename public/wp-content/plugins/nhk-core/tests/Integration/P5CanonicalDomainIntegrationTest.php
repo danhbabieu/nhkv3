@@ -109,6 +109,34 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         self::assertNotContains($retired->canonicalId, array_column($data['items'], 'id'));
     }
 
+    public function test_authority_repository_ignores_corrupt_payload_rows(): void
+    {
+        global $wpdb;
+        $repository = new WpdbAuthorityRepository();
+        $entity = new AuthorityEntity(
+            \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
+            'brand',
+            'p5-integration-corrupt-payload',
+            'Corrupt payload',
+            1,
+            ['country' => 'Switzerland'],
+        );
+        $repository->create($entity);
+
+        try {
+            $wpdb->query($wpdb->prepare(
+                'UPDATE ' . $wpdb->prefix . 'nhk_entities SET payload=%s WHERE canonical_uuid=%s',
+                '"not-an-object"',
+                \NHK\Core\Shared\Uuid\UuidCodec::toBinary($entity->canonicalId)
+            ));
+
+            self::assertNull($repository->findByCanonicalId($entity->canonicalId));
+            self::assertNotContains($entity->canonicalId, array_column(array_map(static fn (AuthorityEntity $item): array => ['id' => $item->canonicalId], $repository->listByType('brand')), 'id'));
+        } finally {
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_entities WHERE canonical_uuid=%s', \NHK\Core\Shared\Uuid\UuidCodec::toBinary($entity->canonicalId)));
+        }
+    }
+
     public function test_authority_repository_rejects_duplicate_identity_with_changed_state(): void
     {
         $repository = new WpdbAuthorityRepository();
