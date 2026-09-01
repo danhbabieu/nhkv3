@@ -51,7 +51,16 @@ final class P6PersistenceTest extends TestCase
         $usage = $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured');
         self::assertSame($created->canonicalId, $asset->mediaId);
         self::assertSame('PRIVATE', $asset->visibility);
+        $sameAsset = $service->addAsset($created->canonicalId, 'original', 'uploads/odo-front.jpg', hash('sha256', 'binary'), 'image/jpeg', 6, 1200, 800);
+        self::assertSame($asset->assetId, $sameAsset->assetId);
+        self::assertCount(1, $service->assets($created->canonicalId));
         self::assertSame($created->canonicalId, $usage->mediaId);
+        try {
+            $service->addAsset($created->canonicalId, 'original', 'uploads/odo-front.jpg', hash('sha256', 'changed'), 'image/jpeg', 7, 1200, 800);
+            self::fail('Expected a conflicting Media asset storage key to be rejected.');
+        } catch (\NHK\Core\Domain\Media\MediaException $exception) {
+            self::assertSame('Media asset storage key is already bound to different content.', $exception->getMessage());
+        }
         self::assertCount(1, $service->assets($created->canonicalId));
         self::assertCount(1, $service->usages($created->canonicalId));
 

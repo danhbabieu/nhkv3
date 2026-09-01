@@ -98,7 +98,13 @@ final class MediaService
     public function addAsset(string $mediaId, string $kind, string $storageKey, string $checksum, string $mimeType, int $byteSize, ?int $width = null, ?int $height = null, string $visibility = 'PRIVATE', array $metadata = []): MediaAsset
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        return $this->assets->create(new MediaAsset(UuidCodec::newV7(), $mediaId, $kind, $storageKey, $checksum, $mimeType, $byteSize, $width, $height, strtoupper($visibility), $metadata));
+        $candidate = new MediaAsset(UuidCodec::newV7(), $mediaId, $kind, $storageKey, $checksum, $mimeType, $byteSize, $width, $height, strtoupper($visibility), $metadata);
+        foreach ($this->assets->listByMediaId($mediaId) as $existing) {
+            if ($existing->storageKey !== $candidate->storageKey) continue;
+            if ($this->sameAsset($existing, $candidate)) return $existing;
+            throw new MediaException('Media asset storage key is already bound to different content.');
+        }
+        return $this->assets->create($candidate);
     }
 
     public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0): MediaUsage
