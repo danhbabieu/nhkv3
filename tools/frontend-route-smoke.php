@@ -9,7 +9,7 @@ foreach (array_slice($argv, 1) as $argument) {
         $base = rtrim(substr($argument, 11), '/');
         continue;
     }
-    foreach (['post-url', 'brand-url', 'model-url', 'movement-url', 'music-url', 'component-url', 'specimen-url', 'product-url', 'claim-url', 'media-url', 'video-url', 'comparison-url'] as $option) {
+    foreach (['post-url', 'brand-url', 'model-url', 'movement-url', 'music-url', 'component-url', 'classification-url', 'variant-url', 'specimen-url', 'product-url', 'claim-url', 'media-url', 'video-url', 'comparison-url'] as $option) {
         $prefix = "--{$option}=";
         if (str_starts_with($argument, $prefix)) {
             $route = trim(substr($argument, strlen($prefix)));
@@ -42,6 +42,10 @@ $routes = [
     '/music/' => 200,
     '/am-nhac/' => 200,
     '/component/' => 200,
+    '/classification/' => 200,
+    '/classification/page/2/' => 200,
+    '/variant/' => 200,
+    '/variant/page/2/' => 200,
     '/specimen/' => 200,
     '/hien-vat/' => 200,
     '/product/' => 200,

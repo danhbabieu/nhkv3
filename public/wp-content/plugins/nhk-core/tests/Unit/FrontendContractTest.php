@@ -512,7 +512,11 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("home_url('/comparison/')", $home);
         self::assertStringContainsString("'/comparison/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
         $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
-        self::assertStringContainsString("'movement-url', 'music-url', 'component-url', 'specimen-url', 'product-url'", $routeSmoke);
+        self::assertStringContainsString("'movement-url', 'music-url', 'component-url', 'classification-url', 'variant-url'", $routeSmoke);
+        self::assertStringContainsString("'/variant/' => 200", $routeSmoke);
+        self::assertStringContainsString("'/classification/' => 200", $routeSmoke);
+        self::assertStringContainsString("'/variant/page/2/' => 200", $routeSmoke);
+        self::assertStringContainsString("'/classification/page/2/' => 200", $routeSmoke);
         self::assertStringContainsString("'media-url', 'video-url', 'comparison-url'", $routeSmoke);
         foreach (["'/tri-thuc/page/2/' => 200", "'/goc-chia-se/page/2/' => 200", "'/media/page/2/' => 200", "'/video/page/2/' => 200", "'/knowledge/page/2/' => 200", "'/wp-sitemap.xml' => 200", "'/feed/' => 200"] as $route) {
             self::assertStringContainsString($route, $routeSmoke, 'semantic page-two route must be in smoke coverage');
