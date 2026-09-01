@@ -26,6 +26,18 @@ Evidence was collected with limits of at most 10 Media and 5 Source/Video
 records per call. The calls were read-only and reported zero writes where the
 adapter exposes a write counter.
 
+## Pagination and validation cross-check
+
+Additional bounded read-only probes returned Media page 1 and page 2 with
+`limit=3`, stable `total=242`, and three records per page. Source page 1
+returned three records while page 2 returned one record, but the Source
+adapter response has no `total` field, so its pagination contract cannot yet
+be treated as equivalent to the V3 contract. Video returned `total=0` with a
+ready storage status. A request with `page=0` and `limit=0` was rejected by
+connector schema validation (`minimum=1`) before reaching the ability. Every
+successful Source/Media/Video probe reported `writes=0`; no external or local
+state changed.
+
 ## Canonical identity cross-check
 
 Read-only calls by canonical ID confirmed that three external Media records

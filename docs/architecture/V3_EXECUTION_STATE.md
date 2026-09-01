@@ -38,6 +38,13 @@ Last updated: 2026-09-01, P11 complete Authority route smoke checkpoint.
   archive/page-two routes; the two real active detail routes also returned
   HTTP 200. No database or production state changed.
 
+- 2026-09-01: Extended the read-only external MCP probe across Media and
+  Source pages 1/2 plus invalid pagination bounds. Media returned stable
+  `total=242`; Source page 2 returned one record without a `total` field;
+  Video remained `total=0`; invalid page/limit values were rejected by schema
+  validation and successful calls reported `writes=0`. This strengthens the
+  recorded pagination/error/schema mismatch evidence without any data change.
+
 - 2026-09-01: Added read-only `DomainTargetCandidateAudit` and CLI
   `tools/v2-domain-target-audit.php`. TDD coverage proves same-domain exact
   title/slug matches remain review candidates, cross-domain matches are
