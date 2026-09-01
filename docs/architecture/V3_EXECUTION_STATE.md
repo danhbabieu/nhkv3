@@ -26,6 +26,13 @@ Last updated: 2026-09-01, P11 complete Authority route smoke checkpoint.
   opt-in real-detail sweep passed 41/41. Guarded PHPUnit passed 190 tests,
   1,245 assertions; Composer lint and the smoke-script PHP lint passed.
 
+- 2026-09-01: Browser QA inspected real active Variant and Classification
+  detail routes at desktop and 390px/844px. Both rendered Vietnamese H1/title,
+  had one static footer, no horizontal overflow, broken images, dead links,
+  internal domain terminology or console errors; the apparent full-page blank
+  area was confirmed as normal page height/padding rather than a duplicate
+  footer. No data or runtime code changed.
+
 - 2026-09-01: Added read-only `DomainTargetCandidateAudit` and CLI
   `tools/v2-domain-target-audit.php`. TDD coverage proves same-domain exact
   title/slug matches remain review candidates, cross-domain matches are
