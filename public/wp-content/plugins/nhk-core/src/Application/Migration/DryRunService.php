@@ -100,7 +100,10 @@ final class DryRunService
             if (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || $claimText === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         }
         if ($type === 'source' && (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || trim((string) ($record['canonical_name'] ?? '')) === '')) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
-        if ($type === 'evidence' && (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || !UuidCodec::isValid((string) ($record['claim_id'] ?? '')) || !UuidCodec::isValid((string) ($record['source_id'] ?? '')) || trim((string) ($record['excerpt'] ?? '')) === '')) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        if ($type === 'evidence') {
+            if (!isset($record['canonical_uuid']) || !UuidCodec::isValid((string) $record['canonical_uuid']) || !UuidCodec::isValid((string) ($record['claim_id'] ?? '')) || !UuidCodec::isValid((string) ($record['source_id'] ?? '')) || trim((string) ($record['excerpt'] ?? '')) === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+            if (strtolower((string) ($record['target_type'] ?? 'knowledge')) !== 'knowledge') return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
+        }
         if ($type === 'legacy_media_asset') {
             $mediaId = (string) ($record['media_id'] ?? '');
             $storageKey = trim((string) ($record['storage_key'] ?? ''));

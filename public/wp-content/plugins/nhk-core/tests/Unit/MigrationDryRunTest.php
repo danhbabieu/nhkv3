@@ -75,6 +75,22 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame(5, $report['skipped_by_reason']['INVALID_IDENTITY']);
     }
 
+    public function test_evidence_dry_run_rejects_non_knowledge_targets_like_apply(): void
+    {
+        $report = (new DryRunService())->run([[
+            'type' => 'evidence',
+            'stable_key' => 'evidence-wrong-target',
+            'canonical_uuid' => UuidCodec::newV7(),
+            'claim_id' => UuidCodec::newV7(),
+            'source_id' => UuidCodec::newV7(),
+            'excerpt' => 'Evidence target boundary.',
+            'target_type' => 'brand',
+        ]]);
+
+        self::assertSame(1, $report['skipped']);
+        self::assertSame('UNSUPPORTED_LEGACY_TYPE', $report['items'][0]['reason']);
+    }
+
     public function test_nil_canonical_uuid_is_skipped_with_bounded_reason(): void
     {
         $report = (new DryRunService())->run([['type' => 'brand', 'stable_key' => 'odo', 'canonical_uuid' => '00000000-0000-0000-0000-000000000000']]);

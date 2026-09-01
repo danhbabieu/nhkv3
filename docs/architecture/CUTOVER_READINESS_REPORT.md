@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 94 tests/512 assertions (245
-tests/1,426 assertions combined);
+Latest verification: guarded WordPress suite 94 tests/512 assertions (246
+tests/1,428 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -26,9 +26,10 @@ remains data-gated.
 The migration boundary now canonicalizes supported YouTube URL forms before
 Video persistence and records URL/external-ID disagreement as a reason-coded
 conflict, and dry-run now requires the same canonical UUID boundary plus the
-required identity/content fields for apply-backed domains. The dry-run
+required identity/content fields for apply-backed domains and rejects Evidence
+targets outside Knowledge. The dry-run
 regression is covered by the unit suite and the migration regression by the
-guarded suite; full verification is now 245 tests/1,426 assertions.
+guarded suite; full verification is now 246 tests/1,428 assertions.
 
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
@@ -360,7 +361,7 @@ and active-data parity therefore remain explicit gates.
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 151 tests, 914 assertions |
+| Unit tests | PASS — 152 tests, 916 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
@@ -372,7 +373,7 @@ and active-data parity therefore remain explicit gates.
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
 
 Current quality-count supersession: guarded integration is 94 tests / 512
-assertions and the combined suite is 245 tests / 1,426 assertions. The longer
+assertions and the combined suite is 246 tests / 1,428 assertions. The longer
 integration row above retains the detailed historical coverage description; this
 checkpoint count is authoritative.
 
