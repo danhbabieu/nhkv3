@@ -149,4 +149,22 @@ final class P6MigrationIntegrationTest extends TestCase
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
         }
     }
+
+    public function test_media_repository_rejects_same_identity_with_changed_state(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        $repository = new WpdbMediaRepository($wpdb);
+        $media = new Media(UuidCodec::newV7(), 'integration-media-state-conflict-' . bin2hex(random_bytes(4)), 'State Conflict Media', 'ready', ['source' => 'test'], true, 1);
+        $repository->create($media);
+
+        try {
+            $repository->create(new Media($media->canonicalId, $media->stableKey, $media->canonicalName, 'draft', $media->provenance, true, 1));
+            self::fail('Expected a same-identity Media with changed readiness to be rejected.');
+        } catch (\NHK\Core\Domain\Media\MediaException $exception) {
+            self::assertSame('Media stable key or identity already exists.', $exception->getMessage());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
 }

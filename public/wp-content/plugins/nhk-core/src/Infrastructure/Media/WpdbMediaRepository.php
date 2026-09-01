@@ -28,11 +28,16 @@ final class WpdbMediaRepository implements MediaRepository
 
     public function create(Media $media): Media
     {
+        $existingById = $this->findByCanonicalId($media->canonicalId);
+        if ($existingById !== null) {
+            if ($this->sameMedia($existingById, $media)) return $existingById;
+            throw new MediaException('Media stable key or identity already exists.');
+        }
         $now = gmdate('Y-m-d H:i:s.u');
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (canonical_uuid,stable_key,canonical_name,readiness,provenance_json,state,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%d,%d,%s,%s)", UuidCodec::toBinary($media->canonicalId), $media->stableKey, $media->canonicalName, $media->readiness, wp_json_encode($media->provenance, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $media->active ? 1 : 0, $media->revision, $now, $now));
         if ($ok === false) {
             $existing = $this->findByStableKey($media->stableKey);
-            if ($existing && $existing->canonicalId === $media->canonicalId && $existing->canonicalName === $media->canonicalName && $existing->provenance === $media->provenance) return $existing;
+            if ($existing && $this->sameMedia($existing, $media)) return $existing;
             throw new MediaException('Media stable key or identity already exists.');
         }
         return $this->findByCanonicalId($media->canonicalId) ?? $media;
@@ -57,5 +62,16 @@ final class WpdbMediaRepository implements MediaRepository
     {
         if (!$row) return null;
         return new Media(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['canonical_name'], (string) $row['readiness'], json_decode((string) $row['provenance_json'], true, 512, JSON_THROW_ON_ERROR), (int) $row['state'] === 1, (int) $row['revision']);
+    }
+
+    private function sameMedia(Media $left, Media $right): bool
+    {
+        return $left->canonicalId === $right->canonicalId
+            && $left->stableKey === $right->stableKey
+            && $left->canonicalName === $right->canonicalName
+            && $left->readiness === $right->readiness
+            && $left->provenance === $right->provenance
+            && $left->active === $right->active
+            && $left->revision === $right->revision;
     }
 }
