@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 94 tests/512 assertions (242
-tests/1,418 assertions combined);
+Latest verification: guarded WordPress suite 94 tests/512 assertions (243
+tests/1,422 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -25,8 +25,9 @@ remains data-gated.
 
 The migration boundary now canonicalizes supported YouTube URL forms before
 Video persistence and records URL/external-ID disagreement as a reason-coded
-conflict. The new migration regression is covered by the guarded suite; full
-verification is now 242 tests/1,418 assertions.
+conflict. The dry-run regression is covered by the unit suite and the migration
+regression by the guarded suite; full verification is now 243 tests/1,422
+assertions.
 
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
@@ -358,7 +359,7 @@ and active-data parity therefore remain explicit gates.
 
 | Gate | Result |
 |---|---|
-| Unit tests | PASS — 148 tests, 906 assertions |
+| Unit tests | PASS — 149 tests, 910 assertions |
 | Plugin PHP lint | PASS |
 | Theme PHP lint | PASS |
 | `git diff --check` | PASS at checkpoints |
@@ -368,6 +369,11 @@ and active-data parity therefore remain explicit gates.
 | Frontend visual QA | PARTIAL — desktop homepage, Post single, Search, Comparison, active Media detail/archive, Video empty state, Knowledge pagination, Authority archive/detail and 404 plus mobile homepage/editorial archive/Post/Authority detail/Media detail were visually inspected; this checkpoint additionally captured mobile screenshots for `/comparison/`, `/model/page/2/`, `/component/page/2/`, `/media/page/2/`, `/video/page/2/`, `/knowledge/page/2/`, `/thu-vien/`, `/category/uncategorized/` and 404; all nine route screenshots had expected Vietnamese H1/title, no overflow, broken images or empty/`#` anchors, and card/footer links now use the NHK palette; pagination exposes `aria-current="page"` on the active link, public Knowledge evidence presents the approved source title/type with inactive sources filtered, the default category archive and `/tri-thuc/`/`/goc-chia-se/` archives now have localized H1/title/description/canonical metadata, and public editorial dates are Vietnamese while machine-readable timestamps remain ISO; the shared public URL validator now rejects malformed data-derived HTTP links; public templates plus entity payload presentation are contract-tested to avoid internal domain terminology; a read-only local query confirms no active Video row exists for detail inspection, so active Video detail remains pending |
 | V2 data inventory/counts/mappings | PARTIAL — restored 4,973-record baseline export/dry-run had 3,960 candidates and 1,013 skips; policy-normalized homepage `/` no-op brings the local-dev checkpoint to 3,961 migrated, 1,012 explicit skips and 0 conflicts, including 367 Knowledge claim redirects, 370 entity-registry redirects, 34 native-post URL redirects, two safe URL no-ops, 3 field-level PRIVATE MediaAsset rows, 19 Source and 40 Evidence rows |
 | V2 backup restore | PARTIAL — reviewed staging conversion restores the dump and test snapshot; original dump is not MariaDB-portable without conversion, and live field-level reconciliation remains open |
+
+Current quality-count supersession: guarded integration is 94 tests / 512
+assertions and the combined suite is 243 tests / 1,422 assertions. The longer
+integration row above retains the detailed historical coverage description; this
+checkpoint count is authoritative.
 
 ## Blocking gates
 

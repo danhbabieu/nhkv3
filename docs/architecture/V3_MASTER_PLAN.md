@@ -22,10 +22,10 @@ malformed or non-array persistence rows; guarded integration is 75 tests / 449
 assertions and combined coverage is 215 tests / 1,295 assertions.
 
 Current verification supersedes the historical checkpoint counts above: the
-guarded suite is 94 tests / 512 assertions and the combined suite is 242 tests /
-1,418 assertions. V2 Video migration also canonicalizes supported YouTube URL
-forms before persistence and records URL/external-ID disagreement as a review
-conflict.
+guarded suite is 94 tests / 512 assertions and the combined suite is 243 tests /
+1,422 assertions. V2 Video migration and its dry-run now canonicalize supported
+YouTube URL forms before persistence and record URL/external-ID disagreement as
+a review conflict.
 
 Governance proposal `command_json` hydration is also fail-closed for malformed
 or non-array rows; latest combined coverage is 216 tests / 1,297 assertions.

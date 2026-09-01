@@ -36,6 +36,19 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('INVALID_IDENTITY', $report['items'][0]['reason']);
     }
 
+    public function test_video_dry_run_matches_apply_url_normalization_and_conflict_boundary(): void
+    {
+        $report = (new DryRunService())->run([
+            ['type' => 'video', 'stable_key' => 'video-short-url', 'canonical_uuid' => UuidCodec::newV7(), 'metadata' => ['canonical_url' => 'https://youtu.be/dQw4w9WgXcQ?t=42']],
+            ['type' => 'video', 'stable_key' => 'video-mismatched-id', 'canonical_uuid' => UuidCodec::newV7(), 'metadata' => ['canonical_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'external_video_id' => 'oHg5SJYRHA0']],
+        ]);
+
+        self::assertSame(1, $report['mapped']);
+        self::assertSame(1, $report['conflict']);
+        self::assertSame('https://www.youtube.com/watch?v=dQw4w9WgXcQ', $report['items'][0]['normalized_url']);
+        self::assertSame('CONFLICT_REQUIRES_REVIEW', $report['items'][1]['reason']);
+    }
+
     public function test_nil_canonical_uuid_is_skipped_with_bounded_reason(): void
     {
         $report = (new DryRunService())->run([['type' => 'brand', 'stable_key' => 'odo', 'canonical_uuid' => '00000000-0000-0000-0000-000000000000']]);

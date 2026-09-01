@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Migration;
 
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Domain\Video\Video;
 
 final class DryRunService
 {
@@ -92,6 +93,21 @@ final class DryRunService
         if (!in_array($type, self::SUPPORTED_TYPES, true)) return ['status' => 'skipped', 'reason' => 'UNSUPPORTED_LEGACY_TYPE'];
         if (isset($record['canonical_uuid']) && !UuidCodec::isValid((string) $record['canonical_uuid'])) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         if ((string) ($record['stable_key'] ?? '') === '') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+        if ($type === 'video') {
+            $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+            $platform = strtolower(trim((string) ($metadata['platform'] ?? 'youtube')));
+            $url = trim((string) ($metadata['canonical_url'] ?? $metadata['url'] ?? $metadata['source_url'] ?? ''));
+            $externalId = trim((string) ($metadata['external_video_id'] ?? $metadata['video_id'] ?? ''));
+            if ($url === '' && $externalId !== '' && $platform === 'youtube') $url = 'https://www.youtube.com/watch?v=' . $externalId;
+            if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false || $platform !== 'youtube') return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+            try {
+                $normalized = Video::fromUrl($url);
+            } catch (\Throwable) {
+                return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
+            }
+            if ($externalId !== '' && $externalId !== $normalized->externalVideoId) return ['status' => 'conflict', 'reason' => 'CONFLICT_REQUIRES_REVIEW'];
+            return ['status' => 'mapped', 'reason' => 'READY', 'normalized_url' => $normalized->canonicalUrl, 'normalized_external_id' => $normalized->externalVideoId];
+        }
         $checksum = strtolower((string) ($record['checksum'] ?? ''));
         if ($checksum !== '' && preg_match('/^[a-f0-9]{64}$/', $checksum) !== 1) return ['status' => 'skipped', 'reason' => 'INVALID_IDENTITY'];
         if ($checksum !== '') {
