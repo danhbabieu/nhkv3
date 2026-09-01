@@ -20,6 +20,10 @@ final class EntityTypeRegistry
         foreach (array_keys($definition->fieldTypes) as $field) {
             if (!in_array($field, $definition->allowedFields, true)) throw new InvalidArgumentException('Typed field is not allowed: ' . $field);
         }
+        foreach ($definition->fieldFormats as $field => $format) {
+            if (!in_array($field, $definition->allowedFields, true)) throw new InvalidArgumentException('Formatted field is not allowed: ' . $field);
+            if (!in_array($format, ['uuid', 'url'], true)) throw new InvalidArgumentException('Unknown entity field format: ' . $format);
+        }
         if (isset($this->definitions[$definition->type]) && $this->definitions[$definition->type] !== $definition) {
             throw new InvalidArgumentException('Entity type is already registered with a different definition: ' . $definition->type);
         }

@@ -10,14 +10,14 @@ final class CanonicalEntityTypeCatalog
     {
         return [
             new EntityTypeDefinition('brand', 1, true, ['aliases', 'description', 'country', 'founded_year'], [], ['aliases' => 'array', 'description' => 'string', 'country' => 'string', 'founded_year' => 'int']),
-            new EntityTypeDefinition('model', 1, true, ['brand_uuid', 'aliases', 'description', 'launch_year'], [], ['brand_uuid' => 'string', 'aliases' => 'array', 'description' => 'string', 'launch_year' => 'int']),
-            new EntityTypeDefinition('variant', 1, true, ['model_uuid', 'aliases', 'description', 'reference'], [], ['model_uuid' => 'string', 'aliases' => 'array', 'description' => 'string', 'reference' => 'string']),
+            new EntityTypeDefinition('model', 1, true, ['brand_uuid', 'aliases', 'description', 'launch_year'], [], ['brand_uuid' => 'string', 'aliases' => 'array', 'description' => 'string', 'launch_year' => 'int'], ['brand_uuid' => 'uuid']),
+            new EntityTypeDefinition('variant', 1, true, ['model_uuid', 'aliases', 'description', 'reference'], [], ['model_uuid' => 'string', 'aliases' => 'array', 'description' => 'string', 'reference' => 'string'], ['model_uuid' => 'uuid']),
             new EntityTypeDefinition('movement', 1, true, ['manufacturer', 'caliber', 'description', 'frequency_hz', 'jewels'], [], ['manufacturer' => 'string', 'caliber' => 'string', 'description' => 'string', 'frequency_hz' => 'float', 'jewels' => 'int']),
             new EntityTypeDefinition('music', 1, true, ['artist', 'album', 'description', 'release_year'], [], ['artist' => 'string', 'album' => 'string', 'description' => 'string', 'release_year' => 'int']),
             new EntityTypeDefinition('component', 1, true, ['kind', 'manufacturer', 'description'], [], ['kind' => 'string', 'manufacturer' => 'string', 'description' => 'string']),
             new EntityTypeDefinition('classification', 1, true, ['family', 'description'], [], ['family' => 'string', 'description' => 'string']),
-            new EntityTypeDefinition('specimen', 1, true, ['model_uuid', 'serial_number', 'acquired_at', 'notes'], [], ['model_uuid' => 'string', 'serial_number' => 'string', 'acquired_at' => 'string', 'notes' => 'string']),
-            new EntityTypeDefinition('product', 1, true, ['specimen_uuid', 'vendor', 'url', 'price', 'currency', 'availability'], [], ['specimen_uuid' => 'string', 'vendor' => 'string', 'url' => 'string', 'price' => 'float', 'currency' => 'string', 'availability' => 'string']),
+            new EntityTypeDefinition('specimen', 1, true, ['model_uuid', 'serial_number', 'acquired_at', 'notes'], [], ['model_uuid' => 'string', 'serial_number' => 'string', 'acquired_at' => 'string', 'notes' => 'string'], ['model_uuid' => 'uuid']),
+            new EntityTypeDefinition('product', 1, true, ['specimen_uuid', 'vendor', 'url', 'price', 'currency', 'availability'], [], ['specimen_uuid' => 'string', 'vendor' => 'string', 'url' => 'string', 'price' => 'float', 'currency' => 'string', 'availability' => 'string'], ['specimen_uuid' => 'uuid', 'url' => 'url']),
         ];
     }
 
