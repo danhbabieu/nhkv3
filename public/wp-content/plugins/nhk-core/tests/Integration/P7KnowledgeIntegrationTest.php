@@ -73,6 +73,8 @@ final class P7KnowledgeIntegrationTest extends TestCase
         $repository = new WpdbSourceRepository($wpdb);
         $source = new Source(UuidCodec::newV7(), 'p7-integration-source-conflict', 'Conflict source', 'catalog', 'https://example.test/catalog', ['visibility' => 'PRIVATE']);
         $repository->create($source);
+        $raced = $repository->create(new Source(UuidCodec::newV7(), $source->stableKey, $source->title, $source->sourceType, $source->locator, $source->metadata));
+        self::assertSame($source->canonicalId, $raced->canonicalId);
 
         try {
             $repository->create(new Source($source->canonicalId, $source->stableKey, $source->title, $source->sourceType, $source->locator, ['visibility' => 'PUBLIC']));

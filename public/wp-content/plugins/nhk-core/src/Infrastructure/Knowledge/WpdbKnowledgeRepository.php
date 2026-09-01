@@ -20,6 +20,11 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository
             if ($this->sameClaim($existingById, $claim)) return $existingById;
             throw new KnowledgeException('Knowledge claim identity already exists.');
         }
+        $existingByKey = $this->findByStableKey($claim->stableKey);
+        if ($existingByKey !== null) {
+            if ($this->sameClaim($existingByKey, $claim)) return $existingByKey;
+            throw new KnowledgeException('Knowledge claim identity already exists.');
+        }
         $now = gmdate('Y-m-d H:i:s.u');
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (canonical_uuid,stable_key,claim_text,claim_type,provenance_json,state,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%d,%d,%s,%s)", UuidCodec::toBinary($claim->canonicalId), $claim->stableKey, $claim->claimText, $claim->claimType, wp_json_encode($claim->provenance, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $claim->active ? 1 : 0, $claim->revision, $now, $now));
         if ($ok === false) { $existing = $this->findByStableKey($claim->stableKey); if ($existing && $this->sameClaim($existing, $claim)) return $existing; throw new KnowledgeException('Knowledge claim identity already exists.'); }
@@ -36,8 +41,7 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository
 
     private function sameClaim(KnowledgeClaim $left, KnowledgeClaim $right): bool
     {
-        return $left->canonicalId === $right->canonicalId
-            && $left->stableKey === $right->stableKey
+        return $left->stableKey === $right->stableKey
             && $left->claimText === $right->claimText
             && $left->claimType === $right->claimType
             && $left->provenance === $right->provenance

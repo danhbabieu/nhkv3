@@ -20,6 +20,11 @@ final class WpdbSourceRepository implements SourceRepository
             if ($this->sameSource($existingById, $source)) return $existingById;
             throw new KnowledgeException('Source identity already exists.');
         }
+        $existingByKey = $this->findByStableKey($source->stableKey);
+        if ($existingByKey !== null) {
+            if ($this->sameSource($existingByKey, $source)) return $existingByKey;
+            throw new KnowledgeException('Source identity already exists.');
+        }
         $locatorSql = $source->locator === null ? 'NULL' : '%s';
         $args = [UuidCodec::toBinary($source->canonicalId), $source->stableKey, $source->title, $source->sourceType];
         if ($source->locator !== null) $args[] = $source->locator;
@@ -43,8 +48,7 @@ final class WpdbSourceRepository implements SourceRepository
 
     private function sameSource(Source $left, Source $right): bool
     {
-        return $left->canonicalId === $right->canonicalId
-            && $left->stableKey === $right->stableKey
+        return $left->stableKey === $right->stableKey
             && $left->title === $right->title
             && $left->sourceType === $right->sourceType
             && $left->locator === $right->locator
