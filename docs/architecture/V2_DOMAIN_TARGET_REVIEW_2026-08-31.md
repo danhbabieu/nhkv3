@@ -57,6 +57,18 @@ legacy post ID link, revision/provenance binding or governed approval. Every
 candidate therefore remains an explicit mapping review item, and no URL/body
 or semantic identity was changed.
 
+## Reproducible five-lane classification — 2026-09-01
+
+The read-only classifier
+`php tools/v2-domain-post-classify.php /path/to/export.json` processes only
+the 764 non-editorial domain-post records, leaving the 36 editorial
+`nhk_article`/native post/page records in their separate migration lane.
+Against the retained full export it reports 742 `STRUCTURE_REFERENCE`
+records, 21 `REQUIRES_REVIEW` attachment records and one `RETIRE`
+`wp_global_styles` record. Each item carries a bounded reason code and
+`mapping_applied=false`; the tool performs no body import, identity mapping,
+redirect creation or data mutation.
+
 ## Editorial boundary
 
 The 34 `nhk_article` records are handled separately as native editorial posts

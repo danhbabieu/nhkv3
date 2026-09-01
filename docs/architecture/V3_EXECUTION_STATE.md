@@ -80,6 +80,14 @@ Video detail remains unavailable because the local query has no active Video row
   verification is 152 tests / 918 assertions; guarded integration is 94 tests /
   517 assertions; combined verification is 246 tests / 1,435 assertions.
 
+- 2026-09-01: Read-only `tools/v2-domain-post-classify.php` now classifies the
+  764 non-editorial domain-post records into `STRUCTURE_REFERENCE` (742),
+  `REQUIRES_REVIEW` (21 attachments) and `RETIRE` (one `wp_global_styles`
+  record). Every item carries a bounded reason code and
+  `mapping_applied=false`; no body, identity, redirect or V2/V3 record was
+  changed. The next gate is governed mapping/retirement approval for the
+  structural and recovery lanes.
+
 - 2026-09-01: Admin proposal detail now reads and displays direct dependency
   UUIDs alongside the dependency binding fingerprint through the existing
   read-only dependency repository. Unit verification is 148 tests / 904

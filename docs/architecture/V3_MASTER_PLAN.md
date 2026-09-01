@@ -118,6 +118,11 @@ An independent no-write rerun against the retained full V2 export reproduced
 those migration totals and the 742-candidate domain audit; no V2/live data was
 modified.
 
+The 764 non-editorial domain-post records now have a reproducible read-only
+classification: 742 `STRUCTURE_REFERENCE`, 21 attachment `REQUIRES_REVIEW`
+and one `RETIRE` `wp_global_styles` record. No identity mapping, redirect or
+body import is applied.
+
 Admin/REST/MCP proposal creation now treats an empty optional target UUID as
 null while retaining strict validation for non-empty values; the REST path is
 covered by guarded integration and the MCP path by unit coverage.
