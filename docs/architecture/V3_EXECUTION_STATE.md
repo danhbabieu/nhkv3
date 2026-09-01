@@ -19,6 +19,11 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Post-push runtime revalidation passed all 34 declared frontend
+  routes and all MCP wire checks (CORS, protocol negotiation, 18-tool catalog,
+  invalid-Origin rejection and initialized notification); the smoke commands
+  are read-only and made no database changes.
+
 - 2026-09-01: Guarded MCP integration now proves a valid uppercase canonical
   UUID passes the advertised schema and semantic transport validation while a
   nil UUID remains rejected with JSON-RPC `-32602`. Full verification is Unit

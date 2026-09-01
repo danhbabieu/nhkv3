@@ -9,6 +9,9 @@ tests/1,366 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
+Post-push read-only runtime revalidation again passed all 34 frontend routes
+and the complete MCP wire smoke; no database state changed.
+
 The latest domain checkpoint also rejects malformed optional Governance
 proposal `targetUuid` values before persistence while retaining semantic
 subject IDs.
