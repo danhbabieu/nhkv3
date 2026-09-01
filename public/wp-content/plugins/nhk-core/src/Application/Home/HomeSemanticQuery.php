@@ -7,11 +7,12 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class HomeSemanticQuery
 {
-    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null) {}
+    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null) {}
 
     public function extend(array $modules): array
     {
@@ -19,7 +20,8 @@ final class HomeSemanticQuery
             foreach ($this->types->all() as $definition) {
                 foreach ($this->authority->listByType($definition->type) as $entity) {
                     if (!$entity->active()) continue;
-                    $modules['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => home_url('/' . $entity->entityType . '/' . rawurlencode($entity->stableKey) . '/')];
+                    $path = ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); if ($path === null) continue;
+                    $modules['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => home_url($path)];
                     if (count($modules['entities']) >= 6) break 2;
                 }
             }

@@ -40,7 +40,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink,
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
-use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, RelatedContentQuery};
+use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, PublicRouteResolver, RelatedContentQuery};
 use NHK\Core\Application\Media\{MediaService, MediaVideoPageQuery};
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Home\HomeSemanticQuery;
@@ -49,7 +49,7 @@ use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Knowledge\KnowledgeService;
 
 final class Plugin {
-    private const REWRITE_VERSION = '5';
+    private const REWRITE_VERSION = '6';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.

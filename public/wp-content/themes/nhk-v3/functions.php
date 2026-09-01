@@ -100,6 +100,7 @@ function nhk_v3_public_url(mixed $value): string
     if (!is_string($value)) return '';
     $url = trim($value);
     if ($url === '' || $url === '#') return '';
+    if (str_starts_with($url, '/')) return esc_url_raw(home_url('/' . ltrim($url, '/')));
     $validated = wp_http_validate_url($url);
     return is_string($validated) ? $validated : '';
 }
@@ -211,7 +212,7 @@ function nhk_v3_seo_head(): void
     }
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
-        if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ ' . (string) $entity['name'] . ' trong kho NHK.'; $canonical = home_url('/' . (string) $context['type'] . '/' . rawurlencode((string) $entity['stable_key']) . '/'); }
+        if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ ' . (string) $entity['name'] . ' trong kho NHK.'; $canonical = nhk_v3_public_url($entity['url'] ?? null); }
         elseif (($context['mode'] ?? '') === 'archive') { $label = nhk_v3_entity_label((string) ($context['type'] ?? '')); $title = 'Khám phá ' . $label . ' — Đồng Hồ Nhà Kho'; $description = 'Khám phá ' . $label . ' trong kho tri thức NHK.'; $canonical = home_url('/' . (string) ($context['type'] ?? '') . '/'); }
     }
     if (is_array($media_context)) {

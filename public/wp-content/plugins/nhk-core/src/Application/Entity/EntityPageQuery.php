@@ -10,7 +10,11 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EntityPageQuery
 {
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null) {}
+
+    public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
+    /** @param list<string> $segments */
+    public function resolvePublic(string $type, array $segments): ?AuthorityEntity { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->resolve($type, $segments); }
 
     public function detail(string $type, string $key): ?array
     {
@@ -51,7 +55,7 @@ final class EntityPageQuery
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload]; }
+    private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); $item = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
