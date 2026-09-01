@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Domain\Governance;
 
 use InvalidArgumentException;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final readonly class Proposal
 {
@@ -35,7 +36,7 @@ final readonly class Proposal
         if ($id === '' || $subjectId === '' || $operation === '' || $contentFingerprint === '' || $dependencyFingerprint === '') {
             throw new InvalidArgumentException('Proposal identity and binding fields are required.');
         }
-        if ($targetUuid !== null && !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $targetUuid)) {
+        if ($targetUuid !== null && !UuidCodec::isValid($targetUuid)) {
             throw new InvalidArgumentException('Proposal target UUID is invalid.');
         }
         if ($expectedRevision < 1) {

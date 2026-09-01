@@ -112,11 +112,6 @@ final class DryRunService
 
     private function validUuid(string $value): bool
     {
-        try {
-            UuidCodec::toBinary($value);
-            return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value);
-        } catch (\Throwable) {
-            return false;
-        }
+        return UuidCodec::isValid($value);
     }
 }

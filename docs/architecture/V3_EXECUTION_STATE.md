@@ -19,6 +19,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Hợp nhất UUID validation vào `UuidCodec::isValid()` tại các
+  domain constructors Authority, Graph, Media, Video, Knowledge, Evidence và
+  Governance, đồng thời thống nhất migration node mapping/dependency reads.
+  Full verification: Unit 146 tests / 872 assertions và guarded integration
+  89 tests / 479 assertions.
+
 - 2026-09-01: MCP tool schemas now declare canonical UUID patterns for entity,
   Media, Video, Knowledge, Source, Evidence and Proposal ID fields, while
   runtime guards continue to reject nil UUIDs. Unit verification is 146 tests

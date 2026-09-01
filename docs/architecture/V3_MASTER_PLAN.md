@@ -92,6 +92,9 @@ MCP `tools/list` schemas now declare the same canonical UUID shape for public
 read, evidence-ingest and Proposal ID fields; runtime validation remains the
 authoritative nil/malformed-ID guard.
 
+Domain constructors and migration/dependency readers now use the same shared
+UUID validator rather than duplicated shape-only checks.
+
 Fresh read-only revalidation confirms MCP wire smoke and frontend route smoke
 remain green (34/34 routes); the current dry-run remains 3,961 mapped / 1,012
 skipped / 0 conflicts, with 742 domain-target candidates awaiting governed

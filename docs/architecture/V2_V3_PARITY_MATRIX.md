@@ -46,6 +46,9 @@ MCP `tools/list` now declares canonical UUID patterns for public read,
 evidence-ingest and Proposal ID fields, with runtime nil/malformed validation
 remaining authoritative.
 
+Domain constructors and migration/dependency readers now share the same strict
+UUID validator, preventing shape-only canonical identity acceptance.
+
 Raw persisted state validation is strict across Authority, Media, Video and
 Knowledge hydrators; malformed values are omitted before public or governed
 domain consumption.

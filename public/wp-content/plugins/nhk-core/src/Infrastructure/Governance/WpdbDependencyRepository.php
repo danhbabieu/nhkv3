@@ -23,7 +23,7 @@ final class WpdbDependencyRepository implements DependencyRepository
         foreach ($rows ?: [] as $uuid) {
             try {
                 $canonical = UuidCodec::fromBinary((string) $uuid);
-                if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $canonical) === 1) $dependencies[] = $canonical;
+                if (UuidCodec::isValid($canonical)) $dependencies[] = $canonical;
             } catch (\Throwable) {
                 // A corrupt dependency must not poison closure or cycle reads.
             }

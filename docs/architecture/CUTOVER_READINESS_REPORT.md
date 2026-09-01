@@ -32,6 +32,9 @@ Authority, Media, Video, Knowledge, Source and Evidence references.
 MCP tool schemas now expose canonical UUID patterns for public read, evidence
 ingest and Proposal ID fields, matching the runtime fail-closed boundary.
 
+Canonical UUID validation is now shared by domain constructors and migration/
+dependency readers, including nil UUID rejection.
+
 The current KnowledgeClaim hydration checkpoint brings the guarded suite to
 75 integration tests / 449 assertions (215 tests / 1,295 assertions combined).
 

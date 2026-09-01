@@ -434,7 +434,7 @@ final class V2MigrationService
         $map = ['article' => 'wp_post', 'wp_post' => 'wp_post', 'brand' => 'brand', 'model' => 'model', 'variant' => 'variant', 'movement' => 'movement', 'music' => 'music', 'component' => 'component', 'classification' => 'classification', 'specimen' => 'specimen', 'product' => 'product', 'media' => 'media', 'knowledge' => 'knowledge'];
         if (!isset($map[$type])) return null;
         if ($map[$type] === 'wp_post' && preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', $key) !== 1) return null;
-        if ($map[$type] !== 'wp_post' && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $key) !== 1) return null;
+        if ($map[$type] !== 'wp_post' && !$this->validUuid($key)) return null;
         return new NodeReference($map[$type], $key);
     }
 
