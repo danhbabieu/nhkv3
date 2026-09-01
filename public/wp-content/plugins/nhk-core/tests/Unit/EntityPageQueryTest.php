@@ -23,6 +23,8 @@ final class EntityPageQueryTest extends TestCase
         $query = new EntityPageQuery($repository, $types);
         $archive = $query->archive('brand', 1, 1, 'odo');
         self::assertSame(1, $archive['total']); self::assertSame($first->canonicalId, $archive['items'][0]['id']);
+        $all = $query->archive('brand', 1, 24);
+        self::assertNotContains($retired->canonicalId, array_column($all['items'], 'id'));
         self::assertSame($first->canonicalId, $query->detail('brand', 'odo')['id']);
         self::assertNull($query->detail('brand', 'retired'));
         self::assertNull($query->detail('model', 'odo'));

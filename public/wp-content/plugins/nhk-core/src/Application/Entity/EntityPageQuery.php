@@ -39,7 +39,8 @@ final class EntityPageQuery
     {
         if (!$this->types->has($type) || !$this->available()) return ['type' => $type, 'page' => 1, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
         $query = trim($query); $items = [];
-        foreach ($this->authority->listByType($type) as $entity) {
+        foreach ($this->authority->listByType($type, true) as $entity) {
+            if (!$entity->active()) continue;
             $publicPayload = array_intersect_key($entity->payload, array_fill_keys($this->types->get($entity->entityType)->allowedFields, true));
             if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($publicPayload))) continue;
             $items[] = $this->serialize($entity);
