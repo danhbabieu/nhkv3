@@ -95,6 +95,34 @@ final class P7KnowledgeIntegrationTest extends TestCase
         self::assertSame([], $evidenceRepository->listByClaim($claim->canonicalId));
     }
 
+    public function test_knowledge_repositories_omit_invalid_domain_rows(): void
+    {
+        global $wpdb;
+        $sourceRepository = new WpdbSourceRepository($wpdb);
+        $claimRepository = new WpdbKnowledgeRepository($wpdb);
+        $evidenceRepository = new WpdbEvidenceRepository($wpdb);
+        $source = $sourceRepository->create(new Source(UuidCodec::newV7(), 'p7-integration-invalid-source', 'Invalid source row', 'archive'));
+        $claim = $claimRepository->create(new KnowledgeClaim(UuidCodec::newV7(), 'p7-integration-invalid-claim', 'Invalid claim row.', 'fact'));
+        $evidence = $evidenceRepository->create(new Evidence(UuidCodec::newV7(), $claim->canonicalId, $source->canonicalId, 'supports', 'Invalid evidence row.'));
+
+        try {
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_sources SET revision=%d WHERE canonical_uuid=%s", 0, UuidCodec::toBinary($source->canonicalId)));
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_knowledge_claims SET revision=%d WHERE canonical_uuid=%s", 0, UuidCodec::toBinary($claim->canonicalId)));
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_evidence SET relation_type=%s WHERE evidence_uuid=%s", 'invalid', UuidCodec::toBinary($evidence->canonicalId)));
+
+            self::assertNull($sourceRepository->findByCanonicalId($source->canonicalId));
+            self::assertNull($claimRepository->findByCanonicalId($claim->canonicalId));
+            self::assertNull($evidenceRepository->findByCanonicalId($evidence->canonicalId));
+            self::assertSame([], $sourceRepository->list());
+            self::assertSame([], $claimRepository->list());
+            self::assertSame([], $evidenceRepository->listByClaim($claim->canonicalId));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_evidence WHERE evidence_uuid=%s", UuidCodec::toBinary($evidence->canonicalId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid=%s", UuidCodec::toBinary($claim->canonicalId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($source->canonicalId)));
+        }
+    }
+
     public function test_knowledge_repository_ignores_corrupt_provenance_rows(): void
     {
         global $wpdb;

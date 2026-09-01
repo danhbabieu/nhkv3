@@ -137,6 +137,34 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         }
     }
 
+    public function test_authority_repository_ignores_invalid_domain_rows(): void
+    {
+        global $wpdb;
+        $repository = new WpdbAuthorityRepository();
+        $entity = new AuthorityEntity(
+            \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
+            'brand',
+            'p5-integration-invalid-domain-row',
+            'Invalid domain row',
+            1,
+            [],
+        );
+        $repository->create($entity);
+
+        try {
+            $wpdb->query($wpdb->prepare(
+                'UPDATE ' . $wpdb->prefix . 'nhk_entities SET revision=%d WHERE canonical_uuid=%s',
+                0,
+                \NHK\Core\Shared\Uuid\UuidCodec::toBinary($entity->canonicalId)
+            ));
+
+            self::assertNull($repository->findByCanonicalId($entity->canonicalId));
+            self::assertNotContains($entity->canonicalId, array_column(array_map(static fn (AuthorityEntity $item): array => ['id' => $item->canonicalId], $repository->listByType('brand')), 'id'));
+        } finally {
+            $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_entities WHERE canonical_uuid=%s', \NHK\Core\Shared\Uuid\UuidCodec::toBinary($entity->canonicalId)));
+        }
+    }
+
     public function test_authority_repository_rejects_duplicate_identity_with_changed_state(): void
     {
         $repository = new WpdbAuthorityRepository();

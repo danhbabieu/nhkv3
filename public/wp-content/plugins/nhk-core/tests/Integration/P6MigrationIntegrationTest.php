@@ -146,6 +146,24 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_media_usage_repository_omits_invalid_domain_rows_from_collections(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'integration-media-invalid-usage-' . bin2hex(random_bytes(4)), 'Invalid usage media', 'ready'));
+        $repository = new WpdbMediaUsageRepository($wpdb);
+        $usage = $repository->create(new MediaUsage(UuidCodec::newV7(), $media->canonicalId, 'wp_post', '1:987656', 'featured'));
+
+        try {
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_media_usages SET usage_role=%s WHERE usage_uuid=%s", 'invalid', UuidCodec::toBinary($usage->usageId)));
+            self::assertSame([], $repository->listByMediaId($media->canonicalId));
+            self::assertSame([], $repository->listByEndpoint('wp_post', '1:987656'));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_usages WHERE usage_uuid=%s", UuidCodec::toBinary($usage->usageId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
+
     public function test_media_and_video_repositories_ignore_corrupt_json_rows(): void
     {
         global $wpdb;

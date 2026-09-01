@@ -4,7 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: guarded WordPress suite 214 tests/1,293 assertions;
+Latest verification: guarded WordPress suite 87 tests/476 assertions (228
+tests/1,328 assertions combined);
 Composer lint, MCP wire smoke, all-nine-type core route smoke 34/34 and
 opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 
@@ -60,6 +61,12 @@ public Media query consumption; latest combined verification is 224 tests /
 Video identity hydration now also omits malformed persisted domain rows before
 public Video/query consumption; latest combined verification is 225 tests /
 1,318 assertions.
+
+The persistence boundary is now consistent across Authority, Knowledge
+Source/Claim/Evidence and MediaUsage as well: malformed UUID, state, revision,
+relation and endpoint/domain rows are omitted from repository reads and
+collections. Latest verification is Unit 141/852 and Integration 87/476
+(228/1,328 combined).
 
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,

@@ -24,6 +24,11 @@ the final parity declaration.
 Latest P11 persistence evidence also covers fail-closed KnowledgeClaim
 provenance hydration; guarded integration is 75 tests / 449 assertions.
 
+The persistence hydration boundary now also covers malformed Authority,
+Knowledge Source/Claim/Evidence and MediaUsage domain rows; current combined
+verification is 228 tests / 1,328 assertions. This hardening does not change
+the separate V2 data/publication gates below.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 
