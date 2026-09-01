@@ -27,6 +27,10 @@ or non-array rows; latest combined coverage is 216 tests / 1,297 assertions.
 Proposal hydration additionally fails closed for invalid durable fields such as
 non-positive revisions; latest combined coverage is 217 tests / 1,298 assertions.
 
+NHK Admin entity/proposal UUID lookups now canonicalize through the shared
+codec and reject malformed values before repository access; latest combined
+coverage is 217 tests / 1,301 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

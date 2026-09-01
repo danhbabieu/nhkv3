@@ -30,6 +30,9 @@ rows; latest guarded integration is 76 tests / 451 assertions.
 Governance proposal reads also omit rows with invalid durable fields such as
 non-positive revisions; latest guarded integration is 77 tests / 452 assertions.
 
+NHK Admin entity/proposal lookup forms now fail closed on malformed UUID input;
+latest Unit coverage is 140 tests / 849 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

@@ -99,6 +99,11 @@ Last updated: 2026-09-01, P11 Governance command hydration checkpoint.
   passed 138 tests/844 assertions and guarded integration passed 69 tests/434
   assertions.
 
+- 2026-09-01: Hardened NHK Admin UUID lookup inputs: entity and proposal
+  forms now canonicalize UUIDs through the shared codec and fail closed on
+  malformed values before repository access. Current verification is Unit 140
+  tests / 849 assertions and guarded integration 77 tests / 452 assertions.
+
 - 2026-09-01: Closed the Graph relation identity boundary: `GraphEdge` now
   validates UUID, predicate and positive revision, while the WPDB hydrator
   normalizes MariaDB `HEX(edge_uuid)` output back to RFC 4122 before domain

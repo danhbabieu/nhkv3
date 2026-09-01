@@ -8,6 +8,7 @@ use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Governance\{WpdbApplyAttemptRepository, WpdbProposalRepository};
 use NHK\Core\Shared\Health\HealthCheck;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class AdminPage
 {
@@ -71,7 +72,7 @@ final class AdminPage
         if (!$status->authorityStorageReady()) { echo '<p class="notice notice-warning">Authority storage chưa sẵn sàng.</p>'; return; }
         $type = sanitize_key((string) ($_GET['entity_type'] ?? '')); $key = trim(sanitize_text_field((string) ($_GET['entity_key'] ?? ''))); if ($type === '' || $key === '') return;
         $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types); if (!$types->has($type)) { echo '<p class="notice notice-error">Entity type không hợp lệ.</p>'; return; }
-        $repo = new WpdbAuthorityRepository(); $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $repo->findByCanonicalId($key) : $repo->findByStableKey($type, $key);
+        $repo = new WpdbAuthorityRepository(); $canonicalUuid = self::canonicalUuid($key); $entity = $canonicalUuid !== null ? $repo->findByCanonicalId($canonicalUuid) : $repo->findByStableKey($type, $key);
         if (!$entity || $entity->entityType !== $type) { echo '<p class="notice notice-info">Không tìm thấy entity.</p>'; return; }
         echo '<table class="widefat striped"><tbody><tr><th>Type</th><td>' . esc_html($entity->entityType) . '</td></tr><tr><th>Name</th><td>' . esc_html($entity->canonicalName) . '</td></tr><tr><th>Stable key</th><td><code>' . esc_html($entity->stableKey) . '</code></td></tr><tr><th>Canonical UUID</th><td><code>' . esc_html($entity->canonicalId) . '</code></td></tr><tr><th>Revision</th><td>' . esc_html((string) $entity->revision) . '</td></tr><tr><th>State</th><td>' . esc_html($entity->active() ? 'active' : 'retired') . '</td></tr><tr><th>Payload</th><td><pre>' . esc_html((string) wp_json_encode($entity->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) . '</pre></td></tr></tbody></table>';
     }
@@ -79,7 +80,7 @@ final class AdminPage
     private static function renderProposalLookup(MigrationStatus $status): void
     {
         echo '<h2 id="nhk-proposal-lookup-heading">Governance proposal</h2><form method="get" aria-labelledby="nhk-proposal-lookup-heading"><input type="hidden" name="page" value="nhk-v3"><p><label for="nhk-proposal-id">Proposal UUID</label> <input id="nhk-proposal-id" name="proposal_id" value="' . esc_attr((string) ($_GET['proposal_id'] ?? '')) . '" placeholder="Proposal UUID" size="40"><button class="button">Mở proposal</button></p></form>';
-        $id = trim(sanitize_text_field((string) ($_GET['proposal_id'] ?? ''))); if ($id === '' || preg_match('/^[0-9a-f-]{36}$/i', $id) !== 1) return;
+        $id = trim(sanitize_text_field((string) ($_GET['proposal_id'] ?? ''))); $id = self::canonicalUuid($id); if ($id === null) return;
         if (!$status->governanceStorageReady()) { echo '<p class="notice notice-warning">Governance storage chưa sẵn sàng.</p>'; return; }
         $proposal = (new WpdbProposalRepository())->find($id); if (!$proposal) { echo '<p class="notice notice-info">Không tìm thấy proposal.</p>'; return; }
         $base = rest_url('nhk/v1/governance/proposals/' . rawurlencode($proposal->id)); $payload = wp_json_encode(['content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint], JSON_UNESCAPED_SLASHES);
@@ -113,6 +114,15 @@ final class AdminPage
     {
         if ($capability !== null && !current_user_can($capability)) return;
         echo '<button type="button" class="button nhk-governance-action" data-url="' . esc_attr($url) . '" data-method="' . esc_attr($method) . '"' . ($body !== null ? ' data-body="' . esc_attr($body) . '"' : '') . '>' . esc_html($label) . '</button> ';
+    }
+
+    private static function canonicalUuid(string $value): ?string
+    {
+        try {
+            return UuidCodec::fromBinary(UuidCodec::toBinary($value));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private static function scripts(): void
