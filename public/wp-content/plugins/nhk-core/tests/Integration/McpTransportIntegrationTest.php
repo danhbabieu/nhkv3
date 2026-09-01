@@ -124,6 +124,28 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(-32003, $response->get_data()['error']['code']);
     }
 
+    public function test_rest_proposal_create_normalizes_empty_optional_target_uuid(): void
+    {
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        GovernanceCapabilities::register();
+        $previousUser = get_current_user_id();
+        wp_set_current_user((int) $users[0]->ID);
+        global $wpdb;
+        $idempotencyKey = 'rest-empty-target-' . bin2hex(random_bytes(4));
+        try {
+            $request = new \WP_REST_Request('POST', '/nhk/v1/governance/proposals');
+            $request->set_header('Content-Type', 'application/json');
+            $request->set_body(wp_json_encode(['operation' => 'create', 'entity_type' => 'brand', 'target_uuid' => '', 'idempotency_key' => $idempotencyKey, 'payload' => ['stable_key' => $idempotencyKey, 'name' => 'REST empty target']]));
+            $response = rest_do_request($request);
+            self::assertSame(200, $response->get_status(), (string) wp_json_encode($response->get_data()));
+            self::assertNull($response->get_data()['target_uuid']);
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_proposals WHERE idempotency_key=%s", $idempotencyKey));
+        } finally {
+            wp_set_current_user($previousUser);
+        }
+    }
+
     public function test_unauthenticated_media_ingest_is_rejected_before_proposal_creation(): void
     {
         $response = $this->request('tools/call', ['id' => 4, 'params' => ['name' => 'nhk.media.ingest', 'arguments' => ['stable_key' => 'blocked-media', 'name' => 'Blocked Media']]], ['Mcp-Name' => 'nhk.media.ingest']);

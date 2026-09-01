@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\GovernanceService;
+use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Contracts\Governance\GovernanceAuthorizer;
 use NHK\Core\Domain\Governance\{ApplyAttempt, Proposal, ProposalState};
 use NHK\Core\Governance\Exception\ProposalBindingConflict;
@@ -94,5 +95,12 @@ final class GovernanceCoreTest extends TestCase
 
         $this->expectException(GovernancePermissionDenied::class);
         $service->create(new Proposal('p6', 'entity-1', 'rename', ['name' => 'New'], 'content', 1, 'deps', ProposalState::DRAFT, null, null, null, 'key-6'));
+    }
+
+    public function test_mcp_empty_optional_target_uuid_is_normalized_to_null(): void
+    {
+        $handler = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
+        $proposal = $handler->createFromArguments(['operation' => 'create', 'entity_type' => 'brand', 'target_uuid' => '', 'payload' => ['stable_key' => 'brand-empty-target', 'name' => 'Brand']]);
+        self::assertNull($proposal->targetUuid);
     }
 }

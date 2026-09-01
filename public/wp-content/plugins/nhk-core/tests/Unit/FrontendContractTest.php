@@ -135,6 +135,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('private static function canonicalUuid(string $value): ?string', $admin);
         self::assertStringContainsString('catch (\\Throwable)', $admin);
         self::assertStringContainsString('$canonicalUuid = self::canonicalUuid($key)', $admin);
+        self::assertStringContainsString('target_uuid:(String(form.get("target_uuid")||"").trim()||null)', $admin);
     }
 
     public function test_mcp_wire_smoke_is_read_only_and_covers_protocol_negotiation(): void

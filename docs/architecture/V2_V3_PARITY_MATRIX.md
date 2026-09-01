@@ -78,6 +78,10 @@ domain-target candidates requiring explicit mapping evidence.
 The retained full V2 export independently reproduces those no-write totals and
 the 742-candidate audit; no V2/live records were changed.
 
+Admin, REST and MCP proposal creation normalize an empty optional target UUID
+to null while preserving strict validation for non-empty targets; the REST
+runtime path is guarded-integration tested and the MCP path is unit tested.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 
