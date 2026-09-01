@@ -54,6 +54,10 @@ evaluation; latest guarded integration coverage is 80 tests / 458 assertions.
 Graph edge reads now omit malformed persisted rows from single/paginated
 results; latest guarded integration coverage is 81 tests / 460 assertions.
 
+MediaAsset reads now omit malformed persisted domain rows before public
+delivery/query use; latest guarded integration coverage is 82 tests / 462
+assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

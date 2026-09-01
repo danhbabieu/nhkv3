@@ -113,6 +113,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
   verification is Unit 141 tests / 852 assertions and guarded integration 81
   tests / 460 assertions.
 
+- 2026-09-01: Hardened MediaAsset hydration: malformed asset/parent UUIDs,
+  dimensions, MIME/storage fields, visibility or checksum data now omit the
+  row from single/list reads instead of leaking `InvalidMedia` or UUID errors
+  into public delivery/query paths. Current verification is Unit 141 tests /
+  852 assertions and guarded integration 82 tests / 462 assertions.
+
 - 2026-09-01: Extended the Governance proposal hydration boundary: rows with
   invalid durable domain fields (such as non-positive revision) are now omitted
   from repository reads instead of leaking domain-construction exceptions into

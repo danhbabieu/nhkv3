@@ -96,6 +96,24 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_media_asset_repository_ignores_invalid_domain_rows(): void
+    {
+        global $wpdb;
+        (new MediaAssetMetadataMigration008())->up();
+        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'integration-media-invalid-asset-' . bin2hex(random_bytes(4)), 'Invalid asset media', 'ready'));
+        $repository = new WpdbMediaAssetRepository($wpdb);
+        $asset = $repository->create(new MediaAsset(UuidCodec::newV7(), $media->canonicalId, 'original', 'invalid/domain.webp', hash('sha256', 'invalid-domain'), 'image/webp', 16, null, null, 'PRIVATE'));
+
+        try {
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_media_assets SET width=%d WHERE asset_uuid=%s", 0, UuidCodec::toBinary($asset->assetId)));
+            self::assertNull($repository->findByAssetId($asset->assetId));
+            self::assertSame([], $repository->listByMediaId($media->canonicalId));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE asset_uuid=%s", UuidCodec::toBinary($asset->assetId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
+
     public function test_media_and_video_repositories_ignore_corrupt_json_rows(): void
     {
         global $wpdb;

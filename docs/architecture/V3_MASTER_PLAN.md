@@ -55,6 +55,10 @@ Graph edge hydration now fails closed for malformed persisted edge/node/state
 data before Post Graph and relation APIs consume it; latest combined
 verification is 222 tests / 1,312 assertions.
 
+MediaAsset hydration now fails closed for malformed persisted domain rows before
+public delivery/query consumption; latest combined verification is 223 tests /
+1,314 assertions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge
