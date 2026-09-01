@@ -23,6 +23,17 @@ Video detail remains unavailable because the local query has no active Video row
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
+## Autonomous work queue
+
+| Queue field | Current value |
+|---|---|
+| `ACTIVE_GATE` | V2 Structural Mapping / Retirement |
+| `NEXT_ACTIONABLE_GATE` | Produce governed structural mapping evidence for Brand → Model → Variant and the remaining Authority/Knowledge/Media/WordPress relation lanes, without applying identity mappings |
+| `TEMPORARILY_BLOCKED_GATES` | MCP local wire/runtime evidence: HTTP harness is not responding at `http://localhost:80` or `http://wordpress.local:8080`; retry `php tools/mcp-wire-smoke.php --base-url=http://localhost` after restoring the existing WordPress/Apache vhost |
+| `HUMAN_BLOCKED_GATES` | Final identity/retirement decisions for 742 structural posts, 21 attachment recovery/retirement decisions, 27 residual URL decisions, public Source/Evidence activation, production-scale legacy migration backup/restore, final cutover |
+| `COMPLETED_GATES` | Visibility contract; 764-record classifier; structural mapping policy packet; MCP resolver implementation and transport contract |
+| `DEFERRED_NONCRITICAL_WORK` | Unrequested defensive hardening, new indexes/caches without evidence, cosmetic redesign outside the frontend acceptance sweep |
+
 ## Checkpoint journal
 
 - 2026-09-01: V2 Video migration now parses every supported YouTube URL,
