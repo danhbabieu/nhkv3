@@ -18,7 +18,7 @@ final class PublicKnowledgeRoutes
 
     public function rewrite(): void
     {
-        add_rewrite_rule('^knowledge/claim/([0-9a-f-]{36})/?$', 'index.php?nhk_knowledge_key=$matches[1]', 'top');
+        add_rewrite_rule('^knowledge/claim/([0-9A-Fa-f-]{36})/?$', 'index.php?nhk_knowledge_key=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/page/([1-9][0-9]*)/?$', 'index.php?nhk_knowledge_page=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/?$', 'index.php?nhk_knowledge_page=1', 'top');
     }

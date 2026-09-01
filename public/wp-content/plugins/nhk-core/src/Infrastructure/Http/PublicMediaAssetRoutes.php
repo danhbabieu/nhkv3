@@ -21,7 +21,7 @@ final class PublicMediaAssetRoutes
 
     public function rewrite(): void
     {
-        add_rewrite_rule('^media/asset/([0-9a-f-]{36})/?$', 'index.php?nhk_media_asset_key=$matches[1]', 'top');
+        add_rewrite_rule('^media/asset/([0-9A-Fa-f-]{36})/?$', 'index.php?nhk_media_asset_key=$matches[1]', 'top');
     }
 
     public function serve(): void

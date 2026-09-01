@@ -25,11 +25,11 @@ final class GovernanceApi
     public function register(): void
     {
         register_rest_route('nhk/v1', '/governance/proposals', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_create_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->create($request)]);
-        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9a-f-]{36})/submit', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_submit_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'submit')]);
-        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9a-f-]{36})/approve', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_approve_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'approve')]);
-        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9a-f-]{36})/reject', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_approve_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'reject')]);
-        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9a-f-]{36})/eligibility', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance'), 'callback' => fn (\WP_REST_Request $request) => $this->eligibility($request)]);
-        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9a-f-]{36})/apply', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_apply_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->apply($request)]);
+        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/submit', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_submit_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'submit')]);
+        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/approve', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_approve_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'approve')]);
+        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/reject', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_approve_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'reject')]);
+        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/eligibility', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance'), 'callback' => fn (\WP_REST_Request $request) => $this->eligibility($request)]);
+        register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/apply', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_apply_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->apply($request)]);
     }
 
     private function eligibility(\WP_REST_Request $request): array|\WP_Error

@@ -19,11 +19,11 @@ final class ReadApi
 
     public function register(): void
     {
-        register_rest_route('nhk/v1', '/media/(?P<id>[0-9a-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->media($request)]);
-        register_rest_route('nhk/v1', '/video/(?P<id>[0-9a-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->video($request)]);
-        register_rest_route('nhk/v1', '/knowledge/claim/(?P<id>[0-9a-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->claim($request)]);
-        register_rest_route('nhk/v1', '/knowledge/source/(?P<id>[0-9a-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->source($request)]);
-        register_rest_route('nhk/v1', '/knowledge/evidence/(?P<id>[0-9a-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->evidenceRead($request)]);
+        register_rest_route('nhk/v1', '/media/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->media($request)]);
+        register_rest_route('nhk/v1', '/video/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->video($request)]);
+        register_rest_route('nhk/v1', '/knowledge/claim/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->claim($request)]);
+        register_rest_route('nhk/v1', '/knowledge/source/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->source($request)]);
+        register_rest_route('nhk/v1', '/knowledge/evidence/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->evidenceRead($request)]);
     }
 
     private function media(\WP_REST_Request $request): array|\WP_Error

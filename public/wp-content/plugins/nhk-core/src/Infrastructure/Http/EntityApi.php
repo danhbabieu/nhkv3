@@ -14,7 +14,7 @@ final class EntityApi
 
     public function register(): void
     {
-        register_rest_route('nhk/v1', '/entity/(?P<type>[a-z][a-z0-9_]{0,63})/(?P<id>[0-9a-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->detail($request)]);
+        register_rest_route('nhk/v1', '/entity/(?P<type>[a-z][a-z0-9_]{0,63})/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->detail($request)]);
         register_rest_route('nhk/v1', '/entity/(?P<type>[a-z][a-z0-9_]{0,63})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'args' => ['page' => ['default' => 1], 'per_page' => ['default' => 24]], 'callback' => fn (\WP_REST_Request $request) => $this->list($request)]);
     }
 

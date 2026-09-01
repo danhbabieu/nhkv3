@@ -167,7 +167,7 @@ final class FrontendContractTest extends TestCase
     public function test_public_knowledge_read_api_exposes_reader_safe_evidence_detail(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
-        self::assertStringContainsString("'/knowledge/evidence/(?P<id>[0-9a-f-]{36})'", $readApi);
+        self::assertStringContainsString("'/knowledge/evidence/(?P<id>[0-9A-Fa-f-]{36})'", $readApi);
         self::assertStringContainsString('function evidenceRead(\\WP_REST_Request $request)', $readApi);
         self::assertStringContainsString("'nhk_evidence_not_found'", $readApi);
         self::assertStringNotContainsString("'metadata' =>", $readApi);

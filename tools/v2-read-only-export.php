@@ -110,7 +110,7 @@ $projectionEntityIdsByPost = [];
 foreach ($rows($db, 'SELECT post_id,meta_value FROM ' . $table('postmeta') . " WHERE meta_key='_nhk_projection_source_id' ORDER BY meta_id") as $meta) {
     $postId = (string) $meta['post_id'];
     $entityId = strtolower(trim((string) $meta['meta_value']));
-    if ($postId !== '' && preg_match('/^[0-9a-f-]{36}$/', $entityId) === 1) $projectionEntityIdsByPost[$postId] = $entityId;
+    if ($postId !== '' && preg_match('/^[0-9a-f-]{36}$/i', $entityId) === 1) $projectionEntityIdsByPost[$postId] = strtolower($entityId);
 }
 
 $publicEntityRouteTypes = ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'];

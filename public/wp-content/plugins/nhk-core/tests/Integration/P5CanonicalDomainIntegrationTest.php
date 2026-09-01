@@ -86,6 +86,26 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         self::assertArrayNotHasKey('revision', $response->get_data());
     }
 
+    public function test_public_entity_api_accepts_uppercase_canonical_uuid_route(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new WpdbAuthorityRepository();
+        $entity = new AuthorityEntity(
+            \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
+            'brand',
+            'p5-integration-uppercase-route',
+            'Uppercase route',
+            1,
+            ['country' => 'Switzerland']
+        );
+        $repository->create($entity);
+        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/' . strtoupper($entity->canonicalId)));
+
+        self::assertSame(200, $response->get_status());
+        self::assertSame($entity->canonicalId, $response->get_data()['id']);
+    }
+
     public function test_public_entity_api_list_excludes_retired_entities_before_pagination(): void
     {
         $types = new EntityTypeRegistry();
