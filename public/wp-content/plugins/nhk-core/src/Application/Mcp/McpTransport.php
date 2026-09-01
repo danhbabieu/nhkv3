@@ -141,6 +141,7 @@ final class McpTransport
         if (($schema['format'] ?? '') === 'uuid' && (!is_string($value) || !UuidCodec::isValid($value))) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['enum']) && !in_array($value, (array) $schema['enum'], true)) throw new \InvalidArgumentException('Argument has invalid value: ' . $key . '.');
+        if (isset($schema['minLength']) && is_string($value) && strlen($value) < (int) $schema['minLength']) throw new \InvalidArgumentException('Argument is too short: ' . $key . '.');
         if (isset($schema['minimum']) && is_int($value) && $value < (int) $schema['minimum']) throw new \InvalidArgumentException('Argument is below minimum: ' . $key . '.');
         if (isset($schema['maximum']) && is_int($value) && $value > (int) $schema['maximum']) throw new \InvalidArgumentException('Argument is above maximum: ' . $key . '.');
         if (($schema['type'] ?? '') === 'object') {

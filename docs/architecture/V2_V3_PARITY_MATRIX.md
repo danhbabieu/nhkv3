@@ -82,6 +82,10 @@ Admin, REST and MCP proposal creation normalize an empty optional target UUID
 to null while preserving strict validation for non-empty targets; the REST
 runtime path is guarded-integration tested and the MCP path is unit tested.
 
+MCP ingest schemas also reject empty required strings and invalid domain enum
+values before dispatch, matching the domain contracts for Media, Video,
+Knowledge, Source and Evidence.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 
