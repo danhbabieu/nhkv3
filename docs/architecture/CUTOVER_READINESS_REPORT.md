@@ -12,6 +12,11 @@ opt-in real Authority detail smoke 41/41 pass; diff check is clean.
 Post-push read-only runtime revalidation again passed all 34 frontend routes
 and the complete MCP wire smoke; no database state changed.
 
+Fresh read-only revalidation after the MCP validation checkpoint again passed
+34/34 frontend routes and all nine MCP wire checks, including protocol-header
+CORS, modern initialize/tools exchange, invalid Origin rejection and the
+initialized notification contract.
+
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
 skipped, 0 conflicts and 742 explicit mapping-review candidates. No V2/live

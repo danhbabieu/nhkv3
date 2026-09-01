@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
+Last updated: 2026-09-01, P11 runtime, MCP validation and migration audit checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Fresh read-only revalidation after the MCP validation checkpoint
+  passed all 34 declared frontend routes and all nine MCP wire checks,
+  including CORS protocol headers, modern initialize/tools exchange, invalid
+  Origin rejection and initialized notification handling; no database state
+  changed.
 
 - 2026-09-01: Read-only reference QA revalidated V2 `/tri-thuc/` (12 cards),
   `/thuong-hieu/` (15 cards), honest empty states for `/thu-vien/` and
