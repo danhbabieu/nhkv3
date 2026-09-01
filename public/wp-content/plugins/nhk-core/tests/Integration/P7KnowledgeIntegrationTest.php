@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Knowledge\KnowledgeService;
-use NHK\Core\Domain\Knowledge\{KnowledgeClaim, Source};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Migration\{KnowledgeEvidenceMetadataMigration007, KnowledgeMigration005};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -100,6 +100,26 @@ final class P7KnowledgeIntegrationTest extends TestCase
             self::assertSame('Knowledge claim identity already exists.', $exception->getMessage());
         } finally {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid=%s", UuidCodec::toBinary($claim->canonicalId)));
+        }
+    }
+
+    public function test_evidence_repository_rejects_same_identity_with_changed_metadata(): void
+    {
+        global $wpdb;
+        $service = new KnowledgeService(new WpdbKnowledgeRepository($wpdb), new WpdbSourceRepository($wpdb), new WpdbEvidenceRepository($wpdb));
+        $claim = $service->createClaim('p7-integration-evidence-claim', 'Evidence identity claim.', 'fact');
+        $source = $service->createSource('p7-integration-evidence-source', 'Evidence source', 'catalog', 'catalog:evidence');
+        $repository = new WpdbEvidenceRepository($wpdb);
+        $evidence = new Evidence(UuidCodec::newV7(), $claim->canonicalId, $source->canonicalId, 'supports', 'Original excerpt', null, true, 1, ['visibility' => 'PRIVATE']);
+        $repository->create($evidence);
+        $raced = $repository->create(new Evidence($evidence->canonicalId, $evidence->claimId, $evidence->sourceId, $evidence->relation, $evidence->excerpt, $evidence->locator, $evidence->active, $evidence->revision, $evidence->metadata));
+        self::assertSame($evidence->canonicalId, $raced->canonicalId);
+
+        try {
+            $repository->create(new Evidence($evidence->canonicalId, $evidence->claimId, $evidence->sourceId, $evidence->relation, $evidence->excerpt, $evidence->locator, $evidence->active, $evidence->revision, ['visibility' => 'PUBLIC']));
+            self::fail('Expected a same-identity Evidence with changed metadata to be rejected.');
+        } catch (\NHK\Core\Domain\Knowledge\KnowledgeException $exception) {
+            self::assertSame('Evidence identity already exists.', $exception->getMessage());
         }
     }
 }
