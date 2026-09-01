@@ -147,6 +147,14 @@ final class McpTransportIntegrationTest extends TestCase
         $stableKey = 'mcp-media-' . bin2hex(random_bytes(4));
         $assetChecksum = hash('sha256', $stableKey);
         try {
+            $invalid = $this->request('tools/call', ['id' => 50, 'params' => ['name' => 'nhk.media.ingest', 'arguments' => [
+                'stable_key' => $stableKey . '-invalid',
+                'name' => 'Invalid MCP media',
+                'assets' => [['storage_key' => 'uploads/mcp/missing-kind.jpg']],
+            ]]], ['Mcp-Name' => 'nhk.media.ingest']);
+            self::assertSame(400, $invalid->get_status());
+            self::assertSame(-32602, $invalid->get_data()['error']['code']);
+
             $create = $this->request('tools/call', ['id' => 5, 'params' => ['name' => 'nhk.media.ingest', 'arguments' => [
                 'stable_key' => $stableKey,
                 'name' => 'MCP ' . $stableKey,
