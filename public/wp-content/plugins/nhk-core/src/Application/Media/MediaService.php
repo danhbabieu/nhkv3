@@ -110,7 +110,13 @@ final class MediaService
     public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        return $this->usages->create(new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder));
+        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder);
+        foreach ($this->usages->listByMediaId($mediaId) as $existing) {
+            if ($existing->endpointType !== $candidate->endpointType || $existing->endpointKey !== $candidate->endpointKey || $existing->role !== $candidate->role) continue;
+            if ($this->sameUsage($existing, $candidate)) return $existing;
+            throw new MediaException('Media usage is already bound to a different sort order.');
+        }
+        return $this->usages->create($candidate);
     }
 
     /** @return list<MediaAsset> */
@@ -128,6 +134,15 @@ final class MediaService
             && $left->height === $right->height
             && $left->visibility === $right->visibility
             && $left->metadata === $right->metadata;
+    }
+
+    private function sameUsage(MediaUsage $left, MediaUsage $right): bool
+    {
+        return $left->mediaId === $right->mediaId
+            && $left->endpointType === $right->endpointType
+            && $left->endpointKey === $right->endpointKey
+            && $left->role === $right->role
+            && $left->sortOrder === $right->sortOrder;
     }
 
     private function changeState(string $id, int $revision, bool $active): Media

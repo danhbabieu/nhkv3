@@ -51,6 +51,9 @@ final class P6PersistenceTest extends TestCase
         $usage = $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured');
         self::assertSame($created->canonicalId, $asset->mediaId);
         self::assertSame('PRIVATE', $asset->visibility);
+        $sameUsage = $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured');
+        self::assertSame($usage->usageId, $sameUsage->usageId);
+        self::assertCount(1, $service->usages($created->canonicalId));
         $sameAsset = $service->addAsset($created->canonicalId, 'original', 'uploads/odo-front.jpg', hash('sha256', 'binary'), 'image/jpeg', 6, 1200, 800);
         self::assertSame($asset->assetId, $sameAsset->assetId);
         self::assertCount(1, $service->assets($created->canonicalId));
@@ -60,6 +63,12 @@ final class P6PersistenceTest extends TestCase
             self::fail('Expected a conflicting Media asset storage key to be rejected.');
         } catch (\NHK\Core\Domain\Media\MediaException $exception) {
             self::assertSame('Media asset storage key is already bound to different content.', $exception->getMessage());
+        }
+        try {
+            $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured', 1);
+            self::fail('Expected a conflicting Media usage sort order to be rejected.');
+        } catch (\NHK\Core\Domain\Media\MediaException $exception) {
+            self::assertSame('Media usage is already bound to a different sort order.', $exception->getMessage());
         }
         self::assertCount(1, $service->assets($created->canonicalId));
         self::assertCount(1, $service->usages($created->canonicalId));
