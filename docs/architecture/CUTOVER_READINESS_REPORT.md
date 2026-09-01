@@ -17,6 +17,12 @@ Fresh read-only revalidation after the MCP validation checkpoint again passed
 CORS, modern initialize/tools exchange, invalid Origin rejection and the
 initialized notification contract.
 
+Fresh read-only in-app browser visual QA checked `/`, `/tri-thuc/` and `/video/`.
+The visitor-facing hero, navigation, discovery panel and honest empty states
+rendered successfully with no browser console errors or warnings. This does not
+upgrade active Video detail QA: no active local Video row exists, so that route
+remains data-gated.
+
 The retained full V2 export was independently re-run through the no-write
 dry-run and domain-target audit: 4,973 source records, 3,961 mapped, 1,012
 skipped, 0 conflicts and 742 explicit mapping-review candidates. No V2/live

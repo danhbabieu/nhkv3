@@ -26,6 +26,13 @@ endpoints (`wp_post` included) through the existing read APIs. Governed proposal
 composer covers entity and Graph relation commands; lifecycle application still
 requires capability, approval, eligibility and Controlled Apply.
 
+Fresh in-app browser visual QA (read-only, localhost) checked `/`, `/tri-thuc/`
+and `/video/`: visitor-facing navigation, editorial hero, semantic discovery
+panel and honest empty states rendered without internal terminology; browser
+console error/warning logs were empty. The local query has no active Video row,
+so active Video detail remains data-gated and is not claimed as visually
+verified.
+
 The read-only smoke harness is `php tools/frontend-route-smoke.php
 --base-url=http://localhost`. Representative concrete routes can be added
 without fixture assumptions, for example

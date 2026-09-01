@@ -1,6 +1,12 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 runtime, MCP validation and migration audit checkpoint.
+Last updated: 2026-09-01, P11 runtime, MCP validation, migration audit and
+browser visual QA checkpoint.
+
+Fresh read-only in-app browser visual QA checked `/`, `/tri-thuc/` and `/video/`.
+The visitor-facing hero, navigation, discovery panel and honest empty states
+rendered successfully; browser console error/warning logs were empty. Active
+Video detail remains unavailable because the local query has no active Video row.
 
 | Field | Current value |
 |---|---|
