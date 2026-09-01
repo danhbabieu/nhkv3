@@ -60,6 +60,19 @@ final class P6MigrationIntegrationTest extends TestCase
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
     }
 
+    public function test_media_asset_visibility_schema_defaults_to_private(): void
+    {
+        global $wpdb;
+        (new MediaAssetMetadataMigration008())->up();
+
+        $default = $wpdb->get_var($wpdb->prepare(
+            "SELECT column_default FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=%s AND column_name='visibility'",
+            $wpdb->prefix . 'nhk_media_assets'
+        ));
+
+        self::assertSame('PRIVATE', strtoupper(trim((string) $default, "'")));
+    }
+
     public function test_malformed_media_asset_is_skipped_with_invalid_identity_reason(): void
     {
         global $wpdb;
