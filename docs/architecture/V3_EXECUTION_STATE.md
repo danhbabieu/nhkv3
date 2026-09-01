@@ -87,6 +87,12 @@ Last updated: 2026-09-01, P11 Governance command hydration checkpoint.
   passed 139 tests/845 assertions and guarded integration passed 69 tests/434
   assertions.
 
+- 2026-09-01: Extended the Governance proposal hydration boundary: rows with
+  invalid durable domain fields (such as non-positive revision) are now omitted
+  from repository reads instead of leaking domain-construction exceptions into
+  Admin or lifecycle services. Current verification is Unit 140 tests / 846
+  assertions and guarded integration 77 tests / 452 assertions.
+
 - 2026-09-01: Hardened the Graph predicate domain contract: source/target
   endpoint lists must be non-empty typed lists with valid endpoint identifiers;
   predicate key and cardinality validation remain fail-closed. Unit PHPUnit

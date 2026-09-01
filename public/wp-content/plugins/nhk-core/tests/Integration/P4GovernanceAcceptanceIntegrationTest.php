@@ -91,6 +91,21 @@ final class P4GovernanceAcceptanceIntegrationTest extends TestCase
         self::assertNull($repository->findByIdempotencyKey($proposal->idempotencyKey));
     }
 
+    public function test_proposal_repository_ignores_corrupt_durable_fields(): void
+    {
+        global $wpdb;
+        $repository = new WpdbProposalRepository();
+        $proposal = $repository->create($this->proposal('corrupt-identity'));
+
+        $wpdb->query($wpdb->prepare(
+            'UPDATE ' . $wpdb->prefix . 'nhk_proposals SET revision=%d WHERE idempotency_key=%s',
+            0,
+            $proposal->idempotencyKey
+        ));
+
+        self::assertNull($repository->findByIdempotencyKey($proposal->idempotencyKey));
+    }
+
     public function test_eligibility_reports_dependency_and_revision_reason_codes(): void
     {
         $service = $this->service();

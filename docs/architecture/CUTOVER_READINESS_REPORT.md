@@ -19,6 +19,10 @@ The current Governance checkpoint adds fail-closed handling for malformed or
 non-array proposal `command_json` rows; the suite is now 216 tests / 1,297
 assertions combined.
 
+The follow-up Governance hydration checkpoint also omits proposal rows with
+invalid durable fields such as a non-positive revision; the latest guarded
+suite is 217 tests / 1,298 assertions combined.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

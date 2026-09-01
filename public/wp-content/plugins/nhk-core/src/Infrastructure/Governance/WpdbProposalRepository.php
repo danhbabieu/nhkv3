@@ -27,27 +27,27 @@ final class WpdbProposalRepository implements ProposalRepository
     }
     private function hydrate(?array $row): ?Proposal {
         if (!$row) return null;
-        $state = ProposalState::cases()[max(0, (int) $row['state'] - 1)] ?? ProposalState::DRAFT;
-        $targetBinary = (string) ($row['target_uuid'] ?? '');
-        $target = $targetBinary !== '' && trim($targetBinary, "\0") !== '' ? UuidCodec::fromBinary($targetBinary) : null;
-        $decisionActor = null;
-        $supersededBy = null;
-        $proposalDbId = (int) ($row['id'] ?? 0);
-        if ($proposalDbId > 0) {
-            $approval = $this->db()->get_var($this->db()->prepare('SELECT approved_by FROM '.$this->db()->prefix.'nhk_proposal_approvals WHERE proposal_id=%d ORDER BY id DESC LIMIT 1', $proposalDbId));
-            $decisionActor = $approval !== null ? (string) $approval : null;
-            if (!empty($row['superseded_by_proposal_id'])) {
-                $replacementUuid = $this->db()->get_var($this->db()->prepare('SELECT proposal_uuid FROM '.$this->table().' WHERE id=%d', (int) $row['superseded_by_proposal_id']));
-                $supersededBy = $replacementUuid ? UuidCodec::fromBinary((string) $replacementUuid) : null;
-            }
-        }
         try {
+            $state = ProposalState::cases()[max(0, (int) $row['state'] - 1)] ?? ProposalState::DRAFT;
+            $targetBinary = (string) ($row['target_uuid'] ?? '');
+            $target = $targetBinary !== '' && trim($targetBinary, "\0") !== '' ? UuidCodec::fromBinary($targetBinary) : null;
+            $decisionActor = null;
+            $supersededBy = null;
+            $proposalDbId = (int) ($row['id'] ?? 0);
+            if ($proposalDbId > 0) {
+                $approval = $this->db()->get_var($this->db()->prepare('SELECT approved_by FROM '.$this->db()->prefix.'nhk_proposal_approvals WHERE proposal_id=%d ORDER BY id DESC LIMIT 1', $proposalDbId));
+                $decisionActor = $approval !== null ? (string) $approval : null;
+                if (!empty($row['superseded_by_proposal_id'])) {
+                    $replacementUuid = $this->db()->get_var($this->db()->prepare('SELECT proposal_uuid FROM '.$this->table().' WHERE id=%d', (int) $row['superseded_by_proposal_id']));
+                    $supersededBy = $replacementUuid ? UuidCodec::fromBinary((string) $replacementUuid) : null;
+                }
+            }
             $payload = json_decode((string) ($row['command_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
+            if (!is_array($payload)) return null;
+            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
+        } catch (\InvalidArgumentException|\JsonException) {
             return null;
         }
-        if (!is_array($payload)) return null;
-        return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? 1 : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
     }
     public function create(Proposal $proposal): Proposal {
         $db = $this->db();

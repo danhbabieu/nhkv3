@@ -27,6 +27,9 @@ provenance hydration; guarded integration is 75 tests / 449 assertions.
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 
+Governance proposal reads also omit rows with invalid durable fields such as
+non-positive revisions; latest guarded integration is 77 tests / 452 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical
