@@ -55,5 +55,6 @@ Nếu mục 1 và mục 2 mâu thuẫn, không tự ý sửa contract hoặc inv
 - `04_BRAND_BACKBONE.md`
 - `05_BOUNDARIES_AND_PROJECTIONS.md`
 - `06_REGISTRY_GOVERNANCE_AND_CONFLICTS.md`
+- `15_FRONTEND_DESIGN_UX_LAW.md`
 
 Mọi tài liệu con phải được đọc cùng file này, không tách riêng khỏi nguyên tắc tối cao.

@@ -62,6 +62,7 @@ If implementation, an older architecture document, a migration path or a propose
 ## Git and quality policy
 
 - Read `docs/constitution/READ_FIRST.md` before every task.
+- Frontend changes also follow `docs/constitution/15_FRONTEND_DESIGN_UX_LAW.md`.
 - Read `docs/architecture/V3_EXECUTION_STATE.md` before every task and update it
   after every checkpoint. Read `V2_V3_PARITY_MATRIX.md` before claiming parity.
 - Preserve existing working-tree changes. Never use `git reset --hard`,

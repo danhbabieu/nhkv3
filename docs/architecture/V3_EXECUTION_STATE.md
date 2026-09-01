@@ -41,6 +41,16 @@ Video detail remains unavailable because the local query has no active Video row
 
 ## Checkpoint journal
 
+- 2026-09-01: Continued from accepted `27c79ae`. Confirmed its scope is limited
+  to canonical public Authority routing and related Constitution/spec/tests;
+  push remains blocked by DNS resolution for `github.com`. The current route
+  audit records the approved boundary: Video has a canonical presentation slug
+  route with UUID legacy redirect, while MediaAsset delivery is non-indexable
+  and atomic Knowledge Claims remain consumed through public projections rather
+  than receiving invented SEO pages. Frontend design law is now explicitly
+  listed in the Constitution and AGENTS guidance; shared theme tokens cap normal
+  display typography at 48px desktop / 36px mobile guardrails.
+
 - 2026-09-01: V2 Video migration now parses every supported YouTube URL,
   rejects an explicit external-ID mismatch as a review conflict, and persists
   the canonical `https://www.youtube.com/watch?v=...` URL. This prevents valid
