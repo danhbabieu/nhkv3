@@ -57,6 +57,10 @@ Media identity hydration now also omits malformed persisted domain rows before
 public Media query consumption; latest combined verification is 224 tests /
 1,316 assertions.
 
+Video identity hydration now also omits malformed persisted domain rows before
+public Video/query consumption; latest combined verification is 225 tests /
+1,318 assertions.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

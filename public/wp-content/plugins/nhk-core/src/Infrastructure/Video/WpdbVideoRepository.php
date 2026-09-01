@@ -79,7 +79,11 @@ final class WpdbVideoRepository implements VideoRepository
             return null;
         }
         if (!is_array($metadata)) return null;
-        return new Video(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['platform'], (string) $row['external_video_id'], (string) $row['canonical_url'], (string) $row['title'], $metadata, $row['thumbnail_media_uuid'] === null ? null : UuidCodec::fromBinary($row['thumbnail_media_uuid']), (int) $row['state'] === 1, (int) $row['revision']);
+        try {
+            return new Video(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['platform'], (string) $row['external_video_id'], (string) $row['canonical_url'], (string) $row['title'], $metadata, $row['thumbnail_media_uuid'] === null ? null : UuidCodec::fromBinary($row['thumbnail_media_uuid']), (int) $row['state'] === 1, (int) $row['revision']);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function sameVideo(Video $left, Video $right): bool

@@ -61,6 +61,9 @@ assertions.
 Media identity reads now omit malformed persisted domain rows before public
 query use; latest guarded integration coverage is 83 tests / 464 assertions.
 
+Video identity reads now omit malformed persisted domain rows before public
+query use; latest guarded integration coverage is 84 tests / 466 assertions.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

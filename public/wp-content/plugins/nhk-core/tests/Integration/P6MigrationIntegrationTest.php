@@ -130,6 +130,22 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_video_repository_ignores_invalid_domain_rows(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        $repository = new WpdbVideoRepository($wpdb);
+        $video = $repository->create(Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Invalid video row'));
+
+        try {
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_videos SET revision=%d WHERE canonical_uuid=%s", 0, UuidCodec::toBinary($video->canonicalId)));
+            self::assertNull($repository->findByCanonicalId($video->canonicalId));
+            self::assertSame([], $repository->list());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s", UuidCodec::toBinary($video->canonicalId)));
+        }
+    }
+
     public function test_media_and_video_repositories_ignore_corrupt_json_rows(): void
     {
         global $wpdb;

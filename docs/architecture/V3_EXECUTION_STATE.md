@@ -125,6 +125,12 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
   Current verification is Unit 141 tests / 852 assertions and guarded
   integration 83 tests / 464 assertions.
 
+- 2026-09-01: Hardened Video identity hydration: malformed canonical UUID,
+  external-reference fields, thumbnail UUID or revision rows are omitted from
+  single/list reads instead of leaking `InvalidVideoReference` into public
+  Video/query paths. Current verification is Unit 141 tests / 852 assertions
+  and guarded integration 84 tests / 466 assertions.
+
 - 2026-09-01: Extended the Governance proposal hydration boundary: rows with
   invalid durable domain fields (such as non-positive revision) are now omitted
   from repository reads instead of leaking domain-construction exceptions into
