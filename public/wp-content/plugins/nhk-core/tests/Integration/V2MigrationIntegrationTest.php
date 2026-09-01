@@ -100,6 +100,7 @@ final class V2MigrationIntegrationTest extends TestCase
             $result = (new V2MigrationService($wpdb))->apply($records, 11, 10);
             self::assertSame(3, $result['processed']);
             self::assertSame(3, $result['skipped']);
+            self::assertSame(['EXPLICIT_MAPPING_REQUIRED' => 1, 'SOURCE_RECOVERY_REQUIRED' => 1, 'RETIRE_NO_EDITORIAL_IMPORT' => 1], $result['review_by_action']);
             $details = $wpdb->get_results($wpdb->prepare(
                 "SELECT source_key,reason_code,details_json FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key LIKE %s ORDER BY source_key",
                 'v2-migration-integration-review-%'

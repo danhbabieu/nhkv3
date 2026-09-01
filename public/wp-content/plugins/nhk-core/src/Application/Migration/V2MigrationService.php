@@ -56,7 +56,7 @@ final class V2MigrationService
     /** @param list<array<string,mixed>> $records */
     public function apply(array $records, int $batchNo = 1, int $limit = 100): array
     {
-        $processed = 0; $migrated = 0; $skipped = 0; $conflict = 0;
+        $processed = 0; $migrated = 0; $skipped = 0; $conflict = 0; $reviewByAction = [];
         foreach ($records as $record) {
             if ($processed >= $limit) break;
             if (!is_array($record)) continue;
@@ -67,7 +67,7 @@ final class V2MigrationService
             $existing = $this->ledger->find($type, $key);
             $existingDetails = is_array(json_decode((string) ($existing['details_json'] ?? ''), true)) ? json_decode((string) ($existing['details_json'] ?? ''), true) : [];
             $reprocessProjection = $type === 'legacy_semantic_projection' && ((string) ($existing['reason_code'] ?? '') === 'UNSUPPORTED_LEGACY_TYPE' || ((string) ($existing['reason_code'] ?? '') === 'CONTEXT_SINK_READY' && (int) ($existingDetails['context_schema_version'] ?? 0) < 1));
-            if ($existing && !$reprocessProjection && (string) ($existing['source_checksum'] ?? '') === $checksum && in_array((string) $existing['status'], ['migrated', 'skipped', 'conflict'], true)) { $processed++; if ($existing['status'] === 'migrated') $migrated++; elseif ($existing['status'] === 'conflict') $conflict++; else $skipped++; continue; }
+            if ($existing && !$reprocessProjection && (string) ($existing['source_checksum'] ?? '') === $checksum && in_array((string) $existing['status'], ['migrated', 'skipped', 'conflict'], true)) { $processed++; if ($existing['status'] === 'migrated') $migrated++; elseif ($existing['status'] === 'conflict') $conflict++; else $skipped++; $reviewAction = $this->reviewAction((string) ($existing['reason_code'] ?? '')); if ($reviewAction !== null) $reviewByAction[$reviewAction] = ($reviewByAction[$reviewAction] ?? 0) + 1; continue; }
             $processed++;
             try {
                 $result = $this->migrate($record, $batchNo);
@@ -78,6 +78,8 @@ final class V2MigrationService
                 $review = $this->reviewDetails($record, $error->reason);
                 if ($review !== []) $details['review'] = $review;
                 $this->ledger->record($type, $key, $error->status, $error->reason, $checksum, null, null, null, $batchNo, $details);
+                $reviewAction = $this->reviewAction($error->reason);
+                if ($reviewAction !== null) $reviewByAction[$reviewAction] = ($reviewByAction[$reviewAction] ?? 0) + 1;
                 if ($error->status === 'conflict') $conflict++; else $skipped++;
             } catch (\Throwable $error) {
                 // A storage or domain failure is recorded as a conflict and is
@@ -86,7 +88,17 @@ final class V2MigrationService
                 $conflict++;
             }
         }
-        return ['processed' => $processed, 'migrated' => $migrated, 'skipped' => $skipped, 'conflict' => $conflict, 'ledger' => $this->ledger->counts()];
+        return ['processed' => $processed, 'migrated' => $migrated, 'skipped' => $skipped, 'conflict' => $conflict, 'review_by_action' => $reviewByAction, 'ledger' => $this->ledger->counts()];
+    }
+
+    private function reviewAction(string $reason): ?string
+    {
+        return match ($reason) {
+            'DOMAIN_TARGETED' => 'EXPLICIT_MAPPING_REQUIRED',
+            'UNSUPPORTED_MEDIA_REFERENCE' => 'SOURCE_RECOVERY_REQUIRED',
+            'RETIRED_LEGACY_GARBAGE' => 'RETIRE_NO_EDITORIAL_IMPORT',
+            default => null,
+        };
     }
 
     /** @return array<string,mixed> */
