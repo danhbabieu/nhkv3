@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Knowledge\KnowledgeService;
-use NHK\Core\Domain\Knowledge\Source;
+use NHK\Core\Domain\Knowledge\{KnowledgeClaim, Source};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Migration\{KnowledgeEvidenceMetadataMigration007, KnowledgeMigration005};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -81,6 +81,23 @@ final class P7KnowledgeIntegrationTest extends TestCase
             self::assertSame('Source identity already exists.', $exception->getMessage());
         } finally {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_sources WHERE canonical_uuid=%s", UuidCodec::toBinary($source->canonicalId)));
+        }
+    }
+
+    public function test_knowledge_repository_rejects_same_identity_with_changed_provenance(): void
+    {
+        global $wpdb;
+        $repository = new WpdbKnowledgeRepository($wpdb);
+        $claim = new KnowledgeClaim(UuidCodec::newV7(), 'p7-integration-claim-conflict', 'Conflict claim', 'fact', ['source' => 'test']);
+        $repository->create($claim);
+
+        try {
+            $repository->create(new KnowledgeClaim($claim->canonicalId, $claim->stableKey, $claim->claimText, $claim->claimType, ['source' => 'changed']));
+            self::fail('Expected a same-identity Knowledge claim with changed provenance to be rejected.');
+        } catch (\NHK\Core\Domain\Knowledge\KnowledgeException $exception) {
+            self::assertSame('Knowledge claim identity already exists.', $exception->getMessage());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_knowledge_claims WHERE canonical_uuid=%s", UuidCodec::toBinary($claim->canonicalId)));
         }
     }
 }

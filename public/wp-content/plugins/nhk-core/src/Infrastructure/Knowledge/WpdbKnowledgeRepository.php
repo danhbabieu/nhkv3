@@ -15,9 +15,14 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository
     public function findByStableKey(string $key): ?KnowledgeClaim { return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE stable_key=%s LIMIT 1", $key), ARRAY_A)); }
     public function create(KnowledgeClaim $claim): KnowledgeClaim
     {
+        $existingById = $this->findByCanonicalId($claim->canonicalId);
+        if ($existingById !== null) {
+            if ($this->sameClaim($existingById, $claim)) return $existingById;
+            throw new KnowledgeException('Knowledge claim identity already exists.');
+        }
         $now = gmdate('Y-m-d H:i:s.u');
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (canonical_uuid,stable_key,claim_text,claim_type,provenance_json,state,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%d,%d,%s,%s)", UuidCodec::toBinary($claim->canonicalId), $claim->stableKey, $claim->claimText, $claim->claimType, wp_json_encode($claim->provenance, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $claim->active ? 1 : 0, $claim->revision, $now, $now));
-        if ($ok === false) { $existing = $this->findByStableKey($claim->stableKey); if ($existing && $existing->canonicalId === $claim->canonicalId && $existing->claimText === $claim->claimText) return $existing; throw new KnowledgeException('Knowledge claim identity already exists.'); }
+        if ($ok === false) { $existing = $this->findByStableKey($claim->stableKey); if ($existing && $this->sameClaim($existing, $claim)) return $existing; throw new KnowledgeException('Knowledge claim identity already exists.'); }
         return $this->findByCanonicalId($claim->canonicalId) ?? $claim;
     }
     public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim
@@ -28,4 +33,15 @@ final class WpdbKnowledgeRepository implements KnowledgeRepository
     }
     public function list(bool $includeRetired = false): array { $rows = $this->database->get_results("SELECT * FROM {$this->table}" . ($includeRetired ? '' : ' WHERE state=1') . ' ORDER BY id', ARRAY_A); return array_map(fn (array $row): KnowledgeClaim => $this->hydrate($row), $rows ?: []); }
     private function hydrate(?array $row): ?KnowledgeClaim { if (!$row) return null; return new KnowledgeClaim(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['stable_key'], (string) $row['claim_text'], (string) $row['claim_type'], json_decode((string) $row['provenance_json'], true, 512, JSON_THROW_ON_ERROR), (int) $row['state'] === 1, (int) $row['revision']); }
+
+    private function sameClaim(KnowledgeClaim $left, KnowledgeClaim $right): bool
+    {
+        return $left->canonicalId === $right->canonicalId
+            && $left->stableKey === $right->stableKey
+            && $left->claimText === $right->claimText
+            && $left->claimType === $right->claimType
+            && $left->provenance === $right->provenance
+            && $left->active === $right->active
+            && $left->revision === $right->revision;
+    }
 }
