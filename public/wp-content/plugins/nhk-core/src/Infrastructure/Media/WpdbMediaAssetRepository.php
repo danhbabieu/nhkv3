@@ -78,7 +78,17 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
         $mediaUuid = $this->database->get_var($this->database->prepare("SELECT canonical_uuid FROM {$this->mediaTable} WHERE id=%d LIMIT 1", (int) $row['media_id']));
         if (!is_string($mediaUuid) || strlen($mediaUuid) !== 16) return null;
         $metadata = (string) ($row['metadata_json'] ?? '');
-        return new MediaAsset(UuidCodec::fromBinary($row['asset_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['asset_kind'], (string) $row['storage_key'], bin2hex($row['checksum']), (string) $row['mime_type'], (int) $row['byte_size'], $row['width'] === null ? null : (int) $row['width'], $row['height'] === null ? null : (int) $row['height'], strtoupper((string) ($row['visibility'] ?? 'PRIVATE')), $metadata === '' ? [] : json_decode($metadata, true, 512, JSON_THROW_ON_ERROR));
+        if ($metadata === '') {
+            $decodedMetadata = [];
+        } else {
+            try {
+                $decodedMetadata = json_decode($metadata, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                return null;
+            }
+            if (!is_array($decodedMetadata)) return null;
+        }
+        return new MediaAsset(UuidCodec::fromBinary($row['asset_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['asset_kind'], (string) $row['storage_key'], bin2hex($row['checksum']), (string) $row['mime_type'], (int) $row['byte_size'], $row['width'] === null ? null : (int) $row['width'], $row['height'] === null ? null : (int) $row['height'], strtoupper((string) ($row['visibility'] ?? 'PRIVATE')), $decodedMetadata);
     }
 
     private function mediaInternalId(string $mediaUuid): ?int { $id = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->mediaTable} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($mediaUuid))); return $id === null ? null : (int) $id; }

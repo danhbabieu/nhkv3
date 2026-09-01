@@ -73,6 +73,29 @@ final class P6MigrationIntegrationTest extends TestCase
         self::assertSame('PRIVATE', strtoupper(trim((string) $default, "'")));
     }
 
+    public function test_media_asset_repository_ignores_non_object_metadata_rows(): void
+    {
+        global $wpdb;
+        (new MediaAssetMetadataMigration008())->up();
+        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'integration-media-corrupt-metadata-' . bin2hex(random_bytes(4)), 'Corrupt metadata media', 'ready'));
+        $repository = new WpdbMediaAssetRepository($wpdb);
+        $asset = $repository->create(new MediaAsset(UuidCodec::newV7(), $media->canonicalId, 'original', 'corrupt/metadata.webp', hash('sha256', 'corrupt-metadata'), 'image/webp', 16, null, null, 'PRIVATE'));
+
+        try {
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$wpdb->prefix}nhk_media_assets SET metadata_json=%s WHERE asset_uuid=%s",
+                '"not-an-object"',
+                UuidCodec::toBinary($asset->assetId)
+            ));
+
+            self::assertNull($repository->findByAssetId($asset->assetId));
+            self::assertSame([], $repository->listByMediaId($media->canonicalId));
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE asset_uuid=%s", UuidCodec::toBinary($asset->assetId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
+
     public function test_malformed_media_asset_is_skipped_with_invalid_identity_reason(): void
     {
         global $wpdb;
