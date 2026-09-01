@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 129 tests, 804 assertions; guarded WordPress integration: 59 tests, 425 assertions; combined current suite: 188 tests, 1,229 assertions; Composer PHP lint, MCP wire smoke, core route smoke 30/30 and opt-in real Authority detail route smoke 35/35 pass; browser public-language/SEO and responsive route sweep remains recorded below |
+| Tests | Unit suite: 131 tests, 816 assertions; guarded WordPress integration: 59 tests, 425 assertions; combined current suite: 190 tests, 1,241 assertions; Composer PHP lint, MCP wire smoke, core route smoke 30/30 and opt-in real Authority detail route smoke 35/35 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -19,6 +19,16 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Added read-only `DomainTargetCandidateAudit` and CLI
+  `tools/v2-domain-target-audit.php`. TDD coverage proves same-domain exact
+  title/slug matches remain review candidates, cross-domain matches are
+  excluded, ambiguous candidates are surfaced, and no item is marked mapped.
+  The restored export reports 742/742 unique same-domain candidates with zero
+  ambiguous cases. Guarded PHPUnit passed 190 tests/1,241 assertions and
+  Composer lint passed; the unguarded integration attempt correctly failed
+  closed without the required environment variables, while no V2/V3 data
+  changed.
+
 - 2026-09-01: Read-only V2 endpoint recovery audit found 18/21 exact legacy
   upload paths returning HTTP 200 with allowlisted image MIME/size and three
   `wp1-thumbnail-*` paths returning 404. Temporary downloads were hashed for
@@ -26,6 +36,13 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
   were written to V3. The candidates and SHA-256 values are recorded in
   `V2_MEDIA_SOURCE_RECOVERY_AUDIT_2026-09-01.md`; governed MediaAsset mapping,
   usage resolution, backup/restore and privacy approval remain required.
+
+- 2026-09-01: The new read-only `tools/v2-domain-target-audit.php` compared
+  each of the 742 domain-targeted posts only with same-domain canonical
+  records. Against the restored export it found one candidate for all 742,
+  with no none/ambiguous cases; every item remains explicit-mapping review
+  because the export lacks a legacy-post identity link and governed approval.
+  No URL, body or semantic identity was changed.
 
 - 2026-09-01: Read-only V2 REST metadata cross-check covered all 18 available
   attachment IDs and matched API MIME/filesize to the observed bytes; it

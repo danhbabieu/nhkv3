@@ -30,6 +30,33 @@ records as separate rows; it does not expose a deterministic
 `legacy_post_id` field on the semantic identity rows. Therefore an automatic
 name/slug join would be identity-risking and is intentionally not performed.
 
+## Read-only candidate audit — 2026-09-01
+
+The reproducible audit tool
+`php tools/v2-domain-target-audit.php /path/to/export.json` compares each
+domain post only with canonical records of the same domain type. It emits
+candidate evidence, never a migration mapping or redirect. Against the
+restored 4,973-record export it found one unique same-domain candidate for all
+742 domain posts and no ambiguous candidate:
+
+| Legacy post type | Domain posts | None | One candidate | Ambiguous |
+|---|---:|---:|---:|---:|
+| `nhk_brand` | 4 | 0 | 4 | 0 |
+| `nhk_model` | 30 | 0 | 30 | 0 |
+| `nhk_variant` | 42 | 0 | 42 | 0 |
+| `nhk_movement` | 18 | 0 | 18 | 0 |
+| `nhk_music` | 11 | 0 | 11 | 0 |
+| `nhk_component` | 91 | 0 | 91 | 0 |
+| `nhk_classification` | 174 | 0 | 174 | 0 |
+| `nhk_knowledge` | 372 | 0 | 372 | 0 |
+| **Total** | **742** | **0** | **742** | **0** |
+
+This is useful review evidence, not deterministic identity proof. The match is
+based on normalized canonical title and/or slug; the export still lacks a
+legacy post ID link, revision/provenance binding or governed approval. Every
+candidate therefore remains an explicit mapping review item, and no URL/body
+or semantic identity was changed.
+
 ## Editorial boundary
 
 The 34 `nhk_article` records are handled separately as native editorial posts
