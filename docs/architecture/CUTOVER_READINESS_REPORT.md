@@ -4,8 +4,8 @@ Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**
 
-Latest verification: unit 117 tests/730 assertions; guarded integration 57
-tests/403 assertions; combined 174 tests/1,133 assertions; Composer lint,
+Latest verification: unit 117 tests/732 assertions; guarded integration 57
+tests/403 assertions; combined 174 tests/1,135 assertions; Composer lint,
 MCP wire smoke and
 route smoke 30/30 pass.
 

@@ -60,6 +60,9 @@ try {
     if (count($toolsBody['result']['tools'] ?? []) !== 18) fail('tools/list did not return the registered 18-tool catalog');
     pass('tools/list catalog');
 
+    $invalidOrigin = request($url, 'POST', [...$common, 'Origin: https://invalid.example'], json_encode(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/list', 'params' => []], JSON_THROW_ON_ERROR));
+    expectStatus($invalidOrigin, 403, 'invalid Origin rejection');
+
     $notification = request($url, 'POST', $common, json_encode(['jsonrpc' => '2.0', 'method' => 'notifications/initialized', 'params' => []], JSON_THROW_ON_ERROR));
     expectStatus($notification, 202, 'initialized notification');
     if (trim($notification['body']) !== '') fail('initialized notification returned a response body');

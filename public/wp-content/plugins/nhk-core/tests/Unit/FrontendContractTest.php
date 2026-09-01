@@ -130,6 +130,8 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'initialize'", $tool);
         self::assertStringContainsString("'tools/list'", $tool);
         self::assertStringContainsString("'notifications/initialized'", $tool);
+        self::assertStringContainsString('invalid Origin rejection', $tool);
+        self::assertStringContainsString("'Origin: https://invalid.example'", $tool);
         self::assertStringNotContainsString("'tools/call'", $tool);
         self::assertStringNotContainsString('--apply', $tool);
     }

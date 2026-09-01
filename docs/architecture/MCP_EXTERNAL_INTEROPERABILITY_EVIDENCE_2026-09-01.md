@@ -43,4 +43,5 @@ adapter mapping and deployment verification remain open.
 
 The result is reproducible with the repository's no-write command
 `php tools/mcp-wire-smoke.php`, which passes CORS preflight, `initialize`,
-`tools/list` (18 tools) and the 202 response/no-body notification contract.
+`tools/list` (18 tools), invalid-Origin rejection (403) and the 202
+response/no-body notification contract.
