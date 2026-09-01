@@ -28,6 +28,18 @@ final class WpdbVideoRepository implements VideoRepository
 
     public function create(Video $video): Video
     {
+        $existing = $this->findByCanonicalId($video->canonicalId);
+        if ($existing !== null) {
+            if ($this->sameVideo($existing, $video)) return $existing;
+            throw new VideoException('Video external reference or identity already exists.');
+        }
+
+        $existing = $this->findByExternalReference($video->platform, $video->externalVideoId);
+        if ($existing !== null) {
+            if ($this->sameVideo($existing, $video)) return $existing;
+            throw new VideoException('Video external reference or identity already exists.');
+        }
+
         $now = gmdate('Y-m-d H:i:s.u');
         $thumbnailSql = $video->thumbnailMediaId === null ? 'NULL' : '%s';
         $args = [UuidCodec::toBinary($video->canonicalId), $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, wp_json_encode($video->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $video->active ? 1 : 0, $video->revision, $now, $now];
@@ -35,7 +47,7 @@ final class WpdbVideoRepository implements VideoRepository
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (canonical_uuid,platform,external_video_id,canonical_url,title,metadata_json,thumbnail_media_uuid,state,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,{$thumbnailSql},%d,%d,%s,%s)", ...$args));
         if ($ok === false) {
             $existing = $this->findByExternalReference($video->platform, $video->externalVideoId);
-            if ($existing && $existing->canonicalId === $video->canonicalId && $existing->canonicalUrl === $video->canonicalUrl) return $existing;
+            if ($existing && $this->sameVideo($existing, $video)) return $existing;
             throw new VideoException('Video external reference or identity already exists.');
         }
         return $this->findByCanonicalId($video->canonicalId) ?? $video;
@@ -62,5 +74,17 @@ final class WpdbVideoRepository implements VideoRepository
     {
         if (!$row) return null;
         return new Video(UuidCodec::fromBinary($row['canonical_uuid']), (string) $row['platform'], (string) $row['external_video_id'], (string) $row['canonical_url'], (string) $row['title'], json_decode((string) $row['metadata_json'], true, 512, JSON_THROW_ON_ERROR), $row['thumbnail_media_uuid'] === null ? null : UuidCodec::fromBinary($row['thumbnail_media_uuid']), (int) $row['state'] === 1, (int) $row['revision']);
+    }
+
+    private function sameVideo(Video $left, Video $right): bool
+    {
+        return $left->platform === $right->platform
+            && $left->externalVideoId === $right->externalVideoId
+            && $left->canonicalUrl === $right->canonicalUrl
+            && $left->title === $right->title
+            && $left->metadata === $right->metadata
+            && $left->thumbnailMediaId === $right->thumbnailMediaId
+            && $left->active === $right->active
+            && $left->revision === $right->revision;
     }
 }

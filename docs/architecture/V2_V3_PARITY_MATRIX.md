@@ -51,7 +51,7 @@ metadata, sitemap and RSS must be reconciled before P11 can close.
 | Proposal/submit/approval/eligibility/apply | Governance-controlled mutation | IN PROGRESS |
 | Relations / Post semantic links | One typed Graph | IN PROGRESS |
 | Media ingestion / usage | Media identity, asset and placement separation | PASS — V2 usage inventory is exactly zero; V3 usage contract and fail-closed public asset delivery are covered, while publication policy remains open |
-| Video linking | Canonical external-reference entity | PASS — validated YouTube identity, idempotent external-reference persistence and governed lifecycle are covered; active public-record/data parity remains open |
+| Video linking | Canonical external-reference entity | PASS — validated YouTube identity, strict idempotent external-reference persistence across UUID races with changed-content rejection, and governed lifecycle are covered; active public-record/data parity remains open |
 | Knowledge / Source / Evidence | Atomic claims with provenance | PASS for V3 lifecycle; IN PROGRESS for V2/public policy |
 | Search | Unified SearchService abstraction and native WP post query | IN PROGRESS |
 | Admin / MCP | Governed operational workflows and MCP tool contract | PASS for local contract/lifecycle; IN PROGRESS for external/V2 parity |

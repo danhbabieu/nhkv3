@@ -8,6 +8,7 @@ use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
 use NHK\Core\Application\Migration\V2MigrationService;
 use NHK\Core\Application\Media\MediaVideoPageQuery;
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
+use NHK\Core\Domain\Video\Video;
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Media\{MediaAsset, MediaUsage};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
@@ -165,6 +166,27 @@ final class P6MigrationIntegrationTest extends TestCase
             self::assertSame('Media stable key or identity already exists.', $exception->getMessage());
         } finally {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
+
+    public function test_video_repository_is_idempotent_for_same_external_reference_and_rejects_changed_content(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        $repository = new WpdbVideoRepository($wpdb);
+        $externalId = substr(str_replace('-', '', UuidCodec::newV7()), 0, 11);
+        $video = new Video(UuidCodec::newV7(), 'youtube', $externalId, 'https://www.youtube.com/watch?v=' . $externalId, 'Reference', ['source' => 'test']);
+        $repository->create($video);
+        $raced = $repository->create(new Video(UuidCodec::newV7(), $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata));
+        self::assertSame($video->canonicalId, $raced->canonicalId);
+
+        try {
+            $repository->create(new Video(UuidCodec::newV7(), $video->platform, $video->externalVideoId, $video->canonicalUrl, 'Changed reference', $video->metadata));
+            self::fail('Expected a same-reference Video with changed content to be rejected.');
+        } catch (\NHK\Core\Domain\Video\VideoException $exception) {
+            self::assertSame('Video external reference or identity already exists.', $exception->getMessage());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_videos WHERE canonical_uuid=%s", UuidCodec::toBinary($video->canonicalId)));
         }
     }
 }
