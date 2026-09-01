@@ -12,10 +12,13 @@ Read-only endpoint base: `https://demo.1945.vn/wp-content/uploads/`
 
 18 of 21 exact legacy upload paths returned HTTP 200 from the read-only V2
 reference. The three `wp1-thumbnail-*` paths returned HTTP 404. The 200
-responses have allowlisted image MIME types and nonzero byte sizes, so they are
-source-recovery candidates only. A governed MediaAsset mapping still requires
-backup/restore evidence, an explicit identity/usage mapping, checksum capture
-from the approved source artifact, and publication/privacy approval.
+responses have allowlisted image MIME types and nonzero byte sizes. Three of
+the 18 candidates (attachments 818, 849 and 852) already have explicit
+canonical Media identities and imported PRIVATE asset rows in the export; the
+other 15 have no equivalent deterministic semantic mapping in the export. A
+governed recovery/update still requires backup/restore evidence, checksum
+capture from the approved source artifact, preservation of the existing
+processed asset where applicable, and publication/privacy approval.
 
 | V2 ID | Legacy path | HTTP | MIME | Bytes | Read-only response SHA-256 |
 |---:|---|---:|---|---:|---|
@@ -55,12 +58,27 @@ returned `post=819`, which is the V2 logo attachment, not an editorial post or
 semantic usage relation. Several responses returned `source_url=false` even
 though the exact upload path returned HTTP 200, so the path/bytes table above is
 the authoritative recovery evidence. The API exposed no deterministic
-Media/Specimen/Product usage mapping for these candidates.
+Media/Specimen/Product usage mapping for the 15 unmapped candidates. The export
+does, however, carry explicit provenance for three existing MediaAsset rows:
+
+| Attachment | Canonical Media UUID | Original filename | Observed source hash | Existing V3 asset state |
+|---:|---|---|---|---|
+| 818 | `839ba38c-d60e-4029-ad90-245bd73a267a` | `IMG_3581.jpg` | `dc083036a32647a28d4a01a6e71656e81cc1cd28aa571062448bd510b272d1ba` | PRIVATE, parent Media draft |
+| 849 | `6c1783b3-d49e-4664-bec0-256d91db79b9` | `IMG_3612-1.jpg` | `d43b7c635e9a69ce1ac2eb726c9857438e34bf7abb3be74b24a4c3f894af85cf` | PRIVATE, parent Media draft |
+| 852 | `11f5eb62-076e-44b6-a34a-740963e5c50c` | `IMG_4413.jpg` | `edf5396fd2eef21b7052481fb7a0e8251aaa8f49c54f16b8c3cd954d5b1876a2` | PRIVATE, parent Media draft |
+
+These are identity/attachment relationships, not permission to replace the
+existing processed V2 asset bytes. Their imported V3 asset checksums and
+storage keys refer to processed V2 files that are not present in the current
+workspace, so a recovery implementation must preserve provenance and choose
+explicitly whether the original is a new asset variant or a governed repair.
 
 Consequently, even the available files remain recovery candidates rather than
-approved imports. In particular, matching filenames, equal hashes or a V2
-attachment's own detail page cannot establish semantic identity or intended
-public usage.
+approved imports. For the 15 unmapped files, matching filenames, equal hashes
+or a V2 attachment's own detail page cannot establish semantic identity or
+intended public usage. For the three explicitly mapped files, identity is
+known but publication, asset-variant semantics and source-byte handling remain
+governed decisions.
 
 ## Required next gate
 

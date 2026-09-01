@@ -29,10 +29,11 @@ Last updated: 2026-09-01, P11 real Authority detail route checkpoint.
 
 - 2026-09-01: Read-only V2 REST metadata cross-check covered all 18 available
   attachment IDs and matched API MIME/filesize to the observed bytes; it
-  exposed no deterministic semantic usage mapping (`post=null` for 17 and the
-  logo-to-logo attachment relation for the remaining response). Several
-  `source_url=false` API fields reinforce that exact path/bytes evidence must
-  be retained separately. No V2/V3 state changed.
+  exposed no deterministic usage mapping for 15 candidates (`post=null`),
+  while the export already carries explicit Media/asset provenance for
+  attachments 818, 849 and 852. Several `source_url=false` API fields
+  reinforce that exact path/bytes evidence must be retained separately. No
+  V2/V3 state changed.
 
 - 2026-09-01: A fresh HTTP route sweep passed 35/35 using active local-dev
   stable keys for Brand `nhk:brand:junghans`, Model `nhk:model:ffr.69`,
