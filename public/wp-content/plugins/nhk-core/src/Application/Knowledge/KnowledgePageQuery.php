@@ -21,7 +21,7 @@ final class KnowledgePageQuery
             $source = $this->sources->findByCanonicalId($item->sourceId);
             return $source !== null && $source->active && $source->isPublic();
         }));
-        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'revision' => $claim->revision, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
+        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
     }
 
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */
@@ -34,5 +34,5 @@ final class KnowledgePageQuery
     }
 
     private function available(): bool { return !$this->status || $this->status->knowledgeStorageReady(); }
-    private function evidence(Evidence $item, ?Source $source = null): array { return ['id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'revision' => $item->revision]; }
+    private function evidence(Evidence $item, ?Source $source = null): array { return ['id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator]; }
 }

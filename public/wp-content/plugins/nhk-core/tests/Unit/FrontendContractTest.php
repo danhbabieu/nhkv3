@@ -371,6 +371,27 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("'metadata' => \$evidence->metadata", $evidenceMethod);
     }
 
+    public function test_public_knowledge_serializers_do_not_expose_lifecycle_fields(): void
+    {
+        $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
+        foreach ([
+            "'active' => \$claim->active", "'revision' => \$claim->revision",
+            "'active' => \$source->active", "'revision' => \$source->revision",
+            "'active' => \$evidence->active", "'revision' => \$evidence->revision",
+        ] as $field) self::assertStringNotContainsString($field, $readApi);
+        $mcp = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php');
+        foreach ([
+            "'active' => \$claim->active", "'revision' => \$claim->revision",
+            "'active' => \$source->active", "'revision' => \$source->revision",
+        ] as $field) self::assertStringNotContainsString($field, $mcp);
+        $publicEvidence = substr($mcp, strpos($mcp, 'private function publicEvidence'), strpos($mcp, 'private function publicEvidenceByClaim') - strpos($mcp, 'private function publicEvidence'));
+        self::assertStringNotContainsString("'active' => \$evidence->active", $publicEvidence);
+        self::assertStringNotContainsString("'revision' => \$evidence->revision", $publicEvidence);
+        $query = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Knowledge/KnowledgePageQuery.php');
+        self::assertStringNotContainsString("'revision' => \$claim->revision", $query);
+        self::assertStringNotContainsString("'revision' => \$item->revision", $query);
+    }
+
     public function test_public_search_filters_retired_media_and_video(): void
     {
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');

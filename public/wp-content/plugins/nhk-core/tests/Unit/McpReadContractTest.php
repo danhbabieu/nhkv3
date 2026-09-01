@@ -102,10 +102,16 @@ final class McpReadContractTest extends TestCase
         self::assertArrayNotHasKey('revision', $videoRead);
         $knowledgeRead = $handler->knowledgeGet($mcpClaim->canonicalId);
         self::assertArrayNotHasKey('provenance', $knowledgeRead);
+        self::assertArrayNotHasKey('active', $knowledgeRead);
+        self::assertArrayNotHasKey('revision', $knowledgeRead);
         self::assertArrayNotHasKey('metadata', $knowledgeRead['evidence'][0]);
         self::assertSame($mcpSource->canonicalId, $handler->sourceGet($mcpSource->canonicalId)['id']);
+        self::assertArrayNotHasKey('active', $handler->sourceGet($mcpSource->canonicalId));
+        self::assertArrayNotHasKey('revision', $handler->sourceGet($mcpSource->canonicalId));
         self::assertSame($mcpEvidence->canonicalId, $handler->evidenceGet($mcpEvidence->canonicalId)['id']);
         self::assertArrayNotHasKey('metadata', $handler->evidenceGet($mcpEvidence->canonicalId));
+        self::assertArrayNotHasKey('active', $handler->evidenceGet($mcpEvidence->canonicalId));
+        self::assertArrayNotHasKey('revision', $handler->evidenceGet($mcpEvidence->canonicalId));
         self::assertNull($handler->entityGet('model', $entity->canonicalId));
         $invalidVideo = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
         $invalidVideos = new class($invalidVideo) implements VideoRepository {
