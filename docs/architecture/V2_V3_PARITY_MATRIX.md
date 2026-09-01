@@ -41,6 +41,10 @@ Dry-run relation and URL target candidates apply the same strict UUID boundary,
 with nil/malformed UUIDs rejected before mapping; latest Unit coverage is 141
 tests / 852 assertions.
 
+Fresh MCP wire smoke and complete frontend route smoke pass on canonical
+`http://localhost`; the domain candidate audit remains 742 explicit review
+items, with no automatic identity mapping.
+
 Homepage, archives, posts, all canonical entity pages, search, navigation,
 images, related content, mobile/desktop behavior, create/edit/relations/media/
 publish/proposal/approval/apply/search/MCP workflows, URL redirects, canonical

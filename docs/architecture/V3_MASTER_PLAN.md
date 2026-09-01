@@ -40,6 +40,10 @@ Dry-run relation and URL target validation now uses the same strict UUID
 boundary before reporting mapped candidates; latest coverage is 219 tests /
 1,308 assertions combined.
 
+Fresh local-dev MCP wire and frontend route smoke revalidation passed on the
+canonical host; the read-only domain-target audit remains 742 explicit mapping
+review candidates.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

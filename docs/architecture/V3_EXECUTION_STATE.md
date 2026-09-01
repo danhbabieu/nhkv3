@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 Governance command hydration checkpoint.
+Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -18,6 +18,14 @@ Last updated: 2026-09-01, P11 Governance command hydration checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Revalidated the live local-dev read-only boundary after a
+  graceful Apache restart: MCP wire smoke passed CORS, initialize, tools/list,
+  invalid-Origin rejection and initialized notification; frontend route smoke
+  passed all declared routes including sitemap/RSS, search, aliases,
+  comparison, 404 and fail-closed asset checks on canonical `http://localhost`.
+  The read-only domain-target audit still reports 742 unique same-domain
+  candidates, all requiring explicit mapping evidence and approval.
 
 - 2026-09-01: Closed the Governance command hydration boundary: proposal
   repository reads now omit malformed or non-array `command_json` rows from

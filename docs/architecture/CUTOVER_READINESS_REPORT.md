@@ -35,6 +35,11 @@ Dry-run relation and URL target identity checks now share that strict UUID
 boundary, rejecting nil/malformed UUIDs before mapping candidates are emitted;
 latest combined coverage is 219 tests / 1,308 assertions.
 
+Fresh local-dev runtime revalidation passed the complete MCP wire smoke and all
+declared frontend route smoke checks on canonical `http://localhost`; the
+read-only domain audit still finds 742 unique candidates requiring governed
+mapping evidence, so no V2 identity or URL decision was inferred.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping
