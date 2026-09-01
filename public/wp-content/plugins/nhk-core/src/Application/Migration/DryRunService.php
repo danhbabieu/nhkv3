@@ -12,7 +12,7 @@ final class DryRunService
     /** @param list<array<string,mixed>> $records */
     public function run(array $records): array
     {
-        $report = ['source_count' => count($records), 'source_counts' => [], 'mapped' => 0, 'mapped_by_type' => [], 'skipped' => 0, 'skipped_by_reason' => [], 'conflict' => 0, 'duplicate_candidate' => 0, 'invalid_relation' => 0, 'missing_endpoint' => 0, 'url_mapping' => 0, 'items' => []];
+        $report = ['source_count' => count($records), 'source_counts' => [], 'mapped' => 0, 'mapped_by_type' => [], 'skipped' => 0, 'skipped_by_reason' => [], 'review_by_action' => [], 'conflict' => 0, 'duplicate_candidate' => 0, 'invalid_relation' => 0, 'missing_endpoint' => 0, 'url_mapping' => 0, 'items' => []];
         $checksums = [];
         foreach ($records as $index => $record) {
             $result = is_array($record) ? $this->inspect($record, $checksums) : ['status' => 'skipped', 'reason' => 'INVALID_RECORD'];
@@ -21,6 +21,8 @@ final class DryRunService
             $report['items'][] = ['index' => $index, ...$result];
             if ($result['status'] === 'mapped') { $report['mapped']++; $report['mapped_by_type'][$type] = ($report['mapped_by_type'][$type] ?? 0) + 1; }
             if ($result['status'] === 'skipped') { $report['skipped']++; $report['skipped_by_reason'][$result['reason']] = ($report['skipped_by_reason'][$result['reason']] ?? 0) + 1; }
+            $reviewAction = $this->reviewAction($result);
+            if ($reviewAction !== null) $report['review_by_action'][$reviewAction] = ($report['review_by_action'][$reviewAction] ?? 0) + 1;
             if ($result['status'] === 'conflict') $report['conflict']++;
             if ($result['reason'] === 'DUPLICATE_CANDIDATE') $report['duplicate_candidate']++;
             if ($result['reason'] === 'INVALID_RELATION') $report['invalid_relation']++;
@@ -28,6 +30,15 @@ final class DryRunService
             if (in_array($result['reason'], ['URL_MAPPING_READY', 'READY_NOOP'], true)) $report['url_mapping']++;
         }
         return $report;
+    }
+
+    private function reviewAction(array $result): ?string
+    {
+        $review = is_array($result['review'] ?? null) ? $result['review'] : [];
+        if (isset($review['requires_explicit_mapping']) || $result['reason'] === 'DOMAIN_TARGETED') return 'EXPLICIT_MAPPING_REQUIRED';
+        if (isset($review['requires_source_recovery']) || $result['reason'] === 'UNSUPPORTED_MEDIA_REFERENCE') return 'SOURCE_RECOVERY_REQUIRED';
+        if (($review['disposition'] ?? '') === 'retire' || $result['reason'] === 'RETIRED_LEGACY_GARBAGE') return 'RETIRE_NO_EDITORIAL_IMPORT';
+        return null;
     }
 
     /** @param array<string,mixed> $record @param array<string,list<string>> $checksums */

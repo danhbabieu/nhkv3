@@ -105,6 +105,7 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('brand', $report['items'][0]['review']['target_domain']);
         self::assertTrue($report['items'][0]['review']['requires_explicit_mapping']);
         self::assertTrue($report['items'][0]['review']['name_only_match_forbidden']);
+        self::assertSame(['EXPLICIT_MAPPING_REQUIRED' => 1], $report['review_by_action']);
     }
 
     public function test_attachment_and_global_style_skips_include_safe_dispositions(): void
@@ -117,6 +118,7 @@ final class MigrationDryRunTest extends TestCase
         self::assertSame('media_asset', $report['items'][0]['review']['target_domain']);
         self::assertSame('retire', $report['items'][1]['review']['disposition']);
         self::assertTrue($report['items'][1]['review']['editorial_import_forbidden']);
+        self::assertSame(['SOURCE_RECOVERY_REQUIRED' => 1, 'RETIRE_NO_EDITORIAL_IMPORT' => 1], $report['review_by_action']);
     }
 
     public function test_invalid_checksum_and_non_record_are_not_silently_mapped(): void

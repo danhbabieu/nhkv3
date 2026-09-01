@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 Admin migration review checkpoint.
+Last updated: 2026-09-01, P11 dry-run review summary checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 Admin migration review checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 116 tests, 722 assertions; guarded WordPress integration: 57 tests, 403 assertions; combined current suite: 173 tests, 1,125 assertions; plugin/theme PHP lint, route smoke 30/30, browser public-language/SEO sweep and diff check pass |
+| Tests | Unit suite: 116 tests, 724 assertions; guarded WordPress integration: 57 tests, 403 assertions; combined current suite: 173 tests, 1,127 assertions; plugin/theme PHP lint, route smoke 30/30, browser public-language/SEO sweep and diff check pass |
 | Blockers | Remaining route-specific screenshot QA and an active Video detail, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and recovery of the three missing V2 source files, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -81,6 +81,11 @@ Last updated: 2026-09-01, P11 Admin migration review checkpoint.
   header-only `tools/list` returned HTTP 200 JSON-RPC responses with the 18
   registered tools. External adapter mapping/deployment remains a separate
   open gate.
+
+- 2026-09-01: The no-write dry-run now emits `review_by_action` aggregates in
+  addition to per-item review metadata, covering explicit mapping, source
+  recovery and retirement-only dispositions. Full guarded PHPUnit passed 173
+  tests/1,127 assertions; no V2/V3 data was mutated.
 
 - 2026-09-01: Route smoke now asserts title/canonical metadata for the two
   editorial archives, the default category archive and the 404 route, including

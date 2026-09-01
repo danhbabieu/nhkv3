@@ -49,7 +49,8 @@ Before any mutation, the migration work must record read-only counts and
 mapping coverage for Posts, categories, attachments/media, all Authority
 types, Knowledge, Sources, Evidence, relations, Videos and URLs. The dry-run
 must emit source count, mapped, skipped, conflicts, duplicate candidates,
-invalid relations, missing endpoints and URL mappings. It must not write to V2
+invalid relations, missing endpoints, URL mappings and `review_by_action`
+aggregates for governed skip dispositions. It must not write to V2
 or production. Media checksum matches are duplicate candidates only and never
 automatic identity merges.
 
@@ -59,7 +60,8 @@ automatic identity merges.
 object containing a `records` array and emits a machine-readable report. The
 `DryRunService` performs no database or filesystem writes. It classifies
 supported records, URL mappings and relations, validates canonical UUIDs and
-stable keys, reports per-type source/mapped counts and skipped-reason counts,
+stable keys, reports per-type source/mapped counts, skipped-reason counts and
+`review_by_action` aggregates,
 and emits bounded reason codes including `DUPLICATE_CANDIDATE`,
 `INVALID_RELATION`, `MISSING_ENDPOINT`, `INVALID_IDENTITY`, `INVALID_RECORD`,
 `CONFLICT_REQUIRES_REVIEW` and `UNSUPPORTED_LEGACY_TYPE`. Invalid checksums
