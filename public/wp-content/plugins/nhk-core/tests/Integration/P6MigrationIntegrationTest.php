@@ -92,6 +92,27 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
+    public function test_media_asset_repository_rejects_same_identity_with_changed_content(): void
+    {
+        global $wpdb;
+        (new MediaMigration004())->up();
+        (new MediaAssetMetadataMigration008())->up();
+        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'integration-media-conflict-' . bin2hex(random_bytes(4)), 'Conflict Media', 'ready'));
+        $repository = new WpdbMediaAssetRepository($wpdb);
+        $asset = new MediaAsset(UuidCodec::newV7(), $media->canonicalId, 'original', 'uploads/conflict.jpg', hash('sha256', 'conflict-original'), 'image/jpeg', 42, 20, 10, 'PRIVATE', ['source' => 'test']);
+        $repository->create($asset);
+
+        try {
+            $repository->create(new MediaAsset($asset->assetId, $asset->mediaId, 'original', $asset->storageKey, $asset->checksum, 'image/png', 42, 20, 10, 'PRIVATE', ['source' => 'test']));
+            self::fail('Expected a same-identity Media asset with changed content metadata to be rejected.');
+        } catch (\NHK\Core\Domain\Media\MediaException $exception) {
+            self::assertSame('Media asset identity or storage key already exists.', $exception->getMessage());
+        } finally {
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE asset_uuid=%s", UuidCodec::toBinary($asset->assetId)));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
+        }
+    }
+
     public function test_private_asset_metadata_is_persisted_but_not_exposed_by_public_media_query(): void
     {
         global $wpdb;

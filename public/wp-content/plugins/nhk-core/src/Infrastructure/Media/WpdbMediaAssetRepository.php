@@ -29,13 +29,18 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
         $heightSql = $asset->height === null ? 'NULL' : '%d';
         $mediaId = $this->mediaInternalId($asset->mediaId);
         if ($mediaId === null) throw new MediaException('Media parent not found.');
+        $existingById = $this->findByAssetId($asset->assetId);
+        if ($existingById !== null) {
+            if ($this->sameAsset($existingById, $asset)) return $existingById;
+            throw new MediaException('Media asset identity or storage key already exists.');
+        }
         $args = [UuidCodec::toBinary($asset->assetId), $mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize];
         foreach ([$asset->width, $asset->height] as $dimension) if ($dimension !== null) $args[] = $dimension;
         array_push($args, $asset->visibility, wp_json_encode($asset->metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), gmdate('Y-m-d H:i:s.u'));
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (asset_uuid,media_id,asset_kind,storage_key,checksum,mime_type,byte_size,width,height,visibility,metadata_json,created_at) VALUES (%s,%s,%s,%s,UNHEX(%s),%s,%d,{$widthSql},{$heightSql},%s,%s,%s)", ...$args));
         if ($ok === false) {
             $existing = $this->findByAssetId($asset->assetId);
-            if ($existing && $existing->mediaId === $asset->mediaId && $existing->storageKey === $asset->storageKey && $existing->checksum === $asset->checksum) return $existing;
+            if ($existing && $this->sameAsset($existing, $asset)) return $existing;
             throw new MediaException('Media asset identity or storage key already exists.');
         }
         return $this->findByAssetId($asset->assetId) ?? $asset;
@@ -77,6 +82,20 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
     }
 
     private function mediaInternalId(string $mediaUuid): ?int { $id = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->mediaTable} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($mediaUuid))); return $id === null ? null : (int) $id; }
+
+    private function sameAsset(MediaAsset $left, MediaAsset $right): bool
+    {
+        return $left->mediaId === $right->mediaId
+            && $left->kind === $right->kind
+            && $left->storageKey === $right->storageKey
+            && $left->checksum === $right->checksum
+            && $left->mimeType === $right->mimeType
+            && $left->byteSize === $right->byteSize
+            && $left->width === $right->width
+            && $left->height === $right->height
+            && $left->visibility === $right->visibility
+            && $left->metadata === $right->metadata;
+    }
 
     /** @param list<array<string,mixed>> $rows @return list<MediaAsset> */
     private function hydrateList(array $rows): array

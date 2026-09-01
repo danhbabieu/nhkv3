@@ -1,6 +1,6 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-01, P11 Media duplicate-boundary checkpoint.
+Last updated: 2026-09-01, P11 Media repository conflict checkpoint.
 
 | Field | Current value |
 |---|---|
@@ -9,7 +9,7 @@ Last updated: 2026-09-01, P11 Media duplicate-boundary checkpoint.
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 134 tests, 828 assertions; guarded WordPress integration: 60 tests, 430 assertions; combined current suite: 194 tests, 1,258 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
+| Tests | Unit suite: 134 tests, 828 assertions; guarded WordPress integration: 61 tests, 431 assertions; combined current suite: 195 tests, 1,259 assertions; Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, final retirement/target approval for 27 explicitly classified URL candidates (the 5 domain-targeted records now have exact but archived/non-public Knowledge identity matches, while 21 are unsupported media references and 1 is retired legacy garbage), MediaAsset publication/privacy policy and governed recovery/mapping of 18 available V2 upload candidates plus recovery/retirement of 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and 764 domain-targeted posts remain open; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
 | Next executable task | Use `V2_URL_RECONCILIATION_REVIEW_2026-08-31.md` and `V2_DOMAIN_TARGET_REVIEW_2026-08-31.md` to obtain governed retirement/target decisions for the 27 residual URLs and deterministic mappings for the 764 skipped domain records, then continue MediaAsset delivery/privacy policy, Source/Evidence activation/public provenance policy, active-Video QA and external MCP interoperability checks |
@@ -18,6 +18,13 @@ Last updated: 2026-09-01, P11 Media duplicate-boundary checkpoint.
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
 
 ## Checkpoint journal
+
+- 2026-09-01: Hardened `WpdbMediaAssetRepository::create()` with strict
+  duplicate comparison across parent, kind, storage, checksum, MIME, size,
+  dimensions, visibility and metadata. UUID preflight now avoids emitting a
+  duplicate SQL warning, while the insert-failure path remains race-safe;
+  same-identity changed-content packets fail closed. Guarded PHPUnit passed
+  195 tests/1,259 assertions and no database state was retained.
 
 - 2026-09-01: Hardened the resumable V2 MediaAsset migration boundary: a
   missing MIME type is now classified as `skipped / INVALID_IDENTITY` with a
