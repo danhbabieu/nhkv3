@@ -76,6 +76,10 @@ Authority, Media, Video and Knowledge hydrators also validate the raw persisted
 state representation before casting, preventing malformed values from being
 silently interpreted as active or retired records.
 
+Fresh read-only revalidation passed MCP wire smoke and all 34 frontend route
+checks; the current dry-run remains 3,961 mapped / 1,012 skipped / 0
+conflicts, and the domain audit remains 742 explicit mapping-review items.
+
 Current runtime revalidation also passed local MCP wire smoke and frontend route
 smoke 34/34; bounded external Media/Source/Video reads reported zero writes,
 Media total 242, draft Sources and no Video records. External adapter mapping

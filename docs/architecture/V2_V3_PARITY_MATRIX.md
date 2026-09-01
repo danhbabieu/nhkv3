@@ -37,6 +37,10 @@ Raw persisted state validation is strict across Authority, Media, Video and
 Knowledge hydrators; malformed values are omitted before public or governed
 domain consumption.
 
+The latest read-only revalidation still reports MCP wire smoke PASS, frontend
+route smoke 34/34, dry-run 3,961 mapped / 1,012 skipped / 0 conflicts and 742
+domain-target candidates requiring explicit mapping evidence.
+
 Governance proposal reads likewise omit malformed/non-array `command_json`
 rows; latest guarded integration is 76 tests / 451 assertions.
 

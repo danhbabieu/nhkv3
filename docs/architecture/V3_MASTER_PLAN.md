@@ -80,6 +80,11 @@ Raw numeric state validation is now strict across Authority, Media, Video and
 Knowledge persistence hydrators; malformed state values are omitted before
 domain construction.
 
+Fresh read-only revalidation confirms MCP wire smoke and frontend route smoke
+remain green (34/34 routes); the current dry-run remains 3,961 mapped / 1,012
+skipped / 0 conflicts, with 742 domain-target candidates awaiting governed
+decisions.
+
 ## Locked direction
 
 WordPress owns article content; Authority owns canonical entities; Knowledge

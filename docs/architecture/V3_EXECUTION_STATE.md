@@ -19,6 +19,14 @@ Last updated: 2026-09-01, P11 runtime and migration audit checkpoint.
 
 ## Checkpoint journal
 
+- 2026-09-01: Revalidated the read-only runtime and migration evidence from
+  current artifacts: MCP wire smoke passed CORS, initialize, tools/list,
+  invalid-Origin rejection and initialized notification; frontend route smoke
+  passed 34/34; the current no-write dry-run reports 4,973 source records,
+  3,961 mapped, 1,012 skipped and 0 conflicts; domain-target audit reports
+  742 candidates, all still requiring explicit mapping evidence. No V2/live
+  data was modified.
+
 - 2026-09-01: Persistence hydrators now validate raw numeric state values
   before casting: non-domain values cannot silently become RETIRED or ACTIVE
   records. Authority, Media, Video, Source, Knowledge Claim and Evidence
