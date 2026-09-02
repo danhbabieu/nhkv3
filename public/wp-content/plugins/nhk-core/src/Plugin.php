@@ -12,6 +12,7 @@ use NHK\Core\Infrastructure\Migration\MigrationLedger006;
 use NHK\Core\Infrastructure\Migration\KnowledgeEvidenceMetadataMigration007;
 use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
 use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
+use NHK\Core\Infrastructure\Migration\ArticleIngestMigration010;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
@@ -53,8 +54,8 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', ProjectionContextMigration009::VERSION, false);
-        if ((int) get_option('nhk_core_migration_current', 0) < ProjectionContextMigration009::VERSION) (new ProjectionContextMigration009())->up();
+        update_option('nhk_core_migration_target', ArticleIngestMigration010::VERSION, false);
+        if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
@@ -142,7 +143,7 @@ final class Plugin {
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', ProjectionContextMigration009::VERSION, '', false);
+        add_option('nhk_core_migration_target', ArticleIngestMigration010::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
@@ -152,6 +153,7 @@ final class Plugin {
         (new KnowledgeEvidenceMetadataMigration007())->up();
         (new MediaAssetMetadataMigration008())->up();
         (new ProjectionContextMigration009())->up();
+        (new ArticleIngestMigration010())->up();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }
