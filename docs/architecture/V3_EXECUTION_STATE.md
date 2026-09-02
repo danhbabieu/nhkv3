@@ -6,6 +6,27 @@
 
 ## Odo Semantic Pack installation checkpoint — 2026-09-03
 
+### Local runtime recovery recheck — 2026-09-03
+
+The requested continuation point `bbf6f12147d8ea015485fb756fd4d46357d10fcb`
+is present in the current history, but a concurrent Video sequence has advanced
+the observed local HEAD to `e356d53ed3f89cd8a22ef44f6090d7ce0ad76b1a`. No reset
+or checkout was performed. The exact Homebrew service was resolved as
+`mysql (homebrew.mxcl.mysql)`; it is loaded and `Running: true`, with
+`mysqld_safe --datadir=/opt/homebrew/var/mysql`. OS-level checks observed
+`mysqld` PID `95616` listening on `127.0.0.1:3306`, `/tmp/mysql.sock` present,
+and the configured `/opt/homebrew/var/mysql/nhk_v3` directory present.
+
+No service restart was performed because MySQL is already running and its log
+records `ready for connections`. The agent sandbox rejected TCP and Unix-socket
+client handshakes with `Operation not permitted`; unrestricted escalation was
+rejected and Computer Use could not access Terminal. PHP MySQL extensions pass,
+but WordPress bootstrap still returns `Error establishing a database
+connection`; `php tools/deployment-preflight.php` remains fail-closed at 5/10.
+Authentication and server-catalog database existence remain unverified. No
+database, Post, semantic record, relation, proposal, migration or Odo mutation
+was performed.
+
 The approved Odo reference pack and manifest were validated and checkpointed at
 `6fd6cc3` (`docs: add Odo semantic reference pack`). YAML parsing passed, and
 the pack's `o-do` occurrences are limited to forbidden-namespace rules and
@@ -2674,14 +2695,14 @@ publication was performed.
 | YOUTUBE_ADAPTER | **PASS (unit/static)** | Official Data API adapter boundary, bounded timeout, API-key environment configuration, source snapshot normalization, unavailable/rate-limit/error classification and deterministic source hash are implemented. |
 | TRANSCRIPT_AND_CHAPTER_POLICY | **PASS (unit/static)** | Default is `NO_TRANSCRIPT`; authorized/user-supplied transcript kinds are explicit; timestamp chapters require increasing source-description evidence and are never fabricated. |
 | VIDEO_INTAKE | **PASS (unit/static)** | One-shot enriched `nhk.video.ingest` builds a source, research, relation, Hub, editorial, SEO, completeness and ambiguity packet, then creates one governed Proposal. Existing external identity selects update/reconcile mode. |
-| VIDEO_ORPHAN_GATE | **PASS (unit/static)** | Enriched apply rejects incomplete packets, missing semantic attachments and missing Graph executor; category is not an attachment. Approved attachments are created through Graph in the governed apply path. |
+| VIDEO_ORPHAN_GATE | **PASS (unit/static)** | Every Video ingest apply rejects incomplete packets, missing semantic attachments and missing Graph executor; category is not an attachment. Approved attachments are created through Graph in the governed apply path. |
 | VIDEO_RELATIONS | **PASS (unit/static)** | Planner requires canonical UUID, registered predicate, explicit/inferred origin and evidence; public related traversal is bounded to two hops, direct-first and non-materialized. Direction/path explanation convergence remains open. |
 | VIDEO_HUB | **PASS (unit/static)** | Eight fixed editorial/navigation Hub keys have one primary and optional evidence-based secondary results; Hub classification is not a Graph relation or WordPress taxonomy. |
 | EDITORIAL_AND_SEO | **PASS (unit/static)** | NHK editorial package is distinct from source description; canonical SEO projection emits visible-content VideoObject, Open Graph and evidence-backed Clip parts; unavailable/incomplete videos emit no VideoObject. |
 | WATCH_AND_SITEMAP | **PASS (static/unit)** | Watch projection supports unavailable-source state, source attribution, editorial content and related sections; video sitemap route is rewrite-registered and includes only active, available, indexable entries with HTTPS thumbnails. Live public data coverage remains unproven. |
 | SEARCH_AND_HOME_PROJECTION | **PASS (unit/static)** | Video discovery uses editorial/source fields, Hub and resolved canonical subject context, while unavailable sources are excluded from normal discovery. |
 | VIDEO_SYNC | **PASS (unit/static)** | Read-only comparison reports `NO_CHANGE`, `SOURCE_CHANGED`, `SOURCE_UNAVAILABLE` or `REVIEW_REQUIRED`; source changes do not overwrite NHK editorial fields or Graph relations. A separate MCP sync tool is not yet exposed. |
-| MCP_GOVERNANCE | **PASS (unit/static)** | Enriched MCP video intake is governed and returns a single Proposal preview; it does not approve, apply or publish. Legacy-shaped calls retain compatibility behavior. |
+| MCP_GOVERNANCE | **PASS (unit/static)** | Enriched MCP video intake is governed and returns a single Proposal preview; it does not approve, apply or publish. Legacy-shaped calls retain the old input shape but cannot apply without semantic attachments. |
 | NHK_UNIT | **PASS** | `281 tests / 1,411 assertions`. |
 | COMPOSER_AND_LINT | **PASS** | `composer validate --no-check-publish` valid with existing license warning; new/changed PHP files lint clean. |
 | DIFF_CHECK | **PARTIAL** | Our implementation checks are clean; repository-wide `git diff --check` reports one trailing-space line in the concurrently modified user file `docs/semantic-packs/odo/ODO_RUNTIME_INVENTORY.md`. |

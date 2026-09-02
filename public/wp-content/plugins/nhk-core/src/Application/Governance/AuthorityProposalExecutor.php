@@ -141,13 +141,13 @@ final class AuthorityProposalExecutor
     private function applyVideoAttachments(Proposal $proposal, Video $video): void
     {
         $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
-        if (!array_key_exists('intake_version', $metadata)) return;
-        if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
+        if (!array_key_exists('intake_version', $metadata) && $proposal->operation !== 'ingest') return;
         $completeness = is_array($metadata['completeness'] ?? null) ? $metadata['completeness'] : [];
         $blockers = array_values(array_filter((array) ($completeness['blockers'] ?? []), static fn (mixed $blocker): bool => is_string($blocker) && trim($blocker) !== ''));
         if ($blockers !== []) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $blockers));
         $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
         if ($attachments === []) throw new \RuntimeException('NO_SEMANTIC_ATTACHMENT');
+        if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
         foreach ($attachments as $attachment) {
             if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
             $this->graph->create(

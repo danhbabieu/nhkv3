@@ -13,10 +13,10 @@ lookup is read-only and resolves canonical identities without creating Brand,
 Model or other entities.
 
 The Proposal lifecycle remains submit → human approve → eligibility →
-Controlled Apply. Enriched Video Apply also creates approved Graph attachments
-atomically; no `wp_create_post`, taxonomy, post meta or direct SQL path is used.
-Same idempotency key and same intent return the original Proposal; changed
-intent under the same key is an idempotency conflict.
+Controlled Apply. Every Video Apply requires approved Graph attachments and
+creates them atomically; no `wp_create_post`, taxonomy, post meta or direct SQL
+path is used. Same idempotency key and same intent return the original
+Proposal; changed intent under the same key is an idempotency conflict.
 
 Source synchronization is read-only preview/reconciliation planning until a
 separate sync command is exposed. It reports `NO_CHANGE`, `SOURCE_CHANGED`,

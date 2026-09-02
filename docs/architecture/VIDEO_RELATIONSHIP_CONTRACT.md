@@ -9,10 +9,10 @@ predicate, `EXPLICIT_USER_RELATION` or `INFERRED_RELATION`, evidence references,
 confidence and a reason. Ambiguous or unknown targets fail closed. Unknown
 predicate, endpoint or target identity is a typed gap/conflict.
 
-Apply is governed. For an enriched intake, the approved Video proposal creates
-the Video and its approved attachment relations through `GraphService` in the
-same Controlled Apply transaction. Zero candidates returns `NO_SEMANTIC_ATTACHMENT`;
-a Hub never satisfies this requirement.
+Apply is governed. Every approved Video ingest proposal must create the Video
+with at least one approved attachment through `GraphService` in the same
+Controlled Apply transaction. Zero candidates returns
+`NO_SEMANTIC_ATTACHMENT`; a Hub never satisfies this requirement.
 
 Public related sections reuse `RelatedContentQuery`, direct before derived,
 with derived traversal bounded at two hops. Derived output is never persisted
