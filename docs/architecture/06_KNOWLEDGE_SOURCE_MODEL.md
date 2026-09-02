@@ -1,5 +1,8 @@
 # Knowledge và Source
 
+> **NON-NORMATIVE.** Đây là evidence mô hình và runtime. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 Knowledge là claim/fact/research statement có thể được nhiều Post sử dụng.
 Source là thực thể authority để truy nguyên claim và quan hệ nghiên cứu. Một
 Post có thể liên hệ nhiều Knowledge; một Knowledge có thể liên hệ nhiều Post.
@@ -11,6 +14,12 @@ source supports, contradicts or qualifies the claim. `PostKnowledgeLinkService`
 connects a WordPress Post to a Knowledge claim through the single Graph using
 the `about` predicate; it does not copy claim text into the Post body and does
 not create an Article Authority.
+
+Article Ingest may reuse these records, but completion is coordinated at the
+operation boundary: semantic preflight, WordPress draft, governed semantic
+mutation, read-back verification and WordPress publish. A direct link write
+outside Governance/Controlled Apply is a `CONSTITUTION_CONFLICT`; future Article
+implementation must route the link through the approved governed boundary.
 
 Public read boundaries require active records and fail closed when persisted
 Source or Evidence metadata explicitly declares a non-`PUBLIC` visibility

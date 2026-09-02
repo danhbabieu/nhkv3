@@ -6,6 +6,33 @@
 
 ## Current checkpoint — 2026-09-02
 
+Documentation amendment checkpoint, 2026-09-02: the approved Article Ingest
+boundary is now recorded in the Constitution and routed through
+`docs/constitution/NHK_V3_CONSTITUTION.md`. The required sequence is semantic preflight
+→ WordPress draft → semantic Governance/Controlled Apply → read-back
+verification → WordPress publish. No Article entity, Graph endpoint, status or
+operation name was added. No PHP/JS code, database row, Graph edge, WordPress
+Post (including reconciliation case 55), slug, legacy body, migration or
+external state was changed. The runtime coordinator, cross-boundary idempotency,
+WordPress revision binding and final outcome contract remain implementation gaps.
+`V2MigrationService.php` legacy body import and any direct
+`PostKnowledgeLinkService` Graph mutation outside Governance are separately
+recorded as `CONSTITUTION_CONFLICT` risks; Article Ingest must not call either
+path. The pre-existing untracked MCP plan remains preserved and unstaged.
+
+Historical constitutional forensic review checkpoint, 2026-09-02: the single
+normative file remains `docs/constitution/NHK_V3_CONSTITUTION.md`. The retired
+`READ_FIRST.md` artifact and all superseded constitutional fragments are absent
+from the active tree; `AGENTS.md` now points directly to the single Constitution.
+Tracked architecture, audit, V2 evidence, MCP and route documents that could be
+misread as law now carry explicit NON-NORMATIVE notices, and an obsolete plan
+reference was normalized. The Constitution vocabulary now explicitly defines
+Variant Configuration, Specimen Observation and native WordPress featured/
+content-image ownership. This checkpoint changed documentation only; no code,
+database, semantic row, Graph edge, slug, redirect, migration, import, V2/live
+state or push was changed. A pre-existing untracked MCP plan remains preserved
+and unstaged.
+
 Runtime verification checkpoint, 2026-09-02: implementation HEAD `67f7f79`
 contains `abc2f67`, `b073780` and the hub checkpoint. Local WordPress and
 MySQL were restored without replacing either database. Canonical preflight

@@ -16,6 +16,10 @@ return endpoint keys, edge state and revisions. Public post/entity surfaces use
 URLs and omits unavailable groups. This keeps the single Graph relation system
 without exposing its storage identifiers as public content API.
 
+Article Ingest is an operation-level coordination boundary, not a Graph endpoint.
+It may reference a registered `wp_post` and registered semantic endpoints only;
+there is no `article` endpoint and no Article semantic identity or body in Graph.
+
 ## Types and registries
 
 `NodeReference` gồm `endpoint_type` và `endpoint_key`. `EndpointTypeRegistry`
@@ -26,6 +30,10 @@ trash không bị Graph tự xóa. Các type còn lại dùng contract/fake reso
 `PredicateRegistry` seed tối thiểu `about` và `depicts`. Predicate có source/target
 allow-list, outbound/inbound cardinality (`ONE`/`MANY`), self-relation và active.
 Không cho nhập predicate tùy ý và không lưu rule mutable JSON trong DB.
+
+Post-to-Knowledge links remain Graph relations and must be applied through
+Governance/Controlled Apply when part of Article Ingest. A direct mutation path
+outside that boundary is a `CONSTITUTION_CONFLICT` to be audited and closed.
 
 ## Storage migration 001
 

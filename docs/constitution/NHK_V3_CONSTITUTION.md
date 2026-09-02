@@ -23,13 +23,49 @@ viết cũ; không cho phép seed, sửa, backfill, merge hoặc xóa semantic r
 không cho phép ghi Graph edge; và không cho phép thay đổi V2, staging hoặc
 production. Những hành động đó cần contract, governance và gate riêng.
 
+## Amendment record — 2026-09-02 — Article Ingest Boundary
+
+**WHY:** A V3 knowledge Article request may cross the editorial and semantic
+boundaries, but its completion claim must not be inferred from a WordPress write
+or from an ungoverned semantic side effect.
+
+**WHAT:** Approve the operation-level Article Ingest Contract with the sequence
+`semantic preflight → WordPress draft → semantic Governance / Controlled Apply
+→ read-back verification → WordPress publish`. This does not create an Article
+Authority entity, a second editorial body, a Graph `article` endpoint, a new
+status enum or a new operation name.
+
+**AFFECTED SUBSYSTEMS:** WordPress editorial boundary, Authority, Knowledge,
+Source/Evidence, Graph, Governance, MCP/Admin orchestration, Article ingest
+readiness and documentation.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** WordPress `wp_posts` remains the sole
+source of truth for title/body and public editorial URLs. Registered semantic
+entities, atomic Knowledge claims, provenance and typed relations remain owned
+by their existing bounded contexts. Existing generic WordPress publication
+remains independent; only a V3 knowledge Article completion claim is subject to
+the coordinated contract.
+
+**DATA, MIGRATION AND ROLLOUT:** No legacy article body is migrated, imported,
+parsed or populated by this amendment. No existing semantic identity, slug,
+URL, WordPress post, Graph edge or production/staging data is changed. Runtime
+implementation, idempotency, WordPress revision binding, outcome vocabulary,
+read-back and observability remain follow-up work under the approved contract.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Semantic mutation remains Proposal → Human
+Approval → Eligibility → Controlled Apply → repository → audit. The Article
+workflow must fail closed on registry, contract, governance, verification or
+infrastructure failure and must be tested before implementation is accepted.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
+
 ## 2. Ranh giới trách nhiệm tối cao
 
 Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:
 
 | Subsystem | Trách nhiệm canonical |
 |---|---|
-| WordPress native Post | Nội dung biên tập, tiêu đề, body, tác giả, ngày, category, archive, search, RSS, sitemap và permalink editorial |
+| WordPress native Post | Nội dung biên tập, tiêu đề, body, featured/content images, tác giả, ngày, category, archive, search, RSS, sitemap và permalink editorial |
 | Authority | Identity và lifecycle của canonical semantic entity |
 | Graph | Quan hệ semantic typed giữa các endpoint đã đăng ký |
 | Knowledge | Atomic claim/fact/research statement |
@@ -87,6 +123,11 @@ Một thuật ngữ chỉ có một nghĩa trong NHK V3.
 - **MediaUsage:** vị trí, endpoint context và vai trò của Media.
 - **Video:** canonical external reference gồm platform, external ID, URL và
   metadata được phép.
+- **Variant Configuration:** fact mô tả một cấu hình hoặc offering cụ thể ở
+  scope Variant; không tự tạo entity, field hoặc quan hệ mới nếu registry/
+  contract chưa đăng ký.
+- **Specimen Observation:** observation gắn với đúng một Specimen và evidence
+  của observation đó; không tự promotion thành fact của Variant hoặc Model.
 - **WordPress Post:** nội dung biên tập native, có thể liên hệ semantic object
   nhưng không trở thành nơi chứa duplicate semantic truth.
 
@@ -361,7 +402,9 @@ yêu cầu; derived Brand visibility dùng Graph traversal, không dùng fake ow
 ## 14. WordPress editorial law
 
 WordPress native wp_posts là nguồn sự thật duy nhất cho editorial title, body,
-author, date, category, archive, search, RSS, sitemap và editorial URL.
+featured/content images, author, date, category, archive, search, RSS, sitemap
+và editorial URL. Editorial publication của Post cũng thuộc native WordPress
+boundary.
 
 Post có thể liên hệ nhiều semantic entity qua Graph/application service. Post
 about một Brand không chứng minh mọi object trong body thuộc Brand. Body không
@@ -371,6 +414,35 @@ và không được tạo Article Authority hoặc Article Projection body path.
 WordPress editorial create/update/publish hoạt động độc lập với Semantic
 Controlled Apply. Governance kiểm soát semantic mutation; nó không biến việc
 biên tập và xuất bản một native Post thành semantic apply bắt buộc.
+
+### 14.1 Coordinated Article Ingest Boundary
+
+V3 knowledge Article là một workflow ở cấp operation, không phải một Authority
+entity. Không tạo Article Authority, Article body, body projection thứ hai,
+Graph `article` endpoint hoặc semantic identity cho bài viết. WordPress native
+`wp_posts` vẫn sở hữu title, body, editorial metadata và public URL.
+
+Khi request có intent tạo/cập nhật/xuất bản V3 knowledge Article hoặc Post kèm
+semantic claims/relations, completion chỉ hợp lệ sau khi Article Ingest Contract
+đã hoàn tất, theo thứ tự: semantic registry resolution và preflight; ghi Post ở
+trạng thái draft; semantic Proposal/Governance/Controlled Apply; read-back
+verification; rồi mới đủ điều kiện publish WordPress. Generic WordPress
+create/update/publish không tự trở thành Article Ingest và không được báo là
+workflow V3 knowledge hoàn tất.
+
+Nếu semantic required stage thất bại hoặc unavailable, kết quả phải là explicit
+non-success, retryable, unavailable, conflict hoặc outcome tương đương được
+định nghĩa bởi Article Ingest Contract đã phê duyệt. Amendment này không tự
+đặt thêm enum status/operation.
+
+Một fact canonical chỉ có một owner. Article, FAQ, Search và hub chỉ được reuse
+registered Authority, Knowledge, Source/Evidence và Graph data; không tạo FAQ
+entity hoặc semantic type mới bằng workflow Article.
+
+Alias/model/component/classification trong bài phải resolve qua registry. Không
+dùng prose, title, body, URL, slug, checksum hoặc display name làm semantic
+identity. Post endpoint dùng `wp_post` với stable key `<blog_id>:<post_id>`;
+không có `article` Graph endpoint.
 
 ## 15. Identity, slug, alias và URL
 
@@ -660,7 +732,10 @@ machine test:
 12. Public eligible entity có membership, URL, detail và REST/search nhất quán.
 13. Infrastructure/programming failure không bị đổi thành empty success.
 14. Semantic writes luôn qua Governance và Controlled Apply.
-15. WordPress editorial publication vẫn độc lập với semantic apply.
+15. Generic WordPress editorial publication remains independent from semantic
+apply. A V3 knowledge Article workflow may report completion only after the
+approved coordinated Article Ingest Contract has satisfied all required
+editorial, semantic and verification stages.
 16. Technical legacy routes không phải canonical và redirect tối đa một hop.
 17. Media, MediaAsset và MediaUsage không bị gộp identity/persistence.
 18. Product không trở thành Specimen identity.
@@ -685,6 +760,8 @@ khác không được dùng như decision authority song song.
 | Product is offer identity | Commerce context thay đổi và relist được | Product–Specimen chỉ dùng khi contract chọn owner/semantics rõ |
 | Media distinctions | Semantic meaning, binary và placement có lifecycle khác nhau | Media/Asset/Usage tách persistence; checksum không merge |
 | Knowledge vs Post | Claim atomic khác narrative editorial body | Post giữ body/URL; Knowledge giữ claim; Graph chỉ liên hệ |
+| Coordinated Article Ingest | V3 knowledge Article completion crosses editorial and semantic boundaries | Approved operation-level contract: semantic preflight → WordPress draft → governed semantic apply → read-back → WordPress publish; no Article entity/body/endpoint |
+| No Article semantic entity | Article is an editorial workflow, not a canonical semantic owner | Reuse registered Authority, Knowledge, Source/Evidence and Graph records; do not invent Article/FAQ types |
 | Public identity distinctions | Rename không được thay semantic identity hoặc URL ngoài ý muốn | Slug durable, history và redirect là governed contract |
 | Vietnamese hubs | Public IA dành cho người đọc, không leak registry | Technical roots chỉ là compatibility inputs |
 | Eligibility parity | Một entity không được có membership khác nhau giữa surface | Một underlying policy và blocker/warning rõ ràng |
@@ -714,6 +791,7 @@ phải dùng Change Control.
 | Product/Specimen ownership | Both registered; Product payload allows specimen_uuid and broad about allows Product→Specimen, without one selected canonical owner | CONSTITUTION_CONFLICT | CanonicalEntityTypeCatalog.php, PredicateRegistry.php, MCP content-operations audit |
 | Album | No Authority type, endpoint, predicate, repository, service or public contract | SEMANTIC_GAP | MCP content-operations audit |
 | WordPress Post boundary | Native Post remains editorial title/body/author/date/category/URL truth; no Article Authority body path is approved | COMPLIANT | 01_EDITORIAL_CONTENT_BOUNDARY.md historical evidence; Plugin.php and public route contracts |
+| Article Ingest boundary | Constitutionally approved operation-level workflow; no runtime coordinator, cross-boundary idempotency, WordPress revision binding or final outcome contract exists yet | CODE_GAP / SEMANTIC_GAP | Article Ingest amendment; MCP_V3_CONTENT_OPERATIONS.md; current runtime catalog |
 | Governance | Proposal binding, approval, eligibility, Controlled Apply, capability checks, revision, idempotency and durable audit are implemented for current operations | COMPLIANT for registered operations | ControlledApplyService.php, ProposalEligibilityService.php, MCP catalog |
 | MCP catalog | Exactly 19 tools; governed writes remain capability-gated; eight existing read abilities are exposed on supported WordPress versions | IMPLEMENTED for current catalog | McpToolCatalog.php, McpAbilityRegistration.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Hydration/health | Bounded malformed-row omission and layered health/preflight exist; runtime/DB evidence varies by environment | IMPLEMENTED with environment gates | AuthorityRowHydrator.php, HealthCheck.php, tools/deployment-preflight.php |

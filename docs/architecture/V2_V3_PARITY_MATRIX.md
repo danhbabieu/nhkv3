@@ -215,7 +215,7 @@ by design.
 
 | Workflow | V3 contract | Status |
 |---|---|---|
-| WordPress Post publish | Native WP editorial lifecycle | IN PROGRESS |
+| WordPress Post publish | Native WP editorial lifecycle; generic publication remains independent, while V3 knowledge Article intent requires the approved Article Ingest Contract | IN PROGRESS — coordinated Article Ingest is not implemented |
 | Entity create/update/retire/reactivate | Authority + optimistic revision | IN PROGRESS |
 | Proposal/submit/approval/eligibility/apply | Governance-controlled mutation | IN PROGRESS |
 | Relations / Post semantic links | One typed Graph | IN PROGRESS |

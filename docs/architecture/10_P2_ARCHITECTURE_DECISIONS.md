@@ -1,5 +1,8 @@
 # P2 Architecture Decisions
 
+> **NON-NORMATIVE.** Đây là decision evidence của phase cũ. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 Các quyết định này là baseline đã được phê duyệt cho P2.
 
 ## B1–B2. Canonical ID và stable key
@@ -31,10 +34,12 @@ endpoint mặc định. Checksum chỉ phát hiện duplicate binary, không aut
 
 ## B6. Article legacy
 
-Article Authority không tồn tại trong runtime V3. LegacyArticleReader và mapping
-chỉ được tạo sau này trong migration/compatibility boundary, rồi retire khi
-reconciliation, URL mapping, content hash, rollback snapshot và observation window
-đạt yêu cầu.
+Article Authority không tồn tại trong runtime V3. Article Ingest là operation-level
+contract cho V3 knowledge workflow, không phải entity hoặc body projection.
+LegacyArticleReader và mapping chỉ được tạo sau này trong migration/compatibility
+boundary, rồi retire khi reconciliation, URL mapping, content hash, rollback
+snapshot và observation window đạt yêu cầu. Article Ingest không được gọi
+`V2MigrationService.php` hoặc bất kỳ legacy body import path nào.
 
 ## B7. Proposal states
 

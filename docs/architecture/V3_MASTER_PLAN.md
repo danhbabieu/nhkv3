@@ -141,6 +141,14 @@ owns atomic claims; one Graph connects semantic endpoints; Governance controls
 durable semantic mutation; Media is first-class; Video is an external reference.
 V2 implementation and schema are reference material, not a template.
 
+Approved Article Ingest boundary (2026-09-02): for a V3 knowledge Article
+workflow, coordinate semantic registry resolution/preflight, WordPress draft,
+governed semantic apply, read-back verification and WordPress publish. This is
+an operation-level contract; it does not add Article/FAQ entities, a second
+body, a Graph endpoint, status enum or operation name. The coordinator,
+WordPress revision binding, cross-boundary idempotency and outcome contract are
+implementation gaps for a later reviewed slice.
+
 ## Autonomous delivery direction
 
 The remaining phases are executed as tested vertical slices and are not paused

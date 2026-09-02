@@ -1,5 +1,8 @@
 # MCP V3 Ability Exposure
 
+> **NON-NORMATIVE.** Đây là implementation checkpoint. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 Status: implementation checkpoint, 2026-09-02.
 
 ## Root cause
@@ -30,6 +33,12 @@ Each ability delegates to `McpReadHandler` and reuses the existing catalog input
 `nhk.media.ingest`, `nhk.video.ingest`, `nhk.knowledge.ingest`, `nhk.source.ingest`, `nhk.evidence.ingest` and all `nhk.proposal.*` tools are intentionally absent from the WordPress Abilities public/MCP allowlist in this checkpoint. The existing custom MCP writes remain Governance-backed and capability-gated. A separate exposure review is required before registering them through another connector.
 
 No `wp_create_post`, taxonomy, post meta, direct SQL semantic mutation or ungoverned ability was introduced.
+
+These eight read-only abilities do not constitute Article Ingest. A generic
+WordPress Post write or these abilities alone cannot be reported as a completed
+V3 knowledge Article workflow; the approved semantic-preflight → draft →
+governed-apply → read-back → publish boundary remains a future implementation
+contract. No Article ability is added by this documentation checkpoint.
 
 ## Verification boundary
 

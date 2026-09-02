@@ -3,8 +3,16 @@
 ## Constitution — mandatory first read
 
 Before any NHK V3 architectural or implementation work, every Codex session MUST
-read:
+follow this read chain:
 
+AGENTS.md
+→ docs/constitution/READ_FIRST.md
+→ docs/constitution/NHK_V3_CONSTITUTION.md
+→ relevant normative contracts
+
+At minimum, read these two constitutional files in order:
+
+docs/constitution/READ_FIRST.md
 docs/constitution/NHK_V3_CONSTITUTION.md
 
 This is the only normative Constitution. Specs, plans, audits, execution state,

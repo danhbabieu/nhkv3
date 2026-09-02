@@ -82,10 +82,13 @@ The exact current wire order is the table order above.
 
 ## 4. Post workflow
 
-The safe sequence is: resolve Authority context; read claims, sources, evidence
-and entities; create/edit/publish a native WordPress Post through its existing
-editorial API/UI; create governed semantic proposals and Post Graph links; then
-read back semantic records and verify Post/frontend.
+For a V3 knowledge Article request, the approved Article Ingest sequence is:
+semantic registry resolution and preflight; create/update a native WordPress
+draft; create and apply governed semantic proposals and Post Graph links; read
+back the semantic records, Graph and Post; then publish the WordPress Post only
+when the contract's publish eligibility is satisfied. Generic WordPress
+create/update/publish remains an independent editorial workflow and cannot be
+reported as completed Article Ingest by itself.
 
 There is no MCP Post create/update/publish contract. `wp_post` is only a Graph
 endpoint resolver with key `<blog_id>:<post_id>`, positive numeric components,
@@ -241,7 +244,7 @@ For “Biên soạn và đưa bài lên web, xây chặt các quan hệ liên qu
 2. nhk.entity.get, nhk.knowledge.get, nhk.source.get, nhk.evidence.get
    Read canonical facts and public evidence; do not copy article body.
 3. Native WordPress editorial API/UI
-   Create/update draft Post, then publish its native editorial fields.
+   Create/update the draft Post; do not publish yet.
 4. knowledge/source/evidence.ingest
    Submit -> approve with fingerprints -> eligibility -> apply.
 5. nhk.proposal.create with operation=relation_create
@@ -249,7 +252,11 @@ For “Biên soạn và đưa bài lên web, xây chặt các quan hệ liên qu
    same governed lifecycle.
 6. nhk.media.ingest / nhk.video.ingest
    Use only current asset/usage and external-reference contracts.
-7. Read back domain records, Post and Graph; run frontend route/browser checks.
+7. Read back domain records, Post and Graph; verify identity, revisions,
+   visibility, relation direction and public projection.
+8. Native WordPress editorial API/UI
+   Publish only after Article Ingest's required semantic and verification stages
+   satisfy the approved contract.
 ```
 
 MCP-native Post CRUD/publish, binary upload, Graph read, standalone MediaUsage,
@@ -278,3 +285,23 @@ on older WordPress versions.
 Each reuses the existing input schema, `read` capability callback and metadata
 `public=true`, `show_in_rest=true`, `readonly=true`, `destructive=false`,
 `idempotent=true`. No write or governance Ability is registered.
+
+## 17. Article Ingest implementation gaps
+
+The Constitution approves the Article Ingest boundary, but this runtime audit
+does not claim that a coordinated Article operation already exists. The current
+catalog has no Article-specific tool, coordinator, cross-boundary idempotency
+key, WordPress revision binding or final outcome contract. Do not add an Article
+entity, endpoint, status or operation name to close those gaps in documentation.
+
+`V2MigrationService.php` can import legacy `post_content` through a separate
+migration path; Article Ingest must never call it. Any reachable Article path
+that does so is `CONSTITUTION_CONFLICT`. Likewise, if
+`PostKnowledgeLinkService` mutates Graph directly outside
+Governance/Controlled Apply, record `CONSTITUTION_CONFLICT` and route future
+implementation through the governed boundary.
+
+Until the contract is implemented and tested, a generic WordPress Post write or
+the existing semantic tools alone cannot be reported as a complete V3 knowledge
+Article workflow. Required-stage failure must remain an explicit non-success,
+retryable, unavailable, conflict or equivalent contract-defined outcome.
