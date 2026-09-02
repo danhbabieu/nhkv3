@@ -6,6 +6,15 @@
 
 ## Current checkpoint — 2026-09-02
 
+Single-Constitution finalization checkpoint, 2026-09-02: the later
+Constitution-finalization decision supersedes the earlier `5c60346` router
+reconciliation. `AGENTS.md` again points directly to the sole normative
+Constitution and `docs/constitution/READ_FIRST.md` is removed from the active
+tree. The router decision remains historical evidence in Git only. This
+documentation correction does not alter the concurrent Article Ingest runtime
+implementation, tests, migration work, semantic data, Graph edges, WordPress
+content, Post 55 or the preserved untracked MCP plan.
+
 Documentation reconciliation checkpoint, 2026-09-02: the approved human
 architectural decision restores `docs/constitution/READ_FIRST.md` as a short,
 non-normative router and updates `AGENTS.md` to route

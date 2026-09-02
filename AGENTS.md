@@ -3,25 +3,14 @@
 ## Constitution — mandatory first read
 
 Before any NHK V3 architectural or implementation work, every Codex session MUST
-read the following chain directly and in order:
+read directly:
 
-AGENTS.md
-→ docs/constitution/READ_FIRST.md
-→ docs/constitution/NHK_V3_CONSTITUTION.md
-→ relevant normative contracts
-
-The session MUST also read the canonical Constitution directly:
 docs/constitution/NHK_V3_CONSTITUTION.md
 
 This is the only normative Constitution. Specs, plans, audits, execution state,
 parity matrices, READMEs and historical V2 material are subordinate evidence or
 implementation guidance. If any source conflicts with the Constitution, mark it
 CONSTITUTION_CONFLICT; do not weaken the Constitution to legalize code.
-
-`docs/constitution/READ_FIRST.md` is a non-normative router only; it is not a
-second Constitution. For Article Ingest work, read
-`docs/architecture/ARTICLE_INGEST_CONTRACT.md` and the relevant MCP contracts
-after the Constitution.
 
 ## Scope and workspace
 
