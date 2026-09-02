@@ -39,14 +39,24 @@ final class RelatedContentQuery
     {
         $groups = $this->emptyGroups();
         if ($this->status && !$this->status->graphStorageReady()) return $groups;
-        $seen = [];
-        $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
-        foreach ($pages as $page) foreach ($page['items'] as $edge) {
-            $node = $edge->source->reference->key() === $reference->key() ? $edge->target->reference : $edge->source->reference;
-            if ($node->key() === $reference->key() || isset($seen[$node->key()])) continue;
-            $seen[$node->key()] = true; $item = $this->resolve($node);
-            if ($item === null) continue;
-            $groups[$item['group']][] = $item['value'];
+        $seen = [$reference->key() => true];
+        $queue = [[$reference, 0]];
+        while ($queue !== []) {
+            [$current, $depth] = array_shift($queue);
+            if ($depth >= 2) continue;
+            $pages = [$this->graph->findOutgoing($current, null, 0, 100), $this->graph->findIncoming($current, null, 0, 100)];
+            foreach ($pages as $page) foreach ($page['items'] as $edge) {
+                $node = $edge->source->reference->key() === $current->key() ? $edge->target->reference : $edge->source->reference;
+                if (isset($seen[$node->key()])) continue;
+                $seen[$node->key()] = true;
+                $item = $this->resolve($node);
+                // Derived traversal is bounded and only continues through a
+                // public, resolvable node; private/unavailable nodes must not
+                // become a bridge into public related content.
+                if ($item === null) continue;
+                $groups[$item['group']][] = $item['value'];
+                $queue[] = [$node, $depth + 1];
+            }
         }
         return $groups;
     }
@@ -72,6 +82,6 @@ final class RelatedContentQuery
         return null;
     }
     private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
-    private function videoValue(Video $video): array { $path = PublicRouteResolver::videoPath($video->title, $video->externalVideoId); return ['type' => 'video', 'title' => $video->title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
+    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $path = PublicRouteResolver::videoPath($title, $video->externalVideoId); return ['type' => 'video', 'title' => $title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
     private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path); }
 }

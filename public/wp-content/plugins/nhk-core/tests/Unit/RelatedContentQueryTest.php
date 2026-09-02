@@ -53,6 +53,30 @@ final class RelatedContentQueryTest extends TestCase
         self::assertSame([], $related['articles']); self::assertSame([], $related['media']); self::assertSame([], $related['videos']);
     }
 
+    public function test_related_query_returns_second_hop_but_not_third_hop_and_keeps_direct_first(): void
+    {
+        $types = new EntityTypeRegistry();
+        foreach (['brand', 'model', 'movement', 'music'] as $type) $types->register(new EntityTypeDefinition($type, 1, true, []));
+        $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
+        $brand = $authority->create('brand', 'odo', 'Odo');
+        $model = $authority->create('model', 'calibre-1', 'Calibre 1');
+        $movement = $authority->create('movement', 'calibre-1-movement', 'Calibre 1 movement');
+        $music = $authority->create('music', 'bell', 'Bell');
+        $endpoints = new EndpointTypeRegistry();
+        foreach (['brand' => $brand, 'model' => $model, 'movement' => $movement, 'music' => $music] as $type => $entity) $endpoints->register($type, new FakeEndpointResolver($type, [$entity->canonicalId]));
+        $graph = new GraphService($graphRepository = new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $graph->create(new NodeReference('brand', $brand->canonicalId), 'about', new NodeReference('model', $model->canonicalId));
+        $graph->create(new NodeReference('model', $model->canonicalId), 'about', new NodeReference('movement', $movement->canonicalId));
+        $graph->create(new NodeReference('movement', $movement->canonicalId), 'about', new NodeReference('music', $music->canonicalId));
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
+
+        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId);
+
+        self::assertSame(['model', 'movement'], array_column($related['entities'], 'type'));
+        self::assertNotContains('music', array_column($related['entities'], 'type'));
+    }
+
     public function test_post_related_query_uses_the_wp_post_graph_endpoint(): void
     {
         $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, []));

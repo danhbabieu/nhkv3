@@ -12,9 +12,9 @@ final class VideoService
     {
     }
 
-    public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null): Video
+    public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null): Video
     {
-        $candidate = Video::fromUrl($url, $title, $metadata, $thumbnailMediaId);
+        $candidate = Video::fromUrl($url, $title, $metadata, $thumbnailMediaId, $canonicalId);
         $existing = $this->videos->findByExternalReference($candidate->platform, $candidate->externalVideoId);
         if ($existing) {
             if ($existing->canonicalUrl === $candidate->canonicalUrl) return $existing;

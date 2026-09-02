@@ -45,22 +45,27 @@ final class AuthorityProposalExecutor
         if ($proposal->entityType === 'video' && $proposal->operation === 'ingest') {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
             $payload = $proposal->payload;
-            return $this->video->ingestUrl(
+            $video = $this->video->ingestUrl(
                 (string) ($payload['url'] ?? ''),
                 (string) ($payload['title'] ?? ''),
                 is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                 isset($payload['thumbnail_media_id']) && (string) $payload['thumbnail_media_id'] !== '' ? (string) $payload['thumbnail_media_id'] : null,
+                isset($payload['canonical_id']) && (string) $payload['canonical_id'] !== '' ? (string) $payload['canonical_id'] : null,
             );
+            $this->applyVideoAttachments($proposal, $video);
+            return $video;
         }
         if ($proposal->entityType === 'video' && in_array($proposal->operation, ['update', 'retire', 'reactivate'], true)) {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');
             $payload = $proposal->payload;
             $target = $proposal->targetUuid ?: $proposal->subjectId;
-            return match ($proposal->operation) {
+            $video = match ($proposal->operation) {
                 'update' => $this->video->update($target, (string) ($payload['title'] ?? ''), is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [], isset($payload['thumbnail_media_id']) && (string) $payload['thumbnail_media_id'] !== '' ? (string) $payload['thumbnail_media_id'] : null, $proposal->expectedRevision),
                 'retire' => $this->video->retire($target, $proposal->expectedRevision),
                 'reactivate' => $this->video->reactivate($target, $proposal->expectedRevision),
             };
+            if ($proposal->operation === 'update') $this->applyVideoAttachments($proposal, $video);
+            return $video;
         }
         if (in_array($proposal->entityType, ['knowledge', 'source', 'evidence'], true)) return $this->knowledge($proposal);
         if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
@@ -131,5 +136,25 @@ final class AuthorityProposalExecutor
         return $proposal->operation === 'relation_retire'
             ? $this->graph->retire($edgeId, $proposal->expectedRevision)
             : $this->graph->reactivate($edgeId, $proposal->expectedRevision);
+    }
+
+    private function applyVideoAttachments(Proposal $proposal, Video $video): void
+    {
+        $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
+        if (!array_key_exists('intake_version', $metadata)) return;
+        if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
+        $completeness = is_array($metadata['completeness'] ?? null) ? $metadata['completeness'] : [];
+        $blockers = array_values(array_filter((array) ($completeness['blockers'] ?? []), static fn (mixed $blocker): bool => is_string($blocker) && trim($blocker) !== ''));
+        if ($blockers !== []) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $blockers));
+        $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
+        if ($attachments === []) throw new \RuntimeException('NO_SEMANTIC_ATTACHMENT');
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
+            $this->graph->create(
+                new NodeReference('video', $video->canonicalId),
+                (string) ($attachment['predicate'] ?? ''),
+                new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_key'] ?? '')),
+            );
+        }
     }
 }

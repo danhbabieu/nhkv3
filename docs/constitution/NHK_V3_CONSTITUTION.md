@@ -103,6 +103,47 @@ data exclusion and channel parity. Unknown registry values fail closed.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
+## Amendment record — 2026-09-02 — Video Semantic Ingest Law
+
+**WHY:** Video had a validated external-reference foundation, but the intake,
+source snapshot, semantic attachment, editorial, SEO and reconciliation rules
+were not enforceable as one workflow.
+
+**WHAT:** Approve the Video Law in §13.2 and the related contracts
+`VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `VIDEO_RELATIONSHIP_CONTRACT.md`,
+`VIDEO_HUB_CLASSIFICATION_CONTRACT.md` and
+`docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`. YouTube identity is the pair
+`platform=youtube` and `youtube_video_id`, never a URL literal. A Video cannot
+be published without a valid available source, NHK editorial package, one
+controlled Video Hub classification, provenance, valid embed representation and
+at least one governed semantic attachment. Source changes reconcile through a
+proposal and never silently overwrite NHK editorial or Graph truth.
+
+**AFFECTED SUBSYSTEMS:** Video, Source/Evidence, Graph, Governance, MCP,
+Public Projection, SEO, WordPress theme and source synchronization.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** Existing Video remains an external
+reference and does not become a local MediaAsset or WordPress Post. Existing
+`nhk.video.ingest` is the governed intake adapter; its enriched packet may
+carry source snapshot, editorial, classification and SEO projection data in
+the dedicated Video metadata boundary. Public serializers expose only
+reader-safe projection fields.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no import, seed,
+legacy repair, Graph backfill, publication or production/staging mutation.
+Source snapshot and editorial package storage reuse the existing Video metadata
+boundary; any future normalized columns require a separate additive migration
+review. YouTube API access is configuration-only and secrets are never stored
+in source or audit output.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Intake creates or reconciles a governed
+Proposal only. A reviewed intake with semantic attachments applies Video and
+its approved Graph relations atomically through Controlled Apply; no generic
+WordPress write is a Video writer. Transcript absence is a warning, not a
+blocker; fabricated transcript or unsupported source metadata is forbidden.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
+
 ## Amendment record — 2026-09-02 — Product / Specimen Boundary
 
 **WHY:** Product and Specimen are different identities, but the previous
@@ -765,6 +806,31 @@ ID/URL mâu thuẫn hoặc platform chưa hỗ trợ phải fail-closed.
 Video không mặc định được tải thành local MP4 hoặc biến thành MediaAsset. Thumbnail
 Media nếu có là typed reference riêng. Relation của Video mô tả nội dung mà Video
 yêu cầu; derived Brand visibility dùng Graph traversal, không dùng fake ownership.
+
+#### Video Law
+
+1. Video là semantic content first-class và giữ canonical UUID trong NHK; YouTube
+   chỉ là external source.
+2. YouTube identity là `platform=youtube` + `youtube_video_id`. Watch, short,
+   embed, `youtu.be` và playlist URL có cùng video ID phải resolve cùng identity;
+   tracking query không tạo bản ghi mới.
+3. Video không được publish nếu thiếu semantic attachment hợp lệ. Hub category
+   chỉ là editorial/navigation classification và không thay thế Graph relation.
+4. Một Video phải có tối đa một primary Hub và secondary Hub chỉ khi có đủ
+   tín hiệu; tám Hub bị khóa trong `VIDEO_HUB_CLASSIFICATION_CONTRACT.md`.
+5. Source snapshot, transcript, user hint và NHK editorial package giữ provenance
+   riêng. YouTube title/description/tags không tự trở thành NHK body, taxonomy
+   hoặc Graph truth.
+6. Transcript chỉ được dùng khi authorized hoặc user-supplied; captions có sẵn
+   không chứng minh transcript có thể tải. Không có transcript là warning.
+7. Mọi relation candidate phải trỏ canonical UUID, dùng predicate đã đăng ký và
+   có evidence reference. `AI_SAYS_SO` không đủ làm evidence duy nhất.
+8. SEO chỉ project semantic truth đã có; không tạo Graph edge để làm SEO và
+   không khai báo VideoObject data không có thật.
+9. Source change tạo snapshot/reconciliation signal hoặc Proposal; không
+   overwrite NHK editorial, semantic relation hoặc Authority history âm thầm.
+10. Deleted/private/region-blocked/embed-disabled source giữ Video identity,
+    provenance và history; public watch/sitemap áp dụng unavailable policy.
 
 ## 14. WordPress editorial law
 

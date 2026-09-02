@@ -44,7 +44,7 @@ must not be replaced by a static catalog assertion.
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage | WRITE | Yes | Apply creates revision | Usage is placement | READY for metadata; no byte upload |
-| `nhk.video.ingest` | Video external reference | WRITE | Yes | Apply creates revision | No edge by ingest | READY for validated YouTube URL |
+| `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; source/review gates explicit |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |

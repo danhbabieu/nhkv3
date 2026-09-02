@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Video\VideoIntakeService;
 
 final class McpTransport
 {
@@ -18,6 +19,7 @@ final class McpTransport
         private $can = null,
         private $originAllowed = null,
         private ?McpArticleIngestHandler $article = null,
+        private ?VideoIntakeService $videoIntake = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -141,6 +143,7 @@ final class McpTransport
             $value === null => in_array('null', $types, true),
             in_array('string', $types, true) => is_string($value),
             in_array('integer', $types, true) => is_int($value),
+            in_array('number', $types, true) => is_int($value) || is_float($value),
             in_array('object', $types, true), in_array('array', $types, true) => is_array($value),
             default => true,
         };
@@ -151,8 +154,8 @@ final class McpTransport
         if (isset($schema['pattern']) && is_string($value) && preg_match('/' . $schema['pattern'] . '/', $value) !== 1) throw new \InvalidArgumentException('Argument has invalid format: ' . $key . '.');
         if (isset($schema['enum']) && !in_array($value, (array) $schema['enum'], true)) throw new \InvalidArgumentException('Argument has invalid value: ' . $key . '.');
         if (isset($schema['minLength']) && is_string($value) && strlen($value) < (int) $schema['minLength']) throw new \InvalidArgumentException('Argument is too short: ' . $key . '.');
-        if (isset($schema['minimum']) && is_int($value) && $value < (int) $schema['minimum']) throw new \InvalidArgumentException('Argument is below minimum: ' . $key . '.');
-        if (isset($schema['maximum']) && is_int($value) && $value > (int) $schema['maximum']) throw new \InvalidArgumentException('Argument is above maximum: ' . $key . '.');
+        if (isset($schema['minimum']) && (is_int($value) || is_float($value)) && $value < (float) $schema['minimum']) throw new \InvalidArgumentException('Argument is below minimum: ' . $key . '.');
+        if (isset($schema['maximum']) && (is_int($value) || is_float($value)) && $value > (float) $schema['maximum']) throw new \InvalidArgumentException('Argument is above maximum: ' . $key . '.');
         if (($schema['type'] ?? '') === 'object') {
             foreach ((array) ($schema['required'] ?? []) as $required) if (!array_key_exists((string) $required, $value)) throw new \InvalidArgumentException('Missing required argument: ' . $key . '.' . $required . '.');
             if (($schema['additionalProperties'] ?? true) === false) foreach (array_keys($value) as $property) if (!array_key_exists((string) $property, (array) ($schema['properties'] ?? []))) throw new \InvalidArgumentException('Unknown argument: ' . $key . '.' . $property . '.');
@@ -211,6 +214,26 @@ final class McpTransport
 
     private function videoIngest(array $arguments): array
     {
+        // Keep the original proposal shape available to existing callers. The
+        // enriched intake contract is selected explicitly by one of its new
+        // fields, so upgrading the plugin does not silently change old jobs.
+        $enriched = $this->videoIntake !== null && array_intersect(
+            ['user_hint', 'intended_category', 'intended_relations', 'editorial_instruction', 'idempotency_key'],
+            array_keys($arguments),
+        ) !== [];
+        if ($enriched) {
+            $preview = $this->videoIntake->preview(
+                (string) ($arguments['url'] ?? ''),
+                (string) ($arguments['user_hint'] ?? ''),
+                isset($arguments['intended_category']) ? (string) $arguments['intended_category'] : null,
+                is_array($arguments['intended_relations'] ?? null) ? $arguments['intended_relations'] : [],
+                (string) ($arguments['editorial_instruction'] ?? ''),
+            );
+            $proposal = $this->governance->createFromArguments($this->videoIntake->proposalArguments($preview, isset($arguments['idempotency_key']) ? (string) $arguments['idempotency_key'] : null));
+            $result = $this->proposal($proposal);
+            $result['preview'] = $preview->toArray();
+            return $result;
+        }
         $videoArguments = $arguments;
         $videoArguments['operation'] = 'ingest';
         $videoArguments['entity_type'] = 'video';

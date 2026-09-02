@@ -2658,3 +2658,40 @@ proof is unavailable in this checkpoint. No database mutation was performed.
 | FULL_TEST_GATE | **FAIL / ENVIRONMENT BLOCKED** | Current local WP bootstrap cannot establish its database connection; do not treat this as a clean full-suite pass. |
 | DEPLOYMENT_READY | **NO** | No production/staging/V2 mutation or deployment was attempted. |
 | READY_FOR_LEGACY_MEDIA_REPAIR | **NO** | Explicitly outside R2 scope. |
+
+## Video V3 semantic ingestion checkpoint — 2026-09-03
+
+This checkpoint adds the YouTube-first Video semantic intake slice while
+preserving the Constitution as the only normative authority. The work is
+source/projection/governance code only: no YouTube import, legacy migration,
+WordPress Post write, production/staging write, Graph backfill, slug repair or
+publication was performed.
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| VIDEO_CONSTITUTION | **PASS (static)** | Video Law amendment and detailed §13.2 invariants cover external identity, source/editorial separation, no fabricated transcript, evidence-backed relations, completeness, reconciliation and unavailable-source history. |
+| VIDEO_SOURCE_IDENTITY | **PASS (unit)** | YouTube watch, short, embed, short-host and playlist-with-video forms normalize to one external ID; tracking parameters do not duplicate identity; arbitrary hosts and malformed IDs fail closed. |
+| YOUTUBE_ADAPTER | **PASS (unit/static)** | Official Data API adapter boundary, bounded timeout, API-key environment configuration, source snapshot normalization, unavailable/rate-limit/error classification and deterministic source hash are implemented. |
+| TRANSCRIPT_AND_CHAPTER_POLICY | **PASS (unit/static)** | Default is `NO_TRANSCRIPT`; authorized/user-supplied transcript kinds are explicit; timestamp chapters require increasing source-description evidence and are never fabricated. |
+| VIDEO_INTAKE | **PASS (unit/static)** | One-shot enriched `nhk.video.ingest` builds a source, research, relation, Hub, editorial, SEO, completeness and ambiguity packet, then creates one governed Proposal. Existing external identity selects update/reconcile mode. |
+| VIDEO_ORPHAN_GATE | **PASS (unit/static)** | Enriched apply rejects incomplete packets, missing semantic attachments and missing Graph executor; category is not an attachment. Approved attachments are created through Graph in the governed apply path. |
+| VIDEO_RELATIONS | **PASS (unit/static)** | Planner requires canonical UUID, registered predicate, explicit/inferred origin and evidence; public related traversal is bounded to two hops, direct-first and non-materialized. Direction/path explanation convergence remains open. |
+| VIDEO_HUB | **PASS (unit/static)** | Eight fixed editorial/navigation Hub keys have one primary and optional evidence-based secondary results; Hub classification is not a Graph relation or WordPress taxonomy. |
+| EDITORIAL_AND_SEO | **PASS (unit/static)** | NHK editorial package is distinct from source description; canonical SEO projection emits visible-content VideoObject, Open Graph and evidence-backed Clip parts; unavailable/incomplete videos emit no VideoObject. |
+| WATCH_AND_SITEMAP | **PASS (static/unit)** | Watch projection supports unavailable-source state, source attribution, editorial content and related sections; video sitemap route is rewrite-registered and includes only active, available, indexable entries with HTTPS thumbnails. Live public data coverage remains unproven. |
+| SEARCH_AND_HOME_PROJECTION | **PASS (unit/static)** | Video discovery uses editorial/source fields, Hub and resolved canonical subject context, while unavailable sources are excluded from normal discovery. |
+| VIDEO_SYNC | **PASS (unit/static)** | Read-only comparison reports `NO_CHANGE`, `SOURCE_CHANGED`, `SOURCE_UNAVAILABLE` or `REVIEW_REQUIRED`; source changes do not overwrite NHK editorial fields or Graph relations. A separate MCP sync tool is not yet exposed. |
+| MCP_GOVERNANCE | **PASS (unit/static)** | Enriched MCP video intake is governed and returns a single Proposal preview; it does not approve, apply or publish. Legacy-shaped calls retain compatibility behavior. |
+| NHK_UNIT | **PASS** | `281 tests / 1,411 assertions`. |
+| COMPOSER_AND_LINT | **PASS** | `composer validate --no-check-publish` valid with existing license warning; new/changed PHP files lint clean. |
+| DIFF_CHECK | **PARTIAL** | Our implementation checks are clean; repository-wide `git diff --check` reports one trailing-space line in the concurrently modified user file `docs/semantic-packs/odo/ODO_RUNTIME_INVENTORY.md`. |
+| WORDPRESS_INTEGRATION | **BLOCKED** | Guarded integration run cannot bootstrap `$wpdb` without `NHK_WP_TEST_PATH`/WordPress database setup; observed 8 bootstrap errors, 12 mandatory-runtime failures and 74 skips. No runtime data was mutated. |
+| MCP_WIRE_SMOKE | **BLOCKED** | No live wire probe was run in this checkpoint because the WordPress bootstrap/runtime endpoint is unavailable. Prior execution state records the earlier 21-tool smoke evidence; the enriched workflow still requires a live probe. |
+| DEPLOYMENT | **NO** | No production/staging/V2 deployment, cutover or data write was attempted. |
+| COMMIT | **PENDING** | Logical commit is still subject to the managed filesystem's Git ref/index-lock permission gate; no push or merge was attempted. |
+
+Remaining `IMPLEMENTATION_GAP`: expose a dedicated governed sync-preview MCP
+operation, converge direction-aware/path-explainable related results and live
+runtime/wire-probe the enriched YouTube intake with configured API/database.
+Album/Collection support remains a registry gap and was not invented. There is
+no unresolved `CONSTITUTION_CONFLICT` in this checkpoint.

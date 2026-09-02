@@ -95,6 +95,35 @@ final class SearchSemanticQueryTest extends TestCase
         self::assertSame(0, $result['_totals']['videos']);
     }
 
+    public function test_semantic_search_indexes_video_editorial_source_category_and_subject_context(): void
+    {
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $authorityRepository = new InMemoryAuthorityRepository();
+        $brand = $authorityRepository->create(new AuthorityEntity(UuidCodec::newV7(), 'brand', 'brand:odo', 'Odo', 1, []));
+        $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Technical source title', [
+            'source_snapshot' => ['availability' => 'available', 'source_title' => 'Technical source title', 'tags' => ['bell']],
+            'editorial' => ['title' => 'Âm thanh Odo', 'summary' => 'Bối cảnh nhận diện đồng hồ cổ.'],
+            'category' => ['primary' => ['key' => '06', 'label' => 'Âm thanh đồng hồ cổ']],
+            'semantic_attachments' => [['target_key' => $brand->canonicalId, 'target_type' => 'brand', 'predicate' => 'about']],
+        ]);
+        $videos = new class($video) implements VideoRepository {
+            public function __construct(private Video $item) {}
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $item): Video { return $item; }
+            public function update(Video $item, int $expectedRevision): Video { return $item; }
+            public function list(bool $includeRetired = false): array { return [$this->item]; }
+        };
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $item): Media { return $item; } public function update(Media $item, int $expectedRevision): Media { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyKnowledge = new class implements KnowledgeRepository { public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; } public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+
+        $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $videos, $emptyKnowledge, $types))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo');
+
+        self::assertSame(1, $result['_totals']['videos']);
+        self::assertSame('Âm thanh Odo', $result['videos'][0]['title']);
+    }
+
     public function test_semantic_search_excludes_an_active_authority_row_without_a_public_route(): void
     {
         $types = new EntityTypeRegistry();

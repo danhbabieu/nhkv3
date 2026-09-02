@@ -35,8 +35,13 @@ final class HomeSemanticQuery
         if ($this->ready('video')) {
             foreach ($this->videos->list() as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
-                $path = PublicRouteResolver::videoPath($item->title, $item->externalVideoId); if ($path === null) continue;
-                $modules['videos'][] = ['title' => $item->title ?: 'Video NHK', 'platform' => $item->platform, 'url' => home_url($path)];
+                $metadata = is_array($item->metadata) ? $item->metadata : [];
+                $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+                if (isset($source['availability']) && $source['availability'] !== 'available' && $source['availability'] !== 'unknown') continue;
+                $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
+                $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video NHK');
+                $path = PublicRouteResolver::videoPath($title, $item->externalVideoId); if ($path === null) continue;
+                $modules['videos'][] = ['title' => $title, 'platform' => $item->platform, 'url' => home_url($path)];
                 if (count($modules['videos']) >= 4) break;
             }
         }

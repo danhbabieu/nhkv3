@@ -21,20 +21,22 @@ final readonly class Video
         if ($revision < 1) throw new InvalidVideoReference('Video revision must be positive.');
     }
 
-    public static function fromUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null): self
+    public static function fromUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null): self
     {
         $parts = parse_url(trim($url));
+        if (!is_array($parts) || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true) || isset($parts['user'], $parts['pass'], $parts['port'])) throw new InvalidVideoReference('Only a valid YouTube URL is supported.');
         $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
         $id = null;
         if (in_array($host, ['youtube.com', 'www.youtube.com', 'm.youtube.com'], true)) {
             parse_str((string) ($parts['query'] ?? ''), $query);
-            $id = $query['v'] ?? null;
-            if ($id === null && preg_match('#^/(?:shorts|embed)/([A-Za-z0-9_-]{11})#', (string) ($parts['path'] ?? ''), $match)) $id = $match[1];
+            $id = $path === '/watch' ? ($query['v'] ?? null) : null;
+            if ($id === null && preg_match('#^/(?:shorts|embed)/([A-Za-z0-9_-]{11})/?$#', (string) ($parts['path'] ?? ''), $match)) $id = $match[1];
         } elseif ($host === 'youtu.be') {
-            $id = ltrim((string) ($parts['path'] ?? ''), '/');
+            if (preg_match('#^/([A-Za-z0-9_-]{11})/?$#', (string) ($parts['path'] ?? ''), $match)) $id = $match[1];
         }
         if (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]{11}$/', $id)) throw new InvalidVideoReference('Only a valid YouTube external video reference is supported.');
-        return new self(UuidCodec::newV7(), 'youtube', $id, 'https://www.youtube.com/watch?v=' . $id, $title, $metadata, $thumbnailMediaId);
+        return new self($canonicalId ?? UuidCodec::newV7(), 'youtube', $id, 'https://www.youtube.com/watch?v=' . $id, $title, $metadata, $thumbnailMediaId);
     }
 
     public function hasValidPublicReference(): bool
