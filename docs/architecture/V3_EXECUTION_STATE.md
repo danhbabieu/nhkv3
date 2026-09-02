@@ -4,6 +4,22 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Constitution compliance audit checkpoint — 2026-09-02
+
+The documentation-only full Constitution compliance audit is complete. It is
+recorded at
+`docs/architecture/V3_CONSTITUTION_COMPLIANCE_AUDIT_2026-09-02.md` and its
+non-normative TDD remediation plan is at
+`docs/superpowers/plans/2026-09-02-v3-constitution-compliance-remediation.md`.
+The highest findings are P0 semantic-write Governance bypasses, silent
+Graph/runtime failure paths, unresolved Product/Specimen ownership, structural
+parent truth using transitional payload fields, and public identity leakage /
+missing durable slug history. Runtime/database evidence was unavailable, so
+historical parent and Graph counts remain explicitly unverified. The audit
+performed no database, Graph, WordPress, migration, seed, repair or legacy
+article-body mutation. The next approved implementation gate is **Phase 0 —
+P0 integrity fixes**; it does not authorize Graph backfill.
+
 ## Current checkpoint — 2026-09-02
 
 Single-Constitution finalization checkpoint, 2026-09-02: the later
