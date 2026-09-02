@@ -17,6 +17,7 @@ final class McpTransport
         private McpGovernanceHandler $governance,
         private $can = null,
         private $originAllowed = null,
+        private ?McpArticleIngestHandler $article = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -78,6 +79,8 @@ final class McpTransport
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
         $capability = match ($name) {
+            'nhk.article.preflight' => 'read',
+            'nhk.article.ingest' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
             'nhk.video.ingest' => 'nhk_create_proposals',
@@ -93,6 +96,8 @@ final class McpTransport
         $result = match ($name) {
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
+            'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
+            'nhk.article.ingest' => $this->article?->ingest($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments),

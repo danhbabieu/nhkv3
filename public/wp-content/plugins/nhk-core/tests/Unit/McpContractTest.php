@@ -9,11 +9,13 @@ use PHPUnit\Framework\TestCase;
 
 final class McpContractTest extends TestCase
 {
-    public function test_catalog_has_exact_current_ordered_nineteen_tool_contract(): void
+    public function test_catalog_has_exact_current_ordered_twenty_one_tool_contract(): void
     {
         self::assertSame([
             'nhk.search',
             'nhk.semantic.resolve',
+            'nhk.article.preflight',
+            'nhk.article.ingest',
             'nhk.entity.get',
             'nhk.media.get',
             'nhk.media.ingest',
@@ -48,6 +50,20 @@ final class McpContractTest extends TestCase
             'relation_retire',
             'relation_reactivate',
         ], $tools['nhk.proposal.create']['inputSchema']['properties']['operation']['enum']);
+    }
+
+    public function test_article_abilities_are_coordinated_and_phase_one_is_reconcile_only(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertSame('read', $tools['nhk.article.preflight']['kind']);
+        self::assertFalse($tools['nhk.article.preflight']['governed']);
+        self::assertSame('mutation', $tools['nhk.article.ingest']['kind']);
+        self::assertTrue($tools['nhk.article.ingest']['governed']);
+        self::assertSame(['reconcile', 'create', 'update'], $tools['nhk.article.ingest']['inputSchema']['properties']['intent']['enum']);
+        self::assertSame(['idempotency_key', 'intent'], $tools['nhk.article.ingest']['inputSchema']['required']);
+        self::assertSame(['intent'], $tools['nhk.article.preflight']['inputSchema']['required']);
+        self::assertSame(['endpoint_type', 'endpoint_key'], $tools['nhk.article.ingest']['inputSchema']['properties']['target_wp_post']['required']);
+        self::assertArrayNotHasKey('body', $tools['nhk.article.ingest']['inputSchema']['properties']);
     }
 
     public function test_read_tools_are_not_mutations_and_all_mutations_are_governed(): void

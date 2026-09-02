@@ -72,7 +72,14 @@ implementation requirements, not claims of current runtime support.
 
 ## Current implementation status
 
-The current MCP catalog and WordPress Abilities expose no coordinated Article
-operation. This contract is therefore approved architectural guidance with a
-runtime `CODE_GAP`/`SEMANTIC_GAP`; implementation requires a separate reviewed
-slice with tests and read-back evidence.
+Phase 1 implements the reconcile-only coordinator, durable operation receipt,
+deterministic child proposal planning, read-only editorial fingerprinting,
+semantic/editorial verification, diagnostics and the coordinated MCP surface.
+The receipt is orchestration/recovery state and never stores the full Article
+body. Semantic writes remain behind Governance and Controlled Apply.
+
+`nhk.article.preflight` is read-only; `nhk.article.ingest` is the governed
+execute/resume surface and uses the same idempotency key for retry. `create` and
+editorial `update` return `UNSUPPORTED_OPERATION` and do not write WordPress.
+Production Post 55 execution remains outside this implementation and requires
+the separate human-reviewed reconciliation packet.

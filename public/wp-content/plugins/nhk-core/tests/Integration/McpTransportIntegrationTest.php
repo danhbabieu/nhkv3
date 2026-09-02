@@ -30,7 +30,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         $data = $response->get_data();
         self::assertSame('2.0', $data['jsonrpc']);
-        self::assertCount(19, $data['result']['tools']);
+        self::assertCount(21, $data['result']['tools']);
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
@@ -113,7 +113,7 @@ final class McpTransportIntegrationTest extends TestCase
         $request->set_body(wp_json_encode(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'tools/list', 'params' => []]));
         $response = rest_do_request($request);
         self::assertSame(200, $response->get_status());
-        self::assertCount(19, $response->get_data()['result']['tools']);
+        self::assertCount(21, $response->get_data()['result']['tools']);
     }
 
     public function test_standard_modern_tools_call_accepts_header_only_without_custom_method_headers(): void

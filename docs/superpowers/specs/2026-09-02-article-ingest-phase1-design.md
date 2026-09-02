@@ -174,6 +174,16 @@ deleted. A retry continues only missing children whose prerequisites and
 revisions remain valid. Otherwise the operation returns a non-success outcome
 and requires re-preflight or human reconciliation.
 
+## Phase 1 semantic bundle atomicity
+
+The semantic bundle is preflight-atomic but apply-non-atomic. Every command,
+registry reference, dependency and provenance prerequisite must pass before
+the first proposal is created. Controlled Apply then executes children as
+independent governed transactions in dependency order. A later child failure
+does not compensate an earlier applied child; the receipt records the partial
+state and a retry continues only the missing children. A changed prerequisite
+or revision fails closed and requires a new preflight or human reconciliation.
+
 ## MCP surface
 
 Phase 1 exposes two coordinated logical abilities using the current `nhk.*`

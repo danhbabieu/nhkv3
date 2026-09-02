@@ -7,9 +7,10 @@ use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Domain\Governance\{ApplyAttempt,ProposalState};
 use NHK\Core\Governance\Exception\{InvalidProposalTransition,ProposalNotFound};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Contracts\Article\ArticleApplyService;
 
 /** Transaction owner for governed authority mutations. The executor must use the same wpdb connection. */
-final class ControlledApplyService
+final class ControlledApplyService implements ArticleApplyService
 {
     public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null, private ?GovernanceAuthorizer $authorizer=null) {}
 

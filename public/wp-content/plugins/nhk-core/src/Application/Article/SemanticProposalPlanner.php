@@ -14,7 +14,7 @@ final class SemanticProposalPlanner
     {
         if ($operationId === '') throw new InvalidArgumentException('Article operation identity is required.');
         $slots = [];
-        $planned = [];
+        $commandsBySlot = [];
         foreach ($commands as $command) {
             $slot = trim((string) ($command['slot'] ?? ''));
             if ($slot === '' || isset($slots[$slot])) throw new InvalidArgumentException('Semantic proposal slot is missing or duplicated.');
@@ -28,7 +28,22 @@ final class SemanticProposalPlanner
             $expectedRevision = (int) ($command['expected_revision'] ?? 1);
             $content = CommandCanonicalizer::fingerprint($operation, $entityType, $targetUuid, $expectedRevision, $payload, []);
             $dependencyFingerprint = CommandCanonicalizer::fingerprint($operation, $entityType, $targetUuid, $expectedRevision, $payload, $dependencies);
-            $planned[] = new SemanticProposalCommand($slot, $operation, $entityType, $subjectId, $targetUuid, $expectedRevision, $payload, $dependencies, $operationId . ':semantic:' . $slot, bin2hex($content), bin2hex($dependencyFingerprint));
+            $commandsBySlot[$slot] = new SemanticProposalCommand($slot, $operation, $entityType, $subjectId, $targetUuid, $expectedRevision, $payload, $dependencies, $operationId . ':semantic:' . $slot, bin2hex($content), bin2hex($dependencyFingerprint));
+        }
+        foreach ($commandsBySlot as $command) foreach ($command->dependencySlots as $dependency) {
+            if (!isset($commandsBySlot[$dependency])) throw new InvalidArgumentException('Semantic proposal dependency slot does not exist: ' . $dependency);
+        }
+        $planned = [];
+        while ($commandsBySlot !== []) {
+            $progress = false;
+            foreach ($commandsBySlot as $slot => $command) {
+                $unresolved = array_filter($command->dependencySlots, static fn (string $dependency): bool => isset($commandsBySlot[$dependency]));
+                if ($unresolved !== []) continue;
+                $planned[] = $command;
+                unset($commandsBySlot[$slot]);
+                $progress = true;
+            }
+            if (!$progress) throw new InvalidArgumentException('Semantic proposal dependencies contain a cycle or unknown slot.');
         }
         return $planned;
     }

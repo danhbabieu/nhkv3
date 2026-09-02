@@ -46,5 +46,21 @@ final class ArticleReceiptRepositoryIntegrationTest extends TestCase
         );
         self::assertSame(2, $repository->save($updated)->revision);
         self::assertSame('COMPLETED', $repository->findByIdempotencyKey($receipt->idempotencyKey)?->outcome->value);
+
+        $sameKey = $repository->create(new ArticleOperationReceipt(
+            UuidCodec::newV7(), $receipt->idempotencyKey, $receipt->requestFingerprint,
+            'reconcile', '1:55', 55, 'receipt', ArticleIngestOutcome::GOVERNANCE_PENDING,
+            true, ['proposal-1'], [], ['code' => 'REPLAY'], 1,
+        ));
+        self::assertSame($receipt->operationId, $sameKey->operationId);
+
+        $stale = new ArticleOperationReceipt(
+            $receipt->operationId, $receipt->idempotencyKey, $receipt->requestFingerprint,
+            'reconcile', '1:55', 55, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED,
+            true, ['proposal-1'], [], ['code' => 'STALE_WRITE'], 2,
+        );
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ARTICLE_RECEIPT_REVISION_CONFLICT');
+        $repository->save($stale);
     }
 }

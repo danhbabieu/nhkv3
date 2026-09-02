@@ -19,12 +19,19 @@ final readonly class ArticleOperationReceipt
         public string $stage,
         public ArticleIngestOutcome $outcome,
         public bool $retryable,
-        public array $proposalIds,
-        public array $appliedProposalIds,
+        public array $proposalIds = [],
+        public array $appliedProposalIds = [],
         public array $failure = [],
         public int $revision = 1,
         public ?string $createdAt = null,
         public ?string $updatedAt = null,
+        public ?string $wpStateToken = null,
+        /** @var array<string,list<string>> */
+        public array $dependencyMap = [],
+        /** @var array<string,string> */
+        public array $proposalStates = [],
+        /** @var array<string,int> */
+        public array $applyAttempts = [],
     ) {
         if (!UuidCodec::isValid($operationId) || $idempotencyKey === '' || !preg_match('/^[a-f0-9]{64}$/i', $requestFingerprint)) {
             throw new InvalidArgumentException('Article operation identity and fingerprint are invalid.');
@@ -45,6 +52,10 @@ final readonly class ArticleOperationReceipt
             'intent' => $this->intent,
             'wp_endpoint_key' => $this->wpEndpointKey,
             'wp_post_id' => $this->wpPostId,
+            'wp_state_token' => $this->wpStateToken,
+            'dependency_map' => $this->dependencyMap,
+            'proposal_states' => $this->proposalStates,
+            'apply_attempts' => $this->applyAttempts,
             'stage' => $this->stage,
             'outcome' => $this->outcome->value,
             'retryable' => $this->retryable,

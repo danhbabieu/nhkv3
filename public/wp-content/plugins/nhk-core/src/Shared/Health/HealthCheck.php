@@ -33,6 +33,7 @@ final class HealthCheck {
             'media_storage_ready' => $this->migrations->mediaStorageReady(),
             'video_storage_ready' => $this->migrations->videoStorageReady(),
             'knowledge_storage_ready' => $this->migrations->knowledgeStorageReady(),
+            'article_storage_ready' => method_exists($this->migrations, 'articleStorageReady') ? $this->migrations->articleStorageReady() : false,
             'layers' => ['storage' => $storage, 'runtime' => $runtime, 'hydration' => $hydration, 'application' => $application, 'rest' => $rest],
         ];
     }

@@ -11,6 +11,8 @@ final class McpToolCatalog
         return [
             self::tool('nhk.search', 'Search native editorial posts and active semantic records with bounded pagination.', ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['q']),
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
+            self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),
+            self::tool('nhk.article.ingest', 'Resume a governed Article semantic reconciliation using the same idempotency key; Phase 1 is reconcile-only.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.media.ingest', 'Create a governed Media identity with complete asset and usage metadata; binary delivery remains separately verified.', [
@@ -128,6 +130,58 @@ final class McpToolCatalog
                 'sort_order' => ['type' => 'integer', 'minimum' => 0],
             ],
             'required' => ['endpoint_type', 'endpoint_key', 'role'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    private static function articleProperties(bool $includeIdempotency): array
+    {
+        $properties = [
+            'operation_id' => self::uuidField(true),
+            'intent' => ['type' => 'string', 'enum' => ['reconcile', 'create', 'update']],
+            'target_wp_post' => [
+                'type' => 'object',
+                'properties' => [
+                    'endpoint_type' => ['type' => 'string', 'enum' => ['wp_post']],
+                    'endpoint_key' => ['type' => 'string', 'pattern' => '^[1-9][0-9]*:[1-9][0-9]*$'],
+                ],
+                'required' => ['endpoint_type', 'endpoint_key'],
+                'additionalProperties' => false,
+            ],
+            'expected_editorial_state' => [
+                'type' => 'object',
+                'properties' => ['state_token' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$']],
+                'required' => ['state_token'],
+                'additionalProperties' => false,
+            ],
+            'semantic_bundle' => [
+                'type' => 'object',
+                'properties' => ['commands' => ['type' => 'array', 'items' => self::articleCommandField()]],
+                'required' => ['commands'],
+                'additionalProperties' => false,
+            ],
+        ];
+        if ($includeIdempotency) $properties['idempotency_key'] = ['type' => 'string', 'minLength' => 1, 'maxLength' => 191];
+        return $properties;
+    }
+
+    /** @return array<string,mixed> */
+    private static function articleCommandField(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'slot' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'operation' => ['type' => 'string', 'enum' => self::governedOperations()],
+                'entity_type' => ['type' => 'string', 'minLength' => 1],
+                'subject_id' => ['type' => 'string', 'minLength' => 1],
+                'target_uuid' => self::uuidField(true),
+                'expected_revision' => ['type' => 'integer', 'minimum' => 1],
+                'payload' => ['type' => 'object'],
+                'dependency_slots' => ['type' => 'array', 'items' => ['type' => 'string', 'minLength' => 1]],
+            ],
+            'required' => ['slot', 'operation', 'entity_type', 'subject_id', 'expected_revision', 'payload'],
             'additionalProperties' => false,
         ];
     }

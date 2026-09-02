@@ -40,5 +40,20 @@ final class ArticleOperationReceiptTest extends TestCase
         self::assertSame('COMPLETED', $state['outcome']);
         self::assertSame(['proposal-1'], $state['proposal_ids']);
         self::assertArrayNotHasKey('body', $state);
+        self::assertArrayHasKey('dependency_map', $state);
+        self::assertArrayHasKey('proposal_states', $state);
+        self::assertArrayHasKey('apply_attempts', $state);
+    }
+
+    public function test_receipt_preserves_editorial_state_token_as_operational_metadata(): void
+    {
+        $receipt = new ArticleOperationReceipt(
+            '018f7c48-6d87-7a1d-8c9e-3b8c4c8d1f22', 'key-token', str_repeat('b', 64),
+            'reconcile', '1:55', 55, 'preflight', ArticleIngestOutcome::GOVERNANCE_PENDING,
+            true, [], [], [], 1, null, null, 'editorial-token',
+        );
+
+        self::assertSame('editorial-token', $receipt->toArray()['wp_state_token']);
+        self::assertArrayNotHasKey('body', $receipt->toArray());
     }
 }
