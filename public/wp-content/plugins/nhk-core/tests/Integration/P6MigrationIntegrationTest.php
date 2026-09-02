@@ -5,7 +5,6 @@ namespace NHK\Tests\Integration;
 
 use NHK\Core\Infrastructure\Migration\MediaMigration004;
 use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
-use NHK\Core\Application\Migration\V2MigrationService;
 use NHK\Core\Application\Media\MediaVideoPageQuery;
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Domain\Video\Video;
@@ -188,35 +187,20 @@ final class P6MigrationIntegrationTest extends TestCase
         }
     }
 
-    public function test_malformed_media_asset_is_skipped_with_invalid_identity_reason(): void
+    public function test_malformed_media_asset_row_is_omitted_without_hiding_runtime_failures(): void
     {
         global $wpdb;
-        (new MediaMigration004())->up();
         (new MediaAssetMetadataMigration008())->up();
-        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'v2-migration-malformed-media-' . bin2hex(random_bytes(4)), 'Malformed Media', 'ready'));
-        $sourceKey = 'v2-migration-malformed-media-asset-' . bin2hex(random_bytes(4));
+        $media = (new WpdbMediaRepository($wpdb))->create(new Media(UuidCodec::newV7(), 'integration-malformed-media-' . bin2hex(random_bytes(4)), 'Malformed Media', 'ready'));
+        $repository = new WpdbMediaAssetRepository($wpdb);
+        $asset = $repository->create(new MediaAsset(UuidCodec::newV7(), $media->canonicalId, 'original', 'malformed/mime.jpg', hash('sha256', 'malformed-mime'), 'image/jpeg', 12, 20, 10));
 
         try {
-            $result = (new V2MigrationService($wpdb))->apply([[
-                'type' => 'legacy_media_asset',
-                'stable_key' => $sourceKey,
-                'media_id' => $media->canonicalId,
-                'public_id' => 'legacy-asset-1',
-                'storage_key' => 'uploads/malformed.jpg',
-                'checksum' => hash('sha256', 'malformed-media-asset'),
-                'mime_type' => '',
-            ]], 21, 10);
-
-            self::assertSame(1, $result['processed']);
-            self::assertSame(0, $result['migrated']);
-            self::assertSame(1, $result['skipped']);
-            self::assertSame(0, $result['conflict']);
-            self::assertSame('INVALID_IDENTITY', (string) $wpdb->get_var($wpdb->prepare(
-                "SELECT reason_code FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s",
-                $sourceKey
-            )));
+            $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}nhk_media_assets SET mime_type=%s WHERE asset_uuid=%s", '', UuidCodec::toBinary($asset->assetId)));
+            self::assertNull($repository->findByAssetId($asset->assetId));
+            self::assertSame([], $repository->listByMediaId($media->canonicalId));
         } finally {
-            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_migration_ledger WHERE source_key=%s", $sourceKey));
+            $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE asset_uuid=%s", UuidCodec::toBinary($asset->assetId)));
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
         }
     }

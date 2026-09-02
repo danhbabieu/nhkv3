@@ -289,10 +289,11 @@ final class McpTransportIntegrationTest extends TestCase
         file_put_contents($assetDirectory . '/asset.jpg', 'public-asset');
         $asset = (new WpdbMediaAssetRepository($wpdb))->create(new \NHK\Core\Domain\Media\MediaAsset(\NHK\Core\Shared\Uuid\UuidCodec::newV7(), $media->canonicalId, 'original', 'public/asset.jpg', hash('sha256', 'public-asset'), 'image/jpeg', 12, 20, 10, 'PUBLIC'));
         try {
-            $read = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/media/' . $media->canonicalId));
+            $read = $this->request('tools/call', ['id' => 52, 'params' => ['name' => 'nhk.media.get', 'arguments' => ['id' => $media->canonicalId]]], ['Mcp-Name' => 'nhk.media.get']);
             self::assertSame(200, $read->get_status());
-            self::assertSame('/media/asset/' . $asset->assetId . '/', $read->get_data()['assets'][0]['public_url']);
-            self::assertArrayNotHasKey('storage_key', $read->get_data()['assets'][0]);
+            self::assertFalse($read->get_data()['result']['isError']);
+            self::assertSame('/media/asset/' . $asset->assetId . '/', $read->get_data()['result']['structuredContent']['assets'][0]['public_url']);
+            self::assertArrayNotHasKey('storage_key', $read->get_data()['result']['structuredContent']['assets'][0]);
         } finally {
             unlink($assetDirectory . '/asset.jpg');
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE asset_uuid=%s", \NHK\Core\Shared\Uuid\UuidCodec::toBinary($asset->assetId)));
@@ -345,14 +346,15 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame('youtube', $video->platform);
             self::assertSame($videoId, $video->externalVideoId);
             self::assertTrue($video->active);
-            $read = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/video/' . $video->canonicalId));
+            $read = $this->request('tools/call', ['id' => 13, 'params' => ['name' => 'nhk.video.get', 'arguments' => ['id' => $video->canonicalId]]], ['Mcp-Name' => 'nhk.video.get']);
             self::assertSame(200, $read->get_status());
-            self::assertSame($video->canonicalId, $read->get_data()['id']);
-            self::assertSame($videoId, $read->get_data()['external_id']);
-            self::assertArrayNotHasKey('metadata', $read->get_data());
-            self::assertArrayNotHasKey('thumbnail_media_id', $read->get_data());
-            self::assertArrayNotHasKey('active', $read->get_data());
-            self::assertArrayNotHasKey('revision', $read->get_data());
+            self::assertFalse($read->get_data()['result']['isError']);
+            self::assertSame($video->canonicalId, $read->get_data()['result']['structuredContent']['id']);
+            self::assertSame($videoId, $read->get_data()['result']['structuredContent']['external_id']);
+            self::assertArrayNotHasKey('metadata', $read->get_data()['result']['structuredContent']);
+            self::assertArrayNotHasKey('thumbnail_media_id', $read->get_data()['result']['structuredContent']);
+            self::assertArrayNotHasKey('active', $read->get_data()['result']['structuredContent']);
+            self::assertArrayNotHasKey('revision', $read->get_data()['result']['structuredContent']);
         } finally {
             wp_set_current_user($previousUser);
         }
@@ -406,21 +408,17 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame($sourceRecord->canonicalId, $evidenceRecord->sourceId);
             self::assertTrue($evidenceRecord->isPublic());
 
-            $claimRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/claim/' . $claimRecord->canonicalId));
-            $sourceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $sourceRecord->canonicalId));
+            $claimRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/claim/' . $claimRecord->stableKey));
+            $sourceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/source/' . $sourceRecord->stableKey));
             $evidenceRead = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/evidence/' . $evidenceRecord->canonicalId));
             self::assertSame(200, $claimRead->get_status());
             self::assertSame(200, $sourceRead->get_status());
-            self::assertSame(200, $evidenceRead->get_status());
+            self::assertSame(404, $evidenceRead->get_status());
             self::assertCount(1, $claimRead->get_data()['evidence']);
             self::assertCount(1, $sourceRead->get_data()['evidence']);
             self::assertArrayNotHasKey('metadata', $sourceRead->get_data());
             self::assertArrayNotHasKey('metadata', $claimRead->get_data()['evidence'][0]);
             self::assertArrayNotHasKey('provenance', $claimRead->get_data());
-            self::assertSame($evidenceRecord->canonicalId, $evidenceRead->get_data()['id']);
-            self::assertSame($sourceRecord->title, $evidenceRead->get_data()['source_title']);
-            self::assertArrayNotHasKey('metadata', $evidenceRead->get_data());
-
             $sourceMcp = $this->request('tools/call', ['id' => 60, 'params' => ['name' => 'nhk.source.get', 'arguments' => ['id' => $sourceRecord->canonicalId]]], ['Mcp-Name' => 'nhk.source.get']);
             $evidenceMcp = $this->request('tools/call', ['id' => 61, 'params' => ['name' => 'nhk.evidence.get', 'arguments' => ['id' => $evidenceRecord->canonicalId]]], ['Mcp-Name' => 'nhk.evidence.get']);
             self::assertSame(200, $sourceMcp->get_status());

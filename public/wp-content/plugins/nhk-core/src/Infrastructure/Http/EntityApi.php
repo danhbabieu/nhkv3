@@ -26,12 +26,7 @@ final class EntityApi
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
         $key = (string) $request['key'];
         $item = $this->collection?->detail($type, $key);
-        if ($item === null) {
-            $entity = $this->authority->findByStableKey($type, $key);
-            if (!$entity || $entity->entityType !== $type || !$entity->active()) return new \WP_Error('nhk_entity_not_found', 'Entity was not found.', ['status' => 404]);
-            return $this->serialize($entity);
-        }
-        return $item;
+        return $item ?? new \WP_Error('nhk_entity_not_found', 'Entity was not found.', ['status' => 404]);
     }
 
     private function list(\WP_REST_Request $request): array|\WP_Error

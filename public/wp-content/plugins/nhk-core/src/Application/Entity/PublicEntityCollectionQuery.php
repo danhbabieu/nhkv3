@@ -6,7 +6,6 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Graph\BrandAggregationQuery;
-use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class PublicEntityCollectionQuery
 {
@@ -30,20 +29,47 @@ final class PublicEntityCollectionQuery
     public function detail(string $type, string $key): ?array
     {
         if (!$this->isAvailable() || !$this->types->has($type)) return null;
-        if (preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 && !UuidCodec::isValid($key)) return null;
-        $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
-        return $entity && $entity->entityType === $type ? $this->item($entity) : null;
+        $entity = $this->resolvePublicSlug($type, $key);
+        return $entity === null ? null : $this->item($entity);
     }
 
     public function publicPath(AuthorityEntity $entity): ?string { return $this->routes->path($entity); }
+
+    /** Resolve a visitor-facing slug; canonical UUID/stable-key lookups stay internal. */
+    public function resolvePublicSlug(string $type, string $slug): ?AuthorityEntity
+    {
+        if (!$this->isAvailable() || !$this->types->has($type) || trim($slug) === '') return null;
+        $matches = [];
+        foreach ($this->authority->listByType($type, true) as $entity) {
+            if (PublicRouteResolver::slug($entity->canonicalName) !== trim($slug)) continue;
+            if ($this->item($entity) !== null) $matches[] = $entity;
+        }
+        return count($matches) === 1 ? $matches[0] : null;
+    }
+
+    /** Internal stable-key lookup used only to construct a public path. */
+    public function publicPathForStableKey(string $type, string $stableKey): ?string
+    {
+        if (!$this->isAvailable() || !$this->types->has($type)) return null;
+        $entity = $this->authority->findByStableKey($type, $stableKey);
+        if ($entity === null || $entity->entityType !== $type) return null;
+        $item = $this->item($entity);
+        return $item === null ? null : (($item['url'] ?? '') !== '' ? (string) $item['url'] : null);
+    }
+
+    /** Internal entity-to-projection bridge for an already resolved canonical route. */
+    public function detailForEntity(AuthorityEntity $entity): ?array
+    {
+        if (!$this->isAvailable() || !$this->types->has($entity->entityType)) return null;
+        return $this->item($entity);
+    }
 
     /** @param list<string> $segments */
     public function resolvePublic(string $type, array $segments): ?AuthorityEntity { return $this->routes->resolve($type, $segments); }
 
     public function publicPathForKey(string $type, string $key): ?string
     {
-        $item = $this->detail($type, $key);
-        return is_array($item) ? (string) ($item['url'] ?? '') ?: null : null;
+        return $this->publicPathForStableKey($type, $key);
     }
 
     public function stableKeyForPublicSlug(string $type, string $slug): ?string

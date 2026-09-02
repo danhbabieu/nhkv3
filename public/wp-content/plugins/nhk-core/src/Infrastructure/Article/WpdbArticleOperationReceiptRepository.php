@@ -31,6 +31,8 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
     public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt
     {
         $db = $this->db();
+        $existing = $this->findByIdempotencyKey($receipt->idempotencyKey);
+        if ($existing !== null) return $existing;
         $now = gmdate('Y-m-d H:i:s.u');
         $ok = $db->query($db->prepare(
             'INSERT INTO ' . $this->table() . ' (operation_id,idempotency_key,request_fingerprint,intent,wp_endpoint_key,wp_post_id,wp_state_token,dependency_map_json,proposal_states_json,apply_attempts_json,stage,outcome,retryable,proposal_ids_json,applied_proposal_ids_json,failure_json,diagnostics_json,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,%s,%d,%s,%s)',

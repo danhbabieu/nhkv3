@@ -75,7 +75,7 @@ final class PublicEntityRoutes
                 return get_404_template();
             }
             $this->set200();
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detail($publicType, $entity->canonicalId), 'archive_url' => $this->query->publicPath($entity)];
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $this->query->publicPath($entity)];
             $themeTemplate = locate_template('entity.php');
             return $themeTemplate !== '' ? $themeTemplate : $template;
         }
@@ -83,9 +83,14 @@ final class PublicEntityRoutes
         if ($type === '' || !$this->types->has($type)) return $template;
         $key = (string) get_query_var('nhk_entity_key');
         if ($key !== '') {
-            $entity = $this->query->detail($type, rawurldecode($key));
-            if ($entity === null) { $this->set404(); return get_404_template(); }
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $type, 'entity' => $entity, 'archive_url' => home_url($this->query->archivePath($type) ?? '/')];
+            $target = $this->query->publicPathForKey($type, rawurldecode($key));
+            if ($target === null) {
+                $stableKey = $this->query->stableKeyForPublicSlug($type, rawurldecode($key));
+                $target = $stableKey === null ? null : $this->query->publicPathForKey($type, $stableKey);
+            }
+            if ($target === null) { $this->set404(); return get_404_template(); }
+            wp_safe_redirect(home_url($target), 301, 'NHK canonical public route');
+            exit;
         } else {
             $page = max(1, (int) get_query_var('nhk_entity_page', 1)); $query = trim((string) get_query_var('nhk_entity_q'));
             $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'archive' => $this->query->archive($type, $page, 24, $query), 'archive_url' => home_url($this->query->archivePath($type) ?? '/')];
@@ -171,8 +176,12 @@ final class PublicEntityRoutes
         if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli') return;
         $type = (string) get_query_var('nhk_entity_type'); $key = (string) get_query_var('nhk_entity_key');
         if ($type === '' || $key === '') return;
-        $entity = $this->query->detail($type, rawurldecode($key)); $target = is_array($entity) ? (string) ($entity['url'] ?? '') : '';
-        if ($target === '') return;
+        $target = $this->query->publicPathForKey($type, rawurldecode($key));
+        if ($target === null) {
+            $stableKey = $this->query->stableKeyForPublicSlug($type, rawurldecode($key));
+            $target = $stableKey === null ? null : $this->query->publicPathForKey($type, $stableKey);
+        }
+        if ($target === null || $target === '') return;
         $current = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
         if (is_string($current) && rtrim('/' . trim($current, '/'), '/') === rtrim($target, '/')) return;
         wp_safe_redirect(home_url($target), 301, 'NHK canonical public route');

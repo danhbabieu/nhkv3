@@ -4,6 +4,50 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Phase R3 release-gate cleanup checkpoint — 2026-09-02
+
+This checkpoint records fresh verification against the current working tree
+after the R3 red-test cleanup. The Constitution and all current runtime
+contracts remain unchanged.
+
+Verified changes:
+
+- Retired V2 migration behavior tests were replaced with an explicit
+  fail-closed, zero-write proof. No V2, staging, production, legacy Post or
+  semantic data was migrated or repaired.
+- `WpdbMediaAssetRepository` now bounds only malformed domain/identity rows;
+  `TypeError`, autoload failures and other programming/infrastructure errors
+  still surface. The receipt repository preflights idempotency replay so an
+  expected duplicate does not emit a duplicate SQL warning.
+- Public Authority REST/entity routing now resolves reader-facing slugs only;
+  internal UUID/stable-key lookup remains available to internal application
+  paths and governed MCP reads. Native `category`, `tag`, `author` and
+  `knowledge` roots are reserved from broad entity rewrites.
+- MCP integration assertions use the governed internal UUID read tools for
+  Media, Video, Source and Evidence; public Knowledge Evidence remains
+  intentionally non-standalone. The default WordPress category remains
+  `Uncategorized` in storage and is projected as `Chưa phân loại` only at the
+  public presentation boundary.
+
+Fresh evidence:
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| PREFLIGHT | **PASS** | `composer preflight`: 10/10 checks; Composer validation is valid with the existing no-license metadata warning. |
+| UNIT | **PASS** | Full unit suite: 274 tests / 1,379 assertions, including the concurrently added Video semantic tests. |
+| R2 / MEDIA | **PASS** | Guarded P6/media slice: 45 tests / 303 assertions; Media, MediaAsset and MediaUsage boundaries remain separate. MySQL 9.7 emits an existing dbDelta diagnostic while idempotently inspecting `nhk_media_usages.id`; it is not a PHPUnit warning. |
+| MCP WIRE | **PASS** | `tools/mcp-wire-smoke.php --base-url=http://localhost`: all protocol, CORS, catalog and notification checks pass; catalog is 21 tools. |
+| FRONTEND SMOKE | **PASS** | Fresh local HTTP route smoke: 46/46 routes pass, including `/knowledge/` and localized Uncategorized metadata. |
+| FULL TEST | **PASS** | Fresh guarded `composer test`: 361 tests / 1,877 assertions, 0 errors, 0 failures, 2 authorized Post-55 skips, 0 PHPUnit warnings. |
+
+The two skips are the guarded Post 55 tests because `nhk_v3_test` contains no
+published Post 55 fixture; they remain skips rather than fabricated fixtures.
+The local rewrite option was refreshed for route verification only. No semantic
+record, Graph edge, WordPress Post, taxonomy term, slug, redirect mapping,
+legacy body or production/staging/V2 data was changed. Deployment/cutover is
+not claimed by this checkpoint; `READY_FOR_LEGACY_MEDIA_REPAIR: NO` remains in
+force.
+
 ## Article Ingest Phase 1 checkpoint — 2026-09-02
 
 The approved Phase 1 Article Ingest slice is implemented and committed at

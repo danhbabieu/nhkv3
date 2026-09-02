@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Media;
 
 use NHK\Core\Contracts\Media\MediaAssetRepository;
-use NHK\Core\Domain\Media\{MediaAsset, MediaException};
+use NHK\Core\Domain\Media\{InvalidMedia, MediaAsset, MediaException};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class WpdbMediaAssetRepository implements MediaAssetRepository
@@ -20,7 +20,7 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
 
     public function findByAssetId(string $id): ?MediaAsset
     {
-        return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE asset_uuid=%s LIMIT 1", UuidCodec::toBinary($id)), ARRAY_A));
+        return $this->hydrate($this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE asset_uuid=%s LIMIT 1", UuidCodec::toBinary($id)), defined('ARRAY_A') ? ARRAY_A : 1));
     }
 
     public function create(MediaAsset $asset): MediaAsset
@@ -90,7 +90,7 @@ final class WpdbMediaAssetRepository implements MediaAssetRepository
         }
         try {
             return new MediaAsset(UuidCodec::fromBinary($row['asset_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['asset_kind'], (string) $row['storage_key'], bin2hex($row['checksum']), (string) $row['mime_type'], (int) $row['byte_size'], $row['width'] === null ? null : (int) $row['width'], $row['height'] === null ? null : (int) $row['height'], strtoupper((string) ($row['visibility'] ?? 'PRIVATE')), $decodedMetadata);
-        } catch (\Throwable) {
+        } catch (InvalidMedia|\InvalidArgumentException|\ValueError) {
             return null;
         }
     }

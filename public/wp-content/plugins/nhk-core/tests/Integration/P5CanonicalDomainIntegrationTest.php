@@ -78,7 +78,7 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
             ['country' => 'Switzerland', 'private_note' => 'internal']
         );
         $repository->create($entity);
-        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/' . $entity->canonicalId));
+        $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/public-payload'));
 
         self::assertSame(200, $response->get_status());
         self::assertSame(['country' => 'Switzerland'], $response->get_data()['payload']);
@@ -86,7 +86,7 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         self::assertArrayNotHasKey('revision', $response->get_data());
     }
 
-    public function test_public_entity_api_accepts_uppercase_canonical_uuid_route(): void
+    public function test_public_entity_api_uses_reader_facing_slug_and_rejects_canonical_uuid_route(): void
     {
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
@@ -102,8 +102,12 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         $repository->create($entity);
         $response = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/' . strtoupper($entity->canonicalId)));
 
-        self::assertSame(200, $response->get_status());
-        self::assertSame($entity->canonicalId, $response->get_data()['id']);
+        self::assertSame(404, $response->get_status());
+        $public = rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/entity/brand/uppercase-route'));
+        self::assertSame(200, $public->get_status());
+        self::assertSame('Uppercase route', $public->get_data()['name']);
+        self::assertArrayNotHasKey('id', $public->get_data());
+        self::assertArrayNotHasKey('stable_key', $public->get_data());
     }
 
     public function test_public_entity_api_list_excludes_retired_entities_before_pagination(): void
@@ -125,8 +129,13 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         $data = $response->get_data();
         self::assertSame($baseline + 1, $data['total']);
-        self::assertContains($active->canonicalId, array_column($data['items'], 'id'));
-        self::assertNotContains($retired->canonicalId, array_column($data['items'], 'id'));
+        $names = array_column($data['items'], 'name');
+        self::assertContains('Active list item', $names);
+        self::assertNotContains('Retired list item', $names);
+        foreach ($data['items'] as $item) {
+            self::assertArrayNotHasKey('id', $item);
+            self::assertArrayNotHasKey('stable_key', $item);
+        }
     }
 
     public function test_authority_repository_ignores_corrupt_payload_rows(): void

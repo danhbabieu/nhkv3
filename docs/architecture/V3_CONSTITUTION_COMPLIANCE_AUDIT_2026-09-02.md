@@ -3,6 +3,34 @@
 > **NON-NORMATIVE.** The sole normative source is
 > `docs/constitution/NHK_V3_CONSTITUTION.md`.
 
+## R3 release-gate addendum — 2026-09-02
+
+The earlier audit below records an unavailable-runtime baseline. Fresh R3
+verification supersedes those baseline runtime results for the checked gates:
+
+- `composer preflight`: 10/10 PASS.
+- Full guarded PHPUnit: 361 tests / 1,877 assertions, 0 errors, 0 failures,
+  2 authorized Post-55 skips, 0 PHPUnit warnings.
+- Full unit suite: 274 tests / 1,379 assertions PASS.
+- MCP wire smoke: PASS with the governed 21-tool catalog.
+- Frontend route smoke: 46/46 PASS, including `/knowledge/` and localized
+  default-category metadata.
+
+R3 root-cause results: V2 migration tests were stale against the retired
+writer contract; malformed MediaAsset rows were bounded at the repository
+hydration boundary while programming failures remain loud; public entity REST
+resolution is slug-only and governed MCP reads retain UUID identifiers; and
+the broad NHK rewrite was reserving too few native WordPress roots. The default
+`Uncategorized` term was not renamed or mutated. A MySQL 9.7 `dbDelta`
+diagnostic (`ALTER TABLE ... nhk_media_usages ... id SET DEFAULT ''`) remains
+visible during legacy migration idempotency checks but does not produce a
+PHPUnit warning or failure and was outside this Media-preserving cleanup.
+
+The current workspace also contains a separate concurrently added untracked
+Video semantic test/source slice; it was not staged or modified by R3. No V2,
+staging, production, legacy article-body, semantic-record, Graph-edge,
+taxonomy, slug, redirect or repair mutation was performed by this addendum.
+
 ## Scope and evidence boundary
 
 This is a documentation-only audit. The full Constitution was read from the

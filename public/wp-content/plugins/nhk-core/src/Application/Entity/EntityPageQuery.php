@@ -6,7 +6,6 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EntityPageQuery
 {
@@ -14,9 +13,15 @@ final class EntityPageQuery
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
     public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
+    public function detailForEntity(AuthorityEntity $entity): ?array
+    {
+        if ($this->collection !== null) return $this->collection->detailForEntity($entity);
+        if (!$this->types->has($entity->entityType) || !$entity->active() || $this->publicPath($entity) === null) return null;
+        return $this->serialize($entity);
+    }
     public function publicPathForKey(string $type, string $key): ?string
     {
-        if ($this->collection !== null) return $this->collection->publicPathForKey($type, $key);
+        if ($this->collection !== null) return $this->collection->publicPathForStableKey($type, $key);
         if (!$this->types->has($type) || !$this->available()) return null;
         $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
         return $entity && $entity->entityType === $type && $entity->active() ? $this->publicPath($entity) : null;
@@ -29,14 +34,13 @@ final class EntityPageQuery
         if ($this->collection !== null) {
             $item = $this->collection->detail($type, $key);
             if ($item !== null) {
-                $entity = $this->entityForKey($type, $key);
+                $entity = $this->collection->resolvePublicSlug($type, $key);
                 $item['related'] = $entity === null ? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []] : ($this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []]);
             }
             return $item;
         }
         if (!$this->types->has($type) || !$this->available()) return null;
-        if (preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 && !UuidCodec::isValid($key)) return null;
-        $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
+        $entity = $this->entityForPublicSlug($type, $key);
         if (!$entity || $entity->entityType !== $type || !$entity->active()) return null;
         $serialized = $this->serialize($entity); $serialized['related'] = $this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
         return $serialized;
@@ -74,10 +78,14 @@ final class EntityPageQuery
     }
 
     private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
-    private function entityForKey(string $type, string $key): ?AuthorityEntity
+    private function entityForPublicSlug(string $type, string $slug): ?AuthorityEntity
     {
         if (!$this->types->has($type)) return null;
-        return preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
+        $matches = [];
+        foreach ($this->authority->listByType($type, true) as $entity) {
+            if ($entity->active() && PublicRouteResolver::slug($entity->canonicalName) === trim($slug) && $this->publicPath($entity) !== null) $matches[] = $entity;
+        }
+        return count($matches) === 1 ? $matches[0] : null;
     }
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }

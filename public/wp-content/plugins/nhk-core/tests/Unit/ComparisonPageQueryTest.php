@@ -19,7 +19,7 @@ final class ComparisonPageQueryTest extends TestCase
         $retired = $authority->create('brand', 'nhk:brand:retired', 'Retired'); $authority->retire($retired->canonicalId, 1);
         $query = new ComparisonPageQuery(new EntityPageQuery($repository, $types));
 
-        $result = $query->read('brand/' . $brand->stableKey, 'brand/' . $retired->stableKey);
+        $result = $query->read('brand/odo', 'brand/retired');
         self::assertSame('Odo', $result['items']['left']['name']);
         self::assertNull($result['items']['right']);
         self::assertNull($query->read('not-a-reference', 'brand/missing')['items']['left']);
