@@ -6,6 +6,16 @@
 
 ## Current checkpoint — 2026-09-02
 
+Single-Constitution finalization checkpoint, 2026-09-02: forensic review found
+that `READ_FIRST.md` was restored by the completed standalone commit `3abcfd4`
+after `cb239af` retired it; no repository hook, generator or automation recreates
+the file. The concurrent Codex process group remains active for an unrelated
+Article Ingest design review, but three read-only observations showed stable
+HEAD/status and unchanged Constitution-file hashes and mtimes. The final tree
+must keep `AGENTS.md` direct and contain only
+`docs/constitution/NHK_V3_CONSTITUTION.md` under `docs/constitution/`. The
+pre-existing untracked MCP plan remains preserved and unstaged.
+
 Documentation amendment checkpoint, 2026-09-02: the approved Article Ingest
 boundary is now recorded in the Constitution and routed through
 `docs/constitution/NHK_V3_CONSTITUTION.md`. The required sequence is semantic preflight

@@ -100,6 +100,9 @@ Một thuật ngữ chỉ có một nghĩa trong NHK V3.
 - **Historic Slug:** public slug cũ được giữ để redirect một hop tới slug hiện
   hành.
 
+Alias không phải Historic Slug: alias phục vụ resolution, còn Historic Slug là
+route identity cũ có redirect policy riêng.
+
 ### 3.2 Graph và quan hệ
 
 - **Graph Node:** endpoint được đăng ký trong EndpointTypeRegistry.
@@ -694,6 +697,30 @@ Dùng reason code chính xác, không gom thành error chung:
 Khi ghi CONSTITUTION_CONFLICT, phải nêu file/module/operation, điều khoản bị
 vi phạm, registry/contract hiện hành, hành vi thực tế, rủi ro và architectural
 decision cần có. Không tự sửa Hiến pháp để hợp thức hóa implementation.
+
+### 24.1 Deterministic adversarial outcomes
+
+Các trường hợp biên sau đây có kết quả kiến trúc cố định:
+
+| Tình huống | Kết quả bắt buộc |
+|---|---|
+| Một Brand có nhiều Model; một Model có nhiều Variant | Hợp lệ nếu mỗi Model chỉ có một Brand parent và mỗi Variant chỉ có một Model parent; reverse collections là traversal |
+| Một Movement được nhiều Brand dùng; một Music được nhiều Movement support | Hợp lệ; shared entity không có Brand owner ngầm và quan hệ MANY/MANY giữ nguyên scope |
+| Variant cấu hình Music nhưng Specimen quan sát khác Music | Cả hai fact cùng tồn tại ở scope riêng; không promotion, overwrite hoặc suy ngược |
+| Specimen có observation riêng | Giữ ở Specimen Observation với evidence; không biến thành Variant/Model/Brand fact |
+| Knowledge Claim có Source nhưng Evidence không đủ | Không đủ điều kiện public/verified hoặc apply theo contract; giữ diagnostic/provenance gap, không nâng claim thành sự thật |
+| Model thiếu, mơ hồ hoặc conflicting parent | Fail-closed với STRUCTURAL_PARENT_MISSING hoặc STRUCTURAL_PARENT_AMBIGUOUS; không đoán, không dùng payload shortcut làm Graph truth |
+| Brand đổi tên hoặc public slug đổi | Giữ Canonical ID và Stable Key; rename không tự đổi slug; slug change là operation explicit, giữ Historic Slug và redirect một hop |
+| Alias collision hoặc Historic Slug collision | Fail-closed với IDENTITY_CONFLICT; alias không được dùng như historic redirect |
+| Merge/reassignment entity | High-impact semantic mutation; cần Governance, identity/Graph/provenance/redirect review và durable audit, không hard-delete hoặc tự merge |
+| Một Specimen xuất hiện trong nhiều Product; Product biến mất | Hợp lệ theo thời gian; Product là listing/offer, Specimen vẫn giữ physical identity |
+| Database hợp lệ nhưng runtime dependency thiếu | Health là RUNTIME/BOOTSTRAP failure; surface failure, không trả empty semantic data |
+| Homepage và hub cho membership khác nhau | PUBLIC_ELIGIBILITY_FAILURE; dùng cùng policy, identity, route và blocker/warning, không sửa bằng template |
+| Derived Music xuất hiện trên Brand page | Chỉ được hiển thị như DERIVED với relation path; không tạo Brand→Music shortcut |
+| Shortcut trùng với derived path | Không persist shortcut; giữ một direct path và giải thích derived traversal |
+| Legacy V2 field không có V3 contract | REGISTRY_GAP hoặc DATA_COMPATIBILITY_GAP; không phát minh type/field/relation và không migrate tự động |
+| Generic WordPress Post publish | Hợp lệ độc lập ở Post boundary; không được báo là V3 knowledge Article hoàn tất nếu thiếu Article Ingest contract |
+| Semantic MCP/Admin mutation | Chỉ Proposal → Human Approval → Eligibility → Controlled Apply → repository → audit; bypass là CONSTITUTION_CONFLICT |
 
 ## 25. Change control
 
