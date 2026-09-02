@@ -28,7 +28,7 @@ return HTTP 202 with no body.
 
 ## 2. Tool catalog thực tế
 
-`McpToolCatalog::tools()` exposes exactly 19 tools. `kind=mutation` implies
+`McpToolCatalog::tools()` exposes exactly 21 tools. `kind=mutation` implies
 `governed=true`. `nhk.semantic.resolve` is the added catalog member at
 position 2; the catalog's position 19 is `nhk.proposal.apply`. The clean HEAD
 catalog and the wire smoke both use this
@@ -69,7 +69,7 @@ The exact current wire order is the table order above.
 | Create/update entity | Ingest or generic governed proposal; no typed update tool | PARTIAL |
 | Read Source/Evidence | `nhk.source.get`, `nhk.evidence.get` | READY |
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
-| Read/create relation | Governed `relation_create`; Graph read is admin REST only | PARTIAL |
+| Read/create relation | Governed `relation_create`; raw Graph read is admin REST only; related semantic read has no MCP tool yet | PARTIAL / IMPLEMENTATION_GAP |
 | Create/update/publish Post | No MCP Post application command | BLOCKED |
 | Upload/find Media | Metadata ingest only; no byte upload or lookup tool | PARTIAL/BLOCKED |
 | Attach MediaUsage | Nested in Media ingest only | PARTIAL |
@@ -112,8 +112,8 @@ existing Governance operation and require target revision for updates/lifecycle.
 | `music` | yes | `artist`, `album`, `description`, `release_year` |
 | `component` | yes | `kind`, `manufacturer`, `description` |
 | `classification` | yes | `family`, `description` |
-| `specimen` | yes | `model_uuid`, `serial_number`, `acquired_at`, `notes` |
-| `product` | yes | `specimen_uuid`, `vendor`, `url`, `price`, `currency`, `availability` |
+| `specimen` | yes | `model_uuid`, `serial_number`, `acquired_at`, `notes`, `physical_provenance`, `technical_observations`, `condition_observations` |
+| `product` | yes | `vendor`, `url`, `price`, `currency`, `availability`, `listing_title`, `listing_copy`, `offer_state`, `inventory_state`, `listing_start_at`, `listing_end_at`, `commercial_lifecycle`, `condition_copy` |
 
 ## 6. Knowledge / Source / Evidence workflow
 
@@ -152,6 +152,25 @@ definitions above in `PredicateRegistry`; they are pre-existing uncommitted
 work and were not added by this MCP task. No further predicate, derived
 relation, predicate-specific evidence rule or Album relation may be invented.
 
+### 7.1 Related semantic navigation read gap
+
+The approved application contract for related navigation is
+`docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md`. It requires a
+bounded, registry-driven read over registered endpoints, direct/derived
+classification, a maximum of two hops, direction-aware traversal, path
+explainability, deduplication and public eligibility/readiness before
+serialization.
+
+The current MCP surface has no related/Graph read tool. Raw Graph REST remains
+administrator-only, and the eight WordPress read Abilities mirror the existing
+catalog rather than adding related navigation. This is an
+`IMPLEMENTATION_GAP`/`P1` query-exposure gap, not permission to expose raw edges
+or to add a new MCP tool in this documentation task. A future MCP read review
+must delegate to the shared application query contract, return reader-safe
+paths and preserve the existing capability, identity and fail-closed rules.
+No taxonomy, post meta, hard-coded ID or generic WordPress read may substitute
+for the governed Graph query.
+
 ## 8. Media workflow
 
 Media identity, MediaAsset binary metadata and MediaUsage placement are
@@ -167,15 +186,25 @@ it never merges canonical identities.
 
 ## 9. Product / Specimen
 
-Specimen is a concrete physical object. Product is a listing/offer and is not
-the physical object's identity. Both are registered Authority types.
+The approved Constitution amendment separates the two registered Authority
+types. Specimen is the canonical identity of one physical object and owns
+serial/physical evidence, provenance, observations, condition and
+evidence-supported identification. Product is the canonical identity of one
+commercial listing/offer/context and owns listing copy, offer state, price,
+availability, inventory/listing state and commercial lifecycle.
 
-The Product payload permits `specimen_uuid`, while `about` also permits Product
-→ Specimen. Runtime validation does not enforce mutual exclusion or equivalence,
-so the same fact can be stored in payload and Graph. This is a contract-level
-`CONSTITUTION_CONFLICT`. Do not automatically create or repair this link until
-an architecture decision chooses canonical owner, semantics, cardinality,
-provenance and migration rule.
+Cardinality is Specimen `0..N` Products over time and Product `0..1` Specimen.
+A Product that claims one specific physical object is semantically complete
+only with exactly one Specimen; generic/pre-specimen Product may remain
+unlinked when the current Product contract permits it. Product copy is not
+Knowledge or physical truth, and commerce edits do not mutate Specimen.
+
+The current runtime has no dedicated approved Product–Specimen persistence
+relation. The former `specimen_uuid` Product field is no longer registered, and
+broad `about` remains insufficient as an ownership contract. This is recorded
+as `REGISTRY_GAP`/`CODE_GAP`; no relation, payload repair, inferred Specimen or
+backfill is performed. A future relation requires explicit semantics,
+endpoints, cardinality, provenance and Governance review.
 
 ## 10. Album
 

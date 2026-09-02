@@ -94,10 +94,15 @@ states. They must not force every domain into one generic card layout.
 Reusable presentation primitives include Container, SectionHeading, Card,
 ArticleCard, EntityCard, MediaCard, VideoCard, Badge, Breadcrumb, Pagination,
 Search, Filter, Tabs, Gallery, RelatedSection and EmptyState. Templates do not
-query raw database tables. Use HomePageQuery, EntityPageQuery, ArchiveQuery,
-RelatedContentQuery, SearchQuery, MediaGalleryQuery and VideoQuery (or
-equivalent application services), avoiding N+1 queries and requiring
-pagination for large collections.
+query raw database tables. RelatedSection must consume the shared, bounded
+Graph-backed contract in
+`docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md`; page assemblers
+may choose labels and limits but may not create page-specific semantic
+traversal or taxonomy fallbacks. Use HomePageQuery, EntityPageQuery,
+ArchiveQuery, RelatedEntityQuery (with the transitional
+`RelatedContentQuery` seam documented there), SearchQuery, MediaGalleryQuery
+and VideoQuery (or equivalent application services), avoiding N+1 queries and
+requiring pagination for large collections.
 
 ## Accessibility, performance and SEO
 

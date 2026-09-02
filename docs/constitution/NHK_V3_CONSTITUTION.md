@@ -59,6 +59,96 @@ infrastructure failure and must be tested before implementation is accepted.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
+## Amendment record — 2026-09-02 — Product / Specimen Boundary
+
+**WHY:** Product and Specimen are different identities, but the previous
+runtime contract did not completely define their ownership, lifecycle,
+cardinality or semantic-completeness rules. Leaving that boundary implicit
+would allow a commercial listing to become a physical identity or a physical
+record to become a mutable offer.
+
+**WHAT:** Approve the narrow Product / Specimen law in §11 and the related
+Knowledge, Media, Governance and acceptance-invariant clarifications. Specimen
+is the canonical identity of one physical object. Product is the canonical
+identity of one commercial listing/offer/context. One Specimen may have zero to
+many Products over time; one Product may reference zero or one Specimen. A
+specific-object Product is semantically complete only after resolving exactly
+one Specimen. A generic or pre-specimen Product may exist without a Specimen,
+but never owns physical identity in its place.
+
+**AFFECTED SUBSYSTEMS:** Authority, Product/Specimen domain contracts, Graph
+relationship contracts, Knowledge, Source/Evidence, Media/MediaUsage,
+Governance, MCP/Admin diagnostics and public projection.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** Product and Specimen retain separate
+canonical IDs, stable keys, lifecycle and public routes. Product may present
+approved Specimen-derived context, but listing copy is not physical truth and
+public projections must preserve the source/scope distinction without exposing
+internal identifiers.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no storage shortcut,
+seed, inferred link, identity merge, payload repair, Graph edge, migration or
+legacy-data operation. The existing broad `about` predicate is not a
+Product–Specimen ownership contract. A dedicated relation may be registered
+only after its semantics, endpoints, cardinality, provenance and Governance
+contract are separately reviewed. Until then, physical linkage remains an
+explicit REGISTRY_GAP/CODE_GAP and all current data remains untouched.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Physical identity, Specimen
+identification/observation/provenance and Product–Specimen semantic linkage
+use Proposal → Human Approval → Eligibility → Controlled Apply → repository →
+audit. Commerce-only Product edits remain ordinary commerce writes unless they
+also mutate semantic truth. Tests must prove identity separation, lifecycle
+survival, at-most-one linkage, completeness diagnostics, claim non-promotion
+and no implicit repair.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
+
+## Amendment record — 2026-09-02 — Semantic Relationship Navigation & Related Projection
+
+**WHY:** Canonical entities are discovery entry points, not isolated pages. The
+previous law distinguished direct and derived relations, but did not state the
+global traversal bound, related-result ranking, deduplication,
+explainability, or the boundary between Graph truth and frontend projection
+strongly enough to govern every entity page.
+
+**WHAT:** Approve §9.1, the related-navigation invariants in §26, and the
+implementation contract at
+`docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md`. Every registered
+canonical endpoint may start a bounded related query. Direct results are one
+governed hop; derived results may use at most two governed hops, retain an
+explainable path, remain derived, and never become a persisted shortcut.
+Related candidates are filtered by Graph truth before editorial ranking and
+projection limits are applied.
+
+**AFFECTED SUBSYSTEMS:** Graph, Authority, Knowledge, Source/Evidence, Media,
+Video, WordPress Post endpoint links, Public Projection, frontend query
+services and MCP read orchestration.
+
+**REGISTRY AND COMPATIBILITY:** This amendment adds no entity type, endpoint,
+predicate, field, relation type, operation, MCP tool or data. The runtime
+matrix and gaps are recorded in the related projection contract. `Article` is
+an editorial workflow, not a canonical endpoint; Album/Collection remains a
+semantic gap unless a later contract registers it. Existing registry
+directionality limitations, missing traversal engine and current
+Brand/related implementation divergence remain explicit implementation gaps;
+they are not legalized by this amendment.
+
+**DATA, MIGRATION AND ROLLOUT:** No Graph edge, Authority record, WordPress
+Post, taxonomy, post meta, legacy article body, V2/live data or cache is
+created, repaired, backfilled or rewritten. Related projection is read-only
+and fail-closed on registry, identity, eligibility, provenance, readiness or
+infrastructure failure.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Future implementation must use the
+existing Graph read/repository boundaries and public eligibility/route policy.
+It must prove direct-vs-derived precedence, two-hop bounds, directionality,
+cycle prevention, path explainability, semantic filtering before latest or
+featured ranking, honest empty/unavailable states and no taxonomy/post-meta
+fallback before acceptance.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
+
 ## 2. Ranh giới trách nhiệm tối cao
 
 Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:
@@ -308,6 +398,57 @@ Mỗi derived result phải giải thích được DIRECT hoặc DERIVED và, kh
 cho phép, trả relation path. Presence trên projection không được bị hiểu thành
 ownership. Không materialize transitive edge chỉ để frontend dễ query.
 
+### 9.1 Điều hướng quan hệ ngữ nghĩa và phép chiếu nội dung liên quan
+
+Mọi canonical entity và mọi Graph endpoint đã đăng ký là một điểm bắt đầu hợp
+lệ của Semantic Graph navigation. Một trang public có thể không có related
+ item, nhưng không được mặc định là ngõ cụt và không được tạo quan hệ để làm
+ đầy giao diện.
+
+Related candidate chỉ được lấy từ active Graph edge có source/target endpoint,
+predicate, direction, identity, provenance và public/readiness policy hợp lệ.
+Direct Related là một hop. Derived Related được phép tối đa **2 hop**
+(`MAX_HOPS = 2`); không recursive traversal, không graph explosion, không
+materialize transitive edge và không persist derived result thành Authority
+relation.
+
+Traversal phải dùng đúng source/target allow-list và directionality của
+PredicateRegistry cùng traversal policy đã được contract phê duyệt. Query
+incoming để đọc child của một child→parent edge không tự tạo inverse predicate;
+`A → B` không mặc định có nghĩa `B → A` cho semantic traversal. Predicate
+không có traversal/inverse rule rõ ràng là implementation gap và phải fail
+closed cho đường đi chưa được phép.
+
+Mỗi result phải giữ được ở application/query boundary: source canonical
+identity, target canonical identity, `DIRECT` hoặc `DERIVED`, `hop_count`, best
+path, các alternative paths nếu có, predicate của từng hop và provenance khi
+contract hỗ trợ. Public serialization chỉ được expose reader-safe title,
+label, route và path explanation phù hợp; không leak internal UUID, stable key,
+lifecycle hoặc raw Graph storage.
+
+Khi nhiều path tới cùng target, query layer phải deduplicate theo canonical
+identity, chọn best path theo ranking contract và giữ alternative paths khi
+reader/admin contract cho phép. Direct luôn đứng trước derived tương đương.
+Frontend chỉ quyết định section, layout, title, limit, pagination và thứ tự
+trình bày; Authority/Graph không nhận UI concern.
+
+Các mode `RELATED`, `FEATURED` và `LATEST` đều lọc candidate theo Graph trước.
+`RELATED` ưu tiên direct rồi derived; `FEATURED` chỉ dùng quality/editorial
+signal đã có contract; `LATEST` chỉ sort theo thời gian trong tập candidate
+semantic đã lọc. Limit, pagination, diversity và cache là projection/query
+concerns, không phải Authority fact.
+
+Không dùng WordPress category/tag, post meta, hard-coded ID, display name,
+slug, checksum hoặc raw semantic SQL làm semantic fallback. Không có relation
+thật thì trả empty thành công; dependency không sẵn sàng, identity mơ hồ,
+registry/Graph lỗi hoặc public eligibility thất bại phải trả trạng thái
+unavailable/conflict/gap tương ứng, không giả thành empty hoặc related.
+
+Brand, Model, Movement, Variant, Knowledge, WordPress Post/Article workflow,
+Media, Video, Specimen, Product và mọi endpoint canonical khác chịu cùng luật
+này. Album/Collection chỉ xuất hiện khi một entity/endpoint/predicate contract
+được đăng ký riêng; tên section hoặc field `music.album` không tạo identity.
+
 ## 10. Fact-scope law
 
 Mọi assertion kỹ thuật phải có scope hẹp nhất mà evidence thực sự hỗ trợ:
@@ -342,18 +483,74 @@ visual similarity.
 
 ## 11. Specimen và Product
 
-Specimen là một physical object. Nó có thể có observation, provenance, media,
-condition và technical identification. Evidence có thể chỉ đủ để nhận diện tới
-Brand, Model hoặc Variant; hệ thống không được ép specificity cao hơn evidence.
+**Specimen** là canonical semantic identity của **một physical object duy
+nhất**. Specimen sở hữu physical-object truth, gồm physical identity, serial
+hoặc physical identifying evidence, physical provenance, technical
+observations, condition observations mô tả chính object đó, identification tới
+Brand/Model/Variant trong mức evidence hỗ trợ và object-specific semantic
+evidence. Evidence không đủ specificity thì hệ thống không được ép object lên
+một type/identity chi tiết hơn.
 
-Product là listing/offer/commercial context. Một Specimen có thể xuất hiện
-trong nhiều Product theo thời gian. Product không thay thế, đổi tên hoặc trở
-thành identity của Specimen.
+**Product** là canonical identity của **một commercial listing/offer/commerce
+context duy nhất**. Product sở hữu commercial truth, gồm listing identity,
+listing title/copy ở ngữ cảnh thương mại, offer state, asking/sale-price
+context, availability, inventory/listing state, commercial lifecycle,
+listing start/end timestamps và sale/listing presentation context.
 
-Product–Specimen association chỉ được dùng khi semantics, canonical owner,
-cardinality, provenance và mutation contract đã rõ ràng. Nếu một payload field
-và một Graph predicate cùng biểu diễn một fact mà contract chưa chọn owner,
-đó là CONSTITUTION_CONFLICT; không tự tạo, sửa hoặc đồng bộ hai bản.
+Product không trở thành canonical physical identity; Specimen không trở thành
+canonical listing/offer identity. Product không được sở hữu hoặc định nghĩa
+lại physical serial identity, canonical technical observation, physical
+provenance, specimen-level condition identity hoặc Brand/Model/Variant
+identification của physical object chỉ vì listing copy nói như vậy. Specimen
+không được sở hữu listing price, offer status, listing availability, listing
+lifecycle, sales-copy identity hoặc commercial inventory state.
+
+Cardinality cố định:
+
+- một Specimen có **0..N Product theo thời gian**; object có thể chưa từng
+  được list, được list một lần, relist hoặc có nhiều Product lịch sử;
+- một Product có **0..1 Specimen**; Product không thể đồng thời đại diện cho
+  hai Specimen;
+- một listing đại diện cho nhiều physical object không phải là quan hệ
+  Product–một-Specimen hợp lệ; không invent commerce model đó trong amendment
+  này.
+
+Nếu Product tuyên bố đại diện cho một physical object cụ thể, Product phải
+resolve tới đúng một Specimen trước khi được coi là semantically complete.
+Product generic, catalog-like hoặc pre-specimen có thể tồn tại không có
+Specimen nếu Product contract hiện hành cho phép, nhưng không được dùng Product
+để thay thế physical identity. Diagnostic reader phải phân biệt ít nhất
+`PRODUCT_WITH_SPECIMEN`, `PRODUCT_WITHOUT_SPECIMEN_ALLOWED`,
+`PRODUCT_REQUIRES_SPECIMEN` và `PRODUCT_SPECIMEN_CONFLICT` hoặc các reason code
+canonical tương đương hiện hành.
+
+Expiring, archiving hoặc deleting Product không được xóa Specimen. Thay đổi
+price, availability, listing title hoặc commerce state không tạo Specimen mới.
+Tạo Product thứ hai cho cùng Specimen không tạo physical identity thứ hai.
+Merge Product không tự merge Specimen; merge/reassignment Specimen là
+high-impact identity operation được Governance riêng phê duyệt.
+
+Specimen condition observation mô tả condition vật lý của object. Product
+condition copy chỉ là commercial presentation. Product có thể project/reference
+condition hiện hành của Specimen, nhưng copy không được silently overwrite
+observation canonical. Khi listing text xung đột evidence của Specimen, hệ
+thống giữ nguyên Specimen và tạo diagnostic/proposal theo Governance.
+
+Product copy không phải Knowledge Claim. Commercial description không tự động
+trở thành Knowledge, Source/Evidence hoặc semantic relation. Claim về Brand,
+Model, Variant, Movement, Music, Component, condition, provenance, production
+date hoặc technical configuration chỉ được promotion qua evidence → Proposal →
+Human Approval → Eligibility → Controlled Apply → canonical semantic state.
+
+Media vẫn thuộc Media/MediaAsset/MediaUsage law hiện hành. Media dùng trên
+Specimen page, Product listing hoặc editorial Post không tự chứng minh semantic
+depiction hay ownership; listing image chỉ được nói là ảnh của canonical
+Specimen khi có relation/evidence hợp lệ. Product–Specimen association cũng chỉ
+được persist khi đã có một relation mechanism được đăng ký với semantics,
+canonical owner, endpoints, cardinality, provenance và Governance rõ ràng.
+Không dùng `specimen_uuid` trong Product payload hoặc broad `about` để âm thầm
+định nghĩa quan hệ đó; nếu chưa có mechanism hợp lệ, ghi REGISTRY_GAP/CODE_GAP
+và fail closed, không tạo/sửa/sync hai bản truth.
 
 ## 12. Knowledge, Source và Evidence
 
@@ -365,6 +562,13 @@ Source lưu canonical source identity, loại nguồn và locator/metadata đư�
 Evidence là đơn vị cụ thể gắn Claim với Source, có thể supports, contradicts
 hoặc qualifies theo contract. Source tồn tại không chứng minh mọi claim của
 entity đó. Evidence phải hỗ trợ assertion/relation cụ thể.
+
+Commercial Product copy remains outside Knowledge. A listing statement is not
+an atomic canonical fact merely because it names a Brand, Model, Variant,
+condition, provenance or technical attribute. Promotion from Product copy into
+Knowledge or a semantic relation requires the existing evidence and Governance
+chain; a Product update must never silently mutate Specimen, Knowledge, Source,
+Evidence or Graph truth.
 
 Public claim/source/evidence phải qua active/public/verification policy và
 reader-safe serialization. Raw metadata/provenance internals và lifecycle fields
@@ -390,6 +594,11 @@ indexable SEO page.
 Public binary delivery phải kiểm tra parent Media, active/ready state, visibility,
 MIME allow-list, storage containment, size và checksum. Thiếu policy hoặc nguồn
 binary thì fail-closed, không sinh broken URL.
+
+Product listing use of Media does not transfer physical Media identity to
+Product or prove that the asset depicts a referenced Specimen. Such depiction
+or object-specific use remains a MediaUsage/Graph/evidence fact under its
+registered contract.
 
 ### 13.2 Video
 
@@ -600,6 +809,13 @@ apply. Canonical entity không bị hard-delete tùy tiện.
 Native WordPress editorial publish là ngoại lệ có chủ đích: vẫn thuộc Post
 boundary và không cần semantic Governance apply.
 
+Product price, availability, listing copy and ordinary offer-state edits are
+commerce-only when they do not change semantic truth. Any Product–Specimen
+linkage, physical identification, Specimen observation, provenance or other
+canonical semantic mutation must use the full Governance chain. A commercial
+edit that conflicts with physical evidence produces a diagnostic/proposal; it
+does not directly update Authority, Knowledge, Source/Evidence or Graph.
+
 ## 20. MCP và Admin
 
 MCP/Admin là orchestration/diagnostic surface, không phải canonical owner. MCP
@@ -714,6 +930,11 @@ Các trường hợp biên sau đây có kết quả kiến trúc cố định:
 | Alias collision hoặc Historic Slug collision | Fail-closed với IDENTITY_CONFLICT; alias không được dùng như historic redirect |
 | Merge/reassignment entity | High-impact semantic mutation; cần Governance, identity/Graph/provenance/redirect review và durable audit, không hard-delete hoặc tự merge |
 | Một Specimen xuất hiện trong nhiều Product; Product biến mất | Hợp lệ theo thời gian; Product là listing/offer, Specimen vẫn giữ physical identity |
+| Specific-object Product không có Specimen | Semantically incomplete/blocked; không tự tạo Specimen hoặc suy ra physical identity |
+| Generic/pre-specimen Product không có Specimen | Chỉ hợp lệ khi Product contract hiện hành cho phép; Product vẫn không sở hữu physical identity |
+| Product price/availability/title thay đổi | Commerce-only nếu không đổi semantic truth; không tạo, đổi hoặc xóa Specimen |
+| Product copy mâu thuẫn Specimen evidence | Giữ nguyên Specimen; tạo diagnostic/proposal theo Governance, không silently overwrite |
+| Product–Specimen link dùng field hoặc broad `about` chưa được chọn owner | REGISTRY_GAP/CODE_GAP; fail closed, không persist hoặc đồng bộ hai bản truth |
 | Database hợp lệ nhưng runtime dependency thiếu | Health là RUNTIME/BOOTSTRAP failure; surface failure, không trả empty semantic data |
 | Homepage và hub cho membership khác nhau | PUBLIC_ELIGIBILITY_FAILURE; dùng cùng policy, identity, route và blocker/warning, không sửa bằng template |
 | Derived Music xuất hiện trên Brand page | Chỉ được hiển thị như DERIVED với relation path; không tạo Brand→Music shortcut |
@@ -766,7 +987,38 @@ editorial, semantic and verification stages.
 16. Technical legacy routes không phải canonical và redirect tối đa một hop.
 17. Media, MediaAsset và MediaUsage không bị gộp identity/persistence.
 18. Product không trở thành Specimen identity.
-19. Constitution này là nguồn normative duy nhất.
+19. Specimen không trở thành Product listing identity.
+20. Một Specimen có thể có 0..N Product theo thời gian; một Product có tối đa
+    một Specimen.
+21. Specific-object Product không có đúng một Specimen là semantically
+    incomplete/blocked; Product generic/pre-specimen chỉ được phép nếu contract
+    hiện hành cho phép.
+22. Product commerce update không tạo, xóa hoặc thay thế Specimen identity.
+23. Product copy không tự promote thành Knowledge, Source/Evidence hoặc
+    semantic relation.
+24. Specimen condition/technical/provenance truth không bị Product copy
+    silently overwrite.
+25. Product–Specimen relationship persistence không được implicit; thiếu
+    relation contract phải fail closed với gap/diagnostic.
+26. Mọi canonical entity/Graph endpoint đã đăng ký có thể là điểm bắt đầu của
+    Semantic Graph navigation.
+27. Related content phải bắt nguồn từ governed Graph relationship; taxonomy,
+    post meta, hard-coded ID và raw semantic SQL không thay thế Graph.
+28. Derived related content chỉ được traverse tối đa hai governed hops.
+29. Derived result phải giữ trạng thái derived và không được persist thành
+    fake direct Authority edge chỉ vì presentation.
+30. Direct relation luôn thắng derived relation tương đương sau deduplication.
+31. Frontend projection không được mutate semantic truth hoặc ghi UI concern
+    vào Authority/Graph.
+32. Mọi derived result phải explainable bằng traversal path và predicate của
+    từng hop.
+33. Traversal phải tôn trọng directionality, inverse/traversal policy và
+    allow-list của registry; chiều ngược không được suy đoán.
+34. Relation filtering phải hoàn tất trước latest/featured/editorial ranking
+    và trước limit/pagination của projection.
+35. Related query phải bounded, chống cycle/graph explosion, deduplicate theo
+    canonical identity và phân biệt honest empty với unavailable/error.
+36. Constitution này là nguồn normative duy nhất.
 
 ---
 
@@ -782,9 +1034,13 @@ khác không được dùng như decision authority song song.
 | Brand backbone | Model/Variant cần lineage rõ nhưng shared domains không phải Brand asset | Model→Brand và Variant→Model là structural direct edges; Variant→Brand derived |
 | Child→parent storage | Một hướng canonical tránh reverse duplication | Query incoming để điều hướng; không lưu reverse edges |
 | Direct vs Derived | Presence trong projection không đồng nghĩa ownership | Read models trả origin/path; không materialize shortcut |
+| Semantic relationship navigation | Mọi canonical endpoint là điểm vào của mạng tri thức, nhưng Graph truth và presentation có boundary khác nhau | Related query dùng Graph governed, tối đa 2 hop, direct thắng derived, path phải giải thích được và không tạo fake edge |
 | Music has three scopes | Capability, configuration và physical observation là ba sự thật khác nhau | Không promotion hoặc infer từ count/visual/Brand |
 | Specimen is physical identity | Một object có nhiều observation/listing theo thời gian | Product không thay thế Specimen |
 | Product is offer identity | Commerce context thay đổi và relist được | Product–Specimen chỉ dùng khi contract chọn owner/semantics rõ |
+| Product/Specimen cardinality | Tách durable physical identity khỏi commerce lifecycle mutable | Specimen 1 → 0..N Product theo thời gian; Product → 0..1 Specimen; relist không duplicate Specimen |
+| Product semantic completeness | Specific-object listing cần một physical subject xác định; generic/pre-specimen listing không được giả physical identity | Product cụ thể không có đúng một Specimen bị block/incomplete; Product generic chỉ được phép khi contract hiện hành cho phép |
+| Product commercial claims | Listing copy không phải canonical fact | Không tự promote Product copy thành Knowledge, Source/Evidence hoặc Graph relation; promotion qua evidence và Governance |
 | Media distinctions | Semantic meaning, binary và placement có lifecycle khác nhau | Media/Asset/Usage tách persistence; checksum không merge |
 | Knowledge vs Post | Claim atomic khác narrative editorial body | Post giữ body/URL; Knowledge giữ claim; Graph chỉ liên hệ |
 | Coordinated Article Ingest | V3 knowledge Article completion crosses editorial and semantic boundaries | Approved operation-level contract: semantic preflight → WordPress draft → governed semantic apply → read-back → WordPress publish; no Article entity/body/endpoint |
@@ -793,6 +1049,7 @@ khác không được dùng như decision authority song song.
 | Vietnamese hubs | Public IA dành cho người đọc, không leak registry | Technical roots chỉ là compatibility inputs |
 | Eligibility parity | Một entity không được có membership khác nhau giữa surface | Một underlying policy và blocker/warning rõ ràng |
 | Governance | Semantic mutation cần approval, revision, idempotency và audit | Controlled Apply là write boundary; Post publish vẫn độc lập |
+| Product/Specimen boundary | Physical object identity và commercial offer identity có lifecycle/cardinality khác nhau | Specimen 1 → 0..N Product; Product → 0..1 Specimen; no implicit physical identity, claim promotion or repair |
 | Deployment health | Runtime failure không được bị che thành empty data | Preflight, layered health và dependency completeness là release gate |
 
 # Appendix B — CURRENT IMPLEMENTATION STATUS (NON-NORMATIVE STATUS SNAPSHOT)
@@ -806,6 +1063,7 @@ phải dùng Change Control.
 | Authority type registry | Chín type brand, model, variant, movement, music, component, classification, specimen, product đã load qua CanonicalEntityTypeCatalog | COMPLIANT | public/wp-content/plugins/nhk-core/src/Domain/Authority/CanonicalEntityTypeCatalog.php |
 | Graph endpoint registry | Full boot đăng ký wp_post, chín Authority type, media, video, knowledge, source, evidence — 15 endpoint types | COMPLIANT | CoreEndpointResolverRegistrar.php; MCP_V3_CONTENT_OPERATIONS.md |
 | Graph predicates | Runtime hiện có about, depicts và sáu predicate kỹ thuật: model_of, variant_of, uses_movement, supports_music, configured_with_music, observed_playing_music | COMPLIANT vocabulary; DATA GAP physical rows | PredicateRegistry.php; Brand relationship evidence; không có physical backfill trong checkpoint này |
+| Semantic relationship navigation | Canonical endpoints may be navigation entry points; direct/derived, path, ranking, projection và bounded traversal law đã được phê duyệt | PARTIAL / CODE_GAP; directionality and traversal policy gaps remain | RELATED_SEMANTIC_PROJECTION_CONTRACT.md; RelatedContentQuery.php; BrandAggregationQuery.php |
 | Brand structural storage | Registry/cardinality đã có; payload brand_uuid/model_uuid vẫn được PublicRouteResolver dùng; physical structural rows chưa được backfill | CODE_GAP, CONSTITUTION_CONFLICT nếu payload bị coi là canonical, DATA_COMPATIBILITY_GAP cho rows | PublicRouteResolver.php, StructuralContextQuery.php, BRAND_BACKBONE_STRUCTURAL_CONTRACT_EVIDENCE_2026-09-02.md |
 | Direct/derived Brand aggregation | Read-only Brand aggregation trả DIRECT/DERIVED và path; không tạo shortcut edge | IMPLEMENTED | BrandAggregationQuery.php; current execution state |
 | Public identity | Slug vẫn derive từ canonical_name lúc đọc; chưa có persisted public-slug/history contract | PUBLIC_IDENTITY_STORAGE_GAP, CODE_GAP | PublicIdentityContract.php, PublicRouteResolver.php, V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md |
@@ -815,7 +1073,7 @@ phải dùng Change Control.
 | Knowledge/Source/Evidence | Separate domain records, active/public reader-safe gates, governed ingest and evidence chain exist; final public provenance policy remains open | IMPLEMENTED with publication gate | KnowledgeClaim.php, Source.php, Evidence.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Media/Asset/Usage | Separate domain/persistence objects, readiness/visibility and guarded delivery exist; byte upload and final publication policy remain limited/open | IMPLEMENTED with policy gap | Media.php, MediaAsset.php, MediaUsage.php, PublicMediaAssetDelivery.php |
 | Video | Validated YouTube external-reference identity, canonical watch URL and optional thumbnail reference; no local MP4 behavior | IMPLEMENTED for current contract | Video.php, VideoService.php, MCP_V3_CONTENT_OPERATIONS.md |
-| Product/Specimen ownership | Both registered; Product payload allows specimen_uuid and broad about allows Product→Specimen, without one selected canonical owner | CONSTITUTION_CONFLICT | CanonicalEntityTypeCatalog.php, PredicateRegistry.php, MCP content-operations audit |
+| Product/Specimen ownership | Human-approved law separates physical identity and commerce identity; lifecycle, cardinality, completeness, condition and claim boundaries are explicit | PARTIAL / REGISTRY_GAP | This amendment; Product/Specimen tests; no dedicated approved Product–Specimen relation mechanism yet; existing `specimen_uuid`/broad `about` path is not canonical |
 | Album | No Authority type, endpoint, predicate, repository, service or public contract | SEMANTIC_GAP | MCP content-operations audit |
 | WordPress Post boundary | Native Post remains editorial title/body/author/date/category/URL truth; no Article Authority body path is approved | COMPLIANT | 01_EDITORIAL_CONTENT_BOUNDARY.md historical evidence; Plugin.php and public route contracts |
 | Article Ingest boundary | Constitutionally approved operation-level workflow; no runtime coordinator, cross-boundary idempotency, WordPress revision binding or final outcome contract exists yet | CODE_GAP / SEMANTIC_GAP | Article Ingest amendment; MCP_V3_CONTENT_OPERATIONS.md; current runtime catalog |

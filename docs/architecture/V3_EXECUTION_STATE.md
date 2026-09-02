@@ -4,6 +4,34 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Documentation-only checkpoint — 2026-09-02 — Related semantic navigation
+
+The Constitution now explicitly establishes “Điều hướng quan hệ ngữ nghĩa và
+phép chiếu nội dung liên quan” in §9.1 and adds acceptance invariants 26–35:
+every registered canonical endpoint is a Graph entry point; related candidates
+come only from governed Graph reads; derived traversal is bounded to two hops;
+direct beats derived; paths are explainable; traversal honors registry
+directionality; and semantic filtering precedes ranking and projection limits.
+
+The implementation contract is
+`docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md`. It records the
+actual current runtime inventory: nine Authority types, 15 Graph endpoints and
+eight registered predicates (`about`, `depicts`, `model_of`, `variant_of`,
+`uses_movement`, `supports_music`, `configured_with_music`,
+`observed_playing_music`). Article is a WordPress workflow rather than an
+endpoint; Album/Collection remains a `SEMANTIC_GAP`.
+
+The audit confirms that `RelatedContentQuery` is a one-hop read with fixed
+page sizes and `BrandAggregationQuery` is a separate manual traversal. The
+runtime does not yet provide a shared direction-aware two-hop engine,
+standardized path/ranking/deduplication contract, unified related projection,
+or MCP related read. These remain explicit P0/P1/P2 gaps, including the
+existing direct-vs-derived precedence and public eligibility convergence risks.
+No runtime code, registry entry, Graph edge, semantic record, WordPress Post,
+taxonomy, post meta, migration, cache, V2/live data or publication was changed
+by this checkpoint. The phased implementation plan is
+`docs/superpowers/plans/2026-09-02-related-semantic-navigation.md`.
+
 ## Constitution compliance audit checkpoint — 2026-09-02
 
 The documentation-only full Constitution compliance audit is complete. It is
