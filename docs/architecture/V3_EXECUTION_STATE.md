@@ -27,6 +27,14 @@ for Media/Video placeholders. Odo 35 retirement, relation completion,
 Knowledge creation and Post 38/39/40/55 reconciliation are pending runtime
 restoration and governed capability/reference audit.
 
+The blocked apply report is recorded at
+`docs/semantic-packs/odo/ODO_APPLY_REPORT.md` and checkpointed at `a10d265`
+(`docs: record Odo apply boundary`). Unit tests, PHP lint, YAML validation and
+diff checks pass; full integration remains blocked by the unavailable
+WordPress/MySQL runtime. No proposal ID exists because no governed proposal
+could be safely created or applied without runtime inventory and the missing
+generic capabilities.
+
 ## Phase R3 release-gate cleanup checkpoint — 2026-09-02
 
 This checkpoint records fresh verification against the current working tree

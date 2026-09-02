@@ -112,12 +112,11 @@ and is therefore explicitly stopped with `CONTRACT_EXTENSION_REQUIRED`.
 
 - `6fd6cc3` — `docs: add Odo semantic reference pack`
 - `621e59b` — `docs: record Odo runtime inventory gate`
-- Apply report commit: pending, because the concurrent Git process currently
-  owns the shared index; no lock was deleted or bypassed.
+- `a10d265` — `docs: record Odo apply boundary`.
+- The earlier transient shared-index lock was not deleted or bypassed.
 
 ## 15. Final HEAD
 
-At report creation: `621e59b56c4353b349fc44f24b8768dadaced877`.
+At report creation: `a10d265`.
 
-The report itself is intentionally pending its own documentation checkpoint;
-all unrelated Video changes remain uncommitted and untouched.
+All unrelated Video changes remain uncommitted and untouched.
