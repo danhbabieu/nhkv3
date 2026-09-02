@@ -19,7 +19,33 @@ advertises 19; no code or data was changed to mask either result. The
 required current old-iMac snapshot was not present; the only local dump is
 `nhk-v3-local-2026-09-01.sql.gz` and was not imported.
 
-Last updated: 2026-09-02, P0 public identity/slug/visibility parity audit checkpoint.
+Last updated: 2026-09-02, MCP V3 connector ability exposure checkpoint.
+
+The MCP V3 runtime catalog exposes exactly 19 tools. `nhk.semantic.resolve` is
+the 19th catalog member added by this checkpoint (catalog position 2; position
+19 is `nhk.proposal.apply`); stale assertions expecting 18 are now aligned to
+19. The exact Authority registry, 15 Graph endpoint types, two predicates,
+effective Governance operations, Knowledge profiles, Media/Video contracts and
+native-WordPress Post boundary are recorded in
+`docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`. The WordPress Abilities adapter
+registers only eight existing read tools on WordPress 6.9+, feature-detected;
+no semantic type, predicate, relation, field or operation was added. Album is a
+`SEMANTIC_GAP`. Product's `specimen_uuid` plus Graph `about` allowance remains
+a contract-level `CONSTITUTION_CONFLICT`; no Product/Specimen data changed.
+Local HTTP/WordPress evidence remains blocked by the unavailable runtime; no
+push was made.
+
+The connector-gap implementation registers the existing NHK V3 semantic read
+contracts under the explicit `nhk-v3` WordPress Abilities namespace and
+`nhk-semantic` category on the lazy registry hooks. The allowlist contains only
+`search`, `semantic-resolve`, `entity-get`, `media-get`, `video-get`,
+`knowledge-get`, `source-get` and `evidence-get`; each is public/REST-exposed,
+read-only, `read`-capability checked and delegates to `McpReadHandler`. Ingest
+and proposal abilities remain absent while existing custom MCP writes remain
+Governance/capability gated. Unit verification is 166 tests / 985 assertions;
+guarded runtime verification and read-only wire smoke remain blocked by the
+unavailable local WordPress/HTTP runtime. No taxonomy, post meta, semantic data,
+V2/live state or push was changed.
 
 The read-only P0 public identity audit added
 `V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`. It confirms from current code that
@@ -88,7 +114,7 @@ Video detail remains unavailable because the local query has no active Video row
 | Tests | Unit suite: 153 tests, 934 assertions; guarded WordPress integration: 94 tests, 517 assertions; combined current evidence: 247 tests, 1,451 assertions (Unit + latest guarded evidence); Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, ambiguous case-level identity/provenance/retirement decisions after deterministic resolution, final decisions for 27 explicitly classified URL candidates, MediaAsset publication/privacy policy and governed recovery of 18 available V2 upload candidates plus 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and unresolved legacy mappings; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Wire the read-only `McpSemanticContextResolver` into the MCP read contract and transport, then collect local wire evidence; it must preserve exact UUID/stable-key/name-or-alias ordering and fail closed on ambiguity before continuing external MCP interoperability checks |
+| Next executable task | Restore the existing local HTTP/WordPress runtime and collect fresh MCP wire/Abilities/read-only smoke evidence; do not add tools or semantic types before the Product/Specimen conflict and Album gap receive architecture decisions |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,961 rows and skipped 1,012 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
@@ -105,6 +131,11 @@ Video detail remains unavailable because the local query has no active Video row
 | `DEFERRED_NONCRITICAL_WORK` | Unrequested defensive hardening, new indexes/caches without evidence, cosmetic redesign outside the frontend acceptance sweep |
 
 ## Checkpoint journal
+
+- 2026-09-02: Closed the MCP connector registration gap with an explicit
+  eight-ability read allowlist. Unit tests and PHP lint pass; guarded
+  WordPress integration cannot start because the local database bootstrap is
+  unavailable, and `tools/mcp-wire-smoke.php` cannot connect to `localhost:80`.
 
 - 2026-09-01: Continued from accepted `27c79ae`. Confirmed its scope is limited
   to canonical public Authority routing and related Constitution/spec/tests;
