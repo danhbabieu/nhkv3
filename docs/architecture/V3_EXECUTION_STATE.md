@@ -6,6 +6,19 @@
 
 ## Current checkpoint — 2026-09-02
 
+Documentation reconciliation checkpoint, 2026-09-02: the approved human
+architectural decision restores `docs/constitution/READ_FIRST.md` as a short,
+non-normative router and updates `AGENTS.md` to route
+`AGENTS.md → READ_FIRST.md → NHK_V3_CONSTITUTION.md → relevant contracts`.
+`docs/constitution/NHK_V3_CONSTITUTION.md` remains the sole normative source.
+This supersedes the earlier historical note that the active tree should contain
+only the Constitution under `docs/constitution/`. No PHP/JS code, database row,
+WordPress Post, Post 55, semantic record, Graph edge, migration or external
+state was changed. The pre-existing untracked MCP plan remains preserved and
+unstaged. Phase 1 Article Ingest scope is reconciliation-only; create and
+editorial update remain fail-closed pending the separately approved WordPress
+write idempotency/CAS review.
+
 Single-Constitution finalization checkpoint, 2026-09-02: forensic review found
 that `READ_FIRST.md` was restored by the completed standalone commit `3abcfd4`
 after `cb239af` retired it; no repository hook, generator or automation recreates
