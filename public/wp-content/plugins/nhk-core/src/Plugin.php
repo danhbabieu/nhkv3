@@ -14,7 +14,7 @@ use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
 use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
-use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
@@ -59,6 +59,22 @@ final class Plugin {
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
+        add_action('wp_abilities_api_categories_init', [McpAbilityRegistration::class, 'registerCategory']);
+        add_action('wp_abilities_api_init', static function (): void {
+            global $wpdb;
+            if (!isset($wpdb) || !is_object($wpdb)) return;
+            $types = new EntityTypeRegistry();
+            CanonicalEntityTypeCatalog::registerInto($types);
+            $authority = new WpdbAuthorityRepository($wpdb);
+            $media = new WpdbMediaRepository($wpdb);
+            $assets = new WpdbMediaAssetRepository($wpdb);
+            $usages = new WpdbMediaUsageRepository($wpdb);
+            $videos = new WpdbVideoRepository($wpdb);
+            $claims = new WpdbKnowledgeRepository($wpdb);
+            $sources = new WpdbSourceRepository($wpdb);
+            $evidence = new WpdbEvidenceRepository($wpdb);
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types)));
+        });
         (new PublicEditorialRoutes())->register();
         LegacyUrlRedirects::register();
         global $wpdb;

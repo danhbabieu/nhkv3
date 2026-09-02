@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\McpToolCatalog;
+use NHK\Core\Application\Mcp\McpAbilityRegistration;
 use PHPUnit\Framework\TestCase;
 
 final class McpContractTest extends TestCase
@@ -65,5 +66,21 @@ final class McpContractTest extends TestCase
         self::assertSame(['supports', 'contradicts', 'qualifies'], $tools['nhk.evidence.ingest']['inputSchema']['properties']['relation']['enum']);
         self::assertSame(['PUBLIC', 'PRIVATE', 'HIDDEN'], $tools['nhk.source.ingest']['inputSchema']['properties']['visibility']['enum']);
         self::assertSame(['PUBLIC', 'PRIVATE', 'HIDDEN'], $tools['nhk.evidence.ingest']['inputSchema']['properties']['visibility']['enum']);
+    }
+
+    public function test_wordpress_ability_allowlist_contains_only_existing_read_tools(): void
+    {
+        self::assertSame([
+            'nhk-v3/search',
+            'nhk-v3/semantic-resolve',
+            'nhk-v3/entity-get',
+            'nhk-v3/media-get',
+            'nhk-v3/video-get',
+            'nhk-v3/knowledge-get',
+            'nhk-v3/source-get',
+            'nhk-v3/evidence-get',
+        ], McpAbilityRegistration::readAbilityNames());
+        self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
+        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
     }
 }
