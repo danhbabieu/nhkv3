@@ -1,5 +1,9 @@
 # V3 Article Ingest Contract
 
+> **NON-NORMATIVE.** Đây là contract/guidance triển khai được phê duyệt dưới
+> Hiến pháp. Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`,
+> Hiến pháp kiểm soát.
+
 > **APPROVED DOCUMENTATION CONTRACT — 2026-09-02.** This contract implements
 > the Article Ingest boundary approved by
 > `docs/constitution/NHK_V3_CONSTITUTION.md`. It does not create an Article
