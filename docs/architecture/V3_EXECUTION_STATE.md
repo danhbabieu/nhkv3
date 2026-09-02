@@ -1,5 +1,24 @@
 # NHK V3 Execution State
 
+Bootstrap continuation checkpoint, 2026-09-02: local MySQL's existing
+`mysqld` listener is reachable on `127.0.0.1:3306`, although its Homebrew
+launch-agent status remains `error 1` because the service wrapper detects an
+already-running process. `nhk_v3` and `nhk_v3_test` are both non-empty and
+were not replaced. The existing root `wp-config.php` is the supported local
+bootstrap; WP-CLI resolves `nhk_v3`, `wp_`, and `http://localhost` for both
+site URLs, so no duplicate `public/wp-config.php` was created. Canonical
+preflight passes 10/10. Read-only Authority parity is 9/9 types with no
+hydration loss (Brand 4, Model 30, Variant 42, Movement 18, Music 11,
+Component 91, Classification 174, Specimen 0, Product 0); Graph counts are
+189 nodes, 241 edges and 2 predicates. Homepage and REST return 200, the
+read-only MCP wire smoke passes, and canonical available Brand/Music/Movement
+routes return 200. The generic frontend route smoke retains stale or
+contract-incompatible archive expectations, and the guarded PHPUnit suite
+has two existing MCP catalog assertions expecting 18 tools while runtime
+advertises 19; no code or data was changed to mask either result. The
+required current old-iMac snapshot was not present; the only local dump is
+`nhk-v3-local-2026-09-01.sql.gz` and was not imported.
+
 Last updated: 2026-09-02, P0 public identity/slug/visibility parity audit checkpoint.
 
 The read-only P0 public identity audit added
