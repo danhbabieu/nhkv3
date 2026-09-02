@@ -56,4 +56,50 @@ final class ArticleIngestPreflightTest extends TestCase
         self::assertFalse($result->accepted);
         self::assertContains('EVIDENCE_IDEMPOTENCY_UNPROVEN', $result->reasons);
     }
+
+    public function test_create_rejects_forbidden_legacy_target_stable_key_namespace(): void
+    {
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+
+        $result = (new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types))->check('1:55', 'reconcile', [[
+            'slot' => 'brand',
+            'operation' => 'create',
+            'entity_type' => 'brand',
+            'subject_id' => 'brand',
+            'expected_revision' => 1,
+            'payload' => ['stable_key' => 'nhk:brand:o-do', 'name' => 'Odo'],
+        ]]);
+
+        self::assertFalse($result->accepted);
+        self::assertContains('FORBIDDEN_LEGACY_TARGET_KEY_NAMESPACE', $result->reasons);
+    }
+
+    public function test_create_rejects_target_stable_key_collision_before_proposal_persistence(): void
+    {
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+
+        $result = (new ArticleIngestPreflight(
+            $endpoints,
+            new PredicateRegistry(),
+            $types,
+            null,
+            static fn (string $type, string $stableKey): bool => $type === 'brand' && $stableKey === 'nhk:brand:odo',
+        ))->check('1:55', 'reconcile', [[
+            'slot' => 'brand',
+            'operation' => 'create',
+            'entity_type' => 'brand',
+            'subject_id' => 'brand',
+            'expected_revision' => 1,
+            'payload' => ['stable_key' => 'nhk:brand:odo', 'name' => 'Odo'],
+        ]]);
+
+        self::assertFalse($result->accepted);
+        self::assertContains('TARGET_STABLE_KEY_COLLISION', $result->reasons);
+    }
 }

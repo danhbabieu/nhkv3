@@ -173,19 +173,33 @@ final class Plugin {
             $sharedAttachmentBridge = $attachmentBridge;
             $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
             $articleEditorial = new WpEditorialStateReader();
-            $articlePreflight = new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types, static function (string $type, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): bool {
-                if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($id)) return false;
-                return match ($type) {
-                    'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product' => $authority->findByCanonicalId($id) !== null,
-                    'media' => $media->findByCanonicalId($id) !== null,
-                    'video' => $videos->findByCanonicalId($id) !== null,
-                    'knowledge' => $claims->findByCanonicalId($id) !== null,
-                    'source' => $sources->findByCanonicalId($id) !== null,
-                    'evidence' => $evidence->findByCanonicalId($id) !== null,
-                    'relation' => $graphRepository->findByUuid($id) !== null,
-                    default => false,
-                };
-            });
+            $articlePreflight = new ArticleIngestPreflight(
+                $endpoints,
+                new PredicateRegistry(),
+                $types,
+                static function (string $type, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): bool {
+                    if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($id)) return false;
+                    return match ($type) {
+                        'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product' => $authority->findByCanonicalId($id) !== null,
+                        'media' => $media->findByCanonicalId($id) !== null,
+                        'video' => $videos->findByCanonicalId($id) !== null,
+                        'knowledge' => $claims->findByCanonicalId($id) !== null,
+                        'source' => $sources->findByCanonicalId($id) !== null,
+                        'evidence' => $evidence->findByCanonicalId($id) !== null,
+                        'relation' => $graphRepository->findByUuid($id) !== null,
+                        default => false,
+                    };
+                },
+                static function (string $type, string $stableKey) use ($authority, $media, $claims, $sources): bool {
+                    return match ($type) {
+                        'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product' => $authority->findByStableKey($type, $stableKey) !== null,
+                        'media' => $media->findByStableKey($stableKey) !== null,
+                        'knowledge' => $claims->findByStableKey($stableKey) !== null,
+                        'source' => $sources->findByStableKey($stableKey) !== null,
+                        default => false,
+                    };
+                }
+            );
             $articleMedia = new ArticleMediaCoordinator($mediaService, $media, $assets, $usages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
             $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader(), $articleMedia);
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia);

@@ -10,8 +10,8 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class ArticleIngestPreflight
 {
-    /** @param callable(string,string):bool|null $semanticTargetExists */
-    public function __construct(private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private EntityTypeRegistry $types, private $semanticTargetExists = null) {}
+    /** @param callable(string,string):bool|null $semanticTargetExists @param callable(string,string):bool|null $stableKeyExists */
+    public function __construct(private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private EntityTypeRegistry $types, private $semanticTargetExists = null, private $stableKeyExists = null) {}
 
     /** @param list<array<string,mixed>> $commands */
     public function check(string $endpointKey, string $intent, array $commands, string $endpointType = 'wp_post'): ArticlePreflightResult
@@ -51,6 +51,7 @@ final class ArticleIngestPreflight
             }
             if ((int) ($command['expected_revision'] ?? 0) < 1) $reasons[] = 'INVALID_EXPECTED_REVISION';
             $payload = is_array($command['payload'] ?? null) ? $command['payload'] : [];
+            $this->checkTargetStableKey($operation, $entityType, $payload, $reasons, $details, $slot);
             if (str_starts_with($operation, 'relation_')) $this->checkRelation($payload, $reasons);
             if ($entityType === 'evidence' && in_array($operation, ['create', 'ingest'], true)) $reasons[] = 'EVIDENCE_IDEMPOTENCY_UNPROVEN';
             if ($entityType === 'evidence' && ($payload['claim_id'] ?? '') === '' && ($payload['source_id'] ?? '') === '') $reasons[] = 'SOURCE_EVIDENCE_MISSING';
@@ -78,5 +79,32 @@ final class ArticleIngestPreflight
             $message = strtolower($error->getMessage());
             $reasons[] = str_contains($message, 'predicate') ? 'UNKNOWN_PREDICATE' : 'INVALID_RELATION_ENDPOINT';
         }
+    }
+
+    /** @param array<string,mixed> $payload @param list<string> $reasons @param array<string,mixed> $details */
+    private function checkTargetStableKey(string $operation, string $entityType, array $payload, array &$reasons, array &$details, string $slot): void
+    {
+        if (!in_array($operation, ['create', 'ingest'], true) || in_array($entityType, ['relation', 'evidence', 'video'], true)) return;
+        $stableKey = trim((string) ($payload['stable_key'] ?? ''));
+        if ($stableKey === '') return;
+        if ($this->usesForbiddenLegacyNamespace($stableKey)) {
+            $reasons[] = 'FORBIDDEN_LEGACY_TARGET_KEY_NAMESPACE';
+            $details['forbidden_target_keys'][$slot] = $stableKey;
+        }
+        if ($this->stableKeyExists === null) return;
+        try {
+            if ((bool) ($this->stableKeyExists)($entityType, $stableKey)) {
+                $reasons[] = 'TARGET_STABLE_KEY_COLLISION';
+                $details['colliding_target_keys'][$slot] = $stableKey;
+            }
+        } catch (\Throwable $error) {
+            $reasons[] = 'DEPENDENCY_UNAVAILABLE';
+            $details['stable_key_error'] = $error->getMessage();
+        }
+    }
+
+    private function usesForbiddenLegacyNamespace(string $stableKey): bool
+    {
+        return preg_match('/(^|:)o-do(?=[:.]|$)/', strtolower($stableKey)) === 1;
     }
 }

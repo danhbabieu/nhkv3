@@ -6,6 +6,30 @@
 
 ## Odo Semantic Pack installation checkpoint — 2026-09-03
 
+### Task 3 checkpoint — 2026-09-03 — Odo manifest fail-closed validation
+
+The existing generic `ArticleIngestPreflight` boundary now rejects create/ingest
+semantic commands that introduce a target `stable_key` using the forbidden
+legacy namespace token `o-do`, and it rejects target stable-key collisions
+before proposal planning/persistence. The runtime wiring in `Plugin.php` reuses
+existing Authority, Media, Knowledge and Source stable-key lookups; no Odo-only
+storage path, SQL semantic mutation or new semantic capability was added.
+
+Fresh evidence:
+
+| Gate | Result | Evidence |
+|---|---|---|
+| RED | **PASS** | `vendor/bin/phpunit --configuration phpunit.xml.dist --filter ArticleIngestPreflightTest` initially failed on `test_create_rejects_forbidden_legacy_target_stable_key_namespace` because preflight accepted the forbidden key. |
+| FOCUSED | **PASS** | Same focused command after implementation: `5 tests / 10 assertions`. |
+| GOVERNANCE/PREFLIGHT | **PASS** | `ArticleIngestPreflightTest`, `ArticleIngestCoordinatorTest`, `McpArticleContractTest`, `SemanticProposalPlannerTest`, `GovernanceCoreTest`, `GovernanceApplyContractTest`: `27 tests / 59 assertions`. |
+| PHP LINT | **PASS** | `php -l` passes for `ArticleIngestPreflight.php`, `Plugin.php`, `ArticleIngestPreflightTest.php`. |
+| DIFF | **PASS** | `git diff --check` exit `0`. |
+
+No WordPress Post, Authority record, Knowledge claim, Source, Graph edge,
+Media, Video, proposal, taxonomy or postmeta mutation was performed by this
+task. Task detail and self-review are recorded in
+`.superpowers/sdd/2026-09-02-odo-semantic-pack-implementation-plan/report-task-3.md`.
+
 ### Local runtime recovery recheck — 2026-09-03
 
 The requested continuation point `bbf6f12147d8ea015485fb756fd4d46357d10fcb`
