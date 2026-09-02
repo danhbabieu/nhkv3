@@ -26,9 +26,9 @@ return HTTP 202 with no body.
 ## 2. Tool catalog thực tế
 
 `McpToolCatalog::tools()` exposes exactly 19 tools. `kind=mutation` implies
-`governed=true`. The 19th catalog member added by this checkpoint is
-`nhk.semantic.resolve` (catalog position 2); the catalog's position 19 is
-`nhk.proposal.apply`. The clean HEAD catalog and the wire smoke both use this
+`governed=true`. `nhk.semantic.resolve` is the added catalog member at
+position 2; the catalog's position 19 is `nhk.proposal.apply`. The clean HEAD
+catalog and the wire smoke both use this
 same ordered list; the local HTTP wire smoke remains an environment check and
 must not be replaced by a static catalog assertion.
 
