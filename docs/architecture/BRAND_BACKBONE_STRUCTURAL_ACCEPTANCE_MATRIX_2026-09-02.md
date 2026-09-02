@@ -1,5 +1,8 @@
 # Brand Backbone Structural Acceptance Matrix
 
+> **NON-NORMATIVE.** This is executable acceptance evidence. If it conflicts
+> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 This is the executable acceptance contract for later implementation. Every row
 is read-only until implementation and the separately governed data gate are
 approved.

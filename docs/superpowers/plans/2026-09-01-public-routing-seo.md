@@ -1,5 +1,9 @@
 # Public Routing and SEO Implementation Plan
 
+> **NON-NORMATIVE.** This plan is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace public stable-key/English semantic URLs with canonical Vietnamese routes while preserving safe one-hop redirects and SEO contracts.
@@ -54,8 +58,8 @@
 
 **Files:**
 - Create: `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`
-- Modify: `docs/constitution/10_PUBLICATION_SEO_FRONTEND_LAW.md`
-- Modify: `docs/constitution/03_BRAND_BACKBONE_LAW.md`
+- Reference: `docs/constitution/NHK_V3_CONSTITUTION.md` (the sole normative
+  source; this historical plan does not create or modify constitutional law)
 - Modify: `docs/architecture/V3_EXECUTION_STATE.md`
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php`
 

@@ -1,5 +1,8 @@
 # NHK V3 P4 Governance Core Contract
 
+> **NON-NORMATIVE.** This is implementation contract evidence. If it conflicts
+> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 ## Status
 
 P4 implementation and test gates are `ACCEPTED` on `nhk_v3_test`; the final

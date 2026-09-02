@@ -1,5 +1,8 @@
 # Brand Backbone Structural Contract — Evidence Package
 
+> **NON-NORMATIVE.** This is contract evidence. If it conflicts with
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 Date: 2026-09-02
 Status: approved staged-contract implementation checkpoint
 Mutation boundary: no semantic records, Graph edges, redirects, or legacy

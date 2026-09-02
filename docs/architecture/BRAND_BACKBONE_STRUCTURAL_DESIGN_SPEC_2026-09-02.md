@@ -1,5 +1,8 @@
 # Brand Backbone Structural Design Specification
 
+> **NON-NORMATIVE.** This is staged design evidence. If it conflicts with
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 Status: approved staged contract; implementation not started in this checkpoint.
 
 ## Purpose and invariants

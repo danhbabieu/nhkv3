@@ -1,5 +1,8 @@
 # Graph Core V1 Contract
 
+> **NON-NORMATIVE.** This is implementation contract evidence. If it conflicts
+> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 ## Boundary
 
 Graph Core là Semantic Graph duy nhất dùng chung cho Post và các endpoint tương

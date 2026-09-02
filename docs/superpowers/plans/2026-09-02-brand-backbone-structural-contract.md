@@ -1,5 +1,9 @@
 # Brand Backbone Structural Contract Implementation Plan
 
+> **NON-NORMATIVE.** This plan is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Establish Graph-owned `model_of` and `variant_of` structural contracts and derived Brand context without mutating semantic data in the contract checkpoint.

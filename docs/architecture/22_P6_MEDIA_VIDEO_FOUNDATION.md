@@ -1,5 +1,8 @@
 # P6 Media + Video Foundation
 
+> **NON-NORMATIVE.** This is implementation evidence. If it conflicts with
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 ## Current status
 
 The domain boundary and schema migration are implemented and migration 004 is

@@ -1,5 +1,9 @@
 # Entity Hubs and Brand Graph Implementation Plan
 
+> **NON-NORMATIVE.** This plan is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 Implementation checkpoint: Phase A–C code is now present in the working tree.
 The six approved predicates are registered exactly as defined by the current
 relationship contract; this supersedes the earlier staged-registry-gap wording

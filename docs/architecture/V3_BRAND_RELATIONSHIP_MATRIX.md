@@ -1,5 +1,9 @@
 # NHK V3 Brand Relationship Matrix
 
+> **NON-NORMATIVE.** This is a contract/evidence matrix subordinate to the
+> Constitution. If it conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
+> the Constitution controls.
+
 Status: approved architectural requirements with the six definitions now
 registered in code, 2026-09-02. This is a contract matrix, not a data-repair
 approval. No row in this document authorizes a Graph edge to be created.

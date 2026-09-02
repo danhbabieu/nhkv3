@@ -1,5 +1,8 @@
 # MCP V3 CONTENT OPERATIONS
 
+> **NON-NORMATIVE.** This is a runtime contract audit. If it conflicts with
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 Status: runtime audit and contract-safe implementation checkpoint, 2026-09-02.
 
 This shared guide describes the MCP V3 runtime actually present for ChatGPT and

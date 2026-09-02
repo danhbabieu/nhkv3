@@ -1,6 +1,20 @@
 # NHK V3 Execution State
 
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Current checkpoint — 2026-09-02
+
+Constitutional consolidation checkpoint, 2026-09-02: the repository now has
+one authoritative constitutional source at
+`docs/constitution/NHK_V3_CONSTITUTION.md`. The eight fragmented files under
+`docs/constitution/` were superseded and removed from the active tree; AGENTS,
+active architecture/spec/plan notices and obsolete path references now point to
+the single Constitution. The new document records the approved V3 law,
+decision register, non-normative runtime status and V2 retirement notes. This
+checkpoint changed documentation only: no database, semantic row, Graph edge,
+slug, redirect, migration, import, V2/live state or product code was changed.
 
 The approved Vietnamese public discovery implementation is present in the
 working tree. Canonical hubs are wired for Brand, Model, Movement, Music,

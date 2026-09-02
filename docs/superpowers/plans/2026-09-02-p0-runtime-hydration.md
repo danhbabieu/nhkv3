@@ -1,5 +1,9 @@
 # P0 Runtime Hydration and Deployment Reliability Implementation Plan
 
+> **NON-NORMATIVE.** This plan is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Restore valid Authority hydration and make runtime/deployment failures observable without changing semantic data.
@@ -75,7 +79,8 @@
 - Create: `tools/deployment-preflight.php`
 - Modify: `composer.json`
 - Create or modify: `docs/architecture/P0_DEPLOYMENT_PREFLIGHT.md`
-- Modify: `docs/constitution/05_BOUNDARIES_AND_PROJECTIONS.md`
+- Reference: `docs/constitution/NHK_V3_CONSTITUTION.md` (runtime, hydration and
+  deployment law is consolidated there)
 - Modify: `docs/architecture/V3_EXECUTION_STATE.md`
 
 **Interfaces:**

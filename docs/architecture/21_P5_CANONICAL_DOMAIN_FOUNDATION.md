@@ -1,5 +1,8 @@
 # P5 Canonical Domain Foundation
 
+> **NON-NORMATIVE.** This is implementation evidence. If it conflicts with
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 ## Scope
 
 P5 expands the registry-backed Authority boundary over the target canonical

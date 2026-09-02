@@ -1,5 +1,9 @@
 # NHK V3 Frontend Design Contract
 
+> **NON-NORMATIVE.** This records frontend implementation guidance and QA
+> evidence. If it conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
+> the Constitution controls.
+
 Status: contract for P9 implementation; visual choices remain subject to
 read-only theme/demo audit and route evidence.
 

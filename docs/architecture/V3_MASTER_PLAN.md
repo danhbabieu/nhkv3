@@ -1,5 +1,9 @@
 # NHK V3 Master Plan
 
+> **NON-NORMATIVE.** This is execution evidence and implementation guidance.
+> If it conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the
+> Constitution controls.
+
 Status is based on code and test evidence, not commit titles.
 
 | Phase | Status | Evidence / next gate |

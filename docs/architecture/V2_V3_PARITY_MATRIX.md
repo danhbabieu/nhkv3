@@ -1,5 +1,8 @@
 # V2 → V3 Parity Matrix
 
+> **NON-NORMATIVE.** This is historical parity evidence only. If it conflicts
+> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 ## 2026-09-02 implementation checkpoint
 
 Vietnamese public discovery hubs and route contracts are now implemented for

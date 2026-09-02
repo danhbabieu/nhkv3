@@ -1,5 +1,9 @@
 # NHK V3 Entity Hubs and Brand Graph Design Specification
 
+> **NON-NORMATIVE.** This is design and implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 Status: approved design specification, read-only checkpoint, 2026-09-02.
 
 Implementation status — 2026-09-02: The approved route, public-query,

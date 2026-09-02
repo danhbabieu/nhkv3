@@ -1,5 +1,9 @@
 # P0 Runtime Hydration and Deployment Reliability Specification
 
+> **NON-NORMATIVE.** This is implementation specification and evidence. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 **Status:** Approved for implementation 2026-09-02
 
 ## Goal

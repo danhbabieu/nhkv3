@@ -1,5 +1,9 @@
 # V3 Autonomous Execution
 
+> **NON-NORMATIVE.** This is an operating protocol, not architectural law. If
+> it conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the
+> Constitution controls.
+
 This document is the operating protocol for future Codex sessions.
 
 1. Read `AGENTS.md`, `V3_EXECUTION_STATE.md`, the relevant architecture

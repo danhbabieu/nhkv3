@@ -1,5 +1,9 @@
 # V2 → V3 Migration Ledger
 
+> **NON-NORMATIVE.** This ledger records migration evidence and gates. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 The local development apply checkpoint has run after the read-only inventory,
 backup/restore rehearsal and dry-run. It is not a live or production
 migration, and unresolved rows remain explicit in the ledger.

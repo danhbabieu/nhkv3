@@ -1,5 +1,9 @@
 # MCP V3 Connector Ability Exposure Implementation Plan
 
+> **NON-NORMATIVE.** This plan is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 > **For agentic workers:** This plan was executed inline in the current NHK V3 workspace. It did not authorize bootstrap, V2 migration, database reset, or push.
 
 **Goal:** Register existing NHK V3 read contracts as WordPress Abilities for Easy MCP discovery while keeping writes behind a later governed exposure gate.

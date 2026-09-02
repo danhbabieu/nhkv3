@@ -1,5 +1,9 @@
 # P0 Deployment Preflight
 
+> **NON-NORMATIVE.** This is deployment evidence and operating guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 Run from the repository root:
 
 ```bash

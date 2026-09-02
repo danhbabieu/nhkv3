@@ -1,5 +1,9 @@
 # NHK canonical public routes and frontend completion Implementation Plan
 
+> **NON-NORMATIVE.** This plan is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Complete slug-safe public routing and the shared frontend cleanup required by the accepted checkpoint.
@@ -37,14 +41,13 @@
 ### Task 2: Constitution and route matrix
 
 **Files:**
-- Create: `docs/constitution/15_FRONTEND_DESIGN_UX_LAW.md`
+- Reference: `docs/constitution/NHK_V3_CONSTITUTION.md` (frontend law is
+  consolidated there)
 - Modify: `docs/constitution/NHK_V3_CONSTITUTION_INDEX.md`
 - Modify: `docs/constitution/START_HERE.md`
 - Modify: `AGENTS.md`
-- Modify: `docs/constitution/05_MEDIA_IMAGE_LAW.md`
-- Modify: `docs/constitution/06_VIDEO_LAW.md`
-- Modify: `docs/constitution/07_KNOWLEDGE_SOURCE_EVIDENCE_LAW.md`
-- Modify: `docs/constitution/10_PUBLICATION_SEO_FRONTEND_LAW.md`
+- Reference: `docs/constitution/NHK_V3_CONSTITUTION.md` (media, video,
+  knowledge, source/evidence and publication law are consolidated there)
 - Create or modify: `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`
 
 - [x] Record the complete Brand/Model/Variant/Movement/Music/Component/Classification/Specimen/Product/Video/Knowledge/Media/Post matrix with public-page, canonical pattern, slug source, indexability, legacy behavior, resolver support, and tests.

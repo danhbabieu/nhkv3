@@ -1,5 +1,9 @@
 # NHK V3 Public Routing and SEO Design
 
+> **NON-NORMATIVE.** This design is subordinate implementation guidance. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Goal
 
 Make public semantic URLs Vietnamese, stable and identity-safe without changing

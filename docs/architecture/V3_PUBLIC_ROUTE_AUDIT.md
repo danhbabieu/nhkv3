@@ -1,5 +1,9 @@
 # NHK V3 Public Route / SEO Audit
 
+> **NON-NORMATIVE.** This is route/SEO evidence, not public-law authority. If
+> it conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the
+> Constitution controls.
+
 Date: 2026-09-01
 Status: canonical Authority and Video routing implemented; Media and atomic
 Knowledge remain non-indexable where no governed public projection exists.

@@ -1,5 +1,8 @@
 # NHK V3 Public Hub Matrix
 
+> **NON-NORMATIVE.** This is a public-route evidence matrix. If it conflicts
+> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+
 Status: approved public information architecture; read-only design
 checkpoint, 2026-09-02. This matrix defines presentation routes and query
 boundaries. It does not create Authority rows, assign slugs, write redirects,
