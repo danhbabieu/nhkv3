@@ -1,8 +1,8 @@
 # Odo Runtime Inventory — Read-Only Checkpoint
 
 **Date:** 2026-09-03  
-**Status:** `UNAVAILABLE` / `UNVERIFIED` — no runtime data mutation performed  
-**Initial HEAD:** `02d7f3012e0b88ec011c66d130bd412fd059125a`  
+**Status:** `RUNTIME_UNAVAILABLE` / `WORDPRESS_BOOTSTRAP_FAILED` — no runtime data mutation performed
+**Initial HEAD:** `02d7f3012e0b88ec011c66d130bd412fd059125a`
 **Pack checkpoint:** `6fd6cc3` (`docs: add Odo semantic reference pack`)
 
 ## Scope and evidence boundary
@@ -14,6 +14,17 @@ not be completed because the read-only deployment preflight failed at
 database-connection error. Therefore all rows below sourced from the pack are
 marked `DESIGN_INPUT`, not observed facts.
 
+Evidence vocabulary used here is deliberately closed:
+
+- `RUNTIME_UNAVAILABLE`: the application read boundary could not be reached.
+- `WORDPRESS_BOOTSTRAP_FAILED`: WordPress could not establish its configured
+  database connection.
+- `DESIGN_INPUT`: copied from the approved Odo pack/manifest only.
+- `CODE_OBSERVED`: read from the current worktree's runtime code/contracts;
+  this is not a runtime data fact.
+- `RUNTIME_UNVERIFIED`: a runtime record, count, revision, reference or
+  read-back that still requires a restored WordPress/database runtime.
+
 No direct SQL, WordPress write, semantic write, Graph mutation, migration,
 seed, repair, merge, rekey, retirement, Media/Video creation or Post mutation
 was performed.
@@ -24,15 +35,41 @@ was performed.
 |---|---|---|
 | Git HEAD | PASS | `02d7f3012e0b88ec011c66d130bd412fd059125a` before pack checkpoint |
 | Composer lock/autoload/runtime classes | PASS | `php tools/deployment-preflight.php` |
-| WordPress bootstrap | FAIL | `WORDPRESS_BOOTSTRAP_FAILED` |
-| NHK Core bootstrap | FAIL | dependent on WordPress bootstrap |
-| Schema migration | FAIL | dependent on WordPress bootstrap |
-| Authority hydration | FAIL | dependent on WordPress bootstrap |
-| REST bootstrap | FAIL | dependent on WordPress bootstrap |
+| WordPress bootstrap | FAIL | `WORDPRESS_BOOTSTRAP_FAILED`; direct probe rendered `Error establishing a database connection` |
+| NHK Core bootstrap | FAIL | dependent on WordPress bootstrap; `RUNTIME_UNAVAILABLE` |
+| Schema migration | FAIL | dependent on WordPress bootstrap; `RUNTIME_UNAVAILABLE` |
+| Authority hydration | FAIL | dependent on WordPress bootstrap; `RUNTIME_UNAVAILABLE` |
+| REST bootstrap | FAIL | dependent on WordPress bootstrap; `RUNTIME_UNAVAILABLE` |
+
+## `WORDPRESS_BOOTSTRAP_FAILED` root-cause evidence
+
+Investigation was read-only. No SQL statement, write request, migration,
+service restart or data repair was executed.
+
+| Layer | Evidence | Finding |
+|---|---|---|
+| MySQL service | `brew services list`: `mysql started`; launchd plist runs `/opt/homebrew/opt/mysql/bin/mysqld_safe --datadir=/opt/homebrew/var/mysql` | Daemon is configured/launched; this alone does not prove application connectivity |
+| MySQL process/listener | `lsof`: `mysqld` PID `95616`, TCP `127.0.0.1:3306 (LISTEN)` | TCP listener is observed at the OS layer |
+| MySQL server log | `/opt/homebrew/var/mysql/iMac-cua-Imac.local.err`: `ready for connections`, socket `/tmp/mysql.sock`, port `3306` | Server startup completed according to its log |
+| WordPress config resolution | `public/wp-load.php` found the parent `wp-config.php`; `wp-config.php:2-5` defines the values below | Root config is the active config path for this install |
+| Database configured | `DB_NAME = nhk_v3` when `NHK_WP_TEST_DB` is unset; current environment probe reported it unset | Development database target is `nhk_v3`; an explicitly set test override must be rechecked after recovery |
+| TCP/socket config | `DB_HOST = 127.0.0.1`; MySQL log and socket stat show `/tmp/mysql.sock` | WordPress is configured for TCP; socket exists as a secondary diagnostic path |
+| Credentials/config resolution | `DB_USER = root`, `DB_PASSWORD = EMPTY`; no credential file or secret lookup is used by `wp-config.php` | Resolution is deterministic; authentication is not proven because the client did not reach a handshake |
+| Bootstrap result | `/opt/homebrew/bin/php -d display_errors=1 -r 'require .../public/wp-load.php'` rendered `Database Error` / `Error establishing a database connection` | WordPress bootstrap fails at `wpdb` connection initialization |
+| Probe environment | In-sandbox TCP probe returned `Operation not permitted`; `mysqladmin` returned client error `(1)` for TCP and socket | Current agent runner cannot complete a valid DB handshake; this is an environment/connectivity failure, not evidence of an application defect |
+
+Conclusion: the confirmed failure is at the WordPress-to-MySQL connection
+boundary. The daemon/listener/log indicate that MySQL itself has started, while
+the current execution environment cannot establish the client connection. A
+credentials rejection, missing `nhk_v3` database, schema failure or NHK Core
+application failure is **not** proven by the available probes. Treat this as
+`RUNTIME_UNAVAILABLE` until an unrestricted local probe or an approved local
+runtime health check completes the handshake and WordPress bootstrap.
 
 Runtime status is fail-closed. Counts, revisions, inbound/outbound edges,
 Source/Evidence references, Media/Video references and Post references remain
-`UNVERIFIED` until the existing local WordPress/database runtime is restored.
+`RUNTIME_UNVERIFIED` until the existing local WordPress/database runtime is
+restored.
 
 ## Static canonical identity map
 
@@ -80,8 +117,8 @@ the unavailable runtime.
 
 | Source UUID/key | Target UUID/key | Decision | Runtime result |
 |---|---|---|---|
-| `32f43d4b-d6c8-4223-a89b-cc47f30cda77` / `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | Owner-confirmed same identity; merge required | `UNVERIFIED`; no merge operation exists in current runtime |
-| `01bead27-1308-48c1-af99-c68318e2b577` / `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | Merge candidate only; do not merge | `UNVERIFIED`; intentionally untouched |
+| `32f43d4b-d6c8-4223-a89b-cc47f30cda77` / `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | Owner-confirmed same identity; merge required | `RUNTIME_UNVERIFIED`; no merge operation exists in current runtime |
+| `01bead27-1308-48c1-af99-c68318e2b577` / `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | Merge candidate only; do not merge | `RUNTIME_UNVERIFIED`; intentionally untouched |
 
 ## Reference inventory required before mutation
 
@@ -90,19 +127,21 @@ runtime restoration. No inference from names or pack prose is allowed.
 
 | Scope | Required read | Current result |
 |---|---|---|
-| All Odo Authority records | active/retired UUID, type, stable key, name, revision, state, payload | `UNAVAILABLE` |
-| All Odo UUIDs | active inbound and outbound Graph edges with predicate/revision | `UNAVAILABLE` |
-| Source/Evidence | claims and evidence that reference Odo subjects or related proposals | `UNAVAILABLE` |
-| Media/MediaUsage | canonical Media and usage references for Odo subjects | `UNAVAILABLE` |
-| Video | Video references/attachments related to Odo subjects | `UNAVAILABLE` |
-| WordPress Posts | `wp_post:<blog_id>:38`, `39`, `40`, `55` Graph references and editorial fingerprints | `UNAVAILABLE` |
-| Odo 35 | model, movement and variant inbound/outbound references | `UNAVAILABLE` |
+| All Odo Authority records | active/retired UUID, type, stable key, name, revision, state, payload | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
+| All Odo UUIDs | active inbound and outbound Graph edges with predicate/revision | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
+| Source/Evidence | claims and evidence that reference Odo subjects or related proposals | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
+| Media/MediaUsage | canonical Media and usage references for Odo subjects | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
+| Video | Video references/attachments related to Odo subjects | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
+| WordPress Posts | `wp_post:<blog_id>:38`, `39`, `40`, `55` Graph references and editorial fingerprints | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
+| Odo 35 | model, movement and variant inbound/outbound references | `RUNTIME_UNAVAILABLE` / `RUNTIME_UNVERIFIED` |
 
 ## Predicate resolution status
 
 The current code registry contains `about`, `depicts`, `model_of`, `variant_of`,
 `uses_movement`, `supports_music`, `configured_with_music` and
-`observed_playing_music`. No mutation was attempted.
+`observed_playing_music` (`CODE_OBSERVED`). No mutation was attempted. The
+presence of a predicate in code does not prove that an Odo endpoint row or
+triple exists in runtime.
 
 The following intents remain unresolved until actual endpoint rows, evidence
 and directionality are reviewed:
@@ -120,20 +159,22 @@ and directionality are reviewed:
 
 | Required phase | Current capability | Required outcome |
 |---|---|---|
-| Namespace rekey preserving UUID | No Authority `rekey` operation; repository update does not change stable key | `CONTRACT_EXTENSION_REQUIRED` before any proposal/apply |
-| Confirmed component merge | No generic governed merge/reference-move/deprecation operation | `CONTRACT_EXTENSION_REQUIRED`; source remains untouched |
-| Odo 35 retirement | Retirement exists, but reference audit and runtime are unavailable | `CONTRACT_EXTENSION_REQUIRED` for safe apply until audit/capability is available |
-| Media placeholders | No current governed placeholder operation | Keep requirements only; no fake Media/file/URL |
-| Video placeholders | No current governed placeholder operation | Keep requirements only; no Video entity |
-| Post reconciliation | Runtime Article path is reconcile-only but WordPress is unavailable | Do not create proposal/apply or alter Posts |
+| Namespace rekey preserving UUID | `CODE_OBSERVED`: no Authority `rekey`; repository update does not change stable key | `CONTRACT_EXTENSION_REQUIRED` before any proposal/apply |
+| Confirmed component merge | `CODE_OBSERVED`: no generic governed merge/reference-move/deprecation operation | `CONTRACT_EXTENSION_REQUIRED`; source remains untouched |
+| Odo 35 retirement | `CODE_OBSERVED`: ordinary retirement exists, but reference audit and runtime are unavailable | No retirement mutation; keep `RETIREMENT_REVIEW` in the Odo pack |
+| Media placeholders | `CODE_OBSERVED`: Article coordinator has internal system-placeholder handling; no Odo-specific governed placeholder operation | Not a blocker; keep requirements only; no fake Media/file/URL |
+| Video placeholders | `CODE_OBSERVED`: no governed Video placeholder operation | Not a blocker; keep requirements only; no Video entity |
+| Post reconciliation | `CODE_OBSERVED`: Article path is reconcile-only; WordPress is unavailable | Do not create proposal/apply or alter Posts |
 
 ## Next safe action after runtime restoration
 
-1. Re-run read-only preflight and capture runtime counts/revisions.
+1. Restore/validate the local WordPress-to-MySQL connection, then re-run
+   read-only preflight and capture runtime counts/revisions.
 2. Export all inbound/outbound relations and Source/Evidence/Media/Video/Post
    references through application read boundaries.
 3. Resolve target collisions before any proposal.
-4. Obtain a reviewed generic V3 `rekey` capability and generic merge/reference
-   migration capability, or remain fail-closed.
+4. Obtain approval for the generic V3 rekey and merge/reference-movement
+   contract in [ODO_NAMESPACE_AND_IDENTITY_MERGE_RUNTIME_DESIGN.md](ODO_NAMESPACE_AND_IDENTITY_MERGE_RUNTIME_DESIGN.md);
+   until then remain fail-closed.
 5. Create proposals only after capability and reference audit are complete;
    stop at the separate Human Approval/Controlled Apply boundary.
