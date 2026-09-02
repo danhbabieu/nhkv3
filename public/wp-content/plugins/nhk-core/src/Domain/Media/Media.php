@@ -20,4 +20,9 @@ final readonly class Media
         if (!in_array($readiness, ['draft', 'ready', 'blocked'], true)) throw new InvalidMedia('Media readiness is invalid.');
         if ($revision < 1) throw new InvalidMedia('Media revision must be positive.');
     }
+
+    public function isSystemPlaceholder(): bool
+    {
+        return ($this->provenance['system_role'] ?? null) === 'placeholder';
+    }
 }

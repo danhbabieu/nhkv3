@@ -12,4 +12,5 @@ final class MigrationStatus {
     public function videoStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $table=$wpdb->prefix.'nhk_videos'; return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table)) === $table; }
     public function knowledgeStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; foreach (['nhk_knowledge_claims','nhk_sources','nhk_evidence'] as $table) if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$wpdb->prefix.$table)) !== $wpdb->prefix.$table) return false; return true; }
     public function articleStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $table=$wpdb->prefix.'nhk_article_operations'; return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table)) === $table; }
+    public function articleMediaStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $table=$wpdb->prefix.'nhk_article_media_blueprints'; return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table)) === $table; }
 }

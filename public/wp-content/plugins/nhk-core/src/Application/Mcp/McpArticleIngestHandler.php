@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Application\Article\ArticleIngestCoordinator;
 use NHK\Core\Application\Article\ArticleIngestPreflight;
 use NHK\Core\Contracts\Article\EditorialStateReader;
+use NHK\Core\Application\Media\ArticleMediaCoordinator;
 
 class McpArticleIngestHandler
 {
@@ -13,6 +14,7 @@ class McpArticleIngestHandler
         private ArticleIngestCoordinator $coordinator,
         private ArticleIngestPreflight $preflight,
         private EditorialStateReader $editorial,
+        private ?ArticleMediaCoordinator $articleMedia = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -31,6 +33,7 @@ class McpArticleIngestHandler
             }
             $details['wp_post_id'] = $state->postId;
             $details['wp_state_token'] = $state->token;
+            if ($this->articleMedia !== null) $details['media'] = $this->articleMedia->diagnoseForPost($state->postId, is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title])->toArray();
         }
         return ['accepted' => $result->accepted, 'reasons' => $result->reasons, 'details' => $details];
     }
@@ -38,6 +41,8 @@ class McpArticleIngestHandler
     /** @return array<string,mixed> */
     public function ingest(array $input): array
     {
-        return $this->coordinator->execute($input)->toArray();
+        $result = $this->coordinator->execute($input)->toArray();
+        if ($this->articleMedia !== null && isset($result['wp_post_id']) && (int) $result['wp_post_id'] > 0) $result['media'] = $this->articleMedia->diagnoseForPost((int) $result['wp_post_id'], is_array($input['media_context'] ?? null) ? $input['media_context'] : [])->toArray();
+        return $result;
     }
 }

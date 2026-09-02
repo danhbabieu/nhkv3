@@ -33,7 +33,7 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
         $db = $this->db();
         $now = gmdate('Y-m-d H:i:s.u');
         $ok = $db->query($db->prepare(
-            'INSERT INTO ' . $this->table() . ' (operation_id,idempotency_key,request_fingerprint,intent,wp_endpoint_key,wp_post_id,wp_state_token,dependency_map_json,proposal_states_json,apply_attempts_json,stage,outcome,retryable,proposal_ids_json,applied_proposal_ids_json,failure_json,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,%d,%s,%s)',
+            'INSERT INTO ' . $this->table() . ' (operation_id,idempotency_key,request_fingerprint,intent,wp_endpoint_key,wp_post_id,wp_state_token,dependency_map_json,proposal_states_json,apply_attempts_json,stage,outcome,retryable,proposal_ids_json,applied_proposal_ids_json,failure_json,diagnostics_json,revision,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,%s,%d,%s,%s)',
             $receipt->operationId,
             $receipt->idempotencyKey,
             $receipt->requestFingerprint,
@@ -50,6 +50,7 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
             wp_json_encode($receipt->proposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->appliedProposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->failure, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            wp_json_encode($receipt->diagnostics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $receipt->revision,
             $now,
             $now,
@@ -66,13 +67,14 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
     {
         $db = $this->db();
         $ok = $db->query($db->prepare(
-            'UPDATE ' . $this->table() . ' SET stage=%s,outcome=%s,retryable=%d,proposal_ids_json=%s,applied_proposal_ids_json=%s,failure_json=%s,wp_endpoint_key=%s,wp_post_id=%s,wp_state_token=%s,dependency_map_json=%s,proposal_states_json=%s,apply_attempts_json=%s,revision=%d,updated_at=%s WHERE operation_id=%s AND revision=%d',
+            'UPDATE ' . $this->table() . ' SET stage=%s,outcome=%s,retryable=%d,proposal_ids_json=%s,applied_proposal_ids_json=%s,failure_json=%s,diagnostics_json=%s,wp_endpoint_key=%s,wp_post_id=%s,wp_state_token=%s,dependency_map_json=%s,proposal_states_json=%s,apply_attempts_json=%s,revision=%d,updated_at=%s WHERE operation_id=%s AND revision=%d',
             $receipt->stage,
             $receipt->outcome->value,
             $receipt->retryable ? 1 : 0,
             wp_json_encode($receipt->proposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->appliedProposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->failure, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            wp_json_encode($receipt->diagnostics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $receipt->wpEndpointKey,
             $receipt->wpPostId,
             $receipt->wpStateToken,
@@ -95,10 +97,11 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
             $proposalIds = json_decode((string) ($row['proposal_ids_json'] ?? '[]'), true, 512, JSON_THROW_ON_ERROR);
             $appliedIds = json_decode((string) ($row['applied_proposal_ids_json'] ?? '[]'), true, 512, JSON_THROW_ON_ERROR);
             $failure = json_decode((string) ($row['failure_json'] ?? '{}'), true, 512, JSON_THROW_ON_ERROR);
+            $diagnostics = json_decode((string) ($row['diagnostics_json'] ?? '{}'), true, 512, JSON_THROW_ON_ERROR);
             $dependencyMap = json_decode((string) ($row['dependency_map_json'] ?? '{}'), true, 512, JSON_THROW_ON_ERROR);
             $proposalStates = json_decode((string) ($row['proposal_states_json'] ?? '{}'), true, 512, JSON_THROW_ON_ERROR);
             $applyAttempts = json_decode((string) ($row['apply_attempts_json'] ?? '{}'), true, 512, JSON_THROW_ON_ERROR);
-            if (!is_array($proposalIds) || !array_is_list($proposalIds) || !is_array($appliedIds) || !array_is_list($appliedIds) || !is_array($failure) || !is_array($dependencyMap) || !is_array($proposalStates) || !is_array($applyAttempts)) return null;
+            if (!is_array($proposalIds) || !array_is_list($proposalIds) || !is_array($appliedIds) || !array_is_list($appliedIds) || !is_array($failure) || !is_array($diagnostics) || !is_array($dependencyMap) || !is_array($proposalStates) || !is_array($applyAttempts)) return null;
             return new ArticleOperationReceipt(
                 (string) $row['operation_id'],
                 (string) $row['idempotency_key'],
@@ -119,6 +122,7 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
                 $dependencyMap,
                 array_map('strval', $proposalStates),
                 array_map('intval', $applyAttempts),
+                $diagnostics,
             );
         } catch (\Throwable) {
             return null;

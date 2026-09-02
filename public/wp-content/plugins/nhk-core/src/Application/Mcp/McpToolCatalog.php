@@ -106,6 +106,7 @@ final class McpToolCatalog
             'properties' => [
                 'kind' => ['type' => 'string', 'enum' => ['original', 'derivative']],
                 'storage_key' => ['type' => 'string', 'minLength' => 1],
+                'original_filename' => ['type' => 'string'],
                 'checksum' => ['type' => 'string', 'pattern' => '^[0-9A-Fa-f]{64}$'],
                 'mime_type' => ['type' => 'string', 'minLength' => 1],
                 'byte_size' => ['type' => 'integer', 'minimum' => 0],
@@ -126,7 +127,7 @@ final class McpToolCatalog
             'properties' => [
                 'endpoint_type' => ['type' => 'string', 'pattern' => '^[a-z][a-z0-9_]{0,63}$'],
                 'endpoint_key' => ['type' => 'string', 'minLength' => 1],
-                'role' => ['type' => 'string', 'enum' => ['featured', 'inline', 'gallery', 'thumbnail', 'source']],
+                'role' => ['type' => 'string', 'enum' => ['featured_primary', 'inline_primary', 'inline_supporting', 'featured', 'inline', 'gallery', 'thumbnail', 'source']],
                 'sort_order' => ['type' => 'integer', 'minimum' => 0],
             ],
             'required' => ['endpoint_type', 'endpoint_key', 'role'],
@@ -159,6 +160,30 @@ final class McpToolCatalog
                 'type' => 'object',
                 'properties' => ['commands' => ['type' => 'array', 'items' => self::articleCommandField()]],
                 'required' => ['commands'],
+                'additionalProperties' => false,
+            ],
+            'media_context' => [
+                'type' => 'object',
+                'properties' => [
+                    'subject' => ['type' => 'string'],
+                    'preferred_view' => ['type' => 'string'],
+                    'keyword_groups' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'planned_title' => ['type' => 'string'],
+                    'planned_filename_stem' => ['type' => 'string'],
+                    'planned_alt_intent' => ['type' => 'string'],
+                    'preferred_aspect' => ['type' => 'string'],
+                    'minimum_width' => ['type' => 'integer', 'minimum' => 1],
+                    'minimum_height' => ['type' => 'integer', 'minimum' => 1],
+                    'focal_point_expected' => ['type' => 'boolean'],
+                ],
+                'additionalProperties' => false,
+            ],
+            'article_media' => [
+                'type' => 'object',
+                'properties' => [
+                    'selected' => ['type' => 'object'],
+                    'supporting_media_ids' => ['type' => 'array', 'items' => self::uuidField()],
+                ],
                 'additionalProperties' => false,
             ],
         ];

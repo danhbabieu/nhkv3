@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Graph\GraphService;
-use NHK\Core\Application\Media\MediaService;
+use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Domain\Authority\AuthorityEntity;
@@ -18,14 +18,22 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence
     {
         if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
             if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
             $payload = $proposal->payload;
-            return $this->media->ingest(
+            $packet = [
+                'stable_key' => (string) ($payload['stable_key'] ?? ''),
+                'name' => (string) ($payload['name'] ?? ''),
+                'readiness' => (string) ($payload['readiness'] ?? 'draft'),
+                'provenance' => is_array($payload['provenance'] ?? null) ? $payload['provenance'] : [],
+                'assets' => is_array($payload['assets'] ?? null) ? $payload['assets'] : [],
+                'usages' => is_array($payload['usages'] ?? null) ? $payload['usages'] : [],
+            ];
+            return $this->mediaGateway?->ingest($packet) ?? $this->media->ingest(
                 (string) ($payload['stable_key'] ?? ''),
                 (string) ($payload['name'] ?? ''),
                 (string) ($payload['readiness'] ?? 'draft'),

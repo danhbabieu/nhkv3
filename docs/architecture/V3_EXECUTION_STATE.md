@@ -2428,3 +2428,78 @@ the repository's pre-existing unavailable WordPress/MySQL environment failures
 (`$wpdb` bootstrap errors and missing `NHK_WP_TEST_PATH`). No database,
 WordPress Post, semantic record, Graph edge, migration or external deployment
 was changed.
+
+## Media Ingest / Image SEO constitutional checkpoint — 2026-09-02
+
+The Constitution amendment, non-normative spec and implementation plan are now
+recorded for the Media Ingest, Image SEO and Article Media slice. The shared
+`MediaIngestGateway`, controlled registries, Article media coordinator, SEO
+Blueprint persistence, batch context and read-only legacy audit boundary are
+implemented in the current working tree. Existing Media, MediaAsset and
+MediaUsage identities remain distinct, and no new semantic relation or
+auto-created Evidence/Knowledge/Graph record is introduced by ingest.
+
+Static and unit evidence for this checkpoint is green: Composer validation,
+PHP lint, the full NHK Unit suite (`262` tests / `1,338` assertions), focused
+Article Media tests, `git diff --check` and the changed-file secret review.
+The full PHPUnit run reached `369` tests with `8` WordPress bootstrap errors,
+`12` mandatory-runtime failures and `87` skips; the regular preflight reports
+the same unavailable WordPress/MySQL bootstrap. MCP wire smoke could not
+connect to `http://localhost:80`. No database, Post, semantic record, Graph
+edge, migration execution, slug, repair, import or legacy article-body
+operation was run from this checkpoint.
+
+The requested branch/commit checkpoint could not be created because the
+managed filesystem rejects Git ref and index-lock writes. The working-tree
+changes are intentionally preserved on the current branch; no push or merge
+was attempted. Remaining implementation gates are the byte-upload transport,
+the WordPress attachment-to-canonical-Media selection adapter, live runtime
+verification, and any separately governed legacy audit/repair decision.
+
+## Media Phase R runtime proof — 2026-09-02
+
+This additive checkpoint preserves the current working-tree implementation and
+records fresh local evidence after the MySQL service was restored. Migration
+checks used `nhk_v3`; destructive fixture cleanup was limited to exact
+fixtures on `nhk_v3_test`. No V2, staging, production, legacy Post, Graph
+edge, slug, repair or backfill write was performed.
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| SOURCE_UNIT_GATE | **PASS** | `composer validate`, full Unit suite `262 tests / 1,338 assertions`, focused Media/MCP/P6 slice `20 / 148`, PHP lint, diff check and changed-file secret review pass. |
+| WORDPRESS_RUNTIME_GATE | **PASS** | `composer preflight` reached `10/10`; WordPress, NHK Core, schema, hydration and REST bootstrap checks passed. |
+| MIGRATION_011_GATE | **PASS** | On `nhk_v3`, migration 011 rerun found current/target `11/11`, the Blueprint table and required columns/indexes present, and no duplicate rows/schema mutation. |
+| MEDIA_PERSISTENCE_ROUNDTRIP | **PASS** | Isolated `nhk_v3_test` fixture persisted/read back a Blueprint, updated mutable SEO intent with canonical fields preserved and storage revision incremented, and repeated reconciliation without duplicate mandatory usages/Blueprint rows. |
+| ARTICLE_RUNTIME_GATE | **FAIL** | Native Post creation produced exactly two distinct placeholder Media usages and two Blueprints with incomplete diagnostics. Real replacement reached `MEDIA_COMPLETE`, but `featured_media` stayed `0` and inline placement was not written into `post_content`; editorial selection is not synchronized by this adapter. |
+| MCP_RUNTIME_GATE | **FAIL** | Real localhost MCP HTTP `tools/list` returned JSON-RPC 200 with 21 tools and correct protocol headers. Governed MCP Media ingest completed through proposal → approval → apply and persisted Media. MCP Article preflight/ingest returned explicit `RECONCILIATION_CONFLICT`/`EDITORIAL_STATE_CHANGED`, not success. |
+| GENERIC_MCP_BYPASS_GATE | **FAIL** | No generic WordPress write tool is in the NHK MCP catalog, but native WP REST exposes Post create/update and Media upload/update including featured-media paths; these remain a technical bypass unless separately wrapped by an approved policy boundary. |
+| ARTICLE_INGEST_RUNTIME_GATE | **FAIL** | The actual Article Ingest/MCP path failed closed on the editorial reconciliation conflict; persistence diagnostics were returned and no semantic bypass occurred. |
+| BULK_INGEST_RUNTIME_GATE | **PASS** | Real `nhk_v3_test` batch fixture created two independent Media identities under one batch context, normalized camera-style filenames, and produced no automatic relation. |
+| PRODUCT_SPECIMEN_MEDIA_GATE | **PASS** | One Media and Asset were shared through separate Product and Specimen Usages; removing the Product Usage left Media, Asset and Specimen Usage intact. No Product–Specimen relation was inferred. |
+| SEO_RUNTIME_GATE | **FAIL** | Projection excludes placeholders and carries contextual Media state, but returns `image_url=null`; the theme still renders native WP thumbnail output/`og:image` and has no proven MediaUsage-driven inline image, `srcset`, `sizes`, dimensions or structured-data image integration. |
+| IMAGE_SITEMAP_RUNTIME_GATE | **FAIL** | Projection eligibility was proven false for placeholder and true for a real public asset, but no actual image-sitemap integration was found/proven. |
+| FULL_TEST_GATE | **FAIL** | Fresh guarded run: `361 tests`, `14 errors`, `5 failures`, `1 warning`, `2 skips`. Errors/failures are classified below; this is not a pass. |
+| DEPLOYMENT_GATE | **FAIL** | Runtime proof is mixed and generic WP REST bypass remains open; no deployment or production cutover was attempted. |
+| LEGACY_REPAIR_GATE | **NO** | Explicitly not authorized by this phase. |
+
+### Full-suite classification
+
+The 14 errors are `PREEXISTING_FAILURE`: one P6 malformed-asset integration
+case and thirteen V2 migration integration cases call the constitutionally
+retired `V2MigrationService` writer, which throws the explicit retired-writer
+exception. They are not an environment outage and were not repaired.
+
+The five failures are also `PREEXISTING_FAILURE`: three MCP transport cases
+call public REST routes with canonical UUIDs although the current routes use
+stable keys/public slugs (and the public evidence route is not registered),
+and two P5 Authority cases call the stable-key Entity route with a UUID. The
+Phase R diff changes reader fields, not those route contracts. The one warning
+is the associated P5 undefined-id symptom. The two skips are `EXPECTED_SKIP`
+because `nhk_v3_test` has no published Post 55 fixture. Environment failures:
+`0` in the completed 361-test run.
+
+The repository smoke script still expects the historical 19-tool catalog and
+therefore reports a stale tools/list failure; the direct live wire request
+returned the current 21-tool catalog. The implementation remains preserved
+for a later separately authorized fix of the Article editorial adapter,
+public SEO integration and bypass boundary.

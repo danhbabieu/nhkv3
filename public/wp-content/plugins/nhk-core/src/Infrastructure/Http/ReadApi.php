@@ -61,7 +61,7 @@ final class ReadApi
     }
 
     private function asset(MediaAsset $asset): array { return ['kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
-    private function usage(MediaUsage $usage): array { return ['role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
+    private function usage(MediaUsage $usage): array { return ['role' => $usage->role, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption]; }
     private function evidence(Evidence $evidence): array { return ['relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator]; }
     private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $source = $this->sources->findByCanonicalId($item->sourceId); return $source !== null && $source->active && $source->isPublic(); })); }
     private function unavailable(bool $ready, string $domain): ?\WP_Error { return $ready ? null : new \WP_Error('nhk_storage_unavailable', ucfirst($domain) . ' storage is not ready.', ['status' => 503]); }

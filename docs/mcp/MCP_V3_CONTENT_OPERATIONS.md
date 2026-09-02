@@ -180,10 +180,25 @@ for the governed Graph query.
 
 Media identity, MediaAsset binary metadata and MediaUsage placement are
 separate. `nhk.media.ingest` accepts current stable key/name/readiness, asset
-packet and usage packet; Controlled Apply calls `MediaService::ingest`. Asset
-metadata includes storage key, checksum, MIME, size, dimensions and visibility;
-usage includes endpoint type/key, role and order. `nhk.media.get` returns active
-ready Media, public deliverable assets and reader-safe usage.
+packet and usage packet; Controlled Apply delegates through the shared
+`MediaIngestGateway` to `MediaService::ingest`. Asset metadata includes storage
+key, optional original filename, checksum, MIME, size, dimensions and
+visibility. Usage includes endpoint type/key, controlled role, order and
+contextual SEO fields. Article roles are `featured_primary`, `inline_primary`
+and `inline_supporting`; the five existing generic roles remain in the same
+registry. `nhk.media.get` returns active ready Media, public deliverable assets
+and reader-safe usage.
+
+Article Ingest reconciliation uses the same `ArticleMediaCoordinator` as the
+WordPress post-created adapter. It returns a media state, mandatory-slot
+diagnostics and Blueprint information without copying or reordering Post body
+content. `nhk.article.preflight` previews media state read-only. A missing real
+image binds a distinct system placeholder and remains incomplete.
+
+Media detail types, SEO keyword groups, state values and diagnostic reason codes
+are controlled registries owned by NHK Core. This MCP document does not define
+their semantics; the sole source of law is
+`docs/constitution/NHK_V3_CONSTITUTION.md` and the runtime registries.
 
 The current boundary does not upload bytes, resolve a local file, search by
 checksum or add a usage independently. Checksum detects a duplicate candidate;

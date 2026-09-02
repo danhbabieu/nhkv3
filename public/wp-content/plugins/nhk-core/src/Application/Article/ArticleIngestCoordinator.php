@@ -11,6 +11,7 @@ use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Media\ArticleMediaCoordinator;
 
 final class ArticleIngestCoordinator
 {
@@ -24,7 +25,11 @@ final class ArticleIngestCoordinator
         private ?ProposalRepository $proposals = null,
         private ?DependencyRepository $dependencies = null,
         private ?ArticleVerificationReader $verification = null,
+        private ?ArticleMediaCoordinator $articleMedia = null,
     ) {}
+
+    /** @var array<string,mixed> */
+    private array $mediaDiagnostics = [];
 
     /** @param array<string,mixed> $input */
     public function execute(array $input): ArticleOperationReceipt
@@ -68,6 +73,16 @@ final class ArticleIngestCoordinator
         if ($postId === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'WP_POST_TARGET_REQUIRED']);
         $state = $this->editorial->read($postId);
         if ($state === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE']);
+        if ($this->articleMedia !== null) {
+            try {
+                $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title, 'planned_title' => $state->title];
+                $selected = is_array($input['article_media']['selected'] ?? null) ? array_map('strval', $input['article_media']['selected']) : [];
+                $supporting = is_array($input['article_media']['supporting_media_ids'] ?? null) ? array_values(array_map('strval', $input['article_media']['supporting_media_ids'])) : [];
+                $this->mediaDiagnostics = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
+            } catch (\Throwable $error) {
+                return $this->save($receipt, 'media', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'ARTICLE_MEDIA_COORDINATION_FAILED', 'error' => $error->getMessage()], $state->token);
+            }
+        }
         if ($receipt->wpStateToken !== null && $receipt->wpStateToken !== $state->token) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EDITORIAL_STATE_CHANGED'], $state->token);
         $expectedToken = is_array($input['expected_editorial_state'] ?? null) ? trim((string) ($input['expected_editorial_state']['state_token'] ?? '')) : '';
         if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
@@ -160,7 +175,9 @@ final class ArticleIngestCoordinator
     /** @param array<string,list<string>>|null $dependencyMap @param array<string,string>|null $proposalStates @param array<string,int>|null $applyAttempts */
     private function save(ArticleOperationReceipt $receipt, string $stage, ArticleIngestOutcome $outcome, bool $retryable, array $failure, ?string $token = null, array $proposalIds = [], array $applied = [], ?array $dependencyMap = null, ?array $proposalStates = null, ?array $applyAttempts = null): ArticleOperationReceipt
     {
-        $updated = new ArticleOperationReceipt($receipt->operationId, $receipt->idempotencyKey, $receipt->requestFingerprint, $receipt->intent, $receipt->wpEndpointKey, $receipt->wpPostId, $stage, $outcome, $retryable, $proposalIds !== [] ? $proposalIds : $receipt->proposalIds, $applied !== [] ? $applied : $receipt->appliedProposalIds, $failure, $receipt->revision + 1, $receipt->createdAt, $receipt->updatedAt, $token ?? $receipt->wpStateToken, $dependencyMap ?? $receipt->dependencyMap, $proposalStates ?? $receipt->proposalStates, $applyAttempts ?? $receipt->applyAttempts);
+        $diagnostics = $receipt->diagnostics;
+        if ($this->mediaDiagnostics !== []) $diagnostics['media'] = $this->mediaDiagnostics;
+        $updated = new ArticleOperationReceipt($receipt->operationId, $receipt->idempotencyKey, $receipt->requestFingerprint, $receipt->intent, $receipt->wpEndpointKey, $receipt->wpPostId, $stage, $outcome, $retryable, $proposalIds !== [] ? $proposalIds : $receipt->proposalIds, $applied !== [] ? $applied : $receipt->appliedProposalIds, $failure, $receipt->revision + 1, $receipt->createdAt, $receipt->updatedAt, $token ?? $receipt->wpStateToken, $dependencyMap ?? $receipt->dependencyMap, $proposalStates ?? $receipt->proposalStates, $applyAttempts ?? $receipt->applyAttempts, $diagnostics);
         return $this->receipts->save($updated);
     }
 }

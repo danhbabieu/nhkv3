@@ -13,6 +13,7 @@ use NHK\Core\Infrastructure\Migration\KnowledgeEvidenceMetadataMigration007;
 use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
 use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 use NHK\Core\Infrastructure\Migration\ArticleIngestMigration010;
+use NHK\Core\Infrastructure\Migration\ArticleMediaMigration011;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
@@ -44,7 +45,7 @@ use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttempt
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{MediaService, MediaVideoPageQuery};
+use NHK\Core\Application\Media\{ArticleMediaCoordinator, MediaIngestGateway, MediaService, MediaVideoPageQuery};
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
@@ -56,8 +57,9 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', ArticleIngestMigration010::VERSION, false);
+        update_option('nhk_core_migration_target', ArticleMediaMigration011::VERSION, false);
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
@@ -108,6 +110,15 @@ final class Plugin {
             (new PublicComparisonRoutes(new ComparisonPageQuery($publicEntityQuery)))->register();
             $publicAssets = new WpdbMediaAssetRepository($wpdb);
             $publicUsages = new WpdbMediaUsageRepository($wpdb);
+            $articleMedia = new ArticleMediaCoordinator(new MediaService($publicMedia, $publicAssets, $publicUsages), $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
+            add_action('wp_after_insert_post', static function (int $postId, \WP_Post $post, bool $update) use ($articleMedia): void {
+                if ($post->post_type !== 'post' || wp_is_post_revision($postId) || wp_is_post_autosave($postId)) return;
+                try {
+                    $articleMedia->ensureForPost($postId, ['subject' => (string) $post->post_title, 'planned_title' => (string) $post->post_title]);
+                } catch (\Throwable $error) {
+                    do_action('nhk_v3_article_media_failure', $postId, $error->getMessage(), $update);
+                }
+            }, 20, 3);
             (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus)))->register();
             $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
             if ($mediaRoot === '' && function_exists('wp_upload_dir')) { $upload = wp_upload_dir(); $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : ''; }
@@ -131,7 +142,8 @@ final class Plugin {
             $proposalRepository = new WpdbProposalRepository($wpdb); $governanceAudit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb); $transactionManager = new WpdbTransactionManager($wpdb); $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, new MediaService($media, $assets, $usages), new VideoService($videos), new KnowledgeService($claims, $sources, $evidence)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
+            $mediaService = new MediaService($media, $assets, $usages);
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types, static function (string $type, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): bool {
                 if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($id)) return false;
@@ -146,8 +158,9 @@ final class Plugin {
                     default => false,
                 };
             });
-            $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader());
-            $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial);
+            $articleMedia = new ArticleMediaCoordinator($mediaService, $media, $assets, $usages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
+            $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader(), $articleMedia);
+            $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
@@ -174,6 +187,7 @@ final class Plugin {
         (new MediaAssetMetadataMigration008())->up();
         (new ProjectionContextMigration009())->up();
         (new ArticleIngestMigration010())->up();
+        (new ArticleMediaMigration011())->up();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }

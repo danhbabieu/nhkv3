@@ -244,7 +244,7 @@ direct PostKnowledge path and broad V2 migration writer remain semantic write
 bypasses. Normal WordPress editorial publication is exempt from semantic
 Governance, but Article Ingest semantic steps are not.
 
-The MCP contract describes 19 tools and 15 endpoint types, with read/write
+The MCP contract describes 21 tools and 15 endpoint types, with read/write
 permissions and public/private boundaries. Static tests cover portions of the
 handlers. No Article CRUD/publish, binary upload, standalone MediaUsage or
 Album tool is authorized by the current contract; live wire behavior was not
@@ -253,10 +253,10 @@ hide them.
 
 The Article Ingest contract is non-normative and its intended sequence is
 semantic preflight → WordPress draft → governed semantic apply → read-back →
-WordPress publish. The concurrent receipt/coordinator work was not authored by
-this audit and was not staged. Fresh audit conclusion: cross-boundary
-idempotency, WordPress revision binding, final outcome contract and runtime
-coordination are not yet proven. Article Ingest must not call
+WordPress publish. The current reconcile coordinator now wires the shared
+Article Media policy into the receipt and MCP diagnostics; cross-boundary
+create/update idempotency, WordPress revision binding, final outcome contract
+and live runtime coordination are not yet proven. Article Ingest must not call
 `V2MigrationService` or direct `PostKnowledgeLinkService` mutation.
 
 ## Health, deployment and frontend
@@ -384,3 +384,56 @@ therefore **PARTIAL**, not fully complete: semantics and negative ownership
 boundaries are implemented, while the relationship remains a separately
 reviewed registry/storage task. No identity merge, inferred Specimen, Graph
 backfill, payload repair, migration or data write occurred.
+
+## Media Ingest / Image SEO checkpoint — 2026-09-02
+
+This is an additive checkpoint to the baseline audit above. It records the
+approved Media Ingest, Image SEO and Article Media amendment without rewriting
+the earlier runtime findings.
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| Media / Asset / Usage separation | PASS | Existing domain objects remain distinct; contextual alt, caption and keyword groups are stored on Usage. `ArticleMediaPolicyTest` covers one asset reused by different contextual usages. |
+| Shared ingest boundary | PASS for in-scope channels | `MediaIngestGateway` sits above `MediaService`; governed Media proposals and batch ingestion use it. A WordPress attachment-to-canonical-Media adapter and byte-upload transport are not yet present. |
+| Article mandatory slots | PASS in application policy | New Post adapter reconciles exactly one `featured_primary` and one `inline_primary`, requires distinct Media identities, creates placeholders with diagnostics when real Media is unavailable, and persists SEO Blueprints. |
+| Placeholder / semantic safety | PASS | Placeholders are system Media only; tests prove they are excluded from preferred-image and image-sitemap eligibility and do not create Evidence, Knowledge or Graph records. |
+| Reuse / idempotency | PASS in unit evidence | Suitable active, ready Media with assets is reused before placeholder creation; repeated reconciliation preserves one usage per mandatory role. |
+| SEO vocabulary / projection | PASS for policy slice | Role, detail, keyword, state and diagnostic registries fail closed; filename normalization and contextual Usage metadata are covered. Full WordPress attachment, structured-data and live sitemap integration remain unverified. |
+| Bulk / batch boundary | PASS for metadata packets | `MediaBatchIngestService` carries workflow context only and does not create semantic relations. Real upload transport remains a separate gate. |
+| Legacy read-only audit | PASS | The dedicated legacy report records `UNVERIFIED` runtime counts and no-repair status. No Post 55 or legacy article body was mutated. |
+| Live runtime verification | FAIL / BLOCKED | WordPress/MySQL bootstrap is unavailable in this shell; no fresh integration, migration or HTTP evidence can be claimed. |
+
+Checkpoint unit evidence is `262` tests / `1,338` assertions, with Composer
+validation, PHP lint and `git diff --check` passing. Full PHPUnit reached `369`
+tests with `8` WordPress bootstrap errors, `12` mandatory-runtime failures and
+`87` skips; MCP wire smoke could not connect to `http://localhost:80`.
+The implementation is not ready for legacy repair or production cutover:
+**READY_FOR_LEGACY_MEDIA_REPAIR: NO**.
+
+## Media Phase R runtime revalidation — 2026-09-02
+
+The local MySQL service was restored and the current Media/Image SEO working
+tree was exercised against `nhk_v3` for migration proof and `nhk_v3_test` for
+isolated fixture proof. `composer preflight` passed `10/10`; migration 011 is
+at current/target `11/11` with the Blueprint table and required schema present.
+The full Unit suite passes `262 / 1,338`; the guarded full suite is not green:
+`361 tests`, `14 errors`, `5 failures`, `1 warning`, `2 skips`.
+
+The runtime proof confirms Media/Asset/Usage separation, placeholder and
+Blueprint persistence, replacement at the application boundary, batch
+context, reuse across Product and Specimen Usage and governed MCP Media
+ingest. It does not confirm the WordPress editorial adapter: after real
+replacement, `featured_media` remained unset and inline placement remained
+absent from the native Post body. The SEO projection also has no resolved
+public image URL and no proven rendered image/sitemap integration.
+
+The generic MCP catalog contains no generic WordPress write tool, but native
+WordPress REST exposes Post and Media write routes capable of bypassing the
+Article Media invariant. This is recorded as a `TECHNICAL_BYPASS`, not hidden
+by the NHK-specific MCP catalog. No guard was invented in this checkpoint.
+
+The full-suite errors are the retired V2 writer and malformed-asset test
+contract; the five route/identity failures are pre-existing test/route
+contract failures; Post 55 skips are expected because the exact fixture is
+absent. No V2/live data, Post, Graph edge, slug, semantic backfill or legacy
+asset was changed. `READY_FOR_LEGACY_MEDIA_REPAIR: NO`.

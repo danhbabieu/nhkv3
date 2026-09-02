@@ -25,6 +25,6 @@ final class MediaVideoPageQuery
     private function available(string $domain): bool { return !$this->status || ($domain === 'media' ? $this->status->mediaStorageReady() : $this->status->videoStorageReady()); }
     private function archive(array $items, int $page, int $perPage, callable $map, ?callable $filter = null): array { $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $items = array_values(array_filter($items, $filter ?? static fn (object $item): bool => $item->active)); $items = array_map($map, $items); return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)]; }
     private function asset(MediaAsset $asset): array { return ['kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
-    private function usage(MediaUsage $usage): array { return ['role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
+    private function usage(MediaUsage $usage): array { return ['role' => $usage->role, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption]; }
     private function video(Video $video): array { return ['title' => $video->title, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'public_url' => PublicRouteResolver::videoPath($video->title, $video->externalVideoId)]; }
 }

@@ -59,6 +59,50 @@ infrastructure failure and must be tested before implementation is accepted.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
+## Amendment record — 2026-09-02 — Media Ingest, Image SEO & Article Media Law
+
+**WHY:** Media intake was structurally separated from MediaAsset and
+MediaUsage, but the repository did not yet make one enforceable intake policy,
+contextual SEO contract or mandatory Article media invariant visible across
+WordPress, MCP, Admin and future bulk/Product/Specimen adapters.
+
+**WHAT:** Approve the normative Media Ingest, Image SEO and Article Media Law
+in §13.1.1. Every new WordPress Post receives exactly one
+`FEATURED_PRIMARY` and one `INLINE_PRIMARY` usage at creation time; those
+usages must reference different Media identities. When real Media is not
+available, distinct system placeholder Media identities are bound and the
+result remains incomplete. Existing Media is reused before a new identity is
+created. SEO Blueprint, detail/view vocabulary, keyword vocabulary, state and
+diagnostic registries are controlled runtime registries, not semantic truth.
+
+**AFFECTED SUBSYSTEMS:** Media, MediaAsset, MediaUsage, WordPress editorial
+ownership, Public Projection/SEO, Knowledge, Source/Evidence, Governance,
+Product/Specimen, MCP, Admin, Article Ingest, bulk intake and diagnostics.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** WordPress `wp_posts` remains the sole
+owner of title, body, featured/content image selection and inline ordering.
+MediaUsage indexes placement and contextual metadata but never replaces
+editorial layout. Placeholder and private evidence assets are excluded from
+preferred structured-data images and image sitemaps. A MediaUsage never
+creates `depicts`, `about`, Knowledge, Evidence or Authority truth.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes the new-post
+placeholder/blueprint workflow only. It authorizes no legacy repair, body
+import, bulk backfill, checksum merge, image rename of existing public assets,
+Graph edge, Product–Specimen linkage or semantic inference. Existing data is
+audited read-only. Public asset URLs remain stable after publication and
+derivatives never become new semantic Media identities.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** All Media semantic writes converge on the
+existing Media application service and, where the operation is semantic,
+Proposal → Human Approval → Eligibility → Controlled Apply → repository →
+audit. Recognition/OCR is only a candidate for Evidence. Tests must prove
+two distinct mandatory slots, placeholder incompleteness, reuse, contextual
+alt, filename normalization, idempotent reconciliation, sitemap/structured
+data exclusion and channel parity. Unknown registry values fail closed.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
+
 ## Amendment record — 2026-09-02 — Product / Specimen Boundary
 
 **WHY:** Product and Specimen are different identities, but the previous
@@ -600,6 +644,117 @@ Product or prove that the asset depicts a referenced Specimen. Such depiction
 or object-specific use remains a MediaUsage/Graph/evidence fact under its
 registered contract.
 
+### 13.1.1 Media Ingest, Image SEO và Article Media Law
+
+`Media`, `MediaAsset` và `MediaUsage` là ba identity/persistence boundary
+không thể hoán đổi:
+
+- `Media` là canonical semantic identity của một media object.
+- `MediaAsset` là binary gốc hoặc derivative cùng technical/storage metadata.
+- `MediaUsage` là một placement/context/role của Media.
+
+Upload không phải semantic truth. SEO metadata và keyword group không phải
+semantic truth. `MediaUsage` không phải `depicts`; placeholder không phải real
+Media evidence. Dùng Media trên Post, Product, Specimen hoặc Knowledge surface
+không tự tạo `depicts`, `about`, Knowledge Claim, Evidence, identification,
+Brand/Model/Variant/Movement relation hay bất kỳ Graph edge nào. Những sự thật
+đó vẫn phải theo Graph, provenance và Governance contract hiện hành.
+
+#### Controlled Media Ingest boundary
+
+Mọi Media write phải hội tụ tại canonical Media application boundary dùng
+chung validator, policy, registry, persistence và diagnostics. WordPress/Admin,
+MCP, Article Ingest, bulk upload, Product và Specimen chỉ là adapters/orches-
+tration. `wp_insert_attachment`, `set_post_thumbnail`, `update_post_meta` và
+raw block mutation chỉ được xuất hiện bên dưới adapter hạ tầng được gọi từ
+boundary này khi chúng phục vụ editorial state; chúng không được tạo semantic
+Media write path song song. Governance vẫn bắt buộc cho semantic mutation.
+
+Canonical role registry tối thiểu có `FEATURED_PRIMARY`, `INLINE_PRIMARY` và
+`INLINE_SUPPORTING`; các role legacy đã có contract chỉ được giữ lại trong
+chính registry. Detail/view type và diagnostic/state vocabulary cũng là
+controlled registries; input registry value không hợp lệ phải fail closed.
+
+Bulk ingest dùng một workflow batch context. Batch chỉ giữ provenance,
+uploader, source, default context, count và ingest status; batch không phải
+Authority entity, Graph truth hoặc bằng chứng. Mỗi Media trong batch vẫn độc
+lập reviewable; default Specimen/Post/Product context chỉ là suggestion.
+
+#### Article media invariant and reconciliation
+
+Mỗi **new WordPress Post**, ngay sau native Post creation, phải có:
+
+- đúng một `FEATURED_PRIMARY`;
+- đúng một `INLINE_PRIMARY`;
+- không trùng canonical Media identity giữa hai slot;
+- `INLINE_SUPPORTING` từ 0..N.
+
+Invariant này áp dụng từ lúc Post được tạo, không đợi publish. WordPress vẫn là
+owner của `featured_media`, block ordering và editorial placement. MediaUsage
+chỉ index và giải thích placement. Create/update reconciliation phải
+idempotent; khi editor bỏ slot bắt buộc, hệ thống chọn replacement hợp lệ hoặc
+bind placeholder, không để usage bắt buộc biến mất. Placeholder phải là hai
+Media identity khác nhau nếu hai slot cùng cần placeholder, không được tính là
+real Media completeness và phải tạo incomplete diagnostic.
+
+Before creating a Media, the policy searches reusable active Media using
+subject/context, detail/view, rights/public eligibility, resolution, aspect
+suitability and other available editorial evidence. Checksum chỉ là duplicate
+candidate, không phải semantic merge proof. Không copy binary chỉ để đổi alt.
+
+#### Placeholder, evidence and Product/Specimen reuse
+
+System placeholder Media là reusable system records. Placeholder không được
+làm Evidence, Graph relation, image-sitemap member hoặc preferred structured-
+data image; nó luôn phát ra incomplete warning. `SERIAL`, `LOGO`, `MODEL_MARK`,
+`STAMP`, `LABEL`, `ENGRAVING` và các detail type tương đương chỉ làm Evidence
+candidate. OCR/recognition/visual matching không được đổi canonical
+Specimen/Model/Variant/Movement; promotion vẫn là Evidence → Proposal → Human
+Approval → Eligibility → Controlled Apply.
+
+Ảnh của một physical object anchor semantically ở Specimen khi có contract và
+Governance-approved fact. Product dùng cùng Media qua MediaUsage; Product
+không sở hữu physical image truth và xóa Product không xóa Specimen/Media.
+Commercial composite có binary/semantic identity riêng khi contract yêu cầu,
+không overwrite original và không mạnh hơn original Evidence. Nếu chưa có
+predicate `derived-from`, ghi gap, không invent predicate.
+
+#### Image SEO and public asset law
+
+Media-level metadata gồm title, normalized public filename, dimensions, MIME,
+aspect ratio, focal point, rights/source state, checksum và derivatives.
+MediaUsage-level metadata gồm role, endpoint context, contextual alt/caption,
+keyword groups, position, crop, preferred status và SEO completeness. Cùng một
+Media có thể có alt/caption khác nhau cho Article, Product và Specimen; không
+ép một global alt vào mọi context.
+
+Mỗi mandatory Article usage có một SEO Blueprint ngay lúc hoặc ngay sau Post
+creation, kể cả khi đang dùng placeholder. Blueprint ghi subject/context,
+preferred view, controlled keyword groups, planned title/filename/alt intent,
+aspect, minimum dimensions, focal expectation và replacement/completeness
+state. Keyword group chỉ hỗ trợ Blueprint/title/alt/caption/filename; không
+tạo `meta keywords`, Knowledge, Classification, Authority hoặc Graph edge và
+không được stuffing.
+
+Original camera filename không được trở thành public SEO filename tự động.
+Filename phải descriptive, short, ASCII-safe, stable, collision-safe và dùng
+contextual subject/view/unique suffix. Sau khi public URL của MediaAsset được
+thiết lập, display-name, Brand/Model/Variant hoặc keyword change không được
+ép rename/move asset. Derivative là asset khác cùng Media, không phải Media
+semantic mới. Featured real image là preferred structured-data image khi
+public policy cho phép; placeholder/private/temporary evidence không phải.
+Real public Media mới đủ điều kiện image sitemap; UUID/stable key không vào
+public URL hoặc sitemap. SEO-critical imagery dùng semantic `img`/`picture`
+với `srcset`, `sizes`, width, height và meaningful contextual alt; loading policy
+phù hợp vị trí editorial.
+
+Article media state tối thiểu phải phân biệt `MEDIA_COMPLETE`,
+`MEDIA_INCOMPLETE_FEATURED`, `MEDIA_INCOMPLETE_INLINE`, `MEDIA_PLACEHOLDER`,
+`MEDIA_METADATA_INCOMPLETE`, `MEDIA_LOW_RESOLUTION` và
+`MEDIA_RELATION_UNVERIFIED`/`MEDIA_RIGHTS_UNVERIFIED` theo identifier được
+runtime registry hiện hành chấp nhận. Diagnostics phải dùng một vocabulary
+chung giữa Admin, MCP, Article Ingest và tests.
+
 ### 13.2 Video
 
 Video là canonical external reference gồm platform, external video ID, canonical
@@ -1025,6 +1180,26 @@ editorial, semantic and verification stages.
     display spelling duy nhất; policy này chỉ áp dụng ở presentation boundary,
     không sửa `wp_posts`, semantic record, alias, source/evidence hay legacy body.
 37. Constitution này là nguồn normative duy nhất.
+38. Media, MediaAsset và MediaUsage giữ identity/persistence riêng biệt.
+39. Batch context không phải semantic entity và không tạo Graph truth.
+40. Mọi new WordPress Post có đúng một FEATURED_PRIMARY và một INLINE_PRIMARY.
+41. Hai mandatory Article slot luôn trỏ tới hai Media identity khác nhau.
+42. Thiếu real Media dùng placeholder và phát incomplete diagnostic.
+43. Placeholder không phải Evidence, Graph truth, sitemap member hoặc preferred structured-data image.
+44. Suitable existing Media được reuse trước khi tạo semantic Media mới.
+45. Public MediaAsset filename được normalize trước persistence; public URL ổn định sau khi thiết lập.
+46. Derivative không tạo semantic Media identity mới.
+47. Keyword Group không phải Knowledge, Graph, Classification, Authority hoặc `meta keywords`.
+48. Contextual alt/caption thuộc MediaUsage và có thể khác nhau theo usage.
+49. MediaUsage không tự tạo `depicts` hoặc semantic relation.
+50. Recognition/OCR/image matching chỉ là Evidence candidate cho tới Governance apply.
+51. Product và Specimen dùng chung Media qua MediaUsage nhưng Product không sở hữu physical truth.
+52. WordPress native Post vẫn sở hữu featured/content selection và editorial ordering.
+53. Admin, MCP, Article Ingest, bulk, Product và Specimen dùng chung canonical Media write boundary.
+54. Không có parallel semantic Media write bypass.
+55. Article media reconciliation idempotent và không để mandatory usage absent.
+56. Structured data/image sitemap chỉ chọn real public Media theo cùng preferred-image policy.
+57. Legacy Media/Post audit chỉ read-only; không tự repair, rename, infer hoặc backfill.
 
 ---
 
@@ -1048,6 +1223,14 @@ khác không được dùng như decision authority song song.
 | Product semantic completeness | Specific-object listing cần một physical subject xác định; generic/pre-specimen listing không được giả physical identity | Product cụ thể không có đúng một Specimen bị block/incomplete; Product generic chỉ được phép khi contract hiện hành cho phép |
 | Product commercial claims | Listing copy không phải canonical fact | Không tự promote Product copy thành Knowledge, Source/Evidence hoặc Graph relation; promotion qua evidence và Governance |
 | Media distinctions | Semantic meaning, binary và placement có lifecycle khác nhau | Media/Asset/Usage tách persistence; checksum không merge |
+| Canonical Media Ingest boundary | Every intake channel must enforce the same Media policy and diagnostics | Admin, MCP, Article Ingest, bulk, Product and Specimen adapters delegate to one application boundary; no parallel semantic write path |
+| Article two-image invariant | New editorial Posts need honest visual completeness from creation | Exactly one FEATURED_PRIMARY and one INLINE_PRIMARY use distinct Media; missing real media binds distinct placeholders and remains incomplete |
+| Reuse before duplicate | Existing semantic Media should survive context reuse without identity multiplication | Match editorial evidence before creating Media; checksum is only a duplicate candidate |
+| Contextual image SEO | Alt/caption and SEO intent vary by page context | Blueprint and contextual metadata live at MediaUsage scope; keyword groups never become semantic truth or meta keywords |
+| Placeholder semantics | Editorial creation must remain available without fabricating SEO or evidence completeness | Placeholder is reusable system Media, excluded from sitemap/structured-data preference and always diagnostic |
+| Stable asset filename/URL | Semantic naming changes must not break public asset delivery | Normalize before public persistence; derivatives remain under the same Media; established public URLs do not move for SEO/name changes |
+| Media detail/view vocabulary | Image view classifications support review without becoming entities | One controlled registry; detail types such as SERIAL or MOVEMENT_FRONT are metadata/candidate signals only |
+| Batch is workflow context | Bulk intake needs traceability without creating semantic relations | Batch stores workflow metadata and suggestions; each Media is independently reviewable and no edge is inferred |
 | Knowledge vs Post | Claim atomic khác narrative editorial body | Post giữ body/URL; Knowledge giữ claim; Graph chỉ liên hệ |
 | Coordinated Article Ingest | V3 knowledge Article completion crosses editorial and semantic boundaries | Approved operation-level contract: semantic preflight → WordPress draft → governed semantic apply → read-back → WordPress publish; no Article entity/body/endpoint |
 | No Article semantic entity | Article is an editorial workflow, not a canonical semantic owner | Reuse registered Authority, Knowledge, Source/Evidence and Graph records; do not invent Article/FAQ types |
@@ -1077,14 +1260,14 @@ phải dùng Change Control.
 | Transitional parent handling | Clear active payload parent can remain eligible with DATA_COMPATIBILITY_GAP; missing/conflicting parent blocks; no edge mutation | PARTIAL but contract-visible | PublicEntityEligibilityPolicy.php, StructuralContextQuery.php |
 | Technical public routes | Vietnamese hubs/detail routes and one-hop archive redirects are implemented in code; live stored-menu and some runtime evidence remain gated | PARTIAL runtime evidence | PublicEntityRoutes.php, V3_PUBLIC_HUB_MATRIX.md, V3_MENU_ROUTE_AUDIT_2026-09-02.md |
 | Knowledge/Source/Evidence | Separate domain records, active/public reader-safe gates, governed ingest and evidence chain exist; final public provenance policy remains open | IMPLEMENTED with publication gate | KnowledgeClaim.php, Source.php, Evidence.php, MCP_V3_CONTENT_OPERATIONS.md |
-| Media/Asset/Usage | Separate domain/persistence objects, readiness/visibility and guarded delivery exist; byte upload and final publication policy remain limited/open | IMPLEMENTED with policy gap | Media.php, MediaAsset.php, MediaUsage.php, PublicMediaAssetDelivery.php |
+| Media/Asset/Usage | Separate domain/persistence objects, contextual usage SEO, guarded delivery, Article slots, placeholders and Blueprint storage are implemented; byte upload and final publication policy remain limited/open | IMPLEMENTED with policy gap | Media.php, MediaAsset.php, MediaUsage.php, MediaUsageRoleRegistry.php, ArticleMediaCoordinator.php, PublicMediaAssetDelivery.php |
 | Video | Validated YouTube external-reference identity, canonical watch URL and optional thumbnail reference; no local MP4 behavior | IMPLEMENTED for current contract | Video.php, VideoService.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Product/Specimen ownership | Human-approved law separates physical identity and commerce identity; lifecycle, cardinality, completeness, condition and claim boundaries are explicit | PARTIAL / REGISTRY_GAP | This amendment; Product/Specimen tests; no dedicated approved Product–Specimen relation mechanism yet; existing `specimen_uuid`/broad `about` path is not canonical |
 | Album | No Authority type, endpoint, predicate, repository, service or public contract | SEMANTIC_GAP | MCP content-operations audit |
 | WordPress Post boundary | Native Post remains editorial title/body/author/date/category/URL truth; no Article Authority body path is approved | COMPLIANT | 01_EDITORIAL_CONTENT_BOUNDARY.md historical evidence; Plugin.php and public route contracts |
-| Article Ingest boundary | Constitutionally approved operation-level workflow; no runtime coordinator, cross-boundary idempotency, WordPress revision binding or final outcome contract exists yet | CODE_GAP / SEMANTIC_GAP | Article Ingest amendment; MCP_V3_CONTENT_OPERATIONS.md; current runtime catalog |
+| Article Ingest boundary | Constitutionally approved operation-level workflow; reconcile coordinator, receipt diagnostics and MCP preflight/ingest media policy are implemented, while create/update cross-boundary idempotency, WordPress revision binding and final outcome contract remain open | PARTIAL / CODE_GAP | ArticleIngestCoordinator.php, ArticleMediaCoordinator.php, ArticleOperationReceipt.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Governance | Proposal binding, approval, eligibility, Controlled Apply, capability checks, revision, idempotency and durable audit are implemented for current operations | COMPLIANT for registered operations | ControlledApplyService.php, ProposalEligibilityService.php, MCP catalog |
-| MCP catalog | Exactly 19 tools; governed writes remain capability-gated; eight existing read abilities are exposed on supported WordPress versions | IMPLEMENTED for current catalog | McpToolCatalog.php, McpAbilityRegistration.php, MCP_V3_CONTENT_OPERATIONS.md |
+| MCP catalog | Exactly 21 tools; governed writes remain capability-gated; eight existing read abilities are exposed on supported WordPress versions | IMPLEMENTED for current catalog | McpToolCatalog.php, McpAbilityRegistration.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Hydration/health | Bounded malformed-row omission and layered health/preflight exist; runtime/DB evidence varies by environment | IMPLEMENTED with environment gates | AuthorityRowHydrator.php, HealthCheck.php, tools/deployment-preflight.php |
 | Deployment | Root Composer lock/autoload and read-only preflight are release requirements; staging/server verification remains externally gated | PARTIAL evidence | P0_DEPLOYMENT_PREFLIGHT.md, V3_EXECUTION_STATE.md |
 | Frontend law | Vietnamese-first theme tokens, responsive/accessibility/SEO constraints and route/read-model boundaries are implemented or contract-tested; visual/runtime gates remain recorded | IMPLEMENTED with open QA gates | V3_FRONTEND_DESIGN_CONTRACT.md, frontend route evidence |
