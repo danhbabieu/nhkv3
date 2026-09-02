@@ -2,26 +2,29 @@
 
 ## Runtime status
 
-The active stored WordPress menu could not be read: `wp --path=public menu
-list --format=json` fails with `Error establishing a database connection`.
-Consequently, stored menu item IDs and current URLs are **UNVERIFIED**, and no
-stored menu mutation was attempted.
+The local WordPress runtime is available. The active theme is `nhk-v3`, but
+there is no stored menu to inspect or mutate: `wp --path=public menu list
+--format=json` returned `[]`, and `theme_mods_nhk-v3.nav_menu_locations` is an
+empty array. The rendered primary navigation therefore uses the theme
+fallback `nhk_v3_nav_fallback()`; no targeted stored-menu correction was
+needed.
 
 ## Before/after matrix
 
 | Label | Stored current URL / source | Required canonical URL | Code fallback source |
 |---|---|---|---|
-| Tri thức | UNVERIFIED — WordPress stored menu unavailable | `/tri-thuc/` | `themes/nhk-v3/functions.php` |
-| Thương hiệu | UNVERIFIED — WordPress stored menu unavailable | `/thuong-hieu/` | `themes/nhk-v3/functions.php` |
-| Mẫu | UNVERIFIED — WordPress stored menu unavailable | `/mau/` | `themes/nhk-v3/functions.php` |
-| Bộ máy | UNVERIFIED — WordPress stored menu unavailable | `/bo-may/` | `themes/nhk-v3/functions.php` |
-| Bản nhạc | UNVERIFIED — WordPress stored menu unavailable | `/ban-nhac/` | `themes/nhk-v3/functions.php` |
-| So sánh | UNVERIFIED — WordPress stored menu unavailable | `/so-sanh/` | `themes/nhk-v3/functions.php` |
-| Linh kiện | UNVERIFIED — WordPress stored menu unavailable | `/linh-kien/` | `themes/nhk-v3/functions.php` |
-| Hiện vật | UNVERIFIED — WordPress stored menu unavailable | `/hien-vat/` | `themes/nhk-v3/functions.php` |
-| Video | UNVERIFIED — WordPress stored menu unavailable | `/video/` | `themes/nhk-v3/functions.php` |
-| Góc chia sẻ | Retained only by existing fallback/editorial section contract | `/goc-chia-se/` | `themes/nhk-v3/functions.php` |
+| Tri thức | NONE — no stored menu rows; fallback rendered | `/tri-thuc/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Thương hiệu | NONE — no stored menu rows; fallback rendered | `/thuong-hieu/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Mẫu | NONE — no stored menu rows; fallback rendered | `/mau/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Bộ máy | NONE — no stored menu rows; fallback rendered | `/bo-may/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Bản nhạc | NONE — no stored menu rows; fallback rendered | `/ban-nhac/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| So sánh | NONE — no stored menu rows; fallback rendered | `/so-sanh/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Linh kiện | NONE — no stored menu rows; fallback rendered | `/linh-kien/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Hiện vật | NONE — no stored menu rows; fallback rendered | `/hien-vat/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Video | NONE — no stored menu rows; fallback rendered | `/video/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
+| Góc chia sẻ | NONE — no stored menu rows; fallback/editorial section rendered | `/goc-chia-se/` | `themes/nhk-v3/functions.php::nhk_v3_nav_fallback()` |
 
 Classification and Product are intentionally absent from this primary menu.
-Once WordPress is available, record stored item IDs and URLs first, then make
-only targeted updates for stale rows and rerun rendered-navigation HTTP checks.
+Local rendered navigation and the read-only staging navigation both expose the
+Vietnamese canonical routes above; no legacy technical navigation links were
+observed. The legacy roots remain one-hop redirects for compatibility.

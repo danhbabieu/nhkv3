@@ -6,6 +6,33 @@
 
 ## Current checkpoint — 2026-09-02
 
+Runtime verification checkpoint, 2026-09-02: implementation HEAD `67f7f79`
+contains `abc2f67`, `b073780` and the hub checkpoint. Local WordPress and
+MySQL were restored without replacing either database. Canonical preflight
+passes 10/10; the guarded full PHPUnit suite passes 290 tests / 1,641
+assertions after two test-only corrections for the live runtime registry and
+WordPress Abilities return shape. Composer validation/lint and
+`git diff --check` pass. The route matrix, exact Graph audit, REST, MCP wire
+smoke and responsive browser checks were executed against the local runtime;
+the read-only staging route matrix also serves the canonical Vietnamese hubs.
+
+The local stored-menu inspection is now verified: no stored menu rows or
+active menu locations exist, so the canonical theme fallback is rendered and
+no targeted menu mutation was required. Local Authority remains 370 active
+rows across the same nine type counts recorded below; Graph remains 189 nodes,
+241 active edges and two persisted predicate rows. Runtime predicate
+registration exposes eight predicates (the six approved structural predicates
+plus existing `about` and `depicts`); it created no physical predicates or
+edges. Structural diagnostics report 72 blocked Model/Variant findings with
+missing parents and no candidates, so the Model hub and Brand structural
+aggregation correctly remain empty rather than backfilling data.
+
+The generic frontend smoke script still has three stale or
+contract-incompatible expectations (`/knowledge/`, `/knowledge/page/2/` and
+`/category/uncategorized/`); the contract-scoped route matrix passes. Staging
+server preflight, stored-menu inspection and deployment were not available
+over HTTP-only access, and no semantic, V2/live or Graph data was changed.
+
 Constitutional consolidation checkpoint, 2026-09-02: the repository now has
 one authoritative constitutional source at
 `docs/constitution/NHK_V3_CONSTITUTION.md`. The eight fragmented files under

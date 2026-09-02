@@ -52,7 +52,7 @@ final class McpTransportIntegrationTest extends TestCase
     public function test_wordpress_abilities_register_only_the_public_read_allowlist(): void
     {
         $abilities = wp_get_abilities(['namespace' => 'nhk-v3']);
-        self::assertSame(McpAbilityRegistration::readAbilityNames(), array_map(static fn (\WP_Ability $ability): string => $ability->get_name(), $abilities));
+        self::assertSame(McpAbilityRegistration::readAbilityNames(), array_values(array_map(static fn (\WP_Ability $ability): string => $ability->get_name(), $abilities)));
         $read = wp_get_ability('nhk-v3/semantic-resolve');
         self::assertNotNull($read);
         self::assertSame('nhk-semantic', $read->get_category());
@@ -61,6 +61,9 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $read->get_meta_item('annotations'));
         self::assertNull(wp_get_ability('nhk-v3/media-ingest'));
         self::assertNull(wp_get_ability('nhk-v3/proposal-create'));
+        $administrator = get_role('administrator');
+        self::assertNotNull($administrator);
+        $administrator->add_cap('read');
         $users = get_users(['role' => 'administrator', 'number' => 1]);
         self::assertNotEmpty($users);
         $previousUser = get_current_user_id();
