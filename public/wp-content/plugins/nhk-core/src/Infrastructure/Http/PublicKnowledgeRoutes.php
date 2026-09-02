@@ -19,7 +19,7 @@ final class PublicKnowledgeRoutes
     public function rewrite(): void
     {
         add_rewrite_rule('^tri-thuc/([^/]+)/?$', 'index.php?nhk_knowledge_slug=$matches[1]', 'top');
-        add_rewrite_rule('^knowledge/claim/([0-9A-Fa-f-]{36})/?$', 'index.php?nhk_knowledge_key=$matches[1]', 'top');
+        add_rewrite_rule('^knowledge/claim/([a-z0-9][a-z0-9._:-]{0,190})/?$', 'index.php?nhk_knowledge_key=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/page/([1-9][0-9]*)/?$', 'index.php?nhk_knowledge_page=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/?$', 'index.php?nhk_knowledge_page=1', 'top');
     }

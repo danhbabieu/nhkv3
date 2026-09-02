@@ -59,7 +59,9 @@ final class KnowledgePageQueryTest extends TestCase
         self::assertArrayNotHasKey('metadata', $result['evidence'][0]);
         self::assertArrayNotHasKey('provenance', $result);
         self::assertSame(1, (new KnowledgePageQuery($claims, $evidence, $sources))->archive()['total']);
-        self::assertSame($claimId, (new KnowledgePageQuery($claims, $evidence, $sources))->detail('nhk:knowledge:query-test')['id']);
+        $publicClaim = (new KnowledgePageQuery($claims, $evidence, $sources))->detail('nhk:knowledge:query-test');
+        self::assertArrayNotHasKey('id', $publicClaim);
+        self::assertArrayNotHasKey('stable_key', $publicClaim);
     }
 
     public function test_inactive_claim_is_not_public(): void

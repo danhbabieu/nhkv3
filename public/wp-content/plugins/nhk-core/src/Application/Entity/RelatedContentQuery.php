@@ -22,7 +22,7 @@ final class RelatedContentQuery
     public function forEntity(string $type, string $id): array
     {
         if ($this->types->has($type) && !UuidCodec::isValid($id)) return $this->emptyGroups();
-        try { return $this->forReference(new NodeReference($type, $id)); } catch (\Throwable) { return $this->emptyGroups(); }
+        return $this->forReference(new NodeReference($type, $id));
     }
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
@@ -30,7 +30,7 @@ final class RelatedContentQuery
     {
         if ($postId < 1) return $this->emptyGroups();
         $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1;
-        try { return $this->forReference(new NodeReference('wp_post', $blogId . ':' . $postId)); } catch (\Throwable) { return $this->emptyGroups(); }
+        return $this->forReference(new NodeReference('wp_post', $blogId . ':' . $postId));
     }
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
@@ -39,11 +39,7 @@ final class RelatedContentQuery
         $groups = $this->emptyGroups();
         if ($this->status && !$this->status->graphStorageReady()) return $groups;
         $seen = [];
-        try {
-            $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
-        } catch (\Throwable) {
-            return $groups;
-        }
+        $pages = [$this->graph->findOutgoing($reference, null, 0, 100), $this->graph->findIncoming($reference, null, 0, 100)];
         foreach ($pages as $page) foreach ($page['items'] as $edge) {
             $node = $edge->source->reference->key() === $reference->key() ? $edge->target->reference : $edge->source->reference;
             if ($node->key() === $reference->key() || isset($seen[$node->key()])) continue;
@@ -63,7 +59,7 @@ final class RelatedContentQuery
         if ($this->types->has($node->endpoint_type)) {
             $entity = $this->authority->findByCanonicalId($node->endpoint_key);
             if (!$entity || !$entity->active()) return null;
-            return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity)]];
+            return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity)]];
         }
         if ($node->endpoint_type === 'media') { $media = $this->media->findByCanonicalId($node->endpoint_key); return $media && $media->active && $media->readiness === 'ready' ? ['group' => 'media', 'value' => $this->mediaValue($media)] : null; }
         if ($node->endpoint_type === 'video') { $video = $this->videos->findByCanonicalId($node->endpoint_key); return $video && $video->active && $video->hasValidPublicReference() ? ['group' => 'videos', 'value' => $this->videoValue($video)] : null; }
@@ -73,7 +69,7 @@ final class RelatedContentQuery
         }
         return null;
     }
-    private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'id' => $media->canonicalId, 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
-    private function videoValue(Video $video): array { $path = PublicRouteResolver::videoPath($video->title, $video->externalVideoId); return ['type' => 'video', 'id' => $video->canonicalId, 'title' => $video->title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
+    private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
+    private function videoValue(Video $video): array { $path = PublicRouteResolver::videoPath($video->title, $video->externalVideoId); return ['type' => 'video', 'title' => $video->title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
     private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path); }
 }

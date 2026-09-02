@@ -22,10 +22,10 @@ final class EntityPageQueryTest extends TestCase
         $retired = $authority->create('brand', 'retired', 'Retired'); $authority->retire($retired->canonicalId, 1);
         $query = new EntityPageQuery($repository, $types);
         $archive = $query->archive('brand', 1, 1, 'odo');
-        self::assertSame(1, $archive['total']); self::assertSame($first->canonicalId, $archive['items'][0]['id']);
+        self::assertSame(1, $archive['total']); self::assertArrayNotHasKey('id', $archive['items'][0]); self::assertArrayNotHasKey('stable_key', $archive['items'][0]);
         $all = $query->archive('brand', 1, 24);
         self::assertNotContains($retired->canonicalId, array_column($all['items'], 'id'));
-        self::assertSame($first->canonicalId, $query->detail('brand', 'odo')['id']);
+        self::assertArrayNotHasKey('id', $query->detail('brand', 'odo')); self::assertArrayNotHasKey('stable_key', $query->detail('brand', 'odo'));
         self::assertNull($query->detail('brand', 'retired'));
         self::assertNull($query->detail('model', 'odo'));
     }

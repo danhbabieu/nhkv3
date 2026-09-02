@@ -24,9 +24,9 @@ final class MediaVideoPageQueryTest extends TestCase
         $retiredVideo = new Video(UuidCodec::newV7(), 'youtube', '9bZkp7q19f0', 'https://www.youtube.com/watch?v=9bZkp7q19f0', 'Retired', [], null, false);
         $query = $this->query([$retiredMedia, $draftMedia, $activeMedia], [$video, $retiredVideo]);
 
-        self::assertSame(['active'], array_column($query->mediaArchive(1, 10)['items'], 'stable_key'));
+        self::assertSame(['Active'], array_column($query->mediaArchive(1, 10)['items'], 'title'));
         self::assertNull($query->mediaDetail($draftMedia->canonicalId));
-        self::assertSame([$video->canonicalId], array_column($query->videoArchive(1, 10)['items'], 'id'));
+        self::assertSame(['Reference'], array_column($query->videoArchive(1, 10)['items'], 'title'));
     }
 
     public function test_media_detail_contains_assets_and_usages_but_video_detail_keeps_external_reference(): void
@@ -40,7 +40,7 @@ final class MediaVideoPageQueryTest extends TestCase
 
         $media = $query->mediaDetail($mediaId);
         self::assertSame('image/jpeg', $media['assets'][0]['mime_type']);
-        self::assertSame('/media/asset/' . $asset->assetId . '/', $media['assets'][0]['public_url']);
+        self::assertArrayNotHasKey('public_url', $media['assets'][0]);
         self::assertArrayNotHasKey('provenance', $media);
         self::assertArrayNotHasKey('storage_key', $media['assets'][0]);
         self::assertArrayNotHasKey('metadata', $media['assets'][0]);
@@ -75,7 +75,8 @@ final class MediaVideoPageQueryTest extends TestCase
             $assetRepository = $this->assetRepository([$valid, $missing]);
             $mediaRepository = $this->mediaRepository([new Media($mediaId, 'public-assets', 'Public assets', 'ready')]);
             $query = new MediaVideoPageQuery($mediaRepository, $assetRepository, $this->usageRepository([]), $this->videoRepository([]), null, new PublicMediaAssetDelivery($assetRepository, $mediaRepository, $root));
-            self::assertSame([$valid->assetId], array_column($query->mediaDetail($mediaId)['assets'], 'id'));
+            self::assertCount(1, $query->mediaDetail($mediaId)['assets']);
+            self::assertArrayNotHasKey('id', $query->mediaDetail($mediaId)['assets'][0]);
         } finally {
             unlink($root . '/valid.jpg');
             rmdir($root);

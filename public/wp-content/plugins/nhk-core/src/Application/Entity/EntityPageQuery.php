@@ -28,7 +28,10 @@ final class EntityPageQuery
     {
         if ($this->collection !== null) {
             $item = $this->collection->detail($type, $key);
-            if ($item !== null) $item['related'] = $this->related?->forEntity($type, (string) $item['id']) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
+            if ($item !== null) {
+                $entity = $this->entityForKey($type, $key);
+                $item['related'] = $entity === null ? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []] : ($this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []]);
+            }
             return $item;
         }
         if (!$this->types->has($type) || !$this->available()) return null;
@@ -70,7 +73,12 @@ final class EntityPageQuery
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); $item = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
+    private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
+    private function entityForKey(string $type, string $key): ?AuthorityEntity
+    {
+        if (!$this->types->has($type)) return null;
+        return preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
+    }
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }

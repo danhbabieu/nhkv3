@@ -126,6 +126,32 @@ calls fail closed.
 **Stop condition:** no implementation or data operation proceeds while the
 physical identity versus commercial listing decision remains ambiguous.
 
+## Phase 0 execution record — 2026-09-02
+
+The Phase 0 implementation slice is **PARTIAL** and stops at the required
+Product/Specimen human gate.
+
+- Task 0.1 is implemented: Graph-derived readers fail loudly on
+  infrastructure/programming failure and retain honest empty results.
+- Task 0.2 is implemented: Post→Knowledge uses a governed Draft proposal
+  request, direct mutation fails closed, and the historical V2 mutation entry
+  point is retired. No migration or semantic apply was executed.
+- Task 0.3 remains open by design: current disjoint Product/Specimen payload
+  tests do not choose lifecycle or ownership policy. No semantic type,
+  relation, row or payload was changed to force a decision.
+- The structural ownership portion of the approved Phase 0 slice is
+  implemented as a read-only Graph-canonical context with explicitly labelled
+  compatibility fallback and fail-closed conflict handling.
+- The current public projection portion is implemented for Authority, Media,
+  Knowledge, Evidence and related REST projections: internal UUID/stable-key
+  fields and UUID relationship payloads are omitted. Durable public identity
+  storage/history remains a later P1 boundary.
+
+Evidence: isolated unit suite `217` tests / `1163` assertions, Composer PHP
+lint and `git diff --check` pass. Database-backed integration, live preflight
+and HTTP evidence remain unavailable. The concurrent Article Ingest files and
+untracked MCP plan were not included.
+
 ## Phase 1 — Durable public identity foundations
 
 ### Task 1.1 — Persist public identity and historic slug lifecycle

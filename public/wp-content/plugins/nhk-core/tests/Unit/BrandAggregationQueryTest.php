@@ -28,9 +28,9 @@ final class BrandAggregationQueryTest extends TestCase
 
         $result = (new BrandAggregationQuery($graph, $authority, $types))->forBrand($brand->canonicalId);
 
-        self::assertSame($model->canonicalId, $result['models'][0]['id']);
+        self::assertArrayNotHasKey('id', $result['models'][0]);
         self::assertSame('DIRECT', $result['models'][0]['origin']['kind']);
-        self::assertSame($variant->canonicalId, $result['variants'][0]['id']);
+        self::assertArrayNotHasKey('id', $result['variants'][0]);
         self::assertSame(['variant_of', 'model_of'], $result['variants'][0]['origin']['path']);
         self::assertSame([], $result['movements']);
     }

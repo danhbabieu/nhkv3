@@ -5,7 +5,6 @@ namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
-use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Graph\BrandAggregationQuery;
 
 final class PublicEntityCollectionQuery
@@ -62,8 +61,7 @@ final class PublicEntityCollectionQuery
         $identity = $this->identity->resolve($entity);
         $path = $identity === null ? null : $this->routes->path($entity);
         if ($identity === null || $path === null) return null;
-        $definition = $this->types->get($entity->entityType);
-        $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true));
+        $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
         $item = [...$identity, 'payload' => $payload, 'url' => $path];
         if ($this->aggregation !== null && $entity->entityType === 'brand') $item['aggregation'] = $this->aggregation->forBrand($entity->canonicalId);

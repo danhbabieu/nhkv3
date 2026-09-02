@@ -32,7 +32,7 @@ final class SearchApi
         $posts = new \WP_Query(['post_type' => 'post', 'post_status' => 'publish', 's' => $term, 'posts_per_page' => $perPage, 'paged' => $page, 'ignore_sticky_posts' => true]);
         $groups = ['posts' => array_map(static fn (\WP_Post $post): array => ['type' => 'post', 'id' => (string) $post->ID, 'title' => get_the_title($post), 'url' => get_permalink($post), 'excerpt' => wp_trim_words(wp_strip_all_tags(get_the_excerpt($post)), 28), 'date' => get_the_date('c', $post)], $posts->posts)];
         $groups['entities'] = [];
-        if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->types->all() as $definition) foreach (($this->collection?->archive($definition->type, 1, 100, $term)['items'] ?? []) as $item) $groups['entities'][] = ['type' => $item['type'], 'id' => $item['id'], 'title' => $item['name'], 'stable_key' => $item['stable_key'], 'url' => home_url($item['url'])];
+        if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->types->all() as $definition) foreach (($this->collection?->archive($definition->type, 1, 100, $term)['items'] ?? []) as $item) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => home_url($item['url'])];
         $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $item->active && $item->readiness === 'ready' && $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
         $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $this->matches($term, $item->title, $item->externalVideoId, $item->canonicalUrl)))) : [];
         $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $item->active && $item->isPublic() && $this->matches($term, $item->claimText, $item->stableKey)))) : [];
@@ -46,7 +46,7 @@ final class SearchApi
     }
 
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
-    private function media(Media $item): array { return ['type' => 'media', 'id' => $item->canonicalId, 'title' => $item->canonicalName, 'stable_key' => $item->stableKey]; }
-    private function video(Video $item): array { return ['type' => 'video', 'id' => $item->canonicalId, 'title' => $item->title, 'platform' => $item->platform, 'url' => $item->canonicalUrl]; }
-    private function claim(KnowledgeClaim $item): array { return ['type' => 'knowledge', 'id' => $item->canonicalId, 'title' => $item->claimText, 'stable_key' => $item->stableKey]; }
+    private function media(Media $item): array { return ['type' => 'media', 'title' => $item->canonicalName]; }
+    private function video(Video $item): array { return ['type' => 'video', 'title' => $item->title, 'platform' => $item->platform, 'url' => $item->canonicalUrl]; }
+    private function claim(KnowledgeClaim $item): array { return ['type' => 'knowledge', 'title' => $item->claimText]; }
 }

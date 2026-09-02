@@ -216,9 +216,8 @@ final class FrontendContractTest extends TestCase
     public function test_public_knowledge_read_api_exposes_reader_safe_evidence_detail(): void
     {
         $readApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php');
-        self::assertStringContainsString("'/knowledge/evidence/(?P<id>[0-9A-Fa-f-]{36})'", $readApi);
-        self::assertStringContainsString('function evidenceRead(\\WP_REST_Request $request)', $readApi);
-        self::assertStringContainsString("'nhk_evidence_not_found'", $readApi);
+        self::assertStringNotContainsString("'/knowledge/evidence/", $readApi);
+        self::assertStringNotContainsString('function evidenceRead(\\WP_REST_Request $request)', $readApi);
         self::assertStringNotContainsString("'metadata' =>", $readApi);
     }
 
@@ -345,9 +344,8 @@ final class FrontendContractTest extends TestCase
 
     public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
     {
-        foreach ([dirname(__DIR__, 2) . '/src/Application/Entity/EntityPageQuery.php', dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php'] as $file) {
-            self::assertStringContainsString('array_intersect_key($entity->payload', (string) file_get_contents($file), $file . ' must allowlist public entity payload fields');
-        }
+        $contract = dirname(__DIR__, 2) . '/src/Application/Entity/PublicIdentityContract.php';
+        self::assertStringContainsString('array_intersect_key($entity->payload', (string) file_get_contents($contract), $contract . ' must allowlist public entity payload fields');
     }
 
     public function test_public_entity_api_has_fail_closed_authority_storage_guard(): void
@@ -365,7 +363,7 @@ final class FrontendContractTest extends TestCase
         foreach (["'storage_key'", "'checksum'", "'visibility'", "'metadata'"] as $field) {
             self::assertStringNotContainsString($field, $assetMethod, 'public media API exposes internal asset field: ' . $field);
         }
-        self::assertStringContainsString("'public_url' => '/media/asset/'", $assetMethod);
+        self::assertStringNotContainsString("'public_url' => '/media/asset/'", $assetMethod);
     }
 
     public function test_public_media_serializers_do_not_expose_lifecycle_fields(): void

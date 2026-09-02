@@ -48,10 +48,8 @@ final class BrandAggregationQuery
     /** @return list<GraphEdge> */
     private function edges(string $type, string $id, bool $outgoing, string $predicate): array
     {
-        try {
-            $page = $outgoing ? $this->graph->findOutgoing(new NodeReference($type, $id), $predicate, 0, 200) : $this->graph->findIncoming(new NodeReference($type, $id), $predicate, 0, 200);
-            return array_values(array_filter($page['items'], static fn (GraphEdge $edge): bool => $edge->isActive()));
-        } catch (\Throwable) { return []; }
+        $page = $outgoing ? $this->graph->findOutgoing(new NodeReference($type, $id), $predicate, 0, 200) : $this->graph->findIncoming(new NodeReference($type, $id), $predicate, 0, 200);
+        return array_values(array_filter($page['items'], static fn (GraphEdge $edge): bool => $edge->isActive()));
     }
 
     private function entity(string $type, string $id): ?AuthorityEntity
@@ -64,7 +62,7 @@ final class BrandAggregationQuery
     /** @return array<string,mixed> */
     private function item(AuthorityEntity $entity, string $kind, array $path): array
     {
-        $item = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'origin' => ['kind' => $kind, 'path' => $path]];
+        $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'origin' => ['kind' => $kind, 'path' => $path]];
         $url = $this->routes?->path($entity);
         if ($url !== null) $item['url'] = $url;
         return $item;

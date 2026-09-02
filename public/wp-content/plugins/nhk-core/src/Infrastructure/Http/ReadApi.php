@@ -10,8 +10,8 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
+use NHK\Core\Application\Entity\PublicRouteResolver;
 
 final class ReadApi
 {
@@ -19,65 +19,50 @@ final class ReadApi
 
     public function register(): void
     {
-        register_rest_route('nhk/v1', '/media/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->media($request)]);
-        register_rest_route('nhk/v1', '/video/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->video($request)]);
-        register_rest_route('nhk/v1', '/knowledge/claim/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->claim($request)]);
-        register_rest_route('nhk/v1', '/knowledge/source/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->source($request)]);
-        register_rest_route('nhk/v1', '/knowledge/evidence/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->evidenceRead($request)]);
+        register_rest_route('nhk/v1', '/media/(?P<key>[a-z0-9][a-z0-9._:-]{0,190})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->media($request)]);
+        register_rest_route('nhk/v1', '/video/(?P<slug>[a-z0-9_-]{1,190})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->video($request)]);
+        register_rest_route('nhk/v1', '/knowledge/claim/(?P<key>[a-z0-9][a-z0-9._:-]{0,190})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->claim($request)]);
+        register_rest_route('nhk/v1', '/knowledge/source/(?P<key>[a-z0-9][a-z0-9._:-]{0,190})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->source($request)]);
     }
 
     private function media(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->mediaStorageReady(), 'media')) return $error;
-        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
-        $media = $this->media->findByCanonicalId((string) $request['id']);
+        $media = $this->media->findByStableKey((string) $request['key']);
         if (!$media || !$media->active || $media->readiness !== 'ready') return new \WP_Error('nhk_media_not_found', 'Media was not found.', ['status' => 404]);
         $assets = array_values(array_filter($this->assets->listByMediaId($media->canonicalId), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
-        return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($media->canonicalId))];
+        return ['name' => $media->canonicalName, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($media->canonicalId))];
     }
 
     private function video(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->videoStorageReady(), 'video')) return $error;
-        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
-        $video = $this->videos->findByCanonicalId((string) $request['id']);
+        $slug = trim((string) $request['slug']);
+        $matches = array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && PublicRouteResolver::videoPath($item->title, $item->externalVideoId) === '/' . $slug . '/'));
+        $video = count($matches) === 1 ? $matches[0] : null;
         if (!$video || !$video->active || !$video->hasValidPublicReference()) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
-        return ['id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title];
+        return ['platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title];
     }
 
     private function claim(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
-        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
-        $claim = $this->claims->findByCanonicalId((string) $request['id']);
+        $claim = $this->claims->findByStableKey((string) $request['key']);
         if (!$claim || !$claim->active || !$claim->isPublic()) return new \WP_Error('nhk_claim_not_found', 'Knowledge claim was not found.', ['status' => 404]);
-        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map($this->evidence(...), $this->publicEvidenceByClaim($claim->canonicalId))];
+        return ['text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map($this->evidence(...), $this->publicEvidenceByClaim($claim->canonicalId))];
     }
 
     private function source(\WP_REST_Request $request): array|\WP_Error
     {
         if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
-        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
-        $source = $this->sources->findByCanonicalId((string) $request['id']);
+        $source = $this->sources->findByStableKey((string) $request['key']);
         if (!$source || !$source->active || !$source->isPublic()) return new \WP_Error('nhk_source_not_found', 'Source was not found.', ['status' => 404]);
-        return ['id' => $source->canonicalId, 'stable_key' => $source->stableKey, 'title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'evidence' => array_map($this->evidence(...), array_values(array_filter($this->evidence->listBySource($source->canonicalId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $claim = $this->claims->findByCanonicalId($item->claimId); return $claim !== null && $claim->active && $claim->isPublic(); })) )];
+        return ['title' => $source->title, 'type' => $source->sourceType, 'locator' => $source->locator, 'evidence' => array_map($this->evidence(...), array_values(array_filter($this->evidence->listBySource($source->canonicalId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $claim = $this->claims->findByCanonicalId($item->claimId); return $claim !== null && $claim->active && $claim->isPublic(); })) )];
     }
 
-    private function evidenceRead(\WP_REST_Request $request): array|\WP_Error
-    {
-        if ($error = $this->unavailable(!$this->status || $this->status->knowledgeStorageReady(), 'knowledge')) return $error;
-        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_evidence_not_found', 'Evidence was not found.', ['status' => 404]);
-        $item = $this->evidence->findByCanonicalId((string) $request['id']);
-        if (!$item || !$item->active || !$item->isPublic()) return new \WP_Error('nhk_evidence_not_found', 'Evidence was not found.', ['status' => 404]);
-        $claim = $this->claims->findByCanonicalId($item->claimId);
-        $source = $this->sources->findByCanonicalId($item->sourceId);
-        if (!$claim || !$claim->active || !$claim->isPublic() || !$source || !$source->active || !$source->isPublic()) return new \WP_Error('nhk_evidence_not_found', 'Evidence was not found.', ['status' => 404]);
-        return $this->evidence($item) + ['source_title' => $source->title, 'source_type' => $source->sourceType, 'source_locator' => $source->locator];
-    }
-
-    private function asset(MediaAsset $asset): array { return ['id' => $asset->assetId, 'kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'public_url' => '/media/asset/' . $asset->assetId . '/']; }
-    private function usage(MediaUsage $usage): array { return ['id' => $usage->usageId, 'role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
-    private function evidence(Evidence $evidence): array { return ['id' => $evidence->canonicalId, 'claim_id' => $evidence->claimId, 'source_id' => $evidence->sourceId, 'relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator]; }
+    private function asset(MediaAsset $asset): array { return ['kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
+    private function usage(MediaUsage $usage): array { return ['role' => $usage->role, 'sort_order' => $usage->sortOrder]; }
+    private function evidence(Evidence $evidence): array { return ['relation' => $evidence->relation, 'excerpt' => $evidence->excerpt, 'locator' => $evidence->locator]; }
     private function publicEvidenceByClaim(string $claimId): array { return array_values(array_filter($this->evidence->listByClaim($claimId), function (Evidence $item): bool { if (!$item->active || !$item->isPublic()) return false; $source = $this->sources->findByCanonicalId($item->sourceId); return $source !== null && $source->active && $source->isPublic(); })); }
     private function unavailable(bool $ready, string $domain): ?\WP_Error { return $ready ? null : new \WP_Error('nhk_storage_unavailable', ucfirst($domain) . ' storage is not ready.', ['status' => 503]); }
 }

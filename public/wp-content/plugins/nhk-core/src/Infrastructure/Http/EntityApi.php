@@ -5,9 +5,9 @@ namespace NHK\Core\Infrastructure\Http;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Application\Entity\PublicEntityCollectionQuery;
+use NHK\Core\Application\Entity\PublicIdentityContract;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EntityApi
 {
@@ -15,7 +15,7 @@ final class EntityApi
 
     public function register(): void
     {
-        register_rest_route('nhk/v1', '/entity/(?P<type>[a-z][a-z0-9_]{0,63})/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->detail($request)]);
+        register_rest_route('nhk/v1', '/entity/(?P<type>[a-z][a-z0-9_]{0,63})/(?P<key>[a-z0-9][a-z0-9._:-]{0,190})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn (\WP_REST_Request $request) => $this->detail($request)]);
         register_rest_route('nhk/v1', '/entity/(?P<type>[a-z][a-z0-9_]{0,63})', ['methods' => 'GET', 'permission_callback' => '__return_true', 'args' => ['page' => ['default' => 1], 'per_page' => ['default' => 24]], 'callback' => fn (\WP_REST_Request $request) => $this->list($request)]);
     }
 
@@ -24,10 +24,10 @@ final class EntityApi
         if ($error = $this->unavailable()) return $error;
         $type = (string) $request['type'];
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
-        if (!UuidCodec::isValid((string) $request['id'])) return new \WP_Error('nhk_entity_not_found', 'Entity was not found.', ['status' => 404]);
-        $item = $this->collection?->detail($type, (string) $request['id']);
+        $key = (string) $request['key'];
+        $item = $this->collection?->detail($type, $key);
         if ($item === null) {
-            $entity = $this->authority->findByCanonicalId((string) $request['id']);
+            $entity = $this->authority->findByStableKey($type, $key);
             if (!$entity || $entity->entityType !== $type || !$entity->active()) return new \WP_Error('nhk_entity_not_found', 'Entity was not found.', ['status' => 404]);
             return $this->serialize($entity);
         }
@@ -46,6 +46,6 @@ final class EntityApi
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => count($all), 'items' => array_map($this->serialize(...), $items)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { $definition = $this->types->get($entity->entityType); $payload = array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true)); return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'payload' => $payload]; }
+    private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); return ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; }
     private function unavailable(): ?\WP_Error { return $this->status && !$this->status->authorityStorageReady() ? new \WP_Error('nhk_storage_unavailable', 'Authority storage is not ready.', ['status' => 503]) : null; }
 }

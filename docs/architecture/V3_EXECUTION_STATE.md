@@ -20,6 +20,45 @@ performed no database, Graph, WordPress, migration, seed, repair or legacy
 article-body mutation. The next approved implementation gate is **Phase 0 —
 P0 integrity fixes**; it does not authorize Graph backfill.
 
+## Phase 0 P0 integrity implementation checkpoint — 2026-09-02
+
+The Phase 0 implementation was performed against the sole normative
+Constitution at audited baseline `8d480a2`, in an isolated temporary clone so
+the concurrent Article Ingest changes and untracked MCP plan in the official
+workspace remained untouched. The Constitution file is unchanged.
+
+Completed code boundaries:
+
+- Graph-derived Related Content, Brand Aggregation and Structural Context
+  readers now propagate infrastructure/programming failures; only an honest
+  empty Graph result remains empty.
+- Post→Knowledge no longer has a direct Graph mutation boundary. Callers can
+  request a Draft `relation_create` proposal with idempotency/fingerprint
+  binding; the historical `V2MigrationService::apply()` writer is retired and
+  fails closed. No migration was executed.
+- Structural reads use Graph as canonical truth. A single safe payload parent
+  is labelled `COMPATIBILITY_PAYLOAD`, `canonical=false` and
+  `DATA_COMPATIBILITY_GAP`; missing, inactive, ambiguous and Graph/payload
+  conflict cases fail closed. No edge or payload was changed.
+- Public Authority, Media, Knowledge, Evidence and related projections omit
+  internal UUID/stable-key fields and UUID relationship payload fields. Public
+  entity REST detail now resolves stable keys; direct public Evidence REST
+  lookup was removed because Evidence has no durable public key. Admin/MCP
+  diagnostics and Governance contracts retain internal identifiers.
+- Product and Specimen remain separate registry types with disjoint current
+  payload ownership tests. The required lifecycle/ownership decision for
+  multiple listings, physical condition/observation and Product-without-
+  Specimen remains a human architecture gate.
+
+Local evidence in the isolated clone: `217` unit tests / `1163` assertions,
+Composer PHP lint, and `git diff --check` pass. Full runtime/preflight and
+guarded integration evidence remain limited by the unavailable local
+WordPress/database runtime. No database, WordPress Post, Graph edge, slug,
+redirect, migration, seed, repair or legacy article-body operation was run.
+Phase 0 is therefore **PARTIAL / blocked at the Product-Specimen human gate**;
+the remaining P1 durable public identity/history work is not authorized by
+this checkpoint.
+
 ## Current checkpoint — 2026-09-02
 
 Single-Constitution finalization checkpoint, 2026-09-02: the later

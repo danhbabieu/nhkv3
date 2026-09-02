@@ -23,9 +23,7 @@ final class ComparisonPageQuery
         $entity = $this->entities->detail(rawurldecode($parts[0]), rawurldecode($parts[1]));
         if (!is_array($entity)) return null;
         return [
-            'id' => (string) ($entity['id'] ?? ''),
             'type' => (string) ($entity['type'] ?? ''),
-            'stable_key' => (string) ($entity['stable_key'] ?? ''),
             'name' => (string) ($entity['name'] ?? ''),
             'payload' => is_array($entity['payload'] ?? null) ? $entity['payload'] : [],
         ];

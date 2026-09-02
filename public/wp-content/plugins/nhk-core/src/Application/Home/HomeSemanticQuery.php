@@ -19,7 +19,7 @@ final class HomeSemanticQuery
         if ($this->ready('authority')) {
             foreach ($this->types->all() as $definition) {
                 foreach ($this->collection()->archive($definition->type, 1, 6)['items'] as $item) {
-                    $modules['entities'][] = ['type' => $item['type'], 'id' => $item['id'], 'title' => $item['name'], 'url' => home_url($item['url'])];
+                    $modules['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => home_url($item['url'])];
                     if (count($modules['entities']) >= 6) break 2;
                 }
             }
@@ -28,7 +28,7 @@ final class HomeSemanticQuery
             foreach ($this->media->list() as $item) {
                 if (!$item->active || $item->readiness !== 'ready') continue;
                 $path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId); if ($path === null) continue;
-                $modules['media'][] = ['id' => $item->canonicalId, 'title' => $item->canonicalName, 'url' => home_url($path)];
+                $modules['media'][] = ['title' => $item->canonicalName, 'url' => home_url($path)];
                 if (count($modules['media']) >= 4) break;
             }
         }
@@ -36,7 +36,7 @@ final class HomeSemanticQuery
             foreach ($this->videos->list() as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
                 $path = PublicRouteResolver::videoPath($item->title, $item->externalVideoId); if ($path === null) continue;
-                $modules['videos'][] = ['id' => $item->canonicalId, 'title' => $item->title ?: 'Video NHK', 'platform' => $item->platform, 'url' => home_url($path)];
+                $modules['videos'][] = ['title' => $item->title ?: 'Video NHK', 'platform' => $item->platform, 'url' => home_url($path)];
                 if (count($modules['videos']) >= 4) break;
             }
         }

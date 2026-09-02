@@ -49,7 +49,7 @@ final class RelatedContentQueryTest extends TestCase
         $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
         $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId);
         $expectedUrl = function_exists('home_url') ? home_url('/odo/calibre-1/') : '/odo/calibre-1/';
-        self::assertSame([['type' => 'model', 'id' => $model->canonicalId, 'title' => 'Calibre 1', 'url' => $expectedUrl]], $related['entities']);
+        self::assertSame([['type' => 'model', 'title' => 'Calibre 1', 'url' => $expectedUrl]], $related['entities']);
         self::assertSame([], $related['articles']); self::assertSame([], $related['media']); self::assertSame([], $related['videos']);
     }
 
@@ -68,7 +68,7 @@ final class RelatedContentQueryTest extends TestCase
 
         $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forPost(42);
 
-        self::assertSame([['type' => 'brand', 'id' => $brand->canonicalId, 'title' => 'Odo', 'url' => function_exists('home_url') ? home_url('/odo/') : '/odo/']], $related['entities']);
+        self::assertSame([['type' => 'brand', 'title' => 'Odo', 'url' => function_exists('home_url') ? home_url('/odo/') : '/odo/']], $related['entities']);
         self::assertSame([], $related['articles']);
     }
 

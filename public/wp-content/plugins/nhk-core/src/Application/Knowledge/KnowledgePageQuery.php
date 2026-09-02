@@ -24,18 +24,18 @@ final class KnowledgePageQuery
             $source = $this->sources->findByCanonicalId($item->sourceId);
             return $source !== null && $source->active && $source->isPublic();
         }));
-        return ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
+        return ['text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => array_map(function (Evidence $item): array { return $this->evidence($item, $this->sources->findByCanonicalId($item->sourceId)); }, $evidence)];
     }
 
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */
     public function archive(int $page = 1, int $perPage = 24): array
     {
         if (!$this->available()) return ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'items' => []];
-        $items = array_map(fn (KnowledgeClaim $claim): array => ['id' => $claim->canonicalId, 'stable_key' => $claim->stableKey, 'text' => $claim->claimText, 'type' => $claim->claimType], array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic())));
+        $items = array_map(fn (KnowledgeClaim $claim): array => ['text' => $claim->claimText, 'type' => $claim->claimType], array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic())));
         $page = max(1, $page); $perPage = min(100, max(1, $perPage));
         return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
     private function available(): bool { return !$this->status || $this->status->knowledgeStorageReady(); }
-    private function evidence(Evidence $item, ?Source $source = null): array { return ['id' => $item->canonicalId, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator]; }
+    private function evidence(Evidence $item, ?Source $source = null): array { return ['source_title' => $source?->title, 'source_type' => $source?->sourceType, 'source_locator' => $source?->locator, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator]; }
 }

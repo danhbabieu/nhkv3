@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Application\Graph\StructuralContextQuery;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -23,7 +24,7 @@ final class PublicRouteResolver
         'brand', 'model', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'comparison',
     ];
 
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
@@ -34,12 +35,14 @@ final class PublicRouteResolver
         if ($slug === '') return null;
         if ($entity->entityType === 'brand') return in_array($slug, self::RESERVED_ROOTS, true) || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) ? null : '/' . $slug . '/';
         if ($entity->entityType === 'model') {
-            $brand = $this->parent($entity, 'brand_uuid', 'brand');
-            return $brand && $this->uniqueChildAvailable($entity->entityType, $slug, 'brand_uuid', $brand->canonicalId, $entity->canonicalId) ? $this->path($brand) . $slug . '/' : null;
+            $context = $this->context($entity);
+            $brand = $context === null ? $this->parent($entity, 'brand_uuid', 'brand') : ($context->brandId === null || $context->reasons !== [] ? null : $this->authority->findByCanonicalId($context->brandId));
+            return $brand && $brand->entityType === 'brand' && $brand->active() && $this->uniqueChildAvailable($entity->entityType, $slug, $brand->canonicalId, $entity->canonicalId) ? $this->path($brand) . $slug . '/' : null;
         }
         if ($entity->entityType === 'variant') {
-            $model = $this->parent($entity, 'model_uuid', 'model');
-            return $model && $this->uniqueChildAvailable($entity->entityType, $slug, 'model_uuid', $model->canonicalId, $entity->canonicalId) ? $this->path($model) . $slug . '/' : null;
+            $context = $this->context($entity);
+            $model = $context === null ? $this->parent($entity, 'model_uuid', 'model') : ($context->modelId === null || $context->reasons !== [] ? null : $this->authority->findByCanonicalId($context->modelId));
+            return $model && $model->entityType === 'model' && $model->active() && $this->uniqueChildAvailable($entity->entityType, $slug, $model->canonicalId, $entity->canonicalId) ? $this->path($model) . $slug . '/' : null;
         }
         $namespace = self::NAMESPACES[$entity->entityType] ?? null;
         return $namespace === null || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) ? null : '/' . $namespace . '/' . $slug . '/';
@@ -79,12 +82,12 @@ final class PublicRouteResolver
         if ($type === 'brand' && count($slugs) === 1) return $this->unique($type, $slugs[0]);
         if ($type === 'model' && count($slugs) === 2) {
             $brand = $this->unique('brand', $slugs[0]);
-            return $brand ? $this->uniqueChild('model', $slugs[1], 'brand_uuid', $brand->canonicalId) : null;
+            return $brand ? $this->uniqueChild('model', $slugs[1], $brand->canonicalId) : null;
         }
         if ($type === 'variant' && count($slugs) === 3) {
             $brand = $this->unique('brand', $slugs[0]);
-            $model = $brand ? $this->uniqueChild('model', $slugs[1], 'brand_uuid', $brand->canonicalId) : null;
-            return $model ? $this->uniqueChild('variant', $slugs[2], 'model_uuid', $model->canonicalId) : null;
+            $model = $brand ? $this->uniqueChild('model', $slugs[1], $brand->canonicalId) : null;
+            return $model ? $this->uniqueChild('variant', $slugs[2], $model->canonicalId) : null;
         }
         if (isset(self::NAMESPACES[$type], $slugs[1]) && count($slugs) === 2 && $slugs[0] === self::NAMESPACES[$type]) return $this->unique($type, $slugs[1]);
         return null;
@@ -109,9 +112,9 @@ final class PublicRouteResolver
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    private function uniqueChild(string $type, string $slug, string $field, string $parentId, ?string $excludeId = null): ?AuthorityEntity
+    private function uniqueChild(string $type, string $slug, string $parentId, ?string $excludeId = null): ?AuthorityEntity
     {
-        $matches = array_values(array_filter($this->authority->listByType($type), static fn (AuthorityEntity $item): bool => $item->active() && self::slug($item->canonicalName) === $slug && (string) ($item->payload[$field] ?? '') === $parentId && ($excludeId === null || $item->canonicalId !== $excludeId)));
+        $matches = array_values(array_filter($this->authority->listByType($type), fn (AuthorityEntity $item): bool => $item->active() && self::slug($item->canonicalName) === $slug && $this->parentForRoute($item) === $parentId && ($excludeId === null || $item->canonicalId !== $excludeId)));
         return count($matches) === 1 ? $matches[0] : null;
     }
 
@@ -123,10 +126,10 @@ final class PublicRouteResolver
         return true;
     }
 
-    private function uniqueChildAvailable(string $type, string $slug, string $field, string $parentId, string $id): bool
+    private function uniqueChildAvailable(string $type, string $slug, string $parentId, string $id): bool
     {
         foreach ($this->authority->listByType($type) as $item) {
-            if ($item->active() && $item->canonicalId !== $id && self::slug($item->canonicalName) === $slug && (string) ($item->payload[$field] ?? '') === $parentId) return false;
+            if ($item->active() && $item->canonicalId !== $id && self::slug($item->canonicalName) === $slug && $this->parentForRoute($item) === $parentId) return false;
         }
         return true;
     }
@@ -135,5 +138,18 @@ final class PublicRouteResolver
     {
         $id = (string) ($entity->payload[$field] ?? '');
         return UuidCodec::isValid($id) ? (($parent = $this->authority->findByCanonicalId($id)) && $parent->entityType === $type && $parent->active() ? $parent : null) : null;
+    }
+
+    private function context(AuthorityEntity $entity): ?\NHK\Core\Application\Graph\StructuralContext
+    {
+        if ($this->contexts === null) return null;
+        return $entity->entityType === 'model' ? $this->contexts->forModel($entity->canonicalId) : $this->contexts->forVariant($entity->canonicalId);
+    }
+
+    private function parentForRoute(AuthorityEntity $entity): ?string
+    {
+        $context = $this->context($entity);
+        if ($context !== null) return $entity->entityType === 'model' ? $context->brandId : $context->modelId;
+        return (string) ($entity->payload[$entity->entityType === 'model' ? 'brand_uuid' : 'model_uuid'] ?? '') ?: null;
     }
 }

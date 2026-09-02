@@ -23,8 +23,6 @@ final class PublicEntityEligibilityPolicy
         $parentResult = $this->parentResult($entity);
         if ($parentResult !== null) {
             if (!$parentResult->eligible) return $parentResult;
-            $graphConflict = $this->graphConflict($entity);
-            if ($graphConflict !== null) return $graphConflict;
             $result = $this->needsCompatibilityWarning($entity) ? PublicEligibilityResult::eligible()->withWarning('DATA_COMPATIBILITY_GAP') : PublicEligibilityResult::eligible();
         } else {
             $result = PublicEligibilityResult::eligible();
@@ -36,6 +34,11 @@ final class PublicEntityEligibilityPolicy
 
     private function parentResult(AuthorityEntity $entity): ?PublicEligibilityResult
     {
+        if ($this->contexts !== null && in_array($entity->entityType, ['model', 'variant'], true)) {
+            $context = $entity->entityType === 'model' ? $this->contexts->forModel($entity->canonicalId) : $this->contexts->forVariant($entity->canonicalId);
+            if ($context->reasons !== []) return PublicEligibilityResult::blocked(...$context->reasons);
+            return PublicEligibilityResult::eligible();
+        }
         $field = match ($entity->entityType) {
             'model' => ['brand_uuid', 'brand'],
             'variant' => ['model_uuid', 'model'],
@@ -56,13 +59,4 @@ final class PublicEntityEligibilityPolicy
         return $context->relationPath === [];
     }
 
-    private function graphConflict(AuthorityEntity $entity): ?PublicEligibilityResult
-    {
-        if ($this->contexts === null) return null;
-        $context = $entity->entityType === 'model' ? $this->contexts->forModel($entity->canonicalId) : $this->contexts->forVariant($entity->canonicalId);
-        if (in_array('STRUCTURAL_PARENT_AMBIGUOUS', $context->reasons, true)) return PublicEligibilityResult::blocked('STRUCTURAL_PARENT_AMBIGUOUS');
-        $payloadParent = (string) ($entity->payload[$entity->entityType === 'model' ? 'brand_uuid' : 'model_uuid'] ?? '');
-        $graphParent = $entity->entityType === 'model' ? $context->brandId : $context->modelId;
-        return $graphParent !== null && $graphParent !== $payloadParent ? PublicEligibilityResult::blocked('STRUCTURAL_PARENT_AMBIGUOUS') : null;
-    }
 }

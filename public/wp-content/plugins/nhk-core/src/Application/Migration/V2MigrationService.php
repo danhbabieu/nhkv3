@@ -57,6 +57,8 @@ final class V2MigrationService
     /** @param list<array<string,mixed>> $records */
     public function apply(array $records, int $batchNo = 1, int $limit = 100): array
     {
+        throw new \NHK\Core\Governance\Exception\GovernanceException('The historical V2 migration writer is retired and unavailable in the current Constitution scope.');
+
         $processed = 0; $migrated = 0; $skipped = 0; $conflict = 0; $reviewByAction = [];
         foreach ($records as $record) {
             if ($processed >= $limit) break;

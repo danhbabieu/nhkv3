@@ -339,3 +339,26 @@ The single next implementation phase is **PHASE 0 — P0 integrity fixes**:
 fail-loud reader behavior, semantic-write boundary closure, the
 Product/Specimen human decision gate and read-only structural diagnostics. It
 does not include Graph backfill.
+
+## Phase 0 implementation result — 2026-09-02
+
+The Phase 0 code review and tests were completed against audited baseline
+`8d480a2` without modifying the Constitution. The implementation is
+**PARTIAL** because the Product/Specimen lifecycle and ownership decision
+remains an explicit human gate.
+
+| ITEM | RESULT | EVIDENCE / LIMIT |
+|---|---|---|
+| P0-1 fail-loud Graph readers | IMPLEMENTED | Related Content, Brand Aggregation and Structural Context no longer convert Graph failures to empty success; injected-failure and honest-empty unit coverage passes. |
+| P0-2 Governance bypasses | IMPLEMENTED / RETIRED | Post→Knowledge requests a Draft governed relation proposal; direct `link()` fails closed; historical V2 writer entry point is unavailable. No migration or apply was executed. |
+| P0-3 Product/Specimen ownership | HUMAN GATE OPEN | Current disjoint payload tests remain; lifecycle/condition/observation and multi-listing ownership are intentionally not chosen by code. |
+| P0-4 structural ownership | IMPLEMENTED / DATA UNVERIFIED | Graph is canonical; safe payload fallback is explicitly non-canonical and warned; conflict/missing/inactive/ambiguous paths fail closed. Historical/current physical rows remain unverified and untouched. |
+| P0-5 public identity leakage | IMPLEMENTED FOR CURRENT PROJECTIONS | Public serializers and public REST projections omit UUID/stable-key fields and UUID relationship payload fields. Durable public identity/history remains P1; internal Admin/MCP diagnostic and Governance identifiers remain allowed. |
+
+Isolated local verification is `217` unit tests / `1163` assertions, Composer
+PHP lint pass and `git diff --check` pass. The local WordPress/database
+runtime was unavailable, so guarded integration, live preflight and HTTP
+parity remain unverified. No database, WordPress Post, Graph edge, slug,
+redirect, migration, seed, repair or legacy article-body operation was run.
+The Phase 0 gate remains **BLOCKED pending the P0-3 human architecture
+decision**, with no authorization for data repair or Graph backfill.

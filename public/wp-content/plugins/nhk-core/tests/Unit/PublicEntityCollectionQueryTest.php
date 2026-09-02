@@ -35,7 +35,8 @@ final class PublicEntityCollectionQueryTest extends TestCase
 
         self::assertSame(1, $archive['total']);
         self::assertSame('/brand-one/', $archive['items'][0]['url']);
-        self::assertSame($brand->canonicalId, $archive['items'][0]['id']);
+        self::assertArrayNotHasKey('id', $archive['items'][0]);
+        self::assertArrayNotHasKey('stable_key', $archive['items'][0]);
     }
 
     public function test_detail_and_archive_apply_the_same_identity_and_eligibility_decisions(): void
@@ -47,7 +48,8 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertSame('/bo-may/cal-100/', $query->detail('movement', 'cal-100')['url']);
         self::assertSame('/bo-may/cal-100/', $query->archive('movement')['items'][0]['url']);
         self::assertNull($query->detail('movement', 'missing'));
-        self::assertSame($movement->canonicalId, $query->detail('movement', 'cal-100')['id']);
+        self::assertArrayNotHasKey('id', $query->detail('movement', 'cal-100'));
+        self::assertArrayNotHasKey('stable_key', $query->detail('movement', 'cal-100'));
     }
 
     public function test_archive_reports_unavailable_infrastructure_instead_of_masquerading_as_empty_data(): void

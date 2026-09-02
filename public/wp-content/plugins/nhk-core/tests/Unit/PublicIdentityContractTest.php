@@ -18,9 +18,7 @@ final class PublicIdentityContractTest extends TestCase
         $entity = (new AuthorityService(new InMemoryAuthorityRepository(), $types))->create('brand', 'nhk:brand:odo', 'Ô Đô');
 
         self::assertSame([
-            'id' => $entity->canonicalId,
             'type' => 'brand',
-            'stable_key' => 'nhk:brand:odo',
             'name' => 'Ô Đô',
             'slug' => 'o-do',
         ], (new PublicIdentityContract($types))->resolve($entity));
