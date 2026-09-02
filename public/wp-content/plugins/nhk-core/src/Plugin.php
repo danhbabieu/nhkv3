@@ -146,7 +146,6 @@ final class Plugin {
             });
             $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader());
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial);
-            McpAbilityRegistration::registerArticleAbilities($articleHandler);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();

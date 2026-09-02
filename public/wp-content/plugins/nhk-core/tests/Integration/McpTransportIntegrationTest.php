@@ -61,6 +61,8 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $read->get_meta_item('annotations'));
         self::assertNull(wp_get_ability('nhk-v3/media-ingest'));
         self::assertNull(wp_get_ability('nhk-v3/proposal-create'));
+        self::assertNull(wp_get_ability('nhk-v3/article-preflight'));
+        self::assertNull(wp_get_ability('nhk-v3/article-ingest'));
         $administrator = get_role('administrator');
         self::assertNotNull($administrator);
         $administrator->add_cap('read');

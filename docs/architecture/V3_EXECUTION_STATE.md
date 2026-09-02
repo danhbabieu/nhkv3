@@ -2369,3 +2369,22 @@ Video detail remains unavailable because the local query has no active Video row
   current HEAD at this checkpoint is `26d64ec`. No push was attempted after
   that policy block. The concurrent Article Ingest/MCP working-tree changes and
   untracked MCP plan remain preserved.
+
+## WordPress Ability registration hotfix — 2026-09-02
+
+The admin-screen notice was traced to Article Ingest being registered through
+`wp_register_ability()` during `rest_api_init`, after WordPress 6.9 had already
+closed the `wp_abilities_api_init` registration window. This affected only the
+unapproved Article Ability adapter; the approved WordPress Ability surface is
+the exact eight read-only abilities documented in the MCP contracts. The
+Article Ingest handler remains available through the governed MCP REST
+transport, but is no longer exposed as a WordPress Ability.
+
+Removed the late Article Ability registration path and added guarded
+integration assertions for the absence of `nhk-v3/article-preflight` and
+`nhk-v3/article-ingest`. Unit verification passes `246` tests / `1,269`
+assertions; PHP lint and `git diff --check` pass. The full suite still reports
+the repository's pre-existing unavailable WordPress/MySQL environment failures
+(`$wpdb` bootstrap errors and missing `NHK_WP_TEST_PATH`). No database,
+WordPress Post, semantic record, Graph edge, migration or external deployment
+was changed.

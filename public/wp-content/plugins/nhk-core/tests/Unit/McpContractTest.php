@@ -139,5 +139,7 @@ final class McpContractTest extends TestCase
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
+        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
+        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
     }
 }

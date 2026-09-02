@@ -63,31 +63,6 @@ final class McpAbilityRegistration
         }
     }
 
-    public static function registerArticleAbilities(McpArticleIngestHandler $article): void
-    {
-        if (!function_exists('wp_register_ability')) return;
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        foreach (['nhk.article.preflight', 'nhk.article.ingest'] as $toolName) {
-            $tool = $tools[$toolName] ?? null;
-            if (!is_array($tool)) continue;
-            $ingest = $toolName === 'nhk.article.ingest';
-            wp_register_ability($ingest ? 'nhk-v3/article-ingest' : 'nhk-v3/article-preflight', [
-                'label' => $ingest ? 'NHK Article Ingest' : 'NHK Article Preflight',
-                'description' => (string) $tool['description'],
-                'category' => self::CATEGORY,
-                'input_schema' => (array) $tool['inputSchema'],
-                'output_schema' => ['type' => 'object'],
-                'execute_callback' => static fn (mixed $input = null): mixed => self::executeArticle($article, $ingest, $input),
-                'permission_callback' => static fn (): bool => $ingest ? self::canIngest() : self::canRead(),
-                'meta' => [
-                    'public' => true,
-                    'show_in_rest' => true,
-                    'annotations' => ['readonly' => !$ingest, 'destructive' => false, 'idempotent' => true],
-                ],
-            ]);
-        }
-    }
-
     private static function execute(string $tool, McpReadHandler $read, mixed $input): mixed
     {
         $input = is_array($input) ? $input : [];
@@ -113,23 +88,6 @@ final class McpAbilityRegistration
     private static function canRead(): bool
     {
         return !function_exists('current_user_can') || current_user_can('read');
-    }
-
-    private static function canIngest(): bool
-    {
-        return !function_exists('current_user_can') || current_user_can('nhk_ingest_articles');
-    }
-
-    private static function executeArticle(McpArticleIngestHandler $article, bool $ingest, mixed $input): mixed
-    {
-        $input = is_array($input) ? $input : [];
-        try {
-            return $ingest ? $article->ingest($input) : $article->preflight($input);
-        } catch (\InvalidArgumentException $error) {
-            return new \WP_Error('nhk_mcp_invalid_input', $error->getMessage(), ['status' => 400]);
-        } catch (\Throwable) {
-            return new \WP_Error('nhk_mcp_article_unavailable', 'NHK Article operation is unavailable.', ['status' => 503]);
-        }
     }
 
     private static function label(string $tool): string
