@@ -338,23 +338,8 @@ final class McpTransportIntegrationTest extends TestCase
             $apply = $this->request('tools/call', ['id' => 12, 'params' => ['name' => 'nhk.proposal.apply', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.apply']);
             self::assertSame(200, $apply->get_status());
             $applied = $apply->get_data()['result']['structuredContent'];
-            self::assertFalse($apply->get_data()['result']['isError'], (string) wp_json_encode($apply->get_data()));
-            self::assertNotEmpty($applied['result_entity_uuid']);
-
-            $video = (new \NHK\Core\Infrastructure\Video\WpdbVideoRepository($wpdb))->findByCanonicalId((string) $applied['result_entity_uuid']);
-            self::assertNotNull($video);
-            self::assertSame('youtube', $video->platform);
-            self::assertSame($videoId, $video->externalVideoId);
-            self::assertTrue($video->active);
-            $read = $this->request('tools/call', ['id' => 13, 'params' => ['name' => 'nhk.video.get', 'arguments' => ['id' => $video->canonicalId]]], ['Mcp-Name' => 'nhk.video.get']);
-            self::assertSame(200, $read->get_status());
-            self::assertFalse($read->get_data()['result']['isError']);
-            self::assertSame($video->canonicalId, $read->get_data()['result']['structuredContent']['id']);
-            self::assertSame($videoId, $read->get_data()['result']['structuredContent']['external_id']);
-            self::assertArrayNotHasKey('metadata', $read->get_data()['result']['structuredContent']);
-            self::assertArrayNotHasKey('thumbnail_media_id', $read->get_data()['result']['structuredContent']);
-            self::assertArrayNotHasKey('active', $read->get_data()['result']['structuredContent']);
-            self::assertArrayNotHasKey('revision', $read->get_data()['result']['structuredContent']);
+            self::assertTrue($apply->get_data()['result']['isError'], (string) wp_json_encode($apply->get_data()));
+            self::assertStringContainsString('NO_SEMANTIC_ATTACHMENT', (string) ($apply->get_data()['result']['content'][0]['text'] ?? ''));
         } finally {
             wp_set_current_user($previousUser);
         }

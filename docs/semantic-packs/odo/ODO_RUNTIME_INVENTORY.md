@@ -1,8 +1,9 @@
 # Odo Runtime Inventory — Read-Only Checkpoint
 
-**Date:** 2026-09-03  
+**Date:** 2026-09-03 — local runtime recovery recheck
 **Status:** `RUNTIME_UNAVAILABLE` / `WORDPRESS_BOOTSTRAP_FAILED` — no runtime data mutation performed
-**Initial HEAD:** `02d7f3012e0b88ec011c66d130bd412fd059125a`
+**Requested continuation point:** `bbf6f12147d8ea015485fb756fd4d46357d10fcb`
+**Observed current HEAD:** `e356d53ed3f89cd8a22ef44f6090d7ce0ad76b1a` (contains `bbf6f12` plus later concurrent Video commits)
 **Pack checkpoint:** `6fd6cc3` (`docs: add Odo semantic reference pack`)
 
 ## Scope and evidence boundary
@@ -19,7 +20,19 @@ Evidence vocabulary used here is deliberately closed:
 - `RUNTIME_UNAVAILABLE`: the application read boundary could not be reached.
 - `WORDPRESS_BOOTSTRAP_FAILED`: WordPress could not establish its configured
   database connection.
-- `DESIGN_INPUT`: copied from the approved Odo pack/manifest only.
+- `RUNTIME_OBSERVED`: read from the live application read boundary after a
+  successful WordPress bootstrap; this is the only class that can establish
+  Odo runtime counts/references.
+- `DESIGN_INPUT`: copied from the approved Odo pack/manifest only; never runtime
+  evidence.
+- `COLLISION`: a runtime-observed canonical target collision, or a design-input
+  collision explicitly labelled as such.
+- `NON-COLLIDING`: a runtime-observed target with no active collision found.
+- `MERGE_CANDIDATE`: a possible identity merge that is not confirmed.
+- `CONFIRMED_MERGE`: an owner-confirmed same-identity merge decision; it is
+  still not permission to apply a mutation.
+- `RESEARCH_REQUIRED`: evidence is insufficient or the contract/registry is
+  unresolved; no inference is allowed.
 - `CODE_OBSERVED`: read from the current worktree's runtime code/contracts;
   this is not a runtime data fact.
 - `RUNTIME_UNVERIFIED`: a runtime record, count, revision, reference or
@@ -29,11 +42,39 @@ No direct SQL, WordPress write, semantic write, Graph mutation, migration,
 seed, repair, merge, rekey, retirement, Media/Video creation or Post mutation
 was performed.
 
+## Fresh local recovery recheck
+
+The exact Homebrew service was resolved before considering a restart:
+`mysql (homebrew.mxcl.mysql)`, loaded from
+`~/Library/LaunchAgents/homebrew.mxcl.mysql.plist`, with
+`/opt/homebrew/opt/mysql/bin/mysqld_safe --datadir=/opt/homebrew/var/mysql`.
+Homebrew reports `Running: true`; `lsof` observed `mysqld` PID `95616` listening
+on `127.0.0.1:3306`; `/tmp/mysql.sock` exists; and the MySQL error log records
+`ready for connections` with the same port and socket. The configured database
+directory `/opt/homebrew/var/mysql/nhk_v3` exists with NHK V3 tablespace files.
+
+No restart was performed because the exact service is already running and the
+server/listener/log show no service-down condition. A restart would not be a
+safe explanation for the observed failure: the agent sandbox rejects local TCP
+and Unix-socket connects with `Operation not permitted`. `mysqladmin` therefore
+could not complete a handshake, and Computer Use was also denied access to the
+Terminal app. This leaves authentication and server-catalog database existence
+`RUNTIME_UNVERIFIED`, not `PASS`; the WordPress/application read boundary
+remains unavailable.
+
 ## Runtime preflight
 
 | Check | Result | Evidence |
 |---|---|---|
-| Git HEAD | PASS | `02d7f3012e0b88ec011c66d130bd412fd059125a` before pack checkpoint |
+| Git HEAD | PASS | Current observed HEAD `e356d53...`; requested `bbf6f12...` is an ancestor |
+| Homebrew MySQL service | PASS | Exact service `mysql (homebrew.mxcl.mysql)`; `Running: true`, loaded |
+| `mysqld` process | PASS | `lsof` observed PID `95616` on the active listener; `brew services info` wrapper PID `95516` |
+| TCP `127.0.0.1:3306` listener | PASS | OS-level `lsof` shows `TCP 127.0.0.1:3306 (LISTEN)` |
+| TCP client handshake | UNVERIFIED | Sandbox returns `Operation not permitted`; no authentication result claimed |
+| `/tmp/mysql.sock` | PASS | Socket exists with mode `srwxrwxrwx` |
+| Socket client handshake | UNVERIFIED | `mysqladmin` cannot open the local socket from the sandbox |
+| Configured `nhk_v3` database | UNVERIFIED | `/opt/homebrew/var/mysql/nhk_v3` exists on disk; server catalog query is blocked |
+| Authentication | UNVERIFIED | No server handshake was permitted; credentials were not changed |
 | Composer lock/autoload/runtime classes | PASS | `php tools/deployment-preflight.php` |
 | WordPress bootstrap | FAIL | `WORDPRESS_BOOTSTRAP_FAILED`; direct probe rendered `Error establishing a database connection` |
 | NHK Core bootstrap | FAIL | dependent on WordPress bootstrap; `RUNTIME_UNAVAILABLE` |
@@ -48,23 +89,24 @@ service restart or data repair was executed.
 
 | Layer | Evidence | Finding |
 |---|---|---|
-| MySQL service | `brew services list`: `mysql started`; launchd plist runs `/opt/homebrew/opt/mysql/bin/mysqld_safe --datadir=/opt/homebrew/var/mysql` | Daemon is configured/launched; this alone does not prove application connectivity |
-| MySQL process/listener | `lsof`: `mysqld` PID `95616`, TCP `127.0.0.1:3306 (LISTEN)` | TCP listener is observed at the OS layer |
+| MySQL service | `brew services info mysql`: `Running: true`, `Loaded: true`, service `mysql (homebrew.mxcl.mysql)` | Exact service is healthy at launchd/service layer; no restart justified |
+| MySQL process/listener | `lsof`: `mysqld` PID `95616`, TCP `127.0.0.1:3306 (LISTEN)` | Process and listener are observed at the OS layer |
 | MySQL server log | `/opt/homebrew/var/mysql/iMac-cua-Imac.local.err`: `ready for connections`, socket `/tmp/mysql.sock`, port `3306` | Server startup completed according to its log |
 | WordPress config resolution | `public/wp-load.php` found the parent `wp-config.php`; `wp-config.php:2-5` defines the values below | Root config is the active config path for this install |
-| Database configured | `DB_NAME = nhk_v3` when `NHK_WP_TEST_DB` is unset; current environment probe reported it unset | Development database target is `nhk_v3`; an explicitly set test override must be rechecked after recovery |
+| Database configured | `wp-config.php` resolves `DB_NAME = nhk_v3` when `NHK_WP_TEST_DB` is unset; `/opt/homebrew/var/mysql/nhk_v3` exists | Development target is present on disk; server-catalog existence remains unverified because client handshake is blocked |
 | TCP/socket config | `DB_HOST = 127.0.0.1`; MySQL log and socket stat show `/tmp/mysql.sock` | WordPress is configured for TCP; socket exists as a secondary diagnostic path |
 | Credentials/config resolution | `DB_USER = root`, `DB_PASSWORD = EMPTY`; no credential file or secret lookup is used by `wp-config.php` | Resolution is deterministic; authentication is not proven because the client did not reach a handshake |
 | Bootstrap result | `/opt/homebrew/bin/php -d display_errors=1 -r 'require .../public/wp-load.php'` rendered `Database Error` / `Error establishing a database connection` | WordPress bootstrap fails at `wpdb` connection initialization |
-| Probe environment | In-sandbox TCP probe returned `Operation not permitted`; `mysqladmin` returned client error `(1)` for TCP and socket | Current agent runner cannot complete a valid DB handshake; this is an environment/connectivity failure, not evidence of an application defect |
+| Probe environment | In-sandbox TCP probe returned `Operation not permitted`; `mysqladmin` returned client error `(1)` for TCP and socket; unrestricted escalation was rejected; Terminal Computer Use was denied | Current agent runner cannot complete a valid DB handshake; this is an environment/connectivity failure, not evidence of a MySQL service-down condition |
 
 Conclusion: the confirmed failure is at the WordPress-to-MySQL connection
-boundary. The daemon/listener/log indicate that MySQL itself has started, while
+boundary as seen by this execution environment. The daemon/listener/log indicate
+that MySQL itself has started and the configured data directory exists, while
 the current execution environment cannot establish the client connection. A
-credentials rejection, missing `nhk_v3` database, schema failure or NHK Core
-application failure is **not** proven by the available probes. Treat this as
-`RUNTIME_UNAVAILABLE` until an unrestricted local probe or an approved local
-runtime health check completes the handshake and WordPress bootstrap.
+credentials rejection, missing server-catalog `nhk_v3` database, schema failure
+or NHK Core application failure is **not** proven by the available probes. Treat
+this as `RUNTIME_UNAVAILABLE` until a local probe with permission to complete
+the handshake and WordPress bootstrap succeeds.
 
 Runtime status is fail-closed. Counts, revisions, inbound/outbound edges,
 Source/Evidence references, Media/Video references and Post references remain
@@ -117,8 +159,34 @@ the unavailable runtime.
 
 | Source UUID/key | Target UUID/key | Decision | Runtime result |
 |---|---|---|---|
-| `32f43d4b-d6c8-4223-a89b-cc47f30cda77` / `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | Owner-confirmed same identity; merge required | `RUNTIME_UNVERIFIED`; no merge operation exists in current runtime |
-| `01bead27-1308-48c1-af99-c68318e2b577` / `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | Merge candidate only; do not merge | `RUNTIME_UNVERIFIED`; intentionally untouched |
+| `32f43d4b-d6c8-4223-a89b-cc47f30cda77` / `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | `CONFIRMED_MERGE` (`DESIGN_INPUT`); owner-confirmed same identity; merge required | `RUNTIME_UNVERIFIED`; no merge operation exists in current runtime |
+| `01bead27-1308-48c1-af99-c68318e2b577` / `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | `MERGE_CANDIDATE` (`DESIGN_INPUT`); do not merge | `RUNTIME_UNVERIFIED`; intentionally untouched |
+
+## Read-only inventory gate result
+
+Because WordPress bootstrap did not pass, none of the following runtime fields
+may be populated from the manifest, filesystem names or static code. Each item
+is explicitly retained as `RUNTIME_UNVERIFIED`; rows that require an identity or
+contract decision also remain `RESEARCH_REQUIRED`.
+
+| Required inventory | Current evidence status | Result |
+|---|---|---|
+| All active Odo entities: UUID, stable key, revision, state | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Every key containing `o-do` and every key containing `odo` | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Target collision matrix (`o-do` → `odo`) | Pack map only | `DESIGN_INPUT`; runtime `COLLISION`/`NON-COLLIDING` unresolved |
+| Inbound and outbound relations | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Source references and Evidence references | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Knowledge references | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Media and MediaUsage references | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Video references | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| WordPress Post references | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` |
+| Odo 35 references | `RUNTIME_UNAVAILABLE` | `RUNTIME_UNVERIFIED` / `RESEARCH_REQUIRED` |
+| Pinned-dial duplicate references | Owner statement in pack only | `CONFIRMED_MERGE` (`DESIGN_INPUT`); runtime refs unverified |
+| Glued-dial candidate references | Candidate statement in pack only | `MERGE_CANDIDATE` (`DESIGN_INPUT`); `RESEARCH_REQUIRED` |
+
+No complete runtime collision matrix, entity count or reference inventory is
+claimed in this checkpoint. The static map and duplicate rows below remain
+design evidence only.
 
 ## Reference inventory required before mutation
 
