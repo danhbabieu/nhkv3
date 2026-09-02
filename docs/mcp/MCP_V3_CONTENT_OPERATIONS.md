@@ -1,0 +1,263 @@
+# MCP V3 CONTENT OPERATIONS
+
+Status: runtime audit and contract-safe implementation checkpoint, 2026-09-02.
+
+This shared guide describes the MCP V3 runtime actually present for ChatGPT and
+Codex. It does not authorize new entity types, predicates, relation types,
+fields, operations, taxonomy or data population.
+
+## 1. MCP architecture
+
+The endpoint is `/wp-json/nhk/v1/mcp`, using JSON-RPC 2.0 and Streamable HTTP.
+`McpTransport` validates protocol and arguments, `McpReadHandler` performs
+reader-safe orchestration, and governed writes use `McpGovernanceHandler` plus
+Governance's submit → approve → eligibility → controlled apply lifecycle.
+
+MCP is transport/orchestration only. Application and Domain validate canonical
+identity, registry membership, revisions, idempotency, provenance, readiness
+and Graph rules. WordPress `wp_posts` remains title/body/author/date/category,
+URL and publish truth.
+
+Modern requests use protocol `2026-07-28`; `Accept` must include both
+`application/json` and `text/event-stream`. Malformed arguments fail before
+dispatch. Governed tools require their capability. Initialized notifications
+return HTTP 202 with no body.
+
+## 2. Tool catalog thực tế
+
+`McpToolCatalog::tools()` exposes exactly 19 tools. `kind=mutation` implies
+`governed=true`. The 19th catalog member added by this checkpoint is
+`nhk.semantic.resolve` (catalog position 2); catalog position 19 is
+`nhk.proposal.apply`.
+
+| TOOL | DOMAIN | READ/WRITE | GOVERNED | REVISION | GRAPH | STATUS |
+|---|---|---|---|---|---|---|
+| `nhk.search` | native Post + public semantic search | READ | No | N/A | No | READY, bounded/public |
+| `nhk.semantic.resolve` | Authority context | READ | No | N/A | No | READY; ambiguity fails closed |
+| `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
+| `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
+| `nhk.media.ingest` | Media/MediaAsset/MediaUsage | WRITE | Yes | Apply creates revision | Usage is placement | READY for metadata; no byte upload |
+| `nhk.video.ingest` | Video external reference | WRITE | Yes | Apply creates revision | No edge by ingest | READY for validated YouTube URL |
+| `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
+| `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
+| `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
+| `nhk.evidence.get` | Evidence + public endpoints | READ | No | N/A | No raw edge | READY for active/public chain |
+| `nhk.knowledge.ingest` | Knowledge claim | WRITE | Yes | Apply/revision governed | No edge by ingest | READY |
+| `nhk.source.ingest` | Source | WRITE | Yes | Apply/revision governed | No edge by ingest | READY |
+| `nhk.evidence.ingest` | Evidence | WRITE | Yes | Apply/revision governed | Claim/Source boundary | READY |
+| `nhk.proposal.create` | Governance envelope | WRITE | Yes | `expected_revision` | `relation_create` allowed | PARTIAL; final validation at apply |
+| `nhk.proposal.submit` | Governance | WRITE | Yes | Proposal revision | N/A | READY |
+| `nhk.proposal.approve` | Governance | WRITE | Yes | Fingerprints bind approval | N/A | READY |
+| `nhk.proposal.reject` | Governance | WRITE | Yes | Proposal revision | N/A | READY |
+| `nhk.proposal.eligibility` | Governance check | READ | capability-gated | Revision/dependencies | N/A | READY |
+| `nhk.proposal.apply` | Governance + target | WRITE | Yes | Controlled Apply | GraphService | READY for implemented branches |
+
+The stale assertions expecting 18 were corrected to 19; no tool was removed.
+The exact current wire order is the table order above.
+
+## 3. Use-case capability matrix
+
+| USE CASE | CURRENT CAPABILITY | STATUS |
+|---|---|---|
+| Find canonical entity | Authority resolver; UUID-only reads for other domains | PARTIAL |
+| Read canonical entity | Entity/domain `get` tools | READY for exposed boundaries |
+| Create/update entity | Ingest or generic governed proposal; no typed update tool | PARTIAL |
+| Read Source/Evidence | `nhk.source.get`, `nhk.evidence.get` | READY |
+| Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
+| Read/create relation | Governed `relation_create`; Graph read is admin REST only | PARTIAL |
+| Create/update/publish Post | No MCP Post application command | BLOCKED |
+| Upload/find Media | Metadata ingest only; no byte upload or lookup tool | PARTIAL/BLOCKED |
+| Attach MediaUsage | Nested in Media ingest only | PARTIAL |
+| Product / Specimen | Registered Authority types via generic paths | PARTIAL |
+| Album | No V3 contract | SEMANTIC_GAP |
+| Video | Governed ingest, UUID read, YouTube identity, optional thumbnail UUID | READY for current contract |
+| Publish | Semantic Apply only; no editorial Post publish operation | PARTIAL/BLOCKED |
+| Read-back | Domain reads plus native WP/Graph REST checks | PARTIAL |
+| Frontend verification | Existing route smoke/browser QA, not an MCP tool | PARTIAL |
+
+## 4. Post workflow
+
+The safe sequence is: resolve Authority context; read claims, sources, evidence
+and entities; create/edit/publish a native WordPress Post through its existing
+editorial API/UI; create governed semantic proposals and Post Graph links; then
+read back semantic records and verify Post/frontend.
+
+There is no MCP Post create/update/publish contract. `wp_post` is only a Graph
+endpoint resolver with key `<blog_id>:<post_id>`, positive numeric components,
+current-site check and existing `WP_Post` check. It can link an existing draft
+or published Post but cannot create, update or publish one. Do not copy article
+body into Knowledge or Graph.
+
+## 5. Authority workflow
+
+Resolve by canonical UUID, then stable key, then exact canonical name/alias.
+Ambiguous matches return candidates and are never auto-resolved. Reads use
+`nhk.entity.get`; only registry-allowed fields are returned. Writes use an
+existing Governance operation and require target revision for updates/lifecycle.
+
+| TYPE | GRAPH | ALLOWED PAYLOAD FIELDS |
+|---|---:|---|
+| `brand` | yes | `aliases`, `description`, `country`, `founded_year` |
+| `model` | yes | `brand_uuid`, `aliases`, `description`, `launch_year` |
+| `variant` | yes | `model_uuid`, `aliases`, `description`, `reference` |
+| `movement` | yes | `manufacturer`, `caliber`, `description`, `frequency_hz`, `jewels` |
+| `music` | yes | `artist`, `album`, `description`, `release_year` |
+| `component` | yes | `kind`, `manufacturer`, `description` |
+| `classification` | yes | `family`, `description` |
+| `specimen` | yes | `model_uuid`, `serial_number`, `acquired_at`, `notes` |
+| `product` | yes | `specimen_uuid`, `vendor`, `url`, `price`, `currency`, `availability` |
+
+## 6. Knowledge / Source / Evidence workflow
+
+The three ingest tools create proposals. Submit, approve with returned
+fingerprints, check eligibility and apply. Evidence requires existing Claim and
+Source UUIDs. Closed runtime profiles are: claim types `fact`, `specification`,
+`history`, `technical`, `provenance`, `other`; source types `publication`,
+`website`, `archive`, `catalog`, `interview`, `other`; evidence relations
+`supports`, `contradicts`, `qualifies`; visibility `PUBLIC`, `PRIVATE`, `HIDDEN`.
+Public reads require active records and a public evidence chain.
+
+## 7. Graph workflow and runtime matrix
+
+Graph is the only relation persistence. Relation create, retire and reactivate
+are governed operations through `GraphService`. There is no MCP Graph read
+tool; raw Graph REST is administrator-only.
+
+Full boot registers 15 endpoint types: `wp_post`; Authority `brand`, `model`,
+`variant`, `movement`, `music`, `component`, `classification`, `specimen`,
+`product`; and `media`, `video`, `knowledge`, `source`, `evidence`.
+
+| SOURCE | PREDICATE | TARGET | CARDINALITY | DIRECT/DERIVED | EVIDENCE | GOVERNED OPERATION | MCP READ TOOL | MCP WRITE TOOL |
+|---|---|---|---|---|---|---|---|---|
+| all 15 endpoint types | `about` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `media` | `depicts` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+
+Exactly two predicates exist. No third predicate, derived relation, predicate
+specific evidence rule or Album relation may be invented.
+
+## 8. Media workflow
+
+Media identity, MediaAsset binary metadata and MediaUsage placement are
+separate. `nhk.media.ingest` accepts current stable key/name/readiness, asset
+packet and usage packet; Controlled Apply calls `MediaService::ingest`. Asset
+metadata includes storage key, checksum, MIME, size, dimensions and visibility;
+usage includes endpoint type/key, role and order. `nhk.media.get` returns active
+ready Media, public deliverable assets and reader-safe usage.
+
+The current boundary does not upload bytes, resolve a local file, search by
+checksum or add a usage independently. Checksum detects a duplicate candidate;
+it never merges canonical identities.
+
+## 9. Product / Specimen
+
+Specimen is a concrete physical object. Product is a listing/offer and is not
+the physical object's identity. Both are registered Authority types.
+
+The Product payload permits `specimen_uuid`, while `about` also permits Product
+→ Specimen. Runtime validation does not enforce mutual exclusion or equivalence,
+so the same fact can be stored in payload and Graph. This is a contract-level
+`CONSTITUTION_CONFLICT`. Do not automatically create or repair this link until
+an architecture decision chooses canonical owner, semantics, cardinality,
+provenance and migration rule.
+
+## 10. Album
+
+Album has no canonical V3 entity type, Authority registry entry, Graph endpoint,
+predicate, repository, service, MCP tool or public contract. `music.album` is a
+field, not an Album entity; generic gallery/collection language does not
+establish one.
+
+This is `SEMANTIC_GAP`. Do not create an Album entity, taxonomy, relation or
+projection. A future contract must first choose its owner and identity boundary.
+
+## 11. Video
+
+Video identity is the validated external reference. The domain supports YouTube
+watch, short, embed and `youtu.be` forms and stores one canonical watch URL plus
+platform/external ID. Optional thumbnail Media is a typed field, not an
+implicit Graph edge. Video is a Graph endpoint and may use only the two
+predicates through governed proposals. No local MP4 is downloaded.
+
+## 12. Governance
+
+There is no standalone `OperationRegistry`; the effective allowlist is in the
+executor/domain services:
+
+| DOMAIN | EXISTING OPERATIONS |
+|---|---|
+| Authority | `create`, `ingest`, `rename`, `update`, `retire`, `reactivate` |
+| Media | `ingest` |
+| Video | `ingest`, `update`, `retire`, `reactivate` |
+| Knowledge/Source/Evidence | `create`, `ingest`, `update`, `retire`, `reactivate` |
+| Graph | `relation_create`, `relation_retire`, `relation_reactivate` |
+| MCP proposal lifecycle | `create`, `submit`, `approve`, `reject`, `eligibility`, `apply` |
+
+Generic proposal strings are not authorization; final validation occurs at
+apply. Every semantic write retains capability checks, expected revision,
+fingerprints, idempotency, audit and controlled transaction.
+
+## 13. Error codes and fail-closed behavior
+
+`-32600` invalid JSON-RPC request; `-32601` unknown method/tool; `-32602`
+invalid/missing argument; `-32003` origin or capability denied; `-32020`
+Streamable HTTP/header mismatch; `-32022` unsupported protocol version.
+Typed domain/governance failures return an MCP `isError=true` result. Null
+reads, ambiguity, unavailable readiness and revision/idempotency conflicts are
+not success and must not be retried with altered content under the same key.
+
+## 14. Read-back verification
+
+After apply, use `result_entity_uuid`: Authority → `nhk.entity.get`; Media →
+`nhk.media.get`; Video → `nhk.video.get`; Knowledge/Source/Evidence → matching
+read tool. Graph requires administrator-only Graph REST. Post requires native
+WordPress read/browser verification. Verify canonical identity, active state,
+visibility, revision result, relation direction and public projection; apply
+success alone does not prove public availability.
+
+## 15. End-to-end example
+
+For “Biên soạn và đưa bài lên web, xây chặt các quan hệ liên quan”:
+
+```text
+1. nhk.semantic.resolve
+   Resolve Brand/Model context; stop on missing, conflict or ambiguity.
+2. nhk.entity.get, nhk.knowledge.get, nhk.source.get, nhk.evidence.get
+   Read canonical facts and public evidence; do not copy article body.
+3. Native WordPress editorial API/UI
+   Create/update draft Post, then publish its native editorial fields.
+4. knowledge/source/evidence.ingest
+   Submit -> approve with fingerprints -> eligibility -> apply.
+5. nhk.proposal.create with operation=relation_create
+   Use only `about` or `depicts`, registered endpoints and valid keys; run the
+   same governed lifecycle.
+6. nhk.media.ingest / nhk.video.ingest
+   Use only current asset/usage and external-reference contracts.
+7. Read back domain records, Post and Graph; run frontend route/browser checks.
+```
+
+MCP-native Post CRUD/publish, binary upload, Graph read, standalone MediaUsage,
+Album, and Product–Specimen canonical-fact workflows remain blocked or gated.
+Implementing them requires a new contract decision; this guide does not invent
+one.
+
+## 16. WordPress Abilities read bridge
+
+On WordPress 6.9+, the plugin registers eight existing read tools as public
+read-only Abilities under category `nhk-semantic`. This is a discoverability
+adapter, not a second persistence or transport path, and it is feature-detected
+on older WordPress versions.
+
+| ABILITY | MCP SOURCE |
+|---|---|
+| `nhk-v3/search` | `nhk.search` |
+| `nhk-v3/semantic-resolve` | `nhk.semantic.resolve` |
+| `nhk-v3/entity-get` | `nhk.entity.get` |
+| `nhk-v3/media-get` | `nhk.media.get` |
+| `nhk-v3/video-get` | `nhk.video.get` |
+| `nhk-v3/knowledge-get` | `nhk.knowledge.get` |
+| `nhk-v3/source-get` | `nhk.source.get` |
+| `nhk-v3/evidence-get` | `nhk.evidence.get` |
+
+Each reuses the existing input schema, `read` capability callback and metadata
+`public=true`, `show_in_rest=true`, `readonly=true`, `destructive=false`,
+`idempotent=true`. No write or governance Ability is registered.
