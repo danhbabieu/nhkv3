@@ -4,6 +4,29 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Odo Semantic Pack installation checkpoint — 2026-09-03
+
+The approved Odo reference pack and manifest were validated and checkpointed at
+`6fd6cc3` (`docs: add Odo semantic reference pack`). YAML parsing passed, and
+the pack's `o-do` occurrences are limited to forbidden-namespace rules and
+legacy `from`/`source`/review references; no new canonical legacy key was
+authored.
+
+The required read-only runtime inventory is recorded at
+`docs/semantic-packs/odo/ODO_RUNTIME_INVENTORY.md`. Runtime preflight is
+currently **UNAVAILABLE** because WordPress bootstrap fails with
+`WORDPRESS_BOOTSTRAP_FAILED` (database connection error). No Authority,
+Knowledge, Source/Evidence, Graph, Media, Video or WordPress data was read
+from this unavailable runtime and no mutation was attempted.
+
+Code audit confirms the current runtime has no governed Authority `rekey`,
+generic semantic merge/reference-move, Media placeholder or Video placeholder
+operation. Odo execution therefore remains fail-closed with
+`CONTRACT_EXTENSION_REQUIRED` for rekey/merge and requirements-only handling
+for Media/Video placeholders. Odo 35 retirement, relation completion,
+Knowledge creation and Post 38/39/40/55 reconciliation are pending runtime
+restoration and governed capability/reference audit.
+
 ## Phase R3 release-gate cleanup checkpoint — 2026-09-02
 
 This checkpoint records fresh verification against the current working tree
