@@ -1,5 +1,8 @@
 # Legacy Inheritance Matrix — P1
 
+> **NON-NORMATIVE.** Đây là ma trận evidence lịch sử, không phải luật V3. Nếu
+> mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 Phạm vi audit: project cũ `/Users/imac24-2125d/Documents/Codex/2026-07-24/nhk-v2-project-reboot-y-l`, đọc source/docs/tests chỉ-đọc. Các dòng dưới đây là **assessment units** (contract hoặc module), không phải lời mời copy code.
 
 | Module / contract cũ | Trạng thái | Hướng xử lý | Lý do | Test cần kế thừa | Migration cần thiết |

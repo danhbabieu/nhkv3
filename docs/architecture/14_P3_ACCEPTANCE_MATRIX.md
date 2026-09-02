@@ -1,5 +1,9 @@
 # NHK V3 P3 Acceptance Matrix
 
+> **NON-NORMATIVE.** Đây là acceptance evidence, không phải luật kiến trúc.
+> Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
+> kiểm soát.
+
 | ID | Invariant | Test class / method | Layer | Status | Notes |
 |---|---|---|---|---|---|
 | P3-A | Migration 001 up, idempotent up, isolated down, up again | `GraphMigrationIdempotencyTest::test_up_is_idempotent_and_down_isolated` | INTEGRATION | PASS | Real `nhk_v3_test`; destructive path guarded |

@@ -1,5 +1,8 @@
 # V3 Public Menu Route Audit — 2026-09-02
 
+> **NON-NORMATIVE.** Đây là menu/route audit evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 ## Runtime status
 
 The local WordPress runtime is available. The active theme is `nhk-v3`, but

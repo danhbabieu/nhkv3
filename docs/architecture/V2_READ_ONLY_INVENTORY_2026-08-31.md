@@ -1,5 +1,8 @@
 # V2 Read-only Inventory — 2026-08-31
 
+> **NON-NORMATIVE.** Đây là V2 read-only inventory. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This inventory was collected from the restored local V2 backup in the guarded
 database `nhk_v3_test`. The source database was read-only during export. A
 separate local-dev apply was later run against `nhk_v3`; it is recorded in the

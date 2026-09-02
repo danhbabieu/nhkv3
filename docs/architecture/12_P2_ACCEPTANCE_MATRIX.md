@@ -1,5 +1,9 @@
 # P2 Acceptance Matrix
 
+> **NON-NORMATIVE.** Đây là acceptance evidence, không phải luật kiến trúc.
+> Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
+> kiểm soát.
+
 Đối chiếu theo 37 invariant P2, trước khi bắt đầu P3.
 
 | # | Invariant | Test class/method | Kết quả |

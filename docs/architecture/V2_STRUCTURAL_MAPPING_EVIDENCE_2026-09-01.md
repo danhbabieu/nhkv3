@@ -1,5 +1,8 @@
 # V2 → V3 Structural Mapping Evidence — 2026-09-01
 
+> **NON-NORMATIVE.** Đây là V2 read-only mapping evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This is a read-only structural/domain mapping artifact. It defines the
 canonical V3 boundary and records evidence available in the retained V2
 export. It does not apply identity mappings, create relations, import article

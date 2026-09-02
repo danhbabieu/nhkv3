@@ -43,8 +43,7 @@
 **Files:**
 - Reference: `docs/constitution/NHK_V3_CONSTITUTION.md` (frontend law is
   consolidated there)
-- Modify: `docs/constitution/NHK_V3_CONSTITUTION_INDEX.md`
-- Modify: `docs/constitution/START_HERE.md`
+- Reference: `docs/constitution/NHK_V3_CONSTITUTION.md`
 - Modify: `AGENTS.md`
 - Reference: `docs/constitution/NHK_V3_CONSTITUTION.md` (media, video,
   knowledge, source/evidence and publication law are consolidated there)

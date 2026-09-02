@@ -1,5 +1,8 @@
 # NHK V3 P3 Integration Acceptance
 
+> **NON-NORMATIVE.** Đây là test/environment evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 ## Scope
 
 - Workspace: `/Users/imac24-2125d/Developer/nhk-v3`

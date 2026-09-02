@@ -1,5 +1,9 @@
 # NHK V3 Cutover Readiness Report
 
+> **NON-NORMATIVE.** Đây là readiness evidence; nó không cấp quyền cutover.
+> Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
+> kiểm soát.
+
 Date: 2026-09-01
 Repository: `main` at the current local checkpoint
 Decision: **NOT READY — production cutover is not authorized or performed.**

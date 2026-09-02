@@ -1,5 +1,9 @@
 # Migration Backup / Restore Evidence — 2026-08-31
 
+> **NON-NORMATIVE.** Đây là migration evidence; không phải authorization.
+> Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
+> kiểm soát.
+
 Decision: **NOT READY for live/production data migration**. A local-dev apply
 checkpoint is complete and separately ledgered.
 

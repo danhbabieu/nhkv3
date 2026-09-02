@@ -1,5 +1,8 @@
 # V2 Domain-targeted Post Review — 2026-08-31
 
+> **NON-NORMATIVE.** Đây là V2 read-only evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This is a read-only reconciliation aid for the 764 V2 `wp_post` records that
 the migration runner intentionally did not copy into native V3 editorial
 posts. It does not create redirects, migrate bodies, retire records, or

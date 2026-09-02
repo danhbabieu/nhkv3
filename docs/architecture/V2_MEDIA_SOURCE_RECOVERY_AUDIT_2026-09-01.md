@@ -1,5 +1,8 @@
 # V2 Media Source Recovery Audit — 2026-09-01
 
+> **NON-NORMATIVE.** Đây là V2 read-only audit evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This is a read-only source-recovery audit for the 21 legacy attachment URL
 records classified by the V2→V3 migration. It does not download bytes into
 V3, create MediaAsset identities, publish assets, or change V2/live data.

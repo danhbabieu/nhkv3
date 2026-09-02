@@ -1,5 +1,8 @@
 # Bản nháp contract Semantic Graph
 
+> **NON-NORMATIVE.** Đây là bản nháp/evidence triển khai. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 Chỉ có một semantic graph dùng chung cho wp_post, media, video, knowledge,
 source và các authority entity. Relation tương lai có dạng:
 

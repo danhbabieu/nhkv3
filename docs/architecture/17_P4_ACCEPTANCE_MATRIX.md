@@ -1,5 +1,9 @@
 # P4 Acceptance Matrix
 
+> **NON-NORMATIVE.** Đây là acceptance evidence, không phải luật kiến trúc.
+> Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
+> kiểm soát.
+
 Status: `ACCEPTED / CLOSED` — all P4 test gates pass on `nhk_v3_test`, and
 Migration003 UP-only plus health 3/3 pass on `nhk_v3`.
 

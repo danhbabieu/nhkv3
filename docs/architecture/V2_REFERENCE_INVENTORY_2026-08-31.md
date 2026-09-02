@@ -1,5 +1,8 @@
 # V2 Read-only Reference Inventory — 2026-08-31
 
+> **NON-NORMATIVE.** Đây là V2 behavioral/read-only evidence. Nếu mâu thuẫn
+> với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This is a behavioral and route inventory, not a migration or parity claim.
 The source was opened read-only in the in-app Browser at
 [`demo.1945.vn`](https://demo.1945.vn/). No V2 data, forms or settings were

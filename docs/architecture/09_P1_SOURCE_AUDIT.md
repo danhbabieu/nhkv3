@@ -1,5 +1,8 @@
 # P1 Source Audit — NHK V2 → NHK V3
 
+> **NON-NORMATIVE.** Đây là audit evidence lịch sử. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 ## 1. Executive summary
 
 Project cũ có contract governance, identity, revision, provenance, readiness,

@@ -1,5 +1,9 @@
 # NHK V3 Frontend Route Inventory — 2026-09-01
 
+> **NON-NORMATIVE.** Đây là route inventory/evidence, không phải public law.
+> Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp
+> kiểm soát.
+
 This is a source-level route inventory. It records the intended public
 contracts and implementation evidence; it is not a browser smoke pass or a
 V2 URL-parity claim.

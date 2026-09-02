@@ -1,5 +1,8 @@
 # V2 URL Reconciliation Review — 2026-08-31
 
+> **NON-NORMATIVE.** Đây là V2 read-only review evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This is a review artifact for the 27 V2 URL records that remain without a
 canonical V3 target after Mapper 6.14. It does not approve a redirect,
 retirement, media import, or source-data mutation. No V2 or production data

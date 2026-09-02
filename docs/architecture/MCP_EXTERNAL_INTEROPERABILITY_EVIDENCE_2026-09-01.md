@@ -1,5 +1,8 @@
 # MCP External Interoperability Evidence — 2026-09-01
 
+> **NON-NORMATIVE.** Đây là probe evidence. Nếu mâu thuẫn với
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+
 This is a read-only probe record. No external or local NHK data was written.
 It does not approve a deployment or declare MCP parity.
 
