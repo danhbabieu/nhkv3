@@ -9,6 +9,47 @@ use PHPUnit\Framework\TestCase;
 
 final class McpContractTest extends TestCase
 {
+    public function test_catalog_has_exact_current_ordered_nineteen_tool_contract(): void
+    {
+        self::assertSame([
+            'nhk.search',
+            'nhk.semantic.resolve',
+            'nhk.entity.get',
+            'nhk.media.get',
+            'nhk.media.ingest',
+            'nhk.video.ingest',
+            'nhk.video.get',
+            'nhk.knowledge.get',
+            'nhk.source.get',
+            'nhk.evidence.get',
+            'nhk.knowledge.ingest',
+            'nhk.source.ingest',
+            'nhk.evidence.ingest',
+            'nhk.proposal.create',
+            'nhk.proposal.submit',
+            'nhk.proposal.approve',
+            'nhk.proposal.reject',
+            'nhk.proposal.eligibility',
+            'nhk.proposal.apply',
+        ], array_column(McpToolCatalog::tools(), 'name'));
+    }
+
+    public function test_generic_proposal_declares_only_existing_governed_operations(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertSame([
+            'create',
+            'ingest',
+            'relation_create',
+            'rename',
+            'update',
+            'retire',
+            'reactivate',
+            'relation_retire',
+            'relation_reactivate',
+        ], $tools['nhk.proposal.create']['inputSchema']['properties']['operation']['enum']);
+    }
+
     public function test_read_tools_are_not_mutations_and_all_mutations_are_governed(): void
     {
         $tools = McpToolCatalog::tools();

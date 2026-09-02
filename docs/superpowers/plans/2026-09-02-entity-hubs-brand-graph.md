@@ -1,5 +1,11 @@
 # Entity Hubs and Brand Graph Implementation Plan
 
+Implementation checkpoint: Phase A–C code is now present in the working tree.
+The six approved predicates are registered exactly as defined by the current
+relationship contract; this supersedes the earlier staged-registry-gap wording
+below. No physical Graph repair, semantic-data import or legacy article-body
+operation has been performed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Vietnamese discovery hubs, public eligibility and derived Brand context share explicit query/route contracts while registering only the approved typed relationship vocabulary and leaving physical Graph repair untouched.
@@ -14,7 +20,7 @@
 
 - Canonical discovery hubs are `/thuong-hieu/`, `/mau/`, `/bo-may/`, `/ban-nhac/`, `/linh-kien/`, `/phan-loai/`, `/hien-vat/`, `/san-pham/`, `/tri-thuc/`, `/video/` and `/so-sanh/` as defined in `docs/architecture/V3_PUBLIC_HUB_MATRIX.md`.
 - Persist only direct child→parent structural facts: `Model --model_of--> Brand` and `Variant --variant_of--> Model`; never persist reverse edges or `Variant → Brand` shortcuts.
-- `uses_movement`, `supports_music`, `configured_with_music` and `observed_playing_music` remain registry gaps until their exact definitions are added in the Graph phase; no unapproved predicate is invented.
+- Register only the six approved definitions: `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music` and `observed_playing_music`; no unapproved predicate is invented. Physical Graph rows remain untouched.
 - Transitional `brand_uuid` and `model_uuid` payload fields are compatibility evidence, not canonical Graph truth; a clear parent may produce a `DATA_COMPATIBILITY_GAP` warning, while missing or ambiguous evidence blocks public structural completeness.
 - Movement, Music, Component and Classification do not require Brand ancestry; Product remains a listing/offer and Specimen remains a concrete physical object.
 - MediaAsset has no standalone semantic SEO page; Source and Evidence have no standalone public indexable page by default.
@@ -424,11 +430,11 @@ public function test_catalog_contains_the_intentional_read_only_semantic_resolve
 
 Run: `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Integration/McpTransportIntegrationTest.php`
 
-Expected: the two existing `assertCount(18, ...)` assertions fail when the
+Expected: the two existing catalog assertions fail when the
 guarded database is available; if unavailable, record the skip and run the
 unit catalog assertion.
 
-- [ ] **Step 3: Update the stale expectation with the audited names**
+- [x] **Step 3: Update the stale expectation with the audited names**
 
 Assert the full ordered list returned by `McpToolCatalog::tools()`, keeping
 `nhk.semantic.resolve` explicitly read-only. Do not mechanically replace 18 by
@@ -495,13 +501,13 @@ Run: `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plug
 
 Expected: FAIL because the two predicates are not registered.
 
-- [ ] **Step 3: Register only `model_of` and `variant_of`**
+- [x] **Step 3: Register the approved predicate definitions**
 
-Add `new PredicateDefinition('model_of', ['model'], ['brand'], 'ONE', 'MANY')`
-and `new PredicateDefinition('variant_of', ['variant'], ['model'], 'ONE',
-'MANY')` beside the existing definitions. Reuse the existing Graph tables and
-validation. Do not add Movement/Music predicates in this task unless their
-exact registry definitions have independently passed contract review.
+Add the six approved `PredicateDefinition` entries beside the existing
+definitions. Reuse the existing Graph tables and validation. Structural
+predicates use child→parent endpoints with ONE outbound/MANY inbound
+cardinality; the four semantic relation definitions remain MANY/MANY. No
+physical Graph rows are created by registry registration.
 
 - [ ] **Step 4: Run Graph unit tests and PHP lint**
 
@@ -727,8 +733,8 @@ git commit -m "feat: report structural graph compatibility findings"
 public function test_report_keeps_missing_predicate_separate_from_missing_data(): void
 {
     $report = $this->gaps->read();
-    self::assertSame('REGISTRY_GAP', $report['model_of']['classification']);
-    self::assertSame('REGISTRY_GAP', $report['uses_movement']['classification']);
+    self::assertSame('REGISTERED', $report['model_of']['classification']);
+    self::assertSame('REGISTERED', $report['uses_movement']['classification']);
 }
 
 public function test_public_exclusion_report_does_not_rewrite_entity_state(): void

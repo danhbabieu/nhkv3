@@ -23,4 +23,15 @@ final class GraphCoreContractTest extends TestCase {
     public function test_self_relation_and_cardinality_fail(): void { [$service]= $this->service();$this->expectException(InvalidRelationTargetType::class);$service->create(new NodeReference('brand','a'),'about',new NodeReference('brand','a')); }
     public function test_outbound_and_inbound_one_cardinality_fail(): void { $p=new PredicateRegistry();$p->register(new PredicateDefinition('test.one',['brand'],['knowledge'],'ONE','ONE'));[$service]= $this->service($p);$service->create(new NodeReference('brand','a'),'test.one',new NodeReference('knowledge','1:1'));$this->expectException(RelationCardinalityViolation::class);$service->create(new NodeReference('brand','a'),'test.one',new NodeReference('knowledge','1:2')); }
     public function test_audit_sink_receives_all_mutations(): void { [$service,, $audit]=$this->service();$edge=$service->create(new NodeReference('brand','a'),'about',new NodeReference('brand','b'));$retired=$service->retire($edge->edge_uuid,1);$service->reactivate($retired->edge_uuid,2);self::assertSame(['RelationCreated','RelationRetired','RelationReactivated'],array_column($audit->events,'event')); }
+
+    public function test_approved_structural_predicates_are_registered(): void
+    {
+        $registry = new PredicateRegistry();
+        self::assertSame(['model'], $registry->get('model_of')->allowed_source_types);
+        self::assertSame(['brand'], $registry->get('model_of')->allowed_target_types);
+        self::assertSame('ONE', $registry->get('model_of')->outbound_cardinality);
+        self::assertSame(['variant'], $registry->get('variant_of')->allowed_source_types);
+        self::assertSame(['model'], $registry->get('variant_of')->allowed_target_types);
+        self::assertSame('ONE', $registry->get('variant_of')->outbound_cardinality);
+    }
 }

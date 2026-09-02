@@ -7,21 +7,19 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
-use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class HomeSemanticQuery
 {
-    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null) {}
+    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null) {}
 
     public function extend(array $modules): array
     {
         if ($this->ready('authority')) {
             foreach ($this->types->all() as $definition) {
-                foreach ($this->authority->listByType($definition->type) as $entity) {
-                    if (!$entity->active()) continue;
-                    $path = ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); if ($path === null) continue;
-                    $modules['entities'][] = ['type' => $entity->entityType, 'id' => $entity->canonicalId, 'title' => $entity->canonicalName, 'url' => home_url($path)];
+                foreach ($this->collection()->archive($definition->type, 1, 6)['items'] as $item) {
+                    $modules['entities'][] = ['type' => $item['type'], 'id' => $item['id'], 'title' => $item['name'], 'url' => home_url($item['url'])];
                     if (count($modules['entities']) >= 6) break 2;
                 }
             }
@@ -54,5 +52,11 @@ final class HomeSemanticQuery
             'video' => $this->status->videoStorageReady(),
             default => false,
         };
+    }
+
+    private function collection(): PublicEntityCollectionQuery
+    {
+        $this->routes ??= new PublicRouteResolver($this->authority, $this->types);
+        return $this->collection ??= new PublicEntityCollectionQuery($this->authority, $this->types, new PublicIdentityContract($this->types), new PublicEntityEligibilityPolicy($this->authority, $this->types, $this->routes), $this->routes);
     }
 }

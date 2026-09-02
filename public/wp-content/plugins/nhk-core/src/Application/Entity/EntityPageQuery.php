@@ -10,11 +10,13 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EntityPageQuery
 {
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null) {}
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
+    public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
     public function publicPathForKey(string $type, string $key): ?string
     {
+        if ($this->collection !== null) return $this->collection->publicPathForKey($type, $key);
         if (!$this->types->has($type) || !$this->available()) return null;
         $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
         return $entity && $entity->entityType === $type && $entity->active() ? $this->publicPath($entity) : null;
@@ -24,6 +26,11 @@ final class EntityPageQuery
 
     public function detail(string $type, string $key): ?array
     {
+        if ($this->collection !== null) {
+            $item = $this->collection->detail($type, $key);
+            if ($item !== null) $item['related'] = $this->related?->forEntity($type, (string) $item['id']) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
+            return $item;
+        }
         if (!$this->types->has($type) || !$this->available()) return null;
         if (preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 && !UuidCodec::isValid($key)) return null;
         $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
@@ -35,6 +42,7 @@ final class EntityPageQuery
     /** Return a canonical stable key for a legacy visitor-facing slug only when the match is unambiguous. */
     public function stableKeyForPublicSlug(string $type, string $slug): ?string
     {
+        if ($this->collection !== null) return $this->collection->stableKeyForPublicSlug($type, $slug);
         if (!$this->types->has($type) || !$this->available()) return null;
         $slug = trim($slug);
         if ($slug === '') return null;
@@ -49,6 +57,7 @@ final class EntityPageQuery
     /** @return array{type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
     public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
     {
+        if ($this->collection !== null) return $this->collection->archive($type, $page, $perPage, $query);
         if (!$this->types->has($type) || !$this->available()) return ['type' => $type, 'page' => 1, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
         $query = trim($query); $items = [];
         foreach ($this->authority->listByType($type, true) as $entity) {

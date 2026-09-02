@@ -1,5 +1,55 @@
 # NHK V3 Execution State
 
+## Current checkpoint — 2026-09-02
+
+The approved Vietnamese public discovery implementation is present in the
+working tree. Canonical hubs are wired for Brand, Model, Movement, Music,
+Component, Classification, Specimen, Product and Comparison; legacy technical
+archive roots redirect one hop to their Vietnamese canonical hubs. A single
+`PublicEntityCollectionQuery` now supplies Authority archive/detail membership,
+identity, eligibility and route-safe URLs to homepage, entity pages, search and
+REST. Model/Variant transition eligibility uses valid payload parent evidence,
+adds `DATA_COMPATIBILITY_GAP` when canonical Graph structure is not yet
+available, and blocks missing or conflicting structural parents without
+mutating data. Brand aggregation exposes read-only DIRECT/DERIVED paths.
+
+The runtime Graph registry now contains exactly the six approved predicates:
+`model_of`, `variant_of`, `uses_movement`, `supports_music`,
+`configured_with_music` and `observed_playing_music`; no physical Graph edge
+was created, retired or rewritten. Read-only distribution and structural
+diagnostic commands are implemented. Unit verification is 191 tests / 1,105
+assertions; Composer lint and `git diff --check` pass. Guarded WordPress
+integration/preflight, HTTP route/MCP smoke, stored-menu inspection and the
+exact 241-edge audit are currently blocked by the unavailable local WordPress
+database/HTTP runtime. No semantic rows, legacy article bodies or live/V2 data
+were changed.
+
+The stored-menu before/after matrix is recorded as UNVERIFIED in
+`docs/architecture/V3_MENU_ROUTE_AUDIT_2026-09-02.md`; the theme fallback and
+all checked code-level navigation targets use canonical routes. Rewrite
+flushing, targeted stored-menu edits, push, staging deployment and staging HTTP
+verification remain pending the runtime gate.
+
+MCP V3 content-operations audit checkpoint, 2026-09-02: the clean HEAD
+catalog contains exactly 19 tools, with `nhk.proposal.apply` in position 19;
+the two previously stale catalog expectations are aligned to 19 in the
+current integration contract. The audit confirms that Post CRUD/publish,
+binary Media upload/standalone MediaUsage, MCP Graph reads and Album are not
+authorized by current contracts. Product `specimen_uuid` plus the broad Graph
+`about` allowlist is a `CONSTITUTION_CONFLICT`; Album is a `SEMANTIC_GAP`.
+The current working tree (preserved pre-existing Brand work) registers six
+additional approved predicates beyond the two at clean HEAD; this MCP task
+does not add, remove or alter predicates. The only MCP code change in this
+checkpoint adds the existing nine-operation allowlist to proposal input
+validation. Targeted MCP unit tests pass; HTTP wire evidence remains blocked
+at `http://localhost` because the local endpoint is not responding. No
+bootstrap, snapshot, V2 migration, production data or push was performed.
+The targeted MCP/Governance/Graph slice is 37 tests / 197 assertions. The
+unconfigured full suite reported 8 integration errors, 12 mandatory integration
+failures and 84 skips; the configured `NHK_WP_TEST_PATH=public` attempt reached
+the WordPress database error before producing a PHPUnit summary. Composer PHP
+lint and `git diff --check` pass.
+
 Bootstrap continuation checkpoint, 2026-09-02: local MySQL's existing
 `mysqld` listener is reachable on `127.0.0.1:3306`, although its Homebrew
 launch-agent status remains `error 1` because the service wrapper detects an

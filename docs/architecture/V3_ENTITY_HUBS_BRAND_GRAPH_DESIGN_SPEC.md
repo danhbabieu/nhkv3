@@ -2,6 +2,13 @@
 
 Status: approved design specification, read-only checkpoint, 2026-09-02.
 
+Implementation status — 2026-09-02: The approved route, public-query,
+Graph-registry and read-only diagnostics contract is implemented in the current
+working tree. `PredicateRegistry` contains all six approved definitions with
+the exact endpoint/cardinality boundaries; existing physical Graph rows remain
+untouched. Earlier paragraphs describing those definitions as future registry
+gaps are historical design-stage context and are superseded by this status.
+
 This specification turns the approved public discovery and structural Graph
 design into implementation boundaries. It does not authorize physical Graph
 repair, semantic-data mutation, database replacement, seed/import/recreation,
@@ -300,7 +307,7 @@ by the public menu decision unless their approved target contract changes.
 
 | Gap or decision | Classification | Current treatment |
 |---|---|---|
-| `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music` absent from registry | `REGISTRY_GAP` | Contract tests and registry work are a later Graph phase; no edges are written now |
+| `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music` | Registered contract | Exact definitions are now in `PredicateRegistry`; no physical edges are written by this implementation |
 | Existing 241 edges lack a verified source/predicate/target distribution in this workspace | `DATA_COMPATIBILITY_GAP` / evidence unavailable | Run the read-only distribution audit when the local database is available |
 | Payload parent fields currently drive Model/Variant route resolution | `CONSTITUTION_CONFLICT` if treated as canonical Graph truth; `CODE_GAP` for the missing shared structural policy | Keep as transitional evidence until an approved Graph-backed cutover |
 | Archive/list/detail/route consumers do not share one public eligibility result | `CODE_GAP` / `PUBLIC_ELIGIBILITY_FAILURE` | Implement `PublicEntityCollectionQuery`, identity contract and policy in Phase A |

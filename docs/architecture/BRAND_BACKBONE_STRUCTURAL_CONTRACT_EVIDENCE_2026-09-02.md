@@ -1,7 +1,7 @@
 # Brand Backbone Structural Contract — Evidence Package
 
 Date: 2026-09-02
-Status: approved staged-contract design; read-only checkpoint
+Status: approved staged-contract implementation checkpoint
 Mutation boundary: no semantic records, Graph edges, redirects, or legacy
 article bodies were changed.
 
@@ -27,7 +27,7 @@ traversing `variant_of` then `model_of`; it is never persisted as a shortcut.
 
 | Finding | Evidence | Classification | Checkpoint treatment |
 |---|---|---|---|
-| Graph registry seeds only `about` and `depicts` | `src/Domain/Graph/PredicateRegistry.php` registers exactly two definitions | `REGISTRY_GAP` | Do not register or persist new predicates here |
+| Graph registry contains the approved vocabulary | `src/Domain/Graph/PredicateRegistry.php` registers `about`, `depicts` and the six exact approved definitions | Registered contract; physical data unchanged | Do not create or repair physical edges without governed evidence and approval |
 | Graph centralizes endpoint, predicate, self-edge and existence checks | `src/Application/Graph/GraphService.php`, `EndpointTypeRegistry`, `PredicateDefinition` | Existing foundation | Reuse the single Graph boundary later |
 | Model and Variant are registered Authority types | `CanonicalEntityTypeCatalog.php`; P5 covers nine types | No type gap | No new entity types or tables |
 | Model payload requires `brand_uuid` | `CanonicalEntityTypeCatalog.php`; route tests create Models with it | `CODE_GAP`; `CONSTITUTION_CONFLICT` if treated as canonical relationship truth | Mark transitional behavior; later reads use Graph |
@@ -43,7 +43,7 @@ code support does not prove existing data has valid parents.
 
 | Concern | Current runtime | Approved target | Decision |
 |---|---|---|---|
-| Predicate vocabulary | `about`, `depicts` | Add `model_of`, `variant_of` only through future registry contract | `REGISTRY_GAP` |
+| Predicate vocabulary | `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music` | Exact six-definition approved contract | REGISTERED; no physical edge backfill |
 | Model parent | Payload `brand_uuid`; no typed structural predicate | Exactly one active `Model → Brand` `model_of` edge | Graph becomes canonical |
 | Variant parent | Payload `model_uuid`; no typed structural predicate | Exactly one active `Variant → Model` `variant_of` edge | Graph becomes canonical |
 | Variant→Brand | Not a registered predicate | Derived query path only | Never persist |
@@ -77,7 +77,8 @@ brand`, `variant --model_of → brand`, and `model --variant_of → variant`.
 
 ## Non-actions recorded
 
-- No `model_of` or `variant_of` registry entry, predicate row, or Graph edge.
+- No physical `model_of`, `variant_of` or other semantic Graph edge was added,
+  retired or rewritten by this checkpoint.
 - No Authority payload was rewritten or deleted.
 - No route, redirect, migration, import, or article-body operation was run.
 - No Brand was guessed for any record.

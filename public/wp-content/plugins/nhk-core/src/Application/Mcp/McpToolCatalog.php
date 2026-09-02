@@ -55,7 +55,7 @@ final class McpToolCatalog
                 'metadata' => ['type' => 'object'],
             ], ['claim_id', 'source_id', 'excerpt'], true),
             self::tool('nhk.proposal.create', 'Create a governed semantic proposal.', [
-                'operation' => ['type' => 'string'],
+                'operation' => ['type' => 'string', 'enum' => self::governedOperations()],
                 'entity_type' => ['type' => 'string'],
                 'subject_id' => ['type' => 'string'],
                 'payload' => ['type' => 'object'],
@@ -130,5 +130,11 @@ final class McpToolCatalog
             'required' => ['endpoint_type', 'endpoint_key', 'role'],
             'additionalProperties' => false,
         ];
+    }
+
+    /** @return list<string> */
+    private static function governedOperations(): array
+    {
+        return ['create', 'ingest', 'relation_create', 'rename', 'update', 'retire', 'reactivate', 'relation_retire', 'relation_reactivate'];
     }
 }

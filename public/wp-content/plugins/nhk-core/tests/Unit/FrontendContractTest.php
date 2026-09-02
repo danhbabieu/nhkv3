@@ -18,6 +18,44 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('<br> <em>mang một câu chuyện.</em>', $frontPage);
     }
 
+    public function test_public_discovery_links_use_vietnamese_hubs_and_not_technical_archives(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $functions = (string) file_get_contents($theme . '/functions.php');
+        $home = (string) file_get_contents($theme . '/front-page.php');
+        $sidebar = (string) file_get_contents($theme . '/sidebar.php');
+        self::assertStringContainsString("'Thương hiệu' => '/thuong-hieu/'", $functions);
+        self::assertStringContainsString("'Mẫu' => '/mau/'", $functions);
+        foreach (['/thuong-hieu/', '/mau/', '/bo-may/', '/ban-nhac/', '/so-sanh/', '/linh-kien/', '/hien-vat/', '/video/'] as $path) {
+            self::assertStringContainsString($path, $home);
+        }
+        self::assertStringNotContainsString("home_url('/brand/')", $home);
+        self::assertStringNotContainsString("home_url('/model/')", $sidebar);
+    }
+
+    public function test_discovery_consumers_are_wired_to_one_public_collection_query(): void
+    {
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+        $search = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Search/SearchSemanticQuery.php');
+        $home = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Home/HomeSemanticQuery.php');
+        $entityApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php');
+        self::assertStringContainsString('PublicEntityCollectionQuery', $plugin);
+        self::assertStringContainsString('PublicEntityCollectionQuery', $search);
+        self::assertStringContainsString('PublicEntityCollectionQuery', $home);
+        self::assertStringContainsString('PublicEntityCollectionQuery', $entityApi);
+    }
+
+    public function test_technical_archives_are_redirect_inputs_and_comparison_is_so_sanh(): void
+    {
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
+        $comparison = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicComparisonRoutes.php');
+        self::assertStringContainsString("'brand' => 'thuong-hieu'", $routes);
+        self::assertStringContainsString("'thuong-hieu'", $routes);
+        self::assertStringContainsString('nhk_legacy_archive', $routes);
+        self::assertStringContainsString("'^so-sanh/?$'", $comparison);
+        self::assertStringContainsString('legacyRedirect', $comparison);
+    }
+
     public function test_theme_seo_contract_covers_editorial_entity_media_and_video_surfaces(): void
     {
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
@@ -171,7 +209,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
         self::assertStringNotContainsString("home_url('/knowledge/claim/'", $index);
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
-        self::assertStringContainsString('$entity->active()', $searchApi);
+        self::assertStringContainsString('PublicEntityCollectionQuery', $searchApi);
         self::assertStringContainsString("'semantic_totals' => \$semanticTotals", $searchApi);
     }
 
@@ -446,11 +484,11 @@ final class FrontendContractTest extends TestCase
     public function test_public_semantic_search_only_indexes_allowlisted_entity_fields(): void
     {
         foreach ([
-            dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php',
             dirname(__DIR__, 2) . '/src/Application/Search/SearchSemanticQuery.php',
             dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
         ] as $file) {
-            self::assertStringContainsString('array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true))', (string) file_get_contents($file), $file . ' must avoid indexing private entity payload fields');
+            if (str_ends_with($file, 'SearchSemanticQuery.php')) self::assertStringContainsString('PublicEntityCollectionQuery', (string) file_get_contents($file));
+            else self::assertStringContainsString('array_intersect_key($entity->payload, array_fill_keys($definition->allowedFields, true))', (string) file_get_contents($file), $file . ' must avoid indexing private entity payload fields');
         }
     }
 
@@ -494,9 +532,9 @@ final class FrontendContractTest extends TestCase
     public function test_v2_archive_aliases_resolve_to_canonical_entity_types(): void
     {
         $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
-        self::assertStringContainsString("'thuong-hieu' => 'brand'", $routes);
-        self::assertStringContainsString("'hien-vat' => 'specimen'", $routes);
-        self::assertStringContainsString("'am-nhac' => 'music'", $routes);
+        self::assertStringContainsString("'brand' => 'thuong-hieu'", $routes);
+        self::assertStringContainsString("'specimen' => 'hien-vat'", $routes);
+        self::assertStringContainsString('legacyArchiveRedirect', $routes);
         self::assertStringContainsString('nhk_entity_alias', $routes);
     }
 
@@ -521,17 +559,16 @@ final class FrontendContractTest extends TestCase
         $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/comparison.php');
         $home = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/front-page.php');
         self::assertStringContainsString('PublicComparisonRoutes', $plugin);
+        self::assertStringContainsString("so-sanh/?$", $routes);
         self::assertStringContainsString("comparison/?$", $routes);
         self::assertStringContainsString('ComparisonPageQuery', $plugin);
         self::assertStringContainsString('name="a"', $template);
-        self::assertStringContainsString("home_url('/comparison/')", $home);
-        self::assertStringContainsString("'/comparison/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
+        self::assertStringContainsString("home_url('/so-sanh/')", $home);
+        self::assertStringContainsString("'/so-sanh/' => 200", (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php'));
         $routeSmoke = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/frontend-route-smoke.php');
         self::assertStringContainsString("'movement-url', 'music-url', 'component-url', 'classification-url', 'variant-url'", $routeSmoke);
-        self::assertStringContainsString("'/variant/' => 200", $routeSmoke);
-        self::assertStringContainsString("'/classification/' => 200", $routeSmoke);
-        self::assertStringContainsString("'/variant/page/2/' => 200", $routeSmoke);
-        self::assertStringContainsString("'/classification/page/2/' => 200", $routeSmoke);
+        self::assertStringContainsString("'/phan-loai/' => 200", $routeSmoke);
+        self::assertStringContainsString("'/phan-loai/page/2/' => 200", $routeSmoke);
         self::assertStringContainsString("'media-url', 'video-url', 'comparison-url'", $routeSmoke);
         foreach (["'/tri-thuc/page/2/' => 200", "'/goc-chia-se/page/2/' => 200", "'/media/page/2/' => 200", "'/video/page/2/' => 200", "'/knowledge/page/2/' => 200", "'/wp-sitemap.xml' => 200", "'/feed/' => 200"] as $route) {
             self::assertStringContainsString($route, $routeSmoke, 'semantic page-two route must be in smoke coverage');

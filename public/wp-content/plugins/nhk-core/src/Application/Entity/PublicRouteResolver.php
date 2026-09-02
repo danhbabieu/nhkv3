@@ -17,9 +17,10 @@ final class PublicRouteResolver
 
     /** @var list<string> */
     private const RESERVED_ROOTS = [
-        'tri-thuc', 'so-sanh', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai',
+        'thuong-hieu', 'mau', 'tri-thuc', 'so-sanh', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai',
         'hien-vat', 'san-pham', 'video', 'goc-chia-se', 'thu-vien', 'media',
         'wp-admin', 'wp-json', 'wp-content', 'wp-includes', 'feed', 'search', 'sitemap',
+        'brand', 'model', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'comparison',
     ];
 
     public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types) {}
@@ -46,7 +47,9 @@ final class PublicRouteResolver
 
     public function archivePath(string $type): ?string
     {
-        if ($type === 'brand' || $type === 'model' || $type === 'variant') return null;
+        if ($type === 'brand') return '/thuong-hieu/';
+        if ($type === 'model') return '/mau/';
+        if ($type === 'variant') return null;
         $namespace = self::NAMESPACES[$type] ?? null;
         return $namespace === null ? null : '/' . $namespace . '/';
     }

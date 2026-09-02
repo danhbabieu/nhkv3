@@ -70,4 +70,16 @@ final class PublicRouteResolverTest extends TestCase
             self::assertSame($path, $resolver->archivePath($type));
         }
     }
+
+    public function test_brand_and_model_archives_use_vietnamese_hubs_and_all_hubs_are_reserved(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+
+        self::assertSame('/thuong-hieu/', $resolver->archivePath('brand'));
+        self::assertSame('/mau/', $resolver->archivePath('model'));
+        foreach (['thuong-hieu', 'mau', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai', 'tri-thuc', 'hien-vat', 'san-pham', 'video', 'so-sanh', 'goc-chia-se', 'wp-admin', 'wp-json', 'feed', 'search', 'sitemap'] as $root) {
+            self::assertContains($root, PublicRouteResolver::reservedRoots());
+        }
+    }
 }

@@ -1,5 +1,22 @@
 # V2 → V3 Parity Matrix
 
+## 2026-09-02 implementation checkpoint
+
+Vietnamese public discovery hubs and route contracts are now implemented for
+Brand (`/thuong-hieu/`), Model (`/mau/`), Movement (`/bo-may/`), Music
+(`/ban-nhac/`), Component (`/linh-kien/`), Classification (`/phan-loai/`),
+Specimen (`/hien-vat/`), Product (`/san-pham/`) and Comparison (`/so-sanh/`).
+Technical archive roots redirect one hop to their canonical Vietnamese hubs;
+public entity archive, detail, search, home and REST Authority reads share the
+same collection boundary and route-safe identity/eligibility decisions.
+
+The six approved Graph predicates are registered with their contract endpoint
+and cardinality definitions. Structural traversal, Brand aggregation and
+distribution/compatibility diagnostics are read-only; no physical Graph edge,
+Authority row or legacy article body was imported or rewritten. Runtime HTTP,
+stored-menu and exact 241-edge distribution evidence remain environment-gated
+because the local WordPress database is currently unavailable.
+
 `NOT ASSESSED` is intentionally not a parity claim. Mandatory red items block
 the final parity declaration.
 

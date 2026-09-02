@@ -12,16 +12,25 @@ final class PublicComparisonRoutes
     public function register(): void
     {
         add_filter('query_vars', function (array $vars): array {
-            if (!in_array('nhk_comparison_route', $vars, true)) $vars[] = 'nhk_comparison_route';
+            foreach (['nhk_comparison_route', 'nhk_comparison_legacy'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name;
             return $vars;
         });
         add_action('init', [$this, 'rewrite']);
+        add_action('template_redirect', [$this, 'legacyRedirect'], 1);
         add_filter('template_include', [$this, 'template']);
     }
 
     public function rewrite(): void
     {
-        add_rewrite_rule('^comparison/?$', 'index.php?nhk_comparison_route=1', 'top');
+        add_rewrite_rule('^so-sanh/?$', 'index.php?nhk_comparison_route=1', 'top');
+        add_rewrite_rule('^comparison/?$', 'index.php?nhk_comparison_legacy=1', 'top');
+    }
+
+    public function legacyRedirect(): void
+    {
+        if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli' || (string) get_query_var('nhk_comparison_legacy') === '') return;
+        wp_safe_redirect(home_url('/so-sanh/'), 301, 'NHK canonical comparison route');
+        exit;
     }
 
     public function template(string $template): string

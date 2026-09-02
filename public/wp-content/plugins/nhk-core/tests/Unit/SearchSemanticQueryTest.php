@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Search\SearchSemanticQuery;
+use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -92,5 +93,24 @@ final class SearchSemanticQueryTest extends TestCase
         $result = (new SearchSemanticQuery(new InMemoryAuthorityRepository(), $emptyMedia, $videos, $emptyKnowledge, new EntityTypeRegistry()))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'clock');
         self::assertSame([], $result['videos']);
         self::assertSame(0, $result['_totals']['videos']);
+    }
+
+    public function test_semantic_search_excludes_an_active_authority_row_without_a_public_route(): void
+    {
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $authorityRepository = new InMemoryAuthorityRepository();
+        $authority = new AuthorityService($authorityRepository, $types);
+        $authority->create('brand', 'reserved', 'Video');
+        $routes = new PublicRouteResolver($authorityRepository, $types);
+        $collection = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $item): Media { return $item; } public function update(Media $item, int $expectedRevision): Media { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyVideo = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $item): Video { return $item; } public function update(Video $item, int $expectedRevision): Video { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyKnowledge = new class implements KnowledgeRepository { public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; } public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; } public function list(bool $includeRetired = false): array { return []; } };
+
+        $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $emptyVideo, $emptyKnowledge, $types, null, $routes, $collection))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Video');
+
+        self::assertSame([], $result['entities']);
+        self::assertSame(0, $result['_totals']['entities']);
     }
 }

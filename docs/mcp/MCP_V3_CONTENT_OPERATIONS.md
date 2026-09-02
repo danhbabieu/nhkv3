@@ -27,8 +27,10 @@ return HTTP 202 with no body.
 
 `McpToolCatalog::tools()` exposes exactly 19 tools. `kind=mutation` implies
 `governed=true`. The 19th catalog member added by this checkpoint is
-`nhk.semantic.resolve` (catalog position 2); catalog position 19 is
-`nhk.proposal.apply`.
+`nhk.semantic.resolve` (catalog position 2); the catalog's position 19 is
+`nhk.proposal.apply`. The clean HEAD catalog and the wire smoke both use this
+same ordered list; the local HTTP wire smoke remains an environment check and
+must not be replaced by a static catalog assertion.
 
 | TOOL | DOMAIN | READ/WRITE | GOVERNED | REVISION | GRAPH | STATUS |
 |---|---|---|---|---|---|---|
@@ -59,7 +61,7 @@ The exact current wire order is the table order above.
 
 | USE CASE | CURRENT CAPABILITY | STATUS |
 |---|---|---|
-| Find canonical entity | Authority resolver; UUID-only reads for other domains | PARTIAL |
+| Find canonical entity | Authority resolver; `nhk.search` for bounded public discovery; UUID-only reads for other domains | PARTIAL |
 | Read canonical entity | Entity/domain `get` tools | READY for exposed boundaries |
 | Create/update entity | Ingest or generic governed proposal; no typed update tool | PARTIAL |
 | Read Source/Evidence | `nhk.source.get`, `nhk.evidence.get` | READY |
@@ -131,9 +133,18 @@ Full boot registers 15 endpoint types: `wp_post`; Authority `brand`, `model`,
 |---|---|---|---|---|---|---|---|---|
 | all 15 endpoint types | `about` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
 | `media` | `depicts` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `model` | `model_of` | `brand` | outbound ONE / inbound MANY | DIRECT | canonical endpoints; provenance where the relation operation requires it | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `variant` | `variant_of` | `model` | outbound ONE / inbound MANY | DIRECT | canonical endpoints; provenance where the relation operation requires it | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `variant` | `uses_movement` | `movement` | outbound MANY / inbound MANY | DIRECT | canonical endpoints and documented/configured-use evidence | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `movement` | `supports_music` | `music` | outbound MANY / inbound MANY | DIRECT | canonical endpoints and capability evidence | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `variant` | `configured_with_music` | `music` | outbound MANY / inbound MANY | DIRECT | canonical endpoints and configuration evidence | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| `specimen` | `observed_playing_music` | `music` | outbound MANY / inbound MANY | DIRECT | concrete-object observation provenance/evidence | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
 
-Exactly two predicates exist. No third predicate, derived relation, predicate
-specific evidence rule or Album relation may be invented.
+At clean HEAD the registry had two predicates (`about`, `depicts`). The current
+working tree already contains the six exact approved Brand relationship
+definitions above in `PredicateRegistry`; they are pre-existing uncommitted
+work and were not added by this MCP task. No further predicate, derived
+relation, predicate-specific evidence rule or Album relation may be invented.
 
 ## 8. Media workflow
 
@@ -194,12 +205,15 @@ executor/domain services:
 
 Generic proposal strings are not authorization; final validation occurs at
 apply. Every semantic write retains capability checks, expected revision,
-fingerprints, idempotency, audit and controlled transaction.
+fingerprints, idempotency, audit and controlled transaction. The MCP proposal
+schema now rejects any operation outside the nine existing executor operations
+before proposal persistence; this is an input boundary, not a new operation
+registry.
 
 ## 13. Error codes and fail-closed behavior
 
 `-32600` invalid JSON-RPC request; `-32601` unknown method/tool; `-32602`
-invalid/missing argument; `-32003` origin or capability denied; `-32020`
+invalid/missing argument, including an unsupported proposal operation; `-32003` origin or capability denied; `-32020`
 Streamable HTTP/header mismatch; `-32022` unsupported protocol version.
 Typed domain/governance failures return an MCP `isError=true` result. Null
 reads, ambiguity, unavailable readiness and revision/idempotency conflicts are
