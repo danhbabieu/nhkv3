@@ -24,7 +24,12 @@ final class PublicRouteResolver
         'brand', 'model', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'comparison',
     ];
 
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null) {}
+    /**
+     * @param \Closure(string):bool|null $nativeRootExists Optional WordPress
+     *        boundary probe. The application remains usable without WP in
+     *        unit tests and non-HTTP consumers.
+     */
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null, private ?\Closure $nativeRootExists = null) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
@@ -33,7 +38,7 @@ final class PublicRouteResolver
         if (!$this->types->has($entity->entityType) || !$entity->active()) return null;
         $slug = self::slug($entity->canonicalName);
         if ($slug === '') return null;
-        if ($entity->entityType === 'brand') return in_array($slug, self::RESERVED_ROOTS, true) || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) ? null : '/' . $slug . '/';
+        if ($entity->entityType === 'brand') return in_array($slug, self::RESERVED_ROOTS, true) || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) || $this->nativeRootExists($slug) ? null : '/' . $slug . '/';
         if ($entity->entityType === 'model') {
             $context = $this->context($entity);
             $brand = $context === null ? $this->parent($entity, 'brand_uuid', 'brand') : ($context->brandId === null || $context->reasons !== [] ? null : $this->authority->findByCanonicalId($context->brandId));
@@ -105,6 +110,22 @@ final class PublicRouteResolver
     /** @return list<string> */
     public static function reservedRoots(): array { return self::RESERVED_ROOTS; }
     public static function namespaceFor(string $type): ?string { return self::NAMESPACES[$type] ?? null; }
+
+    private function nativeRootExists(string $slug): bool
+    {
+        if ($this->nativeRootExists !== null) return (bool) ($this->nativeRootExists)($slug);
+        if (!function_exists('get_posts')) return false;
+        if (function_exists('get_page_by_path')) {
+            $page = get_page_by_path($slug, OBJECT, 'page');
+            if ($page instanceof \WP_Post && function_exists('is_post_publicly_viewable') && is_post_publicly_viewable($page)) return true;
+        }
+        foreach (get_post_types(['publicly_queryable' => true], 'names') as $postType) {
+            if ($postType === 'page') continue;
+            $posts = get_posts(['name' => $slug, 'post_type' => $postType, 'post_status' => 'publish', 'numberposts' => 1, 'no_found_rows' => true, 'fields' => 'ids']);
+            if ($posts !== []) return true;
+        }
+        return false;
+    }
 
     private function unique(string $type, string $slug): ?AuthorityEntity
     {

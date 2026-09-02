@@ -7,6 +7,7 @@ use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Application\Entity\PublicEntityEligibilityPolicy;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Domain\Media\Media;
@@ -16,7 +17,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class RelatedContentQuery
 {
-    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null) {}
+    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null) {}
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
     public function forEntity(string $type, string $id): array
@@ -59,6 +60,7 @@ final class RelatedContentQuery
         if ($this->types->has($node->endpoint_type)) {
             $entity = $this->authority->findByCanonicalId($node->endpoint_key);
             if (!$entity || !$entity->active()) return null;
+            if ($this->eligibility !== null && !$this->eligibility->evaluate($entity)->eligible) return null;
             return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity)]];
         }
         if ($node->endpoint_type === 'media') { $media = $this->media->findByCanonicalId($node->endpoint_key); return $media && $media->active && $media->readiness === 'ready' ? ['group' => 'media', 'value' => $this->mediaValue($media)] : null; }

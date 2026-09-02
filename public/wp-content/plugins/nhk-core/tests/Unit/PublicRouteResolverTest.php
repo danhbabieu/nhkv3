@@ -82,4 +82,16 @@ final class PublicRouteResolverTest extends TestCase
             self::assertContains($root, PublicRouteResolver::reservedRoots());
         }
     }
+
+    public function test_brand_route_fails_closed_when_a_native_wordpress_root_exists(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $brand = $authority->create('brand', 'nhk:brand:foo', 'Foo');
+        $resolver = new PublicRouteResolver($repository, $types, null, static fn (string $slug): bool => $slug === 'foo');
+
+        self::assertNull($resolver->path($brand));
+        self::assertNotNull($resolver->resolve('brand', ['foo']), 'Incoming collision resolution remains available to the HTTP boundary so it can emit IDENTITY_CONFLICT.');
+    }
 }

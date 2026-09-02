@@ -342,6 +342,18 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_public_url(get_category_link($topic))', (string) file_get_contents($theme . '/front-page.php'));
     }
 
+    public function test_brand_detail_projects_all_registered_authority_related_groups_and_keeps_posts_separate(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php');
+
+        foreach (['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products'] as $group) {
+            self::assertStringContainsString("'{$group}'", $template);
+        }
+        self::assertStringContainsString("if (\$type === 'brand') unset(\$relatedGroups['entities'])", $template);
+        self::assertStringContainsString('Liên kết trực tiếp', $template);
+        self::assertStringContainsString('Liên kết suy ra', $template);
+    }
+
     public function test_public_entity_boundaries_filter_unregistered_payload_fields(): void
     {
         $contract = dirname(__DIR__, 2) . '/src/Application/Entity/PublicIdentityContract.php';
@@ -534,6 +546,29 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'specimen' => 'hien-vat'", $routes);
         self::assertStringContainsString('legacyArchiveRedirect', $routes);
         self::assertStringContainsString('nhk_entity_alias', $routes);
+    }
+
+    public function test_root_entity_routing_preserves_native_wordpress_resolution_and_fails_closed_on_collision(): void
+    {
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
+        self::assertStringContainsString('name=$matches[1]&nhk_public_entity_type=brand', $routes);
+        self::assertStringContainsString('preserveNativeRootRoute', $routes);
+        self::assertStringContainsString('return $template;', $routes);
+        self::assertStringContainsString("'code' => self::ROOT_IDENTITY_CONFLICT", $routes);
+        self::assertStringContainsString('get_404_template()', $routes);
+        self::assertSame('entity', \NHK\Core\Infrastructure\Http\PublicEntityRoutes::classifyRootRoute(true, false));
+        self::assertSame('native_wordpress', \NHK\Core\Infrastructure\Http\PublicEntityRoutes::classifyRootRoute(false, true));
+        self::assertSame('not_found', \NHK\Core\Infrastructure\Http\PublicEntityRoutes::classifyRootRoute(false, false));
+        self::assertSame('IDENTITY_CONFLICT', \NHK\Core\Infrastructure\Http\PublicEntityRoutes::classifyRootRoute(true, true));
+    }
+
+    public function test_native_editorial_links_use_wordpress_permalink_api(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['front-page.php', 'sidebar.php'] as $template) {
+            self::assertStringContainsString('the_permalink()', (string) file_get_contents($theme . '/' . $template), $template . ' must use the native WordPress permalink.');
+        }
+        self::assertStringContainsString("'url' => get_permalink(\$post)", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Entity/RelatedContentQuery.php'));
     }
 
     public function test_v2_search_alias_preserves_query_and_uses_native_wordpress_search(): void

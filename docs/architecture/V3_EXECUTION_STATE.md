@@ -118,6 +118,43 @@ this checkpoint.
 
 ## Current checkpoint — 2026-09-02
 
+Root WordPress Post/Brand route-collision checkpoint — 2026-09-02: source
+tracing confirmed that `PublicEntityRoutes::rewrite()` placed the one-segment
+root Brand rule in `extra_rules_top`, ahead of WordPress `%postname%` rules.
+The previous `PublicEntityRoutes::template()` then forced 404 when the broad
+root rule's Brand lookup returned no entity. The root bridge now retains the
+native `name` query, preserves Page resolution through the `request` filter,
+returns control to WordPress when no Brand resolves, resets a positively
+resolved entity route to 200, and records `IDENTITY_CONFLICT`/404 when both a
+native WordPress object and Brand resolve the same root. Brand public-path
+generation also fails closed when a public native root already exists; native
+editorial links continue to use WordPress permalink APIs. No Post, slug,
+Authority record, Graph edge, redirect or database row was changed.
+
+Focused route tests pass 52 tests / 590 assertions; the complete Unit suite
+passes 253 tests / 1,307 assertions; PHP lint, Composer validation and
+`git diff --check` pass. The guarded Post 55 lifecycle test is present but
+runtime verification is blocked because local MySQL cannot establish a
+connection; HTTP route smoke and staging verification remain unavailable.
+
+Brand related-projection checkpoint — 2026-09-02: the public Brand detail
+projection now includes every registered Authority group that has an active
+Graph `about` edge to/from the Brand, in addition to the approved
+`model_of`/`variant_of` structural path. Results are deduplicated by canonical
+identity internally, prefer DIRECT over DERIVED, expose bounded hop/path
+explanation, and omit the previous invalid three-hop Variant→Movement/Music
+promotion. The theme renders Models, Variants, Movements, Music, Components,
+Classifications, Specimens and Products; posts/media/videos remain in their
+separate related-content groups. Public related Authority results now share
+the eligibility policy. Keyword matches alone still do not create or imply a
+Graph edge, and no semantic record or Graph edge was changed.
+
+Evidence: focused Brand/public/frontend slice passes 57 tests / 581
+assertions; the complete Unit suite passes 250 tests / 1,293 assertions;
+Composer validation, plugin/theme PHP lint and `git diff --check` pass. The
+full suite remains environment-blocked by the unavailable WordPress database
+bootstrap and the mandatory `NHK_WP_TEST_PATH=public` integration gate.
+
 Public entity runtime hotfix checkpoint — 2026-09-02: restored the missing
 `NHK\\Core\\Shared\\Uuid\\UuidCodec` import in
 `PublicEntityCollectionQuery`, preventing PHP from resolving the codec as the

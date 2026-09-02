@@ -52,7 +52,7 @@ use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Knowledge\KnowledgeService;
 
 final class Plugin {
-    private const REWRITE_VERSION = '7';
+    private const REWRITE_VERSION = '8';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
@@ -93,14 +93,15 @@ final class Plugin {
             $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink());
             $publicContexts = new StructuralContextQuery($publicGraph, $publicAuthority);
             $publicRoutes = new PublicRouteResolver($publicAuthority, $publicTypes, $publicContexts);
-            $publicAggregation = new BrandAggregationQuery($publicGraph, $publicAuthority, $publicTypes, $publicRoutes);
-            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), new PublicEntityEligibilityPolicy($publicAuthority, $publicTypes, $publicRoutes, $publicContexts), $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady());
+            $publicEligibility = new PublicEntityEligibilityPolicy($publicAuthority, $publicTypes, $publicRoutes, $publicContexts);
+            $publicAggregation = new BrandAggregationQuery($publicGraph, $publicAuthority, $publicTypes, $publicRoutes, $publicEligibility);
+            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady());
             add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection), 'extend']);
             $publicClaims = new WpdbKnowledgeRepository($wpdb);
             $publicSources = new WpdbSourceRepository($wpdb);
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
             add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus, $publicRoutes, $publicCollection), 'extend'], 10, 3);
-            $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus);
+            $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicEligibility);
             add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2);
             $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
             (new PublicEntityRoutes($publicEntityQuery, $publicTypes))->register();
@@ -125,7 +126,8 @@ final class Plugin {
             $publicStatus = new MigrationStatus();
             $publicContexts = new StructuralContextQuery($graphService, $authority);
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
-            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts), $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes), static fn (): bool => $publicStatus->authorityStorageReady());
+            $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
+            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady());
             $proposalRepository = new WpdbProposalRepository($wpdb); $governanceAudit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb); $transactionManager = new WpdbTransactionManager($wpdb); $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));

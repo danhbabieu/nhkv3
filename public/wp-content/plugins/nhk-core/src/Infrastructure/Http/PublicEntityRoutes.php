@@ -9,6 +9,11 @@ use NHK\Core\Domain\Authority\EntityTypeRegistry;
 
 final class PublicEntityRoutes
 {
+    private const ROOT_ENTITY = 'entity';
+    private const ROOT_NATIVE = 'native_wordpress';
+    private const ROOT_NOT_FOUND = 'not_found';
+    private const ROOT_IDENTITY_CONFLICT = 'IDENTITY_CONFLICT';
+
     /** @var array<string,string> */
     private const CANONICAL_ARCHIVES = [
         'brand' => 'thuong-hieu', 'model' => 'mau', 'movement' => 'bo-may', 'music' => 'ban-nhac',
@@ -20,6 +25,7 @@ final class PublicEntityRoutes
     public function register(): void
     {
         add_filter('query_vars', function (array $vars): array { foreach (['nhk_entity_type', 'nhk_entity_key', 'nhk_entity_page', 'nhk_entity_q', 'nhk_entity_alias', 'nhk_legacy_archive', 'nhk_public_entity_type', 'nhk_public_entity_a', 'nhk_public_entity_b', 'nhk_public_entity_c'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
+        add_filter('request', [$this, 'preserveNativeRootRoute'], 20);
         add_action('init', [$this, 'rewrite']);
         add_action('template_redirect', [$this, 'legacyArchiveRedirect'], 1);
         add_action('template_redirect', [$this, 'legacyIdentityRedirect'], 1);
@@ -32,7 +38,10 @@ final class PublicEntityRoutes
         $reserved = implode('|', array_map(static fn (string $root): string => preg_quote($root, '#'), PublicRouteResolver::reservedRoots()));
         add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/([a-z0-9-]+)/([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=variant&nhk_public_entity_a=$matches[1]&nhk_public_entity_b=$matches[2]&nhk_public_entity_c=$matches[3]', 'top');
         add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=model&nhk_public_entity_a=$matches[1]&nhk_public_entity_b=$matches[2]', 'top');
-        add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=brand&nhk_public_entity_a=$matches[1]', 'top');
+        // Keep the native slug query attached to the root request. WP_Query
+        // can therefore resolve a Post before NHK decides whether a Brand
+        // route is actually claimable.
+        add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/?$', 'index.php?name=$matches[1]&nhk_public_entity_type=brand&nhk_public_entity_a=$matches[1]', 'top');
         foreach (self::CANONICAL_ARCHIVES as $type => $namespace) {
             add_rewrite_rule('^' . preg_quote($namespace, '#') . '/page/([1-9][0-9]*)/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_alias=' . $namespace . '&nhk_entity_page=$matches[1]', 'top');
             add_rewrite_rule('^' . preg_quote($namespace, '#') . '/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_alias=' . $namespace, 'top');
@@ -58,7 +67,14 @@ final class PublicEntityRoutes
         if ($publicType !== '') {
             $segments = array_values(array_filter([(string) get_query_var('nhk_public_entity_a'), (string) get_query_var('nhk_public_entity_b'), (string) get_query_var('nhk_public_entity_c')], static fn (string $value): bool => $value !== ''));
             $entity = $this->query->resolvePublic($publicType, $segments);
-            if ($entity === null) { $this->set404(); return get_404_template(); }
+            $native = $this->nativeRootObject();
+            $decision = self::classifyRootRoute($entity !== null, $native !== null);
+            if ($decision === self::ROOT_NATIVE || $decision === self::ROOT_NOT_FOUND) return $template;
+            if ($decision === self::ROOT_IDENTITY_CONFLICT) {
+                $this->setRouteConflict($publicType, (string) get_query_var('nhk_public_entity_a'), $native);
+                return get_404_template();
+            }
+            $this->set200();
             $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detail($publicType, $entity->canonicalId), 'archive_url' => $this->query->publicPath($entity)];
             $themeTemplate = locate_template('entity.php');
             return $themeTemplate !== '' ? $themeTemplate : $template;
@@ -78,7 +94,65 @@ final class PublicEntityRoutes
         return $themeTemplate !== '' ? $themeTemplate : $template;
     }
 
+    /** @return 'entity'|'native_wordpress'|'not_found'|'IDENTITY_CONFLICT' */
+    public static function classifyRootRoute(bool $entityResolved, bool $nativeResolved): string
+    {
+        if ($entityResolved && $nativeResolved) return self::ROOT_IDENTITY_CONFLICT;
+        if ($entityResolved) return self::ROOT_ENTITY;
+        if ($nativeResolved) return self::ROOT_NATIVE;
+        return self::ROOT_NOT_FOUND;
+    }
+
+    /** @return object|null */
+    private function nativeRootObject(): ?object
+    {
+        global $wp_query;
+        if (!isset($wp_query) || !is_object($wp_query) || !method_exists($wp_query, 'is_singular') || !$wp_query->is_singular() || !method_exists($wp_query, 'get_queried_object')) return null;
+        $object = $wp_query->get_queried_object();
+        return is_object($object) && isset($object->ID, $object->post_type) ? $object : null;
+    }
+
+    private function set200(): void
+    {
+        global $wp_query;
+        if (isset($wp_query) && is_object($wp_query)) $wp_query->is_404 = false;
+        status_header(200);
+    }
+
     private function set404(): void { global $wp_query; if (isset($wp_query) && is_object($wp_query)) $wp_query->set_404(); status_header(404); nocache_headers(); }
+
+    private function setRouteConflict(string $entityType, string $slug, ?object $native): void
+    {
+        $GLOBALS['nhk_core_route_diagnostic'] = [
+            'code' => self::ROOT_IDENTITY_CONFLICT,
+            'entity_type' => $entityType,
+            'slug' => $slug,
+            'native_post_id' => isset($native->ID) ? (int) $native->ID : null,
+            'native_post_type' => isset($native->post_type) ? (string) $native->post_type : null,
+        ];
+        $this->set404();
+    }
+
+    /**
+     * The root entity rewrite is deliberately broad so a valid Brand can
+     * claim its canonical route. Preserve the native Page query where WP's
+     * page resolver needs pagename rather than name.
+     *
+     * @param array<string,mixed> $queryVars
+     * @return array<string,mixed>
+     */
+    public function preserveNativeRootRoute(array $queryVars): array
+    {
+        if (($queryVars['nhk_public_entity_type'] ?? '') !== 'brand') return $queryVars;
+        $slug = is_scalar($queryVars['nhk_public_entity_a'] ?? null) ? (string) $queryVars['nhk_public_entity_a'] : '';
+        if ($slug === '' || !function_exists('get_page_by_path')) return $queryVars;
+        $page = get_page_by_path($slug);
+        if ($page instanceof \WP_Post && (string) ($page->post_type ?? '') === 'page') {
+            unset($queryVars['name']);
+            $queryVars['pagename'] = $slug;
+        }
+        return $queryVars;
+    }
 
     public function legacyArchiveRedirect(): void
     {
@@ -107,7 +181,7 @@ final class PublicEntityRoutes
 
     public function legacyDetailRedirect(): void
     {
-        if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli' || (string) get_query_var('nhk_entity_type') !== '' || !is_404()) return;
+        if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli' || (string) get_query_var('nhk_entity_type') !== '' || (string) get_query_var('nhk_public_entity_type') !== '' || !is_404()) return;
         $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
         if (!is_string($path)) return;
         $segments = array_values(array_filter(explode('/', trim($path, '/')), static fn (string $segment): bool => $segment !== ''));
