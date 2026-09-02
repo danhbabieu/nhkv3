@@ -39,6 +39,61 @@ function nhk_v3_nav_fallback(): void
     echo '</ul>';
 }
 
+function nhk_v3_public_brand_text(string $text): string
+{
+    if (class_exists('NHK\\Core\\Application\\Projection\\PublicBrandNamePolicy')) {
+        return \NHK\Core\Application\Projection\PublicBrandNamePolicy::normalizeText($text);
+    }
+
+    $aliases = [
+        '/(?<![\p{L}\p{N}])(?:ô[\s-]*đ[oô]|o[\s-]*do|odo)(?![\p{L}\p{N}])/iu' => 'Odo',
+        '/(?<![\p{L}\p{N}])(?:vê[\s-]*đét|ve[\s-]*det|vedet(?:te)?)(?![\p{L}\p{N}])/iu' => 'Vedette',
+        '/(?<![\p{L}\p{N}])(?:junghans|jun[\s-]*han(?:s)?|junhan)(?![\p{L}\p{N}])/iu' => 'Junghans',
+    ];
+    foreach ($aliases as $pattern => $replacement) {
+        $normalized = preg_replace($pattern, $replacement, $text);
+        if (is_string($normalized)) $text = $normalized;
+    }
+    return $text;
+}
+
+function nhk_v3_public_html(string $html): string
+{
+    if (class_exists('NHK\\Core\\Application\\Projection\\PublicBrandNamePolicy')) {
+        return \NHK\Core\Application\Projection\PublicBrandNamePolicy::normalizeHtml($html);
+    }
+
+    $parts = function_exists('wp_html_split') ? wp_html_split($html) : preg_split('/(<[^>]+>)/s', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+    if (!is_array($parts)) return nhk_v3_public_brand_text($html);
+    $protected = null;
+    foreach ($parts as $index => $part) {
+        if (!is_string($part) || $part === '') continue;
+        if ($part[0] === '<') {
+            if (preg_match('/^<\s*script\b[^>]*type=(?:["\'])application\/ld\+json(?:["\'])[^>]*>/iu', $part)) {
+                $protected = 'jsonld';
+            } elseif (preg_match('/^<\s*(script|style|textarea)\b/iu', $part, $opening)) {
+                $protected = strtolower((string) $opening[1]);
+            } elseif (preg_match('/^<\s*\/\s*(script|style|textarea)\b/iu', $part)) {
+                $protected = null;
+            }
+            continue;
+        }
+        if (!in_array($protected, ['script', 'style', 'textarea'], true)) $parts[$index] = nhk_v3_public_brand_text($part);
+    }
+    return implode('', $parts);
+}
+
+function nhk_v3_public_title(string $title): string { return is_admin() ? $title : nhk_v3_public_brand_text($title); }
+function nhk_v3_public_excerpt_filter(string $excerpt): string { return is_admin() ? $excerpt : nhk_v3_public_brand_text($excerpt); }
+function nhk_v3_public_content_filter(string $content): string { return is_admin() ? $content : nhk_v3_public_html($content); }
+
+add_filter('the_title', 'nhk_v3_public_title', 20);
+add_filter('the_title_rss', 'nhk_v3_public_title', 20);
+add_filter('get_the_excerpt', 'nhk_v3_public_excerpt_filter', 20);
+add_filter('the_excerpt_rss', 'nhk_v3_public_excerpt_filter', 20);
+add_filter('the_content', 'nhk_v3_public_content_filter', 20);
+add_filter('the_content_feed', 'nhk_v3_public_content_filter', 20);
+
 function nhk_v3_excerpt(): string { return wp_trim_words(wp_strip_all_tags(get_the_excerpt()), 28); }
 
 function nhk_v3_entity_label(string $type): string
@@ -53,7 +108,7 @@ function nhk_v3_public_type(string $type): string
 
 function nhk_v3_public_category_name(string $name): string
 {
-    return strcasecmp(trim($name), 'Uncategorized') === 0 ? 'Chưa phân loại' : $name;
+    return nhk_v3_public_brand_text(strcasecmp(trim($name), 'Uncategorized') === 0 ? 'Chưa phân loại' : $name);
 }
 
 function nhk_v3_public_date(?int $timestamp = null): string
@@ -116,7 +171,7 @@ function nhk_v3_public_value(mixed $value): string
         'external reference' => 'nguồn bên ngoài',
         'atomic claim' => 'thông tin đã kiểm chứng',
     ];
-    return str_ireplace(array_keys($replacements), array_values($replacements), $text);
+    return nhk_v3_public_brand_text(str_ireplace(array_keys($replacements), array_values($replacements), $text));
 }
 
 function nhk_v3_public_label(string $key): string
@@ -164,6 +219,7 @@ function nhk_v3_document_title(string $title): string
     return $title;
 }
 add_filter('pre_get_document_title', 'nhk_v3_document_title');
+add_filter('pre_get_document_title', 'nhk_v3_public_brand_text', 99);
 
 function nhk_v3_seo_head(): void
 {
@@ -233,6 +289,8 @@ function nhk_v3_seo_head(): void
         else $canonical = function_exists('wp_get_canonical_url') ? (string) wp_get_canonical_url() : home_url(add_query_arg([]));
         if ($canonical === '') $canonical = home_url('/');
     }
+    $title = nhk_v3_public_brand_text($title);
+    $description = nhk_v3_public_brand_text($description);
     echo '<meta name="description" content="' . esc_attr(wp_strip_all_tags($description)) . '">' . "\n";
     echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     echo '<meta property="og:type" content="' . esc_attr(is_singular('post') ? 'article' : 'website') . '"><meta property="og:title" content="' . esc_attr($title) . '"><meta property="og:description" content="' . esc_attr(wp_strip_all_tags($description)) . '"><meta property="og:url" content="' . esc_url($canonical) . '"><meta property="og:site_name" content="Đồng Hồ Nhà Kho">' . "\n";
@@ -246,7 +304,7 @@ function nhk_v3_seo_head(): void
     if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/so-sanh/')];
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
-    if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'VideoObject', 'name' => (string) (($video['title'] ?? '') ?: 'Video NHK'), 'url' => $canonical, 'embedUrl' => strtolower((string) ($video['platform'] ?? '')) === 'youtube' ? 'https://www.youtube-nocookie.com/embed/' . (string) ($video['external_id'] ?? '') : null, 'contentUrl' => (string) ($video['url'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; }
+    if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'VideoObject', 'name' => nhk_v3_public_brand_text((string) (($video['title'] ?? '') ?: 'Video NHK')), 'url' => $canonical, 'embedUrl' => strtolower((string) ($video['platform'] ?? '')) === 'youtube' ? 'https://www.youtube-nocookie.com/embed/' . (string) ($video['external_id'] ?? '') : null, 'contentUrl' => (string) ($video['url'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; }
 }
 add_action('wp_head', 'nhk_v3_seo_head', 1);
 

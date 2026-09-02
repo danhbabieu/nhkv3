@@ -111,7 +111,7 @@ final class P0ConstitutionIntegrityTest extends TestCase
         $repository = new InMemoryAuthorityRepository();
         $authority = new \NHK\Core\Application\Authority\AuthorityService($repository, $types);
         $specimen = $authority->create('specimen', 'p0-specimen', 'Physical object', ['serial_number' => 'SN-1']);
-        $product = $authority->create('product', 'p0-product', 'Listing', ['specimen_uuid' => $specimen->canonicalId, 'price' => 100.0, 'currency' => 'USD', 'availability' => 'listed']);
+        $product = $authority->create('product', 'p0-product', 'Listing', ['price' => 100.0, 'currency' => 'USD', 'availability' => 'listed']);
 
         $this->expectException(\NHK\Core\Authority\Exception\InvalidPayload::class);
         $authority->update($product->canonicalId, ['serial_number' => 'SN-2'], 1);
@@ -123,10 +123,9 @@ final class P0ConstitutionIntegrityTest extends TestCase
         $repository = new InMemoryAuthorityRepository();
         $authority = new \NHK\Core\Application\Authority\AuthorityService($repository, $types);
         $specimen = $authority->create('specimen', 'p0-specimen-2', 'Physical object', ['serial_number' => 'SN-2']);
-        $product = $authority->create('product', 'p0-product-2', 'Listing', ['specimen_uuid' => $specimen->canonicalId, 'price' => 200.0, 'currency' => 'USD', 'availability' => 'listed']);
-        $updated = $authority->update($product->canonicalId, ['specimen_uuid' => $specimen->canonicalId, 'price' => 250.0, 'currency' => 'USD', 'availability' => 'sold'], 1);
+        $product = $authority->create('product', 'p0-product-2', 'Listing', ['price' => 200.0, 'currency' => 'USD', 'availability' => 'listed']);
+        $updated = $authority->update($product->canonicalId, ['price' => 250.0, 'currency' => 'USD', 'availability' => 'sold'], 1);
 
-        self::assertSame($specimen->canonicalId, $updated->payload['specimen_uuid']);
         self::assertSame($specimen->canonicalId, $repository->findByCanonicalId($specimen->canonicalId)?->canonicalId);
         try {
             $authority->update($specimen->canonicalId, ['availability' => 'sold'], 1);

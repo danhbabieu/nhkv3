@@ -52,6 +52,13 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertArrayNotHasKey('stable_key', $query->detail('movement', 'cal-100'));
     }
 
+    public function test_detail_rejects_malformed_canonical_uuid_without_autoload_failure(): void
+    {
+        ['query' => $query] = $this->query();
+
+        self::assertNull($query->detail('brand', '550e8400-e29b-11d4-a716-446655440000'));
+    }
+
     public function test_archive_reports_unavailable_infrastructure_instead_of_masquerading_as_empty_data(): void
     {
         ['repository' => $repository] = $this->query();

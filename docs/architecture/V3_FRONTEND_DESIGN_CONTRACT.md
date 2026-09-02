@@ -123,6 +123,12 @@ page-two-or-later archive states emit `noindex,follow` while retaining
 followable links to their canonical content. This includes the custom entity,
 Media, Video and Knowledge pagination query vars.
 
+Public brand copy follows the dedicated
+`docs/architecture/PUBLIC_BRAND_NAMING_CONTRACT.md`: covered aliases are
+presentation-normalized to exactly `Odo`, `Vedette` and `Junghans` across
+editorial and semantic surfaces. The policy does not mutate WordPress source
+content or canonical semantic records.
+
 ## Acceptance
 
 Critical route smoke tests cover homepage, Post, Brand archive/single, Model

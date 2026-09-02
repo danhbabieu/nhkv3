@@ -362,3 +362,25 @@ parity remain unverified. No database, WordPress Post, Graph edge, slug,
 redirect, migration, seed, repair or legacy article-body operation was run.
 The Phase 0 gate remains **BLOCKED pending the P0-3 human architecture
 decision**, with no authorization for data repair or Graph backfill.
+
+## Product / Specimen amendment checkpoint — 2026-09-02
+
+This section updates only the Product/Specimen rows and the directly affected
+Knowledge/Governance conclusions after the human-approved constitutional
+decision. The original matrix above remains the pre-decision audit baseline.
+
+| AREA | BEFORE | AFTER | REMAINING GAP | TEST EVIDENCE | RUNTIME EVIDENCE |
+|---|---|---|---|---|---|
+| Specimen identity/ownership | Specimen was registered as a physical object, but lifecycle and observation ownership were not fully contract-tested | **COMPLIANT** for the declared boundary: Specimen owns one physical object, physical identity/evidence, provenance, technical observations and condition observations | Persistence of Product linkage is not implemented; current physical rows remain unverified | `ProductSpecimenBoundaryTest` proves physical fields are accepted only on Specimen and lifecycle preserves identity | No fresh database mutation or count; runtime remains an environment gate |
+| Product identity/ownership | Product was registered as a listing/offer, but the contract did not prevent a physical-identity field | **COMPLIANT** for the declared boundary: Product owns commerce/listing fields and cannot store physical identity, observation or provenance fields | A Product-specific/generic classification is currently supplied to the read-only assessment; no durable relation mechanism exists | `ProductSpecimenBoundaryTest` and `P0ConstitutionIntegrityTest` prove commerce edits do not replace Specimen and cross-owned fields fail closed | No Product/Specimen data was created or repaired |
+| Product–Specimen cardinality/completeness | Payload `specimen_uuid` plus broad `about` made owner/cardinality ambiguous (`CONSTITUTION_CONFLICT`) | **PARTIAL** — law is fixed at Specimen `0..N` Products over time and Product `0..1` Specimen; specific-object Product without exactly one Specimen is blocked | **REGISTRY_GAP/CODE_GAP:** no dedicated registered relation/persistence contract; `about` is not used as ownership and `specimen_uuid` is removed from the Product schema | Assessment tests cover zero/one/multiple candidate outcomes without persistence | No relation or payload backfill; current rows untouched |
+| Product commerce vs physical truth | No complete negative lifecycle matrix | **COMPLIANT** for current Authority boundary: price, availability, title, offer and listing lifecycle changes are isolated from Specimen identity | Condition copy projection and governed conflict proposal remain future integration work | Tests cover price/availability/title, Product retirement, Specimen survival and Product copy non-promotion | No browser/MCP runtime evidence added |
+| Knowledge/commercial claims | Product copy could not be shown not to become Knowledge | **COMPLIANT** as a boundary rule: Product copy is not Knowledge, Source/Evidence or Graph truth and has no automatic promotion path | Evidence-backed promotion workflow remains the existing governed contract, not a Product shortcut | Product copy update test confirms only Product changes; no Knowledge service is invoked | No Knowledge/Source/Evidence rows changed |
+| Governance | Semantic mutation path was previously a P0 bypass finding | **UNCHANGED by this amendment; existing Phase 0 Governance closure remains the applicable result** | Product–Specimen relation, physical identification and observations must use full Governance when a relation contract is later approved | Existing P0 Governance tests plus amendment contract tests; no direct relation writer added | No Controlled Apply or Graph write executed |
+
+The approved decision resolves the human architecture gate, but it does not
+authorize a relation predicate or storage field. Phase 0 Product/Specimen is
+therefore **PARTIAL**, not fully complete: semantics and negative ownership
+boundaries are implemented, while the relationship remains a separately
+reviewed registry/storage task. No identity merge, inferred Specimen, Graph
+backfill, payload repair, migration or data write occurred.

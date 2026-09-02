@@ -4,6 +4,35 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Article Ingest Phase 1 checkpoint — 2026-09-02
+
+The approved Phase 1 Article Ingest slice is implemented and committed at
+`36e71c7`, following documentation reconciliation commit `26d64ec`. The
+operation is reconcile-only for an existing runtime `wp_post:<blog_id>:55`.
+It persists a durable receipt with unique idempotency key, request fingerprint,
+editorial state token, child proposal IDs, dependency map, proposal states and
+apply attempts. Same-key/different-fingerprint requests return
+`IDEMPOTENCY_CONFLICT`; retries skip applied children and never compensate
+semantic writes.
+
+The coordinated MCP surface is `nhk.article.preflight` (read-only) and
+`nhk.article.ingest` (capability `nhk_ingest_articles`, execute/resume). All
+semantic writes remain Proposal → Human Approval → Eligibility → Controlled
+Apply → repository → audit. Article create, editorial update, draft creation
+and publish fail closed as `UNSUPPORTED_OPERATION`; no WordPress writer,
+`V2MigrationService` or `PostKnowledgeLinkService` is reachable from the
+Article path. The Post 55 fixture test and receipt integration test are guarded
+to `nhk_v3_test`; no production, staging, V2 or live data was changed.
+
+Evidence: unit suite `241 tests / 1,247 assertions`, Composer validation,
+full PHP lint and `git diff --check` pass. Focused integration tests are
+skipped because `NHK_WP_TEST_PATH`/test DB are not configured. The unconfigured
+full suite remains blocked by the existing WordPress/database bootstrap and
+mandatory integration environment failures; these are reported as failures or
+skips, not converted to success. Production Post 55 is explicitly not applied;
+the human-review packet is
+`docs/architecture/ARTICLE_INGEST_POST_55_RECONCILIATION_PACKET.md`.
+
 ## Documentation-only checkpoint — 2026-09-02 — Related semantic navigation
 
 The Constitution now explicitly establishes “Điều hướng quan hệ ngữ nghĩa và
@@ -88,6 +117,25 @@ the remaining P1 durable public identity/history work is not authorized by
 this checkpoint.
 
 ## Current checkpoint — 2026-09-02
+
+Public entity runtime hotfix checkpoint — 2026-09-02: restored the missing
+`NHK\\Core\\Shared\\Uuid\\UuidCodec` import in
+`PublicEntityCollectionQuery`, preventing PHP from resolving the codec as the
+non-existent `NHK\\Core\\Application\\Entity\\UuidCodec` during public detail
+queries. Added a regression test for malformed canonical UUID input. Unit
+verification is 246 tests / 1,266 assertions and plugin PHP lint passes;
+WordPress bootstrap preflight remains unavailable in this isolated workspace.
+No database, semantic record, Graph edge, migration or external deployment was
+changed.
+
+Public brand naming checkpoint — 2026-09-02: website public now applies the
+presentation-only `PublicBrandNamePolicy` to WordPress title/excerpt/content
+filters and all current semantic template text surfaces. Confirmed aliases such
+as `ô đo`, `vê đét` and `junhan` render only as `Odo`, `Vedette` and `Junghans`;
+JSON-LD is covered while tags, attributes, scripts, styles and form values are
+preserved. The source `wp_posts` body and semantic records were not rewritten.
+Focused unit/contract coverage was added; full verification remains subject to
+the repository's existing WordPress/runtime availability.
 
 Single-Constitution finalization checkpoint, 2026-09-02: the later
 Constitution-finalization decision supersedes the earlier `5c60346` router
@@ -2276,3 +2324,48 @@ Video detail remains unavailable because the local query has no active Video row
   success with five items per semantic group and totals entities 76, media 143,
   videos 0 and knowledge 200. This strengthens local protocol evidence only;
   external client/deployment interoperability remains open.
+
+- 2026-09-02: Human-approved Product/Specimen architecture was finalized in
+  the sole normative Constitution. Specimen is the canonical identity of one
+  physical object; Product is the canonical identity of one commercial
+  listing/offer/context. The locked cardinality is Specimen `0..N` Products
+  over time and Product `0..1` Specimen. Specific-object Product without
+  exactly one Specimen is incomplete/blocked; generic/pre-specimen Product may
+  remain unlinked only where the current contract permits it. Product owns
+  commerce fields and copy; Specimen owns physical identity, provenance,
+  observations and condition. Commercial copy is not Knowledge and cannot
+  silently overwrite physical truth.
+
+  The constitutional router reconciliation was also finalized for this
+  checkpoint: `AGENTS.md` points directly to the Constitution and
+  `docs/constitution/` contains only `NHK_V3_CONSTITUTION.md`; no competing
+  normative file was added.
+
+  The amendment is recorded in `docs/constitution/NHK_V3_CONSTITUTION.md`,
+  and the non-normative MCP contract, compliance audit and remediation plan
+  were reconciled. Runtime code adds the read-only
+  `ProductSpecimenAssessment`/result boundary, separates Product commercial
+  fields from Specimen physical-observation fields, and removes the
+  unapproved Product `specimen_uuid` payload field. The existing broad `about`
+  predicate is not used as Product–Specimen ownership; no dedicated relation
+  predicate or persistence mechanism is registered. That relationship remains
+  an explicit `REGISTRY_GAP`/`CODE_GAP` for a later contract task.
+
+  Focused Product/Specimen + Phase-0 regression evidence passes `40` tests /
+  `131` assertions and the broader Phase-0 regression slice passes `37` tests /
+  `77` assertions. RED evidence was observed before implementation when the
+  new boundary fields/assessment were absent. Composer validation, full PHP
+  lint, `git diff --check` and secret review pass. Current unit execution is
+  `233` tests / `1,211` assertions with two unrelated concurrent Article
+  Ingest/MCP failures; these files were preserved and not repaired here.
+  Guarded full PHPUnit reaches WordPress bootstrap and exits without a valid
+  PHPUnit summary because the database connection is unavailable; read-only
+  preflight reports `5/10` failed at WordPress/Core bootstrap, schema,
+  hydration and REST checks. No database, WordPress Post, semantic record,
+  Graph edge, slug, migration, seed, repair, import or backfill was run.
+
+  The implementation is uncommitted because the managed filesystem rejects
+  `.git/index.lock` creation and also blocked creation of the requested branch;
+  current HEAD at this checkpoint is `26d64ec`. No push was attempted after
+  that policy block. The concurrent Article Ingest/MCP working-tree changes and
+  untracked MCP plan remain preserved.

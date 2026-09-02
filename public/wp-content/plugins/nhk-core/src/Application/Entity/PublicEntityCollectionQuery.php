@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Graph\BrandAggregationQuery;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class PublicEntityCollectionQuery
 {

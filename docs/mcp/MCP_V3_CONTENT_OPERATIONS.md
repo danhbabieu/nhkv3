@@ -29,8 +29,8 @@ return HTTP 202 with no body.
 ## 2. Tool catalog thực tế
 
 `McpToolCatalog::tools()` exposes exactly 21 tools. `kind=mutation` implies
-`governed=true`. `nhk.semantic.resolve` is the added catalog member at
-position 2; the catalog's position 19 is `nhk.proposal.apply`. The clean HEAD
+`governed=true`. The coordinated Article tools occupy positions 3–4; the
+catalog's position 21 is `nhk.proposal.apply`. The clean HEAD
 catalog and the wire smoke both use this
 same ordered list; the local HTTP wire smoke remains an environment check and
 must not be replaced by a static catalog assertion.
@@ -39,6 +39,8 @@ must not be replaced by a static catalog assertion.
 |---|---|---|---|---|---|---|
 | `nhk.search` | native Post + public semantic search | READ | No | N/A | No | READY, bounded/public |
 | `nhk.semantic.resolve` | Authority context | READ | No | N/A | No | READY; ambiguity fails closed |
+| `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
+| `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage | WRITE | Yes | Apply creates revision | Usage is placement | READY for metadata; no byte upload |
@@ -57,8 +59,10 @@ must not be replaced by a static catalog assertion.
 | `nhk.proposal.eligibility` | Governance check | READ | capability-gated | Revision/dependencies | N/A | READY |
 | `nhk.proposal.apply` | Governance + target | WRITE | Yes | Controlled Apply | GraphService | READY for implemented branches |
 
-The stale assertions expecting 18 were corrected to 19; no tool was removed.
-The exact current wire order is the table order above.
+The stale assertions expecting 18/19 were corrected to 21; no prior tool was
+removed. Article ingest is capability-gated by `nhk_ingest_articles`, while
+Article preflight is read-gated. The exact current wire order is the table
+order above.
 
 ## 3. Use-case capability matrix
 
@@ -82,13 +86,14 @@ The exact current wire order is the table order above.
 
 ## 4. Post workflow
 
-For a V3 knowledge Article request, the approved Article Ingest sequence is:
-semantic registry resolution and preflight; create/update a native WordPress
-draft; create and apply governed semantic proposals and Post Graph links; read
-back the semantic records, Graph and Post; then publish the WordPress Post only
-when the contract's publish eligibility is satisfied. Generic WordPress
-create/update/publish remains an independent editorial workflow and cannot be
-reported as completed Article Ingest by itself.
+For Phase 1, `nhk.article.preflight` and `nhk.article.ingest` support only
+reconciliation of an existing WordPress Post: read and fingerprint the target,
+preflight the explicit semantic bundle, create deterministic child proposals,
+wait for Governance approval, apply eligible children, and read back semantic
+and editorial state. Generic WordPress create/update/publish remains an
+independent editorial workflow and cannot be reported as completed Article
+Ingest by itself. Article create and editorial update return explicit
+`UNSUPPORTED_OPERATION` outcomes and do not write WordPress.
 
 There is no MCP Post create/update/publish contract. `wp_post` is only a Graph
 endpoint resolver with key `<blog_id>:<post_id>`, positive numeric components,
@@ -315,13 +320,21 @@ Each reuses the existing input schema, `read` capability callback and metadata
 `public=true`, `show_in_rest=true`, `readonly=true`, `destructive=false`,
 `idempotent=true`. No write or governance Ability is registered.
 
-## 17. Article Ingest implementation gaps
+## 17. Article Ingest implementation status
 
-The Constitution approves the Article Ingest boundary, but this runtime audit
-does not claim that a coordinated Article operation already exists. The current
-catalog has no Article-specific tool, coordinator, cross-boundary idempotency
-key, WordPress revision binding or final outcome contract. Do not add an Article
-entity, endpoint, status or operation name to close those gaps in documentation.
+The Phase 1 coordinator, durable receipt, deterministic child proposal planner,
+read-only editorial token, verification reader and diagnostic reader are
+implemented under the approved operation-level contract. The receipt table is
+`nhk_article_operations` with a unique idempotency key and optimistic receipt
+revision. Same-key/different-fingerprint requests return
+`IDEMPOTENCY_CONFLICT` without changing the original receipt. Partial semantic
+apply is recorded and retries skip already-applied children; no compensation is
+attempted.
+
+The implementation is reconcile-only. WordPress create, editorial update,
+draft and publish are deliberately unsupported pending the separate
+`WORDPRESS_EDITORIAL_WRITE_IDEMPOTENCY_AND_CAS` review. No Article entity,
+endpoint, status or generic Governance operation was added.
 
 `V2MigrationService.php` can import legacy `post_content` through a separate
 migration path; Article Ingest must never call it. Any reachable Article path

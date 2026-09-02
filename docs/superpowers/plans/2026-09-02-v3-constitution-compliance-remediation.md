@@ -126,6 +126,28 @@ calls fail closed.
 **Stop condition:** no implementation or data operation proceeds while the
 physical identity versus commercial listing decision remains ambiguous.
 
+**Decision resolved — 2026-09-02:** Human approval fixes Specimen as the
+canonical identity of one physical object and Product as the canonical identity
+of one commercial listing/offer/context. Cardinality is Specimen `0..N`
+Products over time and Product `0..1` Specimen. Specific-object Product without
+exactly one Specimen is incomplete/blocked; generic/pre-specimen Product may
+remain unlinked only where the current contract permits it. Product owns
+commerce fields, Specimen owns physical observations/provenance/condition, and
+commercial copy is not Knowledge. The implementation adds the negative
+ownership/completeness tests and removes the unapproved `specimen_uuid` Product
+payload field. No relation predicate or persistence field is added.
+
+**Remaining follow-up:** Product–Specimen persistence is an explicit
+`REGISTRY_GAP`/`CODE_GAP`. A later task must first specify semantics, endpoints,
+direction, cardinality, provenance, Governance and direct/derived behavior;
+that task must not include implicit backfill or inferred identity repair.
+
+For the Phase 0 gate, the former Product/Specimen `CONSTITUTION_CONFLICT` is
+resolved: the runtime now fails closed on the unapproved payload linkage and
+keeps the relationship gap explicit. The safe relationship gap does not
+authorize Phase 1 or any data repair; Phase 1 remains the next single phase
+only after this report and its remaining runtime gates are reviewed.
+
 ## Phase 0 execution record — 2026-09-02
 
 The Phase 0 implementation slice is **PARTIAL** and stops at the required
@@ -136,9 +158,11 @@ Product/Specimen human gate.
 - Task 0.2 is implemented: Post→Knowledge uses a governed Draft proposal
   request, direct mutation fails closed, and the historical V2 mutation entry
   point is retired. No migration or semantic apply was executed.
-- Task 0.3 remains open by design: current disjoint Product/Specimen payload
-  tests do not choose lifecycle or ownership policy. No semantic type,
-  relation, row or payload was changed to force a decision.
+- Task 0.3 decision is resolved: the constitutional Product/Specimen boundary,
+  cardinality, semantic completeness and lifecycle ownership are approved and
+  covered by focused tests. The dedicated relationship persistence contract
+  remains a later `REGISTRY_GAP`/`CODE_GAP`; no semantic type, relation, row or
+  inferred payload link was added.
 - The structural ownership portion of the approved Phase 0 slice is
   implemented as a read-only Graph-canonical context with explicitly labelled
   compatibility fallback and fail-closed conflict handling.

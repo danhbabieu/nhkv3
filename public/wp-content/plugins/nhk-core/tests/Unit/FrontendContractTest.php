@@ -577,4 +577,24 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('nhk_core_comparison_context', $functions);
         self::assertStringContainsString('So sánh hồ sơ — Đồng Hồ Nhà Kho', $functions);
     }
+
+    public function test_public_brand_spelling_policy_covers_wordpress_and_semantic_surfaces(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $functions = (string) file_get_contents($theme . '/functions.php');
+        self::assertStringContainsString('function nhk_v3_public_brand_text', $functions);
+        self::assertStringContainsString("add_filter('the_title', 'nhk_v3_public_title'", $functions);
+        self::assertStringContainsString("add_filter('the_title_rss', 'nhk_v3_public_title'", $functions);
+        self::assertStringContainsString("add_filter('get_the_excerpt', 'nhk_v3_public_excerpt_filter'", $functions);
+        self::assertStringContainsString("add_filter('the_excerpt_rss', 'nhk_v3_public_excerpt_filter'", $functions);
+        self::assertStringContainsString("add_filter('the_content', 'nhk_v3_public_content_filter'", $functions);
+        self::assertStringContainsString("add_filter('the_content_feed', 'nhk_v3_public_content_filter'", $functions);
+        self::assertStringContainsString("'Odo'", $functions);
+        self::assertStringContainsString("'Vedette'", $functions);
+        self::assertStringContainsString("'Junghans'", $functions);
+
+        foreach (['entity.php', 'index.php', 'front-page.php', 'knowledge.php', 'media.php', 'video.php', 'comparison.php', 'single.php'] as $template) {
+            self::assertStringContainsString('nhk_v3_public_brand_text', (string) file_get_contents($theme . '/' . $template), $template . ' must normalize public dynamic text');
+        }
+    }
 }

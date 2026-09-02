@@ -772,6 +772,9 @@ Public projection phải:
 - không expose internal Authority, Proposal, Knowledge Claim hoặc storage terms
   trong visitor-facing copy;
 - canonicalize one URL per public entity và loại UUID/stable key khỏi indexable URL.
+- public brand copy phải dùng đúng display spelling đã được Constitution/contract
+  phê duyệt; alias né tránh hoặc sai chính tả không được phát ra ở visible text,
+  public metadata hoặc JSON-LD.
 
 Canonical route, canonical tag, OpenGraph URL, breadcrumb, sitemap, search và
 internal link phải nhất quán. Search result và archive page không được tạo
@@ -1018,7 +1021,10 @@ editorial, semantic and verification stages.
     và trước limit/pagination của projection.
 35. Related query phải bounded, chống cycle/graph explosion, deduplicate theo
     canonical identity và phân biệt honest empty với unavailable/error.
-36. Constitution này là nguồn normative duy nhất.
+36. Public projection phải chuẩn hóa các brand alias đã được xác nhận về đúng
+    display spelling duy nhất; policy này chỉ áp dụng ở presentation boundary,
+    không sửa `wp_posts`, semantic record, alias, source/evidence hay legacy body.
+37. Constitution này là nguồn normative duy nhất.
 
 ---
 
