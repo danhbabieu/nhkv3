@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaBatchIngestService, MediaFilenameNormalizer, MediaIngestGateway, MediaService};
-use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MutableMediaUsageRepository};
+use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MutableMediaUsageRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoBlueprint, MediaUsage};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -118,6 +118,53 @@ final class ArticleMediaPolicyTest extends TestCase
         $service->addAsset($real->canonicalId, 'original', 'uploads/public-featured.jpg', hash('sha256', 'public-featured'), 'image/jpeg', 14, 1600, 900, 'PUBLIC');
         $coordinator->ensureForPost(48, [], ['featured_primary' => $real->canonicalId]);
         self::assertTrue($projection->isImageSitemapEligible('1:48'));
+    }
+
+    public function test_coordinator_synchronizes_canonical_slots_to_wordpress_editorial_state(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $featured = $service->create('bridge-featured', 'Bridge featured', 'ready');
+        $inline = $service->create('bridge-inline', 'Bridge inline', 'ready');
+        $service->addAsset($featured->canonicalId, 'original', 'uploads/bridge-featured.jpg', hash('sha256', 'bridge-featured'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addAsset($inline->canonicalId, 'original', 'uploads/bridge-inline.jpg', hash('sha256', 'bridge-inline'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $adapter = new class implements WordPressArticleMediaAdapter {
+            public array $synced = [];
+            public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function synchronize(int $postId, array $result): array { $this->synced[] = [$postId, $result]; return $this->read($postId); }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter);
+
+        $result = $coordinator->ensureForPost(49, [], ['featured_primary' => $featured->canonicalId, 'inline_primary' => $inline->canonicalId]);
+
+        self::assertCount(1, $adapter->synced);
+        self::assertSame(49, $adapter->synced[0][0]);
+        self::assertSame($featured->canonicalId, $adapter->synced[0][1]['slot_media']['featured_primary']);
+        self::assertSame($inline->canonicalId, $adapter->synced[0][1]['slot_media']['inline_primary']);
+        self::assertSame('MEDIA_COMPLETE', $result->state);
+    }
+
+    public function test_seo_projection_uses_the_wordpress_attachment_representation(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $item = $service->create('seo-bridge-featured', 'SEO bridge featured', 'ready');
+        $asset = $service->addAsset($item->canonicalId, 'original', 'uploads/seo-bridge.jpg', hash('sha256', 'seo-bridge'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:50', 'featured_primary', 0, 'Ảnh mặt trước');
+        $adapter = new class implements WordPressArticleMediaAdapter {
+            public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function synchronize(int $postId, array $result): array { return $this->read($postId); }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return ['url' => 'https://cdn.example.test/seo-bridge.jpg', 'src' => 'https://cdn.example.test/seo-bridge.jpg', 'srcset' => 'https://cdn.example.test/seo-bridge.jpg 1600w', 'sizes' => '100vw', 'width' => 1600, 'height' => 900, 'alt' => $contextualAlt, 'attachment_id' => 901]; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+
+        $projection = new ArticleMediaSeoProjection($media, $assets, $usages, $adapter);
+        $result = $projection->forPost('1:50');
+
+        self::assertTrue($result['eligible']);
+        self::assertSame('https://cdn.example.test/seo-bridge.jpg', $result['image_url']);
+        self::assertSame('100vw', $result['sizes']);
+        self::assertSame('Ảnh mặt trước', $result['alt']);
     }
 
     public function test_bulk_ingest_uses_one_batch_context_but_keeps_media_independently_reviewable(): void

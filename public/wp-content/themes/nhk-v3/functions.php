@@ -191,6 +191,13 @@ function nhk_v3_public_label(string $key): string
     ][strtolower(str_replace('_', ' ', $key))] ?? ucwords(str_replace('_', ' ', $key));
 }
 
+/** @return array<string,mixed> */
+function nhk_v3_article_media_seo(int $postId): array
+{
+    $value = apply_filters('nhk_v3_article_media_seo', [], $postId);
+    return is_array($value) ? $value : [];
+}
+
 function nhk_v3_document_title(string $title): string
 {
     $entity = $GLOBALS['nhk_core_entity_context'] ?? null;
@@ -294,7 +301,9 @@ function nhk_v3_seo_head(): void
     echo '<meta name="description" content="' . esc_attr(wp_strip_all_tags($description)) . '">' . "\n";
     echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     echo '<meta property="og:type" content="' . esc_attr(is_singular('post') ? 'article' : 'website') . '"><meta property="og:title" content="' . esc_attr($title) . '"><meta property="og:description" content="' . esc_attr(wp_strip_all_tags($description)) . '"><meta property="og:url" content="' . esc_url($canonical) . '"><meta property="og:site_name" content="Đồng Hồ Nhà Kho">' . "\n";
-    if (is_singular('post') && has_post_thumbnail()) echo '<meta property="og:image" content="' . esc_url(get_the_post_thumbnail_url(null, 'large')) . '">' . "\n";
+    $articleSeo = is_singular('post') ? nhk_v3_article_media_seo((int) get_queried_object_id()) : [];
+    $articleImage = (($articleSeo['eligible'] ?? false) === true && trim((string) ($articleSeo['image_url'] ?? '')) !== '') ? (string) $articleSeo['image_url'] : (has_post_thumbnail() ? (string) get_the_post_thumbnail_url(null, 'large') : '');
+    if (is_singular('post') && $articleImage !== '') echo '<meta property="og:image" content="' . esc_url($articleImage) . '">' . "\n";
     $breadcrumb = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => [['@type' => 'ListItem', 'position' => 1, 'name' => 'NHK', 'item' => home_url('/')]]];
     if (is_singular('post')) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => get_the_title(), 'item' => get_permalink()];
     if (is_array($context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => nhk_v3_entity_label((string) ($context['type'] ?? '')), 'item' => (string) ($context['archive_url'] ?? home_url('/'))];
@@ -303,7 +312,7 @@ function nhk_v3_seo_head(): void
     if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/tri-thuc/')];
     if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/so-sanh/')];
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
-    if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+    if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'image' => $articleImage !== '' ? $articleImage : null, 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'VideoObject', 'name' => nhk_v3_public_brand_text((string) (($video['title'] ?? '') ?: 'Video NHK')), 'url' => $canonical, 'embedUrl' => strtolower((string) ($video['platform'] ?? '')) === 'youtube' ? 'https://www.youtube-nocookie.com/embed/' . (string) ($video['external_id'] ?? '') : null, 'contentUrl' => (string) ($video['url'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; }
 }
 add_action('wp_head', 'nhk_v3_seo_head', 1);

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
-use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MediaUsageRepository, MutableMediaUsageRepository};
+use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MediaUsageRepository, MutableMediaUsageRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Media\{Media, MediaSeoBlueprint, MediaSeoStateRegistry, MediaUsageRoleRegistry};
 
 final class ArticleMediaCoordinator
@@ -15,6 +15,7 @@ final class ArticleMediaCoordinator
         private MediaUsageRepository $usages,
         private ArticleMediaBlueprintRepository $blueprints,
         private ?int $blogId = null,
+        private ?WordPressArticleMediaAdapter $wordpress = null,
     ) {}
 
     /** @param array<string,mixed> $context @param array<string,string> $selectedMediaBySlot @param list<string> $supportingMediaIds */
@@ -25,6 +26,19 @@ final class ArticleMediaCoordinator
         $slotMedia = [];
         $slots = [];
         $diagnostics = [];
+        $editorial = $this->wordpress?->read($postId);
+        if (is_array($editorial)) {
+            $editorialFeatured = trim((string) ($editorial['featured_media_id'] ?? ''));
+            if (($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '') === '' && $editorialFeatured !== '') $selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] = $editorialFeatured;
+            if (($selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? '') === '') {
+                $featured = (string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '');
+                foreach (($editorial['inline_media_ids'] ?? []) as $editorialMediaId) {
+                    $editorialMediaId = trim((string) $editorialMediaId);
+                    if ($editorialMediaId !== '' && $editorialMediaId !== $featured) { $selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] = $editorialMediaId; break; }
+                }
+            }
+            foreach (($editorial['unmapped_attachment_ids'] ?? []) as $attachmentId) $diagnostics[] = ['code' => 'WORDPRESS_ATTACHMENT_UNMAPPED', 'attachment_id' => (int) $attachmentId];
+        }
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
@@ -51,7 +65,33 @@ final class ArticleMediaCoordinator
             if ($candidate !== null) $this->mediaService->addUsage($candidate->canonicalId, 'wp_post', $endpointKey, MediaUsageRoleRegistry::INLINE_SUPPORTING, $index);
         }
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
-        return new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics);
+        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics);
+        if ($this->wordpress !== null) {
+            $payload = $result->toArray();
+            if (is_array($editorial) && isset($editorial['state_token'])) $payload['editorial_state_token'] = (string) $editorial['state_token'];
+            $readback = $this->wordpress->synchronize($postId, $payload);
+            $actualFeatured = trim((string) ($readback['featured_media_id'] ?? ''));
+            if ($actualFeatured !== '' && $actualFeatured !== ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) {
+                $blueprint = $this->blueprints->findByPostAndSlot($postId, MediaUsageRoleRegistry::FEATURED_PRIMARY) ?? MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::FEATURED_PRIMARY, $context, MediaSeoStateRegistry::COMPLETE);
+                $this->reconcileUsage($endpointKey, MediaUsageRoleRegistry::FEATURED_PRIMARY, $actualFeatured, $blueprint);
+                $slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] = $actualFeatured;
+                $slots[MediaUsageRoleRegistry::FEATURED_PRIMARY]['media_id'] = $actualFeatured;
+            }
+            $actualInline = '';
+            foreach (($readback['inline_media_ids'] ?? []) as $actualMediaId) {
+                $actualMediaId = trim((string) $actualMediaId);
+                if ($actualMediaId !== '' && $actualMediaId !== ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) { $actualInline = $actualMediaId; break; }
+            }
+            if ($actualInline !== '' && $actualInline !== ($slotMedia[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? '')) {
+                $blueprint = $this->blueprints->findByPostAndSlot($postId, MediaUsageRoleRegistry::INLINE_PRIMARY) ?? MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::INLINE_PRIMARY, $context, MediaSeoStateRegistry::COMPLETE);
+                $this->reconcileUsage($endpointKey, MediaUsageRoleRegistry::INLINE_PRIMARY, $actualInline, $blueprint);
+                $slotMedia[MediaUsageRoleRegistry::INLINE_PRIMARY] = $actualInline;
+                $slots[MediaUsageRoleRegistry::INLINE_PRIMARY]['media_id'] = $actualInline;
+            }
+            $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
+            $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics);
+        }
+        return $result;
     }
 
     /** Read-only preview for preflight/diagnostics; it never creates placeholders or usages. */

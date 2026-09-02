@@ -73,6 +73,9 @@ final class ArticleIngestCoordinator
         if ($postId === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'WP_POST_TARGET_REQUIRED']);
         $state = $this->editorial->read($postId);
         if ($state === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE']);
+        if ($receipt->wpStateToken !== null && $receipt->wpStateToken !== $state->token) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, true, ['code' => 'EDITORIAL_STATE_CHANGED'], $state->token);
+        $expectedToken = is_array($input['expected_editorial_state'] ?? null) ? trim((string) ($input['expected_editorial_state']['state_token'] ?? '')) : '';
+        if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
         if ($this->articleMedia !== null) {
             try {
                 $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title, 'planned_title' => $state->title];
@@ -80,12 +83,12 @@ final class ArticleIngestCoordinator
                 $supporting = is_array($input['article_media']['supporting_media_ids'] ?? null) ? array_values(array_map('strval', $input['article_media']['supporting_media_ids'])) : [];
                 $this->mediaDiagnostics = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
             } catch (\Throwable $error) {
-                return $this->save($receipt, 'media', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'ARTICLE_MEDIA_COORDINATION_FAILED', 'error' => $error->getMessage()], $state->token);
+                $conflict = str_contains(strtoupper($error->getMessage()), 'EDITORIAL_STATE_CHANGED');
+                return $this->save($receipt, 'media', $conflict ? ArticleIngestOutcome::RECONCILIATION_CONFLICT : ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => $conflict ? 'EDITORIAL_STATE_CHANGED' : 'ARTICLE_MEDIA_COORDINATION_FAILED', 'error' => $error->getMessage()], $state->token);
             }
+            $state = $this->editorial->read($postId);
+            if ($state === null) return $this->save($receipt, 'media', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE']);
         }
-        if ($receipt->wpStateToken !== null && $receipt->wpStateToken !== $state->token) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EDITORIAL_STATE_CHANGED'], $state->token);
-        $expectedToken = is_array($input['expected_editorial_state'] ?? null) ? trim((string) ($input['expected_editorial_state']['state_token'] ?? '')) : '';
-        if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
         $commands = is_array($input['semantic_bundle']['commands'] ?? null) ? $input['semantic_bundle']['commands'] : [];
         $preflight = $this->preflight->check($receipt->wpEndpointKey ?? '', 'reconcile', $commands, (string) ($target['endpoint_type'] ?? 'wp_post'));
         if (!$preflight->accepted) {

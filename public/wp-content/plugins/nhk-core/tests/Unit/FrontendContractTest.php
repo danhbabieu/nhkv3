@@ -128,8 +128,21 @@ final class FrontendContractTest extends TestCase
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
         self::assertStringContainsString("'alt' => get_the_title()", (string) file_get_contents($theme . '/front-page.php'));
-        self::assertStringContainsString("'alt' => get_the_title()", (string) file_get_contents($theme . '/single.php'));
+        self::assertStringContainsString("'alt' => \$featuredAlt !== '' ? \$featuredAlt : get_the_title()", (string) file_get_contents($theme . '/single.php'));
         self::assertStringContainsString("'alt' => ''", (string) file_get_contents($theme . '/template-parts/article-card.php'));
+    }
+
+    public function test_native_wordpress_writes_are_reconciled_through_the_media_bridge(): void
+    {
+        $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+        self::assertStringContainsString('wp_after_insert_post', $plugin);
+        self::assertStringContainsString('rest_after_insert_post', $plugin);
+        self::assertStringContainsString("add_action('add_attachment'", $plugin);
+        self::assertStringContainsString("add_action('edit_attachment'", $plugin);
+        self::assertStringContainsString("add_action('rest_after_insert_attachment'", $plugin);
+        self::assertStringContainsString('WordPressMediaAttachmentBridge', $plugin);
+        self::assertStringContainsString('WordPressImageSitemapProvider', $plugin);
+        self::assertStringContainsString('MediaWordPressBridgeMigration012::VERSION', $plugin);
     }
 
     public function test_theme_seo_contract_declares_archive_index_policy(): void
@@ -195,7 +208,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("'Origin: https://invalid.example'", $tool);
         self::assertStringContainsString("'tools/call'", $tool);
         self::assertStringContainsString("nhk.semantic.resolve", $tool);
-        self::assertStringNotContainsString("nhk.proposal.apply", $tool);
+        self::assertStringContainsString("'nhk.proposal.apply'", $tool);
         self::assertStringNotContainsString('--apply', $tool);
     }
 

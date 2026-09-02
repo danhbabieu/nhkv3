@@ -2498,8 +2498,38 @@ is the associated P5 undefined-id symptom. The two skips are `EXPECTED_SKIP`
 because `nhk_v3_test` has no published Post 55 fixture. Environment failures:
 `0` in the completed 361-test run.
 
-The repository smoke script still expects the historical 19-tool catalog and
-therefore reports a stale tools/list failure; the direct live wire request
-returned the current 21-tool catalog. The implementation remains preserved
-for a later separately authorized fix of the Article editorial adapter,
-public SEO integration and bypass boundary.
+At the pre-R2 checkpoint, the repository smoke script still expected the
+historical 19-tool catalog and the Article editorial adapter, public SEO
+integration and bypass boundary remained open. The direct live wire request
+already exposed the current 21-tool catalog; the R2 section below records the
+implementation and current live-proof limitation.
+
+## Media Phase R2 — WordPress editorial bridge implementation — 2026-09-02
+
+The R2 implementation adds the canonical Media/MediaAsset to WordPress
+attachment mapping, controlled attachment creation with pre-upload filename
+normalization, idempotent featured and managed inline-primary projection,
+reverse native-attachment adoption, native post/REST/admin lifecycle reconciliation,
+Article Ingest state refresh after media writes, contextual SEO image metadata,
+and an image sitemap provider. The MCP smoke contract is now the governed
+21-tool catalog.
+
+Fresh static evidence: the full Unit suite is `265 tests / 1,355 assertions`;
+Composer validation, PHP lint, diff checks and changed-file secret review pass.
+The WordPress preflight and focused integration path are blocked before test
+execution by the current local database bootstrap (`Error establishing a
+database connection`), so live migration, REST lifecycle, SEO and sitemap
+proof is unavailable in this checkpoint. No database mutation was performed.
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| WORDPRESS_MEDIA_ATTACHMENT_BRIDGE | **PASS (static/unit)** | Contract, bridge, mapping migration 012 and coordinator adapter coverage are present. |
+| WORDPRESS_FEATURED_INLINE_SYNC | **BLOCKED (live proof)** | Native write hooks and CAS-protected synchronize path are implemented; WP runtime is unavailable. |
+| WORDPRESS_REVERSE_ADOPTION | **BLOCKED (live proof)** | `add_attachment` adoption path and recursion guard are implemented; WP runtime is unavailable. |
+| ARTICLE_INGEST_STALE_CONFLICT | **PASS (unit/static)** | Editorial token is checked before media work and refreshed after the own media write. |
+| WORDPRESS_NATIVE_WRITE_ENFORCEMENT | **PASS (static)** | Post/REST lifecycle hooks are wired; no generic MCP WordPress writer is catalogued. |
+| SEO_IMAGE_SITEMAP | **PASS (static/unit), BLOCKED (live proof)** | Projection and provider are implemented with placeholder/unmapped filtering; runtime proof is unavailable. |
+| MCP_CATALOG | **PASS (static/unit)** | Smoke contract is exact 21 names, with no `--apply` transport bypass. |
+| FULL_TEST_GATE | **FAIL / ENVIRONMENT BLOCKED** | Current local WP bootstrap cannot establish its database connection; do not treat this as a clean full-suite pass. |
+| DEPLOYMENT_READY | **NO** | No production/staging/V2 mutation or deployment was attempted. |
+| READY_FOR_LEGACY_MEDIA_REPAIR | **NO** | Explicitly outside R2 scope. |

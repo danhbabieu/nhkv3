@@ -74,8 +74,11 @@ read-only preview.
 persistence when packet context is available. `ArticleMediaSeoProjection`
 excludes placeholders/private assets from preferred image and image-sitemap
 eligibility. WordPress remains the editorial owner of featured/content image
-selection and block ordering; an attachment-to-canonical-Media selection
-adapter and byte-upload transport remain explicit implementation gaps.
+selection and block ordering. The WordPress bridge now owns the one-to-one
+Media/Asset-to-attachment mapping, native Featured/inline synchronization,
+managed Gutenberg inline replacement, attachment adoption and responsive
+attachment representation. Byte upload is supported for controlled packets
+that provide a local file path; metadata-only MCP ingest remains metadata-only.
 
 Focused checkpoint evidence: `ArticleMediaPolicyTest` covers placeholders,
 reuse, distinct slots, replacement, contextual usage, filename normalization,
@@ -100,3 +103,36 @@ basename, so public filename/attachment selection is not yet connected.
 `image_url` remains null; actual theme SEO image, responsive markup and image
 sitemap integration are therefore still open. These are explicit runtime
 failures, not silently counted as parity.
+
+### Phase R2 bridge implementation — 2026-09-02
+
+The approved R2 bridge is implemented in the working tree. Migration 012 adds
+`nhk_media_wordpress_attachments` with unique Media and attachment identities;
+it is an infrastructure mapping table and does not create a semantic Graph
+relation. `WordPressMediaAttachmentBridge` reuses that mapping or the native
+`_wp_attached_file` identity before creating a new attachment. Controlled
+packets apply `MediaFilenameNormalizer` to the actual WordPress upload name;
+native `add_attachment` adoption uses the same canonical Media service and an
+instance-scoped controlled-write guard prevents double ingestion.
+
+Native `wp_after_insert_post` and `rest_after_insert_post` both invoke the
+Article coordinator. Native attachment creation, admin edits and REST edits
+all enter the same adoption boundary. The bridge writes `featured_media`,
+appends or repoints only the marked `nhk-managed-inline-primary` Gutenberg
+block, preserves human inline images, reads the editorial state back and
+rejects a changed state token. Article Ingest refreshes its editorial token
+after this authorized media write, so its normal unchanged path does not
+self-report `EDITORIAL_STATE_CHANGED`.
+
+The same attachment representation now supplies public URL, `src`, `srcset`,
+`sizes`, dimensions and contextual alt to Article SEO. Theme `og:image` and
+Article structured data use that same projection. WordPress registers a
+projection image sitemap provider that emits only eligible real public
+featured assets, once per URL; placeholders/private/unmapped assets are
+excluded. The MCP wire smoke now checks the exact approved 21-tool catalog.
+
+Static evidence: full Unit suite `265` tests / `1,355` assertions, Composer
+validation, full PHP lint and `git diff --check` pass. Live WordPress,
+migration, Article/MCP REST, sitemap and HTTP evidence is blocked in this
+shell by the unavailable MySQL bootstrap. No legacy Post, attachment, V2,
+staging or production data was repaired, renamed, backfilled or published.

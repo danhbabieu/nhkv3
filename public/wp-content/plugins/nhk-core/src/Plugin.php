@@ -14,6 +14,7 @@ use NHK\Core\Infrastructure\Migration\MediaAssetMetadataMigration008;
 use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 use NHK\Core\Infrastructure\Migration\ArticleIngestMigration010;
 use NHK\Core\Infrastructure\Migration\ArticleMediaMigration011;
+use NHK\Core\Infrastructure\Migration\MediaWordPressBridgeMigration012;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
@@ -32,7 +33,7 @@ use NHK\Core\Infrastructure\Http\LegacyUrlRedirects;
 use NHK\Core\Infrastructure\Http\PublicKnowledgeRoutes;
 use NHK\Core\Infrastructure\Http\McpApi;
 use NHK\Core\Infrastructure\Admin\AdminPage;
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
+use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Article\{WpEditorialStateReader, WpdbArticleOperationReceiptRepository};
@@ -45,7 +46,7 @@ use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttempt
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, MediaIngestGateway, MediaService, MediaVideoPageQuery};
+use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaIngestGateway, MediaService, MediaVideoPageQuery};
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
@@ -57,9 +58,10 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', ArticleMediaMigration011::VERSION, false);
+        update_option('nhk_core_migration_target', MediaWordPressBridgeMigration012::VERSION, false);
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
@@ -83,6 +85,7 @@ final class Plugin {
         (new PublicEditorialRoutes())->register();
         LegacyUrlRedirects::register();
         global $wpdb;
+        $sharedAttachmentBridge = null;
         if (isset($wpdb) && is_object($wpdb)) {
             $publicTypes = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($publicTypes);
@@ -110,14 +113,35 @@ final class Plugin {
             (new PublicComparisonRoutes(new ComparisonPageQuery($publicEntityQuery)))->register();
             $publicAssets = new WpdbMediaAssetRepository($wpdb);
             $publicUsages = new WpdbMediaUsageRepository($wpdb);
-            $articleMedia = new ArticleMediaCoordinator(new MediaService($publicMedia, $publicAssets, $publicUsages), $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
-            add_action('wp_after_insert_post', static function (int $postId, \WP_Post $post, bool $update) use ($articleMedia): void {
+            $publicMediaService = new MediaService($publicMedia, $publicAssets, $publicUsages);
+            $sharedAttachmentBridge = new WordPressMediaAttachmentBridge($wpdb, $publicMediaService, $publicMedia, $publicAssets);
+            $attachmentBridge = $sharedAttachmentBridge;
+            $articleMedia = new ArticleMediaCoordinator($publicMediaService, $publicMedia, $publicAssets, $publicUsages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
+            $articleSeo = new ArticleMediaSeoProjection($publicMedia, $publicAssets, $publicUsages, $attachmentBridge);
+            add_filter('nhk_v3_article_media_seo', static function (array $value, int $postId) use ($articleSeo): array { return $articleSeo->forPost((string) get_current_blog_id() . ':' . $postId); }, 10, 2);
+            add_action('wp_sitemaps_init', static function (object $sitemaps) use ($articleSeo): void {
+                if (isset($sitemaps->registry) && is_object($sitemaps->registry) && method_exists($sitemaps->registry, 'add_provider')) $sitemaps->registry->add_provider('images', new WordPressImageSitemapProvider($articleSeo));
+            });
+            $reconcilePostMedia = static function (int $postId, \WP_Post $post, bool $update) use ($articleMedia, $attachmentBridge): void {
+                if ($attachmentBridge->isHandlingWrite()) return;
                 if ($post->post_type !== 'post' || wp_is_post_revision($postId) || wp_is_post_autosave($postId)) return;
                 try {
                     $articleMedia->ensureForPost($postId, ['subject' => (string) $post->post_title, 'planned_title' => (string) $post->post_title]);
                 } catch (\Throwable $error) {
                     do_action('nhk_v3_article_media_failure', $postId, $error->getMessage(), $update);
                 }
+            };
+            add_action('wp_after_insert_post', $reconcilePostMedia, 20, 3);
+            add_action('rest_after_insert_post', static function (\WP_Post $post, \WP_REST_Request $request, bool $creating) use ($reconcilePostMedia): void {
+                $reconcilePostMedia((int) $post->ID, $post, !$creating);
+            }, 20, 3);
+            $adoptAttachment = static function (int $attachmentId) use ($attachmentBridge): void {
+                try { $attachmentBridge->adoptAttachment($attachmentId); } catch (\Throwable $error) { do_action('nhk_v3_media_adoption_failure', $attachmentId, $error->getMessage()); }
+            };
+            add_action('add_attachment', $adoptAttachment, 20, 1);
+            add_action('edit_attachment', $adoptAttachment, 20, 1);
+            add_action('rest_after_insert_attachment', static function (\WP_Post $post, \WP_REST_Request $request, bool $creating) use ($adoptAttachment): void {
+                $adoptAttachment((int) $post->ID);
             }, 20, 3);
             (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus)))->register();
             $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
@@ -125,7 +149,7 @@ final class Plugin {
             (new PublicMediaAssetRoutes(new \NHK\Core\Application\Media\PublicMediaAssetDelivery($publicAssets, $publicMedia, $mediaRoot)))->register();
             (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register();
         }
-        add_action('rest_api_init', static function (): void {
+        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
@@ -143,7 +167,9 @@ final class Plugin {
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
+            $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
+            $sharedAttachmentBridge = $attachmentBridge;
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge)), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types, static function (string $type, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): bool {
                 if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($id)) return false;
@@ -158,7 +184,7 @@ final class Plugin {
                     default => false,
                 };
             });
-            $articleMedia = new ArticleMediaCoordinator($mediaService, $media, $assets, $usages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb));
+            $articleMedia = new ArticleMediaCoordinator($mediaService, $media, $assets, $usages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
             $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader(), $articleMedia);
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
@@ -176,7 +202,7 @@ final class Plugin {
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', ArticleIngestMigration010::VERSION, '', false);
+        add_option('nhk_core_migration_target', MediaWordPressBridgeMigration012::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
@@ -188,6 +214,7 @@ final class Plugin {
         (new ProjectionContextMigration009())->up();
         (new ArticleIngestMigration010())->up();
         (new ArticleMediaMigration011())->up();
+        (new MediaWordPressBridgeMigration012())->up();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }

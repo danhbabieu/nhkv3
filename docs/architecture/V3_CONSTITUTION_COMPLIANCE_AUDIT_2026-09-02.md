@@ -385,6 +385,29 @@ boundaries are implemented, while the relationship remains a separately
 reviewed registry/storage task. No identity merge, inferred Specimen, Graph
 backfill, payload repair, migration or data write occurred.
 
+## Media Phase R2 bridge revalidation — 2026-09-02
+
+The previous Media runtime failures were implementation gaps, not
+constitutional conflicts. The working-tree slice adds the missing native
+WordPress editorial bridge without changing WordPress ownership of
+`featured_media`, `post_content` or block order.
+
+| Boundary | Result | Evidence / limitation |
+|---|---|---|
+| Media ↔ attachment identity | IMPLEMENTED | Migration 012 adds unique Media/attachment mapping; the bridge reuses mappings and native attached-file matches before creating a controlled attachment. Live DB proof is blocked by MySQL bootstrap. |
+| Featured and inline sync | IMPLEMENTED | Native post and REST lifecycle hooks call the same coordinator; Featured uses `set_post_thumbnail`, inline uses a marked Gutenberg block and preserves human images. Unit adapter coverage passes; live WordPress assertion is blocked. |
+| Reverse reconciliation / stale edit | IMPLEMENTED | The bridge reads native state, reports unmapped attachments, uses an editorial state token and Article Ingest refreshes the token after its own authorized media write. Live race test remains unavailable. |
+| Native Media adoption | IMPLEMENTED | `add_attachment` routes new image attachments through the canonical Media service; the shared bridge guard prevents controlled double-adoption. Live REST upload proof is blocked. |
+| SEO / structured data / sitemap | IMPLEMENTED | Public projection resolves native URL and responsive metadata; theme OG/Article output uses it; the `images` sitemap provider excludes placeholders/private/unmapped assets. Live HTTP/XML proof is blocked. |
+| MCP catalog | IMPLEMENTED | Smoke expectation now validates the governed exact 21-name catalog; localhost wire execution is blocked by unavailable HTTP/WordPress runtime. |
+
+The full Unit suite is now `265` tests / `1,355` assertions; Composer
+validation, PHP lint and `git diff --check` pass. The guarded integration
+attempt fails at WordPress bootstrap with a database-connection error, before
+any fixture is created. No legacy repair, Post 55 mutation, attachment rename,
+semantic backfill, Graph edge, V2/staging/production write or publication
+occurred. `READY_FOR_LEGACY_MEDIA_REPAIR: NO` remains binding.
+
 ## Media Ingest / Image SEO checkpoint — 2026-09-02
 
 This is an additive checkpoint to the baseline audit above. It records the
