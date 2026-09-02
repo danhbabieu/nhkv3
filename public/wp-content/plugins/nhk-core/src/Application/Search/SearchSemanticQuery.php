@@ -9,6 +9,7 @@ use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
+use NHK\Core\Application\Video\VideoSearchDocument;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchSemanticQuery
@@ -25,21 +26,11 @@ final class SearchSemanticQuery
         }
         if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->collection()->archive($definition->type, 1, 100, $term)['items'] as $item) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => function_exists('home_url') ? home_url($item['url']) : $item['url']];
         if ($this->ready('media')) foreach ($this->media->list() as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => home_url($path)];
-        if ($this->ready('video')) foreach ($this->videos->list() as $item) {
-            if (!$item->active || !$item->hasValidPublicReference()) continue;
-            $metadata = is_array($item->metadata) ? $item->metadata : [];
-            $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
-            if (isset($source['availability']) && $source['availability'] !== 'available' && $source['availability'] !== 'unknown') continue;
-            $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
-            $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video NHK');
-            $searchValues = [$title, $item->externalVideoId, $item->canonicalUrl, (string) ($editorial['summary'] ?? ''), (string) ($editorial['body'] ?? ''), (string) ($editorial['why_this_matters'] ?? ''), (string) ($source['source_title'] ?? ''), (string) ($source['source_description'] ?? ''), (string) ($metadata['category']['primary']['label'] ?? '')];
-            foreach ((array) ($source['tags'] ?? []) as $tag) $searchValues[] = (string) $tag;
-            foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
-                $target = $this->authority->findByCanonicalId((string) ($attachment['target_key'] ?? $attachment['target_id'] ?? ''));
-                if ($target !== null && $target->active()) $searchValues[] = $target->canonicalName;
-            }
-            $path = PublicRouteResolver::videoPath($title, $item->externalVideoId);
-            if ($path !== null && $this->matches($term, ...$searchValues)) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($path) : $path];
+        if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority); foreach ($this->videos->list() as $item) {
+            if (!$item->active || !$item->hasValidPublicReference() || !$videoSearch->isDiscoverable($item)) continue;
+            $title = $videoSearch->title($item); $path = PublicRouteResolver::videoPath($title, $item->externalVideoId);
+            if ($path !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($path) : $path];
+        }
         }
         if ($this->ready('knowledge')) foreach ($this->claims->list() as $item) if ($item->active && $item->isPublic() && ($path = PublicRouteResolver::existingSemanticPath('knowledge', $item->canonicalId)) !== null && $this->matches($term, $item->claimText, $item->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => home_url($path)];
         $offset = ($page - 1) * $perPage;
