@@ -460,3 +460,35 @@ contract; the five route/identity failures are pre-existing test/route
 contract failures; Post 55 skips are expected because the exact fixture is
 absent. No V2/live data, Post, Graph edge, slug, semantic backfill or legacy
 asset was changed. `READY_FOR_LEGACY_MEDIA_REPAIR: NO`.
+
+## Phase R2 local database outage recovery revalidation — 2026-09-02
+
+The R2 worktree was preserved before runtime investigation in
+`/private/tmp/nhk-r2-runtime-recovery-20260902/`. The local outage is classified
+as **MYSQL_DAEMON_DOWN**: the MySQL error log records an explicit user-signal
+shutdown at `2026-09-02T09:03:59Z`, clean completion one second later, and a
+Homebrew `mysqld_safe` restart ten seconds later. Repeated
+`A mysqld process already exists` messages identify a service-wrapper
+duplicate/restart race. Direct evidence rules out wrong port, socket mismatch,
+authentication, missing database, PHP extension and WordPress configuration
+failure.
+
+The recovered server is PID `64761`, Homebrew MySQL 9.7.1, datadir
+`/opt/homebrew/var/mysql`, TCP `127.0.0.1:3306`, socket `/tmp/mysql.sock`;
+`nhk_v3` and `nhk_v3_test` both exist. `wp-config.php` resolves the expected
+`nhk_v3` database, host and `wp_` prefix, with a defined empty local password.
+TCP, socket, authentication, PHP mysqli, WordPress bootstrap, HTTP health and
+the MCP wire smoke all pass. Composer preflight is 10/10, the R2-focused files
+pass at 110 tests / 871 assertions, and the Unit suite passes 265 / 1,355.
+The configured full suite reaches the database and remains non-green for the
+known retired V2 writer/malformed-asset and route/identity contracts; those
+failures are not evidence of a database outage. Frontend route smoke is 44/46,
+with the existing `/knowledge/` and Uncategorized metadata expectations
+failing.
+
+No source R2 implementation, V2/live data, staging/production data, legacy
+body, Graph edge, semantic record, slug or attachment was mutated. The guarded
+test setup/cleanup was restricted to `nhk_v3_test`; no migration was run
+against development `nhk_v3`. Database recovery restores runtime evidence but
+does not close the remaining Article editorial, SEO/sitemap, generic
+WordPress bypass or legacy repair gates recorded above.

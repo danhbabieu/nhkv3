@@ -136,3 +136,21 @@ validation, full PHP lint and `git diff --check` pass. Live WordPress,
 migration, Article/MCP REST, sitemap and HTTP evidence is blocked in this
 shell by the unavailable MySQL bootstrap. No legacy Post, attachment, V2,
 staging or production data was repaired, renamed, backfilled or published.
+
+### Phase R2 local runtime recovery — 2026-09-02
+
+The earlier database-bootstrap block was revalidated after preserving the R2
+worktree. The primary outage classification is **MYSQL_DAEMON_DOWN**: the
+server log records a user-signal shutdown followed by a clean Homebrew
+`mysqld_safe` restart, with duplicate-wrapper messages immediately before the
+shutdown. Direct TCP/socket, authentication, database-existence, PHP mysqli,
+WordPress bootstrap and HTTP health probes now pass. MySQL is PID `64761` on
+`127.0.0.1:3306`, socket `/tmp/mysql.sock`, datadir `/opt/homebrew/var/mysql`.
+
+Fresh proof is `composer preflight` 10/10, MCP wire smoke pass, R2-focused
+tests `110 / 871`, and Unit suite `265 / 1,355`. Migration 012 mapping and
+Blueprint tables were read back successfully. The guarded full suite reaches
+the database but remains non-green on the existing retired V2-writer,
+malformed-asset and route/identity contracts; frontend route smoke is 44/46.
+This recovery performed no R2 source change, legacy repair, attachment write,
+semantic write, Graph write or migration against development `nhk_v3`.

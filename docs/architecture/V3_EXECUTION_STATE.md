@@ -2482,6 +2482,56 @@ edge, slug, repair or backfill write was performed.
 | DEPLOYMENT_GATE | **FAIL** | Runtime proof is mixed and generic WP REST bypass remains open; no deployment or production cutover was attempted. |
 | LEGACY_REPAIR_GATE | **NO** | Explicitly not authorized by this phase. |
 
+## Phase R2 local runtime recovery and root-cause checkpoint — 2026-09-02
+
+The local runtime outage was investigated read-only after preserving the
+uncommitted R2 worktree in `/private/tmp/nhk-r2-runtime-recovery-20260902/`.
+The primary classification is **MYSQL_DAEMON_DOWN**. MySQL's error log records
+`Received SHUTDOWN from user <via user signal>` at `2026-09-02T09:03:59Z`, a
+clean shutdown at `09:04:00Z`, and Homebrew `mysqld_safe` restarting the same
+datadir at `09:04:10Z`. The repeated `A mysqld process already exists` entries
+show a duplicate/restart race around the service wrapper. No evidence supports
+wrong port, socket mismatch, authentication failure, missing database,
+WordPress configuration mismatch, PHP MySQL extension failure, or a second
+active MySQL instance.
+
+Current raw connectivity evidence:
+
+- `mysqld` is running as PID `64761`, binary
+  `/opt/homebrew/Cellar/mysql/9.7.1/bin/mysqld`, datadir
+  `/opt/homebrew/var/mysql`.
+- Homebrew service `mysql` is loaded/running; TCP listens on `127.0.0.1:3306`.
+- The server reports socket `/tmp/mysql.sock` (the `/private/tmp` equivalent
+  also passes); both TCP and socket authentication pass with the local
+  WordPress configuration.
+- WordPress `wp-config.php` resolves `DB_NAME=nhk_v3` (no
+  `NHK_WP_TEST_DB` override), `DB_HOST=127.0.0.1`, default port `3306`,
+  prefix `wp_`, and a defined empty password. Both `nhk_v3` and `nhk_v3_test`
+  exist. PHP 8.5.7 exposes `mysqli`, `mysqlnd` and `pdo_mysql`.
+
+Fresh recovery evidence:
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| MYSQL_PROCESS | PASS | Homebrew `mysql` running; one `mysqld` listener on 3306 |
+| TCP / SOCKET / AUTH / DATABASE | PASS | Direct `mysqladmin`, MySQL query and PHP mysqli probes pass |
+| WORDPRESS_BOOTSTRAP | PASS | `public/wp-load.php` boots `NHK v3`; `$wpdb` uses `nhk_v3` |
+| HTTP_HEALTH | PASS | `nhk/v1/health?details=1` returns 200; migration 12/12 and all five layers healthy |
+| MCP_WIRE | PASS | `tools/mcp-wire-smoke.php --base-url=http://localhost` passes all checks and the governed 21-tool catalog contract |
+| DEPLOYMENT_PREFLIGHT | PASS | 10/10 checks pass |
+| R2_FOCUSED_TESTS | PASS | 110 tests / 871 assertions |
+| NHK_UNIT | PASS | 265 tests / 1,355 assertions |
+| FULL_GUARDED_TESTS | FAIL / CLASSIFIED | 364 tests: 14 retired V2-writer/malformed-asset errors, 5 existing route/identity failures, 1 receipt warning, 2 expected Post-55 skips; no DB bootstrap errors |
+| FRONTEND_ROUTE_SMOKE | PARTIAL | 44/46 pass; `/knowledge/` returned 404 and Uncategorized metadata markers were absent |
+| MIGRATION_012_SCHEMA | PASS | Mapping and Blueprint tables exist with expected columns; no migration was run against `nhk_v3` during recovery |
+
+The configured guarded suite used only `nhk_v3_test` for destructive fixture
+setup/cleanup. No R2 source file was changed during runtime recovery. No V2,
+staging, production, legacy Post, Graph edge, semantic record, slug,
+attachment, backfill, repair or publication operation was performed. The
+preserved R2 worktree remains uncommitted; legacy media repair remains
+**READY_FOR_LEGACY_MEDIA_REPAIR: NO**.
+
 ### Full-suite classification
 
 The 14 errors are `PREEXISTING_FAILURE`: one P6 malformed-asset integration
