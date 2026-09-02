@@ -135,7 +135,10 @@ Focused route tests pass 52 tests / 590 assertions; the complete Unit suite
 passes 253 tests / 1,307 assertions; PHP lint, Composer validation and
 `git diff --check` pass. The guarded Post 55 lifecycle test is present but
 runtime verification is blocked because local MySQL cannot establish a
-connection; HTTP route smoke and staging verification remain unavailable.
+connection; local HTTP smoke cannot connect to localhost:80. Pre-deploy
+staging inspection confirms `/odo/` and `/thuong-hieu/` resolve, `/brand/`
+redirects one hop to `/thuong-hieu/`, the random root is 404, and the Post 55
+slug remains 404 on the not-yet-deployed staging code.
 
 Brand related-projection checkpoint — 2026-09-02: the public Brand detail
 projection now includes every registered Authority group that has an active
