@@ -18,6 +18,7 @@ final class ArticleIngestPreflight
     {
         $reasons = [];
         $details = ['endpoint_key' => $endpointKey];
+        $targetStableKeys = [];
         if ($intent !== 'reconcile') $reasons[] = 'UNSUPPORTED_OPERATION';
         if ($endpointType !== 'wp_post') $reasons[] = 'UNKNOWN_WP_ENDPOINT_TYPE';
         if (preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpointKey, $matches) !== 1 || (int) $matches[1] !== 55) $reasons[] = 'RECONCILIATION_CONFLICT';
@@ -51,7 +52,7 @@ final class ArticleIngestPreflight
             }
             if ((int) ($command['expected_revision'] ?? 0) < 1) $reasons[] = 'INVALID_EXPECTED_REVISION';
             $payload = is_array($command['payload'] ?? null) ? $command['payload'] : [];
-            $this->checkTargetStableKey($operation, $entityType, $payload, $reasons, $details, $slot);
+            $this->checkTargetStableKey($operation, $entityType, $payload, $reasons, $details, $slot, $targetStableKeys);
             if (str_starts_with($operation, 'relation_')) $this->checkRelation($payload, $reasons);
             if ($entityType === 'evidence' && in_array($operation, ['create', 'ingest'], true)) $reasons[] = 'EVIDENCE_IDEMPOTENCY_UNPROVEN';
             if ($entityType === 'evidence' && ($payload['claim_id'] ?? '') === '' && ($payload['source_id'] ?? '') === '') $reasons[] = 'SOURCE_EVIDENCE_MISSING';
@@ -81,8 +82,8 @@ final class ArticleIngestPreflight
         }
     }
 
-    /** @param array<string,mixed> $payload @param list<string> $reasons @param array<string,mixed> $details */
-    private function checkTargetStableKey(string $operation, string $entityType, array $payload, array &$reasons, array &$details, string $slot): void
+    /** @param array<string,mixed> $payload @param list<string> $reasons @param array<string,mixed> $details @param array<string,string> $targetStableKeys */
+    private function checkTargetStableKey(string $operation, string $entityType, array $payload, array &$reasons, array &$details, string $slot, array &$targetStableKeys): void
     {
         if (!in_array($operation, ['create', 'ingest'], true) || in_array($entityType, ['relation', 'evidence', 'video'], true)) return;
         $stableKey = trim((string) ($payload['stable_key'] ?? ''));
@@ -91,7 +92,18 @@ final class ArticleIngestPreflight
             $reasons[] = 'FORBIDDEN_LEGACY_TARGET_KEY_NAMESPACE';
             $details['forbidden_target_keys'][$slot] = $stableKey;
         }
-        if ($this->stableKeyExists === null) return;
+        $dedupeKey = strtolower($entityType . "\n" . $stableKey);
+        if (isset($targetStableKeys[$dedupeKey])) {
+            $reasons[] = 'DUPLICATE_TARGET_STABLE_KEY';
+            $details['duplicate_target_keys'][$slot] = $stableKey;
+            return;
+        }
+        $targetStableKeys[$dedupeKey] = $slot;
+        if ($this->stableKeyExists === null) {
+            $reasons[] = 'DEPENDENCY_UNAVAILABLE';
+            $details['stable_key_error'] = 'TARGET_STABLE_KEY_PREFLIGHT_UNAVAILABLE';
+            return;
+        }
         try {
             if ((bool) ($this->stableKeyExists)($entityType, $stableKey)) {
                 $reasons[] = 'TARGET_STABLE_KEY_COLLISION';

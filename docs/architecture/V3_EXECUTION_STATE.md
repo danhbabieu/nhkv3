@@ -11,17 +11,22 @@
 The existing generic `ArticleIngestPreflight` boundary now rejects create/ingest
 semantic commands that introduce a target `stable_key` using the forbidden
 legacy namespace token `o-do`, and it rejects target stable-key collisions
-before proposal planning/persistence. The runtime wiring in `Plugin.php` reuses
-existing Authority, Media, Knowledge and Source stable-key lookups; no Odo-only
-storage path, SQL semantic mutation or new semantic capability was added.
+before proposal planning/persistence. Review follow-up tightened the same
+boundary so duplicate `(entity_type, stable_key)` create/ingest targets within
+one manifest also fail closed, and a payload-owned target `stable_key` now
+returns `DEPENDENCY_UNAVAILABLE` when the required collision-preflight lookup
+is not wired. The runtime wiring in `Plugin.php` reuses existing Authority,
+Media, Knowledge and Source stable-key lookups; no Odo-only storage path, SQL
+semantic mutation or new semantic capability was added.
 
 Fresh evidence:
 
 | Gate | Result | Evidence |
 |---|---|---|
 | RED | **PASS** | `vendor/bin/phpunit --configuration phpunit.xml.dist --filter ArticleIngestPreflightTest` initially failed on `test_create_rejects_forbidden_legacy_target_stable_key_namespace` because preflight accepted the forbidden key. |
-| FOCUSED | **PASS** | Same focused command after implementation: `5 tests / 10 assertions`. |
-| GOVERNANCE/PREFLIGHT | **PASS** | `ArticleIngestPreflightTest`, `ArticleIngestCoordinatorTest`, `McpArticleContractTest`, `SemanticProposalPlannerTest`, `GovernanceCoreTest`, `GovernanceApplyContractTest`: `27 tests / 59 assertions`. |
+| REVIEW RED | **PASS** | Same focused command later failed on `test_create_rejects_duplicate_target_stable_keys_within_same_manifest` and `test_create_rejects_target_stable_key_when_collision_preflight_is_unavailable`, proving both gaps before the follow-up fix. |
+| FOCUSED | **PASS** | Same focused command after implementation: `7 tests / 14 assertions`. |
+| GOVERNANCE/PREFLIGHT | **PASS** | `ArticleIngestPreflightTest`, `ArticleIngestCoordinatorTest`, `McpArticleContractTest`, `SemanticProposalPlannerTest`, `GovernanceCoreTest`, `GovernanceApplyContractTest`: `29 tests / 63 assertions`. |
 | PHP LINT | **PASS** | `php -l` passes for `ArticleIngestPreflight.php`, `Plugin.php`, `ArticleIngestPreflightTest.php`. |
 | DIFF | **PASS** | `git diff --check` exit `0`. |
 

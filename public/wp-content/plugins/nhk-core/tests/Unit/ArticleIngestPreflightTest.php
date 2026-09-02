@@ -102,4 +102,60 @@ final class ArticleIngestPreflightTest extends TestCase
         self::assertFalse($result->accepted);
         self::assertContains('TARGET_STABLE_KEY_COLLISION', $result->reasons);
     }
+
+    public function test_create_rejects_duplicate_target_stable_keys_within_same_manifest(): void
+    {
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+
+        $result = (new ArticleIngestPreflight(
+            $endpoints,
+            new PredicateRegistry(),
+            $types,
+            null,
+            static fn (string $type, string $stableKey): bool => false,
+        ))->check('1:55', 'reconcile', [
+            [
+                'slot' => 'brand-a',
+                'operation' => 'create',
+                'entity_type' => 'brand',
+                'subject_id' => 'brand',
+                'expected_revision' => 1,
+                'payload' => ['stable_key' => 'nhk:brand:odo', 'name' => 'Odo A'],
+            ],
+            [
+                'slot' => 'brand-b',
+                'operation' => 'ingest',
+                'entity_type' => 'brand',
+                'subject_id' => 'brand',
+                'expected_revision' => 1,
+                'payload' => ['stable_key' => 'nhk:brand:odo', 'name' => 'Odo B'],
+            ],
+        ]);
+
+        self::assertFalse($result->accepted);
+        self::assertContains('DUPLICATE_TARGET_STABLE_KEY', $result->reasons);
+    }
+
+    public function test_create_rejects_target_stable_key_when_collision_preflight_is_unavailable(): void
+    {
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:55']));
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, []));
+
+        $result = (new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types))->check('1:55', 'reconcile', [[
+            'slot' => 'brand',
+            'operation' => 'create',
+            'entity_type' => 'brand',
+            'subject_id' => 'brand',
+            'expected_revision' => 1,
+            'payload' => ['stable_key' => 'nhk:brand:odo', 'name' => 'Odo'],
+        ]]);
+
+        self::assertFalse($result->accepted);
+        self::assertContains('DEPENDENCY_UNAVAILABLE', $result->reasons);
+    }
 }
