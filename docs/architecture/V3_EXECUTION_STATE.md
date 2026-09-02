@@ -1,6 +1,21 @@
 # NHK V3 Execution State
 
-Last updated: 2026-09-02, approved Brand backbone staged-contract evidence checkpoint.
+Last updated: 2026-09-02, P0 public identity/slug/visibility parity audit checkpoint.
+
+The read-only P0 public identity audit added
+`V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`. It confirms from current code that
+Authority public slugs are derived from `canonical_name` at read time, with no
+persisted public-slug or Authority alias-history contract. It also confirms
+that detail, EntityPage archive, REST list, search and nested route resolution
+do not share one public eligibility predicate; a route-less active entity can
+therefore be represented differently across layers. This is recorded as a
+`SLUG_CONTRACT_FAILURE` / data-code contract gap and a
+`PUBLIC_ELIGIBILITY_FAILURE` / code gap, pending runtime proof. Model/Variant
+parent payloads remain a separate structural-contract gap, while Music has no
+Brand route requirement. The staging `/odo/` probe could not reach HTTP because
+the host did not resolve, and the local WordPress database was unavailable;
+all live row/count/cache conclusions remain UNVERIFIED. No database, V2, Graph,
+slug, redirect or cache state was changed.
 
 P0 implementation is in progress. The approved change separates Authority
 row-level malformed-data omission from infrastructure/programming failures:
