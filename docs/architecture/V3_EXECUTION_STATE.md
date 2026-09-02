@@ -30,6 +30,12 @@ all checked code-level navigation targets use canonical routes. Rewrite
 flushing, targeted stored-menu edits, push, staging deployment and staging HTTP
 verification remain pending the runtime gate.
 
+Checkpoint commits: `abc2f67` (implementation), `b073780` (MCP evidence) and
+this execution-state checkpoint. `origin/main` remains
+`20c0d2a73c86940a2bf0036234d5f90172e79256`. The requested push was attempted
+and rejected by the execution policy as external publishing; no workaround was
+used. An unrelated untracked MCP plan file remains preserved and unstaged.
+
 MCP V3 content-operations audit checkpoint, 2026-09-02: the clean HEAD
 catalog contains exactly 19 tools, with `nhk.proposal.apply` in position 19;
 the two previously stale catalog expectations are aligned to 19 in the
