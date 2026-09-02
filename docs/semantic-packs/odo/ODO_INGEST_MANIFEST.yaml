@@ -1,0 +1,371 @@
+pack:
+  id: nhk-v3-brand-pack-odo
+  display_name: Odo
+  version: '1.0'
+  status: approved-design
+  canonical_namespace: odo
+  forbid_new_namespace:
+    - o-do
+  constitutional_precedence:
+    - AGENTS.md
+    - docs/constitution/READ_FIRST.md
+    - docs/constitution/NHK_V3_CONSTITUTION.md
+    - runtime registries/contracts
+    - this manifest
+
+global_rules:
+  preserve_uuid_on_rekey_when_supported: true
+  hard_delete_for_namespace_normalization: false
+  all_mutations_governed: true
+  relation_predicates_must_resolve_from_registry: true
+  article_body_authority: wordpress
+  faq_is_projection: true
+  timeline_is_projection: true
+  recognition_profile_is_projection: true
+  media_fake_url_forbidden: true
+  video_standalone_forbidden: true
+
+entities:
+  - action: REKEY
+    entity_type: brand
+    uuid: d2af7739-3d1b-4666-ad0a-aeda0758f4d8
+    name: Odo
+    from: nhk:brand:o-do
+    to: nhk:brand:odo
+
+  - action: REKEY
+    entity_type: model
+    uuid: 984658bf-19a6-4daa-a220-2a6c13af81ed
+    name: Odo 24
+    from: nhk:model:o-do.24
+    to: nhk:model:odo.24
+
+  - action: REKEY
+    entity_type: model
+    uuid: fdf5bfd5-d3f4-4281-a39e-77c9271bcf4a
+    name: Odo 30
+    from: nhk:model:o-do.30
+    to: nhk:model:odo.30
+
+  - action: REKEY
+    entity_type: model
+    uuid: c01c109c-5d39-401e-a16e-6d61a0a52f50
+    name: Odo 36
+    from: nhk:model:o-do.36
+    to: nhk:model:odo.36
+
+  - action: REKEY
+    entity_type: model
+    uuid: d39bfeae-40c4-47c2-a050-94ca56c8c93b
+    name: Odo 39
+    from: nhk:model:o-do.39
+    to: nhk:model:odo.39
+
+  - action: RETIREMENT_REVIEW
+    entity_type: model
+    uuid: fc86a551-06eb-48da-a765-5578e70bf4c9
+    name: Odo 35
+    stable_key: nhk:model:o-do.35
+    directive: exclude_from_active_odo_pack
+
+  - action: RETIREMENT_REVIEW
+    entity_type: movement
+    uuid: 63eb0f6d-4b38-4a34-aa27-d02f5dbe76f5
+    name: Máy Odo 35
+    stable_key: nhk:movement:o-do.35
+    directive: exclude_from_active_odo_pack
+
+  - action: RETIREMENT_REVIEW
+    entity_type: variant
+    uuid: f60febc6-0e81-460e-a7f2-1addbedcace4
+    name: Odo 36 Odo 35 legacy/config
+    stable_key: nhk:variant:o-do.36.35
+    directive: exclude_from_active_odo_pack
+
+  - action: MERGE
+    entity_type: component
+    source_uuid: 32f43d4b-d6c8-4223-a89b-cc47f30cda77
+    source_key: nhk:component:o-do.dial.applied-pinned
+    target_uuid: 48311ccd-9d45-4985-a620-ca579499f02c
+    target_key: nhk:component:odo.dial.applied-pinned
+    name: Mặt số nổi chân cài
+    owner_confirmed_same_identity: true
+
+  - action: MERGE_CANDIDATE
+    entity_type: component
+    source_uuid: 01bead27-1308-48c1-af99-c68318e2b577
+    source_key: nhk:component:o-do.dial.applied-glued
+    target_uuid: e326a326-ae8c-447f-a2a4-a83a3cf168d4
+    target_key: nhk:component:odo.dial.applied-glued
+    name: Mặt số nổi số dán
+    owner_confirmed_same_identity: false
+
+bulk_rekey_rules:
+  - match_prefix: nhk:model:o-do.
+    target_prefix: nhk:model:odo.
+    exclude:
+      - nhk:model:o-do.35
+    collision_policy: fail_closed_and_review
+
+  - match_prefix: nhk:movement:o-do.
+    target_prefix: nhk:movement:odo.
+    exclude:
+      - nhk:movement:o-do.35
+    collision_policy: fail_closed_and_review
+
+  - match_prefix: nhk:variant:o-do.
+    target_prefix: nhk:variant:odo.
+    exclude:
+      - nhk:variant:o-do.36.35
+    collision_policy: fail_closed_and_review
+
+  - match_prefix: nhk:component:o-do.
+    target_prefix: nhk:component:odo.
+    exclude:
+      - nhk:component:o-do.dial.applied-pinned
+    collision_policy: fail_closed_and_review
+
+  - match_prefix: nhk:knowledge:o-do.
+    target_prefix: nhk:knowledge:odo.
+    exclude: []
+    collision_policy: fail_closed_and_review
+
+canonical_branches:
+  odo_24:
+    model: nhk:model:odo.24
+    movement: nhk:movement:odo.24
+    variants:
+      - nhk:variant:odo.24.54
+      - nhk:variant:odo.24.57
+      - nhk:variant:odo.24.62
+    community_branch_rule: true
+
+  odo_30:
+    model: nhk:model:odo.30
+    movement: nhk:movement:odo.30
+    variants:
+      - nhk:variant:odo.30.8
+      - nhk:variant:odo.30.10
+
+  odo_36:
+    model: nhk:model:odo.36
+    movement: nhk:movement:odo.36
+    variants:
+      - nhk:variant:odo.36.8
+      - nhk:variant:odo.36.8.westminster
+      - nhk:variant:odo.36.8.two-tune
+      - nhk:variant:odo.36.10
+      - nhk:variant:odo.36.10.ave-maria
+      - nhk:variant:odo.36.10.two-tune
+
+  odo_39:
+    model: nhk:model:odo.39
+    movement: nhk:movement:odo.39
+    research_required: true
+
+shared_entities_to_reuse:
+  music:
+    - nhk:music:westminster
+    - nhk:music:ave-maria-lourdes
+    - nhk:music:sonodo
+    - nhk:music:gai-carillon
+    - nhk:music:cloches-comtoises
+  clock_types:
+    - nhk:classification:clock-type.wall-clock
+    - nhk:classification:clock-type.cabinet-clock
+    - nhk:classification:clock-type.mantel-clock
+    - nhk:classification:clock-type.table-clock
+    - nhk:classification:clock-type.automaton-jacquemar-clock
+  case_forms:
+    - nhk:classification:case-form.wide-case
+    - nhk:classification:case-form.medium-case
+    - nhk:classification:case-form.long-case
+
+knowledge_shells:
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.domestic.definition
+    title: Khái niệm đồng hồ nội địa trong cộng đồng sưu tầm Việt Nam
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.domestic.overview
+    title: Odo nội địa tại Việt Nam
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.domestic.36
+    title: Odo 36 nội địa
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.domestic.54
+    title: Odo 54 nội địa
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.domestic.57
+    title: Odo 57 nội địa
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.domestic.62
+    title: Odo 62 nội địa
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.community.54-name
+    title: Odo 54 là tên gọi cộng đồng Việt Nam cho một nhánh Odo 24
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.community.57-name
+    title: Odo 57 là tên gọi cộng đồng Việt Nam cho một nhánh Odo 24
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.community.62-name
+    title: Odo 62 là tên gọi cộng đồng Việt Nam cho một nhánh Odo 24
+    semantic_level: COMMUNITY_KNOWLEDGE
+    runtime_status: RESOLVE_FROM_REGISTRY
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.community.54-origin-hypothesis
+    title: Giả thuyết nguồn gốc tên gọi 54 tại thị trường Việt Nam
+    semantic_level: CLAIM
+    runtime_status: RESOLVE_FROM_REGISTRY
+    must_not_assert_as_fact: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.recognition.57-profile
+    title: Hồ sơ nhận diện Odo 57
+    semantic_level: EXPERT_OBSERVATION
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+  - action: CREATE
+    proposed_stable_key: nhk:knowledge:odo.recognition.62-profile
+    title: Hồ sơ nhận diện Odo 62
+    semantic_level: EXPERT_OBSERVATION
+    runtime_status: RESOLVE_FROM_REGISTRY
+    allow_owner_enrichment: true
+
+media_requirements:
+  action: MEDIA_REQUIREMENT
+  placeholder_creation: ONLY_IF_RUNTIME_SUPPORTS_MEDIA_PLACEHOLDER
+  groups:
+    brand:
+      - logo elip
+      - logo hình trám
+      - triện Odo
+    plates:
+      - vách cam
+      - vách hở
+      - vách xoáy
+      - vách bệt
+      - vách chân kiềng
+      - vách trơn
+      - hoa dâu thô
+      - hoa dâu mịn
+    gong:
+      - Côn 101
+      - Côn 111
+      - Côn 121
+      - Côn 121C
+      - lòng máng đen
+      - lòng máng trắng
+      - chữ U
+      - chữ M
+      - M truyền thống
+      - M MF-style
+      - côn nâu không số
+      - ty xoáy
+      - ty đóng
+    hammer:
+      - búa tròn
+      - búa vuông
+      - búa nhựa
+      - lưỡi búa nhựa tròn
+    hands:
+      - kim 54
+      - kim số 8
+      - kim tháp
+      - kim bút
+      - kim mắt ngỗng Odo
+      - kim lá lúa
+    dial:
+      - tròn 18
+      - tròn 20
+      - tròn 22
+      - tròn 24
+      - đáy đứng 20x20
+      - đáy đứng 22x22
+      - số nổi chân cài
+      - số nổi dán
+    case_glass:
+      - thùng bè
+      - thùng trung
+      - thùng dài
+      - glass research series
+
+video_requirements:
+  action: VIDEO_REQUIREMENT
+  placeholder_creation: ONLY_IF_RUNTIME_SUPPORTS_VIDEO_PLACEHOLDER
+  topics:
+    - Nhận diện Odo 54
+    - Phân biệt Odo 54, 57 và 62
+    - Nhận diện Odo 36
+    - Odo 30 và Odo 36
+    - Côn 101, 111 và 121
+    - Ty đóng và ty xoáy
+    - Búa vuông và búa tròn
+    - Mặt số chân cài và mặt số dán
+    - Odo nội địa
+    - Âm thanh các variant đã xác nhận
+
+article_reconciliation:
+  - post_id: 38
+    action: ARTICLE_RECONCILE
+    no_duplicate_post: true
+  - post_id: 39
+    action: ARTICLE_RECONCILE
+    no_duplicate_post: true
+  - post_id: 40
+    action: ARTICLE_RECONCILE
+    no_duplicate_post: true
+  - post_id: 55
+    action: ARTICLE_RECONCILE
+    no_duplicate_post: true
+    preserve_slug_and_url: true
+    preserve_editorial_body: true
+
+execution:
+  phases:
+    - READ_ONLY_INVENTORY
+    - NAMESPACE_REKEY
+    - CONFIRMED_MERGES
+    - RETIREMENT_REVIEW
+    - RELATION_COMPLETION
+    - KNOWLEDGE_CREATION
+    - MEDIA_VIDEO_REQUIREMENTS
+    - ARTICLE_RECONCILIATION
+    - READ_BACK_VERIFICATION
+  fail_closed: true
+  required_receipt: true
+  required_read_back:
+    - Authority
+    - Graph
+    - public projection where applicable
