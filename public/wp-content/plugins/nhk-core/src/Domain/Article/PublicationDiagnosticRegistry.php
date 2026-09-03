@@ -47,6 +47,8 @@ final class PublicationDiagnosticRegistry
         foreach ([
             $owner('REAL_IMAGE_INCOMPLETE', 'Ảnh thật chưa hoàn tất.', 'Bổ sung ảnh thật phù hợp.'),
             $owner('MEDIAUSAGE_INCOMPLETE', 'Thông tin sử dụng Media chưa hoàn tất.', 'Hoàn tất MediaUsage.'),
+            $owner('ARTICLE_MEDIA_FEATURED_MISSING', 'Ảnh đại diện bắt buộc chưa được gắn.', 'Gắn MediaUsage FEATURED_PRIMARY hợp lệ.'),
+            $owner('ARTICLE_MEDIA_INLINE_MISSING', 'Ảnh inline bắt buộc chưa được gắn.', 'Gắn MediaUsage INLINE_PRIMARY hợp lệ.'),
             $owner('SEO_PROJECTION_INVALID', 'SEO chưa hoàn tất.', 'Hoàn tất projection SEO.'),
             $owner('INTERNAL_LINKS_INCOMPLETE', 'Liên kết nội bộ chưa hoàn tất.', 'Bổ sung liên kết nội bộ hợp lệ.'),
             $owner('STRUCTURED_DATA_INCOMPLETE', 'Structured data chưa hoàn tất.', 'Hoàn tất dữ liệu có cấu trúc.'),
@@ -58,6 +60,7 @@ final class PublicationDiagnosticRegistry
             $system('CANONICAL_PUBLIC_IDENTITY_INVALID', 'Không xác định được public identity hợp lệ.', 'Sửa identity/route qua contract.'),
             $system('RESEARCH_PREFLIGHT_BLOCKED', 'Research preflight bị chặn.', 'Hoàn tất research preflight.'),
             $system('SUBJECT_UNRESOLVED', 'Không xác định được subject duy nhất.', 'Giải quyết identity ambiguity.'),
+            $system('SUBJECT_NOT_PERSISTED', 'Subject mới chỉ được giải quyết trong planning, chưa được gắn persisted.', 'Hoàn tất semantic Governance và read-back.'),
             $system('DUPLICATE_INTENT_UNRESOLVED', 'Duplicate intent chưa được giải quyết.', 'Giải quyết intent qua Governance.'),
             $system('CATEGORY_UNRESOLVED', 'Category không xác định được.', 'Giải quyết category native.'),
             $system('SEMANTIC_PLAN_INCOMPLETE', 'Semantic plan chưa hoàn tất.', 'Hoàn tất semantic Governance.'),

@@ -18,6 +18,14 @@ final class MediaServiceCompletionTest extends TestCase
         self::assertStringContainsString("'visibility' => 'PRIVATE'", $bridge);
     }
 
+    public function test_wordpress_bridge_uses_the_canonical_editorial_state_token(): void
+    {
+        $bridge = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Media/WordPressMediaAttachmentBridge.php');
+        self::assertStringContainsString('WpEditorialStateReader', $bridge);
+        self::assertStringContainsString('$editorialState->token', $bridge);
+        self::assertStringNotContainsString("'state_token' => \$this->stateToken(", $bridge);
+    }
+
     public function test_staged_media_completion_promotes_primary_asset_and_preserves_dimensions(): void
     {
         [$media, $assets, $service] = $this->stores();

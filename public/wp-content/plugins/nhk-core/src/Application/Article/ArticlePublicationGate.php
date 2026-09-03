@@ -22,11 +22,21 @@ final class ArticlePublicationGate
         if ($draft->postId < 1 || $draft->endpointKey === '' || $draft->slug === '' || $draft->permalink === '') $blockers[] = 'CANONICAL_PUBLIC_IDENTITY_INVALID';
         $this->requireTrue($evidence, 'research_acceptable', 'RESEARCH_PREFLIGHT_BLOCKED', $blockers);
         $this->requireTrue($evidence, 'subject_resolved', 'SUBJECT_UNRESOLVED', $blockers);
+        if (($evidence['subject_persistence_status'] ?? '') === 'unattached_planning_candidate') {
+            $this->replaceBlocker($blockers, 'SUBJECT_UNRESOLVED', 'SUBJECT_NOT_PERSISTED');
+        }
         $this->requireTrue($evidence, 'duplicate_intent_handled', 'DUPLICATE_INTENT_UNRESOLVED', $blockers);
         $this->requireTrue($evidence, 'category_resolved', 'CATEGORY_UNRESOLVED', $blockers);
         $this->requireTrue($evidence, 'semantic_plan_complete', 'SEMANTIC_PLAN_INCOMPLETE', $blockers);
         $this->requireTrue($evidence, 'semantic_readback_verified', 'SEMANTIC_READBACK_UNVERIFIED', $blockers);
         $this->requireTrue($evidence, 'media_usage_complete', 'MEDIAUSAGE_INCOMPLETE', $blockers);
+        $mediaSnapshot = is_array($evidence['media_snapshot'] ?? null) ? $evidence['media_snapshot'] : [];
+        foreach (['featured_primary', 'inline_primary'] as $slot) {
+            if (($mediaSnapshot[$slot]['placeholder'] ?? false) === true) {
+                if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
+                $blockers[] = $slot === 'inline_primary' ? 'ARTICLE_MEDIA_INLINE_MISSING' : 'ARTICLE_MEDIA_FEATURED_MISSING';
+            }
+        }
         $this->optionalTrue($evidence, 'real_image_requirements_met', 'REAL_IMAGE_REQUIREMENTS_UNMET', 'REAL_IMAGE_INCOMPLETE', $blockers, $warnings);
         $this->requireTrue($evidence, 'claim_compliance_acceptable', 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', $blockers);
         $this->requireTrue($evidence, 'seo_projection_valid', 'SEO_PROJECTION_INVALID', $blockers);
@@ -52,5 +62,13 @@ final class ArticlePublicationGate
         if (($evidence[$key . '_status'] ?? '') === 'invalid') $blockers[] = $hardReason;
         elseif ($warning === 'REAL_IMAGE_INCOMPLETE' && in_array(($evidence[$key . '_status'] ?? ''), ['missing', 'incomplete'], true)) $blockers[] = $warning;
         else $warnings[] = $warning;
+    }
+
+    /** @param list<string> $blockers */
+    private function replaceBlocker(array &$blockers, string $from, string $to): void
+    {
+        $index = array_search($from, $blockers, true);
+        if ($index !== false) $blockers[$index] = $to;
+        else $blockers[] = $to;
     }
 }

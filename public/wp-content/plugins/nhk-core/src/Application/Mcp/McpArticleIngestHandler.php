@@ -23,7 +23,9 @@ class McpArticleIngestHandler
     public function preflight(array $input): array
     {
         if ($this->research !== null && trim((string) ($input['research_topic'] ?? '')) !== '') {
-            return $this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [])->toArray();
+            $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
+            $postId = preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', (string) ($target['endpoint_key'] ?? ''), $matches) === 1 ? (int) $matches[1] : 0;
+            return $this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [], $postId > 0 ? ['post_id' => $postId] : [])->toArray();
         }
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = trim((string) ($target['endpoint_key'] ?? ''));

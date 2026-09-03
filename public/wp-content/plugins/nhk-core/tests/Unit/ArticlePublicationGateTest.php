@@ -57,6 +57,24 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->warnings);
     }
 
+    public function test_gate_does_not_treat_planning_subject_or_media_candidates_as_persisted_state(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['subject_resolved'] = true;
+        $evidence['subject_persistence_status'] = 'unattached_planning_candidate';
+        $evidence['media_usage_complete'] = true;
+        $evidence['media_snapshot'] = [
+            'featured_primary' => ['placeholder' => false],
+            'inline_primary' => ['placeholder' => true],
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertContains('SUBJECT_NOT_PERSISTED', $result->blockers);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->blockers);
+    }
+
     /** @return array<string,bool> */
     private function evidence(): array
     {

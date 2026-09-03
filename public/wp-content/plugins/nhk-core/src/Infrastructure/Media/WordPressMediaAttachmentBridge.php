@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Media;
 use NHK\Core\Application\Media\{MediaFilenameNormalizer, MediaService};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
+use NHK\Core\Infrastructure\Article\WpEditorialStateReader;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -28,6 +29,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
 
     public function read(int $postId): array
     {
+        $editorialState = (new WpEditorialStateReader())->read($postId);
         $content = function_exists('get_post_field') ? (string) get_post_field('post_content', $postId) : '';
         $featuredAttachmentId = function_exists('get_post_thumbnail_id') ? (int) get_post_thumbnail_id($postId) : 0;
         $inlineAttachmentIds = $this->inlineAttachmentIds($content);
@@ -46,7 +48,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             'featured_attachment_id' => $featuredAttachmentId,
             'inline_attachment_ids' => $inlineAttachmentIds,
             'content' => $content,
-            'state_token' => $this->stateToken($featuredAttachmentId, $content),
+            'state_token' => $editorialState !== null ? $editorialState->token : '',
             'unmapped_attachment_ids' => array_values(array_unique($unmapped)),
         ];
     }
@@ -315,8 +317,4 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if ($ok === false) throw new \RuntimeException('WORDPRESS_MEDIA_MAPPING_SAVE_FAILED');
     }
 
-    private function stateToken(int $featuredAttachmentId, string $content): string
-    {
-        return hash('sha256', (string) json_encode(['featured_attachment_id' => $featuredAttachmentId, 'content' => $content], JSON_UNESCAPED_SLASHES));
-    }
 }

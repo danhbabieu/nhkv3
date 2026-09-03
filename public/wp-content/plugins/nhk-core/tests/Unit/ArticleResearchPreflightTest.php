@@ -84,4 +84,46 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
         self::assertFalse($result->readyForDraft);
     }
+
+    public function test_persisted_article_state_is_separate_from_planning_subject_and_global_candidates(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'movement-1', 'type' => 'movement', 'name' => 'Calibre 1']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [['id' => '1:87', 'title' => 'Bản nháp', 'subject_ids' => [], 'published' => false]],
+                'current_categories' => [['name' => 'Tri thức đồng hồ', 'slug' => 'tri-thuc-dong-ho']],
+                'categories' => [['name' => 'Chưa phân loại', 'slug' => 'uncategorized']],
+                'article_media' => [
+                    'featured_primary' => ['media_id' => 'featured-1', 'placeholder' => false],
+                    'inline_primary' => ['media_id' => 'placeholder-1', 'placeholder' => true],
+                    'media_complete' => false,
+                ],
+                'knowledge' => [], 'sources' => [], 'evidence' => [],
+                'media' => [['id' => 'candidate-1', 'ready' => true, 'public' => true]], 'videos' => [], 'relations' => [],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Bản nháp', ['type' => 'movement', 'name' => 'Calibre 1'], ['post_id' => 87]);
+
+        self::assertSame('unattached_planning_candidate', $result->subjectResolution['persistence']['status']);
+        self::assertSame('Tri thức đồng hồ', $result->categoryPlan['current_category']['name']);
+        self::assertSame('EXISTING', $result->categoryPlan['status']);
+        self::assertFalse($result->mediaPlan['media_complete']);
+        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->mediaPlan['diagnostics'], 'code'));
+    }
+
+    public function test_persisted_subject_attachment_is_reported_as_attached(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'movement-1', 'type' => 'movement']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [['id' => '1:87', 'subject_ids' => ['movement-1']]], 'categories' => [], 'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Bản nháp', ['type' => 'movement'], ['post_id' => 87]);
+
+        self::assertSame('attached', $result->subjectResolution['persistence']['status']);
+    }
 }

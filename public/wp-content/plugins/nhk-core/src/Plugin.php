@@ -253,6 +253,23 @@ final class Plugin {
                 static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $videos, $graphService, $predicates): array {
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
                     $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
+                    $articlePostId = (int) ($input['article_context']['post_id'] ?? 0);
+                    $currentCategories = $articlePostId > 0 && function_exists('get_the_category')
+                        ? array_map(static fn ($category): array => ['name' => (string) $category->name, 'slug' => (string) $category->slug], (array) get_the_category($articlePostId))
+                        : [];
+                    $articleMedia = [];
+                    if ($articlePostId > 0) {
+                        $articleEndpoint = (function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1) . ':' . $articlePostId;
+                        foreach (['featured_primary', 'inline_primary'] as $role) {
+                            $usage = $usages->listByEndpoint('wp_post', $articleEndpoint, $role)[0] ?? null;
+                            $mediaItem = $usage !== null ? $media->findByCanonicalId($usage->mediaId) : null;
+                            $articleMedia[$role] = ['media_id' => $mediaItem?->canonicalId, 'placeholder' => $mediaItem?->isSystemPlaceholder() ?? true];
+                        }
+                        $articleMedia['media_complete'] = count($articleMedia) === 2
+                            && !($articleMedia['featured_primary']['placeholder'] ?? true)
+                            && !($articleMedia['inline_primary']['placeholder'] ?? true);
+                        $articleMedia['diagnostics'] = $articleMedia['media_complete'] ? [] : [['code' => 'ARTICLE_MEDIA_INLINE_MISSING']];
+                    }
                     $authorityRows = [];
                     foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];
                     $knowledgeRows = [];
@@ -286,7 +303,7 @@ final class Plugin {
                             $relations = array_values($relations);
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
-                    return ['status' => 'available', 'posts' => $posts, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
+                    return ['status' => 'available', 'posts' => $posts, 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
                 },
                 [$articlePublicEligibility, 'evaluate'],
             );

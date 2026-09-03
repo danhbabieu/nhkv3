@@ -3768,3 +3768,28 @@ Fresh live read-only evidence still shows two active component collisions,
 both revision 1: the pinned pair is owner-confirmed and the glued pair remains
 `MANUAL_IDENTITY_DECISION_REQUIRED`. No live merge was applied in this turn;
 the external mutation remains behind the trusted human-authorization gate.
+
+## Article state consistency root-cause checkpoint — 2026-09-04
+
+Read-only investigation traced Article research, semantic subject inventory,
+native category lookup, Article MediaUsage diagnostics, editorial state-token
+generation, Media/WordPress synchronization, reconciliation CAS and
+publication gate inputs. The research planner previously resolved an explicit
+subject independently from persisted Post attachment state; inventory exposed
+empty `subject_ids` without a truthful planning-vs-attached distinction. The
+category planner consumed global categories rather than the target Post's
+native taxonomy. Media research used the existence of any usable candidate as
+Article completeness, and the WordPress media bridge compared a private
+attachment/content token with the canonical editorial snapshot token.
+
+The focused fix now passes target Post context into research, reports
+`attached` versus `unattached_planning_candidate`, reads current Post
+categories separately from category recommendations, derives media completeness
+from the two mandatory Article MediaUsage slots, and makes the bridge use
+`EditorialPostState::token`. Publication gate diagnostics preserve explicit
+`SUBJECT_NOT_PERSISTED` and mandatory media-slot failures. Regression coverage
+passes 48 focused tests / 294 assertions; full Unit execution has 521 tests,
+with 12 mandatory integration failures because `NHK_WP_TEST_PATH=public` and
+the WordPress/database runtime are unavailable. Composer validation, PHP lint
+and `git diff --check` pass. No Post 87, staging, production, semantic or
+Knowledge data was changed; no publish, approval, push or deploy was attempted.
