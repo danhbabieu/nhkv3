@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 namespace NHK\Core\Application\Knowledge;
-use NHK\Core\Application\Mcp\McpToolCatalog;
+use NHK\Core\Application\Governance\{ControlledApplyOperationRegistry, OperationCompatibility};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate;
 
@@ -9,7 +9,7 @@ use NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate;
 final class KnowledgeEnrichmentProposalFactory
 {
     /** @param list<string>|null $supportedOperations */
-    public function __construct(private ?array $supportedOperations = null) {}
+    public function __construct(private ?array $supportedOperations = null, private ?OperationCompatibility $operationCompatibility = null) {}
 
     /** @return array<string,mixed> */
     public function arguments(KnowledgeEnrichmentCandidate $candidate, string $operationId): array
@@ -25,8 +25,9 @@ final class KnowledgeEnrichmentProposalFactory
 
     private function operationFor(string $entityType): string
     {
-        $operations = $this->supportedOperations ?? McpToolCatalog::governedOperations();
-        foreach (['ingest', 'create'] as $operation) if (in_array($operation, $operations, true)) return $operation;
+        $operations = $this->supportedOperations ?? \NHK\Core\Application\Mcp\McpToolCatalog::governedOperations();
+        $compatibility = $this->operationCompatibility ?? new ControlledApplyOperationRegistry();
+        foreach (['ingest', 'create'] as $operation) if (in_array($operation, $operations, true) && $compatibility->supports($entityType, $operation)) return $operation;
         throw new KnowledgeEnrichmentProposalException('REGISTRY_GAP', 'No registered create operation for ' . $entityType . '.');
     }
 

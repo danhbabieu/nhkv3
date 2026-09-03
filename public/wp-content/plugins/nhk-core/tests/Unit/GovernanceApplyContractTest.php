@@ -5,6 +5,11 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\AuthorityProposalExecutor;
+use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
+use NHK\Core\Application\Governance\OperationCompatibilityException;
+use NHK\Core\Application\Knowledge\KnowledgeEnrichmentProposalFactory;
+use NHK\Core\Domain\Knowledge\{KnowledgeEnrichmentCandidate, KnowledgeFacetProfile};
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -16,6 +21,48 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernanceApplyContractTest extends TestCase
 {
+    public function test_controlled_apply_registry_matches_the_semantic_dispatch_matrix(): void
+    {
+        $registry = new ControlledApplyOperationRegistry();
+        foreach (['knowledge', 'source', 'evidence'] as $entityType) {
+            foreach (['create', 'ingest', 'update', 'retire', 'reactivate'] as $operation) self::assertTrue($registry->supports($entityType, $operation), $entityType . '+' . $operation);
+            foreach (['relation_create', 'rename'] as $operation) self::assertFalse($registry->supports($entityType, $operation), $entityType . '+' . $operation);
+        }
+    }
+
+    public function test_controlled_apply_rejects_a_global_but_entity_unsupported_operation_before_dispatch(): void
+    {
+        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $authority = new AuthorityService(new InMemoryAuthorityRepository(), $types);
+        $policy = new class implements \NHK\Core\Application\Governance\OperationCompatibility { public function supports(string $entityType, string $operation): bool { return $entityType === 'knowledge' && $operation === 'create'; } };
+        $executor = new AuthorityProposalExecutor($authority, operationCompatibility: $policy);
+        try {
+            $executor(new Proposal('unsupported-knowledge-ingest', 'knowledge', 'ingest', [], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem', 1, null, null, null, 'knowledge'));
+            self::fail('Expected a registry gap.');
+        } catch (OperationCompatibilityException $error) {
+            self::assertSame('REGISTRY_GAP', $error->diagnosticCode);
+        }
+    }
+
+    public function test_factory_and_controlled_apply_can_share_one_compatibility_source(): void
+    {
+        $policy = new class implements \NHK\Core\Application\Governance\OperationCompatibility {
+            public array $calls = [];
+            public function supports(string $entityType, string $operation): bool { $this->calls[] = [$entityType, $operation]; return $entityType === 'knowledge' && $operation === 'create'; }
+        };
+        $candidate = new KnowledgeEnrichmentCandidate('new_claim', UuidCodec::newV7(), new KnowledgeFacetProfile('music', 'movement'), 'Cọc trắng.');
+        self::assertSame('create', (new KnowledgeEnrichmentProposalFactory(['ingest', 'create'], $policy))->arguments($candidate, 'run')['operation']);
+        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        try {
+            (new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), $types), operationCompatibility: $policy))(new Proposal('unsupported-knowledge-ingest', 'knowledge', 'ingest', [], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem', 1, null, null, null, 'knowledge'));
+            self::fail('Expected a registry gap.');
+        } catch (OperationCompatibilityException $error) {
+            self::assertSame('REGISTRY_GAP', $error->diagnosticCode);
+        }
+        self::assertContains(['knowledge', 'create'], $policy->calls);
+        self::assertContains(['knowledge', 'ingest'], $policy->calls);
+    }
+
     public function test_authority_executor_applies_create_and_preserves_the_canonical_identity_on_rename(): void
     {
         $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, ['description'], [], ['description' => 'string']));
