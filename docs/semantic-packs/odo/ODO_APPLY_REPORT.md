@@ -1,7 +1,7 @@
 # Odo Semantic Pack Apply Report
 
 **Date:** 2026-09-03  
-**Result:** `BLOCKED` — `CONTRACT_EXTENSION_REQUIRED`  
+**Result:** `BLOCKED` — `DEMO_ADMIN_SEMANTIC_CREDENTIAL_REQUIRED`
 **Mutation status:** none
 
 ## 1. Initial HEAD
@@ -42,8 +42,13 @@ unverified against runtime.
 
 ## 6. Merge result
 
-None. Current runtime has no generic governed merge/reference-move operation.
-Applying the confirmed merge would require `CONTRACT_EXTENSION_REQUIRED`.
+No demo merge was attempted. The current worktree contains the reviewed
+generic same-type merge coordinator, Graph inbound/outbound adapter, durable
+receipt, read-back verification and Controlled Apply dispatch. The approved
+reference-surface matrix confirms Knowledge, Source, Evidence, MediaUsage and
+Video are `NOT_APPLICABLE` for direct Authority merge movement, and `wp_post`
+is `GRAPH_ONLY`; their absence is not a merge blocker. Demo execution still
+requires authenticated administrator Graph reads and fresh runtime revisions.
 
 ## 7. Odo 35 result
 
@@ -79,45 +84,43 @@ revisions remain untouched; no duplicate Post was created.
 
 ## 12. Unresolved/research-required
 
-- Restore the existing WordPress/MySQL runtime and rerun the full read-only
-  inventory.
-- Obtain a reviewed generic V3 Authority `rekey` capability that preserves
-  UUID, checks expected revision/idempotency and fails closed on collision.
-- Obtain a reviewed generic merge/reference-move/deprecation capability before
-  the confirmed pinned-dial merge.
+- Provide a demo WordPress administrator credential/session with
+  `manage_options` so the restricted Graph inbound/outbound read can complete.
+- Rerun the full read-only inventory and capture all runtime revisions before
+  creating any Odo proposals.
 - Audit Odo 35 references before any retirement decision.
 - Resolve every relation intent from actual registered predicate/endpoint
   contracts and evidence; do not invent predicates.
 - Reconcile Posts only through the existing Article Ingest path and stop at
   its Human Approval/Controlled Apply boundary.
 
-No Constitution conflict was introduced. Proceeding with any of the blocked
-semantic operations now would violate the runtime Governance/Registry boundary
-and is therefore explicitly stopped with `CONTRACT_EXTENSION_REQUIRED`.
+No Constitution conflict was introduced. The remaining stop is the missing
+authenticated demo read capability, recorded as
+`DEMO_ADMIN_SEMANTIC_CREDENTIAL_REQUIRED`; no proposal IDs can be honestly
+created without the runtime snapshot and revisions.
 
 ## 12a. Local generic merge follow-up — 2026-09-03
 
-The local code now includes an append-only durable receipt repository backed by
-the existing Governance audit event table, an explicit adapter `verify`
-contract, plan-bound receipt state (`applying`, `partial`, `completed`) and
-attempt metadata. Focused merge tests pass (`3 tests / 8 assertions`), but the
-runtime is intentionally not wired or deployed because only the Graph adapter
-exists; the required Knowledge, Source, Evidence, MediaUsage, Video and
-WordPress reference surfaces still need contract-audited adapters. This does
-not authorize or constitute an Odo data mutation.
+The local code includes an append-only durable receipt repository backed by the
+existing Governance audit event table, an explicit adapter `verify` contract,
+plan-bound receipt state (`applying`, `partial`, `completed`) and attempt
+metadata. Focused generic rekey/merge/Graph/Controlled Apply tests pass. The
+runtime is wired locally with the Graph-only reference surface; no separate
+Knowledge, Source, Evidence, MediaUsage or Video Authority adapter is required
+by the approved matrix. This does not authorize or constitute an Odo mutation.
 
 ## 13. Test results
 
 - YAML parse: PASS (`YAML_VALID`).
 - New canonical manifest-key scan: PASS (`NEW_CANONICAL_TARGETS_NO_O_DO`).
-- Unit suite: PASS — 277 tests, 1,402 assertions.
+- Unit suite: PASS — 310 tests, 1,528 assertions.
 - PHP lint: PASS.
 - `git diff --check`: PASS.
 - Deployment preflight: FAIL CLOSED — 5/10 checks failed, all dependent on
   WordPress/database bootstrap.
-- Full suite on current concurrent worktree: blocked by environment — 8
-  integration errors, 12 mandatory integration failures, 74 skips; no test
-  failure was hidden or downgraded.
+- Full suite: environment-blocked outside the Unit suite — 8 integration
+  errors, 12 mandatory integration failures, 74 skips; no test failure was
+  hidden or downgraded.
 
 ## 14. Commit hashes
 

@@ -48,7 +48,7 @@ use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttempt
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Authority\WpdbSemanticMergeReceiptRepository;
-use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
+use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
 use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaIngestGateway, MediaService, MediaVideoPageQuery};
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
@@ -210,6 +210,17 @@ final class Plugin {
             $articleMedia = new ArticleMediaCoordinator($mediaService, $media, $assets, $usages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
             $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader(), $articleMedia);
             $researchResolver = new McpSemanticContextResolver($authority, $types);
+            $articlePublicRoutes = [
+                'wp_post' => static fn (array $candidate): ?string => str_starts_with(trim((string) ($candidate['route'] ?? '')), '/') ? trim((string) $candidate['route']) : null,
+                'video' => static fn (array $candidate): ?string => PublicRouteResolver::videoPath((string) ($candidate['title'] ?? ''), (string) ($candidate['external_id'] ?? '')),
+            ];
+            foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $authorityType) {
+                $articlePublicRoutes[$authorityType] = static function (array $candidate) use ($authority, $publicRoutes, $publicEligibility, $authorityType): ?string {
+                    $entity = $authority->findByCanonicalId((string) ($candidate['target_id'] ?? ''));
+                    return $entity && $entity->entityType === $authorityType && $publicEligibility->evaluate($entity)->eligible ? $publicRoutes->path($entity) : null;
+                };
+            }
+            $articlePublicEligibility = new PublicEndpointEligibilityResolver($publicEligibility, $articlePublicRoutes);
             $articleResearch = new ArticleResearchPreflight(
                 static function (array $input) use ($researchResolver): array {
                     $subject = is_array($input['subject'] ?? null) ? $input['subject'] : [];
@@ -253,13 +264,7 @@ final class Plugin {
                     }
                     return ['status' => 'available', 'posts' => $posts, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
                 },
-                static function (array $candidate) use ($authority, $types, $publicRoutes, $publicEligibility): array {
-                    $type = (string) ($candidate['target_type'] ?? ''); $id = (string) ($candidate['target_id'] ?? '');
-                    if (!$types->has($type)) return ['eligible' => false, 'route' => null, 'reason' => 'UNAVAILABLE'];
-                    $entity = $authority->findByCanonicalId($id); $eligibility = $publicEligibility->evaluate($entity);
-                    $path = $entity && $eligibility->eligible ? $publicRoutes->path($entity) : null;
-                    return ['eligible' => $path !== null, 'route' => $path, 'reason' => $eligibility->reasons[0] ?? ($path !== null ? 'PUBLIC_CANONICAL_ROUTE' : 'UNAVAILABLE')];
-                },
+                [$articlePublicEligibility, 'evaluate'],
             );
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();

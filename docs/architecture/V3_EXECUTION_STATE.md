@@ -236,13 +236,12 @@ currently **UNAVAILABLE** because WordPress bootstrap fails with
 Knowledge, Source/Evidence, Graph, Media, Video or WordPress data was read
 from this unavailable runtime and no mutation was attempted.
 
-Code audit confirms the current runtime has no governed Authority `rekey`,
-generic semantic merge/reference-move, Media placeholder or Video placeholder
-operation. Odo execution therefore remains fail-closed with
-`CONTRACT_EXTENSION_REQUIRED` for rekey/merge and requirements-only handling
-for Media/Video placeholders. Odo 35 retirement, relation completion,
-Knowledge creation and Post 38/39/40/55 reconciliation are pending runtime
-restoration and governed capability/reference audit.
+The earlier checkpoint recorded missing generic rekey/merge capability. The
+current worktree has since added and tested generic Authority rekey, same-type
+merge/reference movement through Graph, durable receipts and Controlled Apply
+dispatch. Media/Video placeholders remain requirements-only by decision. Odo
+35 retirement, relation completion, Knowledge creation and Post 38/39/40/55
+reconciliation remain pending authenticated runtime inventory and governance.
 
 The blocked apply report is recorded at
 `docs/semantic-packs/odo/ODO_APPLY_REPORT.md` and checkpointed at `a10d265`

@@ -49,8 +49,10 @@ final class SemanticMergeGraphAdapter implements SemanticMergeReferenceAdapter
         $old = new NodeReference((string) $planned['old_source_type'], (string) $planned['old_source_key']);
         $new = new NodeReference((string) $planned['source_type'], (string) $planned['source_key']);
         $target = new NodeReference((string) $planned['target_type'], (string) $planned['target_key']);
-        return $this->graph->findEdge($old, (string) $planned['predicate'], new NodeReference((string) $planned['old_target_type'], (string) $planned['old_target_key'])) === null
-            && ($new->key() === $target->key() || $this->graph->findEdge($new, (string) $planned['predicate'], $target) !== null);
+        $oldEdge = $this->graph->findEdge($old, (string) $planned['predicate'], new NodeReference((string) $planned['old_target_type'], (string) $planned['old_target_key']));
+        $newEdge = $this->graph->findEdge($new, (string) $planned['predicate'], $target);
+        return ($oldEdge === null || !$oldEdge->isActive())
+            && ($new->key() === $target->key() || ($newEdge !== null && $newEdge->isActive()));
     }
 
     private function all(NodeReference $reference, bool $out): array

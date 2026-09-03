@@ -1,7 +1,7 @@
 # Odo Runtime Inventory — Read-Only Checkpoint
 
 **Date:** 2026-09-03 — demo MCP/API read-only inventory recheck
-**Status:** `PARTIAL_RUNTIME_OBSERVED` — demo read surface reachable; admin Graph/revision inventory unavailable; no runtime data mutation performed
+**Status:** `BLOCKED_AUTHENTICATED_GRAPH_READ` — demo public/read surface evidence exists; administrator Graph/revision inventory unavailable; no runtime data mutation performed
 **Requested continuation point:** `bbf6f12147d8ea015485fb756fd4d46357d10fcb`
 **Observed current HEAD:** `1d598c8` (worktree contains unrelated uncommitted MCP/Media changes)
 **Pack checkpoint:** `6fd6cc3` (`docs: add Odo semantic reference pack`)
@@ -49,8 +49,9 @@ was performed.
 The deployed read path is `POST /wp-json/nhk/v1/mcp` using MCP Streamable HTTP
 protocol `2026-07-28`; `initialize` returned server `nhk-v3` version `3.0.0`.
 No credential or token was printed or committed. The deployed catalog contains
-21 tools, but its proposal schema does not yet advertise `rekey` or `merge`,
-and it has no Graph read tool. `GET /wp-json/nhk/v1/health` returned database,
+21 tools and is older than the current reviewed worktree, whose catalog and
+Governance executor advertise generic `rekey` and `merge`. The deployed
+instance has no authenticated Graph read path available to this run. `GET /wp-json/nhk/v1/health` returned database,
 migration, graph, authority, governance, media, video, knowledge, article,
 runtime, hydration, application and REST checks all healthy.
 
@@ -72,8 +73,10 @@ projection inconsistency, not evidence that those records do not exist.
 revision or lifecycle. The deployed Graph REST read returned `401` for both
 incoming and outgoing requests. Consequently inbound/outbound relations,
 active triple uniqueness, full collision resolution and reference closure
-remain `RUNTIME_UNVERIFIED` pending the demo administrator Graph credential or
-an equivalent authenticated MCP/API connector.
+remain `RUNTIME_UNVERIFIED` pending a demo WordPress administrator credential
+with `manage_options` or an equivalent authenticated project-standard API
+session. This is the exact stop code
+`DEMO_ADMIN_SEMANTIC_CREDENTIAL_REQUIRED`.
 
 Native WP read-only metadata for Posts 38, 39, 40 and 55 was reachable. IDs,
 titles, slugs, status, permalink, dates and excerpts were observed; Post 55
@@ -280,8 +283,8 @@ and directionality are reviewed:
 
 | Required phase | Current capability | Required outcome |
 |---|---|---|
-| Namespace rekey preserving UUID | `CODE_OBSERVED`: no Authority `rekey`; repository update does not change stable key | `CONTRACT_EXTENSION_REQUIRED` before any proposal/apply |
-| Confirmed component merge | `CODE_OBSERVED`: no generic governed merge/reference-move/deprecation operation | `CONTRACT_EXTENSION_REQUIRED`; source remains untouched |
+| Namespace rekey preserving UUID | `CODE_OBSERVED`: generic Authority `rekey`, revision/collision checks and proposal executor dispatch | Runtime proposal/apply still requires authenticated preflight and human gate |
+| Confirmed component merge | `CODE_OBSERVED`: generic same-type merge, Graph inbound/outbound adapter, verify and durable receipt | Runtime proposal/apply still requires authenticated preflight and human gate |
 | Odo 35 retirement | `CODE_OBSERVED`: ordinary retirement exists, but reference audit and runtime are unavailable | No retirement mutation; keep `RETIREMENT_REVIEW` in the Odo pack |
 | Media placeholders | `CODE_OBSERVED`: Article coordinator has internal system-placeholder handling; no Odo-specific governed placeholder operation | Not a blocker; keep requirements only; no fake Media/file/URL |
 | Video placeholders | `CODE_OBSERVED`: no governed Video placeholder operation | Not a blocker; keep requirements only; no Video entity |
