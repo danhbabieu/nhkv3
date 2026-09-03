@@ -18,7 +18,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class RelatedContentQuery
 {
-    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
+    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null, private ?PublicRouteResolver $routes = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
     private PredicateTraversalPolicy $policy;
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
@@ -75,7 +75,8 @@ final class RelatedContentQuery
             $entity = $this->authority->findByCanonicalId($node->endpoint_key);
             if (!$entity || !$entity->active()) return null;
             if ($this->eligibility !== null && !$this->eligibility->evaluate($entity)->eligible) return null;
-            return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity)]];
+            $url = $this->entityUrl($entity);
+            return $url === null ? null : ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'title' => $entity->canonicalName, 'url' => $url]];
         }
         if ($node->endpoint_type === 'media') { $media = $this->media->findByCanonicalId($node->endpoint_key); return $media && $media->active && $media->readiness === 'ready' ? ['group' => 'media', 'value' => $this->mediaValue($media)] : null; }
         if ($node->endpoint_type === 'video') { $video = $this->videos->findByCanonicalId($node->endpoint_key); return $video && $video->active && $video->hasValidPublicReference() ? ['group' => 'videos', 'value' => $this->videoValue($video)] : null; }
@@ -87,5 +88,5 @@ final class RelatedContentQuery
     }
     private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
     private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $path = PublicRouteResolver::videoPath($title, $video->externalVideoId); return ['type' => 'video', 'title' => $title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
-    private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path); }
+    private function entityUrl(AuthorityEntity $entity): ?string { $path = ($this->routes ?? new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? null : (function_exists('home_url') ? home_url($path) : $path); }
 }

@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Application\Entity\{EntityPageQuery, PublicEntityEligibilityPolicy};
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
@@ -15,7 +16,7 @@ final class PublicRouteResolverPersistedIdentityTest extends TestCase
 {
     public function test_all_nine_authority_types_project_from_persisted_slugs(): void
     {
-        [$resolver, $authority, $identity] = $this->fixture();
+        [$resolver, $authority, $identity, $authorityRepository] = $this->fixture();
         $brand = $authority->create('brand', 'brand-odo', 'Ô Đô');
         $model = $authority->create('model', 'model-36', 'Ô Đô 36', ['brand_uuid' => $brand->canonicalId]);
         $variant = $authority->create('variant', 'variant-8', 'Ô Đô 36 8', ['model_uuid' => $model->canonicalId]);
@@ -41,7 +42,7 @@ final class PublicRouteResolverPersistedIdentityTest extends TestCase
 
     public function test_canonical_name_rename_does_not_change_persisted_route(): void
     {
-        [$resolver, $authority, $identity] = $this->fixture();
+        [$resolver, $authority, $identity, $authorityRepository] = $this->fixture();
         $entity = $authority->create('brand', 'brand-odo', 'Ô Đô');
         $this->persist($identity, $entity, 'stable-public-slug', 'root');
         $renamed = $authority->rename($entity->canonicalId, 'Tên hoàn toàn khác', 1);
@@ -90,14 +91,33 @@ final class PublicRouteResolverPersistedIdentityTest extends TestCase
         self::assertNull($resolver->path($brand));
     }
 
-    /** @return array{PublicRouteResolver,AuthorityService,TestPublicIdentityRepository} */
+    public function test_inbound_resolution_rejects_a_native_root_collision(): void
+    {
+        [$resolver, $authority, $identity] = $this->fixture(static fn (string $slug): bool => $slug === 'owned');
+        $brand = $authority->create('brand', 'brand-owned', 'Owned');
+        $this->persist($identity, $brand, 'owned', 'root');
+
+        self::assertNull($resolver->resolve('brand', ['owned']));
+    }
+
+    public function test_entity_detail_and_eligibility_use_persisted_identity_not_display_name(): void
+    {
+        [$resolver, $authority, $identity, $authorityRepository] = $this->fixture();
+        $brand = $authority->create('brand', 'brand-symbol', '!!!');
+        $this->persist($identity, $brand, 'persisted-brand', 'root');
+
+        self::assertTrue((new PublicEntityEligibilityPolicy($authorityRepository, $resolver->types(), $resolver))->evaluate($brand)->eligible);
+        self::assertSame('/persisted-brand/', (new EntityPageQuery($authorityRepository, $resolver->types(), null, null, $resolver))->detail('brand', 'persisted-brand')['url']);
+    }
+
+    /** @return array{PublicRouteResolver,AuthorityService,TestPublicIdentityRepository,InMemoryAuthorityRepository} */
     private function fixture(?\Closure $nativeRootExists = null): array
     {
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
         $authorityRepository = new InMemoryAuthorityRepository();
         $identity = new TestPublicIdentityRepository();
-        return [new PublicRouteResolver($authorityRepository, $types, null, $nativeRootExists, $identity), new AuthorityService($authorityRepository, $types), $identity];
+        return [new PublicRouteResolver($authorityRepository, $types, null, $nativeRootExists, $identity), new AuthorityService($authorityRepository, $types), $identity, $authorityRepository];
     }
 
     private function persist(TestPublicIdentityRepository $repository, AuthorityEntity $entity, string $slug, string $scope): void

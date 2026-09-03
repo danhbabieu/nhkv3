@@ -49,24 +49,10 @@ final class PublicRouteResolver
         if (!$this->types->has($type) || $segments === []) return null;
         $matches = [];
         foreach ($this->authority->listByType($type, true) as $entity) {
-            $path = $this->identityPath($entity);
+            $path = $this->path($entity);
             if ($path !== null && explode('/', trim($path, '/')) === array_values($segments)) $matches[] = $entity;
         }
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    private function identityPath(AuthorityEntity $entity): ?string
-    {
-        $identity = $this->identities->findByOwner('authority', $entity->canonicalId);
-        if ($identity === null) return null;
-        if ($entity->entityType === 'brand') return '/' . $identity->currentSlug . '/';
-        if (in_array($entity->entityType, ['model', 'variant'], true)) {
-            $field = $entity->entityType === 'model' ? 'brand_uuid' : 'model_uuid';
-            $parentId = $entity->payload[$field] ?? null;
-            $parent = is_string($parentId) ? $this->authority->findByCanonicalId($parentId) : null;
-            return $parent === null ? null : rtrim($this->identityPath($parent) ?? '', '/') . '/' . $identity->currentSlug . '/';
-        }
-        $namespace = self::namespaceFor($entity->entityType);
-        return $namespace === null ? null : '/' . $namespace . '/' . $identity->currentSlug . '/';
-    }
 }

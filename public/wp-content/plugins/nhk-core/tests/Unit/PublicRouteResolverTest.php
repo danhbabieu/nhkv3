@@ -105,7 +105,7 @@ final class PublicRouteResolverTest extends TestCase
         $resolver = new PublicRouteResolver($repository, $types, null, static fn (string $slug): bool => $slug === 'foo', $identity);
 
         self::assertNull($resolver->path($brand));
-        self::assertNotNull($resolver->resolve('brand', ['foo']), 'Incoming collision resolution remains available to the HTTP boundary so it can emit IDENTITY_CONFLICT.');
+        self::assertNull($resolver->resolve('brand', ['foo']));
     }
 
     private function persist(TestPublicIdentityRepository $repository, \NHK\Core\Domain\Authority\AuthorityEntity $entity, string $slug, string $scope): void

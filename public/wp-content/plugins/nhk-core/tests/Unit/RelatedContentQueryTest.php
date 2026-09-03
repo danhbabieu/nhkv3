@@ -4,10 +4,12 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
-use NHK\Core\Application\Entity\RelatedContentQuery;
+use NHK\Core\Application\Entity\{RelatedContentQuery, PublicRouteResolver};
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
 use NHK\Core\Domain\Media\Media;
@@ -43,26 +45,45 @@ final class RelatedContentQueryTest extends TestCase
         $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, [])); $types->register(new EntityTypeDefinition('model', 1, true, ['brand_uuid']));
         $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
         $brand = $authority->create('brand', 'odo', 'Odo'); $model = $authority->create('model', 'calibre-1', 'Calibre 1', ['brand_uuid' => $brand->canonicalId]);
+        $identities = new RelatedTestPublicIdentityRepository(); $this->persist($identities, $brand, 'odo', 'root'); $this->persist($identities, $model, 'calibre-1', 'brand:' . $brand->canonicalId);
         $endpoints = new EndpointTypeRegistry(); $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId])); $endpoints->register('model', new FakeEndpointResolver('model', [$model->canonicalId]));
         $graph = new GraphService($graphRepository = new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
         $graph->create(new NodeReference('brand', $brand->canonicalId), 'about', new NodeReference('model', $model->canonicalId));
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
-        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId);
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
+        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types, null, null, null, $routes))->forEntity('brand', $brand->canonicalId);
         $expectedUrl = function_exists('home_url') ? home_url('/odo/calibre-1/') : '/odo/calibre-1/';
         self::assertSame([['type' => 'model', 'title' => 'Calibre 1', 'url' => $expectedUrl]], $related['entities']);
         self::assertSame([], $related['articles']); self::assertSame([], $related['media']); self::assertSame([], $related['videos']);
     }
 
+    public function test_related_authority_without_a_public_projection_is_excluded(): void
+    {
+        $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, []));
+        $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
+        $brand = $authority->create('brand', 'odo', 'Odo'); $relatedBrand = $authority->create('brand', 'other', 'Other');
+        $endpoints = new EndpointTypeRegistry(); $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId, $relatedBrand->canonicalId]));
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $graph->create(new NodeReference('brand', $brand->canonicalId), 'about', new NodeReference('brand', $relatedBrand->canonicalId));
+        $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
+        $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
+
+        self::assertSame([], (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId)['entities']);
+    }
+
     public function test_related_query_returns_second_hop_but_not_third_hop_and_keeps_direct_first(): void
     {
         $types = new EntityTypeRegistry();
-        foreach (['brand', 'model', 'movement', 'music'] as $type) $types->register(new EntityTypeDefinition($type, 1, true, []));
+        foreach (['brand', 'movement', 'music'] as $type) $types->register(new EntityTypeDefinition($type, 1, true, []));
+        $types->register(new EntityTypeDefinition('model', 1, true, ['brand_uuid']));
         $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
         $brand = $authority->create('brand', 'odo', 'Odo');
-        $model = $authority->create('model', 'calibre-1', 'Calibre 1');
+        $model = $authority->create('model', 'calibre-1', 'Calibre 1', ['brand_uuid' => $brand->canonicalId]);
         $movement = $authority->create('movement', 'calibre-1-movement', 'Calibre 1 movement');
         $music = $authority->create('music', 'bell', 'Bell');
+        $identities = new RelatedTestPublicIdentityRepository();
+        foreach ([[$brand, 'odo', 'root'], [$model, 'calibre-1', 'brand:' . $brand->canonicalId], [$movement, 'calibre-1-movement', 'namespace:movement'], [$music, 'bell', 'namespace:music']] as [$entity, $slug, $scope]) $this->persist($identities, $entity, $slug, $scope);
         $endpoints = new EndpointTypeRegistry();
         foreach (['brand' => $brand, 'model' => $model, 'movement' => $movement, 'music' => $music] as $type => $entity) $endpoints->register($type, new FakeEndpointResolver($type, [$entity->canonicalId]));
         $graph = new GraphService($graphRepository = new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
@@ -72,7 +93,8 @@ final class RelatedContentQueryTest extends TestCase
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
 
-        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forEntity('brand', $brand->canonicalId);
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
+        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types, null, null, null, $routes))->forEntity('brand', $brand->canonicalId);
 
         self::assertSame(['model', 'movement'], array_column($related['entities'], 'type'));
         self::assertNotContains('music', array_column($related['entities'], 'type'));
@@ -83,6 +105,7 @@ final class RelatedContentQueryTest extends TestCase
         $types = new EntityTypeRegistry(); $types->register(new EntityTypeDefinition('brand', 1, true, []));
         $authority = new AuthorityService($authorityRepository = new InMemoryAuthorityRepository(), $types);
         $brand = $authority->create('brand', 'odo', 'Odo');
+        $identities = new RelatedTestPublicIdentityRepository(); $this->persist($identities, $brand, 'odo', 'root');
         $endpoints = new EndpointTypeRegistry();
         $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:42']));
         $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId]));
@@ -91,7 +114,8 @@ final class RelatedContentQueryTest extends TestCase
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyVideos = new class implements VideoRepository { public function findByCanonicalId(string $id): ?Video { return null; } public function findByExternalReference(string $platform, string $id): ?Video { return null; } public function create(Video $video): Video { return $video; } public function update(Video $video, int $expectedRevision): Video { return $video; } public function list(bool $includeRetired = false): array { return []; } };
 
-        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types))->forPost(42);
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
+        $related = (new RelatedContentQuery($graph, $authorityRepository, $emptyMedia, $emptyVideos, $types, null, null, null, $routes))->forPost(42);
 
         self::assertSame([['type' => 'brand', 'title' => 'Odo', 'url' => function_exists('home_url') ? home_url('/odo/') : '/odo/']], $related['entities']);
         self::assertSame([], $related['articles']);
@@ -123,4 +147,19 @@ final class RelatedContentQueryTest extends TestCase
 
         self::assertSame([], $related['videos']);
     }
+
+    private function persist(RelatedTestPublicIdentityRepository $repository, \NHK\Core\Domain\Authority\AuthorityEntity $entity, string $slug, string $scope): void
+    {
+        $repository->identities[$entity->canonicalId] = new PublicIdentity('identity-' . $entity->canonicalId, 'authority', $entity->canonicalId, $entity->entityType, $slug, $scope, 'public-route-v1', 1);
+    }
+}
+
+final class RelatedTestPublicIdentityRepository implements PublicIdentityRepository
+{
+    public array $identities = [];
+    public function findByOwner(string $ownerKind, string $ownerId): ?PublicIdentity { $identity = $this->identities[$ownerId] ?? null; return $identity && $identity->ownerKind === $ownerKind ? $identity : null; }
+    public function findByRoute(string $routeType, string $collisionScope, string $slug): ?PublicIdentity { foreach ($this->identities as $identity) if ($identity->routeType === $routeType && $identity->collisionScope === $collisionScope && $identity->currentSlug === $slug) return $identity; return null; }
+    public function create(PublicIdentity $identity): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
+    public function update(PublicIdentity $identity, int $expectedRevision): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
+    public function appendHistoricRoute(HistoricPublicRoute $historicRoute): PublicIdentityMutationResult { return PublicIdentityMutationResult::acceptedHistoricRoute($historicRoute); }
 }
