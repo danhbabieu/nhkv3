@@ -1,9 +1,9 @@
 # Odo Runtime Inventory — Read-Only Checkpoint
 
-**Date:** 2026-09-03 — local runtime recovery recheck
-**Status:** `RUNTIME_UNAVAILABLE` / `WORDPRESS_BOOTSTRAP_FAILED` — no runtime data mutation performed
+**Date:** 2026-09-03 — demo MCP/API read-only inventory recheck
+**Status:** `PARTIAL_RUNTIME_OBSERVED` — demo read surface reachable; admin Graph/revision inventory unavailable; no runtime data mutation performed
 **Requested continuation point:** `bbf6f12147d8ea015485fb756fd4d46357d10fcb`
-**Observed current HEAD:** `e356d53ed3f89cd8a22ef44f6090d7ce0ad76b1a` (contains `bbf6f12` plus later concurrent Video commits)
+**Observed current HEAD:** `1d598c8` (worktree contains unrelated uncommitted MCP/Media changes)
 **Pack checkpoint:** `6fd6cc3` (`docs: add Odo semantic reference pack`)
 
 ## Scope and evidence boundary
@@ -41,6 +41,46 @@ Evidence vocabulary used here is deliberately closed:
 No direct SQL, WordPress write, semantic write, Graph mutation, migration,
 seed, repair, merge, rekey, retirement, Media/Video creation or Post mutation
 was performed.
+
+## Demo runtime read evidence
+
+`TARGET_RUNTIME=demo.1945.vn`.
+
+The deployed read path is `POST /wp-json/nhk/v1/mcp` using MCP Streamable HTTP
+protocol `2026-07-28`; `initialize` returned server `nhk-v3` version `3.0.0`.
+No credential or token was printed or committed. The deployed catalog contains
+21 tools, but its proposal schema does not yet advertise `rekey` or `merge`,
+and it has no Graph read tool. `GET /wp-json/nhk/v1/health` returned database,
+migration, graph, authority, governance, media, video, knowledge, article,
+runtime, hydration, application and REST checks all healthy.
+
+Read-only `nhk.search` for `odo` returned `post_total=8`, semantic totals
+`entities=76`, `media=0`, `videos=0`, `knowledge=18`. It observed the Odo Brand,
+Odo 24/30/35/36/39/20 models, Odo variants, Odo movements, Odo components,
+Music and Knowledge records, including the confirmed pinned-dial pair:
+`32f43d4b-d6c8-4223-a89b-cc47f30cda77` →
+`48311ccd-9d45-4985-a620-ca579499f02c`, and the applied-glued candidate
+`01bead27-1308-48c1-af99-c68318e2b577` →
+`e326a326-ae8c-447f-a2a4-a83a3cf168d4`. Odo 35 model and movement plus the
+`odo.36.35` variant were observed and remain untouched.
+
+The public `entity/model` and `entity/variant` collection endpoints returned
+`total=0` while `nhk.search` returned their records. This is a deployed
+projection inconsistency, not evidence that those records do not exist.
+`entity` collection responses omit UUID, stable key, revision and lifecycle;
+`nhk.entity.get` by known UUID returns UUID/stable key/name/payload but not
+revision or lifecycle. The deployed Graph REST read returned `401` for both
+incoming and outgoing requests. Consequently inbound/outbound relations,
+active triple uniqueness, full collision resolution and reference closure
+remain `RUNTIME_UNVERIFIED` pending the demo administrator Graph credential or
+an equivalent authenticated MCP/API connector.
+
+Native WP read-only metadata for Posts 38, 39, 40 and 55 was reachable. IDs,
+titles, slugs, status, permalink, dates and excerpts were observed; Post 55
+was `publish`, ID `55`, slug
+`dong-ho-24-may-tron-ten-goi-54-thi-truong-viet-nam`, and its permalink was
+stable at the time of read. Body preservation was not asserted because this
+inventory does not parse legacy article bodies.
 
 ## Fresh local recovery recheck
 

@@ -4,6 +4,31 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Odo demo MCP read-path checkpoint — 2026-09-03
+
+`TARGET_RUNTIME=demo.1945.vn` is reachable through the deployed Streamable HTTP
+MCP endpoint `POST /wp-json/nhk/v1/mcp` with protocol `2026-07-28`; initialize
+returned `nhk-v3` `3.0.0`. Demo health is green across storage, runtime,
+hydration, application and REST. Read-only `nhk.search` observed 76 semantic
+entities, 8 Posts and 18 Knowledge records for `odo`, including the Odo 35
+records and both pinned/glued dial identity pairs. The full evidence is in
+`docs/semantic-packs/odo/ODO_RUNTIME_INVENTORY.md`.
+
+The deployed catalog is older than the current worktree: its 21-tool proposal
+schema does not advertise `rekey` or `merge`, and Graph REST incoming/outgoing
+reads require an administrator credential (`401`). Public entity collections
+also omit UUID/stable-key/revision/lifecycle and currently return zero Model and
+Variant rows despite `nhk.search` finding them. Therefore no demo mutation is
+allowed: revisions, lifecycle, Graph closure/deduplication, and all-reference
+inventory remain `RUNTIME_UNVERIFIED` pending authenticated admin Graph access
+or an equivalent connector.
+
+The worktree now contains a generic `SemanticMergeService`, reference-adapter
+contract and Graph adapter with focused unit coverage. This is implementation
+scaffolding only: durable receipt persistence, transaction wiring, complete
+Knowledge/Source/Evidence/MediaUsage/Video/Post adapters and deployed MCP
+registration remain required before merge can be reported as complete.
+
 ## MCP direct image attachment checkpoint — 2026-09-03
 
 The existing `nhk.media.ingest` adapter now accepts a direct multipart `file`
