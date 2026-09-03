@@ -234,6 +234,63 @@ fallback before acceptance.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
+## Amendment record — 2026-09-03 — Public Claim & Advertising Compliance Law
+
+**WHY:** NHK V3 publishes editorial, commercial, Media, Video and SEO copy that
+may contain promotional claims. Vietnamese advertising law restricts unsupported
+claims using terms such as “nhất”, “duy nhất”, “tốt nhất”, “số một” and other
+expressions with equivalent meaning. A word blacklist alone is insufficient
+because a synonym, euphemism, foreign-language phrase or creative spelling can
+preserve the same unsupported claim meaning.
+
+**WHAT LAW CHANGES:** Approve §18.1 and
+`docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` as the shared
+publication constraint for public promotional/commercial copy. The policy is
+meaning-based and evidence-led: objective claims must remain within supported
+scope; leadership, uniqueness and absolute-superiority claims require legally
+valid supporting material applicable to the exact subject, scope and period.
+Unsupported claims must be genuinely narrowed into truthful descriptive copy
+or blocked for human review. Language substitution that preserves the same
+unsupported meaning is not a compliant rewrite.
+
+**AFFECTED SUBSYSTEMS:** WordPress Article/editorial copy, Product commercial
+copy, MediaUsage caption/alt and text overlays, image/banner/thumbnail text,
+Video editorial package, Public Projection, SEO/meta/Open Graph/structured
+promotional copy, comparison/card/hub copy, Source/Evidence and MCP/Admin
+content orchestration.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** This amendment creates no Authority
+type, endpoint, predicate, Knowledge type, Media role, Video type or parallel
+semantic owner. Existing ownership remains unchanged. Source/Evidence remains
+the support/provenance owner; WordPress/Product/MediaUsage/Video retain their
+copy boundaries; Public Projection/SEO must not render a claim more strongly
+than supported evidence. The same claim meaning receives the same compliance
+result across channels, including text embedded in images or thumbnails.
+
+**LEGAL POLICY BASIS:** The approval is grounded in Article 8(11) of the
+Vietnamese Law on Advertising and Circular 12/2026/TT-BVHTTDL, effective
+2026-07-05, which clarifies equivalent expressions and lawful supporting
+materials. Because law can change, automated implementation must version the
+legal policy/reference used at publication time and fail closed or require human
+review when the applicable rule cannot be determined reliably.
+
+**DATA, MIGRATION AND ROLLOUT:** No existing Article, Product, Media, Video,
+Knowledge, Source/Evidence, Graph edge, V2/staging/production record or public
+asset is rewritten by this amendment. No automatic legacy scan/backfill is
+authorized. Generated copy and AI confidence are never Evidence.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Future runtime enforcement must classify
+material public claims, resolve canonical subject/scope, bind evidence where
+required, check the maintained legal-policy version, verify the rendered output
+across channels and block unresolved required claims. Tests must prove semantic
+rather than keyword-only detection, scope containment, channel parity,
+evidence-required behavior, safe rewrite semantics and honest unavailable/error
+handling. Until runtime proof exists, this amendment is a documentation-approved
+law with a CODE_GAP for automated enforcement and requires human publication
+review under the shared contract.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-03.
+
 ## 2. Ranh giới trách nhiệm tối cao
 
 Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:
@@ -1002,6 +1059,56 @@ internal link phải nhất quán. Search result và archive page không đượ
 canonical duplicate page; page 2+ có thể noindex,follow theo SEO policy nhưng
 vẫn link được tới canonical content.
 
+### 18.1 Public Claim & Advertising Compliance Law
+
+Mọi public promotional/commercial copy phải tuân theo cùng một claim policy,
+bất kể nó xuất hiện trong WordPress Article, Product listing, MediaUsage
+caption/alt, image/banner/thumbnail text, Video editorial package, SEO title/meta,
+Open Graph, structured promotional copy, public card, hub hoặc comparison.
+
+Policy đánh giá **nghĩa của claim**, không chỉ dò một danh sách từ. Một cách viết
+khác, synonym, euphemism, foreign-language phrase hoặc creative spelling vẫn bị
+xử lý như cùng một claim nếu nó tiếp tục khẳng định vị thế dẫn đầu, tính độc bản
+hoặc tính tuyệt đối.
+
+Ba lớp claim tối thiểu:
+
+1. **Descriptive/editorial:** mô tả đặc điểm, observation hoặc ý kiến được đóng
+   khung trung thực mà không khẳng định vị thế dẫn đầu/độc bản/tuyệt đối.
+2. **Objective promotional:** assertion có thể kiểm chứng về performance,
+   origin, age, rarity, material, configuration, provenance, condition, ranking,
+   award, market position hoặc thuộc tính khách quan khác; phải được evidence hỗ
+   trợ đúng subject và scope khi contract yêu cầu.
+3. **Superiority/uniqueness/absolute:** assertion hoặc hàm ý về dẫn đầu, sole
+   status, unmatched quality, absolute superiority, market ranking hoặc meaning
+   tương đương; bắt buộc có legally valid evidence đáp ứng quy định quảng cáo áp
+   dụng tại thời điểm publish.
+
+Evidence phải support đúng **subject, scope, geography/category/comparison set,
+period và meaning** được phát ra. Evidence của một Specimen không được mở rộng
+thành Variant/Model/Brand/market claim; evidence của một award/category hoặc
+một period không tự cho phép claim không giới hạn về category, market hoặc time.
+Generated copy, Product listing text, source-platform marketing copy, AI
+inference/confidence và visual similarity không tự là Evidence.
+
+Khi claim bắt buộc evidence nhưng evidence không đủ, Public Projection phải:
+
+- rewrite thành một descriptive claim hẹp hơn và thực sự thay đổi meaning; hoặc
+- block publication/projection cho human review.
+
+Không được “lách” bằng cách chỉ thay vocabulary trong khi giữ nguyên unsupported
+leadership/uniqueness/absolute meaning.
+
+Source/Evidence giữ canonical provenance/support ownership. WordPress, Product,
+MediaUsage và Video vẫn giữ copy ownership hiện hành. Compliance là publication
+constraint, không phải semantic owner mới và không tạo Authority type,
+predicate, Knowledge type, Media role, Video type hoặc Graph edge.
+
+Automated enforcement phải dùng maintained legal-policy/reference version,
+ghi nhận policy version/date dùng cho quyết định và fail closed hoặc chuyển
+human review nếu pháp lý áp dụng không resolve được đáng tin cậy. Legal-policy
+lookup/runtime failure không được biến thành compliance pass.
+
 ## 19. Governance và Controlled Apply
 
 Mọi semantic durable mutation đi theo:
@@ -1166,6 +1273,9 @@ Các trường hợp biên sau đây có kết quả kiến trúc cố định:
 | Legacy V2 field không có V3 contract | REGISTRY_GAP hoặc DATA_COMPATIBILITY_GAP; không phát minh type/field/relation và không migrate tự động |
 | Generic WordPress Post publish | Hợp lệ độc lập ở Post boundary; không được báo là V3 knowledge Article hoàn tất nếu thiếu Article Ingest contract |
 | Semantic MCP/Admin mutation | Chỉ Proposal → Human Approval → Eligibility → Controlled Apply → repository → audit; bypass là CONSTITUTION_CONFLICT |
+| Public promotional claim khẳng định dẫn đầu/độc bản/tuyệt đối nhưng thiếu legally valid supporting evidence | Không publish claim đó; phải evidence-bind đúng scope, rewrite thực sự hẹp hơn hoặc block human review. Đổi synonym nhưng giữ nguyên meaning không làm claim hợp lệ |
+| Claim evidence chỉ support một Specimen/category/period nhưng public copy mở rộng ra Variant/Brand/market/all-time | Scope violation; giữ evidence ở scope thật, không publish claim mở rộng |
+| Compliance/legal-policy dependency unavailable | Surface unavailable/review-required state; không coi là compliance pass |
 
 ## 25. Change control
 
@@ -1266,6 +1376,13 @@ editorial, semantic and verification stages.
 55. Article media reconciliation idempotent và không để mandatory usage absent.
 56. Structured data/image sitemap chỉ chọn real public Media theo cùng preferred-image policy.
 57. Legacy Media/Post audit chỉ read-only; không tự repair, rename, infer hoặc backfill.
+58. Public promotional/commercial claim được đánh giá theo meaning, không chỉ keyword.
+59. Objective promotional claim không được mạnh hơn canonical fact/evidence và scope thực tế hỗ trợ.
+60. Leadership, uniqueness hoặc absolute-superiority claim không được public nếu thiếu legally valid supporting evidence đáp ứng policy pháp lý hiện hành.
+61. Rewrite compliance phải thay đổi unsupported meaning; synonym/euphemism/creative spelling không phải bypass.
+62. Một claim có cùng meaning phải nhận cùng compliance result trên Article, Product, Media/image text, Video, SEO/meta/Open Graph và các public projection khác.
+63. Generated copy, Product listing text, source-platform marketing copy hoặc AI confidence không tự trở thành Evidence.
+64. Compliance/legal-policy dependency failure không được biến thành compliance pass; phải fail closed hoặc human review theo contract.
 
 ---
 
@@ -1305,6 +1422,7 @@ khác không được dùng như decision authority song song.
 | Eligibility parity | Một entity không được có membership khác nhau giữa surface | Một underlying policy và blocker/warning rõ ràng |
 | Governance | Semantic mutation cần approval, revision, idempotency và audit | Controlled Apply là write boundary; Post publish vẫn độc lập |
 | Product/Specimen boundary | Physical object identity và commercial offer identity có lifecycle/cardinality khác nhau | Specimen 1 → 0..N Product; Product → 0..1 Specimen; no implicit physical identity, claim promotion or repair |
+| Public claim & advertising compliance | Promotional wording can create unsupported legal/objective claims even when semantic records are otherwise correct | Meaning-based cross-channel publication gate; objective claims stay within evidence scope; leadership/uniqueness/absolute claims require valid support; unsupported meaning is rewritten narrowly or blocked |
 | Deployment health | Runtime failure không được bị che thành empty data | Preflight, layered health và dependency completeness là release gate |
 
 # Appendix B — CURRENT IMPLEMENTATION STATUS (NON-NORMATIVE STATUS SNAPSHOT)
@@ -1329,6 +1447,7 @@ phải dùng Change Control.
 | Media/Asset/Usage | Separate domain/persistence objects, contextual usage SEO, guarded delivery, Article slots, placeholders and Blueprint storage are implemented; byte upload and final publication policy remain limited/open | IMPLEMENTED with policy gap | Media.php, MediaAsset.php, MediaUsage.php, MediaUsageRoleRegistry.php, ArticleMediaCoordinator.php, PublicMediaAssetDelivery.php |
 | Video | Validated YouTube external-reference identity, canonical watch URL and optional thumbnail reference; no local MP4 behavior | IMPLEMENTED for current contract | Video.php, VideoService.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Product/Specimen ownership | Human-approved law separates physical identity and commerce identity; lifecycle, cardinality, completeness, condition and claim boundaries are explicit | PARTIAL / REGISTRY_GAP | This amendment; Product/Specimen tests; no dedicated approved Product–Specimen relation mechanism yet; existing `specimen_uuid`/broad `about` path is not canonical |
+| Public claim & advertising compliance | Constitution and shared contract approved; READ_FIRST, Article Ingest and Video SEO documentation point to the same cross-channel policy; automated claim classification/evidence/legal-policy enforcement across all surfaces is not yet runtime-proven | CODE_GAP / HUMAN_REVIEW_REQUIRED | PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md; ARTICLE_INGEST_CONTRACT.md; VIDEO_SEO_PROJECTION_CONTRACT.md; READ_FIRST.md |
 | Album | No Authority type, endpoint, predicate, repository, service or public contract | SEMANTIC_GAP | MCP content-operations audit |
 | WordPress Post boundary | Native Post remains editorial title/body/author/date/category/URL truth; no Article Authority body path is approved | COMPLIANT | 01_EDITORIAL_CONTENT_BOUNDARY.md historical evidence; Plugin.php and public route contracts |
 | Article Ingest boundary | Constitutionally approved operation-level workflow; reconcile coordinator, receipt diagnostics and MCP preflight/ingest media policy are implemented, while create/update cross-boundary idempotency, WordPress revision binding and final outcome contract remain open | PARTIAL / CODE_GAP | ArticleIngestCoordinator.php, ArticleMediaCoordinator.php, ArticleOperationReceipt.php, MCP_V3_CONTENT_OPERATIONS.md |
