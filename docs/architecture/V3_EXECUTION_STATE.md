@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+## Odo demo mutable-token migration — 2026-09-03
+
+On the explicitly authorized demo runtime, backup and runtime inventory passed.
+The guarded apply updated 193 non-collision mutable rows from `o-do` to `odo`
+using a transaction and WordPress serialization-safe handling for postmeta and
+options. Two Authority collisions remain intentionally unresolved: the glued
+and pinned dial records have distinct UUIDs, names and semantic records. They
+remain active with their legacy keys pending a governed identity decision; no
+Graph edge or immutable audit/Evidence quotation was rewritten. The receipt is
+`docs/semantic-packs/odo/ODO_MIGRATION_RECEIPT_2026-09-03.md`.
+
+Read-back found 2 mutable Authority collision rows, 1 immutable audit row and
+2 WordPress GUID rows; all other mutable stores have zero `o-do` matches. The
+demo route check is `/odo/` HTTP 200 and `/o-do/` HTTP 301 → `/odo/`. Remote
+HEAD changed independently from `54c9a26` at preflight to
+`6d624650075293cfa8de4be21908697be05cc73f` at final verification; no tracked
+working-tree changes were present.
+
 ## YouTube source availability probe restoration — 2026-09-03
 
 Root-cause tracing of the `P4KaHX3LBOw` Video intake path found that
