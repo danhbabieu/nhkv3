@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+## Governed Living Knowledge + SEO Stable Projection checkpoint — 2026-09-03
+
+Owner-approved incremental, contract-first design is recorded in
+`docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md` and
+`docs/seo/LIVING_KNOWLEDGE_SEO_STABILITY_CONTRACT.md`; the implementation plan
+is `docs/superpowers/plans/2026-09-03-governed-living-knowledge.md`.
+
+Implemented without semantic data mutation: validated Knowledge facet/scope
+profiles, read-only enrichment planner, current-truth packet/resolver,
+governed proposal argument factory, deterministic facet fragment projector
+with dependency fingerprints, and stable-core SEO risk guard. Existing claims,
+Evidence and routes remain untouched. No new Authority type or Graph predicate
+was added and no migration was required.
+
+Focused proof is 9 tests / 22 assertions for the new slices. The complete Unit
+suite is 382 tests / 1,822 assertions, exit 0, with one warning and one PHPUnit
+deprecation. Composer validation is valid with the repository's existing
+license warning; changed PHP files lint clean and `git diff --check` is clean.
+
+Remaining `CODE_GAP`: end-to-end governed apply/read-back for enrichment,
+persisted last-known-good fragment storage, public-render SEO verification, and
+shared Video/Media/Article adapter wiring. `EXTERNAL_SYNTHESIS_ADAPTER_GAP`:
+only deterministic synthesis/projection exists; no approved live AI provider
+boundary is present. `PUBLIC_IDENTITY_STORAGE_GAP` remains unchanged: slug is
+still derived at read time and no migration was run. Odo acceptance remains
+read-only/runtime-gated; no fixture was used to claim live corpus behavior.
+
 ## Odo demo mutable-token migration — 2026-09-03
 
 On the explicitly authorized demo runtime, backup and runtime inventory passed.

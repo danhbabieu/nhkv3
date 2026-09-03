@@ -21,6 +21,8 @@
 
 ### Task 1: Define validated Knowledge profile and enrichment candidate value objects
 
+**Status:** complete in `f631209`.
+
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Domain/Knowledge/KnowledgeFacetProfile.php`, `KnowledgeEnrichmentCandidate.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/GovernedLivingKnowledgeDomainTest.php`.
 
 - [ ] Write failing tests for supported facets/scopes, unknown-value rejection, candidate classifications, and no generated-copy-as-evidence flag.
@@ -30,6 +32,8 @@
 - [ ] Commit `feat: define governed knowledge profile values`.
 
 ### Task 2: Implement read-only enrichment planner
+
+**Status:** complete in `f631209`.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Knowledge/KnowledgeEnrichmentPlanner.php`; Modify `public/wp-content/plugins/nhk-core/src/Contracts/Knowledge/KnowledgeRepository.php`, `EvidenceRepository.php`, `SourceRepository.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgeEnrichmentPlannerTest.php`.
 
@@ -41,6 +45,8 @@
 
 ### Task 3: Implement current-truth resolver
 
+**Status:** complete in `f631209`.
+
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Knowledge/CurrentTruthResolver.php`, `CurrentTruthPacket.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/CurrentTruthResolverTest.php`.
 
 - [ ] Write failing tests for compatible claims, qualifiers, contradictions, unresolved conflicts, evidence coverage and scope preservation.
@@ -50,6 +56,8 @@
 - [ ] Commit `feat: resolve current governed knowledge truth`.
 
 ### Task 4: Add governed apply candidate contract
+
+**Status:** partial: proposal argument factory is complete in `f631209`; end-to-end apply/read-back remains open.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Knowledge/KnowledgeEnrichmentProposalFactory.php`; Modify `public/wp-content/plugins/nhk-core/src/Application/Governance/ControlledApplyService.php` only if an existing hook is required; Test `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgeEnrichmentProposalFactoryTest.php`.
 
@@ -61,6 +69,8 @@
 
 ### Task 5: Implement facet fragment projection and deterministic synthesis boundary
 
+**Status:** partial: deterministic projector/fingerprint is complete in `f631209`; persisted last-known-good storage and vendor adapter remain open.
+
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Projection/KnowledgeFragmentProjector.php`, `KnowledgeSynthesisPort.php`, `DeterministicKnowledgeSynthesizer.php`, `KnowledgeFragmentProjection.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgeFragmentProjectionTest.php`.
 
 - [ ] Write failing tests proving recognition-only changes do not rebuild music/history, dependency fingerprints enable reuse, public fragments omit internal IDs, and unavailable synthesis keeps safe fallback.
@@ -70,6 +80,8 @@
 - [ ] Commit `feat: add living knowledge fragment projection`.
 
 ### Task 6: Implement SEO stability guard
+
+**Status:** complete for stable-core comparison in `f631209`; public render verification integration remains open.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Seo/LivingKnowledgeSeoStabilityGuard.php`, `SeoChangeRisk.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/LivingKnowledgeSeoStabilityGuardTest.php`.
 
@@ -81,6 +93,8 @@
 
 ### Task 7: Integrate candidate packets with Video, Media and Article read workflows
 
+**Status:** not started; existing contracts do not expose an approved shared adapter seam without extending operation contracts.
+
 **Files:** Modify `VideoIntakeService.php`, `VideoInternalSemanticResearcher.php` or existing adapter boundary, `ArticleResearchPreflight.php`, `ArticleIngestPreflight.php`; Create `MediaKnowledgeEnrichmentPlanner.php` only if an existing Media annotation boundary requires an adapter; Tests in `VideoSemanticCoreTest.php`, `ArticleResearchPreflightTest.php`, and new `KnowledgeEnrichmentIntegrationTest.php`.
 
 - [ ] Write failing tests proving Video user_hint produces scoped candidates only, MediaUsage/depicts does not create Evidence, and Article returns a suggestion packet without changing WordPress body.
@@ -91,6 +105,8 @@
 
 ### Task 8: Odo acceptance, public routes, docs and full verification
 
+**Status:** partial; generic unit coverage and full Unit verification are complete, but runtime Odo acceptance requires unavailable live read infrastructure and no data was fabricated.
+
 **Files:** Create `public/wp-content/plugins/nhk-core/tests/Unit/OdoLivingKnowledgeAcceptanceTest.php`; Modify `docs/architecture/V3_EXECUTION_STATE.md` and relevant contracts; no data files.
 
 - [ ] Write failing Odo acceptance tests for 62 white pegs, Sonodo/24, 54/57/62 parity, no 30 cloning, 39 evidence-only, `/odo/` and `/o-do/` behavior.
@@ -100,4 +116,3 @@
 - [ ] Run complete Unit suite, available integration suite with exact DB guard, PHP lint, Composer validation, `git diff --check`, and secret review.
 - [ ] Update execution state with implemented slices and remaining CODE_GAP/REGISTRY_GAP/HUMAN_GATE entries.
 - [ ] Commit `docs: record governed living knowledge checkpoint`.
-
