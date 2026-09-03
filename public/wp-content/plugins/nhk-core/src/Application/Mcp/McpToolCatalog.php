@@ -15,14 +15,30 @@ final class McpToolCatalog
             self::tool('nhk.article.ingest', 'Resume a governed Article semantic reconciliation using the same idempotency key; Phase 1 is reconcile-only.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
-            self::tool('nhk.media.ingest', 'Create a governed Media identity with complete asset and usage metadata; binary delivery remains separately verified.', [
+            self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or process one direct multipart image attachment into the WordPress Media Library without semantic inference.', [
                 'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'name' => ['type' => 'string', 'minLength' => 1],
                 'readiness' => ['type' => 'string', 'enum' => ['draft', 'ready', 'blocked']],
                 'provenance' => ['type' => 'object'],
                 'assets' => ['type' => 'array', 'items' => self::mediaAssetField()],
                 'usages' => ['type' => 'array', 'items' => self::mediaUsageField()],
-            ], ['stable_key', 'name'], true),
+                'file' => [
+                    'type' => 'object',
+                    'format' => 'binary',
+                    'description' => 'Direct multipart file attachment. Send a file parameter; base64 and data URLs are not accepted.',
+                    'properties' => [
+                        'name' => ['type' => 'string'],
+                        'type' => ['type' => 'string'],
+                        'size' => ['type' => 'integer', 'minimum' => 0],
+                    ],
+                    'additionalProperties' => false,
+                ],
+                'filename' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'max_width' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 20000],
+                'max_height' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 20000],
+                'quality' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],
+            ], ['name'], true),
+            self::tool('nhk.media.attachment.get', 'Read back one WordPress image attachment and its generated derivatives after file ingest.', ['attachment_id' => ['type' => 'integer', 'minimum' => 1]], ['attachment_id']),
             self::tool('nhk.video.ingest', 'Create a governed canonical external Video reference from a validated YouTube URL.', [
                 'url' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1],
                 'title' => ['type' => 'string'],
@@ -235,6 +251,6 @@ final class McpToolCatalog
     /** @return list<string> */
     private static function governedOperations(): array
     {
-        return ['create', 'ingest', 'relation_create', 'rekey', 'rename', 'update', 'retire', 'reactivate', 'relation_retire', 'relation_reactivate'];
+        return ['create', 'ingest', 'relation_create', 'rekey', 'merge', 'rename', 'update', 'retire', 'reactivate', 'relation_retire', 'relation_reactivate'];
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\VideoService;
@@ -18,9 +19,9 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
         if ($proposal->entityType === 'media' && $proposal->operation === 'ingest') {
             if (!$this->media) throw new \RuntimeException('Media executor is not configured.');
@@ -73,6 +74,10 @@ final class AuthorityProposalExecutor
         }
         $payload = $proposal->payload;
         $target = $proposal->targetUuid ?: $proposal->subjectId;
+        if ($proposal->operation === 'merge') {
+            if (!$this->merge) throw new \RuntimeException('Merge executor is not configured.');
+            return $this->merge->merge($proposal->subjectId, (string) ($proposal->targetUuid ?? ''), (int) ($payload['source_revision'] ?? $proposal->expectedRevision), (int) ($payload['target_revision'] ?? 0), $proposal->idempotencyKey);
+        }
         return match ($proposal->operation) {
             'create', 'ingest' => $this->authority->create(
                 $proposal->entityType,

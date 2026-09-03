@@ -3,7 +3,7 @@
 > **NON-NORMATIVE.** Đây là implementation checkpoint. Nếu mâu thuẫn với
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
 
-Status: implementation checkpoint, 2026-09-02.
+Status: implementation checkpoint, 2026-09-03.
 
 ## Root cause
 
@@ -28,13 +28,29 @@ The adapter registers only these existing read tools:
 
 Each ability delegates to `McpReadHandler` and reuses the existing catalog input schema. Results remain reader-safe; no raw Graph storage, lifecycle fields, provenance internals or second persistence path is exposed.
 
-## Write boundary
+## Governed workflow bridge
 
-`nhk.media.ingest`, `nhk.video.ingest`, `nhk.knowledge.ingest`, `nhk.source.ingest`, `nhk.evidence.ingest` and all `nhk.proposal.*` tools are intentionally absent from the WordPress Abilities public/MCP allowlist in this checkpoint. The existing custom MCP writes remain Governance-backed and capability-gated. A separate exposure review is required before registering them through another connector.
+The connector-facing bridge now exposes the minimum governed Video workflow:
+
+| Existing MCP tool | WordPress ability | Capability |
+|---|---|---|
+| `nhk.video.ingest` | `nhk-v3/video-ingest` | `nhk_create_proposals` |
+| `nhk.proposal.create` | `nhk-v3/proposal-create` | `nhk_create_proposals` |
+| `nhk.proposal.submit` | `nhk-v3/proposal-submit` | `nhk_submit_proposals` |
+| `nhk.proposal.approve` | `nhk-v3/proposal-approve` | `nhk_approve_proposals` |
+| `nhk.proposal.reject` | `nhk-v3/proposal-reject` | `nhk_approve_proposals` |
+| `nhk.proposal.eligibility` | `nhk-v3/proposal-eligibility` | `nhk_view_governance` |
+| `nhk.proposal.apply` | `nhk-v3/proposal-apply` | `nhk_apply_proposals` |
+
+Each governed Ability delegates to the registered `/nhk/v1/mcp` transport. It
+does not write WordPress directly, create a second proposal path or bypass
+MCP validation, capability checks, Proposal → Approval → Eligibility →
+Controlled Apply, audit or Graph execution. The remaining semantic ingest
+writers stay on the custom MCP endpoint until separately reviewed.
 
 No `wp_create_post`, taxonomy, post meta, direct SQL semantic mutation or ungoverned ability was introduced.
 
-These eight read-only abilities do not constitute Article Ingest. A generic
+These read-only abilities do not constitute Article Ingest. A generic
 WordPress Post write or these abilities alone cannot be reported as a completed
 V3 knowledge Article workflow; the approved semantic-preflight → draft →
 governed-apply → read-back → publish boundary remains a future implementation
@@ -42,4 +58,8 @@ contract. No Article ability is added by this documentation checkpoint.
 
 ## Verification boundary
 
-Unit tests assert the exact eight-name allowlist and reject a write mapping. Guarded integration tests assert runtime registration, metadata, write exclusion and authenticated read execution, but the current local WordPress/DB bootstrap is unavailable. The read-only wire smoke also remains blocked by `localhost:80`; external Easy MCP deployment discovery/call verification remains pending.
+Unit tests assert the exact read and governed allowlists. Guarded integration
+tests assert runtime registration, metadata, capability boundaries and
+authenticated read execution, but the current local WordPress/DB bootstrap is
+unavailable. The custom MCP wire smoke and external Easy MCP deployment call
+verification remain environment-dependent.

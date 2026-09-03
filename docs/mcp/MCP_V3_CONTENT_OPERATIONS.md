@@ -28,9 +28,9 @@ return HTTP 202 with no body.
 
 ## 2. Tool catalog thực tế
 
-`McpToolCatalog::tools()` exposes exactly 21 tools. `kind=mutation` implies
+`McpToolCatalog::tools()` exposes exactly 22 tools. `kind=mutation` implies
 `governed=true`. The coordinated Article tools occupy positions 3–4; the
-catalog's position 21 is `nhk.proposal.apply`. The clean HEAD
+catalog's position 22 is `nhk.proposal.apply`. The clean HEAD
 catalog and the wire smoke both use this
 same ordered list; the local HTTP wire smoke remains an environment check and
 must not be replaced by a static catalog assertion.
@@ -43,7 +43,8 @@ must not be replaced by a static catalog assertion.
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
-| `nhk.media.ingest` | Media/MediaAsset/MediaUsage | WRITE | Yes | Apply creates revision | Usage is placement | READY for metadata; no byte upload |
+| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or WordPress image attachment | WRITE | Yes | Metadata path uses Governance; file path writes processed WP attachment | Usage is placement; file path is adapter-only | READY for metadata and direct image attachment |
+| `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
 | `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; source/review gates explicit |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
@@ -59,8 +60,9 @@ must not be replaced by a static catalog assertion.
 | `nhk.proposal.eligibility` | Governance check | READ | capability-gated | Revision/dependencies | N/A | READY |
 | `nhk.proposal.apply` | Governance + target | WRITE | Yes | Controlled Apply | GraphService | READY for implemented branches |
 
-The stale assertions expecting 18/19 were corrected to 21; no prior tool was
-removed. Article ingest is capability-gated by `nhk_ingest_articles`, while
+The historical assertions expecting 18/19/21 were updated to the current 22;
+no prior tool was removed. Article ingest is capability-gated by
+`nhk_ingest_articles`, while
 Article preflight is read-gated. The exact current wire order is the table
 order above.
 
@@ -75,7 +77,7 @@ order above.
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
 | Read/create relation | Governed `relation_create`; raw Graph read is admin REST only; related semantic read has no MCP tool yet | PARTIAL / IMPLEMENTATION_GAP |
 | Create/update/publish Post | No MCP Post application command | BLOCKED |
-| Upload/find Media | Metadata ingest only; no byte upload or lookup tool | PARTIAL/BLOCKED |
+| Upload/find Media | Governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
 | Attach MediaUsage | Nested in Media ingest only | PARTIAL |
 | Product / Specimen | Registered Authority types via generic paths | PARTIAL |
 | Album | No V3 contract | SEMANTIC_GAP |
@@ -179,15 +181,31 @@ for the governed Graph query.
 ## 8. Media workflow
 
 Media identity, MediaAsset binary metadata and MediaUsage placement are
-separate. `nhk.media.ingest` accepts current stable key/name/readiness, asset
-packet and usage packet; Controlled Apply delegates through the shared
-`MediaIngestGateway` to `MediaService::ingest`. Asset metadata includes storage
-key, optional original filename, checksum, MIME, size, dimensions and
-visibility. Usage includes endpoint type/key, controlled role, order and
-contextual SEO fields. Article roles are `featured_primary`, `inline_primary`
-and `inline_supporting`; the five existing generic roles remain in the same
-registry. `nhk.media.get` returns active ready Media, public deliverable assets
-and reader-safe usage.
+separate. The existing metadata path of `nhk.media.ingest` accepts current
+stable key/name/readiness, asset packet and usage packet; Controlled Apply
+delegates through the shared `MediaIngestGateway` to `MediaService::ingest`.
+Asset metadata includes storage key, optional original filename, checksum, MIME,
+size, dimensions and visibility. Usage includes endpoint type/key, controlled
+role, order and contextual SEO fields. Article roles are `featured_primary`,
+`inline_primary` and `inline_supporting`; the five existing generic roles
+remain in the same registry. `nhk.media.get` returns active ready Media, public
+deliverable assets and reader-safe usage.
+
+The same `nhk.media.ingest` tool also accepts one direct multipart `file`
+parameter. The MCP envelope carries JSON-RPC arguments separately from the
+multipart file part; the file is never represented as base64 or a data URL.
+`filename`, `max_width`, `max_height` and `quality` control the binary adapter.
+Before `wp_upload_bits`, the adapter copies the upload to a temporary workfile,
+validates the image MIME, applies EXIF orientation, resizes without cropping to
+the maximum dimensions, sets the requested encoder quality and sanitizes the
+passed filename. Only that processed file is inserted into the WordPress Media
+Library; the camera/source upload and workfiles are not retained after the
+request. WordPress-generated image sizes are returned as `derivatives`.
+
+The direct file path is an editorial/binary adapter only. It does not create an
+NHK semantic Media identity, Knowledge claim, Source, Evidence or Graph edge
+from image content. `nhk.media.attachment.get` reads back the attachment ID,
+canonical URL, sanitized filename, MIME, dimensions, filesize and derivatives.
 
 Article Ingest reconciliation uses the same `ArticleMediaCoordinator` as the
 WordPress post-created adapter. It returns a media state, mandatory-slot
@@ -200,9 +218,9 @@ are controlled registries owned by NHK Core. This MCP document does not define
 their semantics; the sole source of law is
 `docs/constitution/NHK_V3_CONSTITUTION.md` and the runtime registries.
 
-The current boundary does not upload bytes, resolve a local file, search by
-checksum or add a usage independently. Checksum detects a duplicate candidate;
-it never merges canonical identities.
+The direct file boundary does not search by checksum or add a usage
+independently. Checksum detects a duplicate candidate on the governed metadata
+path; it never merges canonical identities.
 
 ## 9. Product / Specimen
 
@@ -276,12 +294,14 @@ not success and must not be retried with altered content under the same key.
 
 ## 14. Read-back verification
 
-After apply, use `result_entity_uuid`: Authority → `nhk.entity.get`; Media →
-`nhk.media.get`; Video → `nhk.video.get`; Knowledge/Source/Evidence → matching
-read tool. Graph requires administrator-only Graph REST. Post requires native
-WordPress read/browser verification. Verify canonical identity, active state,
-visibility, revision result, relation direction and public projection; apply
-success alone does not prove public availability.
+After apply, use `result_entity_uuid`: Authority → `nhk.entity.get`; governed
+Media metadata → `nhk.media.get`; Video → `nhk.video.get`;
+Knowledge/Source/Evidence → matching read tool. Direct file attachment ingest
+must use `nhk.media.attachment.get` with the returned `attachment_id` for
+WordPress read-back. Graph requires administrator-only Graph REST. Post
+requires native WordPress read/browser verification. Verify canonical identity,
+active state, visibility, revision result, relation direction and public
+projection; apply success alone does not prove public availability.
 
 ## 15. End-to-end example
 
@@ -308,17 +328,17 @@ For “Biên soạn và đưa bài lên web, xây chặt các quan hệ liên qu
    satisfy the approved contract.
 ```
 
-MCP-native Post CRUD/publish, binary upload, Graph read, standalone MediaUsage,
-Album, and Product–Specimen canonical-fact workflows remain blocked or gated.
-Implementing them requires a new contract decision; this guide does not invent
-one.
+MCP-native Post CRUD/publish, Graph read, standalone MediaUsage, Album, and
+Product–Specimen canonical-fact workflows remain blocked or gated. The
+approved direct image attachment path is limited to processed WordPress binary
+intake and read-back; it does not expand any of those semantic workflows.
 
-## 16. WordPress Abilities read bridge
+## 16. WordPress Abilities MCP bridge
 
-On WordPress 6.9+, the plugin registers eight existing read tools as public
-read-only Abilities under category `nhk-semantic`. This is a discoverability
-adapter, not a second persistence or transport path, and it is feature-detected
-on older WordPress versions.
+On WordPress 6.9+, the plugin registers eight existing read tools and the
+minimum governed Video workflow as public Abilities under category
+`nhk-semantic`. This is a discoverability adapter, not a second persistence or
+transport path, and it is feature-detected on older WordPress versions.
 
 | ABILITY | MCP SOURCE |
 |---|---|
@@ -333,7 +353,15 @@ on older WordPress versions.
 
 Each reuses the existing input schema, `read` capability callback and metadata
 `public=true`, `show_in_rest=true`, `readonly=true`, `destructive=false`,
-`idempotent=true`. No write or governance Ability is registered.
+`idempotent=true`.
+
+The governed bridge additionally exposes `nhk-v3/video-ingest`,
+`nhk-v3/proposal-create`, `nhk-v3/proposal-submit`, `nhk-v3/proposal-approve`,
+`nhk-v3/proposal-reject`, `nhk-v3/proposal-eligibility` and
+`nhk-v3/proposal-apply`. These callbacks delegate to the registered custom MCP
+transport, preserving its capability mapping and lifecycle. Media, Knowledge,
+Source and Evidence writers remain unexposed through Abilities; no generic
+WordPress writer is registered.
 
 ## 17. Article Ingest implementation status
 

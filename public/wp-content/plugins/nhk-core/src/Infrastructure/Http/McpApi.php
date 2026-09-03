@@ -40,9 +40,21 @@ final class McpApi
     private function dispatch(\WP_REST_Request $request): \WP_REST_Response
     {
         $body = $request->get_json_params();
-        $body = is_array($body) ? $body : [];
+        if (!is_array($body) || $body === []) {
+            foreach (['request', 'json', 'payload'] as $field) {
+                $candidate = $request->get_param($field);
+                if (!is_string($candidate) || trim($candidate) === '') continue;
+                $decoded = json_decode($candidate, true);
+                if (is_array($decoded)) { $body = $decoded; break; }
+            }
+        }
+        if (!is_array($body)) {
+            $decoded = json_decode($request->get_body(), true);
+            $body = is_array($decoded) ? $decoded : [];
+        }
         $headers = $request->get_headers();
-        $result = $this->transport->dispatch($body, is_array($headers) ? $headers : []);
+        $files = method_exists($request, 'get_file_params') ? $request->get_file_params() : [];
+        $result = $this->transport->dispatch($body, is_array($headers) ? $headers : [], is_array($files) ? $files : []);
         return new \WP_REST_Response($result['body'], $result['status']);
     }
 }

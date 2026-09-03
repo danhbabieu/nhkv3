@@ -4,6 +4,40 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## MCP direct image attachment checkpoint — 2026-09-03
+
+The existing `nhk.media.ingest` adapter now accepts a direct multipart `file`
+parameter in addition to its governed metadata packet. `McpApi` reads the
+JSON-RPC envelope and WordPress file parameters separately; base64/data URLs are
+not accepted. The WordPress-only binary adapter copies the upload to temporary
+workfiles, validates the image, applies EXIF auto-orientation, performs
+aspect-preserving max-dimension resize, applies requested quality, sanitizes the
+caller-provided filename, and uploads only the processed output. WordPress
+generated sizes are returned as derivatives. The source camera upload and
+temporary workfiles are not retained by NHK after the request succeeds.
+
+The direct path intentionally creates no NHK semantic Media identity from image
+content and no Knowledge, Evidence or Graph relation. The new
+`nhk.media.attachment.get` read tool returns the attachment ID, canonical URL,
+filename, MIME, width, height, filesize and derivatives for read-back. A
+write-guard prevents the existing native attachment-adoption hook from creating
+semantic records for this adapter-only path.
+
+Fresh evidence:
+
+| Gate | Result | Evidence / limitation |
+|---|---|---|
+| MCP contract | **PASS** | `McpContractTest`: 9 tests / 108 assertions; catalog is 22 tools and multipart file routing is covered without base64. |
+| UNIT | **PASS** | Unit suite: 297 tests / 1,466 assertions (current concurrent working tree). |
+| PHP LINT | **PASS** | New/changed MCP, WordPress adapter, guard, Plugin and test PHP files pass `php -l`. |
+| COMPOSER | **PASS** | `composer validate --no-check-publish`; existing no-license warning only. |
+| DIFF | **PASS** | `git diff --check` exit `0`. |
+| WP integration | **SKIPPED** | `NHK_WP_TEST_PATH` is unset; live image editor, upload, derivative and attachment read-back remain unverified in this shell. |
+
+No database, WordPress Post, NHK Media semantic record, Knowledge claim,
+Evidence, Graph edge, V2, staging or production data was mutated by this
+checkpoint. Existing concurrent working-tree changes were preserved.
+
 ## Odo Semantic Pack installation checkpoint — 2026-09-03
 
 ### Task 3 checkpoint — 2026-09-03 — Odo manifest fail-closed validation
@@ -472,6 +506,30 @@ required current old-iMac snapshot was not present; the only local dump is
 `nhk-v3-local-2026-09-01.sql.gz` and was not imported.
 
 Last updated: 2026-09-02, MCP V3 connector ability exposure checkpoint.
+
+## MCP governed Video connector bridge checkpoint — 2026-09-03
+
+The connector gap was traced to the boundary between the custom NHK
+Streamable HTTP endpoint and WordPress Abilities/Easy MCP discovery. The
+custom `McpToolCatalog` already contained governed Video and Proposal tools,
+but `McpAbilityRegistration` exposed only eight read abilities, so a connector
+discovering WordPress Abilities could not see the governed writers.
+
+The bridge now exposes `nhk-v3/video-ingest` plus the six
+`nhk-v3/proposal-*` lifecycle abilities. Each is public/REST-discoverable but
+capability-gated and delegates to the registered `/nhk/v1/mcp` transport;
+there is no direct WordPress writer, second proposal path, SQL semantic write,
+taxonomy, post-meta or Graph bypass. Media/Knowledge/Source/Evidence writers
+remain outside the Ability bridge.
+
+Focused MCP verification passed: 28 tests / 108 assertions, PHP lint,
+Composer validation and `git diff --check` passed. Full Composer PHPUnit ran
+389 tests and remains environment-blocked with 8 integration errors and 12
+bootstrap/configuration failures because the WordPress/MySQL runtime was not
+available; 74 tests were skipped. Live MCP wire smoke is blocked because
+`http://localhost:80` is not listening. Therefore no live Ability discovery,
+Odo URL ingest, proposal apply, result UUID, read-back or data mutation is
+claimed in this checkpoint.
 
 The MCP V3 runtime catalog exposes exactly 19 tools. `nhk.semantic.resolve` is
 the 19th catalog member added by this checkpoint (catalog position 2; position

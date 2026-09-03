@@ -30,7 +30,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(200, $response->get_status());
         $data = $response->get_data();
         self::assertSame('2.0', $data['jsonrpc']);
-        self::assertCount(21, $data['result']['tools']);
+        self::assertCount(22, $data['result']['tools']);
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
     }
 
@@ -49,10 +49,10 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['resolved' => [], 'candidates' => [], 'ambiguities' => [], 'missing' => [], 'conflicts' => [], 'relations' => []], $response->get_data()['result']['structuredContent']);
     }
 
-    public function test_wordpress_abilities_register_only_the_public_read_allowlist(): void
+    public function test_wordpress_abilities_register_public_read_and_governed_video_allowlist(): void
     {
         $abilities = wp_get_abilities(['namespace' => 'nhk-v3']);
-        self::assertSame(McpAbilityRegistration::readAbilityNames(), array_values(array_map(static fn (\WP_Ability $ability): string => $ability->get_name(), $abilities)));
+        self::assertSame(array_merge(McpAbilityRegistration::readAbilityNames(), McpAbilityRegistration::governedAbilityNames()), array_values(array_map(static fn (\WP_Ability $ability): string => $ability->get_name(), $abilities)));
         $read = wp_get_ability('nhk-v3/semantic-resolve');
         self::assertNotNull($read);
         self::assertSame('nhk-semantic', $read->get_category());
@@ -60,7 +60,13 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertTrue($read->get_meta_item('show_in_rest'));
         self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $read->get_meta_item('annotations'));
         self::assertNull(wp_get_ability('nhk-v3/media-ingest'));
-        self::assertNull(wp_get_ability('nhk-v3/proposal-create'));
+        foreach (McpAbilityRegistration::governedAbilityNames() as $abilityName) {
+            $ability = wp_get_ability($abilityName);
+            self::assertNotNull($ability, $abilityName);
+            self::assertTrue($ability->get_meta_item('public'));
+            self::assertTrue($ability->get_meta_item('show_in_rest'));
+            self::assertFalse($ability->get_meta_item('annotations')['readonly']);
+        }
         self::assertNull(wp_get_ability('nhk-v3/article-preflight'));
         self::assertNull(wp_get_ability('nhk-v3/article-ingest'));
         $administrator = get_role('administrator');
@@ -115,7 +121,7 @@ final class McpTransportIntegrationTest extends TestCase
         $request->set_body(wp_json_encode(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'tools/list', 'params' => []]));
         $response = rest_do_request($request);
         self::assertSame(200, $response->get_status());
-        self::assertCount(21, $response->get_data()['result']['tools']);
+        self::assertCount(22, $response->get_data()['result']['tools']);
     }
 
     public function test_standard_modern_tools_call_accepts_header_only_without_custom_method_headers(): void

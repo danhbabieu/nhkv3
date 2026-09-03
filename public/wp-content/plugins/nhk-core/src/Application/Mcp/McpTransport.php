@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
+use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 
 final class McpTransport
 {
@@ -20,10 +21,11 @@ final class McpTransport
         private $originAllowed = null,
         private ?McpArticleIngestHandler $article = null,
         private ?VideoIntakeService $videoIntake = null,
+        private ?WordPressMediaAttachmentIngestor $wordpressAttachments = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
-    public function dispatch(array $request, array $headers = []): array
+    public function dispatch(array $request, array $headers = [], array $files = []): array
     {
         $id = array_key_exists('id', $request) ? $request['id'] : null;
         if (($request['jsonrpc'] ?? null) !== '2.0' || !is_string($request['method'] ?? null)) return $this->error($id, -32600, 'Invalid Request.', 400);
@@ -50,7 +52,7 @@ final class McpTransport
 
         if (!array_key_exists('id', $request) && str_starts_with($method, 'notifications/')) return ['status' => 202, 'body' => null];
         try {
-            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => $this->handle($method, $params, $modern)]];
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => $this->handle($method, $params, $modern, $files)]];
         } catch (McpMethodNotFound $error) {
             return $this->error($id, -32601, $error->getMessage(), 404);
         } catch (McpPermissionDenied $error) {
@@ -62,21 +64,22 @@ final class McpTransport
         }
     }
 
-    private function handle(string $method, array $params, bool $modern): array
+    private function handle(string $method, array $params, bool $modern, array $files = []): array
     {
         return match ($method) {
             'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
             'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
             'tools/list' => ['tools' => array_map(static fn (array $tool): array => ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']], McpToolCatalog::tools())],
-            'tools/call' => $this->callTool($params),
+            'tools/call' => $this->callTool($params, $files),
             default => throw new McpMethodNotFound($method),
         };
     }
 
-    private function callTool(array $params): array
+    private function callTool(array $params, array $files = []): array
     {
         $name = (string) ($params['name'] ?? '');
         $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
+        if ($name === 'nhk.media.ingest') $arguments = $this->fileArgumentMetadata($arguments, $files);
         $definition = null;
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
@@ -102,7 +105,8 @@ final class McpTransport
             'nhk.article.ingest' => $this->article?->ingest($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
-            'nhk.media.ingest' => $this->mediaIngest($arguments),
+            'nhk.media.ingest' => $this->mediaIngest($arguments, $files),
+            'nhk.media.attachment.get' => $this->read->mediaAttachmentGet((int) ($arguments['attachment_id'] ?? 0)),
             'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
             'nhk.knowledge.get' => $this->read->knowledgeGet((string) ($arguments['id'] ?? '')),
@@ -196,8 +200,24 @@ final class McpTransport
         return $value;
     }
 
-    private function mediaIngest(array $arguments): array
+    private function mediaIngest(array $arguments, array $files = []): array
     {
+        $attachment = $this->fileAttachment($arguments, $files);
+        if ($attachment !== null) {
+            if ($this->wordpressAttachments === null) throw new \RuntimeException('WORDPRESS_MEDIA_INGEST_UNAVAILABLE');
+            $filename = trim((string) ($arguments['filename'] ?? ''));
+            if ($filename === '') throw new \InvalidArgumentException('filename is required for file ingest.');
+            return $this->wordpressAttachments->ingest(
+                $attachment,
+                $filename,
+                (string) ($arguments['name'] ?? ''),
+                (int) ($arguments['max_width'] ?? 2400),
+                (int) ($arguments['max_height'] ?? 2400),
+                (int) ($arguments['quality'] ?? 82),
+            );
+        }
+        if (array_key_exists('file', $arguments)) throw new \InvalidArgumentException('file must be a direct multipart attachment.');
+        if (trim((string) ($arguments['stable_key'] ?? '')) === '') throw new \InvalidArgumentException('Missing required argument: stable_key.');
         $mediaArguments = $arguments;
         $mediaArguments['operation'] = 'ingest';
         $mediaArguments['entity_type'] = 'media';
@@ -210,6 +230,47 @@ final class McpTransport
             'usages' => is_array($arguments['usages'] ?? null) ? $arguments['usages'] : [],
         ];
         return $this->proposal($this->governance->createFromArguments($mediaArguments));
+    }
+
+    /** @return array<string,mixed> */
+    private function fileArgumentMetadata(array $arguments, array $files): array
+    {
+        if (array_key_exists('file', $arguments)) {
+            if (is_string($arguments['file']) && isset($files[$arguments['file']]) && is_array($files[$arguments['file']])) {
+                $file = $files[$arguments['file']];
+                $arguments['file'] = ['name' => (string) ($file['name'] ?? ''), 'type' => (string) ($file['type'] ?? ''), 'size' => (int) ($file['size'] ?? 0)];
+            }
+            return $arguments;
+        }
+        $file = $this->fileAttachment($arguments, $files);
+        if ($file === null) return $arguments;
+        $arguments['file'] = [
+            'name' => (string) ($file['name'] ?? ''),
+            'type' => (string) ($file['type'] ?? ''),
+            'size' => (int) ($file['size'] ?? 0),
+        ];
+        return $arguments;
+    }
+
+    /** @return array<string,mixed>|null */
+    private function fileAttachment(array $arguments, array $files): ?array
+    {
+        if ($files === []) return null;
+        $requested = $arguments['file'] ?? null;
+        if (is_string($requested) && isset($files[$requested]) && is_array($files[$requested])) return $this->normalizeUploadedFile($files[$requested]);
+        if (is_array($requested) && isset($requested['field']) && is_string($requested['field']) && isset($files[$requested['field']]) && is_array($files[$requested['field']])) return $this->normalizeUploadedFile($files[$requested['field']]);
+        if (isset($files['file']) && is_array($files['file'])) return $this->normalizeUploadedFile($files['file']);
+        foreach ($files as $file) {
+            if (is_array($file) && isset($file['tmp_name'])) return $this->normalizeUploadedFile($file);
+            if (is_array($file)) foreach ($file as $nested) if (is_array($nested) && isset($nested['tmp_name'])) return $this->normalizeUploadedFile($nested);
+        }
+        return null;
+    }
+
+    /** @return array<string,mixed>|null */
+    private function normalizeUploadedFile(array $file): ?array
+    {
+        return isset($file['tmp_name']) && is_string($file['tmp_name']) ? $file : null;
     }
 
     private function videoIngest(array $arguments): array

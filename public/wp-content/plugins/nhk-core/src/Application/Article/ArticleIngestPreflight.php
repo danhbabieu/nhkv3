@@ -37,7 +37,7 @@ final class ArticleIngestPreflight
             $operation = (string) ($command['operation'] ?? '');
             $entityType = (string) ($command['entity_type'] ?? '');
             $subjectId = trim((string) ($command['subject_id'] ?? ''));
-            if (!in_array($operation, ['create', 'ingest', 'relation_create', 'rekey', 'rename', 'update', 'retire', 'reactivate', 'relation_retire', 'relation_reactivate'], true)) $reasons[] = 'UNKNOWN_OPERATION';
+            if (!in_array($operation, ['create', 'ingest', 'relation_create', 'rekey', 'merge', 'rename', 'update', 'retire', 'reactivate', 'relation_retire', 'relation_reactivate'], true)) $reasons[] = 'UNKNOWN_OPERATION';
             if ($entityType !== 'relation' && !$this->types->has($entityType)) $reasons[] = 'UNKNOWN_ENTITY_TYPE';
             if ($subjectId === '') $reasons[] = 'SUBJECT_REQUIRED';
             if (isset($command['target_uuid']) && (string) $command['target_uuid'] !== '' && !UuidCodec::isValid((string) $command['target_uuid'])) $reasons[] = 'INVALID_TARGET_UUID';

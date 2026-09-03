@@ -18,6 +18,23 @@ is indexed as a duplicate candidate only; it never merges semantic Media
 identities. The schema keeps Media, asset and usage in separate tables and does
 not make an attachment or asset a Graph endpoint by default.
 
+### MCP direct image attachment checkpoint — 2026-09-03
+
+`nhk.media.ingest` now has a direct WordPress binary adapter for a multipart
+`file` parameter. It sanitizes the explicit filename and processes a temporary
+copy with EXIF auto-orientation, aspect-preserving `max_width`/`max_height`
+resize and requested encoder `quality` before the processed bytes enter the
+WordPress Media Library. The original camera upload is never copied to uploads
+and temporary workfiles are removed after the request. The result includes the
+attachment ID, canonical URL, final filename, MIME, dimensions, filesize and
+WordPress derivatives. `nhk.media.attachment.get` provides the same reader-safe
+read-back shape.
+
+This path is adapter-only: it does not infer or create NHK semantic Media,
+Knowledge, Evidence or Graph relation from image content. The native attachment
+adoption hook is guarded for this path. Metadata-only `nhk.media.ingest` remains
+the governed Media/MediaAsset/MediaUsage proposal workflow.
+
 ## Video contract
 
 `Video` is an external reference. The initial adapter normalizes YouTube watch,
@@ -129,7 +146,9 @@ The same attachment representation now supplies public URL, `src`, `srcset`,
 Article structured data use that same projection. WordPress registers a
 projection image sitemap provider that emits only eligible real public
 featured assets, once per URL; placeholders/private/unmapped assets are
-excluded. The MCP wire smoke now checks the exact approved 21-tool catalog.
+excluded. The historical checkpoint's MCP wire smoke checked the then-approved
+21-tool catalog; the current catalog additionally exposes the direct attachment
+read-back tool and is verified as 22 tools in the 2026-09-03 checkpoint below.
 
 Static evidence: full Unit suite `265` tests / `1,355` assertions, Composer
 validation, full PHP lint and `git diff --check` pass. Live WordPress,

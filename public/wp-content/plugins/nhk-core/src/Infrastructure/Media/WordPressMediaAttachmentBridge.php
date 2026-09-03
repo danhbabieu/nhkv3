@@ -150,6 +150,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
 
     public function adoptAttachment(int $attachmentId): ?string
     {
+        if (WordPressMediaAttachmentWriteGuard::active()) return null;
         if ($this->controlledWriteDepth > 0 || $attachmentId < 1 || !function_exists('get_post')) return $this->mediaIdForAttachment($attachmentId);
         $existing = $this->mediaIdForAttachment($attachmentId);
         if ($existing !== null) return $existing;

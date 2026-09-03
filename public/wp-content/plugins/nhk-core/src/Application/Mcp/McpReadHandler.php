@@ -15,6 +15,7 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 
 final class McpReadHandler
 {
@@ -31,6 +32,7 @@ final class McpReadHandler
         private ?SourceRepository $sources = null,
         private ?PublicMediaAssetDelivery $delivery = null,
         private ?McpSemanticContextResolver $resolver = null,
+        private ?WordPressMediaAttachmentIngestor $wordpressAttachments = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -47,6 +49,11 @@ final class McpReadHandler
         if (!$media || !$media->active || $media->readiness !== 'ready') return null;
         $assets = array_values(array_filter($this->assets->listByMediaId($id), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
         return ['id' => $media->canonicalId, 'stable_key' => $media->stableKey, 'name' => $media->canonicalName, 'assets' => array_map($this->publicAsset(...), $assets), 'usages' => array_map($this->publicUsage(...), $this->usages->listByMediaId($id))];
+    }
+
+    public function mediaAttachmentGet(int $attachmentId): ?array
+    {
+        return $this->wordpressAttachments?->read($attachmentId);
     }
 
     public function videoGet(string $id): ?array

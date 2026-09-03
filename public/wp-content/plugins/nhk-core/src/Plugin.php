@@ -34,7 +34,7 @@ use NHK\Core\Infrastructure\Http\PublicKnowledgeRoutes;
 use NHK\Core\Infrastructure\Http\PublicVideoSitemapRoutes;
 use NHK\Core\Infrastructure\Http\McpApi;
 use NHK\Core\Infrastructure\Admin\AdminPage;
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge};
+use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Article\{WpEditorialStateReader, WpdbArticleOperationReceiptRepository};
@@ -82,6 +82,7 @@ final class Plugin {
             $sources = new WpdbSourceRepository($wpdb);
             $evidence = new WpdbEvidenceRepository($wpdb);
             McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types)));
+            McpAbilityRegistration::registerGovernedAbilities();
         });
         (new PublicEditorialRoutes())->register();
         LegacyUrlRedirects::register();
@@ -137,6 +138,7 @@ final class Plugin {
                 $reconcilePostMedia((int) $post->ID, $post, !$creating);
             }, 20, 3);
             $adoptAttachment = static function (int $attachmentId) use ($attachmentBridge): void {
+                if (WordPressMediaAttachmentWriteGuard::active()) return;
                 try { $attachmentBridge->adoptAttachment($attachmentId); } catch (\Throwable $error) { do_action('nhk_v3_media_adoption_failure', $attachmentId, $error->getMessage()); }
             };
             add_action('add_attachment', $adoptAttachment, 20, 1);
@@ -207,13 +209,14 @@ final class Plugin {
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
-            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types));
+            $wordpressAttachments = new WordPressMediaAttachmentIngestor();
+            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments);
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
             $youtubeClient = trim((string) getenv('NHK_YOUTUBE_API_KEY')) !== '' ? static fn (object $identity): array => (new YouTubeDataApiClient())->fetch($identity) : null;
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry()), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
