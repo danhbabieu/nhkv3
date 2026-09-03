@@ -119,6 +119,59 @@ final class OwnerPublicationOverrideIntegrationTest extends TestCase
         }
     }
 
+    public function test_authenticated_mcp_review_then_approval_publishes_with_the_exact_exception(): void
+    {
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        GovernanceCapabilities::register();
+        $administrator = get_role('administrator');
+        self::assertNotNull($administrator);
+        $administrator->add_cap('publish_posts');
+        $administrator->add_cap('nhk_ingest_articles');
+        $previousUser = get_current_user_id();
+        wp_set_current_user((int) $users[0]->ID);
+        try {
+            $postId = $this->draft();
+            $state = (new WpEditorialPostStore())->read($postId);
+            self::assertNotNull($state);
+            $evidence = ownerPublicationIntegrationEvidence(['real_image_requirements_met' => false, 'real_image_requirements_met_status' => 'missing']);
+            $headers = ['MCP-Protocol-Version' => '2026-07-28', 'Mcp-Method' => 'tools/call', 'Content-Type' => 'application/json', 'Accept' => 'application/json, text/event-stream'];
+            $review = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+            foreach ($headers as $name => $value) $review->set_header($name, $value);
+            $review->set_header('Mcp-Name', 'nhk.article.publish.review');
+            $review->set_body(wp_json_encode([
+                'jsonrpc' => '2.0', 'id' => 702, 'method' => 'tools/call',
+                'params' => ['name' => 'nhk.article.publish.review', 'arguments' => ['post_id' => $postId, 'expected_state_token' => $state->token, 'idempotency_key' => 'mcp-approval-' . $postId, 'evidence' => $evidence]],
+                '_meta' => ['io.modelcontextprotocol/protocolVersion' => '2026-07-28'],
+            ]));
+            $reviewResponse = rest_do_request($review);
+            $reviewData = $reviewResponse->get_data();
+            self::assertSame(200, $reviewResponse->get_status(), (string) wp_json_encode($reviewData));
+            self::assertSame('OWNER_REVIEW_REQUIRED', $reviewData['result']['structuredContent']['outcome'], (string) wp_json_encode($reviewData));
+            self::assertContains('REAL_IMAGE_INCOMPLETE', $reviewData['result']['structuredContent']['diagnostics']);
+            self::assertSame('draft', (new WpEditorialPostStore())->read($postId)?->status);
+
+            $approval = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+            foreach ($headers as $name => $value) $approval->set_header($name, $value);
+            $approval->set_header('Mcp-Name', 'nhk.article.publish.approve');
+            $approval->set_body(wp_json_encode([
+                'jsonrpc' => '2.0', 'id' => 703, 'method' => 'tools/call',
+                'params' => ['name' => 'nhk.article.publish.approve', 'arguments' => ['post_id' => $postId, 'expected_state_token' => $state->token, 'idempotency_key' => 'mcp-approval-' . $postId, 'decision_id' => $reviewData['result']['structuredContent']['decision_id'], 'affirmation' => 'Đăng.', 'evidence' => $evidence]],
+                '_meta' => ['io.modelcontextprotocol/protocolVersion' => '2026-07-28'],
+            ]));
+            $approvalResponse = rest_do_request($approval);
+            $approvalData = $approvalResponse->get_data();
+            self::assertSame(200, $approvalResponse->get_status(), (string) wp_json_encode($approvalData));
+            self::assertFalse($approvalData['result']['isError'] ?? false, (string) wp_json_encode($approvalData));
+            self::assertSame('PASS', $approvalData['result']['structuredContent']['outcome'], (string) wp_json_encode($approvalData));
+            self::assertSame('published_with_exceptions', $approvalData['result']['structuredContent']['final_outcome']);
+            self::assertSame('publish', $approvalData['result']['structuredContent']['post']['status']);
+            self::assertContains('REAL_IMAGE_INCOMPLETE', $approvalData['result']['structuredContent']['diagnostics']);
+        } finally {
+            wp_set_current_user($previousUser);
+        }
+    }
+
     private function draft(): int
     {
         $slug = 'nhk-isolated-owner-publication-' . bin2hex(random_bytes(4));

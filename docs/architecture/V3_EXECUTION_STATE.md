@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+## Owner Publication Override final release verification — 2026-09-03
+
+Fresh local verification used the supported WordPress vhost at
+`http://localhost` and MySQL database `nhk_v3_test`; migration 013 was
+readable and the owner-decision table was present with zero residual rows.
+The canonical MCP transport now has an integration proof for
+`OWNER_REVIEW_REQUIRED` → authenticated owner approval → native publish and
+WordPress read-back: 5 tests / 45 assertions passed, including preservation of
+`REAL_IMAGE_INCOMPLETE` and `published_with_exceptions`. The frontend route
+smoke passed 47/47 routes and the read-only MCP wire smoke passed all 11
+protocol/CORS/catalog/notification checks.
+
+The full guarded suite ran 511 tests / 2,512 assertions with 3 failures, 2
+warnings, 1 PHPUnit deprecation and 2 authorized skips. The three failures are
+the existing media, video and Knowledge/Source/Evidence MCP fixture assertions
+(`McpTransportIntegrationTest`, lines 262, 338 and 443/364). The same three
+failures, with the same assertions and stack locations, reproduce on both
+`15fa3d7` (before Owner Override) and `77912fe` (Owner Override implementation),
+so they are classified `PRE_EXISTING_FAILURE`, not owner-override regressions.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Governed Living Knowledge E2E acceptance — 2026-09-03
 
 The focused in-memory acceptance now proves the owner-approved sequence
@@ -56,6 +80,14 @@ Fresh isolated runtime proof used `NHK_WP_TEST_PATH=public` and
 passed 4 tests / 30 assertions, including isolated `wp_insert_post()` PASS,
 OWNER_REVIEW_REQUIRED→authenticated approval, SYSTEM_BLOCKED, MCP review-only,
 and retry returning the durable completed decision. Post 87 was not used.
+
+Follow-up verification added a canonical MCP transport integration assertion
+for `nhk.article.publish.review` → `nhk.article.publish.approve` using an
+isolated `wp_insert_post()` draft in `nhk_v3_test`. Review returned
+`OWNER_REVIEW_REQUIRED` without publishing; authenticated approval returned
+`PASS` with `published_with_exceptions`, preserved `REAL_IMAGE_INCOMPLETE`,
+and verified native WordPress `publish` read-back. Fresh proof: 1 test / 14
+assertions. No production change was required for this coverage addition.
 
 The focused unit/contract suite passed 70 tests / 761 assertions. A focused
 P4/P5/MCP integration run executed against the isolated database but retained
