@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Application\Graph\PredicateTraversalPolicy;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -17,7 +18,8 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class RelatedContentQuery
 {
-    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null) {}
+    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
+    private PredicateTraversalPolicy $policy;
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
     public function forEntity(string $type, string $id): array
@@ -46,7 +48,9 @@ final class RelatedContentQuery
             if ($depth >= 2) continue;
             $pages = [$this->graph->findOutgoing($current, null, 0, 100), $this->graph->findIncoming($current, null, 0, 100)];
             foreach ($pages as $page) foreach ($page['items'] as $edge) {
-                $node = $edge->source->reference->key() === $current->key() ? $edge->target->reference : $edge->source->reference;
+                $outgoing = $edge->source->reference->key() === $current->key();
+                $node = $outgoing ? $edge->target->reference : $edge->source->reference;
+                if (!$this->policy->permits($current, $outgoing ? 'outgoing' : 'incoming', $node, $edge->predicate)) continue;
                 if (isset($seen[$node->key()])) continue;
                 $seen[$node->key()] = true;
                 $item = $this->resolve($node);

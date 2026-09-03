@@ -4,6 +4,23 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Article Research gate recheck — 2026-09-03
+
+The current working tree passes the full NHK Unit suite: 307 tests / 1,516
+assertions. Focused Article Research, related traversal, MCP contract and
+capability-manifest coverage also passes: 18 tests / 145 assertions. Composer
+validation passes with the existing no-license warning; changed PHP lint and
+`git diff --check` remain clean.
+
+The Article Research gate remains **PARTIAL** and must not claim
+`ARTICLE_RESEARCH_PREFLIGHT_RUNTIME_READY`. Guarded integration evidence is
+blocked by WordPress bootstrap: running with `NHK_WP_TEST_PATH=public` reaches
+`Error establishing a database connection`, while the environment does not
+provide a verified `nhk_v3_test` runtime. Public-route/public-readiness
+coverage for every registered endpoint type and the complete acceptance matrix
+also remain open. No Post, taxonomy, semantic record, Graph edge, Media,
+Video, proposal or live data was mutated.
+
 ## P0 content-operations planning boundary — 2026-09-03
 
 The first read-only slice of the MCP/Admin Content Operations Control Plane is
@@ -22,6 +39,25 @@ read-back/public verification pipeline remain implementation gaps. No Post,
 taxonomy, semantic record, Graph edge, Media, Video, migration or live data was
 mutated. Concurrent working-tree changes in the semantic merge/Odo workstream
 were preserved.
+
+## Article research preflight continuation — 2026-09-03
+
+The read-only research path now has a shared registry-driven semantic reader
+(`RelatedSemanticQuery` with `PredicateTraversalPolicy`): active edges are
+direction-validated, bounded to two hops, cycle-protected, deduplicated, and
+returned with direct/derived classification plus best and alternative paths.
+Article inventory projects existing Post references from Graph, reads a
+bounded Knowledge → Evidence → Source chain, and delegates semantic link
+candidates to the existing public eligibility and route policy. No Post,
+taxonomy, semantic record, Graph edge, Media, Video or Governance mutation was
+performed.
+
+Focused evidence: 9 tests / 30 assertions; changed PHP files lint clean and
+`git diff --check` passes. This checkpoint remains **PARTIAL**: the full
+acceptance matrix, complete route/readiness serialization for every registered
+endpoint, guarded integration evidence and final capability manifest READY
+transition are still pending. The runtime must not yet claim
+`ARTICLE_RESEARCH_PREFLIGHT_RUNTIME_READY`.
 
 ## P0 Article research preflight runtime slice — 2026-09-03
 

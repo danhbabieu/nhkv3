@@ -41,7 +41,7 @@ use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepo
 use NHK\Core\Infrastructure\Article\{WpEditorialStateReader, WpdbArticleOperationReceiptRepository};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
-use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, StructuralContextQuery};
+use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
@@ -225,20 +225,41 @@ final class Plugin {
                     $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
                     $authorityRows = [];
                     foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];
-                    $knowledgeRows = array_map(static fn ($claim): array => ['id' => $claim->canonicalId, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'supported' => $claim->isPublic()], $claims->list());
-                    $sourceRows = array_map(static fn ($source): array => ['id' => $source->canonicalId, 'title' => $source->title, 'public' => $source->isPublic()], $sources->list());
+                    $knowledgeRows = [];
+                    $sourceRows = [];
+                    $evidenceRows = [];
+                    foreach (array_slice($claims->list(), 0, 50) as $claim) {
+                        $claimEvidence = array_slice($evidence->listByClaim($claim->canonicalId), 0, 20);
+                        $evidenceForClaim = [];
+                        foreach ($claimEvidence as $item) {
+                            $source = $sources->findByCanonicalId($item->sourceId);
+                            $evidenceForClaim[] = ['id' => $item->canonicalId, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'active' => $item->active, 'public' => $item->isPublic(), 'source' => $source ? ['id' => $source->canonicalId, 'title' => $source->title, 'locator' => $source->locator, 'public' => $source->isPublic(), 'active' => $source->active] : null];
+                            $evidenceRows[] = $evidenceForClaim[array_key_last($evidenceForClaim)];
+                            if ($source !== null && count($sourceRows) < 50) $sourceRows[$source->canonicalId] = ['id' => $source->canonicalId, 'title' => $source->title, 'locator' => $source->locator, 'public' => $source->isPublic(), 'active' => $source->active];
+                        }
+                        $support = array_values(array_filter($evidenceForClaim, static fn (array $item): bool => $item['relation'] === 'supports' && $item['active'] === true));
+                        $knowledgeRows[] = ['id' => $claim->canonicalId, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'active' => $claim->active, 'public' => $claim->isPublic(), 'evidence' => $evidenceForClaim, 'evidence_status' => $support === [] ? ($claimEvidence === [] ? 'NO_EVIDENCE' : 'INSUFFICIENT_EVIDENCE') : 'SUPPORTED_WITHIN_SCOPE'];
+                    }
                     $mediaRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'ready' => $item->readiness === 'ready', 'public' => $item->active], $media->list());
                     $videoRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'public' => $item->active && $item->hasValidPublicReference()], $videos->list());
                     $relations = [];
                     if ($primary !== []) {
                         try {
                             $ref = new \NHK\Core\Domain\Graph\NodeReference((string) $primary['type'], (string) $primary['id']);
-                            foreach ([$graphService->findOutgoing($ref, null, 0, 50), $graphService->findIncoming($ref, null, 0, 50)] as $page) foreach ($page['items'] as $edge) $relations[] = ['class' => 'DIRECT', 'predicate' => $edge->predicate, 'target_id' => $edge->target->reference->key(), 'target_type' => $edge->target->reference->endpoint_type, 'reason' => 'active registered Graph edge'];
+                            $related = (new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy(new PredicateRegistry())))->query($ref, [], 2, 50);
+                            foreach ($related['items'] as $item) $relations[] = ['class' => $item['relationship_class'], 'predicate' => $item['best_path'][array_key_last($item['best_path'])]['predicate'] ?? '', 'target_id' => $item['target_entity_id'], 'target_type' => $item['target_entity_type'], 'path' => $item['best_path'], 'reason' => 'registered Graph traversal'];
+                            foreach ($graphService->findIncoming($ref, null, 0, 50)['items'] as $edge) { $postRef = $edge->source->reference; if ($postRef->endpoint_type !== 'wp_post') continue; foreach ($posts as &$post) if ($post['id'] === substr($postRef->endpoint_key, strpos($postRef->endpoint_key, ':') + 1)) $post['subject_ids'][] = $primary['id']; unset($post); }
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
-                    return ['status' => 'available', 'posts' => $posts, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => $sourceRows, 'evidence' => [], 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
+                    return ['status' => 'available', 'posts' => $posts, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
                 },
-                static fn (array $candidate): array => ['eligible' => false, 'route' => null],
+                static function (array $candidate) use ($authority, $types, $publicRoutes, $publicEligibility): array {
+                    $type = (string) ($candidate['target_type'] ?? ''); $id = (string) ($candidate['target_id'] ?? '');
+                    if (!$types->has($type)) return ['eligible' => false, 'route' => null, 'reason' => 'UNAVAILABLE'];
+                    $entity = $authority->findByCanonicalId($id); $eligibility = $publicEligibility->evaluate($entity);
+                    $path = $entity && $eligibility->eligible ? $publicRoutes->path($entity) : null;
+                    return ['eligible' => $path !== null, 'route' => $path, 'reason' => $eligibility->reasons[0] ?? ($path !== null ? 'PUBLIC_CANONICAL_ROUTE' : 'UNAVAILABLE')];
+                },
             );
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();

@@ -6,6 +6,11 @@
 
 Status is based on code and test evidence, not commit titles.
 
+Article research preflight continuation (2026-09-03) adds the first shared
+bounded semantic traversal and route-gated, evidence-aware read planning
+slice. It remains partial until the complete acceptance matrix and guarded
+integration evidence pass.
+
 Latest P0 content-operations slice (2026-09-03): the Article Semantic/SEO
 Research Preflight contract, Article SEO Projection contract, shared control
 plane mapping and catalog-derived `McpCapabilityManifest` are present. This is

@@ -4,6 +4,12 @@
 > `docs/constitution/NHK_V3_CONSTITUTION.md` and does not authorize a new
 > entity, endpoint, predicate, field, operation or data mutation.
 
+Status: approved contract with an initial read-only runtime slice, 2026-09-03.
+Post references, bounded Knowledge → Evidence → Source inventory, shared
+semantic traversal and route-gated link planning are now wired. Full
+acceptance coverage and guarded integration evidence remain required before
+the capability can claim READY.
+
 ## Purpose
 
 An Article request managed by MCP is an operation over native WordPress

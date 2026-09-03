@@ -4,6 +4,10 @@
 > under the Constitution. SEO is not semantic truth and cannot create claims,
 > relations, identities or evidence.
 
+Status: approved contract, 2026-09-03. Article research supplies semantic
+references, bounded evidence inventory, explainable related paths and
+route-gated candidates; SEO remains read-only and cannot create semantic truth.
+
 ## Blueprint boundary
 
 `ArticleSeoBlueprint` is derived planning data. It may contain user intent,

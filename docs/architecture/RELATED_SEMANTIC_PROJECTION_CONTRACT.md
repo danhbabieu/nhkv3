@@ -3,7 +3,10 @@
 > **NON-NORMATIVE.** Đây là architecture contract dưới Hiến pháp. Nếu mâu
 > thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
 
-Status: approved documentation contract and runtime audit, 2026-09-02.
+Status: approved contract with initial shared read-engine implementation,
+2026-09-03. The engine is bounded to two hops, validates stored edge direction
+against the predicate registry, prevents cycles, deduplicates targets and
+retains direct/derived paths. Full page-level convergence remains pending.
 This document defines a reusable read/query boundary. It does not authorize
 new entity types, endpoints, predicates, fields, operations, Graph edges,
 taxonomy, post meta, migration or data repair.

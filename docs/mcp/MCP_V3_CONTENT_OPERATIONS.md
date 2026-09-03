@@ -3,7 +3,7 @@
 > **NON-NORMATIVE.** This is a runtime contract audit. If it conflicts with
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-Status: runtime audit and contract-safe implementation checkpoint, 2026-09-02.
+Status: runtime audit and contract-safe implementation checkpoint, 2026-09-03.
 
 This shared guide describes the MCP V3 runtime actually present for ChatGPT and
 Codex. It does not authorize new entity types, predicates, relation types,
@@ -92,9 +92,10 @@ The existing read-only `nhk.article.preflight` surface also accepts optional
 `research_topic` and `research_subject` fields. When present, it delegates to
 the shared Article Semantic/SEO Research Preflight and returns a planning
 packet; it performs no Post, taxonomy, semantic, Graph, Media, Video or
-Governance write. This path is partial until Post semantic-reference
-projection, complete Source/Evidence inventory and public-route eligibility
-are available. Without `research_topic`, the reconciliation contract below is
+Governance write. The research path uses the shared bounded two-hop Graph
+reader, Post semantic-reference projection, bounded Knowledge → Evidence →
+Source inventory and public route/eligibility boundary. Without
+`research_topic`, the reconciliation contract below is
 unchanged.
 
 For Phase 1, `nhk.article.preflight` and `nhk.article.ingest` support only
