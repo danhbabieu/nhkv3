@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+## YouTube runtime configuration safety checkpoint — 2026-09-03
+
+Root-cause tracing confirmed that the production Video adapter had no
+`NHK_YOUTUBE_API_KEY` in the PHP runtime: the repository contains no
+`$_ENV`/`$_SERVER` or dotenv loader for this key, and the deployed bootstrap
+did not define the constant. A shell/SSH environment is therefore
+insufficient when PHP-FPM uses `clear_env`; the `getenv()` call in the FPM worker
+returns unavailable.
+
+The adapter now uses `YouTubeApiConfiguration`, which deterministically
+selects a non-empty `NHK_YOUTUBE_API_KEY` constant before `getenv()` and
+returns only `{configured, source}` through the existing read-only health
+diagnostic. Missing configuration still fails closed before any outbound
+HTTP request. No secret, semantic record, Video, Proposal, Graph relation or
+WordPress data was changed.
+
+Focused proof: 25 tests / 99 assertions for YouTube, health and configuration.
+The full NHK Unit suite ran 414 tests and has one unrelated failure in the
+pre-existing uncommitted `OdoMediaIntegrityAuditorTest`; no Odo code was
+changed in this checkpoint. Full PHP lint, Composer validation, diff checks
+and secret review passed.
+
 ## Governed Living Knowledge apply-boundary correction — 2026-09-03
 
 The final corrective slice audited the actual Governance vocabulary: the

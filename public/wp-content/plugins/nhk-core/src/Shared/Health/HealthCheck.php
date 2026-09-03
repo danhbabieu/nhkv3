@@ -5,9 +5,10 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Authority\AuthorityParityAudit;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
+use NHK\Core\Application\Video\YouTubeApiConfiguration;
 
 final class HealthCheck {
-    public function __construct(private object $migrations, private $hydrationProbe = null) {}
+    public function __construct(private object $migrations, private $hydrationProbe = null, private ?YouTubeApiConfiguration $youtubeApi = null) {}
     public function register_routes(): void {
         register_rest_route('nhk/v1', '/health', [
             'methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => fn () => $this->read(),
@@ -27,6 +28,7 @@ final class HealthCheck {
             'database_reachable' => $database,
             'migration_current' => $migration['current'], 'migration_target' => $migration['target'],
             'migration_required' => $migration['current'] < $migration['target'],
+            'youtube_api' => ($this->youtubeApi ?? new YouTubeApiConfiguration())->diagnostic(),
             'graph_storage_ready' => $this->migrations->graphStorageReady(),
             'authority_storage_ready' => $this->migrations->authorityStorageReady(),
             'governance_storage_ready' => $this->migrations->governanceStorageReady(),

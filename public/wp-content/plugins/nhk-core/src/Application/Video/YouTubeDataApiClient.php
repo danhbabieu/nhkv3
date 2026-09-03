@@ -8,14 +8,14 @@ use NHK\Core\Domain\Video\{VideoException, YouTubeVideoIdentity};
 final class YouTubeDataApiClient
 {
     /** @param callable(string,array<string,mixed>):mixed|null $http */
-    public function __construct(private ?string $apiKey = null, private $http = null)
+    public function __construct(private ?string $apiKey = null, private $http = null, private ?YouTubeApiConfiguration $configuration = null)
     {
     }
 
     /** @return array<string,mixed> */
     public function fetch(YouTubeVideoIdentity $identity): array
     {
-        $key = trim($this->apiKey ?? (defined('NHK_YOUTUBE_API_KEY') ? (string) NHK_YOUTUBE_API_KEY : (string) getenv('NHK_YOUTUBE_API_KEY')));
+        $key = trim($this->apiKey ?? ($this->configuration ?? new YouTubeApiConfiguration())->value() ?? '');
         if ($key === '') throw new VideoException('YOUTUBE_API_NOT_CONFIGURED');
         $url = 'https://www.googleapis.com/youtube/v3/videos?' . http_build_query(['part' => 'snippet,contentDetails,status,liveStreamingDetails', 'id' => $identity->videoId, 'key' => $key], '', '&', PHP_QUERY_RFC3986);
         try {
