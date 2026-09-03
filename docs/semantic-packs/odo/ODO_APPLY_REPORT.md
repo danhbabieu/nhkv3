@@ -95,6 +95,17 @@ No Constitution conflict was introduced. Proceeding with any of the blocked
 semantic operations now would violate the runtime Governance/Registry boundary
 and is therefore explicitly stopped with `CONTRACT_EXTENSION_REQUIRED`.
 
+## 12a. Local generic merge follow-up — 2026-09-03
+
+The local code now includes an append-only durable receipt repository backed by
+the existing Governance audit event table, an explicit adapter `verify`
+contract, plan-bound receipt state (`applying`, `partial`, `completed`) and
+attempt metadata. Focused merge tests pass (`3 tests / 8 assertions`), but the
+runtime is intentionally not wired or deployed because only the Graph adapter
+exists; the required Knowledge, Source, Evidence, MediaUsage, Video and
+WordPress reference surfaces still need contract-audited adapters. This does
+not authorize or constitute an Odo data mutation.
+
 ## 13. Test results
 
 - YAML parse: PASS (`YAML_VALID`).

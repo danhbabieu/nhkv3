@@ -16,4 +16,7 @@ interface SemanticMergeReferenceAdapter
 
     /** @param array<string,mixed> $planned @return array{action:string,reference:string} */
     public function apply(array $planned): array;
+
+    /** @param array<string,mixed> $planned */
+    public function verify(array $planned): bool;
 }

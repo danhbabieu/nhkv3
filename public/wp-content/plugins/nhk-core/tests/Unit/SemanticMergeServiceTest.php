@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\SemanticMergeService;
-use NHK\Core\Contracts\Authority\SemanticMergeReferenceAdapter;
+use NHK\Core\Contracts\Authority\{SemanticMergeReferenceAdapter,SemanticMergeReceiptRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity,AuthorityState,EntityTypeDefinition,EntityTypeRegistry};
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
@@ -22,8 +22,15 @@ final class SemanticMergeServiceTest extends TestCase
             public function enumerate(AuthorityEntity $source, AuthorityEntity $target): array { return $source->state === AuthorityState::RETIRED ? [] : $this->refs; }
             public function plan(AuthorityEntity $source, AuthorityEntity $target, array $references): array { return $references; }
             public function apply(array $planned): array { return ['action' => 'moved', 'reference' => (string) $planned['reference']]; }
+            public function verify(array $planned): bool { return true; }
         };
-        return [new SemanticMergeService($repo, [$adapter], $events === [] ? null : static function(string $event, object $receipt) use (&$events): void { $events[] = [$event, $receipt]; }), $repo, $source, $target];
+        $stored = [];
+        $repoStore = new class($stored) implements SemanticMergeReceiptRepository {
+            public function __construct(private array &$stored) {}
+            public function findByIdempotencyKey(string $key): ?\NHK\Core\Domain\Authority\SemanticMergeReceipt { return $this->stored[$key] ?? null; }
+            public function append(\NHK\Core\Domain\Authority\SemanticMergeReceipt $receipt): void { $this->stored[$receipt->idempotencyKey] = $receipt; }
+        };
+        return [new SemanticMergeService($repo, [$adapter], $events === [] ? null : static function(string $event, object $receipt) use (&$events): void { $events[] = [$event, $receipt]; }, $repoStore), $repo, $source, $target];
     }
 
     public function test_same_type_merge_moves_references_retires_source_and_preserves_uuid(): void

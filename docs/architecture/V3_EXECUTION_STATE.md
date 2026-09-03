@@ -25,9 +25,30 @@ or an equivalent connector.
 
 The worktree now contains a generic `SemanticMergeService`, reference-adapter
 contract and Graph adapter with focused unit coverage. This is implementation
-scaffolding only: durable receipt persistence, transaction wiring, complete
-Knowledge/Source/Evidence/MediaUsage/Video/Post adapters and deployed MCP
-registration remain required before merge can be reported as complete.
+scaffolding only: complete Knowledge/Source/Evidence/MediaUsage/Video/Post
+adapters and deployed MCP registration remain required before merge can be
+reported as complete. A local follow-up adds the `verify` adapter contract and
+an append-only durable receipt repository backed by the existing Governance
+audit table, plus applying/partial/completed receipt state and attempt metadata;
+it is not wired into the deployed runtime and has not been demo-tested.
+
+## Odo continuation checkpoint — 2026-09-03
+
+The requested continuation was inspected at concurrent HEAD `cd9700e` (not
+reset to `92dc93a`). The local generic merge follow-up passes focused tests
+(`3 tests / 8 assertions`), Composer validation, full PHP lint and
+`git diff --check`. The full suite remains environment-blocked with `8`
+integration errors from unavailable `$wpdb` bootstrap and `12` mandatory
+integration failures requiring `NHK_WP_TEST_PATH=public`; no test failure was
+hidden or downgraded.
+
+The merge remains `PARTIAL`: only the Graph adapter exists; the required
+actual V3 reference-surface audit/adapters, production wiring, and independent
+read-back are absent. No local or demo semantic data, WordPress Post, Graph
+edge, migration, deployment or credential was changed by this checkpoint.
+The request to deploy and apply Odo on `demo.1945.vn` conflicts with the
+Constitution/AGENTS live-data and production/staging mutation prohibitions and
+is stopped at that human gate.
 
 ## MCP direct image attachment checkpoint — 2026-09-03
 
