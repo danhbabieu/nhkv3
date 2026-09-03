@@ -7,6 +7,7 @@ use NHK\Core\Application\Article\ArticleIngestCoordinator;
 use NHK\Core\Application\Article\ArticleIngestPreflight;
 use NHK\Core\Contracts\Article\EditorialStateReader;
 use NHK\Core\Application\Media\ArticleMediaCoordinator;
+use NHK\Core\Application\Article\ArticleResearchPreflight;
 
 class McpArticleIngestHandler
 {
@@ -15,11 +16,15 @@ class McpArticleIngestHandler
         private ArticleIngestPreflight $preflight,
         private EditorialStateReader $editorial,
         private ?ArticleMediaCoordinator $articleMedia = null,
+        private ?ArticleResearchPreflight $research = null,
     ) {}
 
     /** @return array<string,mixed> */
     public function preflight(array $input): array
     {
+        if ($this->research !== null && trim((string) ($input['research_topic'] ?? '')) !== '') {
+            return $this->research->research((string) $input['research_topic'], is_array($input['research_subject'] ?? null) ? $input['research_subject'] : [])->toArray();
+        }
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $endpoint = trim((string) ($target['endpoint_key'] ?? ''));
         $intent = (string) ($input['intent'] ?? '');

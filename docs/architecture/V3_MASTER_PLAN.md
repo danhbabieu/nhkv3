@@ -6,6 +6,12 @@
 
 Status is based on code and test evidence, not commit titles.
 
+Latest P0 content-operations slice (2026-09-03): the Article Semantic/SEO
+Research Preflight contract, Article SEO Projection contract, shared control
+plane mapping and catalog-derived `McpCapabilityManifest` are present. This is
+documentation plus a read-only capability boundary only; the full research
+inventory/planner, editorial/taxonomy gateways and Admin parity remain open.
+
 | Phase | Status | Evidence / next gate |
 |---|---|---|
 | P0 Bootstrap | ACCEPTED/CLOSED | Repository and V3 boundaries established. |

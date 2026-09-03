@@ -88,6 +88,15 @@ order above.
 
 ## 4. Post workflow
 
+The existing read-only `nhk.article.preflight` surface also accepts optional
+`research_topic` and `research_subject` fields. When present, it delegates to
+the shared Article Semantic/SEO Research Preflight and returns a planning
+packet; it performs no Post, taxonomy, semantic, Graph, Media, Video or
+Governance write. This path is partial until Post semantic-reference
+projection, complete Source/Evidence inventory and public-route eligibility
+are available. Without `research_topic`, the reconciliation contract below is
+unchanged.
+
 For Phase 1, `nhk.article.preflight` and `nhk.article.ingest` support only
 reconciliation of an existing WordPress Post: read and fingerprint the target,
 preflight the explicit semantic bundle, create deterministic child proposals,

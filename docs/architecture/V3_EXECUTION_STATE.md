@@ -23,6 +23,27 @@ taxonomy, semantic record, Graph edge, Media, Video, migration or live data was
 mutated. Concurrent working-tree changes in the semantic merge/Odo workstream
 were preserved.
 
+## P0 Article research preflight runtime slice — 2026-09-03
+
+`ArticleResearchPreflight` and `ArticleResearchResult` now provide a read-only
+research boundary and are available through the optional `research_topic` path
+of `nhk.article.preflight`; the existing reconcile path is unchanged. The
+runtime wiring uses bounded WordPress/repository reads and the existing
+semantic resolver. It classifies supplied Graph candidates as direct/derived,
+filters link candidates through the injected public-eligibility boundary and
+produces category, Media, Video, SEO and claim-compliance planning sections.
+
+Fresh evidence: 306 Unit tests / 1,510 assertions pass; changed PHP files pass
+lint; Composer validation and `git diff --check` pass.
+
+This remains **PARTIAL / NOT ARTICLE_RESEARCH_PREFLIGHT_RUNTIME_READY**:
+runtime Post-to-subject reference projection, complete Source/Evidence
+cross-inventory, public route eligibility resolution and shared Graph
+two-hop traversal are not yet complete. The current runtime therefore reports
+explicit gaps rather than claiming complete overlap/relation/link coverage.
+No WordPress Post, taxonomy, semantic record, Graph edge, Media, Video,
+proposal or live data was mutated.
+
 ## Odo demo MCP read-path checkpoint — 2026-09-03
 
 `TARGET_RUNTIME=demo.1945.vn` is reachable through the deployed Streamable HTTP

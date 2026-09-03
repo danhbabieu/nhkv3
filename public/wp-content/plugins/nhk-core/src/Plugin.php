@@ -19,7 +19,7 @@ use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabi
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
-use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleVerificationReader, SemanticProposalPlanner};
+use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
@@ -209,7 +209,38 @@ final class Plugin {
             );
             $articleMedia = new ArticleMediaCoordinator($mediaService, $media, $assets, $usages, new \NHK\Core\Infrastructure\Media\WpdbArticleMediaBlueprintRepository($wpdb), null, $attachmentBridge);
             $articleCoordinator = new ArticleIngestCoordinator(new WpdbArticleOperationReceiptRepository($wpdb), $articlePreflight, new SemanticProposalPlanner(), $articleEditorial, $governance, $controlledApply, $proposalRepository, new WpdbDependencyRepository($wpdb), new ArticleVerificationReader(), $articleMedia);
-            $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia);
+            $researchResolver = new McpSemanticContextResolver($authority, $types);
+            $articleResearch = new ArticleResearchPreflight(
+                static function (array $input) use ($researchResolver): array {
+                    $subject = is_array($input['subject'] ?? null) ? $input['subject'] : [];
+                    $type = trim((string) ($subject['type'] ?? ''));
+                    if ($type === '') return ['status' => 'ambiguous', 'candidates' => []];
+                    $resolved = $researchResolver->resolve([$type => $subject]);
+                    if (($resolved['ambiguities'][$type] ?? null) !== null) return ['status' => 'ambiguous', 'candidates' => $resolved['candidates'][$type] ?? []];
+                    if (isset($resolved['resolved'][$type])) return ['status' => 'resolved', 'primary' => $resolved['resolved'][$type]];
+                    return ['status' => 'not_found'];
+                },
+                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $videos, $graphService): array {
+                    $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
+                    $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
+                    $authorityRows = [];
+                    foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];
+                    $knowledgeRows = array_map(static fn ($claim): array => ['id' => $claim->canonicalId, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'supported' => $claim->isPublic()], $claims->list());
+                    $sourceRows = array_map(static fn ($source): array => ['id' => $source->canonicalId, 'title' => $source->title, 'public' => $source->isPublic()], $sources->list());
+                    $mediaRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'ready' => $item->readiness === 'ready', 'public' => $item->active], $media->list());
+                    $videoRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'public' => $item->active && $item->hasValidPublicReference()], $videos->list());
+                    $relations = [];
+                    if ($primary !== []) {
+                        try {
+                            $ref = new \NHK\Core\Domain\Graph\NodeReference((string) $primary['type'], (string) $primary['id']);
+                            foreach ([$graphService->findOutgoing($ref, null, 0, 50), $graphService->findIncoming($ref, null, 0, 50)] as $page) foreach ($page['items'] as $edge) $relations[] = ['class' => 'DIRECT', 'predicate' => $edge->predicate, 'target_id' => $edge->target->reference->key(), 'target_type' => $edge->target->reference->endpoint_type, 'reason' => 'active registered Graph edge'];
+                        } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
+                    }
+                    return ['status' => 'available', 'posts' => $posts, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => $sourceRows, 'evidence' => [], 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
+                },
+                static fn (array $candidate): array => ['eligible' => false, 'route' => null],
+            );
+            $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();

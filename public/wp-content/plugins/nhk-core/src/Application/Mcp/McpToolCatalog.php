@@ -224,6 +224,8 @@ final class McpToolCatalog
                 'additionalProperties' => false,
             ],
         ];
+        $properties['research_topic'] = ['type' => 'string', 'minLength' => 1, 'maxLength' => 500];
+        $properties['research_subject'] = ['type' => 'object'];
         if ($includeIdempotency) $properties['idempotency_key'] = ['type' => 'string', 'minLength' => 1, 'maxLength' => 191];
         return $properties;
     }

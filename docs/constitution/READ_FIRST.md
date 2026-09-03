@@ -18,6 +18,12 @@ For an approved V3 knowledge Article workflow, also read
 `docs/architecture/ARTICLE_INGEST_CONTRACT.md` and the current
 `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` contract before implementation.
 
+For MCP/Admin content operations, also read
+`docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`. For Article research or
+SEO work, read
+`docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md` and
+`docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` before implementation.
+
 For any workflow that drafts, generates, edits, projects or publishes public
 promotional/commercial copy — including WordPress Article text, Product copy,
 MediaUsage caption/alt or image/thumbnail text, Video editorial copy, SEO/meta,
