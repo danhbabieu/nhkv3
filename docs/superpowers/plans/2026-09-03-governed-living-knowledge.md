@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement governed, scope-aware living Knowledge enrichment and stable fragment-level SEO projection without creating unregistered semantic owners or mutating live data.
+**Goal:** Complete and verify the governed Living Knowledge E2E slice from candidate creation through canonical repository read-back, audit and idempotent replay, while preserving the existing read-only projection boundaries.
 
-**Architecture:** Add read-only profile/planner/resolver services over existing Knowledge/Evidence repositories; use Governance payloads for durable candidates. Add deterministic fragment projection and SEO guards at the application boundary, then expose candidate packets to existing Video/Media/Article flows without direct semantic writes.
+**Architecture:** Reuse the existing candidate, proposal factory, Governance lifecycle, ControlledApplyService, AuthorityProposalExecutor and KnowledgeService seams. Add only the missing approval binding enforcement and a focused in-memory acceptance harness; no new semantic operation, owner, predicate, adapter or direct repository orchestration is introduced.
 
 **Tech Stack:** PHP 8+, WordPress plugin, PHPUnit 11, existing PSR-4 runtime, existing WPDB repositories and migration framework.
 
@@ -103,7 +103,20 @@
 - [ ] Run focused tests and confirm GREEN.
 - [ ] Commit `feat: integrate governed enrichment with content intake`.
 
-### Task 8: Odo acceptance, public routes, docs and full verification
+### Task 8: Complete governed Living Knowledge E2E acceptance
+
+**Status:** implementation complete; in-memory E2E verified. Runtime integration remains `ENVIRONMENT_BLOCKED` because `NHK_WP_TEST_PATH` is unset.
+
+**Files:** Create `public/wp-content/plugins/nhk-core/tests/Unit/GovernedLivingKnowledgeE2ETest.php`; Modify `public/wp-content/plugins/nhk-core/src/Application/Governance/ProposalEligibilityService.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Governance/WpdbProposalRepository.php`; Test same file and existing Governance regression tests.
+
+- [x] Write the failing acceptance harness for `new_claim`, `supports`, `qualifies` and `contradicts`, with in-memory repositories, transaction rollback, audit and apply-attempt read-back.
+- [x] Run the focused test and observe RED caused by missing in-memory approval binding and dependency verification.
+- [x] Implement the minimum binding correction: persist/check the complete approval binding fingerprint while retaining existing proposal content/dependency fields and operation vocabulary.
+- [x] Run the focused test and observe GREEN, including idempotent replay, stale dependency rejection and failure atomicity.
+- [x] Run guarded integration on exact `nhk_v3_test`; record `ENVIRONMENT_BLOCKED` when the WordPress/runtime/database prerequisite is unavailable.
+- [x] Keep the existing Odo 62 acceptance in-memory-only and report the two unrelated `OdoMediaIntegrityAuditor` failures separately.
+
+### Task 9: Odo acceptance, public routes, docs and full verification
 
 **Status:** partial; generic unit coverage and full Unit verification are complete, but runtime Odo acceptance requires unavailable live read infrastructure and no data was fabricated.
 
@@ -113,6 +126,6 @@
 - [ ] Run focused tests and confirm RED.
 - [ ] Implement only generic fixture builders and route assertions; do not seed or mutate runtime data.
 - [ ] Run focused tests and confirm GREEN.
-- [ ] Run complete Unit suite, available integration suite with exact DB guard, PHP lint, Composer validation, `git diff --check`, and secret review.
-- [ ] Update execution state with implemented slices and remaining CODE_GAP/REGISTRY_GAP/HUMAN_GATE entries.
+- [x] Run complete Unit suite, guarded integration suite with exact DB guard, PHP lint, Composer validation, `git diff --check`, and secret review.
+- [x] Update execution state with implemented slices and remaining `ENVIRONMENT_BLOCKED`/`REGISTRY_GAP`/`HUMAN_GATE` entries.
 - [ ] Commit `docs: record governed living knowledge checkpoint`.

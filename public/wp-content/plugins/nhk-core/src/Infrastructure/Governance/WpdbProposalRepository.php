@@ -82,7 +82,7 @@ final class WpdbProposalRepository implements ProposalRepository
         $db = $this->db();
         $proposalId = $db->get_var($db->prepare('SELECT id FROM '.$this->table().' WHERE proposal_uuid=%s', UuidCodec::toBinary($proposal->id)));
         if (!$proposalId) throw new \RuntimeException('PROPOSAL_NOT_FOUND');
-        $ok = $db->query($db->prepare('INSERT INTO '.$db->prefix.'nhk_proposal_approvals (approval_uuid,proposal_id,proposal_revision,fingerprint,approved_by,approved_at) VALUES (%s,%d,%d,%s,%d,%s)', UuidCodec::toBinary(UuidCodec::newV7()), (int) $proposalId, $proposal->revision, $this->fingerprintBinary($proposal->contentFingerprint), (int) $actor, gmdate('Y-m-d H:i:s.u')));
+        $ok = $db->query($db->prepare('INSERT INTO '.$db->prefix.'nhk_proposal_approvals (approval_uuid,proposal_id,proposal_revision,fingerprint,approved_by,approved_at) VALUES (%s,%d,%d,%s,%d,%s)', UuidCodec::toBinary(UuidCodec::newV7()), (int) $proposalId, $proposal->revision, $this->fingerprintBinary($proposal->bindingFingerprint()), (int) $actor, gmdate('Y-m-d H:i:s.u')));
         if ($ok === false) throw new \RuntimeException('APPROVAL_INSERT_FAILED: '.(string) $db->last_error);
     }
 

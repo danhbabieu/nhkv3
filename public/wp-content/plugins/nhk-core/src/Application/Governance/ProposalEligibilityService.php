@@ -20,7 +20,7 @@ final class ProposalEligibilityService
         $approval = $this->proposals->latestApproval($proposalId);
         if ($approval === null) return EligibilityResult::blocked('APPROVAL_MISSING');
         if ((int) ($approval['proposal_revision'] ?? 0) !== $proposal->revision
-            || bin2hex((string) ($approval['fingerprint'] ?? '')) !== strtolower($proposal->contentFingerprint)) {
+            || $this->fingerprint($approval['fingerprint'] ?? null) !== strtolower($proposal->bindingFingerprint())) {
             return EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
         }
         $reasons = [];
@@ -35,5 +35,13 @@ final class ProposalEligibilityService
         } elseif (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';
         return $reasons ? EligibilityResult::blocked(...$reasons) : EligibilityResult::ready();
+    }
+
+    private function fingerprint(mixed $value): string
+    {
+        if (!is_string($value)) return '';
+        return preg_match('/^[a-f0-9]{64}$/i', $value) === 1
+            ? strtolower($value)
+            : bin2hex($value);
     }
 }

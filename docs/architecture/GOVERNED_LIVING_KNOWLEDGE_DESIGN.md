@@ -104,6 +104,24 @@ structured ordering binds content, dependency and idempotency fingerprints.
 The factory is translation-only and performs no KnowledgeService or repository
 write.
 
+## E2E acceptance boundary
+
+The governed apply slice is accepted only when a focused in-memory test proves
+the complete sequence `candidate → factory → proposal → submit/review/binding →
+approve → eligibility → ControlledApplyService → AuthorityProposalExecutor →
+KnowledgeService → canonical repository read-back → audit`, including replay of
+the same idempotency binding. The same test must cover `new_claim` and Evidence
+relations `supports`, `qualifies` and `contradicts`, reject a changed dependency
+after approval, and prove failure atomicity (no semantic mutation or applied
+proposal after a controlled failure, with a durable failed attempt).
+
+The approval record binds the complete proposal binding fingerprint, which
+includes content and dependency fingerprints. Integration evidence is a
+separate gate and may only be reported when the exact guarded `nhk_v3_test`
+runtime is available. If unavailable, the result is `ENVIRONMENT_BLOCKED`, not
+PASS. Odo 62 remains in-memory acceptance/reference data only and never mutates
+live semantic, Graph, WordPress URL, H1 or SEO state.
+
 ## Acceptance and non-goals
 
 The Odo corpus is acceptance/reference data only. Tests cover Odo 62 white pegs,
@@ -111,9 +129,10 @@ Sonodo/Movement 24 scope, 54/57/62 configuration parity, Odo 30 non-cloning,
 Odo 39 evidence-only enrichment, stable `/odo/` and `/o-do/` routes, and all
 scope/contradiction/idempotency rules. No Odo production/demo data is mutated.
 
-End-to-end `Proposal → Approval → Eligibility → Controlled Apply → read-back`
-for living Knowledge enrichment remains an explicit `CODE_GAP`; this slice
-does not claim runtime completion.
+The focused in-memory E2E acceptance closes the implementation
+`CODE_GAP: end-to-end governed apply/read-back` for the approved slice. It does
+not claim database/runtime verification: that gate is currently
+`ENVIRONMENT_BLOCKED` because the exact WordPress test runtime was unavailable.
 
 Durable public identity remains a separately reported
 `PUBLIC_IDENTITY_STORAGE_GAP` unless additive storage can be implemented without

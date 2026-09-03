@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+## Governed Living Knowledge E2E acceptance — 2026-09-03
+
+The focused in-memory acceptance now proves the owner-approved sequence
+`candidate → factory → proposal → submit/review/binding → approve → eligibility
+→ ControlledApplyService → AuthorityProposalExecutor → KnowledgeService →
+canonical repository read-back → audit`, including `new_claim` and Evidence
+relations `supports`, `qualifies` and `contradicts`. It also proves replay of an
+applied proposal is idempotent, a changed dependency after approval is blocked
+by the complete approval binding fingerprint, and a controlled executor failure
+rolls back the semantic mutation while retaining the approved proposal, failed
+attempt and failure audit.
+
+Governance approval persistence now stores the complete proposal binding
+fingerprint, and eligibility normalizes both WPDB binary and in-memory hex
+representations before comparison. No direct `KnowledgeRepository::create()` is
+used by the orchestration path; apply dispatch remains
+AuthorityProposalExecutor → KnowledgeService.
+
+Fresh focused proof: 3 tests / 43 assertions. Governance + Knowledge
+regression proof: 42 tests / 164 assertions. Full Unit proof: 419 tests / 1,982
+assertions, exit 0. The full Unit run reports two pre-existing PHP warnings
+(KnowledgeEnrichmentProposalFactory profile-version access and
+MediaServiceCompletionTest fixture access) and one PHPUnit deprecation; no
+OdoMediaIntegrityAuditor failure occurred in this run.
+
+Guarded integration was attempted against the exact `nhk_v3_test` suite, but
+`NHK_WP_TEST_PATH` is unset, so 15 integration tests were skipped with zero
+assertions. Status is `ENVIRONMENT_BLOCKED`; runtime/database read-back is not
+verified and is not reported as PASS. Odo 62 remains in-memory acceptance only;
+no live semantic, Graph, WordPress URL/H1/SEO or media mutation occurred.
+
+The in-memory E2E `CODE_GAP: end-to-end governed apply/read-back` is closed by
+the focused proof above. Runtime verification remains blocked and separately
+tracked as `ENVIRONMENT_BLOCKED`; persisted projection/read-back and unrelated
+Video/Media/Article adapter work remain outside this slice.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Owner Publication Override root-cause and isolated runtime checkpoint — 2026-09-03
 
 The review boundary now has an explicit read-only `review()` operation. The
