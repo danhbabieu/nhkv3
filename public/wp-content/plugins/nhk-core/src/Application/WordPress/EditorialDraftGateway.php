@@ -44,6 +44,16 @@ final class EditorialDraftGateway
         return $this->transition($postId, $expectedStateToken, $idempotencyKey, 'publish', $evidence);
     }
 
+    /** Review publication readiness without invoking the native WordPress writer. */
+    public function reviewPublication(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey): array
+    {
+        if ($this->ownerPublication !== null) return $this->ownerPublication->review($postId, $expectedStateToken, $evidence, $idempotencyKey, new PublicationPrincipal(function_exists('get_current_user_id') ? (string) get_current_user_id() : '0', 'mcp', ''));
+        $current = $this->posts->read($postId);
+        if ($current === null) return ['outcome' => 'SYSTEM_BLOCKED', 'diagnostics' => ['WP_POST_UNAVAILABLE']];
+        $gate = (new ArticlePublicationGate())->check($current, $evidence, $expectedStateToken);
+        return $gate->toArray() + ['post' => $current->snapshot(), 'state_token' => $current->token];
+    }
+
     /** @param array<string,mixed> $evidence */
     public function approvePublication(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, string $decisionId, string $affirmation, string $principalId, string $requestReference = ''): array
     {

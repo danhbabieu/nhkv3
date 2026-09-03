@@ -14,7 +14,7 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
     /** @param callable|null $can @param callable|null $clock */
     public function __construct(private EditorialPostStore $posts, private OwnerPublicationDecisionRepository $decisions, private $can = null, private $clock = null) {}
 
-    public function request(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, PublicationPrincipal $principal): array
+    public function review(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, PublicationPrincipal $principal): array
     {
         if ($this->can !== null && !(bool) ($this->can)($principal)) return $this->blocked('PUBLICATION_AUTHORIZATION_FAILED');
         $state = $this->posts->read($postId);
@@ -28,7 +28,16 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
             $stored = $this->decisions->create($decision);
             return $base + ['decision_id' => $stored->decisionId, 'expires_at' => $stored->expiresAt, 'confirmation_question' => 'Bài còn ' . count($gate->blockers) . ' điểm chưa đạt. Vẫn đăng không?'];
         }
-        return $this->publish($state, $evidence, $idempotencyKey, $base);
+        return $base;
+    }
+
+    public function request(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, PublicationPrincipal $principal): array
+    {
+        $review = $this->review($postId, $expectedStateToken, $evidence, $idempotencyKey, $principal);
+        if (($review['outcome'] ?? null) !== ArticlePublicationOutcome::PASS->value) return $review;
+        $state = $this->posts->read($postId);
+        if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
+        return $this->publish($state, $evidence, $idempotencyKey, $review);
     }
 
     public function approveAndPublish(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, string $decisionId, PublicationPrincipal $principal, string $affirmation): array

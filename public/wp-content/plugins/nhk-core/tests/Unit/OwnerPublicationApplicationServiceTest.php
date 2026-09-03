@@ -12,6 +12,18 @@ use PHPUnit\Framework\TestCase;
 
 final class OwnerPublicationApplicationServiceTest extends TestCase
 {
+    public function test_review_is_read_only_for_a_fully_publishable_draft(): void
+    {
+        $posts = new OwnerPublicationFakeStore();
+        $service = new OwnerPublicationApplicationService($posts, new OwnerPublicationFakeDecisionRepository(), static fn (PublicationPrincipal $principal): bool => $principal->id === 'owner-1');
+
+        $result = $service->review(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'review-only', new PublicationPrincipal('owner-1', 'mcp', 'turn-review'));
+
+        self::assertSame('PASS', $result['outcome']);
+        self::assertSame('draft', $posts->rows[1]->status);
+        self::assertSame(0, $posts->publishCalls);
+    }
+
     public function test_review_then_authenticated_approval_publishes_with_exceptions(): void
     {
         $posts = new OwnerPublicationFakeStore(); $decisions = new OwnerPublicationFakeDecisionRepository();
@@ -46,11 +58,12 @@ function ownerPublicationEvidence(array $overrides = []): array
 final class OwnerPublicationFakeStore implements EditorialPostStore
 {
     /** @var array<int,EditorialPostState> */ public array $rows;
+    public int $publishCalls = 0;
     public function __construct() { $this->rows[1] = new EditorialPostState(1, '1:1', 'post', 'draft', 'Title', 'Body', '', 'title', 'https://example.test/title/', 1, 1); }
     public function read(int $postId): ?EditorialPostState { return $this->rows[$postId] ?? null; }
     public function createDraft(array $fields): EditorialPostState { return $this->rows[1]; }
     public function update(int $postId, array $fields): EditorialPostState { return $this->rows[$postId]; }
-    public function publish(int $postId): EditorialPostState { $old = $this->rows[$postId]; return $this->rows[$postId] = new EditorialPostState($old->postId, $old->endpointKey, $old->postType, 'publish', $old->title, $old->content, $old->excerpt, $old->slug, $old->permalink, $old->latestRevisionId + 1, $old->revisionCount + 1); }
+    public function publish(int $postId): EditorialPostState { $this->publishCalls++; $old = $this->rows[$postId]; return $this->rows[$postId] = new EditorialPostState($old->postId, $old->endpointKey, $old->postType, 'publish', $old->title, $old->content, $old->excerpt, $old->slug, $old->permalink, $old->latestRevisionId + 1, $old->revisionCount + 1); }
     public function trash(int $postId): EditorialPostState { return $this->rows[$postId]; }
     public function restore(int $postId): EditorialPostState { return $this->rows[$postId]; }
 }
