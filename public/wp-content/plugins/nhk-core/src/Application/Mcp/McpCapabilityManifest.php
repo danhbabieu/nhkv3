@@ -19,8 +19,8 @@ final class McpCapabilityManifest
         foreach (McpToolCatalog::tools() as $tool) $tools[$tool['name']] = $tool;
 
         $definitions = [
-            'article' => ['owner' => 'wordpress', 'endpoint_types' => ['wp_post'], 'tools' => ['nhk.article.preflight', 'nhk.article.ingest'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
-            'category' => ['owner' => 'wordpress_taxonomy', 'endpoint_types' => [], 'tools' => [], 'seo_preflight' => false, 'relation_support' => false, 'media_support' => false, 'read_back' => false],
+            'article' => ['owner' => 'wordpress', 'endpoint_types' => ['wp_post'], 'tools' => ['nhk.article.preflight', 'nhk.article.ingest', 'nhk.article.draft.create', 'nhk.article.draft.update'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
+            'category' => ['owner' => 'wordpress_taxonomy', 'endpoint_types' => [], 'tools' => ['nhk.category.resolve', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete'], 'seo_preflight' => false, 'relation_support' => false, 'media_support' => false, 'read_back' => true],
             'authority' => ['owner' => 'authority', 'endpoint_types' => ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], 'tools' => ['nhk.entity.get', 'nhk.semantic.resolve'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
             'knowledge' => ['owner' => 'knowledge', 'endpoint_types' => ['knowledge'], 'tools' => ['nhk.knowledge.get', 'nhk.knowledge.ingest'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
             'source' => ['owner' => 'source_evidence', 'endpoint_types' => ['source'], 'tools' => ['nhk.source.get', 'nhk.source.ingest'], 'seo_preflight' => false, 'relation_support' => false, 'media_support' => false, 'read_back' => true],
@@ -50,7 +50,7 @@ final class McpCapabilityManifest
                 'writes' => $writes,
                 'governed' => $writes !== [],
                 'expected_revision' => $writes !== [],
-                'idempotency' => in_array($kind, ['article', 'media', 'video', 'knowledge', 'source', 'evidence'], true),
+                'idempotency' => in_array($kind, ['article', 'category', 'media', 'video', 'knowledge', 'source', 'evidence'], true),
                 'relation_support' => $definition['relation_support'],
                 'media_support' => $definition['media_support'],
                 'seo_preflight' => $definition['seo_preflight'],

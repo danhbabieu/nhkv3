@@ -18,13 +18,21 @@ use PHPUnit\Framework\TestCase;
 
 final class McpContractTest extends TestCase
 {
-    public function test_catalog_has_exact_current_ordered_twenty_two_tool_contract(): void
+    public function test_catalog_has_exact_current_ordered_tool_contract(): void
     {
         self::assertSame([
             'nhk.search',
             'nhk.semantic.resolve',
             'nhk.article.preflight',
             'nhk.article.ingest',
+            'nhk.category.resolve',
+            'nhk.category.create',
+            'nhk.category.update',
+            'nhk.category.assign',
+            'nhk.category.unassign',
+            'nhk.category.delete',
+            'nhk.article.draft.create',
+            'nhk.article.draft.update',
             'nhk.entity.get',
             'nhk.media.get',
             'nhk.media.ingest',

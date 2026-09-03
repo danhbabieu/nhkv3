@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
+use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 
 final class McpTransport
 {
@@ -22,6 +23,8 @@ final class McpTransport
         private ?McpArticleIngestHandler $article = null,
         private ?VideoIntakeService $videoIntake = null,
         private ?WordPressMediaAttachmentIngestor $wordpressAttachments = null,
+        private ?CategoryGateway $categories = null,
+        private ?EditorialDraftGateway $drafts = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -86,6 +89,7 @@ final class McpTransport
         $capability = match ($name) {
             'nhk.article.preflight' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
+            'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
             'nhk.video.ingest' => 'nhk_create_proposals',
@@ -103,6 +107,14 @@ final class McpTransport
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.article.ingest' => $this->article?->ingest($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
+            'nhk.category.resolve' => $this->categories?->resolve((array) ($arguments['selector'] ?? [])) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
+            'nhk.category.create' => $this->categories?->create((string) ($arguments['name'] ?? ''), (string) ($arguments['slug'] ?? ''), (int) ($arguments['parent'] ?? 0)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
+            'nhk.category.update' => $this->categories?->update((int) ($arguments['id'] ?? 0), (array) ($arguments['changes'] ?? []), isset($arguments['expected_fingerprint']) ? (string) $arguments['expected_fingerprint'] : null) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
+            'nhk.category.assign' => $this->categories?->assign((int) ($arguments['post_id'] ?? 0), (int) ($arguments['category_id'] ?? 0)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
+            'nhk.category.unassign' => $this->categories?->unassign((int) ($arguments['post_id'] ?? 0), (int) ($arguments['category_id'] ?? 0)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
+            'nhk.category.delete' => $this->categories?->delete((int) ($arguments['id'] ?? 0), (bool) ($arguments['allow_reassign'] ?? false)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
+            'nhk.article.draft.create' => $this->drafts?->create($arguments) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
+            'nhk.article.draft.update' => $this->drafts?->update((int) ($arguments['post_id'] ?? 0), (array) ($arguments['fields'] ?? []), (string) ($arguments['expected_state_token'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),

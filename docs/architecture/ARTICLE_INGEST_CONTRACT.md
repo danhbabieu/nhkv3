@@ -95,9 +95,13 @@ semantic/editorial verification, diagnostics and the coordinated MCP surface.
 The receipt is orchestration/recovery state and never stores the full Article
 body. Semantic writes remain behind Governance and Controlled Apply.
 
-`nhk.article.preflight` is read-only; `nhk.article.ingest` is the governed
-execute/resume surface and uses the same idempotency key for retry. `create` and
-editorial `update` return `UNSUPPORTED_OPERATION` and do not write WordPress.
+`nhk.article.preflight` is read-only; `nhk.article.ingest` remains the governed
+execute/resume surface for reconciliation. The separate typed draft gateway
+supports draft-only create/update with receipt idempotency and native
+state-token CAS; it does not publish, trash, apply semantic proposals, ingest
+Media/Video or copy body into semantic storage. Draft results remain blocked
+for publication until later semantic, media, compliance and read-back gates
+complete.
 Production Post 55 execution remains outside this implementation and requires
 the separate human-reviewed reconciliation packet.
 

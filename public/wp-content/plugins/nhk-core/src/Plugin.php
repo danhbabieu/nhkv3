@@ -55,6 +55,8 @@ use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Knowledge\KnowledgeService;
+use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
+use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
 
 final class Plugin {
     private const REWRITE_VERSION = '9';
@@ -274,11 +276,14 @@ final class Plugin {
             $wordpressAttachments = new WordPressMediaAttachmentIngestor();
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments);
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
+            $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
+            $categoryGateway = new CategoryGateway(new WpCategoryStore());
+            $draftGateway = new EditorialDraftGateway(new WpEditorialPostStore($articleEditorial), $articleReceipts);
             $youtubeClient = trim((string) getenv('NHK_YOUTUBE_API_KEY')) !== '' ? static fn (object $identity): array => (new YouTubeDataApiClient())->fetch($identity) : null;
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry()), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

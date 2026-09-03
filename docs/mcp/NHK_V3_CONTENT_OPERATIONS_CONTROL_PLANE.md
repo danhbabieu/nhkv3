@@ -20,7 +20,7 @@ an MCP-managed V3 Article is complete only after the Article Ingest contract.
 | Content kind | Owner | Current boundary | Mutation policy |
 |---|---|---|---|
 | Post/Article | WordPress `wp_posts` | Article Ingest + editorial boundary | Post writes are editorial; semantic changes use Governance |
-| Category/hub | WordPress taxonomy | taxonomy gateway (pending full P0) | validate parent/slug and read back |
+| Category/hub | WordPress taxonomy | typed `CategoryGateway` + native WordPress adapter | deterministic resolve/create, parent validation, fingerprint CAS, guarded delete and read-back |
 | Authority | Authority registry | entity application services | governed revision/lifecycle |
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
@@ -60,8 +60,8 @@ idempotency, revision binding, read-back and fail-closed outcomes.
 | Existing Article reconcile preflight | partial | CODE_GAP for full research packet |
 | SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
 | Shared capability source | partial catalog | CODE_GAP for manifest consumers |
-| WordPress editorial gateway | partial/current adapters | CODE_GAP for complete P0 gateway |
-| Taxonomy gateway | not exposed as shared service | CODE_GAP |
+| WordPress editorial gateway | draft create/update boundary | runtime-unverified pending exact integration DB | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |
+| Taxonomy gateway | typed category facade exposed in MCP | runtime-unverified pending exact integration DB | no fuzzy-create, no Graph/semantic mutation, guarded delete |
 | Related semantic query | existing bounded query, policy gaps remain | CODE_GAP/REGISTRY_GAP where traversal policy is absent |
 | Product–Specimen persistence | unavailable | REGISTRY_GAP/CONTRACT_EXTENSION_REQUIRED |
 | Live data application | prohibited in this slice | HUMAN GATE |

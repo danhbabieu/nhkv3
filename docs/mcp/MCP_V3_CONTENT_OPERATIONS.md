@@ -114,11 +114,14 @@ independent editorial workflow and cannot be reported as completed Article
 Ingest by itself. Article create and editorial update return explicit
 `UNSUPPORTED_OPERATION` outcomes and do not write WordPress.
 
-There is no MCP Post create/update/publish contract. `wp_post` is only a Graph
-endpoint resolver with key `<blog_id>:<post_id>`, positive numeric components,
-current-site check and existing `WP_Post` check. It can link an existing draft
-or published Post but cannot create, update or publish one. Do not copy article
-body into Knowledge or Graph.
+The typed `nhk.article.draft.create` and `nhk.article.draft.update` tools now
+cover native WordPress draft creation/update only. Creation is idempotent via
+the existing Article operation receipt repository, never stores body in the
+receipt, and returns a native state token plus `DRAFT_INCOMPLETE_FOR_PUBLICATION`.
+Update requires a matching native state token and only updates an eligible
+draft. Publish, trash and live editorial mutation remain unsupported. The
+typed `nhk.category.*` tools similarly delegate to the shared native Category
+gateway; category membership is taxonomy truth and never a Graph edge.
 
 ## 5. Authority workflow
 
