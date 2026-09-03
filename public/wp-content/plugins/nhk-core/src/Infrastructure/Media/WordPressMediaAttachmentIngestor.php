@@ -15,6 +15,17 @@ use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor as WordPressMediaA
  */
 final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachmentIngestorContract
 {
+    public const MAX_LONG_EDGE = 2048;
+
+    /** @return array{width:int,height:int} */
+    public static function constrainDimensions(int $width, int $height): array
+    {
+        if ($width < 1 || $height < 1) throw new \InvalidArgumentException('Image dimensions must be positive.');
+        if (max($width, $height) <= self::MAX_LONG_EDGE) return ['width' => $width, 'height' => $height];
+        $scale = self::MAX_LONG_EDGE / max($width, $height);
+        return ['width' => max(1, (int) round($width * $scale)), 'height' => max(1, (int) round($height * $scale))];
+    }
+
     public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
     {
         if (!function_exists('wp_get_image_editor') || !function_exists('wp_upload_bits') || !function_exists('wp_insert_attachment')) {
@@ -25,10 +36,10 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         if ($source === '' || !is_file($source) || !is_readable($source)) throw new \InvalidArgumentException('File attachment is unavailable.');
         if ($maxWidth < 1 || $maxHeight < 1) throw new \InvalidArgumentException('max_width and max_height must be positive.');
         if ($quality < 1 || $quality > 100) throw new \InvalidArgumentException('quality must be between 1 and 100.');
-        // The managed primary profile is fixed: at most 1600px on either edge.
+        // The managed primary profile is fixed: at most 2048px on either edge.
         // Caller-supplied limits cannot turn the primary into a thumbnail.
-        $maxWidth = 1600;
-        $maxHeight = 1600;
+        $maxWidth = self::MAX_LONG_EDGE;
+        $maxHeight = self::MAX_LONG_EDGE;
 
             $safeFilename = $this->safeFilename($filename, $title, $source);
         $work = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
@@ -54,8 +65,9 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             $width = (int) ($size['width'] ?? 0);
             $height = (int) ($size['height'] ?? 0);
             if ($width < 1 || $height < 1) throw new \InvalidArgumentException('Image dimensions are unavailable.');
-            if ($width > $maxWidth || $height > $maxHeight) {
-                $resized = $editor->resize($maxWidth, $maxHeight, false);
+            $target = self::constrainDimensions($width, $height);
+            if ($target['width'] !== $width || $target['height'] !== $height) {
+                $resized = $editor->resize($target['width'], $target['height'], false);
                 if (is_wp_error($resized)) throw new \RuntimeException('WORDPRESS_MEDIA_RESIZE_FAILED');
             }
             if ($editor->set_quality($quality) === false) throw new \RuntimeException('WORDPRESS_MEDIA_QUALITY_FAILED');

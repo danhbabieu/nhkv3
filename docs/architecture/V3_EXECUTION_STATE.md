@@ -4,6 +4,24 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Managed image primary policy checkpoint — 2026-09-03
+
+The direct multipart image adapter now enforces `MAX_LONG_EDGE = 2048` for
+the managed primary. Resizing remains aspect-preserving and only runs when an
+input exceeds the bound; smaller inputs are not upscaled and no crop is
+performed. The MCP schema and defaults use the same 2048 bound. Attachment
+metadata explicitly stores an empty `sizes` map, so the scoped path persists
+one primary WebP and creates no derivative cluster; existing files remain
+untouched.
+
+Focused evidence: `McpContractTest` covers the policy with fixture dimensions
+`6000x4000 → 2048x1365` and `1200x800 → 1200x800`, plus the multipart contract
+and zero-derivative read-back shape. Full Unit suite passes: 349 tests / 1,703
+assertions. Changed PHP lint, Composer validation, `git diff --check` and
+secret scan pass. Demo runtime is `NOT_EXECUTED_GOVERNANCE_GATE`; no upload,
+WordPress attachment, semantic Media, Post, derivative or live data was
+created or mutated.
+
 ## WordPress Abilities bridge checkpoint — 2026-09-03
 
 Root-cause investigation confirmed WordPress 7.1 includes the Abilities API and

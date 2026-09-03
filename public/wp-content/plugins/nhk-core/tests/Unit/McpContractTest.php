@@ -13,6 +13,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, Sourc
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentIngestor as ConcreteWordPressMediaAttachmentIngestor;
 use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -154,11 +155,18 @@ final class McpContractTest extends TestCase
         self::assertStringContainsString('base64', $schema['file']['description']);
         self::assertArrayNotHasKey('data', $schema['file']['properties']);
         self::assertSame(1, $schema['max_width']['minimum']);
-        self::assertSame(20000, $schema['max_width']['maximum']);
+        self::assertSame(2048, $schema['max_width']['maximum']);
         self::assertSame(1, $schema['quality']['minimum']);
         self::assertSame(100, $schema['quality']['maximum']);
         self::assertSame(['attachment_id'], $tools['nhk.media.attachment.get']['inputSchema']['required']);
         self::assertFalse($tools['nhk.media.attachment.get']['governed']);
+    }
+
+    public function test_managed_image_policy_caps_long_edge_at_2048_without_upscale_or_crop(): void
+    {
+        self::assertSame(2048, ConcreteWordPressMediaAttachmentIngestor::MAX_LONG_EDGE);
+        self::assertSame(['width' => 2048, 'height' => 1365], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(6000, 4000));
+        self::assertSame(['width' => 1200, 'height' => 800], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(1200, 800));
     }
 
     public function test_media_file_ingest_routes_multipart_file_without_accepting_base64_payloads(): void

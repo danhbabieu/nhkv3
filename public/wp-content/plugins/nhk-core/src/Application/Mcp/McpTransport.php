@@ -226,8 +226,8 @@ final class McpTransport
                 $attachment,
                 $filename,
                 (string) ($arguments['name'] ?? ''),
-                (int) ($arguments['max_width'] ?? 2400),
-                (int) ($arguments['max_height'] ?? 2400),
+                (int) ($arguments['max_width'] ?? 2048),
+                (int) ($arguments['max_height'] ?? 2048),
                 (int) ($arguments['quality'] ?? 82),
             );
         }
