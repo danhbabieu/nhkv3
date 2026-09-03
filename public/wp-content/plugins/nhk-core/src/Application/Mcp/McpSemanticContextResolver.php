@@ -35,7 +35,7 @@ final class McpSemanticContextResolver
     /** @param array<string,mixed> $query */
     private function resolveType(string $type, array $query): array
     {
-        $id = trim((string) ($query['id'] ?? $query['uuid'] ?? ''));
+        $id = trim((string) ($query['canonical_uuid'] ?? $query['id'] ?? $query['uuid'] ?? ''));
         if ($id !== '') {
             if (!UuidCodec::isValid($id)) return ['resolved' => null, 'candidates' => [], 'ambiguous' => false, 'conflict' => 'invalid_canonical_uuid'];
             $entity = $this->authority->findByCanonicalId($id);

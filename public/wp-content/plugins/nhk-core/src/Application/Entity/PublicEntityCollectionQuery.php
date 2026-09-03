@@ -9,7 +9,7 @@ use NHK\Core\Application\Graph\BrandAggregationQuery;
 
 final class PublicEntityCollectionQuery
 {
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private PublicIdentityContract $identity, private PublicEntityEligibilityPolicy $eligibility, private PublicRouteResolver $routes, private ?BrandAggregationQuery $aggregation = null, private ?\Closure $availability = null) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private PublicIdentityContract $identity, private PublicEntityEligibilityPolicy $eligibility, private PublicRouteResolver $routes, private ?BrandAggregationQuery $aggregation = null, private ?\Closure $availability = null, private ?EntityMediaProjection $entityMedia = null) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
@@ -91,8 +91,21 @@ final class PublicEntityCollectionQuery
         $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
         $item = [...$identity, 'payload' => $payload, 'url' => $path];
+        if ($this->entityMedia !== null) {
+            $media = $this->entityMedia->forEntity($entity->entityType, $entity->canonicalId);
+            $item['media'] = [
+                'representative' => $this->publicMediaItem($media['representative']),
+                'evidence' => array_values(array_filter(array_map(fn (array $entry): ?array => $this->publicMediaItem($entry), $media['evidence']))),
+            ];
+        }
         if ($this->aggregation !== null && $entity->entityType === 'brand') $item['aggregation'] = $this->aggregation->forBrand($entity->canonicalId);
         return $item;
+    }
+
+    private function publicMediaItem(?array $item): ?array
+    {
+        if ($item === null) return null;
+        return ['url' => $item['url'], 'alt' => $item['alt']];
     }
 
     private function isAvailable(): bool { return $this->availability === null || (bool) ($this->availability)(); }

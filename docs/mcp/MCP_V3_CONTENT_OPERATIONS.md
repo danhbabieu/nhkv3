@@ -51,7 +51,7 @@ must not be replaced by a static catalog assertion.
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
-| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or WordPress image attachment | WRITE | Yes | Metadata path uses Governance; file path writes normalized WebP attachment | Usage is placement; file path is adapter-only | READY for metadata and direct multipart image attachment; runtime byte proof pending |
+| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media and projects an attachment | Usage is placement; attachment is storage/projection only | READY for metadata and multipart image adoption; runtime byte proof required |
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
 | `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; source/review gates explicit |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
@@ -236,12 +236,15 @@ Before `wp_upload_bits`, the adapter copies the upload to a temporary workfile,
 validates the image MIME, applies EXIF orientation, resizes without cropping to
 the maximum dimensions, sets the requested encoder quality and sanitizes the
 passed filename. Only that processed file is inserted into the WordPress Media
-Library; the camera/source upload and workfiles are not retained after the
-request. WordPress-generated image sizes are returned as `derivatives`.
+Library as a public derivative. The source-original bytes are retained as a
+private MediaAsset under the same canonical Media identity; workfiles are not
+retained after the request. WordPress-generated image sizes are returned as
+`derivatives`.
 
-The direct file path is an editorial/binary adapter only. It does not create an
-NHK semantic Media identity, Knowledge claim, Source, Evidence or Graph edge
-from image content. `nhk.media.attachment.get` reads back the attachment ID,
+The direct file path is a binary/storage adapter inside the governed Media
+flow. It creates or resolves the NHK semantic Media identity but does not
+create Knowledge, Source, Evidence or Graph edges from image content.
+`nhk.media.attachment.get` reads back the attachment ID,
 canonical URL, sanitized filename, MIME, dimensions, filesize and derivatives.
 
 Article Ingest reconciliation uses the same `ArticleMediaCoordinator` as the

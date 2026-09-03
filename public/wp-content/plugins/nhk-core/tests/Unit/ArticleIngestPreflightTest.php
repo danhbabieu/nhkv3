@@ -10,6 +10,21 @@ use PHPUnit\Framework\TestCase;
 
 final class ArticleIngestPreflightTest extends TestCase
 {
+    public function test_generic_reconcile_accepts_post_89_without_post_id_special_case(): void
+    {
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:89']));
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('variant', 1, true, []));
+
+        $result = (new ArticleIngestPreflight($endpoints, new PredicateRegistry(), $types))->check('1:89', 'reconcile', [[
+            'slot' => 'variant', 'operation' => 'update', 'entity_type' => 'variant', 'subject_id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'expected_revision' => 1, 'payload' => [],
+        ]]);
+
+        self::assertTrue($result->accepted);
+        self::assertSame([], $result->reasons);
+    }
+
     public function test_reconcile_requires_post_55_and_registered_semantic_commands(): void
     {
         $endpoints = new EndpointTypeRegistry();

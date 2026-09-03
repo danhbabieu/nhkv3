@@ -59,6 +59,40 @@ infrastructure failure and must be tested before implementation is accepted.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
+## Amendment record — 2026-09-04 — Governed Uploaded Media and Presentation Precedence
+
+**WHY:** The multipart/file adapter could create a WordPress attachment without
+creating or resolving the canonical Media identity, and its optimized-only
+storage discarded the uploaded source. Presentation policy also did not make
+the distinction between representative and evidence/technical imagery
+deterministic.
+
+**WHAT:** Owner-approved behavior requires every multipart/file upload to enter
+the same governed Media V3 ingest boundary and create-or-resolve exactly one
+canonical Media identity. The source-original is retained as a MediaAsset;
+optimized WebP and other sizes are derivatives under that Media and never
+become new semantic identities. WordPress attachment and derivatives are
+storage/projection records only.
+
+Media usage roles must distinguish `representative` from `evidence` and
+`technical_detail`. Evidence/technical usage may be related to a canonical
+target through the registered Graph/evidence contract, but never replaces an
+existing representative Media automatically. Multiple representative
+candidates use deterministic contract precedence; upload recency is not a
+precedence rule. WordPress featured image remains editorial projection state.
+
+Article subject resolution is deterministic in this order: canonical UUID,
+stable key, exact canonical name/alias. A valid explicit UUID must be honored;
+ambiguity fails closed. Search/inventory and Article preflight use the same
+resolution boundary. Generic Article preflight must not special-case any
+WordPress Post ID; Post-specific IDs are test fixtures only.
+
+**DATA, MIGRATION AND ROLLOUT:** No existing Media, attachment, Article,
+semantic record, Graph edge or publication is repaired, backfilled, merged or
+published by this amendment. Existing data remains read-only for audit.
+
+**DECISION OWNER / DATE:** NHK V3 Owner decision, 2026-09-04.
+
 ## Amendment record — 2026-09-02 — Media Ingest, Image SEO & Article Media Law
 
 **WHY:** Media intake was structurally separated from MediaAsset and
@@ -808,6 +842,10 @@ không tự tạo `depicts`, `about`, Knowledge Claim, Evidence, identification,
 Brand/Model/Variant/Movement relation hay bất kỳ Graph edge nào. Những sự thật
 đó vẫn phải theo Graph, provenance và Governance contract hiện hành.
 
+Source-original upload phải được giữ lại như một `MediaAsset` dưới cùng
+canonical Media identity với WebP/responsive derivatives. Derivative chỉ là
+delivery optimization; không được xóa hoặc thay thế source-original.
+
 #### Controlled Media Ingest boundary
 
 Mọi Media write phải hội tụ tại canonical Media application boundary dùng
@@ -822,6 +860,12 @@ Canonical role registry tối thiểu có `FEATURED_PRIMARY`, `INLINE_PRIMARY` v
 `INLINE_SUPPORTING`; các role legacy đã có contract chỉ được giữ lại trong
 chính registry. Detail/view type và diagnostic/state vocabulary cũng là
 controlled registries; input registry value không hợp lệ phải fail closed.
+
+Role intent phải phân biệt `representative`, `evidence` và `technical_detail`.
+Representative selection dùng precedence deterministic đã được contract hóa;
+upload recency không phải tie-breaker. Evidence/technical detail không tự
+động thay thế representative đang tồn tại. Representative là lựa chọn
+presentation/editorial, không phải semantic ownership.
 
 Bulk ingest dùng một workflow batch context. Batch chỉ giữ provenance,
 uploader, source, default context, count và ingest status; batch không phải
@@ -1500,6 +1544,12 @@ editorial, semantic and verification stages.
 72. Mọi Owner publication decision được ghi append-only trong dedicated durable repository với gate snapshot, overridden codes, principal/provenance, expiry, publish attempt, read-back và final outcome.
 73. Publication exception flow phải verify native WordPress read-back trước khi báo success/public URL; uncertain transition không được fake success hoặc blind retry.
 74. Retry/idempotency không được duplicate Owner decision hoặc native publication side effect; semantic Governance behavior không bị thay đổi.
+75. Multipart/file Media ingest đi qua governed Media V3 boundary và create-or-resolve đúng một canonical Media identity.
+76. Source-original và mọi derivative cùng thuộc một Media; derivative không xóa source-original và không tạo Media identity mới.
+77. Representative, evidence và technical-detail intent là các role phân biệt; evidence/technical detail không tự động thay representative.
+78. Representative candidate selection là deterministic và không dùng upload recency làm precedence.
+79. Explicit canonical UUID được resolve trước stable key rồi exact canonical name/alias; ambiguity fail closed.
+80. Generic Article preflight không special-case WordPress Post ID; concrete IDs chỉ được dùng trong test fixtures.
 
 ---
 

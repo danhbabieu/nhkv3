@@ -50,7 +50,7 @@ use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttempt
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Authority\WpdbSemanticMergeReceiptRepository;
-use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityPageQuery, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
+use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
 use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaIngestGateway, MediaService, MediaVideoPageQuery};
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
@@ -110,7 +110,7 @@ final class Plugin {
             $publicRoutes = new PublicRouteResolver($publicAuthority, $publicTypes, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($publicAuthority, $publicTypes, $publicRoutes, $publicContexts);
             $publicAggregation = new BrandAggregationQuery($publicGraph, $publicAuthority, $publicTypes, $publicRoutes, $publicEligibility);
-            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady());
+            $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages));
             add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection), 'extend']);
             $publicClaims = new WpdbKnowledgeRepository($wpdb);
             $publicSources = new WpdbSourceRepository($wpdb);
@@ -174,7 +174,7 @@ final class Plugin {
             $publicContexts = new StructuralContextQuery($graphService, $authority);
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
-            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady());
+            $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($media, $assets, $usages));
             $proposalRepository = new WpdbProposalRepository($wpdb); $governanceAudit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb); $transactionManager = new WpdbTransactionManager($wpdb); $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
@@ -312,7 +312,7 @@ final class Plugin {
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
-            $wordpressAttachments = new WordPressMediaAttachmentIngestor();
+            $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments);
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);

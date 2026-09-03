@@ -145,7 +145,7 @@ final class ArticleMediaCoordinator
             if ($subject !== '' && str_contains(strtolower($candidate->canonicalName), $subject)) $score += 4;
             if (($blueprint->preferredView ?? '') !== '' && ($candidate->provenance['detail_type'] ?? '') === $blueprint->preferredView) $score += 3;
             foreach ($this->assets->listByMediaId($candidate->canonicalId) as $asset) if (($asset->width ?? 0) >= $blueprint->minimumWidth) $score += 2;
-            if ($score > $bestScore) { $best = $candidate; $bestScore = $score; }
+            if ($score > $bestScore || ($score === $bestScore && ($best === null || $candidate->stableKey < $best->stableKey))) { $best = $candidate; $bestScore = $score; }
         }
         return $best;
     }

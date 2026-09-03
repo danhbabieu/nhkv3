@@ -178,7 +178,7 @@ final class McpToolCatalog
             'properties' => [
                 'endpoint_type' => ['type' => 'string', 'pattern' => '^[a-z][a-z0-9_]{0,63}$'],
                 'endpoint_key' => ['type' => 'string', 'minLength' => 1],
-                'role' => ['type' => 'string', 'enum' => ['featured_primary', 'inline_primary', 'inline_supporting', 'featured', 'inline', 'gallery', 'thumbnail', 'source']],
+                'role' => ['type' => 'string', 'enum' => ['featured_primary', 'inline_primary', 'inline_supporting', 'featured', 'inline', 'gallery', 'thumbnail', 'source', 'representative', 'evidence', 'technical_detail']],
                 'sort_order' => ['type' => 'integer', 'minimum' => 0],
             ],
             'required' => ['endpoint_type', 'endpoint_key', 'role'],

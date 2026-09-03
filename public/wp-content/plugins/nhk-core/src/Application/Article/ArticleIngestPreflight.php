@@ -21,7 +21,7 @@ final class ArticleIngestPreflight
         $targetStableKeys = [];
         if ($intent !== 'reconcile') $reasons[] = 'UNSUPPORTED_OPERATION';
         if ($endpointType !== 'wp_post') $reasons[] = 'UNKNOWN_WP_ENDPOINT_TYPE';
-        if (preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpointKey, $matches) !== 1 || (int) $matches[1] !== 55) $reasons[] = 'RECONCILIATION_CONFLICT';
+        if (preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $endpointKey) !== 1) $reasons[] = 'RECONCILIATION_CONFLICT';
         try {
             $this->endpoints->assertExists(new NodeReference('wp_post', $endpointKey));
         } catch (\Throwable $error) {

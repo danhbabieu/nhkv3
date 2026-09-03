@@ -190,6 +190,49 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame([], $usages->listByEndpoint('specimen', 'candidate-1'));
     }
 
+    public function test_representative_evidence_and_technical_detail_roles_are_distinct_and_evidence_does_not_replace_representative(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $representative = $service->create('entity-representative', 'Entity representative', 'ready');
+        $evidence = $service->create('entity-serial', 'Entity serial detail', 'ready');
+        $service->addAsset($representative->canonicalId, 'original', 'uploads/entity-front.jpg', hash('sha256', 'entity-front'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addAsset($evidence->canonicalId, 'original', 'uploads/entity-serial.jpg', hash('sha256', 'entity-serial'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+
+        $service->addUsage($representative->canonicalId, 'variant', '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'representative', 0, 'Ảnh đại diện biến thể 36/10');
+        $service->addUsage($evidence->canonicalId, 'variant', '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'evidence', 0, 'Ảnh số serial biến thể 36/10');
+
+        self::assertSame($representative->canonicalId, $usages->listByEndpoint('variant', '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'representative')[0]->mediaId);
+        self::assertSame($evidence->canonicalId, $usages->listByEndpoint('variant', '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'evidence')[0]->mediaId);
+    }
+
+    public function test_representative_candidate_tie_uses_stable_key_not_insertion_or_upload_recency(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $later = $service->create('representative-z', 'Same subject', 'ready');
+        $first = $service->create('representative-a', 'Same subject', 'ready');
+        foreach ([[$later, 'later'], [$first, 'first']] as [$item, $suffix]) {
+            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $suffix . '.jpg', hash('sha256', $suffix), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        }
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(901, ['subject' => 'Same subject']);
+
+        self::assertSame($first->canonicalId, $result->slotMedia['featured_primary']);
+    }
+
+    public function test_source_original_and_derivative_replay_under_one_media_identity(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $source = ['kind' => 'original', 'storage_key' => 'uploads/odo-36-10-original.jpg', 'original_filename' => 'DSCF8291.JPG', 'checksum' => hash('sha256', 'source'), 'mime_type' => 'image/jpeg', 'byte_size' => 6, 'width' => 4000, 'height' => 3000, 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true]];
+        $derivative = ['kind' => 'derivative', 'storage_key' => 'uploads/odo-36-10.webp', 'original_filename' => 'odo-36-10.webp', 'checksum' => hash('sha256', 'derivative'), 'mime_type' => 'image/webp', 'byte_size' => 4, 'width' => 1600, 'height' => 1200, 'visibility' => 'PUBLIC', 'metadata' => ['derived_from' => 'odo-36-10-original.jpg']];
+
+        $first = $service->ingest('upload:odo-36-10:' . hash('sha256', 'source'), 'Odo 36/10', 'ready', ['source' => 'multipart'], [$source, $derivative]);
+        $second = $service->ingest('upload:odo-36-10:' . hash('sha256', 'source'), 'Odo 36/10', 'ready', ['source' => 'multipart'], [$source, $derivative]);
+
+        self::assertSame($first->canonicalId, $second->canonicalId);
+        self::assertCount(2, $assets->listByMediaId($first->canonicalId));
+        self::assertSame(['original', 'derivative'], array_column($assets->listByMediaId($first->canonicalId), 'kind'));
+    }
+
     /** @return array{0:object,1:object,2:object,3:object,4:MediaService} */
     private function stores(): array
     {

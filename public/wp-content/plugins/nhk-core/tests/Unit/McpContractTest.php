@@ -144,7 +144,7 @@ final class McpContractTest extends TestCase
         self::assertSame('^[0-9A-Fa-f]{64}$', $schema['assets']['items']['properties']['checksum']['pattern']);
         self::assertSame(['endpoint_type', 'endpoint_key', 'role'], $schema['usages']['items']['required']);
         self::assertFalse($schema['usages']['items']['additionalProperties']);
-        self::assertSame(['featured_primary', 'inline_primary', 'inline_supporting', 'featured', 'inline', 'gallery', 'thumbnail', 'source'], $schema['usages']['items']['properties']['role']['enum']);
+        self::assertSame(['featured_primary', 'inline_primary', 'inline_supporting', 'featured', 'inline', 'gallery', 'thumbnail', 'source', 'representative', 'evidence', 'technical_detail'], $schema['usages']['items']['properties']['role']['enum']);
         self::assertSame(1, $tools['nhk.media.ingest']['inputSchema']['properties']['name']['minLength']);
         self::assertSame(1, $schema['assets']['items']['properties']['storage_key']['minLength']);
         self::assertSame(1, $schema['assets']['items']['properties']['mime_type']['minLength']);

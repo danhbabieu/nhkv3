@@ -10,6 +10,9 @@ final class MediaUsageRoleRegistry
     public const FEATURED_PRIMARY = 'featured_primary';
     public const INLINE_PRIMARY = 'inline_primary';
     public const INLINE_SUPPORTING = 'inline_supporting';
+    public const REPRESENTATIVE = 'representative';
+    public const EVIDENCE = 'evidence';
+    public const TECHNICAL_DETAIL = 'technical_detail';
 
     /** @return list<string> */
     public static function all(): array
@@ -18,6 +21,9 @@ final class MediaUsageRoleRegistry
             self::FEATURED_PRIMARY,
             self::INLINE_PRIMARY,
             self::INLINE_SUPPORTING,
+            self::REPRESENTATIVE,
+            self::EVIDENCE,
+            self::TECHNICAL_DETAIL,
             'featured',
             'inline',
             'gallery',

@@ -4,18 +4,21 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Media;
 
 use NHK\Core\Application\Media\MediaFilenameNormalizer;
+use NHK\Core\Contracts\Media\WordPressArticleMediaAdapter;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor as WordPressMediaAttachmentIngestorContract;
 
 /**
  * WordPress-only binary adapter for MCP file attachments.
  *
- * It deliberately does not create NHK Media, Knowledge, Evidence or Graph
- * records. The input attachment is copied to a private work file, normalized,
- * and only the processed output is sent to the WordPress Media Library.
+ * The input attachment is copied to a private work file, normalized, and the
+ * processed output is sent to the WordPress Media Library. The adapter then
+ * enters the governed Media adoption boundary; it never infers relations.
  */
 final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachmentIngestorContract
 {
     public const MAX_LONG_EDGE = 2048;
+
+    public function __construct(private ?WordPressArticleMediaAdapter $semanticMedia = null) {}
 
     /** @return array{width:int,height:int} */
     public static function constrainDimensions(int $width, int $height): array
@@ -41,7 +44,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $maxWidth = self::MAX_LONG_EDGE;
         $maxHeight = self::MAX_LONG_EDGE;
 
-            $safeFilename = $this->safeFilename($filename, $title, $source);
+        $safeFilename = $this->safeFilename($filename, $title, $source);
         $work = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         $processed = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         if (!is_string($work) || $work === '' || !is_string($processed) || $processed === '') throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_UNAVAILABLE');
@@ -112,8 +115,18 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             } finally {
                 WordPressMediaAttachmentWriteGuard::leave();
             }
+            $sourceContents = file_get_contents($source);
+            if (!is_string($sourceContents)) throw new \RuntimeException('WORDPRESS_MEDIA_SOURCE_READ_FAILED');
+            $sourceFilename = $this->sourceFilename($safeFilename, (string) ($sourceInfo['mime'] ?? 'image/jpeg'));
+            $sourceUpload = wp_upload_bits($sourceFilename, null, $sourceContents);
+            if (!is_array($sourceUpload) || !empty($sourceUpload['error']) || !is_string($sourceUpload['file'] ?? null)) throw new \RuntimeException('WORDPRESS_MEDIA_SOURCE_PERSIST_FAILED');
+            $sourceRelative = $this->relativeUploadPath((string) $sourceUpload['file']);
+            if (function_exists('update_post_meta')) update_post_meta((int) $attachmentId, '_nhk_source_original_file', $sourceRelative);
+            $mediaId = null;
+            if ($this->semanticMedia !== null) $mediaId = $this->semanticMedia->adoptAttachment((int) $attachmentId);
             $result = $this->read((int) $attachmentId);
             if ($result === null) throw new \RuntimeException('WORDPRESS_ATTACHMENT_READBACK_FAILED');
+            if ($mediaId !== null) $result['media_id'] = $mediaId;
             return $result;
         } finally {
             if (is_string($work) && is_file($work)) @unlink($work);
@@ -189,6 +202,14 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $checksum = hash_file('sha256', $source);
         if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('WORDPRESS_MEDIA_CHECKSUM_FAILED');
         return (new MediaFilenameNormalizer())->normalizeWebp($title, 'image', $filename);
+    }
+
+    private function sourceFilename(string $processedFilename, string $mime): string
+    {
+        $extension = match (strtolower($mime)) {
+            'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', default => 'jpg',
+        };
+        return preg_replace('/\.webp$/i', '-original.' . $extension, $processedFilename) ?: 'media-original.' . $extension;
     }
 
     private function relativeUploadPath(string $path): string

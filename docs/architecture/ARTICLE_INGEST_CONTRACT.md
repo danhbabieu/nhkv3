@@ -31,9 +31,11 @@ turn generated copy into Evidence.
 
 ## Required stage order
 
-1. Resolve all semantic references through the runtime registries. Ambiguous,
-   unknown or unsupported type, endpoint, field, predicate, target or identity
-   fails closed.
+1. Resolve all semantic references through the runtime registries. Subject
+   identity precedence is canonical UUID, stable key, then exact canonical
+   name/alias. Ambiguous, unknown or unsupported type, endpoint, field,
+   predicate, target or identity fails closed; a valid explicit UUID is never
+   ignored.
 2. Run semantic preflight for required claims, sources/evidence, relation
    direction, readiness, provenance, authorization and expected revisions.
 3. Create or update the native WordPress Post as a draft. The Post identity is
@@ -114,3 +116,7 @@ classification/evidence validation across every output channel is not claimed
 implemented by this file. Until runtime support is verified, publication uses
 human review and the shared compliance contract rather than silently assuming a
 pass.
+
+Subject resolution is shared by search/inventory and Article preflight. The
+generic preflight has no WordPress Post-ID exception; concrete Post IDs may
+appear only as test fixtures.

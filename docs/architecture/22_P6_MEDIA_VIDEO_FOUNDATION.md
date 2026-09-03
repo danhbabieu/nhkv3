@@ -18,6 +18,12 @@ is indexed as a duplicate candidate only; it never merges semantic Media
 identities. The schema keeps Media, asset and usage in separate tables and does
 not make an attachment or asset a Graph endpoint by default.
 
+Every multipart/file intake enters the governed Media V3 boundary and
+create-or-resolves one Media identity. The source-original remains a MediaAsset
+under that identity; optimized WebP and responsive sizes are derivatives and
+must not delete the original or create a second Media. Attachment creation is
+an infrastructure projection/storage step only.
+
 ### MCP direct image attachment checkpoint — 2026-09-03
 
 `nhk.media.ingest` now has a direct WordPress binary adapter for a multipart
@@ -30,10 +36,10 @@ attachment ID, canonical URL, final filename, MIME, dimensions, filesize and
 WordPress derivatives. `nhk.media.attachment.get` provides the same reader-safe
 read-back shape.
 
-This path is adapter-only: it does not infer or create NHK semantic Media,
-Knowledge, Evidence or Graph relation from image content. The native attachment
-adoption hook is guarded for this path. Metadata-only `nhk.media.ingest` remains
-the governed Media/MediaAsset/MediaUsage proposal workflow.
+This path is an adapter into the governed Media/MediaAsset/MediaUsage workflow;
+it does not infer semantic relations from image content. The attachment is
+created or adopted idempotently after Media identity resolution. Metadata-only
+`nhk.media.ingest` remains the governed proposal workflow.
 
 ## Video contract
 
@@ -149,6 +155,13 @@ featured assets, once per URL; placeholders/private/unmapped assets are
 excluded. The historical checkpoint's MCP wire smoke checked the then-approved
 21-tool catalog; the current catalog additionally exposes the direct attachment
 read-back tool and is verified as 22 tools in the 2026-09-03 checkpoint below.
+
+Representative and evidence/technical-detail usages are distinct. Evidence or
+technical detail is retrievable through its governed relation/usage but never
+automatically replaces an existing representative image. Representative
+candidates are selected by explicit selection, existing representative usage,
+eligibility/suitability and stable canonical tie-breakers; upload recency alone
+is not a valid precedence rule.
 
 Static evidence: full Unit suite `265` tests / `1,355` assertions, Composer
 validation, full PHP lint and `git diff --check` pass. Live WordPress,
