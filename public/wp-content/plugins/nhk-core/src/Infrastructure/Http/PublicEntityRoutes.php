@@ -74,6 +74,13 @@ final class PublicEntityRoutes
                 $this->setRouteConflict($publicType, (string) get_query_var('nhk_public_entity_a'), $native);
                 return get_404_template();
             }
+            $canonicalPath = $this->query->publicPath($entity);
+            $requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+            $redirectTarget = self::canonicalRedirectTarget(is_string($requestPath) ? $requestPath : '/', $canonicalPath);
+            if ($redirectTarget !== null && !headers_sent()) {
+                wp_safe_redirect(home_url($redirectTarget), 301, 'NHK canonical public route');
+                exit;
+            }
             $this->set200();
             $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $this->query->publicPath($entity)];
             $themeTemplate = locate_template('entity.php');
@@ -106,6 +113,13 @@ final class PublicEntityRoutes
         if ($entityResolved) return self::ROOT_ENTITY;
         if ($nativeResolved) return self::ROOT_NATIVE;
         return self::ROOT_NOT_FOUND;
+    }
+
+    public static function canonicalRedirectTarget(string $requestPath, ?string $canonicalPath): ?string
+    {
+        if ($canonicalPath === null || $canonicalPath === '') return null;
+        $normalize = static fn (string $path): string => rtrim('/' . trim($path, '/'), '/');
+        return $normalize($requestPath) === $normalize($canonicalPath) ? null : $canonicalPath;
     }
 
     /** @return object|null */

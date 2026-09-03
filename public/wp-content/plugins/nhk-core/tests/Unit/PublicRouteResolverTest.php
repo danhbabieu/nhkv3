@@ -28,9 +28,9 @@ final class PublicRouteResolverTest extends TestCase
         $model = $authority->create('model', 'nhk:model:odo-36', 'Ô Đô 36', ['brand_uuid' => $brand->canonicalId]);
         $variant = $authority->create('variant', 'nhk:variant:odo-36-8', 'Ô Đô 36 8', ['model_uuid' => $model->canonicalId]);
 
-        self::assertSame('/o-do/', $resolver->path($brand));
-        self::assertSame('/o-do/o-do-36/', $resolver->path($model));
-        self::assertSame('/o-do/o-do-36/o-do-36-8/', $resolver->path($variant));
+        self::assertSame('/odo/', $resolver->path($brand));
+        self::assertSame('/odo/odo-36/', $resolver->path($model));
+        self::assertSame('/odo/odo-36/odo-36-8/', $resolver->path($variant));
         self::assertSame('/bo-may/', $resolver->archivePath('movement'));
     }
 
@@ -60,6 +60,14 @@ final class PublicRouteResolverTest extends TestCase
         self::assertNull($resolver->path($first));
         self::assertNull($resolver->path($second));
         self::assertSame('/ve-det/', $resolver->path($brand));
+    }
+
+    public function test_historical_vietnamese_o_do_slug_is_canonicalized_to_odo(): void
+    {
+        self::assertSame('odo', PublicRouteResolver::slug('Ô Đô'));
+        self::assertSame('odo-36', PublicRouteResolver::slug('Ô Đô 36'));
+        self::assertSame('kim-odo-54', PublicRouteResolver::slug('Kim Odo 54'));
+        self::assertSame('odometer', PublicRouteResolver::slug('Odometer'));
     }
 
     public function test_every_registered_cross_brand_type_has_a_vietnamese_archive(): void

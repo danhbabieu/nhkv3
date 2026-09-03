@@ -8,6 +8,16 @@ The local development apply checkpoint has run after the read-only inventory,
 backup/restore rehearsal and dry-run. It is not a live or production
 migration, and unresolved rows remain explicit in the ledger.
 
+## Canonical token migration boundary — 2026-09-03
+
+The canonical token is `odo`; `o-do` is a legacy transliteration of the
+Vietnamese display name `Ô Đô`. Code-level public slug normalization and
+legacy 301 routing are covered by unit tests. A full mutable-store migration
+(`o-do` → `odo`) still requires a read-only inventory, collision report,
+verified backup/restore, governed Authority rekey/merge, reference closure and
+runtime authorization. Immutable governance history and source quotations are
+kept unchanged and must be listed as exceptions in any future apply receipt.
+
 | Data type | Source count | Mapped | Migrated | Skipped | Duplicate | Conflict | Verified | Status / reason codes |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
 | WordPress Posts | 800 | 36 | 36 | 764 | 0 | 0 | 36 | DEV ONLY; 742 domain-targeted custom posts, 21 unsupported attachment references and 1 retired global-style post |

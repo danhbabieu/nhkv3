@@ -8,6 +8,14 @@ Date: 2026-09-01
 Status: canonical Authority and Video routing implemented; Media and atomic
 Knowledge remain non-indexable where no governed public projection exists.
 
+## Odo token correction — 2026-09-03
+
+The former `o-do` public slug was produced by Vietnamese transliteration of
+`Ô Đô`. Canonical public output is now `odo`; resolved legacy paths using
+`o-do` redirect once with HTTP 301 to the corresponding `odo` path. This is a
+route compatibility correction only; UUIDs, stable-key identity records and
+immutable audit/source text are not rewritten by the route layer.
+
 ## Constitution conflict register
 
 `CONSTITUTION_CONFLICT`: legacy technical links existed for Media, Video and

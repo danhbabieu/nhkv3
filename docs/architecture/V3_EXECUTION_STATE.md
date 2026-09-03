@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+## Odo canonical public-token correction — 2026-09-03
+
+The historical Vietnamese slug normalization converted the display name `Ô Đô`
+to `o-do`. `PublicRouteResolver::slug()` now applies a token-boundary
+canonicalization so `Ô Đô`, `Ô Đô 36` and equivalent public names resolve to
+`odo`, `odo-36` and related canonical paths without changing UUIDs. Substrings
+such as `odometer` and `kim-odo-54` are not rewritten.
+
+`PublicEntityRoutes` now sends a single HTTP 301 from a resolved legacy public
+path such as `/o-do/` or `/o-do/o-do-36/` to `/odo/` or `/odo/odo-36/`.
+Stable-key rekey/merge and WordPress data migration remain governed operations;
+no database, Post, taxonomy, semantic record, Graph edge or audit history was
+mutated in this checkpoint. Runtime apply remains blocked until the exact
+WordPress/MySQL environment is verified and the required inventory, backup and
+governance gates are satisfied.
+
 ## YouTube source epistemic-state correction — 2026-09-03
 
 Root-cause tracing of the YouTube intake found that the local runtime has no

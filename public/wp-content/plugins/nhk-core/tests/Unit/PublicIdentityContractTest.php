@@ -20,7 +20,7 @@ final class PublicIdentityContractTest extends TestCase
         self::assertSame([
             'type' => 'brand',
             'name' => 'Ô Đô',
-            'slug' => 'o-do',
+            'slug' => 'odo',
         ], (new PublicIdentityContract($types))->resolve($entity));
     }
 
