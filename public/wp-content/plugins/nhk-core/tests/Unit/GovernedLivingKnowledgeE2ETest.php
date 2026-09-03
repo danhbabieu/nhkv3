@@ -113,12 +113,13 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
     {
         $fixture = $this->fixture();
         $candidate = new KnowledgeEnrichmentCandidate('new_claim', UuidCodec::newV7(), new KnowledgeFacetProfile('recognition', 'variant'), 'Idempotent claim.');
-        $arguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-claim');
-        $first = $fixture['governance']->create($this->proposalFrom($arguments));
-        $second = $fixture['governance']->create($this->proposalFrom($arguments));
+        $firstArguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-claim');
+        $secondArguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-claim');
+        $first = $fixture['governance']->create($this->proposalFrom($firstArguments));
+        $second = $fixture['governance']->create($this->proposalFrom($secondArguments));
         self::assertSame($first->id, $second->id);
         self::assertCount(1, $fixture['proposals']->items);
-        $approved = $fixture['governance']->approve($fixture['governance']->submit($first->id)->id, $first->contentFingerprint, $first->dependencyFingerprint, 'reviewer');
+        $approved = $fixture['governance']->approve($fixture['governance']->submit($first->id)->id, $firstArguments['content_fingerprint'], $firstArguments['dependency_fingerprint'], 'reviewer');
         $fixture['apply']->apply($approved->id);
         self::assertCount(1, $fixture['knowledgeClaims']->items);
     }
@@ -129,14 +130,38 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
         $claim = $fixture['knowledge']->createClaim('e2e:idem:claim', 'Idempotent claim.', 'fact');
         $source = $fixture['knowledge']->createSource('e2e:idem:source', 'Idempotent source', 'website');
         $candidate = new KnowledgeEnrichmentCandidate('add_evidence', UuidCodec::newV7(), new KnowledgeFacetProfile('recognition', 'variant'), 'Idempotent evidence.', ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => 'supports']);
-        $arguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-evidence');
-        $first = $fixture['governance']->create($this->proposalFrom($arguments));
-        $second = $fixture['governance']->create($this->proposalFrom($arguments));
+        $firstArguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-evidence');
+        $secondArguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-evidence');
+        $first = $fixture['governance']->create($this->proposalFrom($firstArguments));
+        $second = $fixture['governance']->create($this->proposalFrom($secondArguments));
         self::assertSame($first->id, $second->id);
         self::assertCount(1, $fixture['proposals']->items);
-        $approved = $fixture['governance']->approve($fixture['governance']->submit($first->id)->id, $first->contentFingerprint, $first->dependencyFingerprint, 'reviewer');
+        $approved = $fixture['governance']->approve($fixture['governance']->submit($first->id)->id, $firstArguments['content_fingerprint'], $firstArguments['dependency_fingerprint'], 'reviewer');
         $fixture['apply']->apply($approved->id);
         self::assertCount(1, $fixture['evidence']->items);
+    }
+
+    public function test_different_subject_scope_source_and_relation_remain_distinct_intents(): void
+    {
+        $fixture = $this->fixture();
+        $subjectA = UuidCodec::newV7();
+        $subjectB = UuidCodec::newV7();
+        $claim = $fixture['knowledge']->createClaim('e2e:distinct:claim', 'Distinct claim.', 'fact');
+        $sourceA = $fixture['knowledge']->createSource('e2e:distinct:source-a', 'Distinct source A', 'website');
+        $sourceB = $fixture['knowledge']->createSource('e2e:distinct:source-b', 'Distinct source B', 'website');
+        $candidates = [
+            new KnowledgeEnrichmentCandidate('new_claim', $subjectA, new KnowledgeFacetProfile('recognition', 'variant'), 'Distinct subject claim.'),
+            new KnowledgeEnrichmentCandidate('new_claim', $subjectB, new KnowledgeFacetProfile('recognition', 'model'), 'Distinct scope claim.'),
+            new KnowledgeEnrichmentCandidate('add_evidence', $subjectA, new KnowledgeFacetProfile('recognition', 'variant'), 'Distinct source evidence.', ['claim_id' => $claim->canonicalId, 'source_id' => $sourceA->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $sourceA->revision, 'relation' => 'supports']),
+            new KnowledgeEnrichmentCandidate('add_evidence', $subjectA, new KnowledgeFacetProfile('recognition', 'variant'), 'Distinct relation evidence.', ['claim_id' => $claim->canonicalId, 'source_id' => $sourceB->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $sourceB->revision, 'relation' => 'contradicts']),
+        ];
+        $proposals = [];
+        foreach ($candidates as $index => $candidate) {
+            $arguments = $fixture['factory']->arguments($candidate, 'e2e-distinct-' . $index);
+            $proposals[] = $fixture['governance']->create($this->proposalFrom($arguments));
+        }
+        self::assertCount(4, $fixture['proposals']->items);
+        self::assertCount(4, array_unique(array_map(static fn (Proposal $proposal): string => $proposal->idempotencyKey, $proposals)));
     }
 
     public function test_failure_atomicity_rolls_back_claim_but_keeps_failed_attempt_and_approved_proposal(): void

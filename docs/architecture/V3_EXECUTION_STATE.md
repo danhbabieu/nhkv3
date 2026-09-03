@@ -64,6 +64,30 @@ Video/Media/Article adapter work remain outside this slice.
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Governed Living Knowledge E2E acceptance hardening — 2026-09-03
+
+The acceptance gap from commit `9391cfc` is closed without Video, Media or
+Article wiring. Approval tamper binding remains covered separately: modifying
+the stored proposal dependency fingerprint after approval returns
+`APPROVAL_BINDING_MISMATCH`. Real canonical dependency staleness is now also
+covered: an approved Evidence proposal records the exact Claim and Source
+revisions, the Source is revised through `KnowledgeService`, shared Governance
+eligibility reads the canonical repositories and returns
+`DEPENDENCY_REVISION_CHANGED`; Controlled Apply writes no Evidence.
+
+The focused E2E now performs exact repository read-back for Knowledge and
+Evidence fields, including canonical identity, stable key/links, claim text and
+type, subject/facet/scope/profile provenance metadata, relation, excerpt,
+locator, metadata, active state and revision. Cross-proposal idempotency now
+proves the same `new_claim` candidate and the same claim/source/relation/
+excerpt Evidence candidate return the existing proposal and produce one
+canonical record. Distinct subject, scope, source and relation inputs remain
+distinct intents.
+
+Fresh focused proof: 7 tests / 89 assertions. Runtime integration remains
+`ENVIRONMENT_BLOCKED` unless `NHK_WP_TEST_PATH` is available; no runtime or
+database PASS is claimed.
+
 ## Owner Publication Override root-cause and isolated runtime checkpoint — 2026-09-03
 
 The review boundary now has an explicit read-only `review()` operation. The

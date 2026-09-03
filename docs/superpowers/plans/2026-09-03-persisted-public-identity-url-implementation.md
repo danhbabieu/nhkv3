@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - Read and obey `AGENTS.md`, `docs/constitution/READ_FIRST.md`, `docs/constitution/NHK_V3_CONSTITUTION.md`, `docs/architecture/V3_EXECUTION_STATE.md`, and each referenced normative contract before execution.
+- The execution preflight must also read `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/architecture/ARTICLE_INGEST_CONTRACT.md`, `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md`, and `docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md`.
 - This planning checkpoint creates no migration, allocates no identity, assigns no slug, changes no URL, migrates no data, renames no physical asset, creates no Video, changes no UUID/relation, and mutates no production/staging/V2 data.
 - `wp_posts` remains the sole owner of Article title/body/editorial slug/permalink; Article is never added to Authority public-identity storage.
 - Runtime registries and the Constitution are the only authority for entity types, endpoint types, predicates, operations, eligibility and public projection; unknown values fail closed.
@@ -63,7 +64,7 @@ Existing files expected to be modified by later execution tasks include `PublicR
 - Create: `public/wp-content/plugins/nhk-core/src/Domain/PublicIdentity/PublicIdentity.php`, `HistoricPublicRoute.php`, `PublicIdentityMutationResult.php`, `PublicUrlResult.php`
 - Create: `public/wp-content/plugins/nhk-core/src/Contracts/PublicIdentity/PublicIdentityRepository.php`, `HistoricPublicRouteResolver.php`
 - Create: `public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityDomainTest.php`, `PublicIdentityRepositoryContractTest.php`
-- Plan-only future files: `public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php`, `WpdbHistoricPublicRouteResolver.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Migration/PublicIdentityMigration014.php`
+- Plan-only future files, created only in the later persistence task after Owner/schema review: `public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbHistoricPublicRouteResolver.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Migration/PublicIdentityMigration014.php`
 
 **Interfaces:**
 - Consumes: registered owner kind/id, route type, normalized slug, collision scope, policy version and expected revision.
@@ -78,9 +79,9 @@ Existing files expected to be modified by later execution tasks include `PublicR
 ### Task 3: Authority route policies and resolver adapter
 
 **Files:**
-- Create: `public/wp-content/plugins/nhk-core/src/Application/Entity/AuthorityUrlPolicy.php`, `PublicRoutePolicyRegistry.php`, `PublicUrlProjector.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php`, `EntityPageQuery.php`, `PublicEntityCollectionQuery.php`, `PublicEntityEligibilityPolicy.php`
-- Create/modify tests: `PublicRouteResolverPersistedIdentityTest.php`, `PublicEntityCollectionQueryTest.php`, `PublicEndpointEligibilityResolverTest.php`
+- Create: `public/wp-content/plugins/nhk-core/src/Application/Entity/AuthorityUrlPolicy.php`, `public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicRoutePolicyRegistry.php`, `public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicUrlProjector.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php`, `public/wp-content/plugins/nhk-core/src/Application/Entity/EntityPageQuery.php`, `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityCollectionQuery.php`, `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityEligibilityPolicy.php`
+- Create/modify tests: `public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverPersistedIdentityTest.php`, `public/wp-content/plugins/nhk-core/tests/Unit/PublicEntityCollectionQueryTest.php`, `public/wp-content/plugins/nhk-core/tests/Unit/PublicEndpointEligibilityResolverTest.php`
 
 **Interfaces:**
 - Consumes: `AuthorityEntity`, `EntityTypeRegistry`, `PublicIdentityRepository`, `PublicEligibilityResult`, `StructuralContextQuery`, native-root probe and the shared normalizer only at allocation time.
@@ -90,14 +91,14 @@ Existing files expected to be modified by later execution tasks include `PublicR
 - [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverPersistedIdentityTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverTest.php`; expected: current read-time derivation or missing adapter failures.
 - [ ] **Step 3: Implement the adapter.** Make `PublicRouteResolver` consume `PublicUrlProjector`; retain approved route shapes and compatibility parent diagnostics; remove request-time transliteration and any UUID/stable-key fallback. Do not add entity types or Graph predicates.
 - [ ] **Step 4: Verify.** Run the focused command, `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicEntityCollectionQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicEndpointEligibilityResolverTest.php`, and `git diff --check`; expected: all focused tests pass and URL-less rows are excluded consistently.
-- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Entity/AuthorityUrlPolicy.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRoutePolicyRegistry.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicUrlProjector.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php public/wp-content/plugins/nhk-core/src/Application/Entity/EntityPageQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityCollectionQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityEligibilityPolicy.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverPersistedIdentityTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicEntityCollectionQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicEndpointEligibilityResolverTest.php && git commit -m "feat: resolve Authority URLs from persisted identity"`.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Entity/AuthorityUrlPolicy.php public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicRoutePolicyRegistry.php public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicUrlProjector.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php public/wp-content/plugins/nhk-core/src/Application/Entity/EntityPageQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityCollectionQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityEligibilityPolicy.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverPersistedIdentityTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicEntityCollectionQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicEndpointEligibilityResolverTest.php && git commit -m "feat: resolve Authority URLs from persisted identity"`.
 
 ### Task 4: Video URL policy and canonical canary shape
 
 **Files:**
 - Create: `public/wp-content/plugins/nhk-core/src/Application/Video/VideoUrlPolicy.php`, `VideoPublicContextSelector.php`
-- Modify: `VideoSeoProjection.php`, `VideoSitemapProjection.php`, `VideoService.php`, `VideoSearchDocument.php`, `MediaVideoPageQuery.php`, `PublicMediaVideoRoutes.php`
-- Test: extend `VideoSemanticCoreTest.php`; create `VideoUrlPolicyTest.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSeoProjection.php`, `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSitemapProjection.php`, `public/wp-content/plugins/nhk-core/src/Application/Video/VideoService.php`, `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSearchDocument.php`, `public/wp-content/plugins/nhk-core/src/Application/Media/MediaVideoPageQuery.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaVideoRoutes.php`
+- Test: extend `public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php`; create `public/wp-content/plugins/nhk-core/tests/Unit/VideoUrlPolicyTest.php`
 
 **Interfaces:**
 - Consumes: Video UUID, `(platform=youtube, external_video_id)`, persisted identity, available source snapshot, NHK editorial package, one controlled Hub, provenance, embed state, governed semantic attachments and explicit user hint.
@@ -112,9 +113,10 @@ Existing files expected to be modified by later execution tasks include `PublicR
 ### Task 5: Historic route storage, exact resolver and one-hop HTTP redirect
 
 **Files:**
-- Create: `public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicIdentityService.php`, `HistoricPublicRouteService.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php`, `WpdbHistoricPublicRouteResolver.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicEntityRoutes.php`, `PublicMediaVideoRoutes.php`, `LegacyUrlRedirects.php`
-- Test: create `PublicIdentityServiceTest.php`, `HistoricPublicRouteResolverTest.php`, `PublicRouteRedirectTest.php`
+- Create: `public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicIdentityService.php`, `public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/HistoricPublicRouteService.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbHistoricPublicRouteResolver.php`
+- Create after the migration gate: `public/wp-content/plugins/nhk-core/src/Infrastructure/Migration/PublicIdentityMigration014.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicEntityRoutes.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaVideoRoutes.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/LegacyUrlRedirects.php`
+- Test: create `public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php`, `public/wp-content/plugins/nhk-core/tests/Unit/HistoricPublicRouteResolverTest.php`, `public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteRedirectTest.php`
 
 **Interfaces:**
 - Consumes: repository contracts, `PublicRoutePolicyRegistry`, native WordPress route collision probe and CAS expected revision.
@@ -124,13 +126,13 @@ Existing files expected to be modified by later execution tasks include `PublicR
 - [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php public/wp-content/plugins/nhk-core/tests/Unit/HistoricPublicRouteResolverTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteRedirectTest.php`; expected: absent persistence/resolver failures.
 - [ ] **Step 3: Implement the minimum repository and adapter.** Add Migration014 only during the later implementation checkpoint, using additive tables and guarded migration conventions; wire `Plugin.php` only after migration review. Reuse the existing HTTP redirect boundary and send one 301 directly to the current projected path; old paths never render.
 - [ ] **Step 4: Verify.** Run the focused tests, `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicEntityRoutesTest.php`, and `git diff --check`; expected: no redirect-chain or alternate slugification path.
-- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/PublicIdentity public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity public/wp-content/plugins/nhk-core/src/Infrastructure/Http public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php public/wp-content/plugins/nhk-core/tests/Unit/HistoricPublicRouteResolverTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteRedirectTest.php && git commit -m "feat: resolve historic public routes in one hop"`.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicIdentityService.php public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/HistoricPublicRouteService.php public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php public/wp-content/plugins/nhk-core/src/Infrastructure/PublicIdentity/WpdbHistoricPublicRouteResolver.php public/wp-content/plugins/nhk-core/src/Infrastructure/Migration/PublicIdentityMigration014.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicEntityRoutes.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaVideoRoutes.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/LegacyUrlRedirects.php public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php public/wp-content/plugins/nhk-core/tests/Unit/HistoricPublicRouteResolverTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteRedirectTest.php && git commit -m "feat: resolve historic public routes in one hop"`.
 
 ### Task 6: SEO single-source and consumer parity
 
 **Files:**
 - Create: `public/wp-content/plugins/nhk-core/src/Application/Seo/PublicSeoProjection.php`, `public/wp-content/plugins/nhk-core/tests/Unit/PublicSeoProjectionTest.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSeoProjection.php`, `VideoSitemapProjection.php`, `SearchSemanticQuery.php`, `EntityPageQuery.php`, `PublicEntityCollectionQuery.php`, `ArticleResearchPreflight.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/SearchApi.php`, `public/wp-content/themes/nhk-v3/functions.php`, `index.php`, `entity.php`, `video.php`, `media.php`, and related `FrontendContractTest.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSeoProjection.php`, `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSitemapProjection.php`, `public/wp-content/plugins/nhk-core/src/Application/Video/VideoSearchDocument.php`, `public/wp-content/plugins/nhk-core/src/Application/Search/SearchSemanticQuery.php`, `public/wp-content/plugins/nhk-core/src/Application/Entity/EntityPageQuery.php`, `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityCollectionQuery.php`, `public/wp-content/plugins/nhk-core/src/Application/Article/ArticleResearchPreflight.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/SearchApi.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/ReadApi.php`, `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicVideoSitemapRoutes.php`, `public/wp-content/themes/nhk-v3/functions.php`, `public/wp-content/themes/nhk-v3/index.php`, `public/wp-content/themes/nhk-v3/entity.php`, `public/wp-content/themes/nhk-v3/video.php`, `public/wp-content/themes/nhk-v3/media.php`, `public/wp-content/themes/nhk-v3/template-parts/article-card.php`, and `public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php`
 
 **Interfaces:**
 - Consumes: one `PublicUrlResult` plus page eligibility, visible editorial data and allowed asset/evidence projection.
@@ -140,42 +142,74 @@ Existing files expected to be modified by later execution tasks include `PublicR
 - [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicSeoProjectionTest.php public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php`; expected: divergence/local slugification failures.
 - [ ] **Step 3: Implement the shared projection.** Thread `PublicUrlResult` through page, archive, REST/search, breadcrumb/card and SEO paths; keep empty success distinct from unavailable runtime, hydration loss, malformed row, collision and infrastructure failure.
 - [ ] **Step 4: Verify.** Run the same PHPUnit command, `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/SearchSemanticQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php`, and `git diff --check`; expected: all canonical/OG/JSON-LD/sitemap/link outputs converge.
-- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Seo public/wp-content/plugins/nhk-core/src/Application/Video public/wp-content/plugins/nhk-core/src/Application/Entity public/wp-content/plugins/nhk-core/src/Application/Search public/wp-content/plugins/nhk-core/src/Infrastructure/Http/SearchApi.php public/wp-content/themes/nhk-v3 public/wp-content/plugins/nhk-core/tests/Unit/PublicSeoProjectionTest.php public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php public/wp-content/plugins/nhk-core/tests/Unit/SearchSemanticQueryTest.php && git commit -m "feat: unify public canonical URL projection"`.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Seo/PublicSeoProjection.php public/wp-content/plugins/nhk-core/src/Application/Video/VideoSeoProjection.php public/wp-content/plugins/nhk-core/src/Application/Video/VideoSitemapProjection.php public/wp-content/plugins/nhk-core/src/Application/Video/VideoSearchDocument.php public/wp-content/plugins/nhk-core/src/Application/Search/SearchSemanticQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/EntityPageQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityCollectionQuery.php public/wp-content/plugins/nhk-core/src/Application/Article/ArticleResearchPreflight.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/SearchApi.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/ReadApi.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicVideoSitemapRoutes.php public/wp-content/themes/nhk-v3/functions.php public/wp-content/themes/nhk-v3/index.php public/wp-content/themes/nhk-v3/entity.php public/wp-content/themes/nhk-v3/video.php public/wp-content/themes/nhk-v3/media.php public/wp-content/themes/nhk-v3/template-parts/article-card.php public/wp-content/plugins/nhk-core/tests/Unit/PublicSeoProjectionTest.php public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php public/wp-content/plugins/nhk-core/tests/Unit/SearchSemanticQueryTest.php && git commit -m "feat: unify public canonical URL projection"`.
 
-### Task 7: Article boundary and new-upload media filename policy
+### Task 7: Article integration boundary
 
 **Files:**
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Article/ArticleResearchPreflight.php`, `EditorialDraftGateway.php` only where new-slug creation passes through the shared normalizer; `public/wp-content/plugins/nhk-core/src/Application/Media/MediaFilenameNormalizer.php`, `MediaIngestGateway.php`
-- Test: extend `ArticleResearchPreflightTest.php`, `ArticlePublicationGateTest.php`, `ArticleMediaPolicyTest.php`; create `MediaFilenameNormalizerTest.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Article/ArticleResearchPreflight.php`, `public/wp-content/plugins/nhk-core/src/Application/WordPress/EditorialDraftGateway.php` only where new-slug creation passes through the shared normalizer.
+- Test: extend `public/wp-content/plugins/nhk-core/tests/Unit/ArticleResearchPreflightTest.php`, `public/wp-content/plugins/nhk-core/tests/Unit/ArticlePublicationGateTest.php`, and `public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php`.
 
 **Interfaces:**
-- Consumes: native WordPress post state/post_name, explicit slug-change operation, shared normalizer and new-upload filename inputs.
-- Produces: new Article slug proposal normalized once; existing published `post_name` preserved; explicit slug change retains native/governed historic redirect; new filename only is normalized. Filename remains distinct from Media identity, alt, caption and semantic relation.
+- Consumes: native WordPress post state/post_name and the shared normalizer.
+- Produces: new Article slug proposal normalized once; existing published `post_name` preserved; explicit slug change retains the native/governed historic redirect; no Authority public identity is allocated.
 
-- [ ] **Step 1: Write failing tests.** Prove title changes keep published `post_name`, new Article slug uses shared Vietnamese behavior when appropriate, explicit slug change produces one old→new redirect, no Authority identity is created, `Ô Đô` upload naming is deterministic, and legacy physical filename is untouched.
-- [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/ArticleResearchPreflightTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticlePublicationGateTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php public/wp-content/plugins/nhk-core/tests/Unit/MediaFilenameNormalizerTest.php`; expected: local slugifier/iconv and missing boundary failures.
-- [ ] **Step 3: Implement minimally.** Delete duplicate transliteration from `MediaFilenameNormalizer` and inject the shared normalizer; retain extension/suffix policy and new-upload-only scope. Do not alter legacy media files, Article ownership or semantic records.
-- [ ] **Step 4: Verify.** Run the same command, `/opt/homebrew/bin/php -l public/wp-content/plugins/nhk-core/src/Application/Media/MediaFilenameNormalizer.php`, and `git diff --check`; expected: pass with no physical rename.
-- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Article public/wp-content/plugins/nhk-core/src/Application/Media/MediaFilenameNormalizer.php public/wp-content/plugins/nhk-core/src/Application/Media/MediaIngestGateway.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleResearchPreflightTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticlePublicationGateTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php public/wp-content/plugins/nhk-core/tests/Unit/MediaFilenameNormalizerTest.php && git commit -m "feat: share safe normalization at Article and upload boundaries"`.
+- [ ] **Step 1: Write failing tests.** Prove title changes keep published `post_name`, new Article slug uses shared Vietnamese behavior when appropriate, explicit slug change produces one old→new redirect, and no Authority identity is created.
+- [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/ArticleResearchPreflightTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticlePublicationGateTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php`; expected: local Article slugifier or missing boundary failures.
+- [ ] **Step 3: Implement minimally.** Route only new-slug creation through the shared normalizer; preserve existing published `post_name` and native WordPress ownership; keep explicit changes behind the existing governed redirect boundary.
+- [ ] **Step 4: Verify.** Run the same command and `git diff --check`; expected: Article tests pass with no semantic mutation.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Article public/wp-content/plugins/nhk-core/src/Application/WordPress/EditorialDraftGateway.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleResearchPreflightTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticlePublicationGateTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php && git commit -m "test: preserve WordPress Article URL ownership"`.
 
-### Task 8: Media route constitutional gate and Knowledge public eligibility
+### Task 8: New-upload Media filename policy
 
 **Files:**
-- Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaVideoRoutes.php`, `PublicMediaAssetRoutes.php`, `PublicKnowledgeRoutes.php`, `public/wp-content/plugins/nhk-core/src/Application/Media/MediaVideoPageQuery.php`, `KnowledgePageQuery.php`, `PublicEndpointEligibilityResolver.php`
-- Test: extend `MediaVideoPageQueryTest.php`, `FrontendContractTest.php`, `KnowledgePageQueryTest.php`; create `PublicProjectionGapTest.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Media/MediaFilenameNormalizer.php`, `public/wp-content/plugins/nhk-core/src/Application/Media/MediaIngestGateway.php`
+- Test: create `public/wp-content/plugins/nhk-core/tests/Unit/MediaFilenameNormalizerTest.php`; extend `public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php`.
+
+**Interfaces:**
+- Consumes: shared normalizer, new-upload subject/view/original filename inputs and existing extension/suffix rules.
+- Produces: deterministic new-upload filename only; filename remains distinct from Media identity, alt text, caption and semantic relation; legacy physical filenames are unchanged.
+
+- [ ] **Step 1: Write failing tests.** Prove `Ô Đô` upload output is deterministic, supported extensions are preserved, empty subject/view handling is bounded, and a legacy physical path is never renamed.
+- [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/MediaFilenameNormalizerTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php`; expected: duplicate `iconv` transliteration behavior or missing shared-normalizer injection.
+- [ ] **Step 3: Implement minimally.** Remove duplicate transliteration, inject `VietnameseSlugNormalizer`, preserve suffix/extension behavior and limit invocation to new upload generation.
+- [ ] **Step 4: Verify.** Run the same command, `/opt/homebrew/bin/php -l public/wp-content/plugins/nhk-core/src/Application/Media/MediaFilenameNormalizer.php`, and `git diff --check`; expected: pass with no rename operation.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Media/MediaFilenameNormalizer.php public/wp-content/plugins/nhk-core/src/Application/Media/MediaIngestGateway.php public/wp-content/plugins/nhk-core/tests/Unit/MediaFilenameNormalizerTest.php public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php && git commit -m "feat: normalize only new Media upload filenames"`.
+
+### Task 9: Media route constitutional gate
+
+**Files:**
+- Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaVideoRoutes.php`, `PublicMediaAssetRoutes.php`, `public/wp-content/plugins/nhk-core/src/Application/Media/MediaVideoPageQuery.php`
+- Test: extend `public/wp-content/plugins/nhk-core/tests/Unit/MediaVideoPageQueryTest.php` and `public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php`; create `public/wp-content/plugins/nhk-core/tests/Unit/PublicMediaRouteGateTest.php`.
 - Create only after Owner gate: `docs/architecture/MEDIA_PUBLIC_ROUTE_DECISION_2026-09-03.md`
 
 **Interfaces:**
-- Consumes: Media/MediaAsset delivery contracts, Knowledge Claim/Source/Evidence repositories, `MediaDetailTypeRegistry`, public eligibility and route ledger.
-- Produces: delivery-only MediaAsset URLs; no indexable standalone Media detail unless explicit constitutional approval; atomic Claim/Source/Evidence no-route/non-indexable outcomes; Album/Gallery `REGISTRY_GAP`; all unknown registry/eligibility values fail closed.
+- Consumes: Media/MediaAsset delivery contracts, `MediaDetailTypeRegistry`, route ledger and Constitution §17.
+- Produces: delivery-only MediaAsset URLs and a documented non-indexable/404 outcome for standalone Media detail unless an explicit constitutional/editorial contract authorizes it.
 
-- [ ] **Step 1: Write failing contract tests.** Assert current `/media/{uuid}` cannot become an indexable page by implementation inertia, MediaAsset delivery remains usable, Claim/Source/Evidence routes return honest 404/non-indexable, no claim is promoted to a public page, and Album/Gallery stays a registry gap.
-- [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicProjectionGapTest.php public/wp-content/plugins/nhk-core/tests/Unit/MediaVideoPageQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/KnowledgePageQueryTest.php`; expected: current Media route exposure or missing diagnostic failures.
-- [ ] **Step 3: Reconcile before implementation.** Produce a read-only route-ledger comparison of Constitution §17, `V3_PUBLIC_ROUTE_AUDIT.md`, media detail registries and runtime routes. If standalone detail is constitutionally disallowed, record `CONSTITUTION_CONFLICT`, obtain explicit Owner decision, and stop route implementation at the gate; if approved, record the approved semantic/editorial contract before wiring.
-- [ ] **Step 4: Verify the allowed path.** Run the focused tests and `git diff --check`; expected: no silent route choice, no standalone Knowledge route and no Album/Gallery route.
-- [ ] **Step 5: Commit.** Commit only the reconciled decision/diagnostic and tests: `git add public/wp-content/plugins/nhk-core/src/Infrastructure/Http public/wp-content/plugins/nhk-core/src/Application/Media public/wp-content/plugins/nhk-core/src/Application/Knowledge public/wp-content/plugins/nhk-core/src/Application/Entity public/wp-content/plugins/nhk-core/tests/Unit/PublicProjectionGapTest.php public/wp-content/plugins/nhk-core/tests/Unit/MediaVideoPageQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/KnowledgePageQueryTest.php docs/architecture/MEDIA_PUBLIC_ROUTE_DECISION_2026-09-03.md && git commit -m "test: enforce Media and Knowledge public projection gates"`.
+- [ ] **Step 1: Write failing tests.** Assert current `/media/{uuid}` cannot become indexable by inertia, MediaAsset delivery remains usable, and route behavior exposes the constitutional conflict rather than selecting a hidden policy.
+- [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicMediaRouteGateTest.php public/wp-content/plugins/nhk-core/tests/Unit/MediaVideoPageQueryTest.php`; expected: current Media route exposure or missing diagnostic failures.
+- [ ] **Step 3: Reconcile before implementation.** Compare Constitution §17, `V3_PUBLIC_ROUTE_AUDIT.md`, media detail registries and runtime routes. Record `CONSTITUTION_CONFLICT`, obtain explicit Owner decision, and do not wire standalone detail until the decision is recorded.
+- [ ] **Step 4: Verify.** Run the focused tests and `git diff --check`; expected: no silent route choice and asset delivery remains separate.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaVideoRoutes.php public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicMediaAssetRoutes.php public/wp-content/plugins/nhk-core/src/Application/Media/MediaVideoPageQuery.php public/wp-content/plugins/nhk-core/tests/Unit/PublicMediaRouteGateTest.php public/wp-content/plugins/nhk-core/tests/Unit/MediaVideoPageQueryTest.php public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php docs/architecture/MEDIA_PUBLIC_ROUTE_DECISION_2026-09-03.md && git commit -m "test: gate standalone Media routes constitutionally"`.
 
-### Task 9: Read-only production readiness audit
+### Task 10: Knowledge public eligibility and registry gaps
+
+**Files:**
+- Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicKnowledgeRoutes.php`, `public/wp-content/plugins/nhk-core/src/Application/Knowledge/KnowledgePageQuery.php`, `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEndpointEligibilityResolver.php`
+- Test: extend `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgePageQueryTest.php`; create `PublicKnowledgeEligibilityTest.php` and `PublicProjectionGapTest.php`.
+
+**Interfaces:**
+- Consumes: runtime registries, Constitution, `PublicEndpointEligibilityResolver`, Knowledge Claim/Source/Evidence repositories and projection contracts.
+- Produces: no atomic Claim/Source/Evidence standalone route; eligible bounded provenance/related projections only; Album/Gallery remains `REGISTRY_GAP`; unknown registry or eligibility values fail closed.
+
+- [ ] **Step 1: Write failing tests.** Assert Claim/Source/Evidence UUID and stable-key inputs cannot produce indexable HTML routes, eligible evidence may appear only through bounded projections, and Album/Gallery reports `REGISTRY_GAP`.
+- [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicKnowledgeEligibilityTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicProjectionGapTest.php public/wp-content/plugins/nhk-core/tests/Unit/KnowledgePageQueryTest.php`; expected: missing or over-broad route eligibility failures.
+- [ ] **Step 3: Implement minimally.** Enforce registry + Constitution + eligibility + projection contract before returning public links; preserve provenance-only use and honest unavailable/empty outcomes.
+- [ ] **Step 4: Verify.** Run the same command and `git diff --check`; expected: no invented route, entity, predicate or projection type.
+- [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Infrastructure/Http/PublicKnowledgeRoutes.php public/wp-content/plugins/nhk-core/src/Application/Knowledge/KnowledgePageQuery.php public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEndpointEligibilityResolver.php public/wp-content/plugins/nhk-core/tests/Unit/PublicKnowledgeEligibilityTest.php public/wp-content/plugins/nhk-core/tests/Unit/PublicProjectionGapTest.php public/wp-content/plugins/nhk-core/tests/Unit/KnowledgePageQueryTest.php && git commit -m "test: enforce Knowledge public eligibility boundaries"`.
+
+### Task 11: Read-only public-identity readiness audit
 
 **Files:**
 - Create: `public/wp-content/plugins/nhk-core/src/Application/Migration/PublicIdentityReadinessAudit.php`, `public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityReadinessAuditTest.php`, `tools/public-identity-readiness-audit.php`, `docs/architecture/PUBLIC_IDENTITY_READINESS_AUDIT_2026-09-03.md`
@@ -188,10 +222,10 @@ Existing files expected to be modified by later execution tasks include `PublicR
 - [ ] **Step 1: Write failing tests.** Assert empty-success vs unavailable runtime, hydration loss, malformed row, collision, historic/current conflict, ineligible owner and infrastructure failure remain distinct; assert canary UUID and external ID are classified without mutation.
 - [ ] **Step 2: Run the failing tests.** Run `vendor/bin/phpunit --configuration phpunit.xml.dist public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityReadinessAuditTest.php`; expected: missing audit service/result failures.
 - [ ] **Step 3: Implement bounded read-only audit.** Require the configured authorized runtime, use no INSERT/UPDATE/DELETE/DDL, do not assign slugs or create redirects/edges, and emit redacted diagnostics only. Include the exact malformed canary path from the spec as input evidence.
-- [ ] **Step 4: Verify.** Run the focused PHPUnit command and `php tools/public-identity-readiness-audit.php --help`; then run the audit only with an explicitly authorized runtime command supplied by the execution environment. Expected: receipt identifies readiness/blockers and confirms mutation count zero.
+- [ ] **Step 4: Verify.** Run the focused PHPUnit command and `php tools/public-identity-readiness-audit.php --help`; then run the audit only with an explicitly authorized runtime command. Expected: receipt identifies readiness/blockers and confirms mutation count zero.
 - [ ] **Step 5: Commit.** `git add public/wp-content/plugins/nhk-core/src/Application/Migration/PublicIdentityReadinessAudit.php public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityReadinessAuditTest.php tools/public-identity-readiness-audit.php docs/architecture/PUBLIC_IDENTITY_READINESS_AUDIT_2026-09-03.md docs/architecture/V3_EXECUTION_STATE.md && git commit -m "audit: add read-only public identity readiness report"`.
 
-### Task 10: Owner-approved canary re-projection and cutover readiness
+### Task 12: Owner-approved canary re-projection and cutover readiness
 
 **Files:**
 - Create: `public/wp-content/plugins/nhk-core/src/Application/Migration/CanaryPublicIdentityProjection.php`, `public/wp-content/plugins/nhk-core/tests/Integration/CanaryPublicIdentityProjectionIntegrationTest.php`, `docs/architecture/PUBLIC_IDENTITY_CUTOVER_READINESS_REPORT_2026-09-03.md`
@@ -214,6 +248,6 @@ Existing files expected to be modified by later execution tasks include `PublicR
 - Task 3 covers Brand, Model, Variant, Movement, Music, Component, Classification, Specimen, Product and native WordPress collision behavior.
 - Task 4 covers governed Video context, external-ID suffix, title stability and the P4KaHX3LBOw expected path without creating a Video.
 - Task 5 covers exact historic lookup and one-hop redirect semantics; Task 6 covers every required SEO/link consumer and excludes local slugification.
-- Task 7 covers Article ownership/title stability and new-upload-only filename normalization; Task 8 explicitly gates Media route policy, Knowledge eligibility and Album/Gallery registry gap.
-- Task 9 is read-only readiness inventory; Task 10 is the later Owner-approved bounded canary and requires a Cutover Readiness Report.
+- Task 7 covers Article ownership/title stability; Task 8 covers new-upload-only filename normalization; Tasks 9–10 explicitly gate Media routes, Knowledge eligibility and Album/Gallery registry gap.
+- Task 11 is read-only readiness inventory; Task 12 is the later Owner-approved bounded canary and requires a Cutover Readiness Report.
 - No placeholder is used; no task authorizes migration or production mutation during plan writing.
