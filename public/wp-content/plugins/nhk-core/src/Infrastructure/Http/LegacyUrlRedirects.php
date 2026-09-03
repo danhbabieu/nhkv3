@@ -8,6 +8,7 @@ final class LegacyUrlRedirects
     public static function register(): void
     {
         add_action('template_redirect', [self::class, 'redirect'], 1);
+        add_filter('redirect_canonical', [self::class, 'canonicalRedirect'], 10, 2);
     }
 
     public static function redirect(): void
@@ -39,5 +40,17 @@ final class LegacyUrlRedirects
     {
         $segments = array_values(array_filter(explode('/', trim($requestPath, '/')), static fn (string $segment): bool => $segment !== ''));
         return count($segments) === 1 && $publicEntityType === 'brand';
+    }
+
+    public static function canonicalRedirect(?string $redirectUrl, string $requestedUrl): ?string
+    {
+        $requestPath = parse_url($requestedUrl, PHP_URL_PATH);
+        if (!is_string($requestPath)) return $redirectUrl;
+        return self::filterCanonicalRedirect($redirectUrl, $requestPath, (string) get_query_var('nhk_public_entity_type'));
+    }
+
+    public static function filterCanonicalRedirect(?string $redirectUrl, string $requestPath, string $publicEntityType): ?string
+    {
+        return self::shouldDeferForSemanticRoot($requestPath, $publicEntityType) ? null : $redirectUrl;
     }
 }

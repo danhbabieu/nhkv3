@@ -22,4 +22,10 @@ final class PublicEntityRoutesTest extends TestCase
         self::assertFalse(LegacyUrlRedirects::shouldDeferForSemanticRoot('/odo/article/', 'brand'));
         self::assertFalse(LegacyUrlRedirects::shouldDeferForSemanticRoot('/odo/', 'model'));
     }
+
+    public function test_wordpress_canonical_redirect_defers_to_a_semantic_brand_root_route(): void
+    {
+        self::assertNull(LegacyUrlRedirects::filterCanonicalRedirect('https://demo.1945.vn/odo-10-con-10-bua-chuong-kep/', '/odo/', 'brand'));
+        self::assertSame('https://demo.1945.vn/other/', LegacyUrlRedirects::filterCanonicalRedirect('https://demo.1945.vn/other/', '/odo/article/', 'brand'));
+    }
 }

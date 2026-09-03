@@ -21,6 +21,22 @@ remains blocked by `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`.
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Odo WordPress canonical-redirect guard — 2026-09-03
+
+The live response exposed `x-redirect-by: WordPress`, proving that the
+remaining `/odo/` redirect was WordPress core's old-slug canonical redirect,
+not the NHK legacy redirect hook. `LegacyUrlRedirects` now filters that core
+redirect for single-segment semantic brand roots, allowing the already
+registered public route boundary to resolve `/odo/`. Focused route tests pass
+(10 tests / 49 assertions across the two route suites), PHP lint and
+`git diff --check` pass. No WordPress metadata or demo runtime data was
+mutated; the live server must pull this additional change and reload its PHP
+runtime before verification.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Video evidence reference contract alignment — 2026-09-03
 
 Root-cause tracing found that `nhk-v3/video-ingest` exposed relation
