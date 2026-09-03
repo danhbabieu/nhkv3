@@ -57,15 +57,15 @@
 
 ### Task 4: Add governed apply candidate contract
 
-**Status:** partial: proposal argument factory is complete in `f631209`; end-to-end apply/read-back remains open.
+**Status:** corrective boundary complete; end-to-end apply/read-back remains an explicit `CODE_GAP`.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Knowledge/KnowledgeEnrichmentProposalFactory.php`; Modify `public/wp-content/plugins/nhk-core/src/Application/Governance/ControlledApplyService.php` only if an existing hook is required; Test `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgeEnrichmentProposalFactoryTest.php`.
 
-- [ ] Write failing tests proving candidate payloads target existing Knowledge/Evidence operations, preserve scope/provenance, carry idempotency fingerprint and never write directly.
-- [ ] Run focused test and confirm RED.
-- [ ] Implement proposal payload factory using existing operation vocabulary; unsupported replacement/promotion returns a typed review diagnostic.
-- [ ] Run focused tests and confirm GREEN.
-- [ ] Commit `feat: route enrichment through governed proposals`.
+- [x] Write failing tests proving candidate payloads target existing Knowledge/Evidence operations, preserve scope/provenance, carry idempotency fingerprint and never write directly.
+- [x] Run focused test and confirm RED.
+- [x] Implement proposal payload factory using the runtime catalog vocabulary; unresolved evidence, registry gaps and unsupported classifications fail closed with typed diagnostics; create candidates do not fabricate an existing revision.
+- [x] Run focused tests and confirm GREEN.
+- [x] Commit `fix: align living knowledge with governance operations`.
 
 ### Task 5: Implement facet fragment projection and deterministic synthesis boundary
 

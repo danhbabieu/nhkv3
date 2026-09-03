@@ -82,12 +82,38 @@ Semantic apply remains `Proposal → Human Approval → Eligibility → Controll
 Apply → canonical repository → audit → read-back`. Same-intent repeats are
 idempotent and produce no duplicate claim, Evidence or relation.
 
+## Governed apply boundary
+
+The effective operation vocabulary is read from the current runtime catalog
+(`McpToolCatalog::governedOperations()`); this slice does not introduce an
+operation registry or an adapter. Knowledge claim and Evidence creation use a
+registered `create`/`ingest` operation selected from that vocabulary. If no
+corresponding operation is registered, proposal translation returns typed
+`REGISTRY_GAP`; unsupported candidate classifications return `UNSUPPORTED`.
+
+Evidence candidates are proposal-eligible only after canonical `claim_id` and
+`source_id` resolution. Their structured contract carries relation,
+excerpt/observation, optional locator, metadata and claim/source revision
+closure. Unresolved source input remains an `ambiguous` review candidate and
+cannot be translated into an Evidence proposal.
+
+Create proposals carry no existing-target revision (`expected_revision=null`).
+Existing-target lifecycle proposals must carry the repository revision read at
+the binding boundary; eligibility rejects a changed revision. Canonical
+structured ordering binds content, dependency and idempotency fingerprints.
+The factory is translation-only and performs no KnowledgeService or repository
+write.
+
 ## Acceptance and non-goals
 
 The Odo corpus is acceptance/reference data only. Tests cover Odo 62 white pegs,
 Sonodo/Movement 24 scope, 54/57/62 configuration parity, Odo 30 non-cloning,
 Odo 39 evidence-only enrichment, stable `/odo/` and `/o-do/` routes, and all
 scope/contradiction/idempotency rules. No Odo production/demo data is mutated.
+
+End-to-end `Proposal → Approval → Eligibility → Controlled Apply → read-back`
+for living Knowledge enrichment remains an explicit `CODE_GAP`; this slice
+does not claim runtime completion.
 
 Durable public identity remains a separately reported
 `PUBLIC_IDENTITY_STORAGE_GAP` unless additive storage can be implemented without

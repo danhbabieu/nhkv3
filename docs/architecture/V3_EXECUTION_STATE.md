@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+## Governed Living Knowledge apply-boundary correction — 2026-09-03
+
+The final corrective slice audited the actual Governance vocabulary: the
+effective operation allowlist is `McpToolCatalog::governedOperations()` and
+the existing `AuthorityProposalExecutor`/KnowledgeService boundary supports
+the current Knowledge/Source/Evidence lifecycle. The enrichment factory now
+translates only through that runtime vocabulary, never invents an operation,
+and returns typed `REGISTRY_GAP` or `UNSUPPORTED` diagnostics when mapping is
+not available. No adapter or new operation was added.
+
+Planner evidence candidates now require canonical claim and source resolution;
+unresolved source input remains an ambiguous review candidate. Resolved
+Evidence candidates preserve claim/source IDs, relation, excerpt, locator,
+metadata and dependency revisions. Canonical ordering binds content,
+dependency and idempotency fingerprints, so source/claim/relation changes
+change intent keys. Create proposals use `expected_revision=null`; existing
+target revisions remain repository-bound and stale eligibility fails closed.
+The factory is translation-only and performs no KnowledgeService/repository
+write.
+
+Focused proof: 9 tests / 26 assertions for the corrected factory/planner,
+plus 38 Governance/MCP/Knowledge regression tests / 232 assertions. The
+full Proposal → Approval → Eligibility → Controlled Apply → read-back path
+for living Knowledge enrichment remains `CODE_GAP` and is not claimed
+complete. Video/Media/Article integration remains out of scope.
+
 ## Governed Living Knowledge corrective review — 2026-09-03
 
 Corrective review fixed four defects before Video/Media/Article expansion:
