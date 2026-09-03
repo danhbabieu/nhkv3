@@ -17,3 +17,11 @@ or implementation guidance. If a source conflicts with the Constitution, mark
 For an approved V3 knowledge Article workflow, also read
 `docs/architecture/ARTICLE_INGEST_CONTRACT.md` and the current
 `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` contract before implementation.
+
+For any workflow that drafts, generates, edits, projects or publishes public
+promotional/commercial copy — including WordPress Article text, Product copy,
+MediaUsage caption/alt or image/thumbnail text, Video editorial copy, SEO/meta,
+Open Graph, structured promotional copy, cards or comparison copy — also read
+`docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` before
+implementation or publication. This requirement is cross-cutting; no public
+channel may bypass the same claim/evidence compliance policy.
