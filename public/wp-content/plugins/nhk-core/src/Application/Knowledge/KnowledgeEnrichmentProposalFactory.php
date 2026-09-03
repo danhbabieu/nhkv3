@@ -1,15 +1,42 @@
 <?php
 declare(strict_types=1);
 namespace NHK\Core\Application\Knowledge;
+use NHK\Core\Application\Mcp\McpToolCatalog;
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate;
+
+/** Translates a validated candidate into the existing generic proposal envelope. */
 final class KnowledgeEnrichmentProposalFactory
 {
+    /** @param list<string>|null $supportedOperations */
+    public function __construct(private ?array $supportedOperations = null) {}
+
+    /** @return array<string,mixed> */
     public function arguments(KnowledgeEnrichmentCandidate $candidate, string $operationId): array
     {
-        $operations = ['knowledge' => 'ingest', 'evidence' => 'ingest'];
-        $fingerprint = hash('sha256', json_encode([$candidate->subjectId, $candidate->profile->toMetadata(), $candidate->observation, $candidate->classification, $candidate->provenance], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
-        if ($candidate->classification === 'new_claim') return ['operation' => $operations['knowledge'], 'entity_type' => 'knowledge', 'subject_id' => $candidate->subjectId, 'expected_revision' => 1, 'idempotency_key' => $operationId . ':knowledge:' . $fingerprint, 'payload' => ['stable_key' => 'nhk:knowledge:' . $fingerprint, 'text' => $candidate->observation, 'claim_type' => 'fact', 'provenance' => ['metadata' => $candidate->profile->toMetadata()] + $candidate->provenance]];
-        if (in_array($candidate->classification, ['add_evidence', 'qualify', 'contradict'], true) && ($candidate->provenance['claim_id'] ?? '') !== '' && ($candidate->provenance['source_id'] ?? '') !== '') return ['operation' => $operations['evidence'], 'entity_type' => 'evidence', 'subject_id' => $candidate->subjectId, 'expected_revision' => max(1, (int) ($candidate->provenance['target_revision'] ?? 1)), 'idempotency_key' => $operationId . ':evidence:' . $fingerprint, 'payload' => ['claim_id' => $candidate->provenance['claim_id'], 'source_id' => $candidate->provenance['source_id'], 'excerpt' => $candidate->observation, 'relation' => $candidate->provenance['relation']]];
-        throw new \InvalidArgumentException('Enrichment candidate requires governed review before proposal mapping.');
+        $isClaim = $candidate->classification === 'new_claim';
+        $payload = $this->payload($candidate);
+        $operation = $this->operationFor($isClaim ? 'knowledge' : 'evidence');
+        $dependencies = array_values(array_filter([$candidate->provenance['claim_id'] ?? null, $candidate->provenance['source_id'] ?? null], static fn (mixed $id): bool => is_string($id) && $id !== ''));
+        $binding = ['subject_id' => $candidate->subjectId, 'facet' => $candidate->profile->facet, 'scope' => $candidate->profile->scope, 'profile_version' => $candidate->profile->version, 'classification' => $candidate->classification, 'operation' => $operation, 'payload' => $payload, 'dependency_ids' => $dependencies];
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($binding));
+        return ['operation' => $operation, 'entity_type' => $isClaim ? 'knowledge' : 'evidence', 'subject_id' => $candidate->subjectId, 'target_uuid' => null, 'expected_revision' => null, 'dependency_ids' => $dependencies, 'content_fingerprint' => $fingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize(['claim_id' => $candidate->provenance['claim_id'] ?? null, 'source_id' => $candidate->provenance['source_id'] ?? null, 'claim_revision' => $candidate->provenance['claim_revision'] ?? null, 'source_revision' => $candidate->provenance['source_revision'] ?? null])), 'idempotency_key' => $operationId . ':' . ($isClaim ? 'knowledge' : 'evidence') . ':' . $fingerprint, 'payload' => $payload];
+    }
+
+    private function operationFor(string $entityType): string
+    {
+        $operations = $this->supportedOperations ?? McpToolCatalog::governedOperations();
+        foreach (['ingest', 'create'] as $operation) if (in_array($operation, $operations, true)) return $operation;
+        throw new KnowledgeEnrichmentProposalException('REGISTRY_GAP', 'No registered create operation for ' . $entityType . '.');
+    }
+
+    /** @return array<string,mixed> */
+    private function payload(KnowledgeEnrichmentCandidate $candidate): array
+    {
+        if ($candidate->classification === 'new_claim') return ['stable_key' => 'nhk:knowledge:' . hash('sha256', CommandCanonicalizer::canonicalize([$candidate->subjectId, $candidate->profile->toMetadata(), $candidate->observation])), 'text' => $candidate->observation, 'claim_type' => (string) ($candidate->provenance['claim_type'] ?? 'fact'), 'provenance' => ['metadata' => $candidate->profile->toMetadata()] + $candidate->provenance];
+        if (!in_array($candidate->classification, ['add_evidence', 'qualify', 'contradict'], true)) throw new KnowledgeEnrichmentProposalException('UNSUPPORTED', 'Candidate classification cannot become a proposal.');
+        $claimId = (string) ($candidate->provenance['claim_id'] ?? ''); $sourceId = (string) ($candidate->provenance['source_id'] ?? '');
+        if ($claimId === '' || $sourceId === '') throw new KnowledgeEnrichmentProposalException('UNSUPPORTED', 'Evidence candidate requires resolved claim_id and source_id.');
+        return ['claim_id' => $claimId, 'source_id' => $sourceId, 'excerpt' => $candidate->observation, 'relation' => (string) ($candidate->provenance['relation'] ?? ''), 'locator' => $candidate->provenance['locator'] ?? null, 'metadata' => is_array($candidate->provenance['metadata'] ?? null) ? $candidate->provenance['metadata'] : $candidate->profile->toMetadata()];
     }
 }

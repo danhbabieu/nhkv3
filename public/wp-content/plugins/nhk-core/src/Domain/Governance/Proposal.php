@@ -14,7 +14,7 @@ final readonly class Proposal
         public string $operation,
         public array $payload,
         public string $contentFingerprint,
-        public int $expectedRevision,
+        public ?int $expectedRevision,
         public string $dependencyFingerprint,
         public ProposalState $state = ProposalState::DRAFT,
         public ?string $actor = null,
@@ -39,7 +39,7 @@ final readonly class Proposal
         if ($targetUuid !== null && !UuidCodec::isValid($targetUuid)) {
             throw new InvalidArgumentException('Proposal target UUID is invalid.');
         }
-        if ($expectedRevision < 1) {
+        if ($expectedRevision !== null && $expectedRevision < 1) {
             throw new InvalidArgumentException('Expected revision must be positive.');
         }
         if ($revision < 1) throw new InvalidArgumentException('Proposal revision must be positive.');
@@ -60,7 +60,7 @@ final readonly class Proposal
         // When a target UUID is present it is the stable subject identity;
         // otherwise entity type is the persisted identity available to the
         // repository (the command payload remains part of the content hash).
-        return hash('sha256', $subject . "\n" . $this->operation . "\n" . ($this->targetUuid ?: $subject) . "\n" . $content . "\n" . $this->expectedRevision . "\n" . $dependency);
+        return hash('sha256', $subject . "\n" . $this->operation . "\n" . ($this->targetUuid ?: $subject) . "\n" . $content . "\n" . ($this->expectedRevision === null ? 'null' : (string) $this->expectedRevision) . "\n" . $dependency);
     }
 
     public function transition(ProposalState $state, ?string $decisionActor = null, ?string $at = null, ?string $supersededBy = null): self

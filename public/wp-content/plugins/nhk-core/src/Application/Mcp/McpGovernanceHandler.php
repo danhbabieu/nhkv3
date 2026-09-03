@@ -41,9 +41,11 @@ final class McpGovernanceHandler
         $subjectId = (string) ($arguments['subject_id'] ?? '');
         if ($subjectId === '' && in_array($operation, ['create', 'ingest', 'relation_create'], true)) $subjectId = $entityType !== '' ? $entityType : 'relation';
         $payload = is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [];
-        $expectedRevision = max(1, (int) ($arguments['expected_revision'] ?? 1));
         $targetUuid = isset($arguments['target_uuid']) ? trim((string) $arguments['target_uuid']) : null;
         $targetUuid = $targetUuid !== '' ? $targetUuid : null;
+        $expectedRevision = array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null
+            ? max(1, (int) $arguments['expected_revision'])
+            : (in_array($operation, ['create', 'ingest', 'relation_create'], true) && $targetUuid === null ? null : 1);
         $dependencyIds = is_array($arguments['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $arguments['dependency_ids']))) : [];
         $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencyIds];
         $contentFingerprint = trim((string) ($arguments['content_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($binding));

@@ -18,7 +18,12 @@ final class KnowledgeEnrichmentPlanner
         $relation = (string) ($context['relation'] ?? '');
         if (in_array($relation, ['supports', 'qualifies', 'contradicts'], true)) {
             $classification = $relation === 'supports' ? 'add_evidence' : ($relation === 'qualifies' ? 'qualify' : 'contradict');
-            return [new KnowledgeEnrichmentCandidate($classification, $subjectId, $profile, $observation, ['claim_id' => (string) ($context['claim_id'] ?? ''), 'relation' => $relation])];
+            $claimId = (string) ($context['claim_id'] ?? '');
+            $sourceId = (string) ($context['source_id'] ?? '');
+            $claim = $this->claims->findByCanonicalId($claimId);
+            $source = $this->sources->findByCanonicalId($sourceId);
+            if ($claim === null || $source === null) return [new KnowledgeEnrichmentCandidate('ambiguous', $subjectId, $profile, $observation, ['candidate_kind' => 'evidence_review', 'reason' => 'Claim or source is unresolved', 'claim_id' => $claimId, 'relation' => $relation])];
+            return [new KnowledgeEnrichmentCandidate($classification, $subjectId, $profile, $observation, ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => $relation, 'locator' => $context['locator'] ?? null, 'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : []])];
         }
         $normalized = $this->normalize($observation);
         foreach ($this->claims->list() as $claim) {

@@ -22,10 +22,11 @@ final class GovernedLivingKnowledgeCorrectiveTest extends TestCase
     {
         $subject = UuidCodec::newV7(); $profile = new KnowledgeFacetProfile('recognition', 'variant');
         $claim = new KnowledgeClaim(UuidCodec::newV7(), 'current', 'Cọc đen.', 'fact', ['metadata' => ['subject_id' => $subject, 'facet' => 'recognition', 'scope' => 'variant']]);
-        $planner = $this->planner([$claim]);
-        self::assertSame('add_evidence', $planner->plan($subject, $profile, 'Ảnh xác nhận.', ['relation' => 'supports', 'claim_id' => $claim->canonicalId])[0]->classification);
-        self::assertSame('qualify', $planner->plan($subject, $profile, 'Một số trường hợp.', ['relation' => 'qualifies', 'claim_id' => $claim->canonicalId])[0]->classification);
-        self::assertSame('contradict', $planner->plan($subject, $profile, 'Có trường hợp khác.', ['relation' => 'contradicts', 'claim_id' => $claim->canonicalId])[0]->classification);
+        $source = new Source(UuidCodec::newV7(), 'source', 'Nguồn xác nhận.', 'website', null, ['visibility' => 'PUBLIC']);
+        $planner = $this->planner([$claim], $source);
+        self::assertSame('add_evidence', $planner->plan($subject, $profile, 'Ảnh xác nhận.', ['relation' => 'supports', 'claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId])[0]->classification);
+        self::assertSame('qualify', $planner->plan($subject, $profile, 'Một số trường hợp.', ['relation' => 'qualifies', 'claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId])[0]->classification);
+        self::assertSame('contradict', $planner->plan($subject, $profile, 'Có trường hợp khác.', ['relation' => 'contradicts', 'claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId])[0]->classification);
     }
 
     public function test_scope_mismatch_is_new_claim_and_ambiguous_or_unsupported_fails_closed(): void
@@ -64,10 +65,10 @@ final class GovernedLivingKnowledgeCorrectiveTest extends TestCase
         self::assertSame('MEDIUM', $result['risk']); self::assertTrue($result['allowed']); self::assertTrue($result['stronger_verification_required']); self::assertSame(['description','faq'], $result['changed']);
     }
 
-    private function planner(array $items): KnowledgeEnrichmentPlanner
+    private function planner(array $items, ?Source $source = null): KnowledgeEnrichmentPlanner
     {
-        $claims = new class($items) implements KnowledgeRepository { public function __construct(private array $items) {} public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $claim): KnowledgeClaim { throw new \LogicException(); } public function update(KnowledgeClaim $claim, int $revision): KnowledgeClaim { throw new \LogicException(); } public function list(bool $includeRetired = false): array { return $this->items; } };
-        $sources = new class implements SourceRepository { public function findByCanonicalId(string $id): ?Source { return null; } public function findByStableKey(string $key): ?Source { return null; } public function create(Source $s): Source { throw new \LogicException(); } public function update(Source $s, int $r): Source { throw new \LogicException(); } public function list(bool $i=false): array { return []; } };
+        $claims = new class($items) implements KnowledgeRepository { public function __construct(private array $items) {} public function findByCanonicalId(string $id): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $claim): KnowledgeClaim { throw new \LogicException(); } public function update(KnowledgeClaim $claim, int $revision): KnowledgeClaim { throw new \LogicException(); } public function list(bool $includeRetired = false): array { return $this->items; } };
+        $sources = new class($source) implements SourceRepository { public function __construct(private ?Source $source) {} public function findByCanonicalId(string $id): ?Source { return $this->source?->canonicalId === $id ? $this->source : null; } public function findByStableKey(string $key): ?Source { return null; } public function create(Source $s): Source { throw new \LogicException(); } public function update(Source $s, int $r): Source { throw new \LogicException(); } public function list(bool $i=false): array { return []; } };
         $evidence = new class implements EvidenceRepository { public function findByCanonicalId(string $id): ?Evidence { return null; } public function create(Evidence $e): Evidence { throw new \LogicException(); } public function update(Evidence $e, int $r): Evidence { throw new \LogicException(); } public function listByClaim(string $id, bool $i=false): array { return []; } public function listBySource(string $id, bool $i=false): array { return []; } };
         return new KnowledgeEnrichmentPlanner($claims, $evidence, $sources);
     }
