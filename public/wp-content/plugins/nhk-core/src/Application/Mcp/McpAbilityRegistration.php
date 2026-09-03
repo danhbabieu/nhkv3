@@ -20,6 +20,7 @@ final class McpAbilityRegistration
         'nhk.knowledge.get' => 'nhk-v3/knowledge-get',
         'nhk.source.get' => 'nhk-v3/source-get',
         'nhk.evidence.get' => 'nhk-v3/evidence-get',
+        'nhk.proposal.eligibility' => 'nhk-v3/proposal-eligibility',
     ];
 
     /** @var array<string,string> */
@@ -35,7 +36,6 @@ final class McpAbilityRegistration
         'nhk.article.publish' => 'nhk-v3/article-publish',
         'nhk.article.trash' => 'nhk-v3/article-trash',
         'nhk.article.restore' => 'nhk-v3/article-restore',
-        'nhk.media.ingest' => 'nhk-v3/media-ingest',
         'nhk.video.ingest' => 'nhk-v3/video-ingest',
         'nhk.knowledge.ingest' => 'nhk-v3/knowledge-ingest',
         'nhk.source.ingest' => 'nhk-v3/source-ingest',
@@ -44,8 +44,12 @@ final class McpAbilityRegistration
         'nhk.proposal.submit' => 'nhk-v3/proposal-submit',
         'nhk.proposal.approve' => 'nhk-v3/proposal-approve',
         'nhk.proposal.reject' => 'nhk-v3/proposal-reject',
-        'nhk.proposal.eligibility' => 'nhk-v3/proposal-eligibility',
         'nhk.proposal.apply' => 'nhk-v3/proposal-apply',
+    ];
+
+    /** @var array<string,string> */
+    private const EXPLICIT_EXCLUSION_REASONS = [
+        'nhk.media.ingest' => 'multipart canonical transport; WordPress Ability input cannot carry the file part',
     ];
 
     /** @return list<string> */
@@ -71,6 +75,12 @@ final class McpAbilityRegistration
         return array_values(array_merge(self::READ_TOOL_MAP, self::GOVERNED_TOOL_MAP));
     }
 
+    /** @return array<string,string> */
+    public static function explicitExclusionReasons(): array
+    {
+        return self::EXPLICIT_EXCLUSION_REASONS;
+    }
+
     public static function registerCategory(): void
     {
         if (!function_exists('wp_register_ability_category')) return;
@@ -94,7 +104,7 @@ final class McpAbilityRegistration
                 'input_schema' => (array) $tool['inputSchema'],
                 'output_schema' => ['type' => ['object', 'null']],
                 'execute_callback' => static fn (mixed $input = null): mixed => self::execute($toolName, $read, $input),
-                'permission_callback' => static fn (): bool => self::canRead(),
+                'permission_callback' => static fn (): bool => self::canRead($toolName),
                 'meta' => [
                     'public' => true,
                     'show_in_rest' => true,
@@ -203,9 +213,10 @@ final class McpAbilityRegistration
         }
     }
 
-    private static function canRead(): bool
+    private static function canRead(string $tool): bool
     {
-        return !function_exists('current_user_can') || current_user_can('read');
+        $capability = $tool === 'nhk.proposal.eligibility' ? 'nhk_view_governance' : 'read';
+        return !function_exists('current_user_can') || current_user_can($capability);
     }
 
     private static function label(string $tool): string

@@ -59,9 +59,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertTrue($read->get_meta_item('public'));
         self::assertTrue($read->get_meta_item('show_in_rest'));
         self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $read->get_meta_item('annotations'));
-        $media = wp_get_ability('nhk-v3/media-ingest');
-        self::assertNotNull($media);
-        self::assertSame('NHK Image Intake / Upload Normalization', $media->get_label());
+        self::assertNull(wp_get_ability('nhk-v3/media-ingest'));
         foreach (McpAbilityRegistration::governedAbilityNames() as $abilityName) {
             $ability = wp_get_ability($abilityName);
             self::assertNotNull($ability, $abilityName);

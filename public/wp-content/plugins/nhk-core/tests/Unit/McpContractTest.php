@@ -220,9 +220,9 @@ final class McpContractTest extends TestCase
             'nhk-v3/knowledge-get',
             'nhk-v3/source-get',
             'nhk-v3/evidence-get',
+            'nhk-v3/proposal-eligibility',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
-        self::assertSame('nhk-v3/media-ingest', McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
         self::assertSame([
             'nhk-v3/article-ingest',
@@ -236,7 +236,6 @@ final class McpContractTest extends TestCase
             'nhk-v3/article-publish',
             'nhk-v3/article-trash',
             'nhk-v3/article-restore',
-            'nhk-v3/media-ingest',
             'nhk-v3/video-ingest',
             'nhk-v3/knowledge-ingest',
             'nhk-v3/source-ingest',
@@ -245,11 +244,44 @@ final class McpContractTest extends TestCase
             'nhk-v3/proposal-submit',
             'nhk-v3/proposal-approve',
             'nhk-v3/proposal-reject',
-            'nhk-v3/proposal-eligibility',
             'nhk-v3/proposal-apply',
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
-        self::assertCount(count(McpToolCatalog::tools()), McpAbilityRegistration::abilityNames());
+        self::assertCount(count(McpToolCatalog::tools()) - 1, McpAbilityRegistration::abilityNames());
+    }
+
+    public function test_every_catalog_tool_is_registered_or_has_an_explicit_exclusion_reason(): void
+    {
+        $excluded = McpAbilityRegistration::explicitExclusionReasons();
+
+        foreach (McpToolCatalog::tools() as $tool) {
+            $name = $tool['name'];
+            self::assertTrue(
+                McpAbilityRegistration::abilityNameForTool($name) !== null || isset($excluded[$name]),
+                sprintf('Catalog tool %s is silently omitted from Ability exposure.', $name)
+            );
+            if (isset($excluded[$name])) self::assertNotSame('', trim($excluded[$name]), $name);
+        }
+    }
+
+    public function test_proposal_eligibility_is_read_only_but_capability_gated(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+
+        self::assertSame('read', $tools['nhk.proposal.eligibility']['kind']);
+        self::assertFalse($tools['nhk.proposal.eligibility']['governed']);
+        self::assertSame('nhk-v3/proposal-eligibility', McpAbilityRegistration::abilityNameForTool('nhk.proposal.eligibility'));
+        self::assertContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::readAbilityNames());
+        self::assertNotContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::governedAbilityNames());
+    }
+
+    public function test_multipart_media_ingest_is_explicitly_excluded_from_ability_transport(): void
+    {
+        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
+        self::assertSame(
+            'multipart canonical transport; WordPress Ability input cannot carry the file part',
+            McpAbilityRegistration::explicitExclusionReasons()['nhk.media.ingest']
+        );
     }
 }
