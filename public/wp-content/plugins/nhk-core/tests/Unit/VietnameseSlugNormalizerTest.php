@@ -43,6 +43,22 @@ final class VietnameseSlugNormalizerTest extends TestCase
         self::assertSame('EMPTY_RESULT', $normalizer->normalize('🕰️!!!')->code());
     }
 
+    public function test_normalizes_decomposed_vietnamese_combining_sequences(): void
+    {
+        $result = (new VietnameseSlugNormalizer(20))->normalize("người Việt");
+
+        self::assertTrue($result->isValid());
+        self::assertSame('nguoi-viet', $result->value());
+    }
+
+    public function test_rejects_malformed_utf8_as_unsupported_input(): void
+    {
+        $result = (new VietnameseSlugNormalizer(20))->normalize("malformed \xC3\x28");
+
+        self::assertFalse($result->isValid());
+        self::assertSame('UNSUPPORTED_INPUT', $result->code());
+    }
+
     public function test_rejects_over_limit_without_truncating(): void
     {
         $result = (new VietnameseSlugNormalizer(7))->normalize('abcdefgh');
