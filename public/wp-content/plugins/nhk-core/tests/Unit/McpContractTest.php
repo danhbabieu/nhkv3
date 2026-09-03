@@ -220,7 +220,6 @@ final class McpContractTest extends TestCase
             'nhk-v3/knowledge-get',
             'nhk-v3/source-get',
             'nhk-v3/evidence-get',
-            'nhk-v3/proposal-eligibility',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
@@ -272,8 +271,9 @@ final class McpContractTest extends TestCase
         self::assertSame('read', $tools['nhk.proposal.eligibility']['kind']);
         self::assertFalse($tools['nhk.proposal.eligibility']['governed']);
         self::assertSame('nhk-v3/proposal-eligibility', McpAbilityRegistration::abilityNameForTool('nhk.proposal.eligibility'));
-        self::assertContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::readAbilityNames());
+        self::assertNotContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::readAbilityNames());
         self::assertNotContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::governedAbilityNames());
+        self::assertContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::capabilityGatedReadAbilityNames());
     }
 
     public function test_multipart_media_ingest_is_explicitly_excluded_from_ability_transport(): void

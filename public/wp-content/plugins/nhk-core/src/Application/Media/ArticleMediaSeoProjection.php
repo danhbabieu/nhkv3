@@ -24,8 +24,8 @@ final class ArticleMediaSeoProjection
         if ($this->wordpress !== null) {
             try { $representation = $this->wordpress->attachmentForMedia($media, $asset, (string) ($usages[0]->altText ?? '')); } catch (\Throwable) { $representation = []; }
         }
-        if ($this->wordpress !== null && trim((string) ($representation['url'] ?? '')) === '') return ['state' => MediaSeoStateRegistry::METADATA_INCOMPLETE, 'eligible' => false, 'image_url' => null, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId];
-        return ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'storage_key' => $asset->storageKey, 'image_url' => (string) ($representation['url'] ?? ''), 'src' => (string) ($representation['src'] ?? ''), 'srcset' => (string) ($representation['srcset'] ?? ''), 'sizes' => (string) ($representation['sizes'] ?? ''), 'width' => (int) ($representation['width'] ?? ($asset->width ?? 0)), 'height' => (int) ($representation['height'] ?? ($asset->height ?? 0)), 'alt' => (string) ($representation['alt'] ?? $usages[0]->altText)];
+        $canonical = (new PublicMediaAssetUrlResolver())->path(is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey));
+        return ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true, 'media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'storage_key' => $asset->storageKey, 'image_url' => function_exists('home_url') ? home_url($canonical) : $canonical, 'src' => function_exists('home_url') ? home_url($canonical) : $canonical, 'srcset' => function_exists('home_url') ? home_url($canonical) . ' ' . (int) ($asset->width ?? 0) . 'w' : $canonical, 'sizes' => (string) ($representation['sizes'] ?? ''), 'width' => (int) ($asset->width ?? ($representation['width'] ?? 0)), 'height' => (int) ($asset->height ?? ($representation['height'] ?? 0)), 'alt' => (string) ($representation['alt'] ?? $usages[0]->altText)];
     }
 
     public function isImageSitemapEligible(string $endpointKey): bool

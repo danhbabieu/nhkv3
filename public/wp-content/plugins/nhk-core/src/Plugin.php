@@ -86,6 +86,7 @@ final class Plugin {
             $sources = new WpdbSourceRepository($wpdb);
             $evidence = new WpdbEvidenceRepository($wpdb);
             McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types)));
+            McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
         (new PublicEditorialRoutes())->register();

@@ -85,7 +85,7 @@ final class ArticleMediaPolicyTest extends TestCase
     public function test_managed_image_filename_is_always_contextual_ascii_webp_and_not_camera_name(): void
     {
         $filename = (new MediaFilenameNormalizer())->normalizeWebp('Máy ảnh Odo 36/8', 'image', 'IMG_1234.JPG', 'a71c');
-        self::assertSame('may-anh-odo-36-8-image-a71c.webp', $filename);
+        self::assertSame('may-anh-odo-36-8-a71c.webp', $filename);
         self::assertStringNotContainsString('IMG_1234', $filename);
         self::assertMatchesRegularExpression('/^[a-z0-9][a-z0-9-]*\.webp$/', $filename);
     }
@@ -170,7 +170,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $result = $projection->forPost('1:50');
 
         self::assertTrue($result['eligible']);
-        self::assertSame('https://cdn.example.test/seo-bridge.jpg', $result['image_url']);
+        self::assertSame('/anh/seo-bridge.webp', $result['image_url']);
         self::assertSame('100vw', $result['sizes']);
         self::assertSame('Ảnh mặt trước', $result['alt']);
     }

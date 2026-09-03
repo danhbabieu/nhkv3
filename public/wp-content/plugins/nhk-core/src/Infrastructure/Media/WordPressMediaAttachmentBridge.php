@@ -197,11 +197,12 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     {
         $this->assertAttachment($attachmentId);
         $src = function_exists('wp_get_attachment_image_src') ? wp_get_attachment_image_src($attachmentId, 'large') : false;
-        $url = function_exists('wp_get_attachment_url') ? (string) wp_get_attachment_url($attachmentId) : '';
-        if (function_exists('wp_get_attachment_url') && $url === '') throw new \RuntimeException('WORDPRESS_MEDIA_ATTACHMENT_UNAVAILABLE');
+        $canonicalPath = (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path(is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey));
+        $url = function_exists('home_url') ? (string) home_url($canonicalPath) : $canonicalPath;
+        if ($url === '') throw new \RuntimeException('WORDPRESS_MEDIA_ATTACHMENT_UNAVAILABLE');
         $width = is_array($src) ? (int) ($src[1] ?? 0) : (int) ($asset->width ?? 0);
         $height = is_array($src) ? (int) ($src[2] ?? 0) : (int) ($asset->height ?? 0);
-        return ['attachment_id' => $attachmentId, 'url' => $url, 'src' => is_array($src) ? (string) ($src[0] ?? $url) : $url, 'srcset' => function_exists('wp_get_attachment_image_srcset') ? (string) wp_get_attachment_image_srcset($attachmentId, 'large') : '', 'sizes' => function_exists('wp_get_attachment_image_sizes') ? (string) wp_get_attachment_image_sizes($attachmentId, 'large') : '', 'width' => $width, 'height' => $height, 'alt' => $alt];
+        return ['attachment_id' => $attachmentId, 'url' => $url, 'src' => $url, 'srcset' => $url . ' ' . (int) ($asset->width ?? $width) . 'w', 'sizes' => function_exists('wp_get_attachment_image_sizes') ? (string) wp_get_attachment_image_sizes($attachmentId, 'large') : '', 'width' => (int) ($asset->width ?? $width), 'height' => (int) ($asset->height ?? $height), 'alt' => $alt];
     }
 
     private function assertAttachment(int $attachmentId): void
@@ -214,7 +215,18 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
 
     private function renderImage(int $attachmentId, string $alt): string
     {
-        if (function_exists('wp_get_attachment_image')) return (string) wp_get_attachment_image($attachmentId, 'large', false, ['alt' => $alt, 'loading' => 'lazy']);
+        if (function_exists('wp_get_attachment_image')) {
+            $html = (string) wp_get_attachment_image($attachmentId, 'large', false, ['alt' => $alt, 'loading' => 'lazy']);
+            $mediaId = $this->mediaIdForAttachment($attachmentId);
+            $asset = $mediaId !== null ? ($this->assets->listByMediaId($mediaId)[0] ?? null) : null;
+            if ($asset instanceof MediaAsset) {
+                $url = (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path(is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey));
+                $absolute = function_exists('home_url') ? home_url($url) : $url;
+                $html = (string) preg_replace('/\ssrc="[^"]*"/i', ' src="' . esc_url($absolute) . '"', $html);
+                $html = (string) preg_replace('/\ssrcset="[^"]*"/i', ' srcset="' . esc_url($absolute) . ' ' . (int) ($asset->width ?? 0) . 'w"', $html);
+            }
+            return $html;
+        }
         return '';
     }
 

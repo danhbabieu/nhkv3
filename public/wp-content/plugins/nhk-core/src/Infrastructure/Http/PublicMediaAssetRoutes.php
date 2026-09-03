@@ -13,6 +13,7 @@ final class PublicMediaAssetRoutes
     {
         add_filter('query_vars', function (array $vars): array {
             if (!in_array('nhk_media_asset_key', $vars, true)) $vars[] = 'nhk_media_asset_key';
+            if (!in_array('nhk_media_asset_filename', $vars, true)) $vars[] = 'nhk_media_asset_filename';
             return $vars;
         });
         add_action('init', [$this, 'rewrite']);
@@ -22,13 +23,15 @@ final class PublicMediaAssetRoutes
     public function rewrite(): void
     {
         add_rewrite_rule('^media/asset/([0-9A-Fa-f-]{36})/?$', 'index.php?nhk_media_asset_key=$matches[1]', 'top');
+        add_rewrite_rule('^anh/([^/]+\.webp)/?$', 'index.php?nhk_media_asset_filename=$matches[1]', 'top');
     }
 
     public function serve(): void
     {
         $assetKey = (string) get_query_var('nhk_media_asset_key');
-        if ($assetKey === '') return;
-        $resolved = $this->delivery->resolve(rawurldecode($assetKey));
+        $filename = (string) get_query_var('nhk_media_asset_filename');
+        if ($assetKey === '' && $filename === '') return;
+        $resolved = $assetKey !== '' ? $this->delivery->resolve(rawurldecode($assetKey)) : $this->delivery->resolveByPublicFilename(rawurldecode($filename));
         if ($resolved === null) {
             status_header(404);
             nocache_headers();

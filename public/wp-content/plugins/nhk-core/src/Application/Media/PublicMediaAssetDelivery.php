@@ -48,6 +48,24 @@ final class PublicMediaAssetDelivery
         return ['asset' => $asset, 'path' => $path];
     }
 
+    /** @return array{asset:MediaAsset,path:string}|null */
+    public function resolveByPublicFilename(string $filename): ?array
+    {
+        $wanted = basename(str_replace('\\', '/', trim($filename)));
+        if ($wanted === '') return null;
+        $resolver = new PublicMediaAssetUrlResolver();
+        foreach ($this->media->list() as $media) {
+            if (!$media->active || $media->readiness !== 'ready') continue;
+            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
+                $candidate = is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey);
+                if ($resolver->path($candidate) !== '/anh/' . rawurlencode($wanted)) continue;
+                $resolved = $this->resolve($asset->assetId);
+                if ($resolved !== null) return $resolved;
+            }
+        }
+        return null;
+    }
+
     private function isAbsolute(string $path): bool
     {
         return str_starts_with($path, DIRECTORY_SEPARATOR) || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;

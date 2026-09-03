@@ -10,7 +10,7 @@ final class MediaFilenameNormalizer
         $extension = strtolower((string) pathinfo($originalFilename, PATHINFO_EXTENSION));
         $extension = preg_match('/^(jpe?g|png|webp|avif|gif)$/', $extension) === 1 ? $extension : 'jpg';
         $subject = $this->slug($subject);
-        $view = $this->slug($view);
+        $view = $view === '' ? '' : $this->slug($view);
         $suffix = $this->slug((string) ($uniqueSuffix ?? substr(hash('sha256', $subject . '|' . $view . '|' . $originalFilename), 0, 8)));
         return trim($subject . '-' . $view . '-' . $suffix, '-') . '.' . $extension;
     }
@@ -18,9 +18,11 @@ final class MediaFilenameNormalizer
     public function normalizeWebp(string $subject, string $view, string $context, ?string $uniqueSuffix = null): string
     {
         $subject = $this->slug($subject);
-        $view = $this->slug($view);
-        $suffix = $this->slug((string) ($uniqueSuffix ?? substr(hash('sha256', $subject . '|' . $view . '|' . $context), 0, 8)));
-        return trim($subject . '-' . $view . '-' . $suffix, '-') . '.webp';
+        $view = $view === '' ? '' : $this->slug($view);
+        $parts = [$subject];
+        if ($view !== '' && $view !== 'image') $parts[] = $view;
+        if ($uniqueSuffix !== null && $uniqueSuffix !== '') $parts[] = $this->slug($uniqueSuffix);
+        return trim(implode('-', $parts), '-') . '.webp';
     }
 
     private function slug(string $value): string

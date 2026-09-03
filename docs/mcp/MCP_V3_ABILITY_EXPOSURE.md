@@ -42,11 +42,20 @@ The connector-facing bridge now exposes the minimum governed Video workflow:
 | `nhk.proposal.eligibility` | `nhk-v3/proposal-eligibility` | `nhk_view_governance` |
 | `nhk.proposal.apply` | `nhk-v3/proposal-apply` | `nhk_apply_proposals` |
 
-Each governed Ability delegates to the registered `/nhk/v1/mcp` transport. It
+`nhk.proposal.eligibility` is deliberately a read-only Ability with a
+`nhk_view_governance` capability gate; it is not marked governed merely for
+discoverability. Each governed Ability delegates to the registered `/nhk/v1/mcp` transport. It
 does not write WordPress directly, create a second proposal path or bypass
 MCP validation, capability checks, Proposal → Approval → Eligibility →
 Controlled Apply, audit or Graph execution. The remaining semantic ingest
 writers stay on the custom MCP endpoint until separately reviewed.
+
+`nhk.media.ingest` is explicitly excluded from the Ability bridge because its
+canonical file path is multipart and an Ability callback cannot carry the file
+part. Its metadata/file contract remains on the existing MCP transport; no
+base64, data URL, URL adapter or persistence path is introduced. Every other
+catalog tool is either mapped to an Ability or carries an explicit exclusion
+reason in `McpAbilityRegistration`.
 
 No `wp_create_post`, taxonomy, post meta, direct SQL semantic mutation or ungoverned ability was introduced.
 
@@ -62,4 +71,9 @@ Unit tests assert the exact read and governed allowlists. Guarded integration
 tests assert runtime registration, metadata, capability boundaries and
 authenticated read execution, but the current local WordPress/DB bootstrap is
 unavailable. The custom MCP wire smoke and external Easy MCP deployment call
-verification remain environment-dependent.
+verification remain environment-dependent. On 2026-09-03 the live Easy MCP
+Browser showed `Nhk-v3` as 32/32 enabled (12 read, 20 write), implying 32 Easy
+MCP exposed tools. A separate actual connector/client MCP-29 `tools/list`
+evidence still returned only 8 read/status tools and none of `video-ingest` or
+the Proposal lifecycle; this is an exposure-state blocker (stale snapshot,
+endpoint/profile or authorization scope), not a Video backend failure.

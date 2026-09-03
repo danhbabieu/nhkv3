@@ -20,6 +20,10 @@ final class McpAbilityRegistration
         'nhk.knowledge.get' => 'nhk-v3/knowledge-get',
         'nhk.source.get' => 'nhk-v3/source-get',
         'nhk.evidence.get' => 'nhk-v3/evidence-get',
+    ];
+
+    /** @var array<string,string> */
+    private const CAPABILITY_GATED_READ_TOOL_MAP = [
         'nhk.proposal.eligibility' => 'nhk-v3/proposal-eligibility',
     ];
 
@@ -58,9 +62,15 @@ final class McpAbilityRegistration
         return array_values(self::READ_TOOL_MAP);
     }
 
+    /** @return list<string> */
+    public static function capabilityGatedReadAbilityNames(): array
+    {
+        return array_values(self::CAPABILITY_GATED_READ_TOOL_MAP);
+    }
+
     public static function abilityNameForTool(string $tool): ?string
     {
-        return self::READ_TOOL_MAP[$tool] ?? self::GOVERNED_TOOL_MAP[$tool] ?? null;
+        return self::READ_TOOL_MAP[$tool] ?? self::CAPABILITY_GATED_READ_TOOL_MAP[$tool] ?? self::GOVERNED_TOOL_MAP[$tool] ?? null;
     }
 
     /** @return list<string> */
@@ -72,7 +82,7 @@ final class McpAbilityRegistration
     /** @return list<string> */
     public static function abilityNames(): array
     {
-        return array_values(array_merge(self::READ_TOOL_MAP, self::GOVERNED_TOOL_MAP));
+        return array_values(array_merge(self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP));
     }
 
     /** @return array<string,string> */
@@ -105,6 +115,30 @@ final class McpAbilityRegistration
                 'output_schema' => ['type' => ['object', 'null']],
                 'execute_callback' => static fn (mixed $input = null): mixed => self::execute($toolName, $read, $input),
                 'permission_callback' => static fn (): bool => self::canRead($toolName),
+                'meta' => [
+                    'public' => true,
+                    'show_in_rest' => true,
+                    'annotations' => ['readonly' => true, 'destructive' => false, 'idempotent' => true],
+                ],
+            ]);
+        }
+    }
+
+    public static function registerCapabilityGatedReadAbilities(): void
+    {
+        if (!function_exists('wp_register_ability') || !function_exists('rest_do_request')) return;
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        foreach (self::CAPABILITY_GATED_READ_TOOL_MAP as $toolName => $abilityName) {
+            $tool = $tools[$toolName] ?? null;
+            if (!is_array($tool) || ($tool['kind'] ?? null) !== 'read' || ($tool['governed'] ?? true) !== false) continue;
+            wp_register_ability($abilityName, [
+                'label' => self::label($toolName),
+                'description' => (string) $tool['description'],
+                'category' => self::CATEGORY,
+                'input_schema' => (array) $tool['inputSchema'],
+                'output_schema' => ['type' => ['object', 'null']],
+                'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
+                'permission_callback' => static fn (): bool => self::canGoverned($toolName),
                 'meta' => [
                     'public' => true,
                     'show_in_rest' => true,

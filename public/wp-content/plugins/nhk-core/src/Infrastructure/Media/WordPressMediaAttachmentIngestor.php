@@ -25,6 +25,10 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         if ($source === '' || !is_file($source) || !is_readable($source)) throw new \InvalidArgumentException('File attachment is unavailable.');
         if ($maxWidth < 1 || $maxHeight < 1) throw new \InvalidArgumentException('max_width and max_height must be positive.');
         if ($quality < 1 || $quality > 100) throw new \InvalidArgumentException('quality must be between 1 and 100.');
+        // The managed primary profile is fixed: at most 1600px on either edge.
+        // Caller-supplied limits cannot turn the primary into a thumbnail.
+        $maxWidth = 1600;
+        $maxHeight = 1600;
 
             $safeFilename = $this->safeFilename($filename, $title, $source);
         $work = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
@@ -129,8 +133,9 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $metadata = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($attachmentId) : [];
         $metadata = is_array($metadata) ? $metadata : [];
         $filename = basename($relative);
-        $canonicalUrl = function_exists('wp_get_attachment_url') ? (string) wp_get_attachment_url($attachmentId) : ($baseUrl !== '' && $relative !== '' ? rtrim($baseUrl, '/') . '/' . ltrim($relative, '/') : '');
-        if ($canonicalUrl === '' || $filename === '') return null;
+        if ($filename === '') return null;
+        $canonicalPath = (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path($filename);
+        $canonicalUrl = function_exists('home_url') ? (string) home_url($canonicalPath) : $canonicalPath;
         $result = [
             'attachment_id' => $attachmentId,
             'canonical_url' => $canonicalUrl,
@@ -151,7 +156,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             $result['derivatives'][] = [
                 'size' => (string) $sizeName,
                 'filename' => basename($derivativeFile),
-                'canonical_url' => $baseUrl !== '' ? rtrim($baseUrl, '/') . '/' . ltrim($derivativeRelative, '/') : '',
+                'canonical_url' => function_exists('home_url') ? (string) home_url((new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path((string) $derivative['file'])) : (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->path((string) $derivative['file']),
                 'mime' => (string) ($derivative['mime-type'] ?? $mime),
                 'width' => (int) ($derivative['width'] ?? 0),
                 'height' => (int) ($derivative['height'] ?? 0),
@@ -171,7 +176,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         if (trim($title) === '') throw new \InvalidArgumentException('Trustworthy filename context is required.');
         $checksum = hash_file('sha256', $source);
         if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('WORDPRESS_MEDIA_CHECKSUM_FAILED');
-        return (new MediaFilenameNormalizer())->normalizeWebp($title, 'image', $filename, substr($checksum, 0, 8));
+        return (new MediaFilenameNormalizer())->normalizeWebp($title, 'image', $filename);
     }
 
     private function relativeUploadPath(string $path): string
