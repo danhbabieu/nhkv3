@@ -1,0 +1,60 @@
+pack_supplement:
+  id: nhk-v3-odo-24-configuration-parity
+  date: '2026-09-03'
+  status: owner-confirmed-data-design
+  scope:
+    model: nhk:model:odo.24
+    movement: nhk:movement:odo.24
+    families:
+      - '54'
+      - '57'
+      - '62'
+
+rules:
+  canonical_namespace: odo
+  preserve_existing_uuid: true
+  resolve_before_create: true
+  variant_to_variant_forbidden: true
+  configuration_variants_attach_directly_to_model_24: true
+  uses_movement_24_where_supported: true
+  music_relations_are_evidence_scoped: true
+  infer_music_from_rod_hammer_count: false
+  wordpress_taxonomy_or_postmeta_as_semantic_storage: false
+  governed_mutation_required: true
+
+configuration_template:
+  source_family: '54'
+  apply_to_families:
+    - '54'
+    - '57'
+    - '62'
+  physical_configurations:
+    - rods: 8
+      hammers: 8
+    - rods: 6
+      hammers: 10
+    - rods: 10
+      hammers: 10
+      note: may resolve to multiple Music-specific variants when evidence supports them
+    - rods: 10
+      hammers: 11
+
+runtime_reconciliation:
+  steps:
+    - resolve_existing_identity
+    - detect_legacy_o_do_and_canonical_odo_collisions
+    - reuse_or_rekey_existing_uuid
+    - propose_missing_configuration_variants
+    - propose_registry_valid_relations
+    - controlled_apply
+    - authority_read_back
+    - graph_read_back
+  required_matrix_columns:
+    - family
+    - configuration
+    - variant_uuid
+    - model
+    - movement
+    - music
+    - evidence
+    - runtime_status
