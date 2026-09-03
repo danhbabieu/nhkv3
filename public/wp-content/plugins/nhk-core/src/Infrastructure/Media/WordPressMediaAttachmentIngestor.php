@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Media;
 
+use NHK\Core\Application\Media\MediaFilenameNormalizer;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor as WordPressMediaAttachmentIngestorContract;
 
 /**
@@ -25,7 +26,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         if ($maxWidth < 1 || $maxHeight < 1) throw new \InvalidArgumentException('max_width and max_height must be positive.');
         if ($quality < 1 || $quality > 100) throw new \InvalidArgumentException('quality must be between 1 and 100.');
 
-        $safeFilename = $this->safeFilename($filename, $source);
+            $safeFilename = $this->safeFilename($filename, $title, $source);
         $work = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         $processed = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         if (!is_string($work) || $work === '' || !is_string($processed) || $processed === '') throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_UNAVAILABLE');
@@ -35,7 +36,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             if (!copy($source, $work)) throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_COPY_FAILED');
             $sourceInfo = @getimagesize($work);
             if (!is_array($sourceInfo) || !is_string($sourceInfo['mime'] ?? null)) throw new \InvalidArgumentException('File attachment is not a supported image.');
-            $mime = $this->allowedMime((string) $sourceInfo['mime']);
+            $this->allowedMime((string) $sourceInfo['mime']);
 
             // EXIF orientation is applied before dimensions are measured and
             // before the aspect-preserving resize.
@@ -54,10 +55,13 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
                 if (is_wp_error($resized)) throw new \RuntimeException('WORDPRESS_MEDIA_RESIZE_FAILED');
             }
             if ($editor->set_quality($quality) === false) throw new \RuntimeException('WORDPRESS_MEDIA_QUALITY_FAILED');
-            $saved = $editor->save($processed, $mime);
+            // WebP is the only durable format for this managed image path.
+            // Never pass the source MIME through as a persistence fallback.
+            $saved = $editor->save($processed, 'image/webp');
             if (is_wp_error($saved) || !is_array($saved) || !is_string($saved['path'] ?? null)) throw new \RuntimeException('WORDPRESS_MEDIA_PROCESS_FAILED');
             $processedPath = (string) $saved['path'];
-            $processedMime = $this->allowedMime((string) ($saved['mime-type'] ?? $mime));
+            $processedMime = strtolower((string) ($saved['mime-type'] ?? ''));
+            if ($processedMime !== 'image/webp') throw new \RuntimeException('WORDPRESS_MEDIA_WEBP_UNAVAILABLE');
             $processedInfo = @getimagesize($processedPath);
             if (!is_array($processedInfo)) throw new \RuntimeException('WORDPRESS_MEDIA_PROCESSED_IMAGE_INVALID');
             $width = (int) ($processedInfo[0] ?? 0);
@@ -83,8 +87,12 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             if (is_wp_error($attachmentId) || (int) $attachmentId < 1) throw new \RuntimeException('WORDPRESS_ATTACHMENT_CREATE_FAILED');
             WordPressMediaAttachmentWriteGuard::enter();
             try {
-                $metadata = function_exists('wp_generate_attachment_metadata') ? wp_generate_attachment_metadata((int) $attachmentId, $uploadedPath) : [];
-                if (is_array($metadata) && function_exists('wp_update_attachment_metadata')) wp_update_attachment_metadata((int) $attachmentId, $metadata);
+                // Do not invoke wp_generate_attachment_metadata here: its
+                // global intermediate-size policy can create an unbounded
+                // number of physical files. This scoped ingest stores one
+                // verified primary; derivatives are opt-in future contracts.
+                $metadata = ['width' => $width, 'height' => $height, 'file' => $this->relativeUploadPath($uploadedPath), 'sizes' => []];
+                if (!function_exists('wp_update_attachment_metadata') || wp_update_attachment_metadata((int) $attachmentId, $metadata) === false) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
             } finally {
                 WordPressMediaAttachmentWriteGuard::leave();
             }
@@ -153,26 +161,26 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         return $result;
     }
 
-    private function safeFilename(string $filename, string $source): string
+    private function safeFilename(string $filename, string $title, string $source): string
     {
         $filename = trim(str_replace('\\', '/', $filename));
         $filename = basename($filename);
         if ($filename === '') throw new \InvalidArgumentException('filename is required.');
-        $safe = function_exists('sanitize_file_name') ? sanitize_file_name($filename) : preg_replace('/[^A-Za-z0-9._-]+/', '-', $filename);
-        $safe = is_string($safe) ? trim($safe, '.-') : '';
         $info = @getimagesize($source);
-        $mime = is_array($info) ? (string) ($info['mime'] ?? '') : '';
-        $extension = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            default => '',
-        };
-        if ($safe === '' || $extension === '') throw new \InvalidArgumentException('filename or image MIME is invalid.');
-        $stem = pathinfo($safe, PATHINFO_FILENAME);
-        if ($stem === '') throw new \InvalidArgumentException('filename is invalid.');
-        return $stem . '.' . $extension;
+        if (!is_array($info) || !is_string($info['mime'] ?? null)) throw new \InvalidArgumentException('File attachment is not a supported image.');
+        if (trim($title) === '') throw new \InvalidArgumentException('Trustworthy filename context is required.');
+        $checksum = hash_file('sha256', $source);
+        if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('WORDPRESS_MEDIA_CHECKSUM_FAILED');
+        return (new MediaFilenameNormalizer())->normalizeWebp($title, 'image', $filename, substr($checksum, 0, 8));
+    }
+
+    private function relativeUploadPath(string $path): string
+    {
+        $upload = function_exists('wp_upload_dir') ? wp_upload_dir() : [];
+        $base = is_array($upload) ? realpath((string) ($upload['basedir'] ?? '')) : false;
+        $real = realpath($path);
+        if ($base === false || $real === false || !$this->within($base, $real)) throw new \RuntimeException('WORDPRESS_MEDIA_UPLOAD_PATH_INVALID');
+        return ltrim(str_replace('\\', '/', substr($real, strlen($base))), '/');
     }
 
     private function allowedMime(string $mime): string

@@ -24,7 +24,7 @@ an MCP-managed V3 Article is complete only after the Article Ingest contract.
 | Authority | Authority registry | entity application services | governed revision/lifecycle |
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
-| Media/MediaUsage | Media contexts + WordPress binary | Media service/coordinator | reuse and contextual usage; placeholders incomplete |
+| Media/MediaUsage | Media contexts + WordPress binary | Media service/coordinator | reuse and contextual usage; placeholders incomplete; new managed image bytes normalize to WebP before persistence |
 | Video | Video | Video intake/sync services | governed canonical external reference |
 | Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
 | Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |
@@ -36,6 +36,14 @@ catalog. It reports supported reads/writes, governance, idempotency,
 revision, relation/media/SEO support, read-back and an explicit unsupported
 reason. It must not advertise an operation merely because a future contract
 mentions it. Admin and MCP must use this one source.
+
+The canonical binary transport for a new image is the existing direct
+multipart `nhk.media.ingest` adapter. It validates, orients, resizes, names
+from supplied editorial context, encodes WebP, persists the normalized output,
+reads it back and cleans temporary/source workfiles. It does not use
+base64/data URLs, retain the source filename/binary, invoke global WordPress
+intermediate-size generation, or create semantic inference. No
+`nhk-v3/media-ingest` Ability is authorized or required.
 
 ## Required Article sequence
 

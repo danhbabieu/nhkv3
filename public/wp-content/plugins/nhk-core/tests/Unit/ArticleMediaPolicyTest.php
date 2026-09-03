@@ -82,6 +82,14 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertStringNotContainsString('DSCF8291', $filename);
     }
 
+    public function test_managed_image_filename_is_always_contextual_ascii_webp_and_not_camera_name(): void
+    {
+        $filename = (new MediaFilenameNormalizer())->normalizeWebp('Máy ảnh Odo 36/8', 'image', 'IMG_1234.JPG', 'a71c');
+        self::assertSame('may-anh-odo-36-8-image-a71c.webp', $filename);
+        self::assertStringNotContainsString('IMG_1234', $filename);
+        self::assertMatchesRegularExpression('/^[a-z0-9][a-z0-9-]*\.webp$/', $filename);
+    }
+
     public function test_unknown_keyword_group_is_rejected_at_media_usage_boundary(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

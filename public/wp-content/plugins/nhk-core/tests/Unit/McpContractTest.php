@@ -159,7 +159,7 @@ final class McpContractTest extends TestCase
             public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
             {
                 $this->received = [$file, $filename, $title, $maxWidth, $maxHeight, $quality];
-                return ['attachment_id' => 77, 'canonical_url' => 'https://example.test/wp-content/uploads/photo.jpg', 'filename' => 'photo.jpg', 'mime' => 'image/jpeg', 'width' => 100, 'height' => 80, 'filesize' => 123, 'derivatives' => []];
+                return ['attachment_id' => 77, 'canonical_url' => 'https://example.test/wp-content/uploads/anh-thu-image-a1b2c3d4.webp', 'filename' => 'anh-thu-image-a1b2c3d4.webp', 'mime' => 'image/webp', 'width' => 100, 'height' => 80, 'filesize' => 123, 'derivatives' => []];
             }
             public function read(int $attachmentId): ?array { return null; }
         };

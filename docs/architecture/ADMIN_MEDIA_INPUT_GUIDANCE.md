@@ -43,6 +43,18 @@ identity. Camera-style filenames are normalized by the application boundary
 when enough context exists. Public preferred-image and sitemap projections
 exclude placeholders and non-public assets.
 
-The current slice provides metadata ingestion and policy enforcement. A real
-byte-upload transport and the adapter that maps a WordPress attachment to a
-canonical Media remain separate runtime work and require their own evidence.
+Every new NHK-managed image byte upload must normalize before durable
+persistence: validate, auto-orient, resize, derive a contextual ASCII filename,
+encode WebP, persist the normalized primary, create only contract-required
+WebP derivatives, read back the attachment, and clean up source/work files.
+The original upload name and source binary are not durable public identity. A
+missing trustworthy context fails closed; the adapter must not invent a
+descriptive filename. This policy is scoped to the canonical Media ingest
+boundary and does not infer Authority, Knowledge, Evidence, Graph or
+`depicts`.
+
+The current direct multipart MCP adapter persists one verified WebP primary and
+does not call WordPress's global intermediate-size generator, so this path is
+bounded to one physical image file until a real derivative contract requires
+more. Existing legacy attachments are read-only and are not renamed, rewritten
+or deleted by this policy.

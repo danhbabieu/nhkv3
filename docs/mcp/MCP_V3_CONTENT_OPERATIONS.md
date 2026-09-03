@@ -5,6 +5,13 @@
 
 Status: runtime audit and contract-safe implementation checkpoint, 2026-09-03.
 
+New NHK-managed image bytes follow one scoped ingest law before durable
+persistence: validate → auto-orient → resize → contextual SEO-safe filename →
+WebP encode → normalized persistence → only required WebP derivatives →
+read-back verification → temporary/source cleanup. Missing trustworthy naming
+context and unavailable WebP conversion fail closed; original JPEG/PNG is not
+stored silently. Existing legacy files are not rewritten or deleted.
+
 This shared guide describes the MCP V3 runtime actually present for ChatGPT and
 Codex. It does not authorize new entity types, predicates, relation types,
 fields, operations, taxonomy or data population.
@@ -43,7 +50,7 @@ must not be replaced by a static catalog assertion.
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
-| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or WordPress image attachment | WRITE | Yes | Metadata path uses Governance; file path writes processed WP attachment | Usage is placement; file path is adapter-only | READY for metadata and direct image attachment |
+| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or WordPress image attachment | WRITE | Yes | Metadata path uses Governance; file path writes normalized WebP attachment | Usage is placement; file path is adapter-only | READY for metadata and direct multipart image attachment; runtime byte proof pending |
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
 | `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; source/review gates explicit |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |

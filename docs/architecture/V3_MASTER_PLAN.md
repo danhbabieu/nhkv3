@@ -17,6 +17,14 @@ plane mapping and catalog-derived `McpCapabilityManifest` are present. This is
 documentation plus a read-only capability boundary only; the full research
 inventory/planner, editorial/taxonomy gateways and Admin parity remain open.
 
+Media ingest policy checkpoint (2026-09-03): the existing direct multipart
+`nhk.media.ingest` adapter is the single canonical binary transport. New
+managed image bytes are validated, oriented, resized, contextually named and
+encoded to WebP before persistence; the scoped path stores one verified
+primary and bypasses global WordPress intermediate-size generation. Source
+binary/name retention, semantic inference and a new Ability facade remain
+forbidden. Runtime byte-level integration evidence remains pending.
+
 | Phase | Status | Evidence / next gate |
 |---|---|---|
 | P0 Bootstrap | ACCEPTED/CLOSED | Repository and V3 boundaries established. |

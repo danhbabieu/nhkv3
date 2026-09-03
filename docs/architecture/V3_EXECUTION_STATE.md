@@ -21,6 +21,17 @@ coverage for every registered endpoint type and the complete acceptance matrix
 also remain open. No Post, taxonomy, semantic record, Graph edge, Media,
 Video, proposal or live data was mutated.
 
+## Media ingest policy contract checkpoint — 2026-09-03
+
+The existing `nhk.media.ingest` direct multipart adapter remains the one
+canonical binary transport; no `nhk-v3/media-ingest` Ability or second
+persistence path is introduced. The policy requires pre-persistence image
+validation, EXIF orientation, bounded resize, contextual ASCII-safe filename,
+WebP encoding, read-back and workfile/source cleanup. The scoped direct path
+stores one primary WebP and bypasses global WordPress intermediate-size
+generation; derivatives are allowed only when a real use contract requires
+them. Existing legacy files remain untouched.
+
 ## P0 content-operations planning boundary — 2026-09-03
 
 The first read-only slice of the MCP/Admin Content Operations Control Plane is
@@ -2959,3 +2970,23 @@ and the future no-mutation cutover packet is
 No demo, V2, staging, production, WordPress Post, semantic record, Graph edge,
 proposal or database row was changed. Unrelated concurrent worktree changes
 remain unmodified and unstaged.
+
+## Odo generic capability and authenticated-read gate — 2026-09-03
+
+The generic rekey/merge slice is complete in the current worktree. Graph
+incoming and outgoing movement now verifies retired source edges correctly and
+retains an active target triple; direct adapter coverage includes move and
+dedupe cases. Focused Odo gates pass: 42 tests / 223 assertions, changed PHP
+lint passes, Composer validation passes with the existing no-license warning,
+and `git diff --check` is clean. The approved surface matrix is authoritative:
+Knowledge, Source, Evidence, MediaUsage and Video are `NOT_APPLICABLE` for
+direct Authority merge adapters, and `wp_post` is `GRAPH_ONLY`.
+
+The demo public read evidence is retained, but the required administrator
+Graph inbound/outbound read could not be authenticated in this runner. The
+project contains no deploy or demo admin credential/configuration, and no
+secret was printed or committed. The exact stop is
+`DEMO_ADMIN_SEMANTIC_CREDENTIAL_REQUIRED`; do not create proposals from
+unverified revisions, deploy without the standard deployment authority, or
+perform controlled apply. No demo, staging, production, V2, WordPress Post,
+semantic record, Graph edge or proposal was mutated.
