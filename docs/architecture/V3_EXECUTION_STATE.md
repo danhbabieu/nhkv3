@@ -3149,6 +3149,16 @@ The native publication writer read-backs after uncertain transitions and records
 `PUBLICATION_RESULT_UNCERTAIN` as retryable when the final state cannot be
 verified, preventing duplicate publication action on retry.
 
+## DEMO cutover infrastructure design checkpoint — 2026-09-03
+
+Approved design written to
+`docs/superpowers/specs/2026-09-03-demo-cutover-infrastructure-design.md`.
+The design defines a thin shell, generic PHP orchestration, explicit
+`demo.1945.vn` allowlisting, deterministic `nhk-core` deployment, authenticated
+runtime preflight, live-revision proposal planning, human approval before
+Controlled Apply, read-back and redacted evidence. Implementation is approved
+but real DEMO deployment/cutover remains explicitly out of scope.
+
 Focused evidence: 12 tests / 40 assertions pass, with one existing PHPUnit
 deprecation. Full suite: 426 tests, 1625 assertions, 8 integration errors and
 12 guarded-acceptance failures caused by unavailable WordPress bootstrap/DB;
