@@ -3394,3 +3394,28 @@ completes with 8 existing WordPress bootstrap errors, 12 guarded integration
 failures, 74 skips and 1 deprecation. Composer validation and `git diff
 --check` pass. No code, domain/backend, semantic data, WordPress data or
 external deployment was mutated.
+
+## DEMO remote runtime adapter continuation — 2026-09-03
+
+The cutover transport now includes `RemoteRuntimeAdapter`, which invokes only
+the versioned `nhk-core/bin/nhk-core-maintenance.php` entrypoint over the
+allowlisted SSH target. The entrypoint loads the real WordPress boundary at
+the remote `public/wp-load.php`, supports only `health`, `inventory`,
+`dry-run`, `backup/snapshot`, `governance-plan`, `controlled-apply` and
+`read-back`, and rejects unknown operations without transport. Health and
+inventory are read-only; snapshot output is written outside the public root
+with a SHA-256 receipt. No SQL/eval/arbitrary WordPress mutation interface is
+exposed.
+
+`LocalCutoverAdapters` now routes `verify` to remote health and `preflight` to
+remote inventory after deployment. Focused Demo/runtime coverage passes 14
+tests / 48 assertions; Composer validation, PHP lint and `git diff --check`
+pass; the changed-file secret review found no credentials or private keys.
+The requested command still stops before transport with
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED` because no external deployment config is
+present. Full PHPUnit completes with 460 tests, 8 pre-existing WordPress
+bootstrap errors, 12 mandatory integration failures, 74 skips, 1 warning and
+1 deprecation. No remote deployment, inventory, snapshot, proposal, approval,
+apply, WordPress data or semantic data was changed. Governance wiring for the
+remaining remote planning/apply operations and the constitutional human
+cutover gate remain required before any demo mutation can be considered.

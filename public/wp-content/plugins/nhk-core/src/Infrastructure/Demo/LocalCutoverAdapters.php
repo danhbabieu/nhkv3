@@ -18,11 +18,14 @@ final class LocalCutoverAdapters
                 : StageResult::blocked('LOCAL_SAFETY_FAILED');
         };
         $deployment = RemoteDeploymentAdapter::fromEnvironment($root);
+        $runtime = RemoteRuntimeAdapter::fromEnvironment();
         $deploy = static fn (DemoCutoverContext $context): StageResult => $deployment->deploy($context);
+        $verify = static fn (DemoCutoverContext $context): StageResult => $runtime->run($context, 'health');
+        $preflight = static fn (DemoCutoverContext $context): StageResult => $runtime->run($context, 'inventory');
         $unavailable = static fn (): StageResult => StageResult::blocked('REMOTE_RUNTIME_ADAPTER_UNAVAILABLE');
         $pass = static fn (): StageResult => StageResult::pass();
         return new CutoverPorts(
-            $safety, $deploy, $pass, $unavailable, $unavailable, $unavailable, $unavailable,
+            $safety, $deploy, $verify, $preflight, $unavailable, $unavailable, $unavailable,
             static fn (): StageResult => StageResult::blocked('LIVE_PLANNER_ADAPTER_UNAVAILABLE'),
             static fn (): StageResult => StageResult::blocked('GOVERNANCE_ADAPTER_UNAVAILABLE'),
             static fn (): StageResult => StageResult::blocked('HUMAN_APPROVAL_REQUIRED'),

@@ -39,4 +39,19 @@ final class DemoCutoverCliContractTest extends TestCase
         self::assertNotSame(0, $status);
         self::assertStringContainsString('PACK_MANIFEST_UNAVAILABLE', implode("\n", $output));
     }
+
+    public function test_remote_entrypoint_has_fixed_bootstrap_and_operation_allowlist(): void
+    {
+        $path = dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php';
+        self::assertFileExists($path);
+        $contents = file_get_contents($path);
+        self::assertIsString($contents);
+        self::assertStringContainsString("\$wordpressRoot . '/wp-load.php'", $contents);
+        foreach (['health', 'inventory', 'dry-run', 'backup/snapshot', 'governance-plan', 'controlled-apply', 'read-back'] as $operation) {
+            self::assertStringContainsString("'{$operation}'", $contents);
+        }
+        self::assertStringNotContainsString('eval(', $contents);
+        self::assertStringNotContainsString('UPDATE ', $contents);
+        self::assertStringNotContainsString('DELETE ', $contents);
+    }
 }
