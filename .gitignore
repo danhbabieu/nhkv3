@@ -5,6 +5,15 @@ wp-content/uploads/
 wp-content/cache/
 wp-content/upgrade/
 wp-content/debug.log
+public/wp-content/uploads/
+public/wp-content/cache/
+public/wp-content/upgrade/
+public/wp-content/debug.log
+error_log
+
+# Server-local WordPress plugins
+public/wp-content/plugins/easy-mcp-ai/
+public/wp-content/plugins/pdev-image-optimizer/
 
 # Dependencies and local tooling
 vendor/
