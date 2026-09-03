@@ -63,6 +63,7 @@ must not be replaced by a static catalog assertion.
 | `nhk.evidence.ingest` | Evidence | WRITE | Yes | Apply/revision governed | Claim/Source boundary | READY |
 | `nhk.proposal.create` | Governance envelope | WRITE | Yes | `expected_revision` | `relation_create` allowed | PARTIAL; final validation at apply |
 | `nhk.proposal.submit` | Governance | WRITE | Yes | Proposal revision | N/A | READY |
+| `nhk.proposal.review` | Governance | READ | capability-gated | N/A | N/A | READY; returns approval bindings |
 | `nhk.proposal.approve` | Governance | WRITE | Yes | Fingerprints bind approval | N/A | READY |
 | `nhk.proposal.reject` | Governance | WRITE | Yes | Proposal revision | N/A | READY |
 | `nhk.proposal.eligibility` | Governance check | READ | capability-gated | Revision/dependencies | N/A | READY |

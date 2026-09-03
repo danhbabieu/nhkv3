@@ -15,6 +15,25 @@ final class McpGovernanceHandler
     public function __construct(private GovernanceService $governance, private ?ProposalEligibilityService $eligibility = null, private ?ControlledApplyService $apply = null) {}
 
     public function create(Proposal $proposal): Proposal { return $this->governance->create($proposal); }
+    public function review(string $id): array
+    {
+        $proposal = $this->governance->review($id);
+        return [
+            'proposal_id' => $proposal->id,
+            'state' => $proposal->state->value,
+            'entity_type' => $proposal->entityType,
+            'operation' => $proposal->operation,
+            'subject_id' => $proposal->subjectId,
+            'target_uuid' => $proposal->targetUuid,
+            'payload' => $proposal->payload,
+            'expected_revision' => $proposal->expectedRevision,
+            'revision' => $proposal->revision,
+            'content_fingerprint' => $proposal->contentFingerprint,
+            'dependency_fingerprint' => $proposal->dependencyFingerprint,
+            'created_at' => $proposal->createdAt,
+            'updated_at' => $proposal->updatedAt,
+        ];
+    }
     public function createFromArguments(array $arguments): Proposal
     {
         $operation = (string) ($arguments['operation'] ?? '');

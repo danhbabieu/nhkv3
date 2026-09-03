@@ -104,6 +104,26 @@ final class GovernanceCoreTest extends TestCase
         self::assertNull($proposal->targetUuid);
     }
 
+    public function test_review_returns_binding_fingerprints_after_submit(): void
+    {
+        $handler = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
+        $created = $handler->createFromArguments([
+            'operation' => 'create', 'entity_type' => 'brand',
+            'payload' => ['stable_key' => 'nhk:brand:review'],
+            'content_fingerprint' => 'content-review',
+            'dependency_fingerprint' => 'dependency-review',
+            'idempotency_key' => 'review-key',
+        ]);
+        $handler->submit($created->id);
+
+        $review = $handler->review($created->id);
+
+        self::assertSame($created->id, $review['proposal_id']);
+        self::assertSame('content-review', $review['content_fingerprint']);
+        self::assertSame('dependency-review', $review['dependency_fingerprint']);
+        self::assertSame('submitted', $review['state']);
+    }
+
     public function test_rekey_proposal_idempotency_key_replays_identical_binding_and_rejects_changed_payload(): void
     {
         $service = new GovernanceService(new InMemoryProposalRepository());

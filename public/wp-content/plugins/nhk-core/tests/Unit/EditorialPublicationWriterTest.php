@@ -18,6 +18,22 @@ final class EditorialPublicationWriterTest extends TestCase
         self::assertTrue($first['ok']); self::assertSame('publish', $first['post']['status']); self::assertSame($first['post_id'] ?? 1, $second['post']['post_id']);
     }
 
+    public function test_publish_returns_permitted_incompleteness_warnings(): void
+    {
+        $posts = new PublicationFakeEditorialStore(); $gateway = new EditorialDraftGateway($posts, new PublicationFakeReceiptRepo());
+        $created = $gateway->create(['idempotency_key' => 'writer-warning', 'title' => 'T', 'content' => 'B']);
+        $evidence = array_fill_keys(['research_acceptable','subject_resolved','duplicate_intent_handled','category_resolved','semantic_plan_complete','semantic_readback_verified','media_usage_complete','claim_compliance_acceptable','seo_projection_valid','public_route_ready'], true);
+        $evidence['real_image_requirements_met'] = false;
+        $evidence['internal_links_valid'] = false;
+        $evidence['structured_data_status'] = 'incomplete';
+        $evidence['rendered_public_verification_status'] = 'unavailable';
+
+        $result = $gateway->publish(1, $created['state_token'], $evidence, 'publish-warning');
+
+        self::assertTrue($result['ok']);
+        self::assertContains('REAL_IMAGE_INCOMPLETE', $result['publication_warnings']);
+    }
+
     public function test_trash_and_restore_are_cas_protected_and_idempotent(): void
     {
         $posts = new PublicationFakeEditorialStore(); $gateway = new EditorialDraftGateway($posts, new PublicationFakeReceiptRepo());

@@ -31,6 +31,12 @@ final class GovernanceService
         return $saved;
     }
 
+    public function review(string $id): Proposal
+    {
+        $this->authorizer?->require('nhk_view_governance');
+        return $this->get($id);
+    }
+
     public function submit(string $id): Proposal
     {
         $this->authorizer?->require('nhk_submit_proposals');

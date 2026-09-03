@@ -49,6 +49,7 @@ final class McpContractTest extends TestCase
             'nhk.evidence.ingest',
             'nhk.proposal.create',
             'nhk.proposal.submit',
+            'nhk.proposal.review',
             'nhk.proposal.approve',
             'nhk.proposal.reject',
             'nhk.proposal.eligibility',
@@ -123,6 +124,15 @@ final class McpContractTest extends TestCase
         self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.proposal.create']['inputSchema']['properties']['target_uuid']['pattern']);
         self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.proposal.create']['inputSchema']['properties']['dependency_ids']['items']['pattern']);
         self::assertSame(1, $tools['nhk.proposal.create']['inputSchema']['properties']['expected_revision']['minimum']);
+    }
+
+    public function test_proposal_review_is_read_only_and_exposes_approval_bindings(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertArrayHasKey('nhk.proposal.review', $tools);
+        self::assertFalse($tools['nhk.proposal.review']['governed']);
+        self::assertSame(['id'], $tools['nhk.proposal.review']['inputSchema']['required']);
+        self::assertSame('nhk-v3/proposal-review', McpAbilityRegistration::abilityNameForTool('nhk.proposal.review'));
     }
 
     public function test_media_ingest_declares_complete_nested_asset_and_usage_contracts(): void

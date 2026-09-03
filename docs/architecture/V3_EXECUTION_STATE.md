@@ -4,6 +4,40 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Semantic reconciliation and publication-gate continuation — 2026-09-03
+
+Root-cause investigation found that Article research wiring collapsed
+`research_subject` to one `{type: ...}` object, so explicit Brand + Music scope
+could not resolve deterministically. The inventory reader now preserves an
+explicit subject map/list, reads each subject through the existing resolver,
+and traverses Graph with the bootstrapped predicate registry; it does not infer
+subjects or relations from title/name text. Missing relations remain empty or
+diagnostic and are never fabricated.
+
+Governance now exposes a read-only proposal review path through the existing
+service, MCP catalog/transport/Ability bridge and REST API. Review returns the
+proposal state, identity, operation, payload, revision and both binding
+fingerprints needed for a valid approval, completing the submit → review →
+approve handoff without weakening fingerprint checks.
+
+`ArticlePublicationGate` now distinguishes permitted operational incompleteness
+from hard integrity failures: missing real imagery, incomplete optional link or
+structured-data enrichment, and explicitly unavailable rendered verification
+are warnings; invalid structured state, unresolved subject, missing semantic
+read-back, route/identity conflict, CAS conflict and compliance failure remain
+hard blockers. New/modified factual claims marked by the research packet as
+such require `SUPPORTED_WITHIN_SCOPE` Evidence; explicitly legacy claims with
+evidence debt emit a warning only. No legacy data, Post, Graph edge, semantic
+record, proposal or live runtime was mutated.
+
+Fresh evidence: focused regression suite `35 tests / 227 assertions` passes
+with one existing PHPUnit deprecation; changed PHP files lint clean and
+`git diff --check` passes. Full suite remains environment-blocked by the
+pre-existing WordPress bootstrap/database errors and mandatory integration
+runtime failures documented below; no READY runtime claim is made. The
+Post-75 acceptance path still requires guarded runtime data/read-back evidence
+against the exact environment and is not claimed complete.
+
 ## Managed image primary policy checkpoint — 2026-09-03
 
 The direct multipart image adapter now enforces `MAX_LONG_EDGE = 2048` for

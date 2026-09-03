@@ -117,6 +117,7 @@ final class McpToolCatalog
                 'idempotency_key' => ['type' => 'string'],
             ], ['operation', 'payload'], true),
             self::tool('nhk.proposal.submit', 'Submit a governed proposal for review.', ['id' => self::uuidField()], ['id'], true),
+            self::tool('nhk.proposal.review', 'Read a governed proposal and its approval binding fingerprints.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.proposal.approve', 'Approve a governed proposal with binding fingerprints.', ['id' => self::uuidField(), 'content_fingerprint' => ['type' => 'string'], 'dependency_fingerprint' => ['type' => 'string']], ['id', 'content_fingerprint', 'dependency_fingerprint'], true),
             self::tool('nhk.proposal.reject', 'Reject a governed proposal.', ['id' => self::uuidField()], ['id'], true),
             self::tool('nhk.proposal.eligibility', 'Check whether a proposal is eligible for controlled apply.', ['id' => self::uuidField()], ['id']),

@@ -66,9 +66,11 @@ final class EditorialDraftGateway
         $current = $this->posts->read($postId);
         if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
         if (!hash_equals($expectedStateToken, $current->token)) return ['ok' => false, 'reason' => 'EDITORIAL_STATE_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token];
+        $publicationWarnings = [];
         if ($intent === 'publish') {
             $gate = (new ArticlePublicationGate())->check($current, $evidence, $expectedStateToken);
             if (!$gate->eligible) return ['ok' => false, 'reason' => 'PUBLICATION_BLOCKED', 'blockers' => $gate->blockers, 'post' => $current->snapshot()];
+            $publicationWarnings = $gate->warnings;
             try {
                 $state = $this->posts->publish($postId);
             } catch (\Throwable $error) {
@@ -88,7 +90,7 @@ final class EditorialDraftGateway
             if ($current->status === 'trash') $state = $this->posts->restore($postId); else $state = $current;
         }
         $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $state->endpointKey, $state->postId, 'editorial', ArticleIngestOutcome::COMPLETED, false, [], [], [], 1, null, null, $state->token, [], [], [], ['status' => $state->status], $this->withoutBody($evidence)));
-        return ['ok' => true, 'post' => $state->snapshot(), 'state_token' => $state->token, 'receipt' => $receipt->toArray()];
+        return ['ok' => true, 'post' => $state->snapshot(), 'state_token' => $state->token, 'receipt' => $receipt->toArray(), 'publication_warnings' => $publicationWarnings];
     }
 
     /** @return array<string,mixed> */

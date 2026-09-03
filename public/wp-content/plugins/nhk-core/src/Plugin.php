@@ -166,7 +166,7 @@ final class Plugin {
             (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus()))->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
-            $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $graphService = new GraphService($graphRepository, $endpoints, new PredicateRegistry(), new WpdbAuditSink());
+            $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink());
             $publicStatus = new MigrationStatus();
             $publicContexts = new StructuralContextQuery($graphService, $authority);
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
@@ -185,7 +185,7 @@ final class Plugin {
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight(
                 $endpoints,
-                new PredicateRegistry(),
+                $predicates,
                 $types,
                 static function (string $type, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): bool {
                     if (!\NHK\Core\Shared\Uuid\UuidCodec::isValid($id)) return false;
@@ -227,14 +227,27 @@ final class Plugin {
             $articleResearch = new ArticleResearchPreflight(
                 static function (array $input) use ($researchResolver): array {
                     $subject = is_array($input['subject'] ?? null) ? $input['subject'] : [];
-                    $type = trim((string) ($subject['type'] ?? ''));
-                    if ($type === '') return ['status' => 'ambiguous', 'candidates' => []];
-                    $resolved = $researchResolver->resolve([$type => $subject]);
-                    if (($resolved['ambiguities'][$type] ?? null) !== null) return ['status' => 'ambiguous', 'candidates' => $resolved['candidates'][$type] ?? []];
-                    if (isset($resolved['resolved'][$type])) return ['status' => 'resolved', 'primary' => $resolved['resolved'][$type]];
-                    return ['status' => 'not_found'];
+                    $context = [];
+                    if (isset($subject['type'])) {
+                        $type = trim((string) $subject['type']);
+                        if ($type !== '') $context[$type] = $subject;
+                    } elseif (is_array($subject['subjects'] ?? null)) {
+                        foreach ($subject['subjects'] as $item) {
+                            $type = trim((string) ($item['type'] ?? ''));
+                            if ($type !== '') $context[$type] = $item;
+                        }
+                    } else {
+                        foreach ($subject as $type => $item) if (is_array($item) && trim((string) $type) !== '') $context[(string) $type] = $item;
+                    }
+                    if ($context === []) return ['status' => 'ambiguous', 'candidates' => []];
+                    $resolved = $researchResolver->resolve($context);
+                    foreach ($resolved['conflicts'] as $type => $conflict) return ['status' => 'ambiguous', 'candidates' => $resolved['candidates'][$type] ?? [], 'conflict' => $conflict];
+                    foreach ($resolved['ambiguities'] as $type => $_reason) return ['status' => 'ambiguous', 'candidates' => $resolved['candidates'][$type] ?? []];
+                    if (count($resolved['resolved']) !== count($context)) return ['status' => 'not_found', 'resolved' => $resolved['resolved']];
+                    $subjects = array_values($resolved['resolved']);
+                    return ['status' => 'resolved', 'primary' => $subjects[0], 'subjects' => $subjects, 'resolved' => $resolved['resolved']];
                 },
-                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $videos, $graphService): array {
+                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $videos, $graphService, $predicates): array {
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
                     $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
                     $authorityRows = [];
@@ -257,12 +270,17 @@ final class Plugin {
                     $mediaRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'ready' => $item->readiness === 'ready', 'public' => $item->active], $media->list());
                     $videoRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'public' => $item->active && $item->hasValidPublicReference()], $videos->list());
                     $relations = [];
-                    if ($primary !== []) {
+                    $subjects = is_array($input['subject_resolution']['subjects'] ?? null) ? $input['subject_resolution']['subjects'] : ($primary !== [] ? [$primary] : []);
+                    if ($subjects !== []) {
                         try {
-                            $ref = new \NHK\Core\Domain\Graph\NodeReference((string) $primary['type'], (string) $primary['id']);
-                            $related = (new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy(new PredicateRegistry())))->query($ref, [], 2, 50);
-                            foreach ($related['items'] as $item) $relations[] = ['class' => $item['relationship_class'], 'predicate' => $item['best_path'][array_key_last($item['best_path'])]['predicate'] ?? '', 'target_id' => $item['target_entity_id'], 'target_type' => $item['target_entity_type'], 'path' => $item['best_path'], 'reason' => 'registered Graph traversal'];
-                            foreach ($graphService->findIncoming($ref, null, 0, 50)['items'] as $edge) { $postRef = $edge->source->reference; if ($postRef->endpoint_type !== 'wp_post') continue; foreach ($posts as &$post) if ($post['id'] === substr($postRef->endpoint_key, strpos($postRef->endpoint_key, ':') + 1)) $post['subject_ids'][] = $primary['id']; unset($post); }
+                            $query = new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy($predicates));
+                            foreach ($subjects as $subject) {
+                                $ref = new \NHK\Core\Domain\Graph\NodeReference((string) $subject['type'], (string) $subject['id']);
+                                $related = $query->query($ref, [], 2, 50);
+                                foreach ($related['items'] as $item) $relations[$item['target_entity_type'].':'.$item['target_entity_id']] = ['class' => $item['relationship_class'], 'predicate' => $item['best_path'][array_key_last($item['best_path'])]['predicate'] ?? '', 'target_id' => $item['target_entity_id'], 'target_type' => $item['target_entity_type'], 'path' => $item['best_path'], 'reason' => 'registered Graph traversal'];
+                                foreach ($graphService->findIncoming($ref, null, 0, 50)['items'] as $edge) { $postRef = $edge->source->reference; if ($postRef->endpoint_type !== 'wp_post') continue; foreach ($posts as &$post) if ($post['id'] === substr($postRef->endpoint_key, strpos($postRef->endpoint_key, ':') + 1)) $post['subject_ids'][] = $subject['id']; unset($post); }
+                            }
+                            $relations = array_values($relations);
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
                     return ['status' => 'available', 'posts' => $posts, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];

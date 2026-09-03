@@ -70,4 +70,18 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertFalse($result->seoBlueprint['media_complete']);
         self::assertContains('CATEGORY_MISSING', $result->warnings);
     }
+
+    public function test_new_factual_claim_without_applied_evidence_is_a_hard_preflight_blocker(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'brand-1', 'type' => 'brand']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [], 'categories' => [['slug' => 'odo']], 'knowledge' => [['id' => 'claim-1', 'new_or_modified' => true, 'evidence_status' => 'NO_EVIDENCE']], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Phương pháp Odo', ['type' => 'brand', 'name' => 'Odo']);
+
+        self::assertContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
+        self::assertFalse($result->readyForDraft);
+    }
 }

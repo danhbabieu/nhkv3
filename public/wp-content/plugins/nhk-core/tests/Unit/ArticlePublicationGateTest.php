@@ -39,6 +39,24 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('CANONICAL_PUBLIC_IDENTITY_INVALID', $result->blockers);
     }
 
+    public function test_soft_incomplete_media_links_optional_data_and_rendered_unavailability_do_not_block(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['real_image_requirements_met'] = false;
+        $evidence['internal_links_valid'] = false;
+        $evidence['structured_data_valid'] = false;
+        $evidence['structured_data_status'] = 'incomplete';
+        $evidence['rendered_public_verification'] = false;
+        $evidence['rendered_public_verification_status'] = 'unavailable';
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertSame([], $result->blockers);
+        self::assertContains('REAL_IMAGE_INCOMPLETE', $result->warnings);
+        self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->warnings);
+    }
+
     /** @return array<string,bool> */
     private function evidence(): array
     {
