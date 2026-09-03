@@ -298,7 +298,7 @@ final class Plugin {
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $draftGateway = new EditorialDraftGateway(new WpEditorialPostStore($articleEditorial), $articleReceipts);
-            $youtubeClient = trim((string) getenv('NHK_YOUTUBE_API_KEY')) !== '' ? static fn (object $identity): array => (new YouTubeDataApiClient())->fetch($identity) : null;
+            $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient())->fetch($identity);
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));

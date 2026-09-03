@@ -63,11 +63,12 @@ final class VideoIntakeService
             'source_rights' => VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE,
             'chapters' => $chapters,
         ];
+        if ($resolution->diagnostic !== null) $package['source_diagnostic'] = $resolution->diagnostic;
         $complete = $this->completeness->evaluate($package);
         $package['completeness'] = ['publishable' => $complete->publishable, 'blockers' => $complete->blockers, 'warnings' => $complete->warnings];
         $watchPath = PublicRouteResolver::videoPath((string) $editorial['title'], (string) $snapshot['external_video_id']) ?? '/video/' . strtolower((string) $snapshot['external_video_id']) . '/';
         $package['seo_projection'] = $this->seo->project($package, $watchPath);
-        $warnings = array_values(array_unique(array_merge($complete->blockers, $complete->warnings, $category['warnings'] ?? [])));
+        $warnings = array_values(array_unique(array_merge($complete->blockers, $complete->warnings, $category['warnings'] ?? [], $resolution->diagnostic !== null ? [$resolution->diagnostic] : [])));
         return new VideoIntakePreview($videoId, $existing === null ? 'ingest' : 'update', $existing?->revision ?? 1, $package, $warnings, $research['ambiguous']);
     }
 

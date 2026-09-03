@@ -26,6 +26,7 @@ use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\{
     TranscriptPolicy,
     Video,
+    VideoException,
     VideoSourceRights,
     YouTubeSourceSnapshot
 };
@@ -92,6 +93,95 @@ final class VideoSemanticCoreTest extends TestCase
             self::fail('Expected API rate limit.');
         } catch (\NHK\Core\Domain\Video\VideoException $error) {
             self::assertSame('API_RATE_LIMIT', $error->getMessage());
+            self::assertStringNotContainsString('secret-key', $error->getMessage());
+        }
+    }
+
+    public function test_youtube_api_client_fetches_public_metadata_and_records_fetch_time(): void
+    {
+        $calls = 0;
+        $client = new YouTubeDataApiClient('secret-key', static function (string $url, array $options) use (&$calls): array {
+            $calls++;
+            self::assertStringContainsString('id=dQw4w9WgXcQ', $url);
+            self::assertSame(8, $options['timeout']);
+            return ['response' => ['code' => 200], 'body' => json_encode(['items' => [[
+                'snippet' => ['channelId' => 'UCnhk', 'channelTitle' => 'NHK Archive', 'title' => 'Odo 36/8', 'description' => 'Mô tả nguồn.', 'publishedAt' => '2026-09-02T00:00:00Z', 'thumbnails' => ['high' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'liveBroadcastContent' => 'none'],
+                'contentDetails' => ['duration' => 'PT7M', 'caption' => 'false'],
+                'status' => ['privacyStatus' => 'public', 'embeddable' => true],
+            ]]], JSON_THROW_ON_ERROR)];
+        });
+
+        $data = $client->fetch(YouTubeUrlNormalizer::normalize('https://www.youtube.com/watch?v=dQw4w9WgXcQ'));
+
+        self::assertSame(1, $calls);
+        self::assertSame('available', $data['availability']);
+        self::assertTrue($data['embeddable']);
+        self::assertSame('Odo 36/8', $data['title']);
+        self::assertSame(420, $data['duration_seconds']);
+        self::assertNotNull($data['fetched_at']);
+    }
+
+    public function test_youtube_api_client_does_not_fabricate_availability_when_embeddability_is_missing(): void
+    {
+        $client = new YouTubeDataApiClient('secret-key', static fn (string $url, array $options): array => [
+            'response' => ['code' => 200],
+            'body' => json_encode(['items' => [[
+                'snippet' => ['title' => 'Unknown embed state'],
+                'contentDetails' => [],
+                'status' => ['privacyStatus' => 'public'],
+            ]]], JSON_THROW_ON_ERROR),
+        ]);
+
+        $data = $client->fetch(YouTubeUrlNormalizer::normalize('https://youtu.be/dQw4w9WgXcQ'));
+
+        self::assertNull($data['embeddable']);
+        self::assertSame('unknown', $data['availability']);
+    }
+
+    public function test_youtube_api_client_reports_missing_key_deterministically(): void
+    {
+        $this->expectException(VideoException::class);
+        $this->expectExceptionMessage('YOUTUBE_API_NOT_CONFIGURED');
+
+        (new YouTubeDataApiClient('', static fn (string $url, array $options): array => []))
+            ->fetch(YouTubeUrlNormalizer::normalize('https://youtu.be/dQw4w9WgXcQ'));
+    }
+
+    public function test_youtube_adapter_keeps_lookup_diagnostic_instead_of_silently_returning_unknown(): void
+    {
+        $resolved = (new YouTubeSourceAdapter())->resolve('https://youtu.be/dQw4w9WgXcQ');
+
+        self::assertSame('unknown', $resolved->snapshot->availability);
+        self::assertNull($resolved->snapshot->fetchedAt);
+        self::assertSame('YOUTUBE_API_NOT_CONFIGURED', $resolved->diagnostic);
+        self::assertSame('YOUTUBE_API_NOT_CONFIGURED', $resolved->toArray()['diagnostic']);
+    }
+
+    public function test_youtube_adapter_preserves_timeout_diagnostic_and_fail_closed_snapshot(): void
+    {
+        $adapter = new YouTubeSourceAdapter(static function (object $identity): array {
+            throw new VideoException('SOURCE_TIMEOUT');
+        });
+
+        $resolved = $adapter->resolve('https://youtube.com/shorts/dQw4w9WgXcQ');
+
+        self::assertSame('SOURCE_TIMEOUT', $resolved->diagnostic);
+        self::assertSame('unknown', $resolved->snapshot->availability);
+        self::assertNull($resolved->snapshot->fetchedAt);
+    }
+
+    public function test_youtube_api_client_exposes_remote_error_code_without_secret(): void
+    {
+        $client = new YouTubeDataApiClient('secret-key', static fn (string $url, array $options): array => [
+            'response' => ['code' => 403],
+            'body' => json_encode(['error' => ['errors' => [['reason' => 'quotaExceeded']]]], JSON_THROW_ON_ERROR),
+        ]);
+
+        try {
+            $client->fetch(YouTubeUrlNormalizer::normalize('https://youtu.be/dQw4w9WgXcQ'));
+            self::fail('Expected YouTube API error.');
+        } catch (VideoException $error) {
+            self::assertSame('YOUTUBE_API_ERROR:quotaExceeded', $error->getMessage());
             self::assertStringNotContainsString('secret-key', $error->getMessage());
         }
     }

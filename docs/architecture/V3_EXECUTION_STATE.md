@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+## YouTube source availability probe restoration — 2026-09-03
+
+Root-cause tracing of the `P4KaHX3LBOw` Video intake path found that
+`Plugin.php` converted the presence of `NHK_YOUTUBE_API_KEY` into whether a
+YouTube client callback existed at all. In the WordPress runtime without an
+exported process variable, `VideoIntakeService` therefore received an adapter
+with no client, performed no Data API request, and emitted an `unknown` source
+snapshot without a diagnostic. The client also treated a missing API
+`embeddable` field as true, which could fabricate `availability=available`.
+
+The runtime now always wires the official `YouTubeDataApiClient`; it resolves
+the key from the configuration constant or environment, reports deterministic
+codes for missing configuration, timeout, malformed response, rate limit and
+remote API errors, and preserves fail-closed unknown snapshots with the
+diagnostic attached to the intake packet. Availability is `available` only
+when the API returns a non-private item with an explicit embeddable state of
+true. A fetched unavailable item records its fetch time and remains blocked.
+The canonical watch/Shorts normalization and governed proposal/apply path are
+unchanged; relation evidence refs remain preserved and no WordPress fallback
+or semantic mutation was added.
+
+Focused Video proof: 21 tests / 85 assertions. Full NHK Unit proof: 373 tests
+/ 1,800 assertions, with one existing warning and one PHPUnit deprecation.
+
 ## Odo root legacy-redirect guard — 2026-09-03
 
 Live demo reproduction showed that `/odo/` was redirected to the editorial
