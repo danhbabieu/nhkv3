@@ -61,6 +61,17 @@ final readonly class VideoKnowledgeEnrichmentPlanner
     /** @param array<string,mixed> $context @param list<string> $diagnostics @return array<string,mixed>|null */
     private function selectSubject(array $context, array &$diagnostics): ?array
     {
+        $intended = array_values(array_filter($context['intended_targets'] ?? [], static fn (mixed $target): bool => is_array($target) && is_string($target['id'] ?? null) && is_string($target['type'] ?? null)));
+        if ($intended !== []) {
+            foreach (['specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
+                $matches = array_values(array_filter($intended, static fn (array $target): bool => $target['type'] === $type));
+                if (count($matches) > 1) {
+                    $diagnostics[] = 'AMBIGUOUS_SUBJECT';
+                    return null;
+                }
+                if ($matches !== []) return $matches[0];
+            }
+        }
         $resolved = array_values(array_filter($context['resolved'] ?? [], static fn (mixed $target): bool => is_array($target) && is_string($target['id'] ?? null) && is_string($target['type'] ?? null)));
         $contextText = $this->normalize(implode(' ', array_filter([
             is_array($context['user_hint'] ?? null) ? (string) ($context['user_hint']['value'] ?? '') : '',

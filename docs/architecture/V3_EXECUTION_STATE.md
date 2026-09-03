@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+## Video canonical target handoff — 2026-09-04
+
+Preserved an explicitly supplied, already-validated Video `about` target as
+the authoritative subject for the read-only Living Knowledge enrichment seam.
+`VideoIntakeService` now derives the explicit target from the existing relation
+candidate and passes it through unchanged; `VideoKnowledgeEnrichmentPlanner`
+uses that target before text matching, so a Variant cannot be replaced by a
+broader Model/Brand match. Model-only text still follows the existing
+fail-closed text-resolution behavior. No Knowledge, Evidence or Graph
+mutation was added.
+
+The exact `SaLpWgitdSE` / `Âm thanh điểm nhạc và điểm chuông trên Odo 36/10`
+regression proves `about → variant`
+`95873bfe-d978-4eda-a5a2-ce9ba79625df`, enrichment subject and candidate scope
+`variant`, and no Model/Brand candidate. Focused Video proof: 29 tests / 113
+assertions. Full Unit proof: 443 tests / 2,094 assertions, with the existing
+one warning and one PHPUnit deprecation. PHP lint and `git diff --check` pass.
+No data or semantic records were changed.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Plugin media projection boot wiring — 2026-09-04
 
 Fixed a production boot fatal in `Plugin::boot()`: the public entity

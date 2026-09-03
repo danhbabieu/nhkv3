@@ -45,6 +45,10 @@ final class VideoIntakeService
         }
         $candidateObjects = $this->relations->plan($videoId, $relations);
         $candidatePayloads = array_map(static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => $candidate->toProposalPayload(), $candidateObjects);
+        $intendedTargets = array_values(array_map(
+            static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => ['id' => $candidate->targetId, 'type' => $candidate->targetType],
+            array_filter($candidateObjects, static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): bool => $candidate->predicate === 'about' && $candidate->origin === 'EXPLICIT_USER_RELATION'),
+        ));
         $category = $this->classifier->classify(['source_title' => $snapshot['source_title'] ?? '', 'source_description' => $snapshot['source_description'] ?? '', 'tags' => $snapshot['tags'] ?? [], 'user_hint' => $userHint]);
         if ($intendedCategory !== null && isset(VideoHubClassifier::hubs()[$intendedCategory])) {
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];
@@ -65,7 +69,7 @@ final class VideoIntakeService
             'source_rights' => VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE,
             'chapters' => $chapters,
         ];
-        $package['knowledge_enrichment'] = $this->knowledgeEnrichmentPacket($research, $snapshot, $resolution, $userHint);
+        $package['knowledge_enrichment'] = $this->knowledgeEnrichmentPacket($research, $snapshot, $resolution, $userHint, $intendedTargets);
         if ($resolution->diagnostic !== null) $package['source_diagnostic'] = $resolution->diagnostic;
         $complete = $this->completeness->evaluate($package);
         $package['completeness'] = ['publishable' => $complete->publishable, 'blockers' => $complete->blockers, 'warnings' => $complete->warnings];
@@ -99,13 +103,14 @@ final class VideoIntakeService
     private function lower(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value); }
 
     /** @return array<string,mixed> */
-    private function knowledgeEnrichmentPacket(array $research, array $snapshot, VideoSourceResolution $resolution, string $userHint): array
+    private function knowledgeEnrichmentPacket(array $research, array $snapshot, VideoSourceResolution $resolution, string $userHint, array $intendedTargets = []): array
     {
         if ($this->knowledgeEnrichment === null) return ['status' => 'not_requested', 'subject' => null, 'candidates' => [], 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []];
         try {
             $result = ($this->knowledgeEnrichment)([
                 'resolved' => $research['resolved'],
                 'ambiguous' => $research['ambiguous'],
+                'intended_targets' => $intendedTargets,
                 'source' => $snapshot,
                 'transcript' => $resolution->toArray()['transcript'] ?? null,
                 'transcript_policy' => $resolution->transcript,

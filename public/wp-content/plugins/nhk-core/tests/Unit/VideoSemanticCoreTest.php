@@ -409,6 +409,58 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame('USER_HINT', $preview->package['knowledge_enrichment']['candidates'][0]['provenance']['origin']);
     }
 
+    public function test_odo_36_10_preserves_intended_variant_for_about_and_knowledge_enrichment(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $authority->create(new AuthorityEntity('44444444-4444-4444-8444-444444444444', 'model', 'nhk:model:odo.36', 'Model Odo 36', 1, ['aliases' => []]));
+        $evidenceId = '01a0667c-9d0f-7950-8e41-cc432cd2dd20';
+        $variantId = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Âm thanh điểm nhạc và điểm chuông trên Odo 36/10',
+                'description' => 'Video giới thiệu âm thanh của Odo 36/10.',
+                'availability' => 'available',
+                'embeddable' => true,
+                'duration_seconds' => 420,
+                'fetched_at' => '2026-09-04T01:00:00Z',
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner($evidenceId),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+            new VideoInternalSemanticResearcher($authority, $types),
+            new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner()),
+        );
+
+        $preview = $service->preview(
+            'https://youtu.be/SaLpWgitdSE',
+            'Âm thanh điểm nhạc và điểm chuông trên Odo 36/10',
+            null,
+            [[
+                'target_id' => $variantId,
+                'target_type' => 'variant',
+                'predicate' => 'about',
+                'origin' => 'EXPLICIT_USER_RELATION',
+                'evidence_refs' => [['evidence_id' => $evidenceId]],
+            ]],
+        );
+
+        self::assertSame($variantId, $preview->package['semantic_attachments'][0]['target_key']);
+        self::assertSame('variant', $preview->package['semantic_attachments'][0]['target_type']);
+        self::assertSame($variantId, $preview->package['knowledge_enrichment']['subject']['id']);
+        self::assertSame('variant', $preview->package['knowledge_enrichment']['subject']['type']);
+        self::assertSame($variantId, $preview->package['knowledge_enrichment']['candidates'][0]['subject_id']);
+        self::assertSame('variant', $preview->package['knowledge_enrichment']['candidates'][0]['scope']);
+        self::assertSame([], array_values(array_filter(
+            $preview->package['knowledge_enrichment']['candidates'],
+            static fn (array $candidate): bool => in_array($candidate['scope'], ['model', 'brand'], true),
+        )));
+    }
+
     public function test_knowledge_enrichment_failure_is_diagnostic_and_preserves_video_intake(): void
     {
         $types = new EntityTypeRegistry();
