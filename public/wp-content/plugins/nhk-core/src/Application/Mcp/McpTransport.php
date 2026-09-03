@@ -89,7 +89,7 @@ final class McpTransport
         $capability = match ($name) {
             'nhk.article.preflight' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
-            'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update' => 'nhk_ingest_articles',
+            'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
             'nhk.video.ingest' => 'nhk_create_proposals',
@@ -115,6 +115,9 @@ final class McpTransport
             'nhk.category.delete' => $this->categories?->delete((int) ($arguments['id'] ?? 0), (bool) ($arguments['allow_reassign'] ?? false)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
             'nhk.article.draft.create' => $this->drafts?->create($arguments) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
             'nhk.article.draft.update' => $this->drafts?->update((int) ($arguments['post_id'] ?? 0), (array) ($arguments['fields'] ?? []), (string) ($arguments['expected_state_token'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
+            'nhk.article.publish' => $this->drafts?->publish((int) ($arguments['post_id'] ?? 0), (string) ($arguments['expected_state_token'] ?? ''), (array) ($arguments['evidence'] ?? []), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
+            'nhk.article.trash' => $this->drafts?->trash((int) ($arguments['post_id'] ?? 0), (string) ($arguments['expected_state_token'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
+            'nhk.article.restore' => $this->drafts?->restore((int) ($arguments['post_id'] ?? 0), (string) ($arguments['expected_state_token'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),

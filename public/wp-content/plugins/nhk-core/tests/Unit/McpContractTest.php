@@ -33,6 +33,7 @@ final class McpContractTest extends TestCase
             'nhk.category.delete',
             'nhk.article.draft.create',
             'nhk.article.draft.update',
+            'nhk.article.publish', 'nhk.article.trash', 'nhk.article.restore',
             'nhk.entity.get',
             'nhk.media.get',
             'nhk.media.ingest',

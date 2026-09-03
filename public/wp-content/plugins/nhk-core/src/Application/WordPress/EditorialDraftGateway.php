@@ -6,6 +6,7 @@ namespace NHK\Core\Application\WordPress;
 use NHK\Core\Contracts\Article\ArticleOperationReceiptRepository;
 use NHK\Core\Contracts\WordPress\EditorialPostStore;
 use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, EditorialPostState};
+use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class EditorialDraftGateway
@@ -33,6 +34,49 @@ final class EditorialDraftGateway
         if (!hash_equals($expectedStateToken, $current->token)) return ['ok' => false, 'reason' => 'EDITORIAL_STATE_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token];
         if ($current->status !== 'draft') return ['ok' => false, 'reason' => 'EDITORIAL_UPDATE_NOT_ELIGIBLE'];
         $updated = $this->posts->update($postId, $fields); return ['ok' => true, 'post' => $updated->snapshot(), 'state_token' => $updated->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
+    }
+
+    /** Publish only after every cross-boundary verification has been supplied and passed. */
+    public function publish(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey): array
+    {
+        return $this->transition($postId, $expectedStateToken, $idempotencyKey, 'publish', $evidence);
+    }
+
+    public function trash(int $postId, string $expectedStateToken, string $idempotencyKey): array
+    {
+        return $this->transition($postId, $expectedStateToken, $idempotencyKey, 'trash');
+    }
+
+    public function restore(int $postId, string $expectedStateToken, string $idempotencyKey): array
+    {
+        return $this->transition($postId, $expectedStateToken, $idempotencyKey, 'restore');
+    }
+
+    /** @param array<string,mixed> $evidence */
+    private function transition(int $postId, string $expectedStateToken, string $idempotencyKey, string $intent, array $evidence = []): array
+    {
+        if ($idempotencyKey === '') return ['ok' => false, 'reason' => 'IDEMPOTENCY_KEY_REQUIRED'];
+        $fingerprint = hash('sha256', json_encode(['post_id' => $postId, 'token' => $expectedStateToken, 'intent' => $intent, 'evidence' => $evidence], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $existing = $this->receipts->findByIdempotencyKey($idempotencyKey);
+        if ($existing !== null) {
+            if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()];
+            $state = $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId);
+            return ['ok' => $state !== null, 'post' => $state?->snapshot(), 'receipt' => $existing->toArray()];
+        }
+        $current = $this->posts->read($postId);
+        if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
+        if (!hash_equals($expectedStateToken, $current->token)) return ['ok' => false, 'reason' => 'EDITORIAL_STATE_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token];
+        if ($intent === 'publish') {
+            $gate = (new ArticlePublicationGate())->check($current, $evidence, $expectedStateToken);
+            if (!$gate->eligible) return ['ok' => false, 'reason' => 'PUBLICATION_BLOCKED', 'blockers' => $gate->blockers, 'post' => $current->snapshot()];
+            $state = $this->posts->publish($postId);
+        } elseif ($intent === 'trash') {
+            if ($current->status === 'publish') $state = $this->posts->trash($postId); else $state = $current;
+        } else {
+            if ($current->status === 'trash') $state = $this->posts->restore($postId); else $state = $current;
+        }
+        $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $state->endpointKey, $state->postId, 'editorial', ArticleIngestOutcome::COMPLETED, false, [], [], [], 1, null, null, $state->token, [], [], [], ['status' => $state->status]));
+        return ['ok' => true, 'post' => $state->snapshot(), 'state_token' => $state->token, 'receipt' => $receipt->toArray()];
     }
 
     /** @return array<string,mixed> */

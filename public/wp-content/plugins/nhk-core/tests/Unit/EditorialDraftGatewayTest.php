@@ -33,6 +33,10 @@ final class FakeEditorialStore implements EditorialPostStore
     public function read(int $postId): ?EditorialPostState { return $this->rows[$postId] ?? null; }
     public function createDraft(array $fields): EditorialPostState { $this->creates++; return $this->rows[1] = new EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', '', '/?p=1', 0, 0); }
     public function update(int $postId, array $fields): EditorialPostState { $old = $this->rows[$postId]; return $this->rows[$postId] = new EditorialPostState($postId, $old->endpointKey, $old->postType, 'draft', (string) ($fields['post_title'] ?? $old->title), $old->content, $old->excerpt, $old->slug, $old->permalink, $old->latestRevisionId, $old->revisionCount + 1); }
+    public function publish(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'publish'); }
+    public function trash(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'trash'); }
+    public function restore(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'draft'); }
+    private function withStatus(EditorialPostState $old, string $status): EditorialPostState { return new EditorialPostState($old->postId, $old->endpointKey, $old->postType, $status, $old->title, $old->content, $old->excerpt, $old->slug ?: 'title', $old->permalink, $old->latestRevisionId + 1, $old->revisionCount + 1); }
 }
 
 final class FakeReceiptRepo implements ArticleOperationReceiptRepository

@@ -119,17 +119,18 @@ cover native WordPress draft creation/update only. Creation is idempotent via
 the existing Article operation receipt repository, never stores body in the
 receipt, and returns a native state token plus `DRAFT_INCOMPLETE_FOR_PUBLICATION`.
 Update requires a matching native state token and only updates an eligible
-draft. Publish, trash and live editorial mutation remain unsupported. The
-typed `nhk.category.*` tools similarly delegate to the shared native Category
+draft. The typed `nhk.article.publish` tool is the only V3 publication writer:
+it requires the current draft token and verified evidence, calls
+`ArticlePublicationGate` before the native status transition, records a
+body-free idempotent receipt, and reads the published Post back.
+`nhk.article.trash` and `nhk.article.restore` use the same CAS/receipt
+boundary and never permanently delete a Post. The typed `nhk.category.*` tools
+similarly delegate to the shared native Category
 gateway; category membership is taxonomy truth and never a Graph edge.
 
-The publication boundary is represented by the read-only
-`ArticlePublicationGate` application service. It consumes verified research,
-semantic, MediaUsage, SEO, public-route, structured-data and claim-compliance
-evidence, requires a matching current editorial state token, and reports
-explicit blockers. It is not a publish writer and is not advertised as a new
-MCP tool until a native WordPress publication writer, evidence token binding,
-uncertain-result recovery and rendered read-back are implemented and tested.
+The publication boundary is enforced by `ArticlePublicationGate`; rendered
+public verification and exact integration runtime evidence remain separate
+completion gates.
 
 ## 5. Authority workflow
 

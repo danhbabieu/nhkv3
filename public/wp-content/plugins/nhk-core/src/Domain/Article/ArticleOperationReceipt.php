@@ -38,7 +38,7 @@ final readonly class ArticleOperationReceipt
         if (!UuidCodec::isValid($operationId) || $idempotencyKey === '' || !preg_match('/^[a-f0-9]{64}$/i', $requestFingerprint)) {
             throw new InvalidArgumentException('Article operation identity and fingerprint are invalid.');
         }
-        if (!in_array($intent, ['reconcile', 'create', 'update'], true) || $stage === '' || $revision < 1) {
+        if (!in_array($intent, ['reconcile', 'create', 'update', 'publish', 'trash', 'restore'], true) || $stage === '' || $revision < 1) {
             throw new InvalidArgumentException('Article operation state is invalid.');
         }
         if ($wpPostId !== null && $wpPostId < 1) throw new InvalidArgumentException('WordPress Post ID must be positive.');

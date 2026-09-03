@@ -19,7 +19,7 @@ final class McpCapabilityManifest
         foreach (McpToolCatalog::tools() as $tool) $tools[$tool['name']] = $tool;
 
         $definitions = [
-            'article' => ['owner' => 'wordpress', 'endpoint_types' => ['wp_post'], 'tools' => ['nhk.article.preflight', 'nhk.article.ingest', 'nhk.article.draft.create', 'nhk.article.draft.update'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
+            'article' => ['owner' => 'wordpress', 'endpoint_types' => ['wp_post'], 'tools' => ['nhk.article.preflight', 'nhk.article.ingest', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.trash', 'nhk.article.restore'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
             'category' => ['owner' => 'wordpress_taxonomy', 'endpoint_types' => [], 'tools' => ['nhk.category.resolve', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete'], 'seo_preflight' => false, 'relation_support' => false, 'media_support' => false, 'read_back' => true],
             'authority' => ['owner' => 'authority', 'endpoint_types' => ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], 'tools' => ['nhk.entity.get', 'nhk.semantic.resolve'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
             'knowledge' => ['owner' => 'knowledge', 'endpoint_types' => ['knowledge'], 'tools' => ['nhk.knowledge.get', 'nhk.knowledge.ingest'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
