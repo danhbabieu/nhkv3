@@ -56,7 +56,7 @@ final readonly class YouTubeSourceSnapshot
             self::strings($data['tags'] ?? []),
             self::nullableString($data['default_language'] ?? null),
             strtolower((string) ($data['caption_availability'] ?? 'unknown')),
-            array_key_exists('embeddable', $data) ? (bool) $data['embeddable'] : null,
+            array_key_exists('embeddable', $data) && $data['embeddable'] !== null ? (bool) $data['embeddable'] : null,
             strtolower((string) ($data['availability'] ?? 'unknown')),
             strtolower((string) ($data['live_state'] ?? 'none')),
             self::nullableString($data['fetched_at'] ?? null),

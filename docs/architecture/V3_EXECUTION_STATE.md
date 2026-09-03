@@ -1,5 +1,17 @@
 # NHK V3 Execution State
 
+## YouTube source epistemic-state correction — 2026-09-03
+
+Root-cause tracing of the YouTube intake found that the local runtime has no
+`NHK_YOUTUBE_API_KEY`, so `Plugin.php` selects no provider client and performs
+no YouTube lookup. Separately, `YouTubeSourceSnapshot::fromArray()` coerced an
+explicit provider `embeddable=null` to factual `false`; this was corrected to
+preserve UNKNOWN while the existing completeness policy continues to fail
+closed. A regression test proves the distinction. Focused Video tests pass:
+13 tests / 51 assertions; full Unit suite passes: 357 tests / 1,731
+assertions, with existing warnings/deprecation. No secret, Video, Proposal,
+Graph relation, WordPress or remote runtime data was changed.
+
 ## Managed WordPress attachment promotion checkpoint — 2026-09-03
 
 The WordPress attachment bridge now stages a validated WebP attachment as

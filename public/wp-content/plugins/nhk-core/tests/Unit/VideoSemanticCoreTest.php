@@ -111,6 +111,19 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame('PUBLIC_EXTERNAL_REFERENCE', VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE);
     }
 
+    public function test_snapshot_preserves_unknown_embeddability_instead_of_claiming_false(): void
+    {
+        $snapshot = YouTubeSourceSnapshot::fromArray([
+            'platform' => 'youtube',
+            'external_video_id' => 'dQw4w9WgXcQ',
+            'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'availability' => 'unknown',
+            'embeddable' => null,
+        ]);
+
+        self::assertNull($snapshot->embeddable);
+    }
+
     public function test_relation_planner_requires_registered_predicate_canonical_target_and_evidence(): void
     {
         $planner = new VideoRelationCandidatePlanner(new PredicateRegistry());
