@@ -113,6 +113,19 @@ Source/Evidence references, Media/Video references and Post references remain
 `RUNTIME_UNVERIFIED` until the existing local WordPress/database runtime is
 restored.
 
+## Demo target preflight — 2026-09-03
+
+`TARGET_RUNTIME=demo.1945.vn`. The public HTTPS homepage was reachable in the
+authenticated browser session and rendered the NHK editorial surface, including
+the public Odo brand link and Odo-related posts. This is only public UI evidence;
+it does not expose the required Authority/Graph/Knowledge/Media/Video/Post
+inventory or revisions. A focused read-only navigation to
+`https://demo.1945.vn/wp-json/` was blocked by the browser client before an API
+response could be inspected. No login, form submission, MCP call, REST write,
+or semantic mutation was performed. Therefore the demo inventory remains
+`RUNTIME_UNAVAILABLE`/`RUNTIME_UNVERIFIED`, and no apply is authorized by this
+checkpoint.
+
 ## Static canonical identity map
 
 The following is the complete explicit identity map in the approved pack. It
