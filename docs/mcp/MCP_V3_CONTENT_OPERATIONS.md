@@ -36,7 +36,7 @@ return HTTP 202 with no body.
 ## 2. Tool catalog thực tế
 
 `McpToolCatalog::tools()` exposes the exact current registered tool list. In
-this 2026-09-03 workspace it contains 33 tools. `kind=mutation` implies
+this 2026-09-03 workspace it contains 35 tools. `kind=mutation` implies
 `governed=true`. The coordinated Article tools occupy positions 3–4; the
 catalog's final position is `nhk.proposal.apply`. The clean HEAD
 catalog and the wire smoke both use this
@@ -122,10 +122,15 @@ cover native WordPress draft creation/update only. Creation is idempotent via
 the existing Article operation receipt repository, never stores body in the
 receipt, and returns a native state token plus `DRAFT_INCOMPLETE_FOR_PUBLICATION`.
 Update requires a matching native state token and only updates an eligible
-draft. The typed `nhk.article.publish` tool is the only V3 publication writer:
-it requires the current draft token and verified evidence, calls
-`ArticlePublicationGate` before the native status transition, records a
-body-free idempotent receipt, and reads the published Post back.
+draft. The typed `nhk.article.publish` tool remains the only V3 publication
+writer: it requires the current draft token and verified evidence, calls
+`ArticlePublicationGate` before the native status transition, and reads the
+published Post back. `nhk.article.publish.review` returns exactly `PASS`,
+`OWNER_REVIEW_REQUIRED` or `SYSTEM_BLOCKED`; eligible failures create a
+dedicated durable owner-decision record. `nhk.article.publish.approve` requires
+the authenticated owner principal, exact decision/token/policy/fingerprint
+binding and an affirmative instruction, then publishes through the same
+writer and records read-back. System-blocked results never expose approval.
 `nhk.article.trash` and `nhk.article.restore` use the same CAS/receipt
 boundary and never permanently delete a Post. The typed `nhk.category.*` tools
 similarly delegate to the shared native Category

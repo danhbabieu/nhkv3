@@ -1,0 +1,11 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Infrastructure\Migration;
+
+final class OwnerPublicationDecisionMigration013
+{
+    public const VERSION = 13;
+    public function up(): void { global $wpdb; require_once ABSPATH . 'wp-admin/includes/upgrade.php'; $table = $wpdb->prefix . 'nhk_owner_publication_decisions'; $charset = $wpdb->get_charset_collate(); dbDelta("CREATE TABLE {$table} (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, decision_id CHAR(36) NOT NULL, idempotency_key VARCHAR(191) NOT NULL, request_fingerprint CHAR(64) NOT NULL, wp_post_id BIGINT UNSIGNED NOT NULL, decision VARCHAR(40) NOT NULL, gate_outcome VARCHAR(32) NOT NULL, diagnostics_json LONGTEXT NOT NULL, overridden_codes_json LONGTEXT NOT NULL, blocker_fingerprint CHAR(64) NOT NULL, editorial_state_token CHAR(64) NOT NULL, policy_version VARCHAR(64) NOT NULL, principal_id VARCHAR(191) NOT NULL, approval_provenance_json LONGTEXT NOT NULL, approved_at DATETIME(6) NOT NULL, expires_at DATETIME(6) NOT NULL, stage VARCHAR(32) NOT NULL, publish_attempt_json LONGTEXT NOT NULL, readback_json LONGTEXT NOT NULL, final_outcome VARCHAR(64) NOT NULL, revision INT UNSIGNED NOT NULL DEFAULT 1, PRIMARY KEY (id), UNIQUE KEY decision_unique (decision_id), UNIQUE KEY decision_idempotency (idempotency_key), KEY decision_binding (wp_post_id,editorial_state_token,policy_version,blocker_fingerprint,principal_id), KEY decision_expiry (expires_at)) {$charset}"); update_option('nhk_core_migration_current', max((int) get_option('nhk_core_migration_current', 0), self::VERSION), false); update_option('nhk_core_migration_target', max((int) get_option('nhk_core_migration_target', 0), self::VERSION), false); }
+    public function down(bool $force = false): void { global $wpdb; if ((string) $wpdb->get_var('SELECT DATABASE()') !== 'nhk_v3_test') throw new \RuntimeException('OWNER_PUBLICATION_MIGRATION_DOWN_REQUIRES_NHK_V3_TEST'); if (!$force && (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . $wpdb->prefix . 'nhk_owner_publication_decisions') > 0) throw new \RuntimeException('OWNER_PUBLICATION_MIGRATION_DOWN_REQUIRES_EMPTY_TABLE'); $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'nhk_owner_publication_decisions'); update_option('nhk_core_migration_current', 12, false); update_option('nhk_core_migration_target', self::VERSION, false); }
+}

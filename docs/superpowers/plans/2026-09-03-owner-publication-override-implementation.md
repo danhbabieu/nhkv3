@@ -55,7 +55,7 @@ public function test_multiple_registered_quality_failures_have_one_review_outcom
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/PublicationDiagnosticRegistryTest.php tests/Unit/ArticlePublicationGateTest.php`
+Run: `vendor/bin/phpunit --filter 'PublicationDiagnosticRegistryTest|ArticlePublicationGateTest'`
 
 Expected: FAIL because the outcome enum, registry classification and gate fingerprint methods do not exist.
 
@@ -65,7 +65,7 @@ Register every current gate code explicitly. Quality codes such as `REAL_IMAGE_I
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/PublicationDiagnosticRegistryTest.php tests/Unit/ArticlePublicationGateTest.php`
+Run: `vendor/bin/phpunit --filter 'PublicationDiagnosticRegistryTest|ArticlePublicationGateTest'`
 
 Expected: PASS, with existing gate tests still green.
 
@@ -106,7 +106,7 @@ public function test_decision_is_append_only_and_expiry_is_thirty_minutes(): voi
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/OwnerPublicationDecisionTest.php tests/Unit/WpdbOwnerPublicationDecisionRepositoryTest.php`
+Run: `vendor/bin/phpunit --filter 'OwnerPublicationDecisionTest|WpdbOwnerPublicationDecisionRepositoryTest'`
 
 Expected: FAIL because the aggregate, repository and migration do not exist.
 
@@ -116,7 +116,7 @@ Validate UUID/fingerprint/state-token formats, positive Post ID, non-empty princ
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/OwnerPublicationDecisionTest.php tests/Unit/WpdbOwnerPublicationDecisionRepositoryTest.php`
+Run: `vendor/bin/phpunit --filter 'OwnerPublicationDecisionTest|WpdbOwnerPublicationDecisionRepositoryTest'`
 
 Expected: PASS; run the guarded migration integration test only when `nhk_v3_test` is available.
 
@@ -157,7 +157,7 @@ public function test_owner_approval_publishes_with_exceptions_and_keeps_failed_c
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/OwnerPublicationApplicationServiceTest.php tests/Unit/EditorialPublicationWriterTest.php`
+Run: `vendor/bin/phpunit --filter 'OwnerPublicationApplicationServiceTest|EditorialPublicationWriterTest'`
 
 Expected: FAIL because no owner service or principal binding exists and the gateway currently returns `PUBLICATION_BLOCKED` for eligible failures.
 
@@ -167,7 +167,7 @@ Expected: FAIL because no owner service or principal binding exists and the gate
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/OwnerPublicationApplicationServiceTest.php tests/Unit/EditorialPublicationWriterTest.php`
+Run: `vendor/bin/phpunit --filter 'OwnerPublicationApplicationServiceTest|EditorialPublicationWriterTest'`
 
 Expected: PASS for PASS, review, owner, Post/token/fingerprint/policy/expiry/principal, system-blocked and retry cases.
 
@@ -206,7 +206,7 @@ public function test_authenticated_owner_review_then_approval_is_exposed_through
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/McpContractTest.php tests/Integration/McpTransportIntegrationTest.php`
+Run: `vendor/bin/phpunit --filter 'McpContractTest|McpTransportIntegrationTest'`
 
 Expected: FAIL because the two tools are absent from the catalog and transport match.
 
@@ -216,7 +216,7 @@ Register strict schemas and descriptions, keep server-side capability/principal 
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/McpContractTest.php tests/Integration/McpTransportIntegrationTest.php`
+Run: `vendor/bin/phpunit --filter 'McpContractTest|McpTransportIntegrationTest'`
 
 Expected: PASS where the integration runtime exists; otherwise report the exact existing WordPress/database runtime block separately.
 
@@ -251,7 +251,7 @@ public function test_owner_publication_invariants_are_present_in_the_sole_consti
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd public/wp-content/plugins/nhk-core && vendor/bin/phpunit tests/Unit/OwnerPublicationConstitutionTest.php`
+Run: `vendor/bin/phpunit --filter OwnerPublicationConstitutionTest`
 
 Expected: FAIL until the Constitution amendment and implementation documentation are visible at the canonical paths.
 
@@ -264,9 +264,8 @@ Record focused test counts, migration/runtime limitations, no-data-mutation evid
 Run, in order:
 
 ```bash
-cd public/wp-content/plugins/nhk-core
 composer validate --no-check-publish
-find src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+find public/wp-content/plugins/nhk-core/src public/wp-content/plugins/nhk-core/tests -name '*.php' -print0 | xargs -0 -n1 php -l
 vendor/bin/phpunit tests/Unit/OwnerPublicationConstitutionTest.php tests/Unit/PublicationDiagnosticRegistryTest.php tests/Unit/OwnerPublicationDecisionTest.php tests/Unit/OwnerPublicationApplicationServiceTest.php tests/Unit/EditorialPublicationWriterTest.php tests/Unit/McpContractTest.php
 vendor/bin/phpunit
 composer preflight

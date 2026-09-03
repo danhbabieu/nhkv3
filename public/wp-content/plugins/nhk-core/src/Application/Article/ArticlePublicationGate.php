@@ -50,6 +50,7 @@ final class ArticlePublicationGate
     {
         if (($evidence[$key] ?? false) === true) return;
         if (($evidence[$key . '_status'] ?? '') === 'invalid') $blockers[] = $hardReason;
+        elseif ($warning === 'REAL_IMAGE_INCOMPLETE' && in_array(($evidence[$key . '_status'] ?? ''), ['missing', 'incomplete'], true)) $blockers[] = $warning;
         else $warnings[] = $warning;
     }
 }

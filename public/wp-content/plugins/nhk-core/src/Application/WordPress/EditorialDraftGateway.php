@@ -8,10 +8,11 @@ use NHK\Core\Contracts\WordPress\EditorialPostStore;
 use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, EditorialPostState};
 use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Contracts\Article\{OwnerPublicationService, PublicationPrincipal};
 
 final class EditorialDraftGateway
 {
-    public function __construct(private EditorialPostStore $posts, private ArticleOperationReceiptRepository $receipts) {}
+    public function __construct(private EditorialPostStore $posts, private ArticleOperationReceiptRepository $receipts, private ?OwnerPublicationService $ownerPublication = null) {}
 
     /** @param array<string,mixed> $input */
     public function create(array $input): array
@@ -39,7 +40,15 @@ final class EditorialDraftGateway
     /** Publish only after every cross-boundary verification has been supplied and passed. */
     public function publish(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey): array
     {
+        if ($this->ownerPublication !== null) return $this->ownerPublication->request($postId, $expectedStateToken, $evidence, $idempotencyKey, new PublicationPrincipal(function_exists('get_current_user_id') ? (string) get_current_user_id() : '0', 'mcp', ''));
         return $this->transition($postId, $expectedStateToken, $idempotencyKey, 'publish', $evidence);
+    }
+
+    /** @param array<string,mixed> $evidence */
+    public function approvePublication(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, string $decisionId, string $affirmation, string $principalId, string $requestReference = ''): array
+    {
+        if ($this->ownerPublication === null) return ['outcome' => 'SYSTEM_BLOCKED', 'diagnostics' => ['OWNER_PUBLICATION_SERVICE_UNAVAILABLE']];
+        return $this->ownerPublication->approveAndPublish($postId, $expectedStateToken, $evidence, $idempotencyKey, $decisionId, new PublicationPrincipal($principalId, 'mcp', $requestReference), $affirmation);
     }
 
     public function trash(int $postId, string $expectedStateToken, string $idempotencyKey): array

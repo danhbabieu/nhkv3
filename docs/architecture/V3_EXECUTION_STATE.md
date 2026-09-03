@@ -270,6 +270,27 @@ Abilities Browser parity cannot be verified in this workspace. Direct binary
 image upload remains the existing multipart MCP transport; the Ability exposes
 the same catalog contract without inventing a second binary persistence path.
 
+## Owner publication override checkpoint — 2026-09-03
+
+The sole Constitution now contains the Owner Publication Override Law and
+acceptance invariants 65–74. Runtime code adds the three-outcome publication
+classification, deterministic diagnostic registry, 30-minute Post/state/
+policy/blocker/principal binding, dedicated append-only decision persistence
+with migration 013, owner approval application service, mandatory native
+WordPress read-back and MCP review/approval continuation tools. Failed quality
+diagnostics remain attached to `published_with_exceptions`; no Authority,
+Knowledge, Evidence, Graph, Media, MediaUsage or Governance semantic write is
+performed by owner approval, and no Post-specific branch exists.
+
+Focused proof: 24 tests / 217 assertions pass, including existing Article
+publication, MCP contract and Governance-adjacent regressions. Full Unit proof
+executes 484 tests with 8 existing WordPress bootstrap errors and 12 mandatory
+integration failures because no verified `nhk_v3_test` runtime is available;
+74 integration tests are skipped by the existing environment guards. Composer
+validation, changed-file PHP lint and `git diff --check` pass. No live Post,
+semantic record, Graph edge, V2/staging/production record or public URL was
+mutated.
+
 ## Content Operations final-completion plan — 2026-09-03
 
 The independently testable checkpoint plan is recorded in

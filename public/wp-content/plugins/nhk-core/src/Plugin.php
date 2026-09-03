@@ -15,11 +15,12 @@ use NHK\Core\Infrastructure\Migration\ProjectionContextMigration009;
 use NHK\Core\Infrastructure\Migration\ArticleIngestMigration010;
 use NHK\Core\Infrastructure\Migration\ArticleMediaMigration011;
 use NHK\Core\Infrastructure\Migration\MediaWordPressBridgeMigration012;
+use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
-use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner};
+use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
@@ -38,7 +39,8 @@ use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
-use NHK\Core\Infrastructure\Article\{WpEditorialStateReader, WpdbArticleOperationReceiptRepository};
+use NHK\Core\Infrastructure\Article\{WpEditorialStateReader, WpdbArticleOperationReceiptRepository, WpdbOwnerPublicationDecisionRepository};
+use NHK\Core\Contracts\Article\PublicationPrincipal;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
@@ -63,10 +65,11 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', MediaWordPressBridgeMigration012::VERSION, false);
+        update_option('nhk_core_migration_target', OwnerPublicationDecisionMigration013::VERSION, false);
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < OwnerPublicationDecisionMigration013::VERSION) (new OwnerPublicationDecisionMigration013())->up();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
@@ -297,7 +300,9 @@ final class Plugin {
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
-            $draftGateway = new EditorialDraftGateway(new WpEditorialPostStore($articleEditorial), $articleReceipts);
+            $editorialPosts = new WpEditorialPostStore($articleEditorial);
+            $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'));
+            $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient())->fetch($identity);
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
@@ -322,6 +327,7 @@ final class Plugin {
         (new ArticleIngestMigration010())->up();
         (new ArticleMediaMigration011())->up();
         (new MediaWordPressBridgeMigration012())->up();
+        (new OwnerPublicationDecisionMigration013())->up();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }

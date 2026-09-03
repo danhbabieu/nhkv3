@@ -39,6 +39,8 @@ final class McpAbilityRegistration
         'nhk.article.draft.create' => 'nhk-v3/article-draft-create',
         'nhk.article.draft.update' => 'nhk-v3/article-draft-update',
         'nhk.article.publish' => 'nhk-v3/article-publish',
+        'nhk.article.publish.review' => 'nhk-v3/article-publish-review',
+        'nhk.article.publish.approve' => 'nhk-v3/article-publish-approve',
         'nhk.article.trash' => 'nhk-v3/article-trash',
         'nhk.article.restore' => 'nhk-v3/article-restore',
         'nhk.video.ingest' => 'nhk-v3/video-ingest',
@@ -213,7 +215,7 @@ final class McpAbilityRegistration
     private static function canGoverned(string $tool): bool
     {
         $capability = match ($tool) {
-            'nhk.article.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
+            'nhk.article.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
