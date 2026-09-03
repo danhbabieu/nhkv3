@@ -10,23 +10,27 @@ final class CurrentTruthResolver
 {
     public function __construct(private KnowledgeRepository $claims, private EvidenceRepository $evidence, private SourceRepository $sources) {}
 
-    public function resolve(string $subjectId, KnowledgeFacetProfile $profile): CurrentTruthPacket
+    public function resolve(string $subjectId, KnowledgeFacetProfile $profile, bool $publicOnly = true): CurrentTruthPacket
     {
         $claims = [];
         $qualifiers = [];
         $contradictions = [];
+        $allEvidence = [];
+        $sources = [];
         foreach ($this->claims->list() as $claim) {
-            if (!$claim instanceof KnowledgeClaim || !$claim->active || !$claim->isPublic() || !$this->context($claim, $subjectId, $profile)) continue;
+            if (!$claim instanceof KnowledgeClaim || !$claim->active || ($publicOnly && !$claim->isPublic()) || !$this->context($claim, $subjectId, $profile)) continue;
             $claims[] = $claim;
             foreach ($this->evidence->listByClaim($claim->canonicalId) as $evidence) {
-                if (!$evidence instanceof Evidence || !$evidence->active || !$evidence->isPublic()) continue;
+                if (!$evidence instanceof Evidence || !$evidence->active || ($publicOnly && !$evidence->isPublic())) continue;
                 $source = $this->sources->findByCanonicalId($evidence->sourceId);
-                if ($source === null || !$source->active || !$source->isPublic()) continue;
+                if ($source === null || !$source->active || ($publicOnly && !$source->isPublic())) continue;
+                $allEvidence[] = $evidence;
+                $sources[] = [$source->canonicalId, $source->revision, $source->active, $source->isPublic()];
                 if ($evidence->relation === 'qualifies') $qualifiers[] = $evidence;
                 if ($evidence->relation === 'contradicts') $contradictions[] = $evidence;
             }
         }
-        return new CurrentTruthPacket($subjectId, $profile, $claims, $qualifiers, $contradictions, ['claim_count' => count($claims), 'qualifier_count' => count($qualifiers), 'contradiction_count' => count($contradictions)]);
+        return new CurrentTruthPacket($subjectId, $profile, $claims, $qualifiers, $contradictions, ['claim_count' => count($claims), 'qualifier_count' => count($qualifiers), 'contradiction_count' => count($contradictions), 'evidence' => $allEvidence, 'sources' => $sources]);
     }
 
     private function context(KnowledgeClaim $claim, string $subjectId, KnowledgeFacetProfile $profile): bool

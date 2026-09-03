@@ -14,7 +14,11 @@ final class KnowledgeFragmentProjector
     }
     private function fingerprint(CurrentTruthPacket $packet, string $fragment): string
     {
-        $items = array_map(static fn($claim): array => [$claim->canonicalId, $claim->revision], $packet->claims);
-        return hash('sha256', json_encode([$packet->subjectId, $packet->profile->toMetadata(), $fragment, $items, count($packet->qualifiers), count($packet->contradictions)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $claims = array_map(static fn($claim): array => [$claim->canonicalId, $claim->revision, $claim->active, $claim->isPublic()], $packet->claims);
+        $evidence = $packet->evidenceCoverage['evidence'] ?? [];
+        $evidence = array_map(static fn($item): array => [$item->canonicalId, $item->revision, $item->relation, $item->active, $item->isPublic()], $evidence);
+        usort($claims, static fn(array $a, array $b): int => $a[0] <=> $b[0]);
+        usort($evidence, static fn(array $a, array $b): int => $a[0] <=> $b[0]);
+        return hash('sha256', json_encode([$packet->subjectId, $packet->profile->toMetadata(), $fragment, $claims, $evidence, $packet->evidenceCoverage['sources'] ?? [], 'projection-v1', 'deterministic-v1'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 }
