@@ -153,7 +153,10 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if (WordPressMediaAttachmentWriteGuard::active()) return null;
         if ($this->controlledWriteDepth > 0 || $attachmentId < 1 || !function_exists('get_post')) return $this->mediaIdForAttachment($attachmentId);
         $existing = $this->mediaIdForAttachment($attachmentId);
-        if ($existing !== null) return $existing;
+        if ($existing !== null) {
+            $this->completeExistingAttachment($existing, $attachmentId);
+            return $existing;
+        }
         $post = get_post($attachmentId);
         if (!$post instanceof \WP_Post || $post->post_type !== 'attachment' || !str_starts_with(strtolower((string) get_post_mime_type($attachmentId)), 'image/')) return null;
         $relative = function_exists('get_post_meta') ? (string) get_post_meta($attachmentId, '_wp_attached_file', true) : '';
@@ -164,15 +167,33 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $metadata = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($attachmentId) : [];
         $width = is_array($metadata) && isset($metadata['width']) ? (int) $metadata['width'] : null;
         $height = is_array($metadata) && isset($metadata['height']) ? (int) $metadata['height'] : null;
-        $checksum = is_file($filePath) ? hash_file('sha256', $filePath) : hash('sha256', 'wp-attachment:' . $attachmentId);
-        if (!is_string($checksum)) return null;
+        $mime = strtolower((string) get_post_mime_type($attachmentId));
+        if ($mime !== 'image/webp' || $width < 1 || $height < 1 || !is_file($filePath) || !is_readable($filePath)) return null;
+        $checksum = hash_file('sha256', $filePath);
+        $byteSize = filesize($filePath);
+        if (!is_string($checksum) || $checksum === '' || $byteSize === false || $byteSize < 1) return null;
         $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1;
+        $canonicalFilename = (new MediaFilenameNormalizer())->normalizeWebp((string) ($post->post_title ?: basename($relative)), 'image', basename($relative));
         $media = $this->mediaService->ingest('wp-attachment:' . max(1, $blogId) . ':' . $attachmentId, (string) ($post->post_title ?: basename($relative)), 'draft', ['source' => 'wordpress_attachment_adoption', 'wordpress_attachment_id' => $attachmentId], [[
-            'kind' => 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => basename($relative), 'checksum' => $checksum, 'mime_type' => (string) get_post_mime_type($attachmentId), 'byte_size' => is_file($filePath) ? (int) filesize($filePath) : 0, 'width' => $width, 'height' => $height, 'visibility' => 'PRIVATE',
+            'kind' => 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => basename($relative), 'checksum' => $checksum, 'mime_type' => $mime, 'byte_size' => (int) $byteSize, 'width' => $width, 'height' => $height, 'visibility' => 'PRIVATE', 'metadata' => ['canonical_filename' => $canonicalFilename, 'sizes' => []],
         ]]);
         $asset = $this->assets->listByMediaId($media->canonicalId)[0] ?? null;
-        if ($asset instanceof MediaAsset) $this->saveMapping($media, $asset, $attachmentId);
+        if (!$asset instanceof MediaAsset) throw new \RuntimeException('WORDPRESS_MEDIA_ASSET_UNAVAILABLE');
+        $media = $this->mediaService->completeIngest($media->canonicalId, $asset->assetId);
+        $asset = $this->assets->findByAssetId($asset->assetId) ?? $asset;
+        $this->saveMapping($media, $asset, $attachmentId);
         return $media->canonicalId;
+    }
+
+    private function completeExistingAttachment(string $mediaId, int $attachmentId): void
+    {
+        $media = $this->media->findByCanonicalId($mediaId);
+        $asset = $this->assets->listByMediaId($mediaId)[0] ?? null;
+        if (!$media instanceof Media || !$asset instanceof MediaAsset || $media->readiness === 'ready' && $asset->visibility === 'PUBLIC') return;
+        if ($asset->mimeType !== 'image/webp' || $asset->width === null || $asset->height === null || $asset->width < 1 || $asset->height < 1) return;
+        $this->mediaService->completeIngest($mediaId, $asset->assetId, ['canonical_filename' => (new MediaFilenameNormalizer())->normalizeWebp($media->canonicalName, 'image', basename($asset->storageKey)), 'sizes' => []]);
+        $completed = $this->assets->findByAssetId($asset->assetId) ?? $asset;
+        $this->saveMapping($media, $completed, $attachmentId);
     }
 
     /** @return array<string,mixed> */

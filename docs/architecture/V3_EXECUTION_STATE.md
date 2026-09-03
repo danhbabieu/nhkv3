@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+## Managed WordPress attachment promotion checkpoint — 2026-09-03
+
+The WordPress attachment bridge now stages a validated WebP attachment as
+Media `draft` with a PRIVATE primary asset, records read-back dimensions,
+checksum, byte size, canonical filename and empty `sizes`, then delegates
+completion to `MediaService::completeIngest()`. Completion promotes the asset
+to PUBLIC and Media to ready; a readiness failure rolls the asset back to its
+private staged state. Existing attachment mappings retry through the same
+completion path and do not create duplicate Media or MediaAsset records.
+
+Focused evidence: 2 tests / 11 assertions; Unit suite: 355 tests / 1,727
+assertions, with one existing PHPUnit deprecation. Changed PHP files lint
+clean, Composer validation and `git diff --check` pass. The bridge fail-closes
+when WebP MIME, dimensions, file readability, checksum or byte size cannot be
+verified. No rewrite, delivery gate, database record or demo runtime data was
+mutated; demo runtime remains `NOT_EXECUTED_GOVERNANCE_GATE`.
+
 > **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.

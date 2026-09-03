@@ -115,6 +115,28 @@ final class MediaService
         return $this->assets->create($candidate);
     }
 
+    /**
+     * Complete a previously staged binary ingest after all read-back checks
+     * have passed. A failed readiness transition leaves the asset private.
+     */
+    public function completeIngest(string $mediaId, string $assetId, array $metadata = []): Media
+    {
+        $media = $this->media->findByCanonicalId($mediaId);
+        $asset = $this->assets->findByAssetId($assetId);
+        if (!$media || !$asset || $asset->mediaId !== $mediaId) throw new MediaException('Media ingest completion target is invalid.');
+        if ($media->readiness === 'ready' && $asset->visibility === 'PUBLIC') return $media;
+
+        $completedMetadata = array_replace($asset->metadata, $metadata);
+        $public = new MediaAsset($asset->assetId, $asset->mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize, $asset->width, $asset->height, 'PUBLIC', $completedMetadata);
+        $this->assets->update($public);
+        try {
+            return $this->update($mediaId, $media->canonicalName, 'ready', $media->provenance, $media->revision);
+        } catch (\Throwable $error) {
+            try { $this->assets->update($asset); } catch (\Throwable) { }
+            throw $error;
+        }
+    }
+
     public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = []): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
