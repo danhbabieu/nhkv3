@@ -4,6 +4,20 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## Content Operations final-completion plan — 2026-09-03
+
+The independently testable checkpoint plan is recorded in
+`docs/superpowers/plans/2026-09-03-content-operations-final-completion.md`.
+The first CP1 slice adds the read-only `ArticlePublicationGate` and explicit
+`ArticlePublicationGateResult`. It requires a current draft state token,
+canonical public identity and verified research, subject, duplicate-intent,
+category, semantic plan/read-back, MediaUsage, real-image, claim-compliance,
+SEO, internal-link, structured-data and public-route evidence. Focused proof:
+3 tests / 11 assertions. It does not write WordPress, Governance, semantic
+records, Graph, Media or live data, and it is not yet runtime-ready because the
+native publish writer, publication evidence binding and rendered read-back are
+still open.
+
 ## Article Research gate recheck — 2026-09-03
 
 The current working tree passes the full NHK Unit suite: 307 tests / 1,516
@@ -2989,3 +3003,110 @@ secret was printed or committed. The exact stop is
 unverified revisions, deploy without the standard deployment authority, or
 perform controlled apply. No demo, staging, production, V2, WordPress Post,
 semantic record, Graph edge or proposal was mutated.
+
+## Article Research preflight gate closure attempt — 2026-09-03
+
+Added `PublicEndpointEligibilityResolver` as the shared route/readiness
+boundary for Article Research links. It fail-closes malformed identity,
+inactive, not-ready, private/hidden, unavailable dependency and missing public
+route states. The registered endpoint audit covers `wp_post`, all nine
+Authority families, `media`, `video`, `knowledge`, `source` and `evidence`;
+no UUID or stable-key URL is synthesized.
+
+Fresh focused evidence: 19 tests / 79 assertions pass, including table-driven
+public/inactive/private/draft/invalid/no-route/unavailable cases. PHP lint and
+`git diff --check` pass. The explicit matrix is
+`docs/architecture/ARTICLE_RESEARCH_ACCEPTANCE_MATRIX.md`.
+
+Integration diagnosis is conclusive for this runner: `NHK_WP_TEST_PATH=public`
+is correct, but WordPress bootstrap returns `Error establishing a database
+connection` before `TestDatabaseGuard` can verify the exact `nhk_v3_test`
+database. Capability remains `PARTIAL` /
+`IMPLEMENTATION_READY_RUNTIME_UNVERIFIED`; runtime READY must not be claimed
+until guarded integration evidence is available. No credentials, service,
+development database, Post, taxonomy, semantic record, Graph edge, proposal,
+Media, Video or live data was mutated.
+
+## WordPress Category and Editorial Draft Gateway checkpoint — 2026-09-03
+
+Added two independently reviewable typed application boundaries. Category
+Gateway delegates to native WordPress taxonomy storage and provides
+deterministic ID/slug/exact-name resolution, conflict detection, idempotent
+create, parent validation, fingerprint CAS update, assignment/unassignment
+and guarded delete. Editorial Draft Gateway delegates to native `wp_posts`,
+reuses the existing Article operation receipt repository, resolves retries
+before creating, never stores Article body in receipts, requires native
+state-token CAS for updates, and returns `DRAFT_INCOMPLETE_FOR_PUBLICATION`.
+Neither boundary publishes, trashes, mutates semantic/Graph data or ingests
+Media/Video.
+
+Fresh evidence: focused gateway/MCP tests `16 tests / 142 assertions`; full
+Unit suite `322 tests / 1,577 assertions` with one existing PHPUnit deprecation;
+Composer validation and changed-PHP lint pass. The typed MCP catalog now has
+30 tools and the capability manifest exposes Category and draft-only Article
+operations. No WordPress Ability bridge was added because the existing custom
+MCP transport is the client surface and adding a second write path would
+duplicate the application boundary.
+
+Guarded integration was attempted with `NHK_WP_TEST_PATH=public`; WordPress
+bootstrap returned `Error establishing a database connection` before exact
+`nhk_v3_test` verification. Both slices therefore remain
+`IMPLEMENTATION_READY_RUNTIME_UNVERIFIED`; runtime READY is not claimed. No
+development, staging, production, V2, Post, taxonomy, semantic record, Graph
+edge, proposal, Media or Video data was mutated.
+
+## Article publication eligibility boundary checkpoint — 2026-09-03
+
+Added the read-only `ArticlePublicationGate` and explicit
+`ArticlePublicationGateResult` in commit `f7fc96e`. The gate consumes verified
+evidence from existing bounded contexts and requires a current draft state
+token, canonical public identity, acceptable research, resolved subject and
+category, completed semantic plan/read-back, complete real-image MediaUsage,
+claim compliance, SEO, internal links, structured data and public route
+readiness. It returns explicit blocker codes; it does not publish, mutate
+WordPress, invoke Governance, create semantic records or infer Graph truth.
+
+Focused evidence is 3 tests / 11 assertions; the full Unit suite is 325 tests /
+1,588 assertions with one existing PHPUnit deprecation. Composer validation,
+changed-file PHP lint, diff check and secret review pass. This checkpoint is
+`IMPLEMENTATION_READY_RUNTIME_UNVERIFIED`: the native publish writer,
+publication-evidence binding, uncertain-result recovery and rendered
+read-back remain open. Existing uncommitted `V3_EXECUTION_STATE.md` and
+`ARTICLE_RESEARCH_ACCEPTANCE_MATRIX.md` changes were preserved and are not
+part of the checkpoint commit.
+
+## Article native publication writer and reversible lifecycle checkpoint — 2026-09-03
+
+Added the native WordPress `EditorialDraftGateway` publication writer and
+reversible trash/restore operations. Publish requires the current draft
+state-token, an explicit evidence packet accepted by `ArticlePublicationGate`,
+then performs one native status transition and reads the Post back. All three
+operations use the existing body-free Article receipt repository for
+idempotency and reject mismatched request fingerprints; trash/restore never
+perform permanent deletion. MCP catalog, transport and capability manifest
+now advertise the typed Article lifecycle operations with the same
+`nhk_ingest_articles` capability.
+
+Fresh evidence: focused writer/gate/contract tests `16 tests / 147
+assertions`; full Unit suite `327 tests / 1,600 assertions`, with one existing
+PHPUnit deprecation. Changed PHP lint and `git diff --check` pass. Exact
+`nhk_v3_test` integration remains unavailable because WordPress bootstrap
+fails with `Error establishing a database connection` before
+`TestDatabaseGuard` can verify the database. Rendered public read-back,
+publication evidence persistence and uncertain post-transition recovery remain
+open follow-up gaps; no Post, taxonomy, semantic record, Graph edge, Media,
+Video or live data was mutated.
+
+## Final-completion continuation runtime recheck — 2026-09-03
+
+The exact guarded integration attempt was repeated with
+`NHK_WP_TEST_PATH=public`; WordPress terminated during bootstrap with
+`Error establishing a database connection`, before `TestDatabaseGuard` could
+verify `nhk_v3_test`. This is an infrastructure/runtime block, not an
+integration PASS. No fallback to `nhk_v3` was used.
+
+The publication writer slice is committed as `d94f3f7`; the broader final
+completion plan remains open. In particular, rendered Article SEO/public
+verification, durable publication-evidence binding and uncertain-result
+recovery, complete Admin parity, standalone Graph read exposure, and the
+remaining Article/MediaUsage acceptance scenarios are not claimed complete.
