@@ -97,8 +97,16 @@ Ports cover:
 10. evidence persistence.
 
 The initial repository implementation provides safe local/in-memory adapters
-and production wiring seams. It must not claim a live DEMO deployment when a
-remote adapter or credential is unavailable.
+and a generic remote deployment adapter. The remote adapter is resolved for the
+allowlisted target but fails closed unless `NHK_DEMO_DEPLOY_CONFIG` points to a
+readable external INI file containing `ssh_target=demo.1945.vn`, a non-empty
+`remote_path`, and either a readable `ssh_key` or an available SSH agent. The
+adapter transfers only the `nhk-core` plugin directory with deterministic
+checksum/fingerprint validation, never transfers a database, and verifies the
+remote `nhk-core.php` artifact over SSH. Transport and verification failures
+remain distinct. Credentials and destination configuration are never stored in
+Git or emitted in receipts. It must not claim a live DEMO deployment when the
+external configuration or credential is unavailable.
 
 ## Failure handling
 

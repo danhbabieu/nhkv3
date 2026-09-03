@@ -17,10 +17,12 @@ final class LocalCutoverAdapters
                 ? (is_file($manifest) ? StageResult::pass() : StageResult::blocked('PACK_MANIFEST_UNAVAILABLE'))
                 : StageResult::blocked('LOCAL_SAFETY_FAILED');
         };
-        $unavailable = static fn (): StageResult => StageResult::blocked('REMOTE_DEPLOYMENT_ADAPTER_UNAVAILABLE');
+        $deployment = RemoteDeploymentAdapter::fromEnvironment($root);
+        $deploy = static fn (DemoCutoverContext $context): StageResult => $deployment->deploy($context);
+        $unavailable = static fn (): StageResult => StageResult::blocked('REMOTE_RUNTIME_ADAPTER_UNAVAILABLE');
         $pass = static fn (): StageResult => StageResult::pass();
         return new CutoverPorts(
-            $safety, $unavailable, $pass, $unavailable, $unavailable, $unavailable, $unavailable,
+            $safety, $deploy, $pass, $unavailable, $unavailable, $unavailable, $unavailable,
             static fn (): StageResult => StageResult::blocked('LIVE_PLANNER_ADAPTER_UNAVAILABLE'),
             static fn (): StageResult => StageResult::blocked('GOVERNANCE_ADAPTER_UNAVAILABLE'),
             static fn (): StageResult => StageResult::blocked('HUMAN_APPROVAL_REQUIRED'),

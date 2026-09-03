@@ -3214,3 +3214,30 @@ tests / 1,675 assertions with 8 existing WordPress bootstrap/database errors,
 14 existing media/acceptance failures and 74 skips; no Demo test failed. Live
 authenticated runtime, remote deploy adapter, Governance wiring and real DEMO
 cutover remain intentionally unverified and out of scope for this task.
+
+## DEMO remote deployment adapter checkpoint — 2026-09-03
+
+Root-cause tracing found that the previous `LocalCutoverAdapters` composition
+hard-coded the deploy port to `REMOTE_DEPLOYMENT_ADAPTER_UNAVAILABLE`; no
+concrete adapter, transport dependency, resolver or external target
+configuration existed. The local repository and Mac configuration contained no
+reusable rsync/scp/deploy primitive and no `~/.ssh/config` alias.
+
+The deploy port now resolves `RemoteDeploymentAdapter`, a generic target-
+allowlisted adapter. Its external contract is one environment key,
+`NHK_DEMO_DEPLOY_CONFIG`, pointing to a non-Git INI file with
+`ssh_target=demo.1945.vn`, `remote_path=<plugin destination>`, and either a
+readable `ssh_key=<path>` or an available `SSH_AUTH_SOCK`. It transfers only
+`public/wp-content/plugins/nhk-core/` via deterministic checksum rsync, excludes
+tests and secret-like files, performs no database or semantic operation, and
+verifies `nhk-core.php` remotely. Failures are classified as configuration,
+credential, transport or verification failures without emitting command output.
+
+Focused evidence: 11 Demo/deployment tests / 38 assertions pass, with one
+existing PHPUnit deprecation. The requested human command now resolves the
+adapter and stops at `REMOTE_DEPLOYMENT_CONFIG_REQUIRED` because the external
+config is absent; it no longer emits `REMOTE_DEPLOYMENT_ADAPTER_UNAVAILABLE`.
+No remote deployment, WordPress, semantic, Graph or live data mutation was
+performed. Full-suite classification remains the existing WordPress
+bootstrap/database errors and guarded integration failures; no regression from
+this adapter was observed.

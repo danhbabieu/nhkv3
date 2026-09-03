@@ -18,7 +18,7 @@ final class DemoCutoverCliContractTest extends TestCase
         self::assertStringNotContainsString('odo', strtolower($contents));
     }
 
-    public function test_requested_command_fails_closed_without_remote_adapter(): void
+    public function test_requested_command_resolves_adapter_and_fails_closed_without_external_config(): void
     {
         $path = dirname(__DIR__, 6) . '/scripts/nhk-demo-cutover';
         $output = [];
@@ -26,7 +26,7 @@ final class DemoCutoverCliContractTest extends TestCase
         exec(escapeshellarg($path) . ' --target=demo.1945.vn --pack=odo --json 2>&1', $output, $status);
 
         self::assertNotSame(0, $status);
-        self::assertStringContainsString('REMOTE_DEPLOYMENT_ADAPTER_UNAVAILABLE', implode("\n", $output));
+        self::assertStringContainsString('REMOTE_DEPLOYMENT_CONFIG_REQUIRED', implode("\n", $output));
     }
 
     public function test_unknown_pack_fails_closed_before_deployment(): void

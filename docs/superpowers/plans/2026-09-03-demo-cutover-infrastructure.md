@@ -71,11 +71,11 @@
 
 - [ ] Write a failing test for missing manifest, non-allowlisted target and unavailable authenticated runtime.
 - [ ] Run the focused tests and confirm failures.
-- [ ] Implement repository checks, safe manifest loading, and blocked results with stable codes.
+- [x] Implement repository checks, safe manifest loading, and blocked results with stable codes.
 - [ ] Run focused tests and confirm pass.
 - [ ] Write a failing test that serialized evidence redacts credential-shaped keys and values.
 - [ ] Implement redaction before persistence/output.
-- [ ] Compose the runner in `tools/nhk-demo-cutover.php`; default to prepare-only and require TTY/explicit approval before apply.
+- [x] Compose the runner in `tools/nhk-demo-cutover.php`; default to prepare-only and require TTY/explicit approval before apply.
 - [ ] Run `php tools/nhk-demo-cutover.php --help` and the no-credential dry preparation path; verify it blocks rather than claims remote success.
 - [ ] Commit `feat: wire safe demo cutover adapters`.
 
@@ -90,7 +90,7 @@
 - [ ] Add the minimal shell wrapper using `exec` and safe path resolution.
 - [ ] Run the focused test and confirm pass.
 - [ ] Add argument contract tests for the requested invocation and invalid target.
-- [ ] Run `./scripts/nhk-demo-cutover --target=demo.1945.vn --pack=odo`; verify it stops with an explicit unavailable-runtime/deployment reason and does not mutate data.
+- [x] Run `./scripts/nhk-demo-cutover --target=demo.1945.vn --pack=odo`; verify it stops with `REMOTE_DEPLOYMENT_CONFIG_REQUIRED` and does not mutate data.
 - [ ] Commit `feat: add human-controlled demo cutover command`.
 
 ### Task 5: Verification and checkpoint
