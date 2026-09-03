@@ -3241,3 +3241,31 @@ No remote deployment, WordPress, semantic, Graph or live data mutation was
 performed. Full-suite classification remains the existing WordPress
 bootstrap/database errors and guarded integration failures; no regression from
 this adapter was observed.
+
+## Continuation verification checkpoint — 2026-09-03
+
+The requested continuation was read-only where external prerequisites were
+missing. The old Video Proposal `01a065d5-a7e0-7092-a798-2decd42213b5` remains
+untouched; no new Video ingest, Proposal, approval or Apply was attempted.
+The current Video contract permits only registered outbound `about` semantic
+attachments and does not permit `depicts` for Video intake. The required
+YouTube API key is not present in this shell, and the new demo deployment is
+blocked by `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`, so no live Video receipt can be
+claimed.
+
+The local catalog has 33 tools and 32 Ability mappings. The exact intentional
+exclusion is `nhk.media.ingest` because its canonical transport is multipart
+binary and WordPress Ability input cannot carry the file part. All other 32
+tools map one-to-one, including `nhk.proposal.eligibility` →
+`nhk-v3/proposal-eligibility`. The live demo Abilities Browser is stale: it
+shows 32 abilities including `nhk-v3/media-ingest` and does not show
+`nhk-v3/proposal-eligibility`.
+
+The deployed revision could not be verified from the live page. A controlled
+canonical test URL `/anh/dong-ho-co-mat-kinh-cuong-hinh-kim-cuong.webp` still
+renders the demo 404 page, therefore no HTTP 200 or `image/webp` claim is made.
+Local focused coverage passes 36 tests / 252 assertions; full Unit execution
+completes with 8 existing WordPress bootstrap errors, 12 guarded integration
+failures, 74 skips and 1 deprecation. Composer validation and `git diff
+--check` pass. No code, domain/backend, semantic data, WordPress data or
+external deployment was mutated.
