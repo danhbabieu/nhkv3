@@ -24,6 +24,11 @@ final readonly class PublicIdentityMutationResult
         return new self(true, null, $identity, $historicRoute);
     }
 
+    public static function acceptedHistoricRoute(HistoricPublicRoute $historicRoute): self
+    {
+        return new self(true, null, null, $historicRoute);
+    }
+
     public static function rejected(string $code): self
     {
         if (!in_array($code, self::codes(), true)) {

@@ -54,7 +54,8 @@ final class PublicIdentityDomainTest extends TestCase
 
     public function test_explicit_replacement_advances_revision_once_and_preserves_policy_version(): void
     {
-        $replacement = $this->identity()->replaceSlug('o-do', 3);
+        $identity = $this->identity();
+        $replacement = $identity->replaceSlug('o-do', 3, $this->historicRouteFor($identity));
 
         self::assertTrue($replacement->accepted);
         self::assertSame(4, $replacement->identity->revision);
@@ -63,9 +64,23 @@ final class PublicIdentityDomainTest extends TestCase
         self::assertSame(4, $replacement->historicRoute->replacementRevision);
     }
 
+    public function test_explicit_replacement_preserves_the_policy_projected_nested_historic_route_without_inventing_a_path(): void
+    {
+        $identity = new PublicIdentity('identity-002', 'authority', 'model-002', 'model', '36-10', 'brand:odo', 'public-route-v1', 3);
+        $historic = new HistoricPublicRoute('identity-002', 'model', 'brand:odo', '/odo/36-10/', '36-10', 4);
+
+        $replacement = $identity->replaceSlug('36-10-revised', 3, $historic);
+
+        self::assertTrue($replacement->accepted);
+        self::assertSame('model', $replacement->historicRoute->routeType);
+        self::assertSame('brand:odo', $replacement->historicRoute->collisionScope);
+        self::assertSame('/odo/36-10/', $replacement->historicRoute->path);
+    }
+
     public function test_stale_revision_is_rejected_without_a_replacement(): void
     {
-        $replacement = $this->identity()->replaceSlug('o-do', 2);
+        $identity = $this->identity();
+        $replacement = $identity->replaceSlug('o-do', 2, $this->historicRouteFor($identity));
 
         self::assertFalse($replacement->accepted);
         self::assertSame(PublicIdentityMutationResult::STALE_REVISION, $replacement->code);
@@ -73,18 +88,30 @@ final class PublicIdentityDomainTest extends TestCase
         self::assertNull($replacement->historicRoute);
     }
 
-    public function test_public_url_never_accepts_a_uuid_or_stable_key_as_a_final_path(): void
+    public function test_public_url_never_accepts_a_uuid_or_projection_supplied_internal_identity_as_a_final_path(): void
     {
         $uuid = '018f3f72-5a7e-7d20-9acf-0b1c2d3e4f50';
 
-        foreach ([$uuid, 'nhk:brand:odo'] as $internalIdentity) {
+        foreach ([[$uuid, []], ['identity-001', ['identity-001']], ['42', ['42']], ['brand-odo', ['brand-odo']]] as [$internalIdentity, $internalIdentityValues]) {
             try {
-                new PublicUrlResult('/' . $internalIdentity . '/', true, [], [], 3);
+                new PublicUrlResult(
+                    finalPath: '/' . $internalIdentity . '/',
+                    eligible: true,
+                    identityRevision: 3,
+                    internalIdentityValues: $internalIdentityValues,
+                );
                 self::fail('An internal identity must not be accepted in a public path.');
             } catch (\InvalidArgumentException) {
                 self::addToAssertionCount(1);
             }
         }
+    }
+
+    public function test_public_url_allows_a_legitimate_numeric_slug_when_it_is_not_an_internal_identity(): void
+    {
+        $result = new PublicUrlResult('/42/', true, [], [], 3, ['identity-001']);
+
+        self::assertSame('/42/', $result->finalPath);
     }
 
     private function identity(): PublicIdentity
@@ -100,6 +127,20 @@ final class PublicIdentityDomainTest extends TestCase
             3,
             '2026-09-03T00:00:00+00:00',
             '2026-09-03T00:00:00+00:00',
+        );
+    }
+
+    private function historicRouteFor(PublicIdentity $identity): HistoricPublicRoute
+    {
+        return new HistoricPublicRoute(
+            $identity->identityId,
+            $identity->routeType,
+            $identity->collisionScope,
+            '/odo/',
+            $identity->currentSlug,
+            $identity->revision + 1,
+            $identity->updatedAt,
+            $identity->updatedAt,
         );
     }
 }

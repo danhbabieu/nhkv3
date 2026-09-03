@@ -5,6 +5,7 @@ namespace NHK\Core\Contracts\PublicIdentity;
 
 use NHK\Core\Domain\PublicIdentity\PublicIdentity;
 use NHK\Core\Domain\PublicIdentity\PublicIdentityMutationResult;
+use NHK\Core\Domain\PublicIdentity\HistoricPublicRoute;
 
 /** Persistence boundary for one current identity per owner and unique route scope/slug. */
 interface PublicIdentityRepository
@@ -16,4 +17,6 @@ interface PublicIdentityRepository
     public function create(PublicIdentity $identity): PublicIdentityMutationResult;
 
     public function update(PublicIdentity $identity, int $expectedRevision): PublicIdentityMutationResult;
+
+    public function appendHistoricRoute(HistoricPublicRoute $historicRoute): PublicIdentityMutationResult;
 }

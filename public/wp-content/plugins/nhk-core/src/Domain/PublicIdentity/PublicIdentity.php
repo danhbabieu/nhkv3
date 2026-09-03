@@ -43,7 +43,7 @@ final readonly class PublicIdentity
         return PublicIdentityMutationResult::accepted($this);
     }
 
-    public function replaceSlug(string $normalizedSlug, int $expectedRevision): PublicIdentityMutationResult
+    public function replaceSlug(string $normalizedSlug, int $expectedRevision, HistoricPublicRoute $historicRoute): PublicIdentityMutationResult
     {
         if ($expectedRevision !== $this->revision) {
             return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::STALE_REVISION);
@@ -53,6 +53,9 @@ final readonly class PublicIdentity
         }
 
         $replacementRevision = $this->revision + 1;
+        if ($historicRoute->identityId !== $this->identityId || $historicRoute->routeType !== $this->routeType || $historicRoute->collisionScope !== $this->collisionScope || $historicRoute->oldSlug !== $this->currentSlug || $historicRoute->replacementRevision !== $replacementRevision) {
+            return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
+        }
         $updated = new self(
             $this->identityId,
             $this->ownerKind,
@@ -65,18 +68,7 @@ final readonly class PublicIdentity
             $this->createdAt,
             $this->updatedAt,
         );
-        $historic = new HistoricPublicRoute(
-            $this->identityId,
-            $this->routeType,
-            $this->collisionScope,
-            '/' . $this->currentSlug . '/',
-            $this->currentSlug,
-            $replacementRevision,
-            $this->updatedAt,
-            $this->updatedAt,
-        );
-
-        return PublicIdentityMutationResult::accepted($updated, $historic);
+        return PublicIdentityMutationResult::accepted($updated, $historicRoute);
     }
 
     private static function isToken(string $value): bool
