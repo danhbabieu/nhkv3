@@ -5,11 +5,12 @@ namespace NHK\Core\Application\Video;
 
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\VideoRelationCandidate;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoRelationCandidatePlanner
 {
-    public function __construct(private PredicateRegistry $predicates)
+    public function __construct(private PredicateRegistry $predicates, private EvidenceRepository $evidence, private KnowledgeRepository $claims, private SourceRepository $sources)
     {
     }
 
@@ -28,7 +29,14 @@ final class VideoRelationCandidatePlanner
             if (!UuidCodec::isValid($targetId)) throw new \InvalidArgumentException('Video relation target must be a canonical UUID.');
             if (!in_array($origin, ['EXPLICIT_USER_RELATION', 'INFERRED_RELATION'], true)) throw new \InvalidArgumentException('Video relation origin is invalid.');
             if ($evidence === []) throw new \InvalidArgumentException('Video relation requires evidence.');
-            foreach ($evidence as $reference) if (!is_array($reference) || trim((string) ($reference['kind'] ?? '')) === '') throw new \InvalidArgumentException('Video relation evidence reference is invalid.');
+            foreach ($evidence as $reference) {
+                if (!is_array($reference) || array_keys($reference) !== ['evidence_id']) throw new \InvalidArgumentException('Video relation evidence reference is invalid.');
+                $evidenceId = trim((string) $reference['evidence_id']);
+                $record = UuidCodec::isValid($evidenceId) ? $this->evidence->findByCanonicalId($evidenceId) : null;
+                $claim = $record === null ? null : $this->claims->findByCanonicalId($record->claimId);
+                $source = $record === null ? null : $this->sources->findByCanonicalId($record->sourceId);
+                if ($record === null || !$record->active || !$record->isPublic() || $claim === null || !$claim->active || !$claim->isPublic() || $source === null || !$source->active || !$source->isPublic()) throw new \InvalidArgumentException('Video relation evidence reference is invalid.');
+            }
             $definition = $this->predicates->get($predicate);
             if (!$definition->allows('video', $targetType)) throw new \InvalidArgumentException('Predicate is not allowed for a Video target.');
             $key = $predicate . ':' . $targetType . ':' . $targetId;

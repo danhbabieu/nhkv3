@@ -19,7 +19,9 @@ use NHK\Core\Application\Video\{
     YouTubeUrlNormalizer
 };
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\{
     TranscriptPolicy,
@@ -126,7 +128,8 @@ final class VideoSemanticCoreTest extends TestCase
 
     public function test_relation_planner_requires_registered_predicate_canonical_target_and_evidence(): void
     {
-        $planner = new VideoRelationCandidatePlanner(new PredicateRegistry());
+        $evidenceId = '01a0667c-9d0f-7950-8e41-cc432cd2dd20';
+        $planner = $this->planner($evidenceId);
         $videoId = '11111111-1111-4111-8111-111111111111';
         $targetId = '22222222-2222-4222-8222-222222222222';
 
@@ -135,7 +138,7 @@ final class VideoSemanticCoreTest extends TestCase
             'target_type' => 'brand',
             'predicate' => 'about',
             'origin' => 'EXPLICIT_USER_RELATION',
-            'evidence_refs' => [['kind' => 'USER_HINT', 'locator' => 'hint']],
+            'evidence_refs' => [['evidence_id' => $evidenceId]],
             'reason' => 'User supplied Odo as context.',
             'confidence' => 1.0,
         ]]);
@@ -144,6 +147,7 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame('about', $candidates[0]->predicate);
         self::assertSame('video', $candidates[0]->sourceType);
         self::assertSame($videoId, $candidates[0]->sourceKey);
+        self::assertSame([['evidence_id' => $evidenceId]], $candidates[0]->evidenceRefs);
 
         $this->expectException(\InvalidArgumentException::class);
         $planner->plan($videoId, [[
@@ -153,6 +157,43 @@ final class VideoSemanticCoreTest extends TestCase
             'origin' => 'INFERRED_RELATION',
             'evidence_refs' => [],
         ]]);
+    }
+
+    public function test_relation_planner_rejects_invalid_or_unusable_evidence_references(): void
+    {
+        $videoId = '11111111-1111-4111-8111-111111111111';
+        $targetId = '22222222-2222-4222-8222-222222222222';
+        $activeId = '01a0667c-9d0f-7950-8e41-cc432cd2dd20';
+        $inactiveId = '01a0667c-9d0f-7950-8e41-cc432cd2dd21';
+        $planner = $this->planner($activeId, $inactiveId);
+        $base = ['target_id' => $targetId, 'target_type' => 'brand', 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'];
+
+        foreach ([
+            ['evidence_refs' => [['evidence_id' => 'not-a-uuid']]],
+            ['evidence_refs' => [['evidence_id' => '01a0667c-9d0f-7950-8e41-cc432cd2dd22']]],
+            ['evidence_refs' => [['evidence_id' => $inactiveId]]],
+            ['evidence_refs' => [['id' => $activeId]]],
+            ['evidence_refs' => [[]]],
+            [],
+        ] as $invalid) {
+            try {
+                $planner->plan($videoId, [array_merge($base, $invalid)]);
+                self::fail('Expected invalid evidence reference to be rejected.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertContains($error->getMessage(), ['Video relation evidence reference is invalid.', 'Video relation requires evidence.']);
+            }
+        }
+    }
+
+    public function test_video_ingest_schema_exposes_canonical_evidence_reference_shape(): void
+    {
+        $tools = array_column(\NHK\Core\Application\Mcp\McpToolCatalog::tools(), null, 'name');
+        $reference = $tools['nhk.video.ingest']['inputSchema']['properties']['intended_relations']['items']['properties']['evidence_refs']['items'];
+
+        self::assertSame(['evidence_id'], $reference['required']);
+        self::assertSame('uuid', $reference['properties']['evidence_id']['format']);
+        self::assertFalse($reference['additionalProperties']);
+        self::assertContains('evidence_refs', $tools['nhk.video.ingest']['inputSchema']['properties']['intended_relations']['items']['required']);
     }
 
     public function test_classifier_uses_multi_signal_evidence_and_returns_one_primary_hub(): void
@@ -231,18 +272,28 @@ final class VideoSemanticCoreTest extends TestCase
             public function list(bool $includeRetired = false): array { return []; }
         };
         $adapter = new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Odo 36/8', 'description' => 'Âm thanh và nhận diện bộ máy.', 'availability' => 'available', 'embeddable' => true, 'duration_seconds' => 420, 'fetched_at' => '2026-09-02T01:00:00Z']);
-        $service = new VideoIntakeService($adapter, $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry()), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types));
+        $evidenceId = '01a0667c-9d0f-7950-8e41-cc432cd2dd20';
+        $service = new VideoIntakeService($adapter, $videos, new VideoHubClassifier(), $this->planner($evidenceId), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types));
 
-        $preview = $service->preview('https://youtu.be/dQw4w9WgXcQ', 'Video này nói về Odo 36/8 và chất âm.');
+        $preview = $service->preview('https://youtu.be/dQw4w9WgXcQ', 'Video này nói về Odo 36/8 và chất âm.', null, [[
+            'target_id' => $brand->canonicalId,
+            'target_type' => 'brand',
+            'predicate' => 'about',
+            'origin' => 'EXPLICIT_USER_RELATION',
+            'evidence_refs' => [['evidence_id' => $evidenceId]],
+        ]]);
         $proposal = $service->proposalArguments($preview, 'video-intake-test');
+        $replayedProposal = $service->proposalArguments($preview, 'video-intake-test');
 
         self::assertSame('ingest', $preview->operation);
         self::assertSame($brand->canonicalId, $preview->package['semantic_attachments'][0]['target_key']);
         self::assertSame('EXPLICIT_USER_RELATION', $preview->package['semantic_attachments'][0]['origin']);
         self::assertSame('video', $proposal['entity_type']);
         self::assertSame('video-intake-test', $proposal['idempotency_key']);
+        self::assertSame($proposal, $replayedProposal);
         self::assertSame($preview->videoId, $proposal['payload']['canonical_id']);
         self::assertSame('Odo 36/8', $preview->package['source']['source_title']);
+        self::assertSame([['evidence_id' => $evidenceId]], $proposal['payload']['metadata']['semantic_attachments'][0]['evidence_refs']);
         self::assertTrue($preview->package['completeness']['publishable']);
     }
 
@@ -258,6 +309,45 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertContains('source_title', $result->changedFields);
         self::assertTrue($result->reconciliationRequired);
         self::assertSame('NHK editorial title', $video->title);
+    }
+
+    private function evidenceRepository(string ...$ids): EvidenceRepository
+    {
+        $items = [];
+        foreach ($ids as $id) {
+            $items[$id] = new Evidence($id, '33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444', 'supports', 'Evidence excerpt.', null, $id !== '01a0667c-9d0f-7950-8e41-cc432cd2dd21', 1, ['visibility' => 'PUBLIC']);
+        }
+        return new class($items) implements EvidenceRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Evidence { return $this->items[$id] ?? null; }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+        };
+    }
+
+    private function planner(string ...$evidenceIds): VideoRelationCandidatePlanner
+    {
+        $claimId = '33333333-3333-4333-8333-333333333333';
+        $sourceId = '44444444-4444-4444-8444-444444444444';
+        $claims = new class($claimId) implements KnowledgeRepository {
+            public function __construct(private string $id) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return $id === $this->id ? new KnowledgeClaim($id, 'test:claim', 'Claim text.') : null; }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $sources = new class($sourceId) implements SourceRepository {
+            public function __construct(private string $id) {}
+            public function findByCanonicalId(string $id): ?Source { return $id === $this->id ? new Source($id, 'test:source', 'Source', 'website', 'https://example.test', ['visibility' => 'PUBLIC']) : null; }
+            public function findByStableKey(string $stableKey): ?Source { return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        return new VideoRelationCandidatePlanner(new PredicateRegistry(), $this->evidenceRepository(...$evidenceIds), $claims, $sources);
     }
 
     public function test_video_sitemap_contains_only_active_available_indexable_watch_pages(): void

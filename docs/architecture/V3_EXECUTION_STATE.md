@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+## Video evidence reference contract alignment — 2026-09-03
+
+Root-cause tracing found that `nhk-v3/video-ingest` exposed relation
+`evidence_refs` as arbitrary `object[]`, while
+`VideoRelationCandidatePlanner` validated the obsolete `kind` field and never
+resolved a canonical Evidence record. This conflicted with Constitution §13.2
+Video Law (7), so it is recorded as `CONSTITUTION_CONFLICT` at the old
+implementation boundary.
+
+The catalog and runtime now use the canonical non-empty shape
+`[{"evidence_id":"<Evidence UUID>"}]`. The planner resolves Evidence through
+the existing Evidence, Knowledge and Source repositories and requires the
+complete active/public usable chain. Arbitrary objects, bare strings, legacy
+`id`, missing, malformed, nonexistent or inactive/unusable references fail
+closed. The exact reference is preserved through the Video intake Proposal
+payload; research matches without canonical Evidence are not promoted to
+relations. No Governance shortcut, Graph bypass, WordPress writer, database
+migration or semantic data mutation was added.
+
+Evidence: focused Video/MCP tests pass; the `nhk-core` Unit suite passes. PHP
+lint, Composer validation, `git diff --check` and secret scan pass. The
+Constitution and normative Video contracts were not changed; the subordinate
+Video Relationship implementation contract now states the canonical shape.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Odo canonical public-token correction — 2026-09-03
 
 The historical Vietnamese slug normalization converted the display name `Ô Đô`

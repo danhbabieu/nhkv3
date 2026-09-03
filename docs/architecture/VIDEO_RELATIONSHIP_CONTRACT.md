@@ -9,6 +9,13 @@ predicate, `EXPLICIT_USER_RELATION` or `INFERRED_RELATION`, evidence references,
 confidence and a reason. Ambiguous or unknown targets fail closed. Unknown
 predicate, endpoint or target identity is a typed gap/conflict.
 
+`evidence_refs` is a non-empty array of exact objects shaped as
+`{"evidence_id":"<canonical Evidence UUID>"}`. The Evidence must resolve
+through the Knowledge/Evidence repository, remain active and be publicly usable
+under the existing Evidence read policy. Arbitrary objects, string references,
+missing IDs and inactive/unusable Evidence fail closed. This reference is
+preserved unchanged through Proposal and Controlled Apply.
+
 Apply is governed. Every approved Video ingest proposal must create the Video
 with at least one approved attachment through `GraphService` in the same
 Controlled Apply transaction. Zero candidates returns

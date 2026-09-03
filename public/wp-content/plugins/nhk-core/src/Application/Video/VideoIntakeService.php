@@ -32,12 +32,15 @@ final class VideoIntakeService
         $videoId = $existing?->canonicalId ?? UuidCodec::newV7();
         $research = $this->researcher?->research(implode("\n", array_filter([$snapshot['source_title'] ?? '', $snapshot['source_description'] ?? '', $userHint]))) ?? ['resolved' => [], 'ambiguous' => [], 'missing' => []];
         $relations = $intendedRelations;
-        foreach ($research['resolved'] as $match) $relations[] = [
-            'target_id' => $match['id'], 'target_type' => $match['type'], 'predicate' => 'about',
-            'origin' => $userHint !== '' && str_contains($this->lower($userHint), $this->lower((string) $match['name'])) ? 'EXPLICIT_USER_RELATION' : 'INFERRED_RELATION',
-            'evidence_refs' => [['kind' => $userHint !== '' ? 'USER_HINT' : 'YOUTUBE_TITLE', 'locator' => $snapshot['canonical_source_url']]],
-            'reason' => 'Resolved against existing NHK canonical identity.', 'confidence' => $userHint !== '' ? 0.9 : 0.7,
-        ];
+        foreach ($research['resolved'] as $match) {
+            if (!is_array($match['evidence_refs'] ?? null) || $match['evidence_refs'] === []) continue;
+            $relations[] = [
+                'target_id' => $match['id'], 'target_type' => $match['type'], 'predicate' => 'about',
+                'origin' => $userHint !== '' && str_contains($this->lower($userHint), $this->lower((string) $match['name'])) ? 'EXPLICIT_USER_RELATION' : 'INFERRED_RELATION',
+                'evidence_refs' => array_values($match['evidence_refs']),
+                'reason' => 'Resolved against existing NHK canonical identity.', 'confidence' => $userHint !== '' ? 0.9 : 0.7,
+            ];
+        }
         $candidateObjects = $this->relations->plan($videoId, $relations);
         $candidatePayloads = array_map(static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => $candidate->toProposalPayload(), $candidateObjects);
         $category = $this->classifier->classify(['source_title' => $snapshot['source_title'] ?? '', 'source_description' => $snapshot['source_description'] ?? '', 'tags' => $snapshot['tags'] ?? [], 'user_hint' => $userHint]);
