@@ -28,7 +28,8 @@ final class PublicEntityEligibilityPolicy
             $result = PublicEligibilityResult::eligible();
         }
 
-        if ($this->routes->path($entity) === null) return PublicEligibilityResult::blocked('UNAVAILABLE');
+        $url = $this->routes->result($entity);
+        if (!$url->eligible) return PublicEligibilityResult::blocked(...($url->blockers ?: ['UNAVAILABLE']));
         return $result;
     }
 

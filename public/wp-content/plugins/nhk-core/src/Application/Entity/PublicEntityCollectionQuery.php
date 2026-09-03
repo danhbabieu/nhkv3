@@ -41,7 +41,7 @@ final class PublicEntityCollectionQuery
         if (!$this->isAvailable() || !$this->types->has($type) || trim($slug) === '') return null;
         $matches = [];
         foreach ($this->authority->listByType($type, true) as $entity) {
-            if (PublicRouteResolver::slug($entity->canonicalName) !== trim($slug)) continue;
+            if ($this->routeSlug($entity) !== trim($slug)) continue;
             if ($this->item($entity) !== null) $matches[] = $entity;
         }
         return count($matches) === 1 ? $matches[0] : null;
@@ -76,7 +76,7 @@ final class PublicEntityCollectionQuery
     {
         if (!$this->types->has($type)) return null;
         $matches = [];
-        foreach ($this->authority->listByType($type) as $entity) if (PublicRouteResolver::slug($entity->canonicalName) === trim($slug) && $this->eligibility->evaluate($entity)->eligible) $matches[] = $entity->stableKey;
+        foreach ($this->authority->listByType($type) as $entity) if ($this->routeSlug($entity) === trim($slug) && $this->eligibility->evaluate($entity)->eligible) $matches[] = $entity->stableKey;
         return count($matches) === 1 ? $matches[0] : null;
     }
 
@@ -85,9 +85,9 @@ final class PublicEntityCollectionQuery
     {
         $decision = $this->eligibility->evaluate($entity);
         if (!$decision->eligible) return null;
-        $identity = $this->identity->resolve($entity);
-        $path = $identity === null ? null : $this->routes->path($entity);
-        if ($identity === null || $path === null) return null;
+        $path = $this->routes->path($entity);
+        if ($path === null) return null;
+        $identity = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'slug' => trim((string) basename($path), '/')];
         $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
         $item = [...$identity, 'payload' => $payload, 'url' => $path];
@@ -99,4 +99,5 @@ final class PublicEntityCollectionQuery
 
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
+    private function routeSlug(AuthorityEntity $entity): ?string { $path = $this->routes->path($entity); return $path === null ? null : trim((string) basename($path), '/'); }
 }
