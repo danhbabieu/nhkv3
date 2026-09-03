@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+## Owner Publication Override root-cause and isolated runtime checkpoint — 2026-09-03
+
+The review boundary now has an explicit read-only `review()` operation. The
+canonical MCP review tool delegates to it and cannot invoke the native
+WordPress writer; normal publication still uses the existing request/publish
+path. The stale MCP wire-smoke fixture now asserts the exact ordered 36-tool
+catalog. P5 teardown returns cleanly when WordPress setup skipped before
+`$wpdb` existed.
+
+Fresh isolated runtime proof used `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test` with local MySQL 9.7.1. WordPress bootstrap and
+`$wpdb` were available; additive migration 013 created/read back
+`wp_nhk_owner_publication_decisions`. The Owner Override integration suite
+passed 4 tests / 30 assertions, including isolated `wp_insert_post()` PASS,
+OWNER_REVIEW_REQUIRED→authenticated approval, SYSTEM_BLOCKED, MCP review-only,
+and retry returning the durable completed decision. Post 87 was not used.
+
+The focused unit/contract suite passed 70 tests / 761 assertions. A focused
+P4/P5/MCP integration run executed against the isolated database but retained
+four unrelated failures: three existing MCP media/video/knowledge fixture
+assertions and one existing P5 pagination baseline mismatch. No unrelated
+working-tree files were staged or changed by this checkpoint.
+
 ## YouTube runtime configuration safety checkpoint — 2026-09-03
 
 Root-cause tracing confirmed that the production Video adapter had no

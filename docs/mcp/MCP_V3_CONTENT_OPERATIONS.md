@@ -36,7 +36,7 @@ return HTTP 202 with no body.
 ## 2. Tool catalog thực tế
 
 `McpToolCatalog::tools()` exposes the exact current registered tool list. In
-this 2026-09-03 workspace it contains 35 tools. `kind=mutation` implies
+this 2026-09-03 workspace it contains 36 tools. `kind=mutation` implies
 `governed=true`. The coordinated Article tools occupy positions 3–4; the
 catalog's final position is `nhk.proposal.apply`. The clean HEAD
 catalog and the wire smoke both use this
