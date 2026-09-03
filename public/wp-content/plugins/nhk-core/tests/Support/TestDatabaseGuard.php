@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Support;
 use PHPUnit\Framework\TestCase;
 final class TestDatabaseGuard {
+    public static function isInitialized(?object $wpdb): bool { return $wpdb !== null; }
     public static function requireTestDatabase(): void {
         if (getenv('NHK_WP_TEST_DB') !== 'nhk_v3_test') TestCase::markTestSkipped('Integration tests require NHK_WP_TEST_DB=nhk_v3_test.');
         global $wpdb;

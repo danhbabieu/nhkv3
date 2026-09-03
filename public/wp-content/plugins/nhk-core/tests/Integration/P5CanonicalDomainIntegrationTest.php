@@ -29,6 +29,7 @@ final class P5CanonicalDomainIntegrationTest extends TestCase
     protected function tearDown(): void
     {
         global $wpdb;
+        if (!TestDatabaseGuard::isInitialized($wpdb ?? null)) return;
         $wpdb->query($wpdb->prepare('DELETE FROM ' . $wpdb->prefix . 'nhk_entities WHERE stable_key LIKE %s', 'p5-integration-%'));
     }
 
