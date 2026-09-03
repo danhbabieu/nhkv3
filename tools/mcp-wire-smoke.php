@@ -58,8 +58,8 @@ try {
     expectStatus($tools, 200, 'tools/list');
     $toolsBody = json_decode($tools['body'], true);
     $actualToolNames = array_values(array_map(static fn (array $tool): string => (string) ($tool['name'] ?? ''), is_array($toolsBody['result']['tools'] ?? null) ? $toolsBody['result']['tools'] : []));
-    $approvedToolNames = ['nhk.search', 'nhk.semantic.resolve', 'nhk.article.preflight', 'nhk.article.ingest', 'nhk.entity.get', 'nhk.media.get', 'nhk.media.ingest', 'nhk.media.attachment.get', 'nhk.video.ingest', 'nhk.video.get', 'nhk.knowledge.get', 'nhk.source.get', 'nhk.evidence.get', 'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest', 'nhk.proposal.create', 'nhk.proposal.submit', 'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility', 'nhk.proposal.apply'];
-    if ($actualToolNames !== $approvedToolNames) fail('tools/list did not return the approved 22-tool catalog');
+    $approvedToolNames = ['nhk.search', 'nhk.semantic.resolve', 'nhk.article.preflight', 'nhk.article.ingest', 'nhk.category.resolve', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore', 'nhk.entity.get', 'nhk.media.get', 'nhk.media.ingest', 'nhk.media.attachment.get', 'nhk.video.ingest', 'nhk.video.get', 'nhk.knowledge.get', 'nhk.source.get', 'nhk.evidence.get', 'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest', 'nhk.proposal.create', 'nhk.proposal.submit', 'nhk.proposal.review', 'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility', 'nhk.proposal.apply'];
+    if ($actualToolNames !== $approvedToolNames) fail('tools/list did not return the exact canonical 36-tool catalog');
     pass('tools/list catalog');
 
     $resolve = request($url, 'POST', $common, json_encode(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.semantic.resolve', 'arguments' => ['context' => ['brand' => ['name' => 'Odo']]]]], JSON_THROW_ON_ERROR));
