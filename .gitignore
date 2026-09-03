@@ -31,3 +31,5 @@ node_modules/
 .idea/
 .vscode/
 
+# Codex isolated worktrees
+.worktrees/
