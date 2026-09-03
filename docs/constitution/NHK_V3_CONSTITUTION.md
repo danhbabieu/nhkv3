@@ -291,6 +291,56 @@ review under the shared contract.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-03.
 
+## Amendment record — 2026-09-03 — Owner Publication Override Law
+
+**WHY:** Publication-quality incompleteness must remain truthful and visible
+without being treated as equivalent to authentication, identity, integrity or
+execution failure. The project owner is the highest editorial publication
+authority, but is not a security principal by implication and cannot authorize
+semantic mutation outside Governance.
+
+**WHAT LAW CHANGES:** Approve the three-outcome publication decision boundary
+in §14.2. All existing publication checks still run normally. Their exact
+diagnostics are classified as `PASS`, `OWNER_REVIEW_REQUIRED` or
+`SYSTEM_BLOCKED`; eligible failed quality rules remain failed and may be
+explicitly overridden only by an authenticated owner approval. System-blocked
+failures are never overridable. Approval is bound to the exact WordPress Post,
+editorial state token, publication policy version and blocker fingerprint and
+expires after 30 minutes.
+
+Every owner decision is append-only and durable in a dedicated publication
+decision repository. The controlled retry-safe sequence is
+`APPROVAL_RECORDED → PUBLISH_ATTEMPTED → READBACK_VERIFIED → COMPLETED / FAILED`.
+WordPress read-back is mandatory before success is reported; chat provenance
+does not replace authenticated application/MCP principal identity.
+
+**AFFECTED SUBSYSTEMS:** WordPress editorial publication, Article publication
+gate, MCP/Admin orchestration, diagnostic registries, state-token/CAS,
+idempotency, audit and public read-back. Authority, Knowledge, Source/Evidence,
+Graph, Media, MediaUsage and Governance semantic ownership remain unchanged.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** `PASS` proceeds without a second
+confirmation when the owner requested publication. `OWNER_REVIEW_REQUIRED`
+stops automatic publication and exposes concise exact diagnostics for owner
+review. `SYSTEM_BLOCKED` exposes the root cause and no override affordance.
+Failed diagnostics are never relabeled as passes, and public URL success is
+returned only after native WordPress publication and read-back verification.
+
+**DATA, MIGRATION AND ROLLOUT:** The decision store is additive. No legacy
+Article body, V2/staging/production record, semantic record, Graph edge,
+public identity or existing receipt is rewritten. Post-specific behavior is
+forbidden; Post 87/Sonodo is acceptance evidence only.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Owner approval never fabricates Evidence
+or Knowledge, suppresses diagnostics, mutates Authority/Graph, bypasses
+Governance, or overrides authentication, authorization, security, integrity,
+identity ambiguity, route collision, CAS conflict or unreliable infrastructure.
+Tests must prove stale post/token/blocker/policy rejection, 30-minute expiry,
+wrong-principal rejection, deterministic fingerprints, append-only audit,
+retry/idempotency safety, mandatory read-back and MCP/Admin outcome parity.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-03.
+
 ## 2. Ranh giới trách nhiệm tối cao
 
 Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:
@@ -934,6 +984,63 @@ dùng prose, title, body, URL, slug, checksum hoặc display name làm semantic
 identity. Post endpoint dùng `wp_post` với stable key `<blog_id>:<post_id>`;
 không có `article` Graph endpoint.
 
+### 14.2 Owner Publication Override Law
+
+All current publication rules run normally before any publication decision.
+No failed rule may silently disappear. The publication boundary has exactly
+three practical outcomes:
+
+- `PASS`: all mandatory checks pass, so an existing owner publication intent
+  may proceed without another approval.
+- `OWNER_REVIEW_REQUIRED`: one or more registered overridable quality rules
+  fail, automatic publication stops, and the exact failed diagnostics are
+  returned for explicit authenticated owner review. Approval permits native
+  publication with exceptions; it does not change the failed rules.
+- `SYSTEM_BLOCKED`: publication cannot safely or reliably proceed and has no
+  owner override path.
+
+Typical `OWNER_REVIEW_REQUIRED` diagnostics include missing inline Media,
+image resolution below editorial preference, incomplete MediaUsage, SEO/FAQ/
+category/internal-link/structured-data enhancement gaps, pending semantic
+reconciliation or read-back where the applicable policy explicitly permits
+review, Knowledge/Evidence completeness warnings and future quality rules
+registered as overridable. Authentication, authorization, security, unknown
+or ambiguous target, confirmed public identity/route collision, corrupted CAS
+or editorial state, infrastructure failure, programming/runtime failure and
+inability to determine whether publication occurred are `SYSTEM_BLOCKED`.
+
+`RULE FAILURE != AUTOMATIC PUBLICATION PROHIBITION` for eligible publication-
+quality rules. The classifier evaluates every diagnostic with precedence
+`SYSTEM_BLOCKED` over `OWNER_REVIEW_REQUIRED` over `PASS`. Every diagnostic
+must have a deterministic registry entry containing its code, classification,
+owner message, remediation hint and policy version. Unknown, malformed or
+policy-incompatible diagnostics fail closed as `SYSTEM_BLOCKED`.
+
+The owner is the highest editorial publication approval authority, but owner
+approval never overrides authentication, authorization, security, system
+integrity, identity ambiguity, route collision, CAS/state safety or reliable
+execution. It never marks failed rules as `PASS`, suppresses diagnostics,
+fabricates Evidence/Knowledge, mutates Authority/Graph outside Governance or
+authorizes a forbidden semantic mutation. Semantic Proposal → Human Approval
+→ Eligibility → Controlled Apply remains unchanged.
+
+An approval is valid only for the exact WordPress Post, editorial state token,
+publication policy version and deterministic blocker fingerprint evaluated for
+that request, and expires after 30 minutes. A changed Post state/token, policy
+version or blocker set requires fresh owner review. Owner/principal identity
+comes from the authenticated application/MCP principal; chat conversation and
+turn references are additional provenance only.
+
+Every decision is append-only in a dedicated durable publication-decision
+repository, not hidden in the generic operation receipt, and records the Post,
+decision, gate outcome, exact overridden diagnostics, blocker fingerprint,
+state token, policy version, authenticated principal, approval provenance and
+timestamps/expiry. Publication proceeds as the retry-safe state sequence
+`APPROVAL_RECORDED → PUBLISH_ATTEMPTED → READBACK_VERIFIED → COMPLETED / FAILED`.
+Native WordPress read-back is mandatory before a public URL or successful
+publication result is returned. Repeated idempotent requests return the
+durable result and cannot duplicate decisions or publication side effects.
+
 ## 15. Identity, slug, alias và URL
 
 Canonical ID, stable key, display name, public slug, alias và historic slug là
@@ -1383,6 +1490,16 @@ editorial, semantic and verification stages.
 62. Một claim có cùng meaning phải nhận cùng compliance result trên Article, Product, Media/image text, Video, SEO/meta/Open Graph và các public projection khác.
 63. Generated copy, Product listing text, source-platform marketing copy hoặc AI confidence không tự trở thành Evidence.
 64. Compliance/legal-policy dependency failure không được biến thành compliance pass; phải fail closed hoặc human review theo contract.
+65. Publication gate luôn chạy đầy đủ trước classification; không failed rule nào bị silently suppressed.
+66. Publication chỉ có đúng ba practical outcomes: `PASS`, `OWNER_REVIEW_REQUIRED` và `SYSTEM_BLOCKED`, với precedence system-blocked rồi owner-review rồi pass.
+67. `PASS` không cần second confirmation; `OWNER_REVIEW_REQUIRED` cần explicit authenticated owner approval; `SYSTEM_BLOCKED` không thể override.
+68. Owner approval không đổi failed diagnostic thành PASS, không suppress diagnostic, không fabricate Evidence/Knowledge và không bypass Semantic Governance.
+69. Owner approval bind exact WordPress Post, editorial state token, blocker fingerprint và policy version; đổi một trong các giá trị đó hoặc quá 30 phút đều invalidate approval.
+70. Owner/principal identity đến từ authenticated application/MCP principal; chat turn/conversation chỉ là provenance bổ sung.
+71. Mọi publication diagnostic có registry entry deterministic gồm code, classification, owner message, remediation hint và policy version; unknown/malformed/incompatible diagnostic fail closed.
+72. Mọi Owner publication decision được ghi append-only trong dedicated durable repository với gate snapshot, overridden codes, principal/provenance, expiry, publish attempt, read-back và final outcome.
+73. Publication exception flow phải verify native WordPress read-back trước khi báo success/public URL; uncertain transition không được fake success hoặc blind retry.
+74. Retry/idempotency không được duplicate Owner decision hoặc native publication side effect; semantic Governance behavior không bị thay đổi.
 
 ---
 
@@ -1423,6 +1540,7 @@ khác không được dùng như decision authority song song.
 | Governance | Semantic mutation cần approval, revision, idempotency và audit | Controlled Apply là write boundary; Post publish vẫn độc lập |
 | Product/Specimen boundary | Physical object identity và commercial offer identity có lifecycle/cardinality khác nhau | Specimen 1 → 0..N Product; Product → 0..1 Specimen; no implicit physical identity, claim promotion or repair |
 | Public claim & advertising compliance | Promotional wording can create unsupported legal/objective claims even when semantic records are otherwise correct | Meaning-based cross-channel publication gate; objective claims stay within evidence scope; leadership/uniqueness/absolute claims require valid support; unsupported meaning is rewritten narrowly or blocked |
+| Owner publication override | Eligible publication-quality incompleteness must be distinguishable from unsafe identity, security and execution failure | Exactly `PASS`, `OWNER_REVIEW_REQUIRED` and `SYSTEM_BLOCKED`; explicit authenticated owner approval may accept only eligible failures, bound to Post/state/policy/blocker fingerprint for 30 minutes, with append-only decision audit and mandatory WordPress read-back |
 | Deployment health | Runtime failure không được bị che thành empty data | Preflight, layered health và dependency completeness là release gate |
 
 # Appendix B — CURRENT IMPLEMENTATION STATUS (NON-NORMATIVE STATUS SNAPSHOT)
