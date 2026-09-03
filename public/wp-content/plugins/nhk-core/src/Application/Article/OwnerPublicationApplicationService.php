@@ -44,6 +44,8 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
     {
         if (!in_array(trim($affirmation), ['Đăng.', 'Vẫn đăng.', 'Publish.'], true)) return $this->blocked('OWNER_AFFIRMATION_REQUIRED');
         if ($this->can !== null && !(bool) ($this->can)($principal)) return $this->blocked('PUBLICATION_AUTHORIZATION_FAILED');
+        $completed = $this->decisions->findByIdempotencyKey($idempotencyKey . ':completed');
+        if ($completed !== null && $completed->finalOutcome !== '') return ['outcome' => ArticlePublicationOutcome::PASS->value, 'diagnostics' => $completed->diagnostics, 'policy_version' => $completed->policyVersion, 'blocker_fingerprint' => $completed->blockerFingerprint, 'final_outcome' => $completed->finalOutcome, 'decision_id' => $completed->decisionId, 'post' => $completed->readback, 'public_url' => $completed->readback['permalink'] ?? ''];
         $state = $this->posts->read($postId); if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
         if (!hash_equals($expectedStateToken, $state->token)) return ['outcome' => ArticlePublicationOutcome::OWNER_REVIEW_REQUIRED->value, 'diagnostics' => ['EDITORIAL_CAS_REQUIRED'], 'policy_version' => PublicationDiagnosticRegistry::policyVersion(), 'blocker_fingerprint' => PublicationDiagnosticRegistry::fingerprint(['EDITORIAL_CAS_REQUIRED']), 'confirmation_question' => 'Bài đã thay đổi hoặc cần Owner review mới. Vẫn đăng không?'];
         $gate = (new ArticlePublicationGate())->check($state, $evidence, $expectedStateToken);
