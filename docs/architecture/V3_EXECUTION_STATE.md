@@ -674,6 +674,35 @@ required current old-iMac snapshot was not present; the only local dump is
 
 Last updated: 2026-09-02, MCP V3 connector ability exposure checkpoint.
 
+## MCP Ability catalog coverage and three-tier exposure probe — 2026-09-03
+
+The catalog/Ability invariant is explicit: every catalog tool is mapped to an
+Ability or has a non-empty exclusion reason. `nhk.proposal.eligibility` remains
+read-only (`governed=false`) and is capability-gated by
+`nhk_view_governance`; it is not classified as governed to force discovery.
+`nhk.media.ingest` is explicitly excluded from the Ability bridge because its
+canonical binary path is multipart. No base64/data URL adapter or second
+persistence path was added.
+
+| Layer | Evidence |
+|---|---|
+| WordPress registered NHK Ability count | 32 mapped; 1 catalog exclusion (`nhk.media.ingest`) |
+| Easy MCP Browser visible count | 32 (`Nhk-v3`) |
+| Easy MCP Browser enabled count | 32/32 (`12 read`, `20 write`) |
+| Easy MCP exposed tool count | 32, per Browser statement that each enabled Ability is a tools/list tool |
+| Actual connector/client MCP-29 tools/list | 8 read/status tools |
+| `video-ingest` actual connector-visible | NO |
+| Proposal lifecycle actual connector-visible | NO (`create`, `submit`, `approve`, `reject`, `eligibility`, `apply`) |
+
+The discrepancy is across the Easy MCP Browser → actual connector/client
+boundary. Current evidence is consistent with a stale connection/tool
+snapshot, wrong MCP endpoint/profile or connector authorization/token scope;
+reconnect/re-authorize and verify the same connector profile before treating
+the server as unavailable. No Video backend change is authorized by this
+probe. Image-from-chat transport was not verified; it remains
+`IMAGE_FROM_CHAT_BLOCKED_BY_EASY_MCP_TRANSPORT` unless a compatible Easy MCP
+transport is observed.
+
 ## MCP governed Video connector bridge checkpoint — 2026-09-03
 
 The connector gap was traced to the boundary between the custom NHK
@@ -3167,3 +3196,21 @@ service exits with a stale `mysqld_safe`/existing-process condition and remains
 unreachable on 127.0.0.1:3306 and `/tmp/mysql.sock`. Exact `nhk_v3_test` was
 not verified; status remains `RUNTIME_VERIFICATION_BLOCKED`. No fallback to
 `nhk_v3` and no live data mutation occurred.
+
+## DEMO cutover infrastructure implementation checkpoint — 2026-09-03
+
+Implemented the generic `DemoCutoverRunner`, typed cutover context/results,
+redacted evidence helper, generic port bundle, safe repository-local adapters,
+PHP command and thin executable shell at `scripts/nhk-demo-cutover`. The exact
+requested invocation reaches the local safety boundary and stops with
+`REMOTE_DEPLOYMENT_ADAPTER_UNAVAILABLE`; no remote deployment, WordPress,
+semantic, Graph or live data mutation occurred. Unknown packs stop with
+`PACK_MANIFEST_UNAVAILABLE`, and the runner apply path rejects missing or
+mismatched approval fingerprints before Controlled Apply.
+
+Focused evidence: 7 Demo tests / 24 assertions pass; Composer validation,
+changed-file PHP lint and `git diff --check` pass. Full PHPUnit executed 438
+tests / 1,675 assertions with 8 existing WordPress bootstrap/database errors,
+14 existing media/acceptance failures and 74 skips; no Demo test failed. Live
+authenticated runtime, remote deploy adapter, Governance wiring and real DEMO
+cutover remain intentionally unverified and out of scope for this task.
