@@ -51,7 +51,12 @@ intermediate-size generation, or create semantic inference. No
 relation plan, internal-link plan, SEO blueprint, media/video plan and claim
 compliance before an Article draft or publication orchestration proceeds.
 `nhk.article.ingest` remains the governed coordinator and must preserve
-idempotency, revision binding, read-back and fail-closed outcomes.
+idempotency, revision binding, read-back and fail-closed outcomes. The
+operation-level `ArticlePublicationGate` consumes those verified results and
+requires the exact current draft state token, canonical public identity,
+semantic read-back, MediaUsage completion, SEO/public-route verification and
+claim-compliance acceptance. It returns explicit blocker codes and does not
+publish or replace any bounded-context policy.
 
 ## Current gap classification
 

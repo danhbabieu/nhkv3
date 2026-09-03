@@ -123,6 +123,14 @@ draft. Publish, trash and live editorial mutation remain unsupported. The
 typed `nhk.category.*` tools similarly delegate to the shared native Category
 gateway; category membership is taxonomy truth and never a Graph edge.
 
+The publication boundary is represented by the read-only
+`ArticlePublicationGate` application service. It consumes verified research,
+semantic, MediaUsage, SEO, public-route, structured-data and claim-compliance
+evidence, requires a matching current editorial state token, and reports
+explicit blockers. It is not a publish writer and is not advertised as a new
+MCP tool until a native WordPress publication writer, evidence token binding,
+uncertain-result recovery and rendered read-back are implemented and tested.
+
 ## 5. Authority workflow
 
 Resolve by canonical UUID, then stable key, then exact canonical name/alias.
