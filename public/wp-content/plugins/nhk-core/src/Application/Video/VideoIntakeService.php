@@ -98,22 +98,30 @@ final class VideoIntakeService
 
     private function lower(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value); }
 
-    /** @return array{status:string,candidates:list<array<string,mixed>>,diagnostics:list<string>} */
+    /** @return array<string,mixed> */
     private function knowledgeEnrichmentPacket(array $research, array $snapshot, VideoSourceResolution $resolution, string $userHint): array
     {
-        if ($this->knowledgeEnrichment === null) return ['status' => 'not_requested', 'candidates' => [], 'diagnostics' => []];
+        if ($this->knowledgeEnrichment === null) return ['status' => 'not_requested', 'subject' => null, 'candidates' => [], 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []];
         try {
-            $candidates = ($this->knowledgeEnrichment)([
+            $result = ($this->knowledgeEnrichment)([
                 'resolved' => $research['resolved'],
+                'ambiguous' => $research['ambiguous'],
                 'source' => $snapshot,
                 'transcript' => $resolution->toArray()['transcript'] ?? null,
                 'transcript_policy' => $resolution->transcript,
                 'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null,
             ]);
-            if (!is_array($candidates)) throw new \UnexpectedValueException('Knowledge enrichment seam returned an invalid packet.');
-            return ['status' => 'available', 'candidates' => array_values(array_map($this->serializeKnowledgeCandidate(...), $candidates)), 'diagnostics' => []];
+            if (!is_array($result)) throw new \UnexpectedValueException('Knowledge enrichment seam returned an invalid packet.');
+            if (array_key_exists('candidates', $result)) {
+                if (array_filter($result['candidates'], static fn (mixed $candidate): bool => $candidate instanceof \NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate) !== []) {
+                    $result['candidates'] = array_values(array_map($this->serializeKnowledgeCandidate(...), $result['candidates']));
+                }
+                return array_merge(['status' => 'available', 'subject' => null, 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []], $result);
+            }
+            $candidates = array_values(array_map($this->serializeKnowledgeCandidate(...), $result));
+            return ['status' => 'available', 'subject' => null, 'candidates' => $candidates, 'diagnostics' => [], 'proposal_ready' => (bool) array_filter($candidates, static fn (array $candidate): bool => ($candidate['proposal_ready'] ?? false) === true), 'unresolved_reasons' => $candidates === [] ? [] : ['GOVERNED_REVIEW_REQUIRED']];
         } catch (\Throwable $error) {
-            return ['status' => 'unavailable', 'candidates' => [], 'diagnostics' => ['KNOWLEDGE_ENRICHMENT_PLANNER_FAILED:' . $error->getMessage()]];
+            return ['status' => 'unavailable', 'subject' => null, 'candidates' => [], 'diagnostics' => ['KNOWLEDGE_ENRICHMENT_PLANNER_FAILED:' . $error->getMessage()], 'proposal_ready' => false, 'unresolved_reasons' => ['ENRICHMENT_UNAVAILABLE']];
         }
     }
 
@@ -121,6 +129,8 @@ final class VideoIntakeService
     private function serializeKnowledgeCandidate(mixed $candidate): array
     {
         if (!$candidate instanceof \NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate) throw new \UnexpectedValueException('Knowledge enrichment seam returned an invalid candidate.');
-        return ['classification' => $candidate->classification, 'subject_id' => $candidate->subjectId, 'profile' => $candidate->profile->toMetadata(), 'observation' => $candidate->observation, 'provenance' => $candidate->provenance, 'is_generated' => $candidate->isGenerated, 'is_evidence' => $candidate->isEvidence];
+        $profile = $candidate->profile->toMetadata();
+        $ready = $candidate->classification === 'new_claim' || ($candidate->classification === 'add_evidence' && ($candidate->provenance['source_id'] ?? '') !== '' && ($candidate->provenance['source_revision'] ?? null) !== null);
+        return ['classification' => $candidate->classification, 'subject_id' => $candidate->subjectId, 'facet' => $profile['facet'], 'scope' => $profile['scope'], 'profile' => $profile, 'observation' => $candidate->observation, 'provenance' => $candidate->provenance, 'provenance_summary' => ['origin' => $candidate->provenance['origin'] ?? null, 'source_id' => $candidate->provenance['source_id'] ?? null, 'source_revision' => $candidate->provenance['source_revision'] ?? null, 'locator' => $candidate->provenance['locator'] ?? null], 'proposal_ready' => $ready, 'is_generated' => $candidate->isGenerated, 'is_evidence' => $candidate->isEvidence];
     }
 }

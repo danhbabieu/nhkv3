@@ -93,7 +93,7 @@
 
 ### Task 7: Integrate candidate packets with Video intake
 
-**Status:** complete for the approved Video-only slice; Media and Article remain out of scope.
+**Status:** corrective hardening complete for the approved Video-only slice; Media and Article remain out of scope.
 
 **Files:** Modify `VideoIntakeService.php`, `Plugin.php`, `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`; Create `VideoKnowledgeEnrichmentPlanner.php`; Test `VideoSemanticCoreTest.php`.
 
@@ -101,6 +101,9 @@
 - [x] Run focused tests and confirm RED.
 - [x] Wire the optional read-only seam after canonical resolution; retain Video `about` relation and Proposal flow, with no Knowledge/Evidence write or Graph predicate.
 - [x] Run focused tests and confirm GREEN.
+- [x] Select one narrowest supported subject, reject equally plausible subjects, and prevent cross-target cloning.
+- [x] Extract bounded transcript observations only; keep unavailable extraction diagnostic and fail-closed.
+- [x] Complete the enrichment packet contract and document the non-canonical Video Source boundary.
 - [ ] Commit `feat: connect video intake to living knowledge planning`.
 
 ### Task 8: Complete governed Living Knowledge E2E acceptance

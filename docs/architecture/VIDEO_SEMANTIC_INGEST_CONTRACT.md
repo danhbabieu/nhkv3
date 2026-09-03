@@ -28,13 +28,35 @@ relation candidates, SEO package, provenance and source-rights state. It is not
 WordPress post meta and does not create a second semantic store.
 
 When configured, `VideoIntakeService` invokes an optional read-only Knowledge
-enrichment seam after canonical semantic target resolution. Its output is the
-`knowledge_enrichment` packet with `status`, `candidates` and `diagnostics`.
-Only resolved Authority targets may become candidates; ambiguity, unavailable
-resolution or planner failure never creates a candidate. `USER_HINT` and an
-authorized transcript retain their own provenance. YouTube metadata is source
-input only, and generated editorial text is never passed to the Knowledge
-planner or represented as Evidence.
+enrichment seam after canonical semantic target resolution. The seam selects
+one narrowest confidently supported subject per observation in the order
+`specimen > variant > model > movement/brand`; it never copies an observation
+upward or sideways. Equal candidates are ambiguous and produce no
+proposal-ready candidate. Brand-only context does not infer a Variant.
+
+Its output is the bounded `knowledge_enrichment` packet with `status`,
+`subject`, `candidates`, `diagnostics`, `proposal_ready` and
+`unresolved_reasons`. Each candidate exposes `classification`, `subject_id`,
+`facet`, `scope`, `observation`, provenance summary and `proposal_ready`.
+`same_claim` and ambiguous/unresolved candidates are never proposal-ready.
+`new_claim` is proposal-ready only after the shared planner has resolved its
+dependencies; `add_evidence` additionally requires canonical `source_id` and
+`source_revision`.
+
+Transcript text is source material, not an atomic Knowledge claim. An approved
+read-only factual-observation extractor must return bounded observations with
+provenance/locator. If no extractor is configured, the packet emits
+`TRANSCRIPT_FACT_EXTRACTION_UNAVAILABLE` and creates no transcript candidate;
+extractor failure is diagnostic and does not fail Video intake. Generated
+editorial text is never passed to the Knowledge planner or represented as
+Evidence.
+
+At this phase Video does not resolve or create a canonical NHK Source entity.
+The intake therefore passes no invented Source ID. If a future caller supplies
+canonical `source_id` plus `source_revision`, the shared planner may produce a
+proposal-ready `add_evidence` candidate. Without that canonical binding,
+existing-claim evidence remains `same_claim`/review-only and the packet records
+`SOURCE_RESOLUTION_NEEDED`; Video intake does not create Source or Evidence.
 
 The seam is planning-only: it does not call Knowledge/Evidence repositories,
 submit or approve proposals, apply mutations, or create Graph predicates. A

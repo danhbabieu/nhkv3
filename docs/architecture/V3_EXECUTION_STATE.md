@@ -2,19 +2,30 @@
 
 ## Video → Living Knowledge planning seam — 2026-09-04
 
-Implemented the owner-approved Video-only Task 7 slice. `VideoIntakeService`
-now accepts an optional read-only enrichment seam and emits a
-`knowledge_enrichment` packet containing status, candidates and diagnostics.
-The seam runs only after canonical Authority target resolution; `USER_HINT` and
-authorized transcript observations retain provenance, YouTube metadata remains
-source input, and generated editorial text is excluded from enrichment/Evidence.
+Corrected the owner-approved Video-only Task 7 seam before runtime acceptance.
+`VideoKnowledgeEnrichmentPlanner` now deterministically selects one narrowest
+supported subject (`specimen > variant > model > movement/brand`) and fails
+closed on equal ambiguity, so observations cannot clone across Authority
+targets. Transcript text is source material only: an optional read-only
+extractor returns bounded atomic observations, while missing/failing extraction
+is diagnostic. The explicit packet includes status, subject, candidates,
+diagnostics, proposal readiness and unresolved reasons; candidates expose
+classification, subject, facet, scope, observation, provenance summary and
+readiness.
+
+At this phase Video does not resolve/create canonical Source. No Source ID is
+invented; add-evidence requires a caller-supplied canonical source ID and
+revision, otherwise source resolution remains a diagnostic/review boundary.
+`USER_HINT` and extracted transcript observations retain provenance, YouTube
+metadata remains source input, and generated editorial text is excluded from
+enrichment/Evidence.
 
 Planner failure is fail-closed diagnostically while preserving the complete
 Video intake result. Existing `about` relation candidates and the governed Video
 Proposal flow are unchanged. No Knowledge/Evidence direct write, proposal
 submit/approve/apply, new Graph predicate, Media work or Article work was added.
 
-Focused proof: 41 tests / 139 assertions. Unit-only proof: 425 tests / 2,035
+Focused proof: 27 tests / 104 assertions for Video semantic core. Unit-only proof: pending
 assertions, with one warning and one PHPUnit deprecation. Full PHPUnit including
 Integration is `ENVIRONMENT_BLOCKED`: 12 existing integration tests require
 `NHK_WP_TEST_PATH=public`. PHP lint and `git diff --check` pass; Composer

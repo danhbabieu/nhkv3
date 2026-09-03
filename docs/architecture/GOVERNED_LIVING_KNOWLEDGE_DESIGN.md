@@ -74,16 +74,23 @@ it never emits fabricated prose or turns unavailable into empty.
 
 Knowledge changes affecting an Article create an enrichment/update suggestion
 packet only. They never write an Article body or bypass the Article workflow.
-Video `user_hint` and authorized transcript observations enter the same
-read-only planner through an optional Video intake seam after canonical target
-resolution. The output is a `knowledge_enrichment` planning packet only:
-`USER_HINT`/transcript provenance is retained, YouTube metadata remains source
-input, and generated editorial text is never Evidence. Planner failure is
-diagnostic and fail-closed for enrichment without losing the Video intake
-result. The seam never submits, approves or applies a Knowledge proposal,
-writes Knowledge/Evidence directly, or creates a Graph predicate. Media
-annotations remain outside this Video slice; `MediaUsage`/`depicts` alone is
-not Evidence.
+Video `user_hint` and bounded factual observations extracted from an authorized
+transcript enter the same read-only planner through an optional Video intake
+seam after canonical target resolution. One observation selects only the
+narrowest confidently supported subject (`specimen > variant > model >
+movement/brand`); equal subjects are ambiguous and no candidate is duplicated
+upward or sideways. The output is a complete `knowledge_enrichment` planning
+packet only. Transcript text itself is never a Knowledge claim, and an absent
+extractor produces `TRANSCRIPT_FACT_EXTRACTION_UNAVAILABLE` rather than a
+fabricated transcript claim. `USER_HINT`/transcript provenance is retained,
+YouTube metadata remains source input, and generated editorial text is never
+Evidence. At this phase Video does not resolve/create Source; no Source ID is
+invented, and `add_evidence` is proposal-ready only when canonical source ID
+and revision are supplied. Planner/extractor failure is diagnostic and
+fail-closed for enrichment without losing the Video intake result. The seam
+never submits, approves or applies a Knowledge proposal, writes
+Knowledge/Evidence directly, or creates a Graph predicate. Media annotations
+remain outside this Video slice; `MediaUsage`/`depicts` alone is not Evidence.
 
 Semantic apply remains `Proposal → Human Approval → Eligibility → Controlled
 Apply → canonical repository → audit → read-back`. Same-intent repeats are

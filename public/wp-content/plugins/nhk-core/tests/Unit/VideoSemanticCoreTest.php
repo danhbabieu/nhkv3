@@ -10,6 +10,7 @@ use NHK\Core\Application\Video\{
     VideoHubClassifier,
     VideoIntakeService,
     VideoInternalSemanticResearcher,
+    VideoKnowledgeEnrichmentPlanner,
     VideoRelationCandidatePlanner,
     VideoSeoProjection,
     VideoSitemapProjection,
@@ -424,6 +425,80 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertArrayHasKey('editorial', $preview->package);
     }
 
+    public function test_video_knowledge_planner_selects_one_narrowest_variant(): void
+    {
+        $planner = new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner());
+        $result = $planner([
+            'resolved' => [
+                ['id' => '33333333-3333-4333-8333-333333333333', 'type' => 'brand', 'name' => 'Odo'],
+                ['id' => '44444444-4444-4444-8444-444444444444', 'type' => 'model', 'name' => 'Odo 36'],
+                ['id' => '55555555-5555-4555-8555-555555555555', 'type' => 'variant', 'name' => 'Odo 36/10'],
+            ],
+            'user_hint' => ['value' => 'Đây là Odo 36/10.', 'kind' => 'USER_HINT'],
+        ]);
+
+        self::assertCount(1, $result['candidates']);
+        self::assertSame('55555555-5555-4555-8555-555555555555', $result['candidates'][0]['subject_id']);
+        self::assertSame('variant', $result['candidates'][0]['scope']);
+    }
+
+    public function test_video_knowledge_planner_marks_equally_plausible_variants_ambiguous(): void
+    {
+        $planner = new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner());
+        $result = $planner([
+            'resolved' => [
+                ['id' => '55555555-5555-4555-8555-555555555555', 'type' => 'variant', 'name' => 'Odo 36/10'],
+                ['id' => '66666666-6666-4666-8666-666666666666', 'type' => 'variant', 'name' => 'Odo 36/12'],
+            ],
+            'user_hint' => ['value' => 'Đây là Odo 36.', 'kind' => 'USER_HINT'],
+        ]);
+
+        self::assertFalse($result['proposal_ready']);
+        self::assertSame([], $result['candidates']);
+        self::assertContains('AMBIGUOUS_SUBJECT', $result['diagnostics']);
+    }
+
+    public function test_sonodo_machine24_observation_does_not_clone_to_sibling_variants(): void
+    {
+        $planner = new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner());
+        $result = $planner([
+            'resolved' => [
+                ['id' => '55555555-5555-4555-8555-555555555555', 'type' => 'variant', 'name' => 'Máy 24'],
+                ['id' => '66666666-6666-4666-8666-666666666666', 'type' => 'variant', 'name' => 'Máy 30'],
+                ['id' => '77777777-7777-4777-8777-777777777777', 'type' => 'variant', 'name' => 'Máy 36'],
+            ],
+            'user_hint' => ['value' => 'Đây là âm thanh Sonodo trên máy 24.', 'kind' => 'USER_HINT'],
+        ]);
+
+        self::assertCount(1, $result['candidates']);
+        self::assertSame('55555555-5555-4555-8555-555555555555', $result['candidates'][0]['subject_id']);
+    }
+
+    public function test_transcript_uses_bounded_extracted_observations_and_never_whole_text(): void
+    {
+        $transcript = TranscriptPolicy::authorized(str_repeat('Một transcript dài. ', 20), 'vi', '2026-09-04', 'youtube-caption');
+        $planner = new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner(), static fn (TranscriptPolicy $input): array => [['observation' => 'Máy 24 có âm thanh Sonodo.', 'locator' => '00:12']]);
+        $result = $planner([
+            'resolved' => [['id' => '55555555-5555-4555-8555-555555555555', 'type' => 'variant', 'name' => 'Odo 36/10']],
+            'transcript_policy' => $transcript,
+        ]);
+
+        self::assertCount(1, $result['candidates']);
+        self::assertSame('Máy 24 có âm thanh Sonodo.', $result['candidates'][0]['observation']);
+        self::assertStringNotContainsString($transcript->text, $result['candidates'][0]['observation']);
+    }
+
+    public function test_transcript_without_extractor_is_diagnostic_and_no_transcript_is_empty(): void
+    {
+        $base = ['resolved' => [['id' => '33333333-3333-4333-8333-333333333333', 'type' => 'brand', 'name' => 'Odo']]];
+        $unavailable = (new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner()))(array_merge($base, ['transcript_policy' => TranscriptPolicy::authorized('Một sự thật.', 'vi', '2026-09-04', 'caption')]));
+        $none = (new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner()))(array_merge($base, ['transcript_policy' => TranscriptPolicy::none()]));
+
+        self::assertContains('TRANSCRIPT_FACT_EXTRACTION_UNAVAILABLE', $unavailable['diagnostics']);
+        self::assertSame([], $none['candidates']);
+        self::assertNotContains('TRANSCRIPT_FACT_EXTRACTION_UNAVAILABLE', $none['diagnostics']);
+    }
+
     public function test_sync_only_reports_source_change_and_never_overwrites_nhk_editorial(): void
     {
         $old = YouTubeSourceSnapshot::fromArray(['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'source_title' => 'Old source', 'availability' => 'available', 'fetched_at' => '2026-09-01T00:00:00Z']);
@@ -486,6 +561,25 @@ final class VideoSemanticCoreTest extends TestCase
             public function list(bool $includeRetired = false): array { return []; }
         };
         return new VideoRelationCandidatePlanner(new PredicateRegistry(), $this->evidenceRepository(...$evidenceIds), $claims, $sources);
+    }
+
+    private function knowledgePlanner(): \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner
+    {
+        $claims = new class implements KnowledgeRepository {
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $sources = new class implements SourceRepository {
+            public function findByCanonicalId(string $id): ?Source { return null; }
+            public function findByStableKey(string $stableKey): ?Source { return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        return new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $this->evidenceRepository(), $sources);
     }
 
     public function test_video_sitemap_contains_only_active_available_indexable_watch_pages(): void
