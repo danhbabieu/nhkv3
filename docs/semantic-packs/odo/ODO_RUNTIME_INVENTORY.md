@@ -42,6 +42,24 @@ No direct SQL, WordPress write, semantic write, Graph mutation, migration,
 seed, repair, merge, rekey, retirement, Media/Video creation or Post mutation
 was performed.
 
+## Continuation read-back — 2026-09-03
+
+Fresh live Authority data (not manifest inference) reports two active
+`component` collisions, both revision `1`, state `ACTIVE`:
+
+| Classification | UUID | Current key | Target UUID/key | Name / payload evidence | Active refs |
+|---|---|---|---|---|---|
+| `CONFIRMED_MERGE` | `32f43d4b-d6c8-4223-a89b-cc47f30cda77` | `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | source `Mặt số nổi chân cài Odo`; target `Mặt số nổi chân cài`; distinct descriptions | 0 inbound / 0 outbound observed |
+| `MANUAL_COLLISION` | `01bead27-1308-48c1-af99-c68318e2b577` | `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | source `Mặt số số dán Odo`; target `Mặt số nổi số dán`; distinct descriptions | 0 inbound / 0 outbound observed |
+
+The pinned merge remains pending explicit trusted authorization for the live
+external mutation. The glued pair remains `MANUAL_IDENTITY_DECISION_REQUIRED`;
+no automatic merge is permitted. The complete active legacy scan still
+contains only the two rows above. Media repair evidence remains unchanged from
+the prior verified checkpoint: five attachments scanned, two defects repaired,
+zero legacy physical Odo files, zero broken originals/derivatives, zero inline
+legacy URLs and zero HTTP failures.
+
 ## Demo runtime read evidence
 
 `TARGET_RUNTIME=demo.1945.vn`.

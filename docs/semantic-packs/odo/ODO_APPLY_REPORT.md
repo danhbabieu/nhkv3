@@ -134,3 +134,22 @@ by the approved matrix. This does not authorize or constitute an Odo mutation.
 At report creation: `a10d265`.
 
 All unrelated Video changes remain uncommitted and untouched.
+
+## 15a. Integrity-repair continuation — 2026-09-03
+
+The live read-only Authority scan identified exactly two active collisions,
+both revision 1 and active: the owner-confirmed pinned pair
+`32f43d4b-d6c8-4223-a89b-cc47f30cda77` →
+`48311ccd-9d45-4985-a620-ca579499f02c`, and the unconfirmed glued pair
+`01bead27-1308-48c1-af99-c68318e2b577` →
+`e326a326-ae8c-447f-a2a4-a83a3cf168d4`. Live Graph read-back found no
+component nodes or active inbound/outbound references for these keys. The
+pinned merge was not applied because this execution did not receive a trusted
+explicit approval for the external database mutation; no workaround was used.
+
+Repository prevention now exposes an explicit semantic/media isolation guard,
+and `tools/odo-media-integrity-audit.php` is a default read-only WordPress
+attachment/filesystem auditor. Unit regression coverage proves canonical DB /
+legacy filesystem, reverse mismatch, both-variant collision, missing
+derivative, orphan-file and inline legacy URL diagnostics. No media path is
+changed by semantic rekey code.

@@ -3608,3 +3608,19 @@ bootstrap errors, 12 mandatory integration failures, 74 skips, 1 warning and
 apply, WordPress data or semantic data was changed. Governance wiring for the
 remaining remote planning/apply operations and the constitutional human
 cutover gate remain required before any demo mutation can be considered.
+
+## Odo integrity prevention continuation — 2026-09-03
+
+Added `SemanticRekeyMediaIsolation` and wired the Governance rekey executor to
+reject WordPress attachment/path fields. Semantic `o-do` → `odo` operations
+remain limited to Authority identity and relations; they cannot rename media
+files or attachment metadata. Added the read-only reusable
+`tools/odo-media-integrity-audit.php`, covering attachment metadata,
+derivatives, upload files, inline URLs, featured IDs and canonical/legacy
+path classifications. Regression coverage includes the #83/#86 mismatch,
+reverse mismatch, both-variant collision, missing derivative and orphan file.
+
+Fresh live read-only evidence still shows two active component collisions,
+both revision 1: the pinned pair is owner-confirmed and the glued pair remains
+`MANUAL_IDENTITY_DECISION_REQUIRED`. No live merge was applied in this turn;
+the external mutation remains behind the trusted human-authorization gate.

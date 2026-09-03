@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Authority\SemanticMergeService;
+use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\VideoService;
@@ -80,6 +81,7 @@ final class AuthorityProposalExecutor
             if (!$this->merge) throw new \RuntimeException('Merge executor is not configured.');
             return $this->merge->merge($proposal->subjectId, (string) ($proposal->targetUuid ?? ''), (int) ($payload['source_revision'] ?? $proposal->expectedRevision), (int) ($payload['target_revision'] ?? 0), $proposal->idempotencyKey);
         }
+        if ($proposal->operation === 'rekey') SemanticRekeyMediaIsolation::assertSemanticOnly($payload);
         return match ($proposal->operation) {
             'create', 'ingest' => $this->authority->create(
                 $proposal->entityType,
