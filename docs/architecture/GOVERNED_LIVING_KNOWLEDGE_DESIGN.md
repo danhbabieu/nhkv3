@@ -74,9 +74,16 @@ it never emits fabricated prose or turns unavailable into empty.
 
 Knowledge changes affecting an Article create an enrichment/update suggestion
 packet only. They never write an Article body or bypass the Article workflow.
-Video `user_hint`, Media annotations and future observations enter the same
-read-only planner and can produce governed candidates, but they do not create a
-second writer or hard Graph truth. `MediaUsage`/`depicts` alone is not Evidence.
+Video `user_hint` and authorized transcript observations enter the same
+read-only planner through an optional Video intake seam after canonical target
+resolution. The output is a `knowledge_enrichment` planning packet only:
+`USER_HINT`/transcript provenance is retained, YouTube metadata remains source
+input, and generated editorial text is never Evidence. Planner failure is
+diagnostic and fail-closed for enrichment without losing the Video intake
+result. The seam never submits, approves or applies a Knowledge proposal,
+writes Knowledge/Evidence directly, or creates a Graph predicate. Media
+annotations remain outside this Video slice; `MediaUsage`/`depicts` alone is
+not Evidence.
 
 Semantic apply remains `Proposal → Human Approval → Eligibility → Controlled
 Apply → canonical repository → audit → read-back`. Same-intent repeats are

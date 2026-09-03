@@ -91,17 +91,17 @@
 - [ ] Run focused tests and confirm GREEN.
 - [ ] Commit `feat: protect living knowledge SEO identity`.
 
-### Task 7: Integrate candidate packets with Video, Media and Article read workflows
+### Task 7: Integrate candidate packets with Video intake
 
-**Status:** not started; existing contracts do not expose an approved shared adapter seam without extending operation contracts.
+**Status:** complete for the approved Video-only slice; Media and Article remain out of scope.
 
-**Files:** Modify `VideoIntakeService.php`, `VideoInternalSemanticResearcher.php` or existing adapter boundary, `ArticleResearchPreflight.php`, `ArticleIngestPreflight.php`; Create `MediaKnowledgeEnrichmentPlanner.php` only if an existing Media annotation boundary requires an adapter; Tests in `VideoSemanticCoreTest.php`, `ArticleResearchPreflightTest.php`, and new `KnowledgeEnrichmentIntegrationTest.php`.
+**Files:** Modify `VideoIntakeService.php`, `Plugin.php`, `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`; Create `VideoKnowledgeEnrichmentPlanner.php`; Test `VideoSemanticCoreTest.php`.
 
-- [ ] Write failing tests proving Video user_hint produces scoped candidates only, MediaUsage/depicts does not create Evidence, and Article returns a suggestion packet without changing WordPress body.
-- [ ] Run focused tests and confirm RED.
-- [ ] Wire the shared planner at preview/research boundaries and retain existing proposal/apply paths.
-- [ ] Run focused tests and confirm GREEN.
-- [ ] Commit `feat: integrate governed enrichment with content intake`.
+- [x] Write failing tests proving resolved Video `user_hint` produces scoped candidates and planner failure preserves Video intake diagnostically.
+- [x] Run focused tests and confirm RED.
+- [x] Wire the optional read-only seam after canonical resolution; retain Video `about` relation and Proposal flow, with no Knowledge/Evidence write or Graph predicate.
+- [x] Run focused tests and confirm GREEN.
+- [ ] Commit `feat: connect video intake to living knowledge planning`.
 
 ### Task 8: Complete governed Living Knowledge E2E acceptance
 

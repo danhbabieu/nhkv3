@@ -21,7 +21,7 @@ use NHK\Core\Application\Video\{
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
-use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source, KnowledgeEnrichmentCandidate, KnowledgeFacetProfile};
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\{
     TranscriptPolicy,
@@ -387,6 +387,43 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertTrue($preview->package['completeness']['publishable']);
     }
 
+    public function test_intake_emits_optional_knowledge_enrichment_after_target_resolution(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $brand = $authority->create(new AuthorityEntity('33333333-3333-4333-8333-333333333333', 'brand', 'brand:odo', 'Odo', 1, ['aliases' => []]));
+        $seen = [];
+        $seam = function (array $context) use (&$seen, $brand): array {
+            if (array_key_exists('editorial', $context)) throw new \LogicException('Generated editorial text must not enter enrichment.');
+            $seen = $context['resolved'];
+            return [new KnowledgeEnrichmentCandidate('new_claim', $brand->canonicalId, new KnowledgeFacetProfile('recognition', 'brand'), 'Odo có cọc đen.', ['origin' => 'USER_HINT'])];
+        };
+        $service = new VideoIntakeService(new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Odo']), $this->emptyVideos(), new VideoHubClassifier(), $this->planner(), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), $seam);
+
+        $preview = $service->preview('https://youtu.be/dQw4w9WgXcQ', 'Odo có cọc đen.');
+
+        self::assertSame($brand->canonicalId, $seen[0]['id']);
+        self::assertSame('new_claim', $preview->package['knowledge_enrichment']['candidates'][0]['classification']);
+        self::assertSame('USER_HINT', $preview->package['knowledge_enrichment']['candidates'][0]['provenance']['origin']);
+    }
+
+    public function test_knowledge_enrichment_failure_is_diagnostic_and_preserves_video_intake(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $authority->create(new AuthorityEntity('33333333-3333-4333-8333-333333333333', 'brand', 'brand:odo', 'Odo', 1, ['aliases' => []]));
+        $service = new VideoIntakeService(new YouTubeSourceAdapter(static fn (object $identity): array => ['title' => 'Odo']), $this->emptyVideos(), new VideoHubClassifier(), $this->planner(), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), static function (array $context): array { throw new \RuntimeException('planner unavailable'); });
+
+        $preview = $service->preview('https://youtu.be/dQw4w9WgXcQ', 'Odo');
+
+        self::assertSame('unavailable', $preview->package['knowledge_enrichment']['status']);
+        self::assertStringContainsString('planner unavailable', $preview->package['knowledge_enrichment']['diagnostics'][0]);
+        self::assertSame('https://www.youtube.com/watch?v=dQw4w9WgXcQ', $preview->package['source']['canonical_source_url']);
+        self::assertArrayHasKey('editorial', $preview->package);
+    }
+
     public function test_sync_only_reports_source_change_and_never_overwrites_nhk_editorial(): void
     {
         $old = YouTubeSourceSnapshot::fromArray(['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'source_title' => 'Old source', 'availability' => 'available', 'fetched_at' => '2026-09-01T00:00:00Z']);
@@ -414,6 +451,17 @@ final class VideoSemanticCoreTest extends TestCase
             public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
             public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
             public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+        };
+    }
+
+    private function emptyVideos(): VideoRepository
+    {
+        return new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
         };
     }
 

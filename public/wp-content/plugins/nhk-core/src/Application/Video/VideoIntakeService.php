@@ -19,6 +19,8 @@ final class VideoIntakeService
         private VideoCompletenessPolicy $completeness,
         private VideoSeoProjection $seo,
         private ?VideoInternalSemanticResearcher $researcher = null,
+        /** @var callable(array<string,mixed>):list<\NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate>|null */
+        private $knowledgeEnrichment = null,
     ) {
     }
 
@@ -63,6 +65,7 @@ final class VideoIntakeService
             'source_rights' => VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE,
             'chapters' => $chapters,
         ];
+        $package['knowledge_enrichment'] = $this->knowledgeEnrichmentPacket($research, $snapshot, $resolution, $userHint);
         if ($resolution->diagnostic !== null) $package['source_diagnostic'] = $resolution->diagnostic;
         $complete = $this->completeness->evaluate($package);
         $package['completeness'] = ['publishable' => $complete->publishable, 'blockers' => $complete->blockers, 'warnings' => $complete->warnings];
@@ -94,4 +97,30 @@ final class VideoIntakeService
     }
 
     private function lower(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value); }
+
+    /** @return array{status:string,candidates:list<array<string,mixed>>,diagnostics:list<string>} */
+    private function knowledgeEnrichmentPacket(array $research, array $snapshot, VideoSourceResolution $resolution, string $userHint): array
+    {
+        if ($this->knowledgeEnrichment === null) return ['status' => 'not_requested', 'candidates' => [], 'diagnostics' => []];
+        try {
+            $candidates = ($this->knowledgeEnrichment)([
+                'resolved' => $research['resolved'],
+                'source' => $snapshot,
+                'transcript' => $resolution->toArray()['transcript'] ?? null,
+                'transcript_policy' => $resolution->transcript,
+                'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null,
+            ]);
+            if (!is_array($candidates)) throw new \UnexpectedValueException('Knowledge enrichment seam returned an invalid packet.');
+            return ['status' => 'available', 'candidates' => array_values(array_map($this->serializeKnowledgeCandidate(...), $candidates)), 'diagnostics' => []];
+        } catch (\Throwable $error) {
+            return ['status' => 'unavailable', 'candidates' => [], 'diagnostics' => ['KNOWLEDGE_ENRICHMENT_PLANNER_FAILED:' . $error->getMessage()]];
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function serializeKnowledgeCandidate(mixed $candidate): array
+    {
+        if (!$candidate instanceof \NHK\Core\Domain\Knowledge\KnowledgeEnrichmentCandidate) throw new \UnexpectedValueException('Knowledge enrichment seam returned an invalid candidate.');
+        return ['classification' => $candidate->classification, 'subject_id' => $candidate->subjectId, 'profile' => $candidate->profile->toMetadata(), 'observation' => $candidate->observation, 'provenance' => $candidate->provenance, 'is_generated' => $candidate->isGenerated, 'is_evidence' => $candidate->isEvidence];
+    }
 }

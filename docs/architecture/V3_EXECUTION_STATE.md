@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+## Video → Living Knowledge planning seam — 2026-09-04
+
+Implemented the owner-approved Video-only Task 7 slice. `VideoIntakeService`
+now accepts an optional read-only enrichment seam and emits a
+`knowledge_enrichment` packet containing status, candidates and diagnostics.
+The seam runs only after canonical Authority target resolution; `USER_HINT` and
+authorized transcript observations retain provenance, YouTube metadata remains
+source input, and generated editorial text is excluded from enrichment/Evidence.
+
+Planner failure is fail-closed diagnostically while preserving the complete
+Video intake result. Existing `about` relation candidates and the governed Video
+Proposal flow are unchanged. No Knowledge/Evidence direct write, proposal
+submit/approve/apply, new Graph predicate, Media work or Article work was added.
+
+Focused proof: 41 tests / 139 assertions. Unit-only proof: 425 tests / 2,035
+assertions, with one warning and one PHPUnit deprecation. Full PHPUnit including
+Integration is `ENVIRONMENT_BLOCKED`: 12 existing integration tests require
+`NHK_WP_TEST_PATH=public`. PHP lint and `git diff --check` pass; Composer
+validation is valid with the repository's existing license warning; secret
+review found no credential material in the diff.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Owner Publication Override final release verification — 2026-09-03
 
 Fresh local verification used the supported WordPress vhost at
