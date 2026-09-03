@@ -33,6 +33,16 @@ final class ProposalEligibilityService
             if ($proposal->subjectId !== '' && $this->reader->targetRevision($proposal->subjectId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
             if ($proposal->targetUuid !== null && $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         } elseif (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        $dependencyRevisions = $proposal->payload['dependency_revisions'] ?? [];
+        if (is_array($dependencyRevisions)) {
+            foreach ($dependencyRevisions as $dependencyUuid => $expectedRevision) {
+                if (!is_string($dependencyUuid) || !is_int($expectedRevision) || $expectedRevision < 1) {
+                    $reasons[] = 'DEPENDENCY_REVISION_INVALID';
+                    continue;
+                }
+                if ($this->reader->targetRevision($dependencyUuid) !== $expectedRevision) $reasons[] = 'DEPENDENCY_REVISION_CHANGED';
+            }
+        }
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';
         return $reasons ? EligibilityResult::blocked(...$reasons) : EligibilityResult::ready();
     }

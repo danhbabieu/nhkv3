@@ -18,6 +18,11 @@ final class KnowledgeEnrichmentProposalFactory
         $payload = $this->payload($candidate);
         $operation = $this->operationFor($isClaim ? 'knowledge' : 'evidence');
         $dependencies = array_values(array_filter([$candidate->provenance['claim_id'] ?? null, $candidate->provenance['source_id'] ?? null], static fn (mixed $id): bool => is_string($id) && $id !== ''));
+        $dependencyRevisions = array_filter([
+            (string) ($candidate->provenance['claim_id'] ?? '') => $candidate->provenance['claim_revision'] ?? null,
+            (string) ($candidate->provenance['source_id'] ?? '') => $candidate->provenance['source_revision'] ?? null,
+        ], static fn (mixed $revision): bool => is_int($revision) && $revision > 0);
+        if ($dependencyRevisions !== []) $payload['dependency_revisions'] = $dependencyRevisions;
         $binding = ['subject_id' => $candidate->subjectId, 'facet' => $candidate->profile->facet, 'scope' => $candidate->profile->scope, 'profile_version' => $candidate->profile->version, 'classification' => $candidate->classification, 'operation' => $operation, 'payload' => $payload, 'dependency_ids' => $dependencies];
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($binding));
         return ['operation' => $operation, 'entity_type' => $isClaim ? 'knowledge' : 'evidence', 'subject_id' => $candidate->subjectId, 'target_uuid' => null, 'expected_revision' => null, 'dependency_ids' => $dependencies, 'content_fingerprint' => $fingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize(['claim_id' => $candidate->provenance['claim_id'] ?? null, 'source_id' => $candidate->provenance['source_id'] ?? null, 'claim_revision' => $candidate->provenance['claim_revision'] ?? null, 'source_revision' => $candidate->provenance['source_revision'] ?? null])), 'idempotency_key' => $operationId . ':' . ($isClaim ? 'knowledge' : 'evidence') . ':' . $fingerprint, 'payload' => $payload];

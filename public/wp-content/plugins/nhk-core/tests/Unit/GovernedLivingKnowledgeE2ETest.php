@@ -11,6 +11,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, Sourc
 use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{ApplyAttempt, DependencyGraph, Proposal, ProposalState};
+use NHK\Core\Governance\Exception\InvalidProposalTransition;
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, KnowledgeEnrichmentCandidate, KnowledgeFacetProfile, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -28,6 +29,7 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
                 $source = $fixture['knowledge']->createSource('e2e:source:' . $relation, 'Source for ' . $relation, 'website', null, ['visibility' => 'PUBLIC']);
                 $provenance = ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'relation' => $relation];
             }
+            if ($relation === null) $provenance['subject_id'] = $subject;
             $candidate = new KnowledgeEnrichmentCandidate($classification, $subject, new KnowledgeFacetProfile('recognition', 'variant'), 'Observed ' . ($relation ?? 'new claim') . '.', $provenance);
             $arguments = $fixture['factory']->arguments($candidate, 'e2e-run-' . $classification);
             $proposal = $fixture['governance']->create(new Proposal(
@@ -45,7 +47,27 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
             self::assertFalse($result['idempotent']);
             self::assertNotNull($result['result_entity_uuid']);
             self::assertSame(ProposalState::APPLIED, $fixture['proposals']->find($approved->id)?->state);
-            self::assertNotNull($fixture['readBack']($result['result_entity_uuid'], $arguments['entity_type']));
+            $readBack = $fixture['readBack']($result['result_entity_uuid'], $arguments['entity_type']);
+            self::assertNotNull($readBack);
+            if ($classification === 'new_claim') {
+                self::assertSame($result['result_entity_uuid'], $readBack->canonicalId);
+                self::assertSame($arguments['payload']['stable_key'], $readBack->stableKey);
+                self::assertSame($arguments['payload']['text'], $readBack->claimText);
+                self::assertSame($arguments['payload']['claim_type'], $readBack->claimType);
+                self::assertSame($arguments['payload']['provenance'], $readBack->provenance);
+                self::assertTrue($readBack->active);
+                self::assertSame(1, $readBack->revision);
+            } else {
+                self::assertSame($result['result_entity_uuid'], $readBack->canonicalId);
+                self::assertSame($arguments['payload']['claim_id'], $readBack->claimId);
+                self::assertSame($arguments['payload']['source_id'], $readBack->sourceId);
+                self::assertSame($arguments['payload']['relation'], $readBack->relation);
+                self::assertSame($arguments['payload']['excerpt'], $readBack->excerpt);
+                self::assertSame($arguments['payload']['locator'], $readBack->locator);
+                self::assertSame($arguments['payload']['metadata'], $readBack->metadata);
+                self::assertTrue($readBack->active);
+                self::assertSame(1, $readBack->revision);
+            }
 
             $replay = $fixture['apply']->apply($approved->id);
             self::assertTrue($replay['idempotent']);
@@ -55,21 +77,66 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
         }
     }
 
-    public function test_changed_dependency_after_approval_is_stale_and_cannot_apply(): void
+    public function test_canonical_dependency_revision_change_after_approval_is_stale_and_cannot_apply(): void
     {
         $fixture = $this->fixture();
         $subject = UuidCodec::newV7();
         $claim = $fixture['knowledge']->createClaim('e2e:stale:claim', 'Stale dependency claim.', 'fact');
         $source = $fixture['knowledge']->createSource('e2e:stale:source', 'Stale dependency source', 'website');
-        $candidate = new KnowledgeEnrichmentCandidate('add_evidence', $subject, new KnowledgeFacetProfile('recognition', 'variant'), 'Stale source observation.', ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'relation' => 'supports']);
+        $candidate = new KnowledgeEnrichmentCandidate('add_evidence', $subject, new KnowledgeFacetProfile('recognition', 'variant'), 'Stale source observation.', ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => 'supports']);
         $arguments = $fixture['factory']->arguments($candidate, 'e2e-stale');
         $proposal = $fixture['governance']->create($this->proposalFrom($arguments));
         $approved = $fixture['governance']->approve($fixture['governance']->submit($proposal->id)->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'reviewer');
-        $fixture['proposals']->changeDependency($approved->id, hash('sha256', 'changed-dependency'));
+        $fixture['knowledge']->updateSource($source->canonicalId, 'Stale dependency source revised', 'website', null, [], $source->revision);
 
         $eligibility = $fixture['eligibility']->check($approved->id);
         self::assertFalse($eligibility->ready);
-        self::assertContains('APPROVAL_BINDING_MISMATCH', $eligibility->reasons);
+        self::assertContains('DEPENDENCY_REVISION_CHANGED', $eligibility->reasons);
+        self::assertCount(0, $fixture['evidence']->items);
+        try { $fixture['apply']->apply($approved->id); self::fail('Expected stale dependency to block apply.'); }
+        catch (InvalidProposalTransition $error) { self::assertSame('Proposal is not eligible for apply.', $error->getMessage()); }
+        self::assertCount(0, $fixture['evidence']->items);
+    }
+
+    public function test_modified_proposal_dependency_fingerprint_is_rejected_as_approval_tamper(): void
+    {
+        $fixture = $this->fixture();
+        $candidate = new KnowledgeEnrichmentCandidate('new_claim', UuidCodec::newV7(), new KnowledgeFacetProfile('recognition', 'variant'), 'Tamper-bound claim.');
+        $arguments = $fixture['factory']->arguments($candidate, 'e2e-approval-tamper');
+        $proposal = $fixture['governance']->create($this->proposalFrom($arguments));
+        $approved = $fixture['governance']->approve($fixture['governance']->submit($proposal->id)->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'reviewer');
+        $fixture['proposals']->changeDependency($approved->id, hash('sha256', 'changed-dependency'));
+        self::assertSame(['APPROVAL_BINDING_MISMATCH'], $fixture['eligibility']->check($approved->id)->reasons);
+    }
+
+    public function test_same_claim_candidate_twice_returns_one_proposal_and_one_canonical_claim(): void
+    {
+        $fixture = $this->fixture();
+        $candidate = new KnowledgeEnrichmentCandidate('new_claim', UuidCodec::newV7(), new KnowledgeFacetProfile('recognition', 'variant'), 'Idempotent claim.');
+        $arguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-claim');
+        $first = $fixture['governance']->create($this->proposalFrom($arguments));
+        $second = $fixture['governance']->create($this->proposalFrom($arguments));
+        self::assertSame($first->id, $second->id);
+        self::assertCount(1, $fixture['proposals']->items);
+        $approved = $fixture['governance']->approve($fixture['governance']->submit($first->id)->id, $first->contentFingerprint, $first->dependencyFingerprint, 'reviewer');
+        $fixture['apply']->apply($approved->id);
+        self::assertCount(1, $fixture['knowledgeClaims']->items);
+    }
+
+    public function test_same_evidence_candidate_twice_returns_one_proposal_and_one_canonical_evidence(): void
+    {
+        $fixture = $this->fixture();
+        $claim = $fixture['knowledge']->createClaim('e2e:idem:claim', 'Idempotent claim.', 'fact');
+        $source = $fixture['knowledge']->createSource('e2e:idem:source', 'Idempotent source', 'website');
+        $candidate = new KnowledgeEnrichmentCandidate('add_evidence', UuidCodec::newV7(), new KnowledgeFacetProfile('recognition', 'variant'), 'Idempotent evidence.', ['claim_id' => $claim->canonicalId, 'source_id' => $source->canonicalId, 'claim_revision' => $claim->revision, 'source_revision' => $source->revision, 'relation' => 'supports']);
+        $arguments = $fixture['factory']->arguments($candidate, 'e2e-cross-proposal-evidence');
+        $first = $fixture['governance']->create($this->proposalFrom($arguments));
+        $second = $fixture['governance']->create($this->proposalFrom($arguments));
+        self::assertSame($first->id, $second->id);
+        self::assertCount(1, $fixture['proposals']->items);
+        $approved = $fixture['governance']->approve($fixture['governance']->submit($first->id)->id, $first->contentFingerprint, $first->dependencyFingerprint, 'reviewer');
+        $fixture['apply']->apply($approved->id);
+        self::assertCount(1, $fixture['evidence']->items);
     }
 
     public function test_failure_atomicity_rolls_back_claim_but_keeps_failed_attempt_and_approved_proposal(): void
@@ -116,6 +183,6 @@ final class GovernedLivingKnowledgeE2ETest extends TestCase
         $reader = new class($claims, $sources, $evidence, $proposals) implements EligibilityReader { public function __construct(private object $claims, private object $sources, private object $evidence, private object $proposals) {} public function isApplied(string $dependencyUuid): bool { return $this->proposals->find($dependencyUuid)?->state === ProposalState::APPLIED; } public function targetRevision(string $targetUuid): ?int { return $this->claims->findByCanonicalId($targetUuid)?->revision ?? $this->sources->findByCanonicalId($targetUuid)?->revision ?? $this->evidence->findByCanonicalId($targetUuid)?->revision; } public function targetExists(string $targetUuid): bool { return $this->targetRevision($targetUuid) !== null; } };
         $eligibility = new ProposalEligibilityService($proposals, new DependencyGraph(new class implements DependencyRepository { public function directDependencies(string $proposalId): array { return []; } public function add(string $proposalId, string $dependencyUuid): void {} }), $reader);
         $apply = new ControlledApplyService($proposals, $attempts, $transactions, $executor, $audit, $eligibility, $hook);
-        return ['knowledge' => $knowledge, 'knowledgeClaims' => $claims, 'factory' => new KnowledgeEnrichmentProposalFactory(), 'governance' => new GovernanceService($proposals, $audit), 'proposals' => $proposals, 'attempts' => $attempts, 'audit' => $audit, 'eligibility' => $eligibility, 'apply' => $apply, 'readBack' => fn (string $id, string $type): mixed => $type === 'knowledge' ? $claims->findByCanonicalId($id) : $evidence->findByCanonicalId($id)];
+        return ['knowledge' => $knowledge, 'knowledgeClaims' => $claims, 'evidence' => $evidence, 'factory' => new KnowledgeEnrichmentProposalFactory(), 'governance' => new GovernanceService($proposals, $audit), 'proposals' => $proposals, 'attempts' => $attempts, 'audit' => $audit, 'eligibility' => $eligibility, 'apply' => $apply, 'readBack' => fn (string $id, string $type): mixed => $type === 'knowledge' ? $claims->findByCanonicalId($id) : $evidence->findByCanonicalId($id)];
     }
 }
