@@ -61,7 +61,7 @@ final class EditorialDraftGateway
         if ($existing !== null) {
             if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()];
             $state = $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId);
-            return ['ok' => $state !== null, 'post' => $state?->snapshot(), 'receipt' => $existing->toArray()];
+            return ['ok' => $state !== null && ($intent !== 'publish' || $state->status === 'publish'), 'post' => $state?->snapshot(), 'receipt' => $existing->toArray()];
         }
         $current = $this->posts->read($postId);
         if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
@@ -69,16 +69,35 @@ final class EditorialDraftGateway
         if ($intent === 'publish') {
             $gate = (new ArticlePublicationGate())->check($current, $evidence, $expectedStateToken);
             if (!$gate->eligible) return ['ok' => false, 'reason' => 'PUBLICATION_BLOCKED', 'blockers' => $gate->blockers, 'post' => $current->snapshot()];
-            $state = $this->posts->publish($postId);
+            try {
+                $state = $this->posts->publish($postId);
+            } catch (\Throwable $error) {
+                // A transport failure after the native transition is uncertain: read back
+                // before retrying so a caller cannot create a second publication action.
+                $readBack = $this->posts->read($postId);
+                if ($readBack !== null && $readBack->status === 'publish') {
+                    $state = $readBack;
+                } else {
+                    $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $current->endpointKey, $current->postId, 'editorial', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, [], [], ['code' => 'PUBLICATION_RESULT_UNCERTAIN', 'error' => $error->getMessage()], 1, null, null, $current->token, [], [], [], ['publication_evidence' => $this->withoutBody($evidence)]));
+                    return ['ok' => false, 'reason' => 'PUBLICATION_RESULT_UNCERTAIN', 'post' => $readBack?->snapshot(), 'receipt' => $receipt->toArray()];
+                }
+            }
         } elseif ($intent === 'trash') {
             if ($current->status === 'publish') $state = $this->posts->trash($postId); else $state = $current;
         } else {
             if ($current->status === 'trash') $state = $this->posts->restore($postId); else $state = $current;
         }
-        $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $state->endpointKey, $state->postId, 'editorial', ArticleIngestOutcome::COMPLETED, false, [], [], [], 1, null, null, $state->token, [], [], [], ['status' => $state->status]));
+        $receipt = $this->receipts->create(new ArticleOperationReceipt(UuidCodec::newV7(), $idempotencyKey, $fingerprint, $intent, $state->endpointKey, $state->postId, 'editorial', ArticleIngestOutcome::COMPLETED, false, [], [], [], 1, null, null, $state->token, [], [], [], ['status' => $state->status], $this->withoutBody($evidence)));
         return ['ok' => true, 'post' => $state->snapshot(), 'state_token' => $state->token, 'receipt' => $receipt->toArray()];
     }
 
     /** @return array<string,mixed> */
     private function result(ArticleOperationReceipt $receipt, ?EditorialPostState $state): array { return ['ok' => $state !== null, 'post' => $state?->snapshot(), 'post_id' => $state?->postId, 'state_token' => $state?->token ?? $receipt->wpStateToken, 'receipt' => $receipt->toArray(), 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION'], 'next_stage' => 'SEMANTIC_GOVERNANCE']; }
+
+    /** @return array<string,mixed> */
+    private function withoutBody(array $value): array
+    {
+        foreach (['body', 'content', 'post_content'] as $key) unset($value[$key]);
+        return $value;
+    }
 }

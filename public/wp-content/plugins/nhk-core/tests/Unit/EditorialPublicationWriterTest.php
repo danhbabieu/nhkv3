@@ -13,7 +13,7 @@ final class EditorialPublicationWriterTest extends TestCase
         $created = $gateway->create(['idempotency_key' => 'writer-draft', 'title' => 'T', 'content' => 'B']);
         $blocked = $gateway->publish(1, $created['state_token'], [], 'publish-1');
         self::assertFalse($blocked['ok']); self::assertSame('PUBLICATION_BLOCKED', $blocked['reason']); self::assertSame(1, $posts->creates);
-        $evidence = array_fill_keys(['research_acceptable','subject_resolved','duplicate_intent_handled','category_resolved','semantic_plan_complete','semantic_readback_verified','media_usage_complete','real_image_requirements_met','claim_compliance_acceptable','seo_projection_valid','internal_links_valid','structured_data_valid','public_route_ready'], true);
+        $evidence = array_fill_keys(['research_acceptable','subject_resolved','duplicate_intent_handled','category_resolved','semantic_plan_complete','semantic_readback_verified','media_usage_complete','real_image_requirements_met','claim_compliance_acceptable','seo_projection_valid','internal_links_valid','structured_data_valid','public_route_ready','rendered_public_verification'], true);
         $first = $gateway->publish(1, $created['state_token'], $evidence, 'publish-2'); $second = $gateway->publish(1, $created['state_token'], $evidence, 'publish-2');
         self::assertTrue($first['ok']); self::assertSame('publish', $first['post']['status']); self::assertSame($first['post_id'] ?? 1, $second['post']['post_id']);
     }
@@ -22,7 +22,7 @@ final class EditorialPublicationWriterTest extends TestCase
     {
         $posts = new PublicationFakeEditorialStore(); $gateway = new EditorialDraftGateway($posts, new PublicationFakeReceiptRepo());
         $created = $gateway->create(['idempotency_key' => 'lifecycle', 'title' => 'T', 'content' => 'B']);
-        $published = $gateway->publish(1, $created['state_token'], array_fill_keys(['research_acceptable','subject_resolved','duplicate_intent_handled','category_resolved','semantic_plan_complete','semantic_readback_verified','media_usage_complete','real_image_requirements_met','claim_compliance_acceptable','seo_projection_valid','internal_links_valid','structured_data_valid','public_route_ready'], true), 'pub');
+        $published = $gateway->publish(1, $created['state_token'], array_fill_keys(['research_acceptable','subject_resolved','duplicate_intent_handled','category_resolved','semantic_plan_complete','semantic_readback_verified','media_usage_complete','real_image_requirements_met','claim_compliance_acceptable','seo_projection_valid','internal_links_valid','structured_data_valid','public_route_ready','rendered_public_verification'], true), 'pub');
         $trashed = $gateway->trash(1, $published['state_token'], 'trash'); self::assertSame('trash', $trashed['post']['status']);
         self::assertSame('EDITORIAL_STATE_CONFLICT', $gateway->restore(1, $created['state_token'], 'restore-bad')['reason']);
         self::assertSame('draft', $gateway->restore(1, $trashed['state_token'], 'restore')['post']['status']);

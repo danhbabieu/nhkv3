@@ -23,6 +23,7 @@ final class ArticleDiagnosticReader
             'proposal_ids' => $receipt->proposalIds,
             'applied_proposal_ids' => $receipt->appliedProposalIds,
             'last_failure' => $receipt->failure,
+            'publication_evidence' => $this->withoutEditorialBody($receipt->publicationEvidence),
         ];
         foreach (['preflight', 'proposal_states', 'eligibility', 'apply_attempts', 'verification'] as $key) {
             if (array_key_exists($key, $context)) $diagnostic[$key] = $this->withoutEditorialBody($context[$key]);

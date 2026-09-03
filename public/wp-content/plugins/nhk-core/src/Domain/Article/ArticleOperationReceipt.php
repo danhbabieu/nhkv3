@@ -34,6 +34,8 @@ final readonly class ArticleOperationReceipt
         public array $applyAttempts = [],
         /** @var array<string,mixed> */
         public array $diagnostics = [],
+        /** @var array<string,mixed> Durable cross-boundary evidence; never contains Article body. */
+        public array $publicationEvidence = [],
     ) {
         if (!UuidCodec::isValid($operationId) || $idempotencyKey === '' || !preg_match('/^[a-f0-9]{64}$/i', $requestFingerprint)) {
             throw new InvalidArgumentException('Article operation identity and fingerprint are invalid.');
@@ -65,6 +67,7 @@ final readonly class ArticleOperationReceipt
             'applied_proposal_ids' => $this->appliedProposalIds,
             'failure' => $this->failure,
             'diagnostics' => $this->diagnostics,
+            'publication_evidence' => $this->publicationEvidence,
             'revision' => $this->revision,
             'created_at' => $this->createdAt,
             'updated_at' => $this->updatedAt,

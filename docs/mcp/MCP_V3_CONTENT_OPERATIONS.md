@@ -35,9 +35,10 @@ return HTTP 202 with no body.
 
 ## 2. Tool catalog thực tế
 
-`McpToolCatalog::tools()` exposes exactly 22 tools. `kind=mutation` implies
+`McpToolCatalog::tools()` exposes the exact current registered tool list. In
+this 2026-09-03 workspace it contains 33 tools. `kind=mutation` implies
 `governed=true`. The coordinated Article tools occupy positions 3–4; the
-catalog's position 22 is `nhk.proposal.apply`. The clean HEAD
+catalog's final position is `nhk.proposal.apply`. The clean HEAD
 catalog and the wire smoke both use this
 same ordered list; the local HTTP wire smoke remains an environment check and
 must not be replaced by a static catalog assertion.
@@ -67,8 +68,9 @@ must not be replaced by a static catalog assertion.
 | `nhk.proposal.eligibility` | Governance check | READ | capability-gated | Revision/dependencies | N/A | READY |
 | `nhk.proposal.apply` | Governance + target | WRITE | Yes | Controlled Apply | GraphService | READY for implemented branches |
 
-The historical assertions expecting 18/19/21 were updated to the current 22;
-no prior tool was removed. Article ingest is capability-gated by
+The historical assertions expecting 18/19/21/22 are obsolete; the current
+catalog also includes the typed Category and native Article draft/publication
+operations present in `McpToolCatalog`. No prior tool was removed. Article ingest is capability-gated by
 `nhk_ingest_articles`, while
 Article preflight is read-gated. The exact current wire order is the table
 order above.
@@ -366,7 +368,7 @@ intake and read-back; it does not expand any of those semantic workflows.
 
 On WordPress 6.9+, the plugin registers eight existing read tools and the
 minimum governed Video workflow as public Abilities under category
-`nhk-semantic`. This is a discoverability adapter, not a second persistence or
+`nhk-v3-content-operations`. This is a discoverability adapter, not a second persistence or
 transport path, and it is feature-detected on older WordPress versions.
 
 | ABILITY | MCP SOURCE |

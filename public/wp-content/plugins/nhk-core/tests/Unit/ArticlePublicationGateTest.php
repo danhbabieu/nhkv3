@@ -46,7 +46,7 @@ final class ArticlePublicationGateTest extends TestCase
             'research_acceptable', 'subject_resolved', 'duplicate_intent_handled',
             'category_resolved', 'semantic_plan_complete', 'semantic_readback_verified',
             'media_usage_complete', 'real_image_requirements_met', 'claim_compliance_acceptable',
-            'seo_projection_valid', 'internal_links_valid', 'structured_data_valid', 'public_route_ready',
+            'seo_projection_valid', 'internal_links_valid', 'structured_data_valid', 'public_route_ready', 'rendered_public_verification',
         ], true);
     }
 

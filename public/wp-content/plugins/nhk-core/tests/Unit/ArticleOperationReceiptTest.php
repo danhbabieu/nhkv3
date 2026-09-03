@@ -56,4 +56,16 @@ final class ArticleOperationReceiptTest extends TestCase
         self::assertSame('editorial-token', $receipt->toArray()['wp_state_token']);
         self::assertArrayNotHasKey('body', $receipt->toArray());
     }
+
+    public function test_receipt_can_durably_record_cross_boundary_evidence_without_body(): void
+    {
+        $receipt = new ArticleOperationReceipt(
+            '018f7c48-6d87-7a1d-8c9e-3b8c4c8d1f22', 'evidence-key', str_repeat('c', 64),
+            'publish', '1:55', 55, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true,
+            [], [], [], 1, null, null, null, [], [], [], [],
+            ['research' => 'used', 'semantic_readback' => true, 'rendered_verification' => ['verified' => false]],
+        );
+        self::assertSame(true, $receipt->publicationEvidence['semantic_readback']);
+        self::assertArrayNotHasKey('body', $receipt->toArray());
+    }
 }

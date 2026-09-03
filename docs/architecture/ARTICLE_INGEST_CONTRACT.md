@@ -100,8 +100,12 @@ execute/resume surface for reconciliation. The separate typed draft gateway
 supports draft-only create/update with receipt idempotency and native
 state-token CAS; it does not publish, trash, apply semantic proposals, ingest
 Media/Video or copy body into semantic storage. Draft results remain blocked
-for publication until later semantic, media, compliance and read-back gates
-complete.
+for publication until later semantic, media, compliance, rendered-public
+verification and read-back gates complete. Rendered verification preserves
+stored-state, rendered-state, public-route-state and unavailable-runtime
+evidence; a stored DTO pass is not a public pass. Publication receipts record
+body-free cross-boundary evidence, and uncertain native transitions are resolved
+by Post read-back before a retry may act.
 Production Post 55 execution remains outside this implementation and requires
 the separate human-reviewed reconciliation packet.
 

@@ -52,7 +52,7 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
             wp_json_encode($receipt->proposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->appliedProposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->failure, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            wp_json_encode($receipt->diagnostics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            wp_json_encode($this->durableDiagnostics($receipt), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $receipt->revision,
             $now,
             $now,
@@ -76,7 +76,7 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
             wp_json_encode($receipt->proposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->appliedProposalIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             wp_json_encode($receipt->failure, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            wp_json_encode($receipt->diagnostics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            wp_json_encode($this->durableDiagnostics($receipt), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $receipt->wpEndpointKey,
             $receipt->wpPostId,
             $receipt->wpStateToken,
@@ -125,9 +125,18 @@ final class WpdbArticleOperationReceiptRepository implements ArticleOperationRec
                 array_map('strval', $proposalStates),
                 array_map('intval', $applyAttempts),
                 $diagnostics,
+                is_array($diagnostics['publication_evidence'] ?? null) ? $diagnostics['publication_evidence'] : [],
             );
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /** Keep the existing durable column while making the cross-boundary evidence explicit. */
+    private function durableDiagnostics(ArticleOperationReceipt $receipt): array
+    {
+        $diagnostics = $receipt->diagnostics;
+        if ($receipt->publicationEvidence !== []) $diagnostics['publication_evidence'] = $receipt->publicationEvidence;
+        return $diagnostics;
     }
 }

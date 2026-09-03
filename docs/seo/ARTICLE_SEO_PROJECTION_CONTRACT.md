@@ -29,6 +29,12 @@ stronger claims than the evidence scope supports. Placeholder Media makes the
 Article media/SEO stage incomplete and is excluded from preferred structured
 data images and image sitemaps.
 
+Publication verification must inspect the actual rendered public route and
+record field-level results for title, H1, permalink/canonical, description,
+robots, category, internal links, media/context, related content and structured
+data. Runtime unavailability is distinct from an empty result or a stored-state
+success and blocks the publication gate.
+
 Title, H1, meta description and slug must be descriptive, differentiated,
 stable, collision-checked and free of unsupported exaggeration. Internal links
 must target public canonical routes; UUIDs, stable keys, private/retired

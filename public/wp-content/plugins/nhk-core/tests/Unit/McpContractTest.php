@@ -206,23 +206,41 @@ final class McpContractTest extends TestCase
         }
     }
 
-    public function test_wordpress_ability_allowlist_contains_only_existing_read_tools(): void
+    public function test_wordpress_ability_allowlist_covers_the_catalog(): void
     {
         self::assertSame([
             'nhk-v3/search',
             'nhk-v3/semantic-resolve',
+            'nhk-v3/article-preflight',
+            'nhk-v3/category-resolve',
             'nhk-v3/entity-get',
             'nhk-v3/media-get',
+            'nhk-v3/media-attachment-get',
             'nhk-v3/video-get',
             'nhk-v3/knowledge-get',
             'nhk-v3/source-get',
             'nhk-v3/evidence-get',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
-        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
+        self::assertSame('nhk-v3/media-ingest', McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
         self::assertSame([
+            'nhk-v3/article-ingest',
+            'nhk-v3/category-create',
+            'nhk-v3/category-update',
+            'nhk-v3/category-assign',
+            'nhk-v3/category-unassign',
+            'nhk-v3/category-delete',
+            'nhk-v3/article-draft-create',
+            'nhk-v3/article-draft-update',
+            'nhk-v3/article-publish',
+            'nhk-v3/article-trash',
+            'nhk-v3/article-restore',
+            'nhk-v3/media-ingest',
             'nhk-v3/video-ingest',
+            'nhk-v3/knowledge-ingest',
+            'nhk-v3/source-ingest',
+            'nhk-v3/evidence-ingest',
             'nhk-v3/proposal-create',
             'nhk-v3/proposal-submit',
             'nhk-v3/proposal-approve',
@@ -230,7 +248,8 @@ final class McpContractTest extends TestCase
             'nhk-v3/proposal-eligibility',
             'nhk-v3/proposal-apply',
         ], McpAbilityRegistration::governedAbilityNames());
-        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
-        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
+        self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
+        self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
+        self::assertCount(count(McpToolCatalog::tools()), McpAbilityRegistration::abilityNames());
     }
 }

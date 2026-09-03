@@ -32,6 +32,7 @@ final class ArticlePublicationGate
         $this->requireTrue($evidence, 'internal_links_valid', 'INTERNAL_LINKS_INVALID', $blockers);
         $this->requireTrue($evidence, 'structured_data_valid', 'STRUCTURED_DATA_INVALID', $blockers);
         $this->requireTrue($evidence, 'public_route_ready', 'PUBLIC_ROUTE_NOT_READY', $blockers);
+        $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
         return new ArticlePublicationGateResult($blockers === [], $blockers);
     }
 

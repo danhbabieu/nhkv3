@@ -4,6 +4,27 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## WordPress Abilities bridge checkpoint — 2026-09-03
+
+Root-cause investigation confirmed WordPress 7.1 includes the Abilities API and
+the plugin already hooks `wp_abilities_api_categories_init` and
+`wp_abilities_api_init`, but the old `McpAbilityRegistration` allowlist exposed
+only 15 of the 33 current catalog tools. The bridge now derives schemas and
+descriptions from `McpToolCatalog`, registers all 33 Article, Category, Media,
+Video, read, Knowledge/Source/Evidence and Proposal abilities in the
+`nhk-v3-content-operations` category, and delegates execution back to the existing MCP
+route/application boundaries. No second domain implementation or direct SQL
+path was added.
+
+Focused evidence: `McpContractTest` and `McpCapabilityManifestTest` pass (11
+tests / 127 assertions); changed PHP lint and `git diff --check` pass. The full
+suite has 418 tests executed with 8 existing WordPress bootstrap errors and 12
+mandatory integration failures because no verified integration database is
+available. The local plugin directory does not contain Easy MCP AI, so the
+Abilities Browser parity cannot be verified in this workspace. Direct binary
+image upload remains the existing multipart MCP transport; the Ability exposes
+the same catalog contract without inventing a second binary persistence path.
+
 ## Content Operations final-completion plan — 2026-09-03
 
 The independently testable checkpoint plan is recorded in
@@ -3110,3 +3131,29 @@ completion plan remains open. In particular, rendered Article SEO/public
 verification, durable publication-evidence binding and uncertain-result
 recovery, complete Admin parity, standalone Graph read exposure, and the
 remaining Article/MediaUsage acceptance scenarios are not claimed complete.
+
+## Final-completion CP2/CP3 rendered verification checkpoint — 2026-09-03
+
+Added `RenderedArticleVerifier` and `RenderedArticleVerificationResult` for
+actual public HTML. The verifier distinguishes `unavailable_runtime` from a
+rendered public route and records field-level results for title, H1,
+permalink/canonical, meta description, robots/indexability, category, internal
+links, featured/inline media, contextual alt/caption, related content,
+structured data, claim compliance, semantic readiness and Media completeness.
+`ArticlePublicationGate` now requires `rendered_public_verification`; stored
+DTO evidence alone cannot satisfy publication.
+
+Article receipts now expose durable, body-free `publication_evidence`, persisted
+through the existing diagnostics column and redacted for editorial body keys.
+The native publication writer read-backs after uncertain transitions and records
+`PUBLICATION_RESULT_UNCERTAIN` as retryable when the final state cannot be
+verified, preventing duplicate publication action on retry.
+
+Focused evidence: 12 tests / 40 assertions pass, with one existing PHPUnit
+deprecation. Full suite: 426 tests, 1625 assertions, 8 integration errors and
+12 guarded-acceptance failures caused by unavailable WordPress bootstrap/DB;
+no Unit regression was observed. Local MySQL restart was attempted, but the
+service exits with a stale `mysqld_safe`/existing-process condition and remains
+unreachable on 127.0.0.1:3306 and `/tmp/mysql.sock`. Exact `nhk_v3_test` was
+not verified; status remains `RUNTIME_VERIFICATION_BLOCKED`. No fallback to
+`nhk_v3` and no live data mutation occurred.
