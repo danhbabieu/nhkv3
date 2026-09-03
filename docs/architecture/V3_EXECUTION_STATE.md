@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+## Plugin media projection boot wiring — 2026-09-04
+
+Fixed a production boot fatal in `Plugin::boot()`: the public entity
+collection previously constructed `EntityMediaProjection` before assigning
+`$publicAssets` and `$publicUsages`, so PHP passed `null` to typed repository
+constructor arguments. Both repositories are now created before the projection
+and the same instances are reused by the public media services and routes.
+
+Regression proof: `PluginBootWiringTest` fails on the pre-fix ordering and
+passes after the change (1 test / 5 assertions). PHP lint and `git diff
+--check` pass. No data, migration or production state was changed.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Governed Media upload + deterministic Article subject resolution — 2026-09-04
 
 Owner-approved contract text now governs multipart/file intake: source-original

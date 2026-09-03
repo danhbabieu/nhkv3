@@ -110,6 +110,8 @@ final class Plugin {
             $publicRoutes = new PublicRouteResolver($publicAuthority, $publicTypes, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($publicAuthority, $publicTypes, $publicRoutes, $publicContexts);
             $publicAggregation = new BrandAggregationQuery($publicGraph, $publicAuthority, $publicTypes, $publicRoutes, $publicEligibility);
+            $publicAssets = new WpdbMediaAssetRepository($wpdb);
+            $publicUsages = new WpdbMediaUsageRepository($wpdb);
             $publicCollection = new PublicEntityCollectionQuery($publicAuthority, $publicTypes, new PublicIdentityContract($publicTypes), $publicEligibility, $publicRoutes, $publicAggregation, static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($publicMedia, $publicAssets, $publicUsages));
             add_filter('nhk_v3_home_semantic_modules', [new HomeSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicRoutes, $publicCollection), 'extend']);
             $publicClaims = new WpdbKnowledgeRepository($wpdb);
@@ -121,8 +123,6 @@ final class Plugin {
             $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
             (new PublicEntityRoutes($publicEntityQuery, $publicTypes))->register();
             (new PublicComparisonRoutes(new ComparisonPageQuery($publicEntityQuery)))->register();
-            $publicAssets = new WpdbMediaAssetRepository($wpdb);
-            $publicUsages = new WpdbMediaUsageRepository($wpdb);
             $publicMediaService = new MediaService($publicMedia, $publicAssets, $publicUsages);
             $sharedAttachmentBridge = new WordPressMediaAttachmentBridge($wpdb, $publicMediaService, $publicMedia, $publicAssets);
             $attachmentBridge = $sharedAttachmentBridge;
