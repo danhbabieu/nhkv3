@@ -21,7 +21,7 @@
 
 ### Task 1: Define validated Knowledge profile and enrichment candidate value objects
 
-**Status:** complete in `f631209`.
+**Status:** complete in `f631209`, with corrective semantic hardening.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Domain/Knowledge/KnowledgeFacetProfile.php`, `KnowledgeEnrichmentCandidate.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/GovernedLivingKnowledgeDomainTest.php`.
 
@@ -33,7 +33,7 @@
 
 ### Task 2: Implement read-only enrichment planner
 
-**Status:** complete in `f631209`.
+**Status:** corrective hardening complete; broad semantic matcher remains intentionally absent.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Knowledge/KnowledgeEnrichmentPlanner.php`; Modify `public/wp-content/plugins/nhk-core/src/Contracts/Knowledge/KnowledgeRepository.php`, `EvidenceRepository.php`, `SourceRepository.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgeEnrichmentPlannerTest.php`.
 
@@ -69,7 +69,7 @@
 
 ### Task 5: Implement facet fragment projection and deterministic synthesis boundary
 
-**Status:** partial: deterministic projector/fingerprint is complete in `f631209`; persisted last-known-good storage and vendor adapter remain open.
+**Status:** corrective fingerprint hardening complete; persisted last-known-good storage and vendor adapter remain open.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Projection/KnowledgeFragmentProjector.php`, `KnowledgeSynthesisPort.php`, `DeterministicKnowledgeSynthesizer.php`, `KnowledgeFragmentProjection.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/KnowledgeFragmentProjectionTest.php`.
 
@@ -81,7 +81,7 @@
 
 ### Task 6: Implement SEO stability guard
 
-**Status:** complete for stable-core comparison in `f631209`; public render verification integration remains open.
+**Status:** corrective stable-core/risk-result hardening complete; public render verification integration remains open.
 
 **Files:** Create `public/wp-content/plugins/nhk-core/src/Application/Seo/LivingKnowledgeSeoStabilityGuard.php`, `SeoChangeRisk.php`; Test `public/wp-content/plugins/nhk-core/tests/Unit/LivingKnowledgeSeoStabilityGuardTest.php`.
 

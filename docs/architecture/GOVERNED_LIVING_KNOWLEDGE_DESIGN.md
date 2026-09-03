@@ -18,7 +18,7 @@ No new Graph predicate is added by this design.
 
 Semantic meaning is never silently rewritten in an existing claim. Editorial
 typos that do not change meaning may use the existing correction contract;
-otherwise the system classifies input as one of:
+otherwise the system conservatively classifies structured input as one of:
 
 - same claim with new Evidence;
 - new compatible claim;
@@ -31,6 +31,11 @@ Historical claims remain readable. `supports`, `contradicts` and `qualifies`
 remain the only Evidence relations. Scope is bounded at the narrowest supported
 level: entity, brand, model, variant, movement or specimen observation. A
 specimen observation never promotes automatically to Variant, Model or Brand.
+Exact normalized text equality is only a deterministic exact-match signal for
+an active claim in the same subject/facet/scope. It is not broad semantic
+equivalence. Fuzzy or AI similarity cannot decide canonical identity. Explicit
+structured relation context is required for add-Evidence, qualification and
+contradiction; ambiguous or unsupported input fails closed.
 
 ## Read model pipeline
 
@@ -52,8 +57,10 @@ winner for an unresolved conflict.
 Entity pages are living projections rebuilt per affected facet. Fragments are
 `overview`, `recognition`, `configuration`, `movement`, `music`, `history`,
 `domestic_cultural`, `evidence_media` and `related`. Every fragment carries a
-dependency fingerprint made from subject, facet, claim IDs/revisions, Evidence
-IDs/revisions/states, projection contract version and generator/policy version.
+dependency fingerprint made from subject, facet/profile version, fragment key,
+claim IDs/revisions/lifecycle/public state, Evidence IDs/revisions/relation/
+state, eligible Source revisions, projection contract version and
+generator/policy version.
 Unchanged fingerprints are reused; unrelated fragments remain unchanged.
 
 AI synthesis accepts a current-truth packet, presentation context, previous
@@ -85,4 +92,3 @@ scope/contradiction/idempotency rules. No Odo production/demo data is mutated.
 Durable public identity remains a separately reported
 `PUBLIC_IDENTITY_STORAGE_GAP` unless additive storage can be implemented without
 bulk migration. No slug migration is part of this feature.
-

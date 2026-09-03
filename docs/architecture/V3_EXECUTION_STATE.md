@@ -1,5 +1,19 @@
 # NHK V3 Execution State
 
+## Governed Living Knowledge corrective review — 2026-09-03
+
+Corrective review fixed four defects before Video/Media/Article expansion:
+retired claims no longer match as current same-claim; planner matching is
+deterministic exact-match only and structured relation context classifies
+add-Evidence/qualification/contradiction/ambiguous/unsupported; fragment
+fingerprints include canonical claim/Evidence/Source dependencies with stable
+ordering; and SEO results cover the complete stable core while MEDIUM changes
+explicitly require stronger verification.
+
+Internal planning can request active private Evidence through resolver
+`publicOnly=false`; public projection remains restricted to eligible public
+Evidence. No new semantic owner, predicate, operation or migration was added.
+
 ## Governed Living Knowledge + SEO Stable Projection checkpoint — 2026-09-03
 
 Owner-approved incremental, contract-first design is recorded in
