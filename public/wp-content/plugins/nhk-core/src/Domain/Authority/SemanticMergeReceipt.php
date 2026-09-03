@@ -33,6 +33,25 @@ final readonly class SemanticMergeReceipt
     /** @return array<string,mixed> */
     public function toArray(): array
     {
-        return get_object_vars($this);
+        $legacy = get_object_vars($this);
+        return $legacy + [
+            'operation' => $this->operation,
+            'idempotency_key' => $this->idempotencyKey,
+            'source_uuid' => $this->sourceUuid,
+            'target_uuid' => $this->targetUuid,
+            'source_revision' => $this->sourceRevision,
+            'target_revision' => $this->targetRevision,
+            'plan_fingerprint' => $this->planFingerprint,
+            'references_discovered' => $this->referencesDiscovered,
+            'references_moved' => $this->referencesMoved,
+            'references_deduped' => $this->referencesDeduped,
+            'references_remaining' => $this->referencesRemaining,
+            'source_final_state' => $this->sourceLifecycle,
+            'target_final_state' => 'active',
+            'verification_result' => $this->readBackVerified ? 'PASS' : 'PENDING',
+            'apply_attempt_id' => $this->applyAttemptId,
+            'created_at' => $this->createdAt,
+            'updated_at' => $this->updatedAt,
+        ];
     }
 }

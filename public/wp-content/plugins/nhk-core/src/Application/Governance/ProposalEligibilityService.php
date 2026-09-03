@@ -26,7 +26,13 @@ final class ProposalEligibilityService
         $reasons = [];
         $isCreation = in_array($proposal->operation, ['create', 'ingest', 'relation_create'], true) && $proposal->targetUuid === null;
         if (!$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
-        if (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        if ($proposal->operation === 'merge') {
+            $sourceRevision = (int) ($proposal->payload['source_revision'] ?? $proposal->expectedRevision);
+            $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);
+            if ($sourceRevision < 1 || $targetRevision < 1) $reasons[] = 'MERGE_REVISIONS_REQUIRED';
+            if ($proposal->subjectId !== '' && $this->reader->targetRevision($proposal->subjectId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
+            if ($proposal->targetUuid !== null && $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        } elseif (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';
         return $reasons ? EligibilityResult::blocked(...$reasons) : EligibilityResult::ready();
     }

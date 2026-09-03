@@ -4,6 +4,25 @@
 > conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
 > controls.
 
+## P0 content-operations planning boundary — 2026-09-03
+
+The first read-only slice of the MCP/Admin Content Operations Control Plane is
+documented in `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`, with the
+Article Semantic/SEO Research Preflight and SEO Projection contracts routed by
+`docs/constitution/READ_FIRST.md`. `McpCapabilityManifest` projects the
+currently registered `McpToolCatalog`; it does not introduce a new MCP tool,
+endpoint, predicate or write path. Focused evidence is
+`McpCapabilityManifestTest`: 2 tests / 7 assertions, PHP lint and
+`git diff --check` pass.
+
+This checkpoint is **PARTIAL**. Full Article inventory services (overlap,
+Knowledge/Source/Evidence, relation plan, internal links, SEO blueprint),
+shared WordPress editorial/taxonomy gateways, Admin consumers and the complete
+read-back/public verification pipeline remain implementation gaps. No Post,
+taxonomy, semantic record, Graph edge, Media, Video, migration or live data was
+mutated. Concurrent working-tree changes in the semantic merge/Odo workstream
+were preserved.
+
 ## Odo demo MCP read-path checkpoint — 2026-09-03
 
 `TARGET_RUNTIME=demo.1945.vn` is reachable through the deployed Streamable HTTP
@@ -2860,3 +2879,26 @@ context. MCP/admin/article preflight operation registries are aligned. This is
 implementation capability only: no Odo, demo, V2, staging or production rows
 were read for mutation or changed. Demo runtime inventory remains a mandatory
 precondition before any Odo proposal apply.
+
+## Odo generic merge continuation checkpoint — 2026-09-03
+
+Completed the local generic merge wiring slice without mutating any runtime.
+`ControlledApplyService` now receives a `SemanticMergeService` configured with
+the registered Graph reference adapter and the durable audit-backed receipt
+repository. Merge proposal eligibility checks source and target revisions from
+the merge payload independently; it no longer compares the target against the
+source revision. Receipt serialization now exposes the required snake-case
+contract fields while retaining backward-compatible properties. Focused merge
+and governance tests pass: 10 tests / 44 assertions.
+
+The reference-surface audit records that Knowledge, Source, Evidence,
+MediaUsage and Video do not own direct Authority UUID references. Their
+movement is therefore `NOT_APPLICABLE`; Graph remains the single association
+movement authority, and `wp_post` is Graph-only with editorial read-back.
+The matrix is `docs/semantic-packs/odo/ODO_SEMANTIC_REFERENCE_SURFACE_MATRIX.md`
+and the future no-mutation cutover packet is
+`docs/semantic-packs/odo/ODO_DEMO_GOVERNED_APPLY_PLAN.md`.
+
+No demo, V2, staging, production, WordPress Post, semantic record, Graph edge,
+proposal or database row was changed. Unrelated concurrent worktree changes
+remain unmodified and unstaged.
