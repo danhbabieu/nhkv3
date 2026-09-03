@@ -22,6 +22,13 @@ support; Graph owns typed relations; Governance owns durable semantic mutation.
 No body is copied into Knowledge or Graph. Article, FAQ, Search and hub surfaces
 reuse registered records and do not become semantic owners.
 
+All public promotional/commercial Article copy is additionally subject to
+`docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md`. That policy
+applies to title, excerpt, body, generated summary, contextual image copy and
+SEO/meta projection where those surfaces make promotional claims. Compliance
+review does not transfer editorial ownership away from WordPress and does not
+turn generated copy into Evidence.
+
 ## Required stage order
 
 1. Resolve all semantic references through the runtime registries. Ambiguous,
@@ -38,23 +45,30 @@ reuse registered records and do not become semantic owners.
 5. Read back the semantic records, Graph relations and WordPress Post. Verify
    canonical identity, revisions, visibility, relation direction, provenance
    and public projection eligibility.
-6. Publish the WordPress Post only when all required stages have satisfied this
+6. Before publication of promotional/commercial copy, run the public-claim
+   compliance gate over the rendered Article and its public projections. An
+   unsupported objective or superiority/uniqueness/absolute claim must be
+   evidence-bound, genuinely narrowed by rewrite, or blocked for human review;
+   synonym substitution alone is not a compliant rewrite.
+7. Publish the WordPress Post only when all required stages have satisfied this
    contract. Generic WordPress publication remains independently valid, but it
    is not a completed V3 knowledge Article workflow without these stages.
 
 ## Completion and failure
 
-A completion claim requires success of every required editorial, semantic and
-verification stage. A required semantic failure or unavailable dependency must
-remain an explicit non-success, retryable, unavailable, conflict or equivalent
-outcome defined by the eventual approved runtime contract. This document does
-not reserve or invent a closed outcome vocabulary.
+A completion claim requires success of every required editorial, semantic,
+verification and applicable public-claim compliance stage. A required semantic,
+compliance or unavailable dependency failure must remain an explicit
+non-success, retryable, unavailable, conflict or equivalent outcome defined by
+the eventual approved runtime contract. This document does not reserve or
+invent a closed outcome vocabulary.
 
 The runtime implementation must preserve canonical UUID/stable-key identity,
 optimistic revision, typed relation, provenance, readiness, idempotency, public
 identity and fail-closed invariants. Cross-boundary idempotency, WordPress
-revision binding, durable outcome recording and observability are follow-up
-implementation requirements, not claims of current runtime support.
+revision binding, durable outcome recording, public-claim policy versioning and
+observability are follow-up implementation requirements, not claims of current
+runtime support.
 
 ## Explicit exclusions
 
@@ -69,6 +83,9 @@ implementation requirements, not claims of current runtime support.
   `CONSTITUTION_CONFLICT` and close it in a reviewed implementation slice.
 - No post-55 delete, replacement, slug/URL change, body-copy change or duplicate
   semantic identity as part of this contract.
+- No generated ranking, award, uniqueness, market-leadership or other strong
+  promotional assertion may be treated as Evidence merely because it appears
+  in an Article draft or AI-generated copy.
 
 ## Current implementation status
 
@@ -83,3 +100,9 @@ execute/resume surface and uses the same idempotency key for retry. `create` and
 editorial `update` return `UNSUPPORTED_OPERATION` and do not write WordPress.
 Production Post 55 execution remains outside this implementation and requires
 the separate human-reviewed reconciliation packet.
+
+The public-claim compliance law is documentation-approved, but automated claim
+classification/evidence validation across every output channel is not claimed
+implemented by this file. Until runtime support is verified, publication uses
+human review and the shared compliance contract rather than silently assuming a
+pass.
