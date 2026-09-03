@@ -19,6 +19,7 @@ final class AuthorityParityAuditTest extends TestCase
             public function findByStableKey(string $type, string $key): ?AuthorityEntity { return null; }
             public function create(AuthorityEntity $entity): AuthorityEntity { return $entity; }
             public function update(AuthorityEntity $entity, int $expectedRevision): AuthorityEntity { return $entity; }
+            public function rekey(AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): AuthorityEntity { return $entity; }
             public function listByType(string $type, bool $includeRetired = false): array
             {
                 if ($type === 'brand') return [new AuthorityEntity('018f0f4e-7b4d-7c72-9b18-5c2b3f3d6f11', 'brand', 'brand-one', 'Brand One', 1, [])];

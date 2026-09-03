@@ -2745,3 +2745,14 @@ operation, converge direction-aware/path-explainable related results and live
 runtime/wire-probe the enriched YouTube intake with configured API/database.
 Album/Collection support remains a registry gap and was not invented. There is
 no unresolved `CONSTITUTION_CONFLICT` in this checkpoint.
+
+## Odo V3 governed namespace rekey checkpoint — 2026-09-03
+
+Added the generic governed Authority `rekey` operation. It preserves the
+canonical UUID and semantic payload/name/state, requires an exact old stable
+key plus optimistic revision, atomically updates the scoped stable key in the
+repository, increments revision once, and records old/new keys in the audit
+context. MCP/admin/article preflight operation registries are aligned. This is
+implementation capability only: no Odo, demo, V2, staging or production rows
+were read for mutation or changed. Demo runtime inventory remains a mandatory
+precondition before any Odo proposal apply.

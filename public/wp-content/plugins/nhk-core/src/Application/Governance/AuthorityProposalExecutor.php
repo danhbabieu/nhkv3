@@ -80,6 +80,7 @@ final class AuthorityProposalExecutor
                 (string) ($payload['name'] ?? ''),
                 is_array($payload['entity_payload'] ?? null) ? $payload['entity_payload'] : [],
             ),
+            'rekey' => $this->authority->rekey($target, (string) ($payload['old_stable_key'] ?? ''), (string) ($payload['new_stable_key'] ?? ''), $proposal->expectedRevision),
             'rename' => $this->authority->rename($target, (string) ($payload['name'] ?? ''), $proposal->expectedRevision),
             'update' => $this->authority->update($target, is_array($payload['entity_payload'] ?? null) ? $payload['entity_payload'] : [], $proposal->expectedRevision),
             'retire' => $this->authority->retire($target, $proposal->expectedRevision),

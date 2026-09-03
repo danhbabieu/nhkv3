@@ -43,6 +43,7 @@ final class McpContractTest extends TestCase
             'create',
             'ingest',
             'relation_create',
+            'rekey',
             'rename',
             'update',
             'retire',

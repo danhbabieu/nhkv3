@@ -65,4 +65,22 @@ final class GovernanceApplyContractTest extends TestCase
         $reactivated = $executor(new Proposal('relation-reactivate-1', $edge->edge_uuid, 'relation_reactivate', [], 'content', 2, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-relation-reactivate', 1, null, null, $edge->edge_uuid, 'relation'));
         self::assertTrue($reactivated->isActive());
     }
+
+    public function test_authority_executor_applies_generic_rekey_without_recreating_the_entity(): void
+    {
+        $types = new EntityTypeRegistry();
+        $types->register(new EntityTypeDefinition('brand', 1, true, ['description'], [], ['description' => 'string']));
+        $authority = new AuthorityService($repository = new InMemoryAuthorityRepository(), $types);
+        $entity = $authority->create('brand', 'odo', 'Odo', ['description' => 'Original']);
+        $executor = new AuthorityProposalExecutor($authority);
+
+        $rekeyed = $executor(new Proposal('rekey-1', $entity->canonicalId, 'rekey', ['old_stable_key' => 'odo', 'new_stable_key' => 'nhk:brand:odo'], 'content', 1, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-rekey', 1, null, null, $entity->canonicalId, 'brand'));
+
+        self::assertSame($entity->canonicalId, $rekeyed->canonicalId);
+        self::assertSame('nhk:brand:odo', $rekeyed->stableKey);
+        self::assertSame('Odo', $rekeyed->canonicalName);
+        self::assertSame(['description' => 'Original'], $rekeyed->payload);
+        self::assertSame(2, $rekeyed->revision);
+        self::assertNull($repository->findByStableKey('brand', 'odo'));
+    }
 }

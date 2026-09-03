@@ -28,6 +28,7 @@ final class RelatedContentQueryTest extends TestCase
             public function findByStableKey(string $type, string $key): ?\NHK\Core\Domain\Authority\AuthorityEntity { return null; }
             public function create(\NHK\Core\Domain\Authority\AuthorityEntity $entity): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
             public function update(\NHK\Core\Domain\Authority\AuthorityEntity $entity, int $expectedRevision): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
+            public function rekey(\NHK\Core\Domain\Authority\AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): \NHK\Core\Domain\Authority\AuthorityEntity { return $entity; }
             public function listByType(string $type, bool $includeRetired = false): array { return []; }
         };
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $media): Media { return $media; } public function update(Media $media, int $expectedRevision): Media { return $media; } public function list(bool $includeRetired = false): array { return []; } };

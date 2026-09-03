@@ -7,7 +7,7 @@ use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Contracts\Governance\GovernanceAuthorizer;
 use NHK\Core\Domain\Governance\{ApplyAttempt, Proposal, ProposalState};
-use NHK\Core\Governance\Exception\ProposalBindingConflict;
+use NHK\Core\Governance\Exception\{ProposalBindingConflict, ProposalIdempotencyConflict};
 use NHK\Core\Governance\Exception\GovernancePermissionDenied;
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Governance\Exception\DependencyCycle;
@@ -102,5 +102,16 @@ final class GovernanceCoreTest extends TestCase
         $handler = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
         $proposal = $handler->createFromArguments(['operation' => 'create', 'entity_type' => 'brand', 'target_uuid' => '', 'payload' => ['stable_key' => 'brand-empty-target', 'name' => 'Brand']]);
         self::assertNull($proposal->targetUuid);
+    }
+
+    public function test_rekey_proposal_idempotency_key_replays_identical_binding_and_rejects_changed_payload(): void
+    {
+        $service = new GovernanceService(new InMemoryProposalRepository());
+        $first = $service->create(new Proposal('p7', 'entity-1', 'rekey', ['old_stable_key' => 'odo', 'new_stable_key' => 'nhk:brand:odo'], 'content-a', 1, 'deps-a', ProposalState::DRAFT, null, null, null, 'key-7', 1, null, null, '018f0f4e-7b4d-7c72-9b18-5c2b3f3d6f11', 'brand'));
+        $same = $service->create(new Proposal('p7b', 'entity-1', 'rekey', ['old_stable_key' => 'odo', 'new_stable_key' => 'nhk:brand:odo'], 'content-a', 1, 'deps-a', ProposalState::DRAFT, null, null, null, 'key-7', 1, null, null, '018f0f4e-7b4d-7c72-9b18-5c2b3f3d6f11', 'brand'));
+        self::assertSame($first->id, $same->id);
+
+        $this->expectException(ProposalIdempotencyConflict::class);
+        $service->create(new Proposal('p7c', 'entity-1', 'rekey', ['old_stable_key' => 'odo', 'new_stable_key' => 'nhk:brand:odo-2'], 'content-b', 1, 'deps-a', ProposalState::DRAFT, null, null, null, 'key-7', 1, null, null, '018f0f4e-7b4d-7c72-9b18-5c2b3f3d6f11', 'brand'));
     }
 }

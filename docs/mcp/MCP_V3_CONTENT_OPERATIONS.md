@@ -251,7 +251,7 @@ executor/domain services:
 
 | DOMAIN | EXISTING OPERATIONS |
 |---|---|
-| Authority | `create`, `ingest`, `rename`, `update`, `retire`, `reactivate` |
+| Authority | `create`, `ingest`, `rekey`, `rename`, `update`, `retire`, `reactivate` |
 | Media | `ingest` |
 | Video | `ingest`, `update`, `retire`, `reactivate` |
 | Knowledge/Source/Evidence | `create`, `ingest`, `update`, `retire`, `reactivate` |
