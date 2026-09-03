@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+## Odo root legacy-redirect guard — 2026-09-03
+
+Live demo reproduction showed that `/odo/` was redirected to the editorial
+article `odo-10-con-10-bua-chuong-kep`, even though the public brand listing
+linked to `/odo/`. Root-cause tracing found the legacy redirect hook running at
+`template_redirect` priority 1 and applying the old `/odo/` mapping before the
+semantic brand route could claim the request.
+
+`LegacyUrlRedirects` now defers single-segment brand-root requests to the
+semantic public-route boundary. A regression test covers the semantic brand
+root and keeps nested article paths/model roots unaffected. Focused route tests
+pass (9 tests / 47 assertions across the two route suites), PHP lint and
+`git diff --check` pass. The full suite executes 461 tests but remains
+environment-blocked by 8 pre-existing WordPress bootstrap errors and 12
+mandatory integration-runtime failures. The demo was not mutated: its cutover
+remains blocked by `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Video evidence reference contract alignment — 2026-09-03
 
 Root-cause tracing found that `nhk-v3/video-ingest` exposed relation

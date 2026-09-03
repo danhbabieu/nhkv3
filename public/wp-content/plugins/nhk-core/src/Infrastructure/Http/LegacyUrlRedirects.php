@@ -16,6 +16,7 @@ final class LegacyUrlRedirects
         $requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
         if (!is_string($requestPath) || $requestPath === '') return;
         $requestPath = '/' . trim($requestPath, '/') . '/';
+        if (self::shouldDeferForSemanticRoot($requestPath, (string) get_query_var('nhk_public_entity_type'))) return;
         $entityRedirects = get_option('nhk_v2_entity_redirects', []);
         if (is_array($entityRedirects) && isset($entityRedirects[$requestPath])) {
             $targetPath = trim((string) $entityRedirects[$requestPath]);
@@ -32,5 +33,11 @@ final class LegacyUrlRedirects
         if (is_string($targetPath) && rtrim('/' . trim($targetPath, '/'), '/') === rtrim($requestPath, '/')) return;
         wp_safe_redirect($target, 301, 'NHK V2 URL migration');
         exit;
+    }
+
+    public static function shouldDeferForSemanticRoot(string $requestPath, string $publicEntityType): bool
+    {
+        $segments = array_values(array_filter(explode('/', trim($requestPath, '/')), static fn (string $segment): bool => $segment !== ''));
+        return count($segments) === 1 && $publicEntityType === 'brand';
     }
 }
