@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+## Governed Media upload + deterministic Article subject resolution — 2026-09-04
+
+Owner-approved contract text now governs multipart/file intake: source-original
+retention, derivative identity, representative/evidence/technical_detail roles,
+deterministic representative precedence, and Article subject precedence
+canonical UUID → stable key → exact canonical name/alias. The direct upload
+adapter now creates/resolves Media through `WordPressMediaAttachmentBridge`,
+retains the source as a PRIVATE asset, exposes the processed attachment as a
+PUBLIC derivative, and is idempotent when the same attachment is adopted again.
+Entity public collection projection now exposes representative media and
+reader-safe evidence media without promoting WordPress attachment state.
+Article preflight no longer contains a Post-ID exception; explicit
+`canonical_uuid` is honored by the shared semantic resolver.
+
+Focused TDD proof: 41 tests / 259 assertions pass, including explicit UUID and
+stable-key/ambiguity resolution, Post 89 generic preflight, role precedence,
+source/derivative replay and entity media projection. The new guarded real-file
+integration test is present but skipped locally because `NHK_WP_TEST_PATH` is
+unset; it must run against exact `nhk_v3_test`. Full PHPUnit is
+`ENVIRONMENT_BLOCKED` locally by 12 pre-existing P4 acceptance failures that
+require WordPress runtime. The user's unrelated uncommitted
+`ArticleResearchPreflightTest.php:114` baseline work remains untouched.
+No production data or content was mutated and no publication occurred.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Video → Living Knowledge planning seam — 2026-09-04
 
 Corrected the owner-approved Video-only Task 7 seam before runtime acceptance.
