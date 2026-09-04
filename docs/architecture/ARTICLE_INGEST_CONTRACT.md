@@ -120,3 +120,36 @@ pass.
 Subject resolution is shared by search/inventory and Article preflight. The
 generic preflight has no WordPress Post-ID exception; concrete Post IDs may
 appear only as test fixtures.
+
+## Media, image and Living Knowledge reuse boundary — 2026-09-04
+
+Article editorial storage and semantic storage remain deliberately separate.
+The WordPress Post owns title/body/excerpt, editorial image ordering and public
+editorial URL. Article Ingest receipts, Governance records and Knowledge
+repositories must not persist a duplicate copy of the Article body as semantic
+truth.
+
+Article media must reuse canonical `Media` where available. A new upload enters
+the governed Media boundary, retains the source-original as a MediaAsset and
+projects normalized WebP/responsive/WordPress attachment outputs under the same
+Media identity. Featured/inline selection remains WordPress editorial state;
+`MediaUsage` records contextual role/SEO metadata and does not itself create a
+Graph edge or Knowledge/Evidence.
+
+An Article that repeats an existing fact should resolve and reuse the canonical
+Knowledge/Source/Evidence chain rather than minting a duplicate claim from its
+prose. New factual observations extracted from Article research/body context are
+planning inputs only until they pass the shared Living Knowledge planner and
+normal Governance lifecycle. A Knowledge update may produce an Article update
+suggestion, but it never rewrites a published WordPress body automatically.
+
+Video and Media references embedded in an Article retain their own bounded
+identity and storage. A Video `about` relation or Media `depicts` relation does
+not make the Article body Evidence. Likewise, alt/caption/OCR/generated copy is
+not Evidence merely because WordPress renders it publicly.
+
+Downstream systems must therefore reuse canonical IDs plus revisions and verify
+read-back across the owning boundary: WordPress for Article editorial state,
+Media/MediaAsset/MediaUsage for image state, Video for external-reference state,
+Knowledge/Source/Evidence for factual state, and Graph only for registered typed
+relations.
