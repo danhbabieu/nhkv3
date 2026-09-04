@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
 use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
 use NHK\Core\Infrastructure\Http\PublicMediaVideoRoutes;
+use NHK\Core\Infrastructure\PublicIdentity\WpdbHistoricPublicRouteResolver;
 use PHPUnit\Framework\TestCase;
 
 final class PublicIdentityTask5ReviewFixTest extends TestCase
@@ -66,6 +67,17 @@ final class PublicIdentityTask5ReviewFixTest extends TestCase
         self::assertSame('/current-brand/current-model/', $result['target']);
     }
 
+    public function test_wpdb_historic_resolver_uses_compatible_path_lookup_without_one_argument_arity_mismatch(): void
+    {
+        $repository = new ReviewWpdbRouteRepository();
+        $result = (new WpdbHistoricPublicRouteResolver($repository))->resolveHistoric('/old-brand/old-model/');
+
+        self::assertSame(['/old-brand/old-model/'], $repository->paths);
+        self::assertSame('FOUND', $result['status']);
+        self::assertSame('/current-brand/current-model/', $result['target']);
+        self::assertSame(1, $result['hops']);
+    }
+
     public function test_hydration_preserves_a_persisted_hierarchical_current_path(): void
     {
         $reflection = new \ReflectionMethod(\NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository::class, 'hydrate');
@@ -95,6 +107,18 @@ final class ReviewPathResolver
             'brand:stored-parent', 'public-route-v1', 4, null, null,
             '/current-brand/current-model/',
         ), new HistoricPublicRoute('01a06815-1e51-7964-b004-1ba79e488ad1', 'model', 'brand:stored-parent', $path, 'old-model', 4));
+    }
+}
+
+final class ReviewWpdbRouteRepository
+{
+    /** @var list<string> */
+    public array $paths = [];
+
+    public function resolvePath(string $path): PublicIdentityMutationResult
+    {
+        $this->paths[] = $path;
+        return (new ReviewPathResolver())->resolvePath($path);
     }
 }
 
