@@ -19,6 +19,14 @@ including runtime-unavailable versus empty, canonical mismatch and structured
 data not-applicable. No migration, semantic write, URL allocation or runtime
 data mutation was performed.
 
+## Governed SEO preferred-image projection — 2026-09-04
+
+Slice 5 is complete locally. `PreferredImageSeoProjection` selects only a
+public non-placeholder representative using deterministic precedence and
+keeps evidence/technical imagery separate. Focused proof: 6 tests / 16
+assertions. No Media identity, asset, usage, Knowledge, Evidence or Graph data
+was written.
+
 ## Governed SEO sitemap/indexability projection — 2026-09-04
 
 Slice 4 is complete locally. `SitemapIndexabilityProjection` accepts only the
