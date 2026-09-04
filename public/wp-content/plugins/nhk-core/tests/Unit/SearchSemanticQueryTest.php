@@ -132,8 +132,8 @@ final class SearchSemanticQueryTest extends TestCase
 
         $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $videos, $emptyKnowledge, $types, null, null, null, $this->identityRepository([new PublicIdentity('identity-video', 'video', $video->canonicalId, 'video', 'odo', 'video', 'public-route-v1', 1)])))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo');
 
-        self::assertSame(1, $result['_totals']['videos']);
-        self::assertSame('Âm thanh Odo', $result['videos'][0]['title']);
+        self::assertSame(0, $result['_totals']['videos']);
+        self::assertSame([], $result['videos']);
     }
 
     public function test_semantic_search_excludes_an_active_authority_row_without_a_public_route(): void

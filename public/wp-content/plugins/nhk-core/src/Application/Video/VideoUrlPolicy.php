@@ -4,12 +4,16 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, SourceRepository};
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoUrlPolicy
 {
-    public function __construct(private ?PublicIdentityRepository $identities = null)
+    public function __construct(private ?PublicIdentityRepository $identities = null, private ?AuthorityRepository $authority = null, private ?EntityTypeRegistry $entityTypes = null, private ?EvidenceRepository $evidence = null, private ?SourceRepository $sources = null, private ?PredicateRegistry $predicates = null)
     {
     }
 
@@ -27,6 +31,7 @@ final class VideoUrlPolicy
         }
         $slug = $identity?->currentSlug ?? '';
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
+        if ($this->authority === null || $this->entityTypes === null || $this->evidence === null || $this->sources === null || $this->predicates === null) $blockers[] = 'GOVERNANCE_READ_BOUNDARY_UNAVAILABLE';
 
         $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
         try {
@@ -58,11 +63,26 @@ final class VideoUrlPolicy
     {
         if (!is_array($attachments)) return false;
         foreach ($attachments as $attachment) {
-            if (!is_array($attachment) || ($attachment['approved'] ?? false) !== true || ($attachment['target_type'] ?? '') === '' || !in_array($attachment['target_type'], ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], true) || ($attachment['predicate'] ?? '') !== 'about' || !UuidCodec::isValid((string) ($attachment['target_id'] ?? $attachment['target_key'] ?? ''))) continue;
+            if (!is_array($attachment) || ($attachment['approved'] ?? false) !== true || ($attachment['target_type'] ?? '') === '' || !$this->entityTypes?->has((string) $attachment['target_type']) || !UuidCodec::isValid((string) ($attachment['target_id'] ?? $attachment['target_key'] ?? ''))) continue;
+            try {
+                $targetId = (string) ($attachment['target_id'] ?? $attachment['target_key']);
+                $target = $this->authority?->findByCanonicalId($targetId);
+                $predicate = (string) ($attachment['predicate'] ?? '');
+                $definition = $this->predicates?->get($predicate);
+                if ($target === null || $target->canonicalId !== $targetId || !$target->active() || $target->entityType !== $attachment['target_type'] || $definition === null || !$definition->allows('video', (string) $attachment['target_type'])) continue;
+            } catch (\Throwable) { continue; }
             $evidence = $attachment['evidence_refs'] ?? null;
             if (!is_array($evidence) || $evidence === []) continue;
             $valid = true;
-            foreach ($evidence as $reference) if (!is_array($reference) || array_keys($reference) !== ['evidence_id'] || !UuidCodec::isValid((string) $reference['evidence_id'])) $valid = false;
+            foreach ($evidence as $reference) {
+                if (!is_array($reference) || array_keys($reference) !== ['evidence_id'] || !UuidCodec::isValid((string) $reference['evidence_id'])) { $valid = false; continue; }
+                try {
+                    $record = $this->evidence?->findByCanonicalId((string) $reference['evidence_id']);
+                    if ($record === null || !$record->active || !$record->isPublic()) { $valid = false; continue; }
+                    $source = $this->sources?->findByCanonicalId($record->sourceId);
+                    if ($source === null || !$source->active || !$source->isPublic()) $valid = false;
+                } catch (\Throwable) { $valid = false; }
+            }
             if ($valid) return true;
         }
         return false;

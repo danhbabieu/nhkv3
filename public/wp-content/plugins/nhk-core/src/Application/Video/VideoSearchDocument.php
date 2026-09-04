@@ -9,7 +9,7 @@ use NHK\Core\Domain\Video\Video;
 
 final class VideoSearchDocument
 {
-    public function __construct(private AuthorityRepository $authority, private ?PublicIdentityRepository $identities = null)
+    public function __construct(private AuthorityRepository $authority, private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $policy = null)
     {
     }
 
@@ -28,7 +28,7 @@ final class VideoSearchDocument
 
     public function publicUrl(Video $video): ?string
     {
-        $result = (new VideoUrlPolicy($this->identities))->project($video, new VideoPublicContextSelector());
+        $result = ($this->policy ?? new VideoUrlPolicy($this->identities))->project($video, new VideoPublicContextSelector());
         return $result['eligible'] ? $result['path'] : null;
     }
 

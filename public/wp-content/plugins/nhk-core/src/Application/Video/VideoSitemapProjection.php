@@ -8,14 +8,14 @@ use NHK\Core\Domain\Video\Video;
 
 final class VideoSitemapProjection
 {
-    public function __construct(private ?PublicIdentityRepository $identities = null)
+    public function __construct(private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $policy = null)
     {
     }
     /** @param list<Video> $videos @return list<array<string,string>> */
     public function project(array $videos, string $baseUrl = ''): array
     {
         $items = [];
-        $policy = new VideoUrlPolicy($this->identities);
+        $policy = $this->policy ?? new VideoUrlPolicy($this->identities);
         $selector = new VideoPublicContextSelector();
         foreach ($videos as $video) {
             if (!$video->active) continue;

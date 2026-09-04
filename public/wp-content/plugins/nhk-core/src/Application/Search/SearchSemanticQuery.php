@@ -15,7 +15,7 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchSemanticQuery
 {
-    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null, private ?PublicIdentityRepository $identities = null) {}
+    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null, private ?PublicIdentityRepository $identities = null, private ?\NHK\Core\Application\Video\VideoUrlPolicy $videoPolicy = null) {}
 
     public function extend(array $groups, string $term, int $page = 1, int $perPage = 12): array
     {
@@ -27,7 +27,7 @@ final class SearchSemanticQuery
         }
         if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->collection()->archive($definition->type, 1, 100, $term)['items'] as $item) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => function_exists('home_url') ? home_url($item['url']) : $item['url']];
         if ($this->ready('media')) foreach ($this->media->list() as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => home_url($path)];
-        if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority, $this->identities); foreach ($this->videos->list() as $item) {
+        if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority, $this->identities, $this->videoPolicy); foreach ($this->videos->list() as $item) {
             if (!$item->active || !$item->hasValidPublicReference() || !$videoSearch->isDiscoverable($item)) continue;
             $title = $videoSearch->title($item); $path = $videoSearch->publicUrl($item);
             if ($path !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($path) : $path];
