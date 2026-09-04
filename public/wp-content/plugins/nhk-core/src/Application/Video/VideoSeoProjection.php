@@ -24,6 +24,14 @@ final class VideoSeoProjection
             'url' => $watchPath,
             'embedUrl' => preg_match('/^[A-Za-z0-9_-]{11}$/', $id) === 1 ? 'https://www.youtube-nocookie.com/embed/' . $id : null,
         ];
+        if (!$seoProjection['indexable']) return [
+            'title' => (string) ($seo['title'] ?? $editorial['title'] ?? ''),
+            'description' => (string) ($seo['description'] ?? $editorial['summary'] ?? ''),
+            'canonical' => null,
+            'indexable' => false,
+            'open_graph' => [],
+            'video_object' => [],
+        ];
         if (($source['published_at'] ?? null) !== null && (string) $source['published_at'] !== '') $object['uploadDate'] = (string) $source['published_at'];
         if (isset($source['duration_seconds']) && (int) $source['duration_seconds'] > 0) $object['duration'] = $this->duration((int) $source['duration_seconds']);
         $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';

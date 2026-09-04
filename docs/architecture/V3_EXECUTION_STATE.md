@@ -36,6 +36,14 @@ compliance and indexability without writing WordPress or semantic state.
 Focused proof: 18 tests / 51 assertions including Article and Living
 Knowledge regressions.
 
+## Governed SEO Video projection hardening — 2026-09-04
+
+Video SEO now suppresses VideoObject/Open Graph output when the shared watch
+page URL is ineligible; validated Video identity and explicit-target behavior
+remain unchanged. Focused proof: 34 tests / 124 assertions across Video SEO,
+URL and semantic regressions. No local binary, Post, Video identity or
+semantic record was created.
+
 ## Governed SEO sitemap/indexability projection — 2026-09-04
 
 Slice 4 is complete locally. `SitemapIndexabilityProjection` accepts only the
