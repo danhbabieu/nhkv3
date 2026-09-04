@@ -2,12 +2,13 @@
 declare(strict_types=1);
 namespace NHK\Core\Application\Graph;
 use NHK\Core\Contracts\Graph\{AuditSink,GraphRepository};
-use NHK\Core\Domain\Graph\{EndpointTypeRegistry,GraphEdge,NodeReference,PredicateRegistry};
+use NHK\Core\Domain\Graph\{EndpointTypeRegistry,GraphEdge,NodeReference,PredicateRegistry,RelationPolicy};
 use NHK\Core\Graph\Exception\{InvalidRelationSourceType,InvalidRelationTargetType};
 final class GraphService {
     public function __construct(private GraphRepository $repository, private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private AuditSink $audit) {}
     public function create(NodeReference $source, string $predicate, NodeReference $target): GraphEdge {
         $definition=$this->predicates->get($predicate); $source=$this->endpoints->assertExists($source); $target=$this->endpoints->assertExists($target);
+        RelationPolicy::assertCanCreate($definition->key, $source->endpoint_type, $target->endpoint_type);
         if (!$definition->allows($source->endpoint_type,$target->endpoint_type)) { if(!in_array($source->endpoint_type,$definition->allowed_source_types,true)) throw new InvalidRelationSourceType('Invalid relation source type.'); throw new InvalidRelationTargetType('Invalid relation target type.'); }
         if (!$definition->allow_self_relation && $source->key()===$target->key()) throw new InvalidRelationTargetType('Self relation is not allowed.');
         $edge=$this->repository->createEdge($this->repository->resolveNode($source),$definition,$this->repository->resolveNode($target)); $this->audit->record('RelationCreated',$edge); return $edge;

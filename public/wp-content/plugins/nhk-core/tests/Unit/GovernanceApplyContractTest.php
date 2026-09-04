@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\AuthorityProposalExecutor;
+use NHK\Core\Contracts\Graph\AuditSink;
 use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
 use NHK\Core\Application\Governance\OperationCompatibilityException;
 use NHK\Core\Application\Knowledge\KnowledgeEnrichmentProposalFactory;
@@ -14,6 +15,7 @@ use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
+use NHK\Core\Graph\Exception\UnapprovedRelationPair;
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
 use NHK\Tests\Support\InMemoryGraphRepository;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
@@ -21,6 +23,46 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernanceApplyContractTest extends TestCase
 {
+    /** @dataProvider governedProductSpecimenDirections */
+    public function test_governed_product_specimen_about_relation_fails_closed(string $source, string $target): void
+    {
+        $types = new EndpointTypeRegistry();
+        foreach (['product', 'specimen'] as $type) {
+            $types->register($type, new FakeEndpointResolver($type, ['a', 'b']));
+        }
+        $graph = new GraphService(new InMemoryGraphRepository(), $types, new PredicateRegistry(), new class implements AuditSink {
+            public function record(string $event, \NHK\Core\Domain\Graph\GraphEdge $edge): void {}
+        });
+        $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()), $graph);
+
+        $this->expectException(UnapprovedRelationPair::class);
+        $this->expectExceptionMessage('Product–Specimen relation is not approved.');
+        $executor(new Proposal(
+            'product-specimen-about',
+            'relation',
+            'relation_create',
+            ['source_type' => $source, 'source_key' => 'a', 'predicate' => 'about', 'target_type' => $target, 'target_key' => 'b'],
+            'content',
+            null,
+            'deps',
+            ProposalState::APPROVED,
+            '1',
+            '2',
+            null,
+            'idem-product-specimen',
+            1,
+            null,
+            null,
+            null,
+            'relation',
+        ));
+    }
+
+    public static function governedProductSpecimenDirections(): array
+    {
+        return [['product', 'specimen'], ['specimen', 'product']];
+    }
+
     public function test_controlled_apply_registry_matches_the_semantic_dispatch_matrix(): void
     {
         $registry = new ControlledApplyOperationRegistry();
