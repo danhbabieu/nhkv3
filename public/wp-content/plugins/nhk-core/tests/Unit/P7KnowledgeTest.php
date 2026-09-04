@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Knowledge\KnowledgeService;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -11,6 +13,27 @@ use PHPUnit\Framework\TestCase;
 
 final class P7KnowledgeTest extends TestCase
 {
+    public function test_dependency_validation_accepts_active_private_evidence_without_public_visibility(): void
+    {
+        $claimId = UuidCodec::newV7(); $sourceId = UuidCodec::newV7(); $evidenceId = UuidCodec::newV7();
+        $claim = new KnowledgeClaim($claimId, 'claim-key', 'Claim');
+        $source = new Source($sourceId, 'source-key', 'Source', metadata: ['visibility' => 'PRIVATE']);
+        $evidence = new Evidence($evidenceId, $claimId, $sourceId, excerpt: 'Excerpt', metadata: ['visibility' => 'HIDDEN']);
+        $validator = new CanonicalDependencyValidator(
+            new class($claim) implements KnowledgeRepository { public function __construct(private KnowledgeClaim $claim) {} public function findByCanonicalId(string $id): ?KnowledgeClaim { return $id === $this->claim->canonicalId ? $this->claim : null; } public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; } public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; } public function list(bool $includeRetired = false): array { return [$this->claim]; } },
+            new class($source) implements SourceRepository { public function __construct(private Source $source) {} public function findByCanonicalId(string $id): ?Source { return $id === $this->source->canonicalId ? $this->source : null; } public function findByStableKey(string $stableKey): ?Source { return null; } public function create(Source $source): Source { return $source; } public function update(Source $source, int $expectedRevision): Source { return $source; } public function list(bool $includeRetired = false): array { return [$this->source]; } },
+            new class($evidence) implements EvidenceRepository { public function __construct(private Evidence $evidence) {} public function findByCanonicalId(string $id): ?Evidence { return $id === $this->evidence->canonicalId ? $this->evidence : null; } public function create(Evidence $evidence): Evidence { return $evidence; } public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; } public function listByClaim(string $claimId, bool $includeRetired = false): array { return [$this->evidence]; } public function listBySource(string $sourceId, bool $includeRetired = false): array { return [$this->evidence]; } },
+        );
+        self::assertSame($evidenceId, $validator->evidence($evidenceId)->canonicalId);
+    }
+
+    public function test_dependency_validation_rejects_inactive_evidence(): void
+    {
+        $id = UuidCodec::newV7();
+        $validator = new CanonicalDependencyValidator($this->createMock(KnowledgeRepository::class), $this->createMock(SourceRepository::class), new class($id) implements EvidenceRepository { public function __construct(private string $id) {} public function findByCanonicalId(string $id): ?Evidence { return $id === $this->id ? new Evidence($id, UuidCodec::newV7(), UuidCodec::newV7(), excerpt: 'x', active: false) : null; } public function create(Evidence $evidence): Evidence { return $evidence; } public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; } public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; } public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; } });
+        $this->expectException(DependencyValidationException::class);
+        $validator->evidence($id);
+    }
     public function test_claim_source_and_evidence_are_atomic_and_idempotent_at_service_boundary(): void
     {
         $claims = new class implements KnowledgeRepository {

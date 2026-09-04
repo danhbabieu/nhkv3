@@ -5,6 +5,15 @@
 
 Status: runtime audit and contract-safe implementation checkpoint, 2026-09-04.
 
+Governed Source/Knowledge/Evidence/Video ingest responses use an explicit
+identity envelope: `proposal_id`, `proposal_state`, `target_uuid` and
+`canonical_id`. Proposal UUIDs are never returned as canonical entity IDs, and
+`canonical_id` is null before Controlled Apply plus canonical owner read-back.
+Evidence ingest validates canonical active Claim/Source dependencies at request
+acceptance and again at apply. Visibility is independent of lifecycle; internal
+verification may read active PRIVATE/HIDDEN Evidence without changing it, while
+public evidence reads remain fail-closed.
+
 
 New NHK-managed image bytes follow one governed Media V3 ingest law before
 durable persistence/public projection: validate the actual payload → auto-orient

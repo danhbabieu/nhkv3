@@ -6,11 +6,12 @@ namespace NHK\Core\Application\Video;
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\VideoRelationCandidate;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoRelationCandidatePlanner
 {
-    public function __construct(private PredicateRegistry $predicates, private EvidenceRepository $evidence, private KnowledgeRepository $claims, private SourceRepository $sources)
+    public function __construct(private PredicateRegistry $predicates, private EvidenceRepository $evidence, private KnowledgeRepository $claims, private SourceRepository $sources, private ?CanonicalDependencyValidator $dependencies = null)
     {
     }
 
@@ -32,10 +33,7 @@ final class VideoRelationCandidatePlanner
             foreach ($evidence as $reference) {
                 if (!is_array($reference) || array_keys($reference) !== ['evidence_id']) throw new \InvalidArgumentException('Video relation evidence reference is invalid.');
                 $evidenceId = trim((string) $reference['evidence_id']);
-                $record = UuidCodec::isValid($evidenceId) ? $this->evidence->findByCanonicalId($evidenceId) : null;
-                $claim = $record === null ? null : $this->claims->findByCanonicalId($record->claimId);
-                $source = $record === null ? null : $this->sources->findByCanonicalId($record->sourceId);
-                if ($record === null || !$record->active || !$record->isPublic() || $claim === null || !$claim->active || !$claim->isPublic() || $source === null || !$source->active || !$source->isPublic()) throw new \InvalidArgumentException('Video relation evidence reference is invalid.');
+                try { ($this->dependencies ?? new CanonicalDependencyValidator($this->claims, $this->sources, $this->evidence))->evidence($evidenceId); } catch (\Throwable) { throw new \InvalidArgumentException('Video relation evidence reference is invalid.'); }
             }
             $definition = $this->predicates->get($predicate);
             if (!$definition->allows('video', $targetType)) throw new \InvalidArgumentException('Predicate is not allowed for a Video target.');

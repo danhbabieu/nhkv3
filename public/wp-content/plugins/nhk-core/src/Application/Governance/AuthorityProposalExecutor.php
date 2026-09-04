@@ -10,6 +10,7 @@ use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Knowledge\KnowledgeService;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Graph\GraphEdge;
@@ -20,7 +21,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
@@ -160,6 +161,13 @@ final class AuthorityProposalExecutor
         if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
         foreach ($attachments as $attachment) {
             if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
+            $evidenceRefs = is_array($attachment['evidence_refs'] ?? null) ? $attachment['evidence_refs'] : [];
+            if ($evidenceRefs === []) throw new \RuntimeException('EVIDENCE_REFS_REQUIRED');
+            if ($this->dependencies === null) throw new \RuntimeException('CANONICAL_DEPENDENCY_VALIDATOR_UNAVAILABLE');
+            foreach ($evidenceRefs as $reference) {
+                if (!is_array($reference) || !isset($reference['evidence_id'])) throw new \RuntimeException('CANONICAL_EVIDENCE_REQUIRED');
+                $this->dependencies->evidence((string) $reference['evidence_id']);
+            }
             $this->graph->create(
                 new NodeReference('video', $video->canonicalId),
                 (string) ($attachment['predicate'] ?? ''),

@@ -15,10 +15,32 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentIngestor as ConcreteWordPressMediaAttachmentIngestor;
 use NHK\Tests\Support\InMemoryProposalRepository;
+use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class McpContractTest extends TestCase
 {
+    public function test_governed_ingest_response_separates_proposal_and_canonical_identity(): void
+    {
+        $read = new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+            null, $this->createMock(SourceRepository::class), null, null, null,
+        );
+        $transport = new McpTransport($read, new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())));
+        $proposalId = UuidCodec::newV7();
+        $reflection = new \ReflectionMethod($transport, 'ingestProposal');
+        $result = $reflection->invoke($transport, new Proposal($proposalId, 'source', 'ingest', [], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'test'));
+
+        self::assertSame($proposalId, $result['proposal_id']);
+        self::assertSame('draft', $result['proposal_state']);
+        self::assertNull($result['target_uuid']);
+        self::assertNull($result['canonical_id']);
+        self::assertArrayNotHasKey('id', $result);
+    }
     public function test_catalog_has_exact_current_ordered_tool_contract(): void
     {
         self::assertSame([

@@ -7,6 +7,8 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
 {
@@ -25,6 +27,7 @@ final class McpTransport
         private ?WordPressMediaAttachmentIngestor $wordpressAttachments = null,
         private ?CategoryGateway $categories = null,
         private ?EditorialDraftGateway $drafts = null,
+        private ?CanonicalDependencyValidator $dependencies = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -62,6 +65,8 @@ final class McpTransport
             return $this->error($id, -32003, 'Capability required: ' . $error->getMessage() . '.', 403);
         } catch (\InvalidArgumentException $error) {
             return $this->error($id, -32602, $error->getMessage(), 400);
+        } catch (DependencyValidationException $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => $error->toStructuredError()], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
         } catch (\Throwable $error) {
             return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
         }
@@ -248,7 +253,7 @@ final class McpTransport
             'assets' => is_array($arguments['assets'] ?? null) ? $arguments['assets'] : [],
             'usages' => is_array($arguments['usages'] ?? null) ? $arguments['usages'] : [],
         ];
-        return $this->proposal($this->governance->createFromArguments($mediaArguments));
+        return $this->ingestProposal($this->governance->createFromArguments($mediaArguments));
     }
 
     /** @return array<string,mixed> */
@@ -310,7 +315,7 @@ final class McpTransport
                 (string) ($arguments['editorial_instruction'] ?? ''),
             );
             $proposal = $this->governance->createFromArguments($this->videoIntake->proposalArguments($preview, isset($arguments['idempotency_key']) ? (string) $arguments['idempotency_key'] : null));
-            $result = $this->proposal($proposal);
+            $result = $this->ingestProposal($proposal);
             $result['preview'] = $preview->toArray();
             return $result;
         }
@@ -323,7 +328,7 @@ final class McpTransport
             'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
             'thumbnail_media_id' => (string) ($arguments['thumbnail_media_id'] ?? ''),
         ];
-        return $this->proposal($this->governance->createFromArguments($videoArguments));
+        return $this->ingestProposal($this->governance->createFromArguments($videoArguments));
     }
 
     private function knowledgeIngest(array $arguments): array
@@ -337,7 +342,7 @@ final class McpTransport
             'claim_type' => (string) ($arguments['claim_type'] ?? 'fact'),
             'provenance' => is_array($arguments['provenance'] ?? null) ? $arguments['provenance'] : [],
         ];
-        return $this->proposal($this->governance->createFromArguments($knowledgeArguments));
+        return $this->ingestProposal($this->governance->createFromArguments($knowledgeArguments));
     }
 
     private function sourceIngest(array $arguments): array
@@ -352,11 +357,14 @@ final class McpTransport
             'locator' => isset($arguments['locator']) ? (string) $arguments['locator'] : null,
             'metadata' => $this->withVisibility($arguments),
         ];
-        return $this->proposal($this->governance->createFromArguments($sourceArguments));
+        return $this->ingestProposal($this->governance->createFromArguments($sourceArguments));
     }
 
     private function evidenceIngest(array $arguments): array
     {
+        if ($this->dependencies === null) throw new \RuntimeException('CANONICAL_DEPENDENCY_VALIDATOR_UNAVAILABLE');
+        $this->dependencies->claim((string) ($arguments['claim_id'] ?? ''), 'claim_id');
+        $this->dependencies->source((string) ($arguments['source_id'] ?? ''), 'source_id');
         $evidenceArguments = $arguments;
         $evidenceArguments['operation'] = 'ingest';
         $evidenceArguments['entity_type'] = 'evidence';
@@ -368,12 +376,29 @@ final class McpTransport
             'locator' => isset($arguments['locator']) ? (string) $arguments['locator'] : null,
             'metadata' => $this->withVisibility($arguments),
         ];
-        return $this->proposal($this->governance->createFromArguments($evidenceArguments));
+        return $this->ingestProposal($this->governance->createFromArguments($evidenceArguments));
     }
 
     private function proposal(\NHK\Core\Domain\Governance\Proposal $proposal): array
     {
         return ['id' => $proposal->id, 'subject_id' => $proposal->subjectId, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'payload' => $proposal->payload, 'state' => $proposal->state->value, 'expected_revision' => $proposal->expectedRevision, 'revision' => $proposal->revision, 'idempotency_key' => $proposal->idempotencyKey, 'target_uuid' => $proposal->targetUuid];
+    }
+
+    /** @return array<string,mixed> */
+    private function ingestProposal(\NHK\Core\Domain\Governance\Proposal $proposal): array
+    {
+        return [
+            'proposal_id' => $proposal->id,
+            'proposal_state' => $proposal->state->value,
+            'target_uuid' => $proposal->targetUuid,
+            'canonical_id' => $proposal->targetUuid,
+            'entity_type' => $proposal->entityType,
+            'operation' => $proposal->operation,
+            'payload' => $proposal->payload,
+            'expected_revision' => $proposal->expectedRevision,
+            'revision' => $proposal->revision,
+            'idempotency_key' => $proposal->idempotencyKey,
+        ];
     }
 
     /** @return array<string,mixed> */

@@ -52,3 +52,9 @@ Runtime acceptance for the Odo 36/10 probe established the required handoff:
 explicit `about → variant 95873bfe-d978-4eda-a5a2-ce9ba79625df` is preserved as
 the enrichment subject and candidate scope, with no Model/Brand fallback. This
 acceptance does not itself create Knowledge, Evidence or Graph records.
+
+The governed dependency runner keeps `proposal_id` separate from canonical
+entity UUIDs and progresses only after Source, Claim, Evidence and Video owner
+read-backs pass. `EXPLICIT_USER_RELATION` `about` still requires non-empty
+`evidence_refs`; active PRIVATE/HIDDEN Evidence is verified internally and is
+never made PUBLIC for that verification.

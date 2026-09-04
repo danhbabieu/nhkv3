@@ -9,8 +9,9 @@ use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Contracts\Governance\GovernedLifecycle;
 
-final class McpGovernanceHandler
+final class McpGovernanceHandler implements GovernedLifecycle
 {
     public function __construct(private GovernanceService $governance, private ?ProposalEligibilityService $eligibility = null, private ?ControlledApplyService $apply = null) {}
 

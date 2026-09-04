@@ -60,6 +60,8 @@ use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Knowledge\KnowledgeService;
+use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Application\Governance\CanonicalApplyReadBackVerifier;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
 
@@ -186,7 +188,25 @@ final class Plugin {
             $merge = new SemanticMergeService($authority, [new SemanticMergeGraphAdapter($graphService)], static function (string $event, object $receipt) use ($governanceAudit): void {
                 $governanceAudit->recordEvent($event, 'semantic_merge', (string) ($receipt->idempotencyKey ?? ''), null, $receipt->toArray());
             }, new WpdbSemanticMergeReceiptRepository($wpdb));
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge), $merge), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer());
+            $dependencyValidator = new CanonicalDependencyValidator($claims, $sources, $evidence);
+            $canonicalReadBack = new CanonicalApplyReadBackVerifier(static function (string $entityType, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): ?array {
+                $record = match ($entityType) {
+                    'knowledge' => $claims->findByCanonicalId($id),
+                    'source' => $sources->findByCanonicalId($id),
+                    'evidence' => $evidence->findByCanonicalId($id),
+                    'video' => $videos->findByCanonicalId($id),
+                    'media' => $media->findByCanonicalId($id),
+                    'relation' => $graphRepository->findByUuid($id),
+                    default => $authority->findByCanonicalId($id),
+                };
+                if ($record === null) return null;
+                $actualType = property_exists($record, 'entityType') ? (string) $record->entityType : $entityType;
+                $active = method_exists($record, 'active') ? (bool) $record->active() : (bool) ($record->active ?? (method_exists($record, 'isActive') ? $record->isActive() : false));
+                $revision = (int) ($record->revision ?? 0);
+                $canonicalId = (string) ($record->canonicalId ?? $record->edge_uuid ?? '');
+                return ['entity_type' => $actualType, 'canonical_id' => $canonicalId, 'active' => $active, 'revision' => $revision, 'snapshot' => get_object_vars($record)];
+            });
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight(
                 $endpoints,
@@ -327,7 +347,7 @@ final class Plugin {
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence))))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

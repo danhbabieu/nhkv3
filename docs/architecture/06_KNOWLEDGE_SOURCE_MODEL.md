@@ -57,3 +57,17 @@ Downstream reuse must resolve canonical Knowledge/Source/Evidence UUIDs and
 revisions and attach/refer to those records; it must not copy canonical claim
 text into a parallel semantic store or create duplicate claims merely because a
 new Post, Video or Media item repeats the same observation.
+
+## Proposal identity versus canonical identity
+
+Governance `proposal_id` identifies a draft/review/apply command only. It is
+never a Source, Knowledge Claim or Evidence `canonical_id`, and must never be
+copied into `claim_id`, `source_id`, `evidence_id` or another entity reference.
+Create/ingest responses expose `proposal_id`, `proposal_state`, `target_uuid`
+and `canonical_id` separately; `canonical_id` remains null until controlled
+apply has produced and verified the canonical record.
+
+Evidence dependency validation is lifecycle-aware and visibility-independent:
+Claim, Source and Evidence must resolve to canonical records and be active.
+PRIVATE/HIDDEN Evidence is valid for governed internal verification and is not
+promoted to PUBLIC. Public readers continue to omit it.

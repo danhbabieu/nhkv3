@@ -96,3 +96,18 @@ explicit Variant UUID `95873bfe-d978-4eda-a5a2-ce9ba79625df` is retained as both
 `variant` and no Model/Brand fallback is emitted. This checkpoint changes no
 semantic data and does not relax the separate Source/Evidence or Governance
 gates.
+
+## Governed dependency lifecycle
+
+The coordinated ingest path is `Source → Knowledge Claim → Evidence → Video →
+about target`. Every node uses `create/ingest → submit → review/approve under
+the current approval policy → eligibility → Controlled Apply → canonical owner
+read-back`. Orchestration never approves on behalf of a required human/manual
+policy and never writes a domain repository directly. `proposal_id` remains
+separate from `target_uuid` and `canonical_id`; a create/ingest response has
+`canonical_id: null` until apply and verification complete.
+
+Controlled Apply's `result_entity_uuid` is only a candidate result. Success and
+dependency progression require an internal canonical snapshot matching entity
+type, UUID, active state and revision. Read-back failure is non-success and
+fail-closed. Retries reuse idempotency, content and dependency fingerprints.

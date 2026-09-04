@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\AuthorityProposalExecutor;
+use NHK\Core\Application\Governance\CanonicalApplyReadBackVerifier;
 use NHK\Core\Contracts\Graph\AuditSink;
 use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
 use NHK\Core\Application\Governance\OperationCompatibilityException;
@@ -23,6 +24,21 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernanceApplyContractTest extends TestCase
 {
+    public function test_canonical_apply_readback_requires_matching_active_owner_snapshot(): void
+    {
+        $proposal = new Proposal(UuidCodec::newV7(), 'source', 'ingest', [], 'content', null, 'deps', ProposalState::APPROVED, idempotencyKey: 'readback');
+        $id = UuidCodec::newV7();
+        $readBack = (new CanonicalApplyReadBackVerifier(static fn (string $type, string $uuid): array => ['entity_type' => $type, 'canonical_id' => $uuid, 'active' => true, 'revision' => 2, 'snapshot' => ['id' => $uuid]]))->verify($proposal, $id);
+        self::assertSame($id, $readBack['canonical_id']);
+        self::assertSame(2, $readBack['revision']);
+    }
+
+    public function test_canonical_apply_readback_fails_closed_on_wrong_entity_type(): void
+    {
+        $proposal = new Proposal(UuidCodec::newV7(), 'source', 'ingest', [], 'content', null, 'deps', ProposalState::APPROVED, idempotencyKey: 'readback-wrong-type');
+        $this->expectExceptionMessage('CANONICAL_READBACK_VERIFICATION_FAILED');
+        (new CanonicalApplyReadBackVerifier(static fn (string $type, string $uuid): array => ['entity_type' => 'evidence', 'canonical_id' => $uuid, 'active' => true, 'revision' => 1, 'snapshot' => []]))->verify($proposal, UuidCodec::newV7());
+    }
     /** @dataProvider governedProductSpecimenDirections */
     public function test_governed_product_specimen_about_relation_fails_closed(string $source, string $target): void
     {

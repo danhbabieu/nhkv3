@@ -16,6 +16,17 @@ under the existing Evidence read policy. Arbitrary objects, string references,
 missing IDs and inactive/unusable Evidence fail closed. This reference is
 preserved unchanged through Proposal and Controlled Apply.
 
+Before relation proposal creation and again immediately before Controlled Apply,
+each `evidence_id` must resolve to canonical active Evidence whose Claim and
+Source dependencies are also canonical and active. Visibility is separate:
+PRIVATE/HIDDEN Evidence is checked through governed owner/internal read-back and
+is never rewritten as PUBLIC. A public evidence-get may still return no record.
+
+`proposal_id` is the Governance command identity only. It is not a valid
+`evidence_id`, target UUID or canonical relation identity. Downstream relation
+apply is allowed only after upstream Evidence and Video canonical owner
+read-backs pass.
+
 Apply is governed. Every approved Video ingest proposal must create the Video
 with at least one approved attachment through `GraphService` in the same
 Controlled Apply transaction. Zero candidates returns

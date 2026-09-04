@@ -12,9 +12,9 @@ use NHK\Core\Contracts\Article\ArticleApplyService;
 /** Transaction owner for governed authority mutations. The executor must use the same wpdb connection. */
 final class ControlledApplyService implements ArticleApplyService
 {
-    public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null, private ?GovernanceAuthorizer $authorizer=null) {}
+    public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null, private ?GovernanceAuthorizer $authorizer=null, private ?CanonicalApplyReadBackVerifier $readBack=null) {}
 
-    /** @return array{proposal_id:string,attempt_no:int,result_entity_uuid:?string,idempotent:bool} */
+    /** @return array{proposal_id:string,attempt_no:int,result_entity_uuid:?string,canonical_id:?string,canonical_readback:?array,idempotent:bool} */
     public function apply(string $proposalId): array
     {
         $this->authorizer?->require('nhk_apply_proposals');
@@ -22,14 +22,14 @@ final class ControlledApplyService implements ArticleApplyService
         try {
             return $this->transactions->transactional(function() use ($proposalId,$started):array {
                 $proposal=$this->proposals->findForUpdate($proposalId)??throw new ProposalNotFound('Proposal not found.');
-                if($proposal->state===ProposalState::APPLIED){$success=$this->attempts->findSuccessful($proposalId);return ['proposal_id'=>$proposalId,'attempt_no'=>$success?->number??0,'result_entity_uuid'=>$success?->resultEntityUuid,'idempotent'=>true];}
+                if($proposal->state===ProposalState::APPLIED){$success=$this->attempts->findSuccessful($proposalId); $resultId=$success?->resultEntityUuid; $readBack=$this->readBack?->verify($proposal, (string) $resultId); return ['proposal_id'=>$proposalId,'attempt_no'=>$success?->number??0,'result_entity_uuid'=>$resultId,'canonical_id'=>$resultId,'canonical_readback'=>$readBack,'idempotent'=>true];}
                 if($proposal->state!==ProposalState::APPROVED)throw new InvalidProposalTransition('Only approved proposals can be applied.');
                 if($this->eligibility && !($this->eligibility->check($proposalId))->ready)throw new InvalidProposalTransition('Proposal is not eligible for apply.');
                 $attempt=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$this->attempts->nextAttemptNumberLocked($proposalId),'running',null,null,null,$started);
                 $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted(); $this->auditEvent('ApplyStarted',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,['attempt_no'=>$attempt->number]);
-                $result=($this->executor)($proposal); $resultId=is_string($result)?$result:(is_object($result)&&property_exists($result,'canonicalId')?$result->canonicalId:(is_object($result)&&property_exists($result,'edge_uuid')?$result->edge_uuid:(is_object($result)&&property_exists($result,'targetUuid')?$result->targetUuid:null)));
+                $result=($this->executor)($proposal); $resultId=is_string($result)?$result:(is_object($result)&&property_exists($result,'canonicalId')?$result->canonicalId:(is_object($result)&&property_exists($result,'edge_uuid')?$result->edge_uuid:(is_object($result)&&property_exists($result,'targetUuid')?$result->targetUuid:null))); $readBack = $this->readBack?->verify($proposal, (string) $resultId);
                 $this->hook?->afterAuthorityMutation(); $this->attempts->markSucceeded($attempt->id,$resultId); $this->hook?->beforeProposalApplied(); $this->proposals->save($proposal->transition(ProposalState::APPLIED,$proposal->decisionActor,gmdate('Y-m-d H:i:s.u'))); $this->auditEvent('ApplySucceeded',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,['attempt_no'=>$attempt->number,'result_entity_uuid'=>$resultId]); $this->hook?->beforeCommit();
-                return ['proposal_id'=>$proposalId,'attempt_no'=>$attempt->number,'result_entity_uuid'=>$resultId,'idempotent'=>false];
+                return ['proposal_id'=>$proposalId,'attempt_no'=>$attempt->number,'result_entity_uuid'=>$resultId,'canonical_id'=>$resultId,'canonical_readback'=>$readBack,'idempotent'=>false];
             });
         } catch(\Throwable $error) {
             // The semantic transaction has rolled back. Failure history is deliberately durable in a new transaction.

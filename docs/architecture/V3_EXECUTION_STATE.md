@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+## Governed SEO Projection consumer-wiring continuation — 2026-09-04
+
+Concrete consumer audit and read-only wiring are complete for the approved SEO
+scope. Entity, Video and Media route contexts now carry the shared
+`PublicSeoProjection`; theme canonical/OG/structured-data and robots consume
+that boundary, while native Article permalink/WordPress sitemap ownership is
+preserved. Home, Search and Related consumers no longer reconstruct semantic
+public URLs; Video sitemap calls `SitemapIndexabilityProjection`.
+
+Regression evidence: `FrontendContractTest` and focused SEO/Video/Sitemap
+tests pass locally; the current full Unit run is 521 tests / 2,395 assertions
+(one existing warning and five PHPUnit deprecations). Structured data now asserts the
+same page URL for `url` and `@id`. No SEO-specific slug fallback, semantic
+writer, migration, route allocation, Product–Specimen shortcut, MediaAsset
+page exposure, transcript/OCR/alt/caption promotion, numeric score truth,
+FAQ dependency or AEO/GEO semantic layer was added.
+
+Living Knowledge remains read/plan/resolve-only; its existing stable-core guard
+and regression tests are the evidence that enrichment does not rewrite Article
+body or canonical/slug/robots/schema identity. `RUNTIME_READBACK` remains
+`ENVIRONMENT_BLOCKED` where `NHK_WP_TEST_PATH` is unavailable; this is separate
+from local `CODE_READY` unit/static evidence. No data mutation, push, merge or
+deploy occurred.
+
 # Governed SEO Projection documentation sync — 2026-09-04
 
 Slice 1 is complete locally: the shared SEO Core, Entity, Media/Image and
@@ -4204,3 +4228,19 @@ WordPress cannot establish its database connection, so no runtime PASS is
 claimed. Focused Unit tests pass 9 tests / 32 assertions; PHP lint, Composer
 validation and `git diff --check` pass. No Post, semantic record, Graph edge,
 Knowledge record, publication or external runtime data was changed.
+
+## Governed semantic ingest identity/dependency checkpoint — 2026-09-04
+
+Implementation adds an explicit MCP ingest response envelope separating
+`proposal_id`, `proposal_state`, `target_uuid` and `canonical_id`; create/ingest
+returns `canonical_id: null` before apply. Canonical dependency validation now
+rejects proposal/draft/unresolved IDs and inactive Claim/Source/Evidence at
+request acceptance. Visibility is independent: active PRIVATE/HIDDEN Evidence
+is valid for governed internal verification and remains hidden from public reads.
+
+Controlled Apply can require canonical owner/internal read-back matching entity
+type, UUID, active state, revision and snapshot; a result UUID alone is not a
+success signal. The governed orchestration service calls create, submit,
+review/approve according to an injected approval policy, eligibility and apply,
+and stops downstream progression on missing read-back. No production/staging/V2
+data was migrated, seeded or mutated. Integration remains environment-gated.
