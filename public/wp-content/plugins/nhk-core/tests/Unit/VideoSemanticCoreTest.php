@@ -31,7 +31,7 @@ use NHK\Core\Domain\Video\{
     VideoSourceRights,
     YouTubeSourceSnapshot
 };
-use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
+use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult, PublicUrlResult};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
@@ -333,12 +333,12 @@ final class VideoSemanticCoreTest extends TestCase
             'source' => ['external_video_id' => 'dQw4w9WgXcQ', 'published_at' => '2026-09-02T00:00:00Z', 'duration_seconds' => 420, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']],
             'editorial' => ['title' => 'Odo 36/8 — Âm thanh đồng hồ cổ', 'summary' => 'Tìm hiểu âm thanh qua bối cảnh biên tập NHK.', 'body' => 'Nội dung độc lập hữu ích.'],
             'seo' => ['title' => 'Odo 36/8 — Âm thanh đồng hồ cổ', 'description' => 'Một mô tả SEO trung thực.'],
-        ], 'https://nhk.example/video/odo-36-8-dqw4w9wxcq/');
+        ], new PublicUrlResult('/video/odo-36-8-dqw4w9wxcq/', true, identityRevision: 9));
 
         self::assertSame('VideoObject', $projection['video_object']['@type']);
         self::assertSame('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', $projection['video_object']['embedUrl']);
         self::assertSame('PT7M', $projection['video_object']['duration']);
-        self::assertSame('https://nhk.example/video/odo-36-8-dqw4w9wxcq/', $projection['canonical']);
+        self::assertSame('/video/odo-36-8-dqw4w9wxcq/', $projection['canonical']);
         self::assertArrayNotHasKey('canonical_id', $projection['video_object']);
     }
 

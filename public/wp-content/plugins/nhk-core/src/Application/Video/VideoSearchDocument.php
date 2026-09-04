@@ -31,7 +31,7 @@ final class VideoSearchDocument
     public function publicUrl(Video $video): ?string
     {
         $result = ($this->policy ?? new VideoUrlPolicy($this->identities))->project($video, new VideoPublicContextSelector());
-        $projected = (new PublicSeoProjection())->project(new \NHK\Core\Domain\PublicIdentity\PublicUrlResult($result['path'], $result['eligible'], $result['blockers'], $result['warnings']), ['type' => 'VideoObject']);
+        $projected = (new PublicSeoProjection())->project($result, ['type' => 'VideoObject']);
         return $projected['indexable'] ? $projected['canonical'] : null;
     }
 

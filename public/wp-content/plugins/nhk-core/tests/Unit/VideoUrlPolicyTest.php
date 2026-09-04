@@ -31,8 +31,8 @@ final class VideoUrlPolicyTest extends TestCase
 
         $result = (new VideoUrlPolicy($this->repository('odo-36-10-gai-carillon'), ...$this->governance()))->project($video, new VideoPublicContextSelector());
 
-        self::assertTrue($result['eligible']);
-        self::assertSame('/video/odo-36-10-gai-carillon-p4kahx3lbow/', $result['path']);
+        self::assertTrue($result->eligible);
+        self::assertSame('/video/odo-36-10-gai-carillon-p4kahx3lbow/', $result->finalPath);
     }
 
     public function test_source_title_changes_do_not_change_the_persisted_video_url(): void
@@ -45,10 +45,7 @@ final class VideoUrlPolicyTest extends TestCase
             'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222', 'target_type' => 'brand', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']], 'approved' => true]],
         ]);
 
-        self::assertSame(
-            '/video/odo-36-10-gai-carillon-p4kahx3lbow/',
-            (new VideoUrlPolicy($this->repository('odo-36-10-gai-carillon'), ...$this->governance()))->project($video, new VideoPublicContextSelector())['path'],
-        );
+        self::assertSame('/video/odo-36-10-gai-carillon-p4kahx3lbow/', (new VideoUrlPolicy($this->repository('odo-36-10-gai-carillon'), ...$this->governance()))->project($video, new VideoPublicContextSelector())->finalPath);
     }
 
     public function test_context_selector_uses_governed_context_before_editorial_and_user_hint(): void
@@ -85,16 +82,16 @@ final class VideoUrlPolicyTest extends TestCase
 
         $result = (new VideoUrlPolicy($this->repository('missing'), ...$this->governance()))->project($video, new VideoPublicContextSelector());
 
-        self::assertFalse($result['eligible']);
-        self::assertContains('PUBLIC_IDENTITY_NOT_FOUND', $result['blockers']);
+        self::assertFalse($result->eligible);
+        self::assertContains('PUBLIC_IDENTITY_NOT_FOUND', $result->blockers);
     }
 
     public function test_arbitrary_metadata_identity_cannot_mint_a_public_url(): void
     {
         $video = Video::fromUrl('https://youtu.be/P4KaHX3LBOw', 'Marketing title', ['public_identity' => ['current_slug' => 'forged'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true]] , null, self::VIDEO_ID);
         $result = (new VideoUrlPolicy($this->repository('missing'), ...$this->governance()))->project($video, new VideoPublicContextSelector());
-        self::assertFalse($result['eligible']);
-        self::assertContains('PUBLIC_IDENTITY_NOT_FOUND', $result['blockers']);
+        self::assertFalse($result->eligible);
+        self::assertContains('PUBLIC_IDENTITY_NOT_FOUND', $result->blockers);
     }
 
     public function test_incomplete_source_snapshot_cannot_mint_a_public_url(): void
@@ -109,16 +106,16 @@ final class VideoUrlPolicyTest extends TestCase
 
         $result = (new VideoUrlPolicy($this->repository('odo-36-10-gai-carillon'), ...$this->governance()))->project($video, new VideoPublicContextSelector());
 
-        self::assertFalse($result['eligible']);
-        self::assertContains('SOURCE_SNAPSHOT_INVALID', $result['blockers']);
+        self::assertFalse($result->eligible);
+        self::assertContains('SOURCE_SNAPSHOT_INVALID', $result->blockers);
     }
 
     public function test_unregistered_target_and_unusable_evidence_block_projection(): void
     {
         $video = $this->validVideo(['target_id' => '44444444-4444-4444-8444-444444444444', 'target_type' => 'brand', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '55555555-5555-4555-8555-555555555555']], 'approved' => true]);
         $result = (new VideoUrlPolicy($this->repository('odo-36-10-gai-carillon'), ...$this->governance(false)))->project($video, new VideoPublicContextSelector());
-        self::assertFalse($result['eligible']);
-        self::assertContains('SEMANTIC_ATTACHMENT_UNUSABLE', $result['blockers']);
+        self::assertFalse($result->eligible);
+        self::assertContains('SEMANTIC_ATTACHMENT_UNUSABLE', $result->blockers);
     }
 
     private function validVideo(array $attachment): Video

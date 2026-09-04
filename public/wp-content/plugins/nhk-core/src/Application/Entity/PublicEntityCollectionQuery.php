@@ -15,12 +15,12 @@ final class PublicEntityCollectionQuery
     public function types(): EntityTypeRegistry { return $this->types; }
 
     /** @return array{available:bool,type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
-    public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
+    public function archive(string $type, int $page = 1, int $perPage = 24, string $query = '', bool $includeUrlResult = false): array
     {
         $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $query = trim($query); $items = [];
         if (!$this->isAvailable() || !$this->types->has($type)) return ['available' => $this->isAvailable(), 'type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
         foreach ($this->authority->listByType($type, true) as $entity) {
-            $item = $this->item($entity, $query);
+            $item = $this->item($entity, $query, $includeUrlResult);
             if ($item !== null) $items[] = $item;
         }
         return ['available' => true, 'type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => count($items), 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
@@ -82,7 +82,7 @@ final class PublicEntityCollectionQuery
     }
 
     /** @return array<string,mixed>|null */
-    private function item(AuthorityEntity $entity, string $query = ''): ?array
+    private function item(AuthorityEntity $entity, string $query = '', bool $includeUrlResult = false): ?array
     {
         $decision = $this->eligibility->evaluate($entity);
         if (!$decision->eligible) return null;
@@ -92,6 +92,7 @@ final class PublicEntityCollectionQuery
         $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
         $item = [...$identity, 'payload' => $payload, 'url' => $path];
+        if ($includeUrlResult) $item['_public_url_result'] = $this->routes->result($entity);
         if ($this->aggregation !== null && $entity->entityType === 'brand') $item['aggregation'] = $this->aggregation->forBrand($entity->canonicalId);
         return $item;
     }

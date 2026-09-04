@@ -26,15 +26,18 @@ final class SearchSemanticQuery
             foreach (['entities', 'media', 'videos', 'knowledge'] as $group) { $groups[$group] = []; $groups['_totals'][$group] = 0; }
             return $groups;
         }
-        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->collection()->archive($definition->type, 1, 100, $term)['items'] as $item) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => function_exists('home_url') ? home_url($item['url']) : $item['url']];
-        if ($this->ready('media')) foreach ($this->media->list() as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => home_url($path)];
+        if ($this->ready('authority')) foreach ($this->types->all() as $definition) foreach ($this->collection()->archive($definition->type, 1, 100, $term, true)['items'] as $item) {
+            $projection = (new PublicSeoProjection())->project($item['_public_url_result'], ['type' => $item['type'], 'title' => $item['name']]);
+            if ($projection['search'] !== null) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => function_exists('home_url') ? home_url($projection['search']) : $projection['search']];
+        }
+        // Media has delivery URLs, not a governed public detail route.
         if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority, $this->identities, $this->videoPolicy); foreach ($this->videos->list() as $item) {
             if (!$item->active || !$item->hasValidPublicReference() || !$videoSearch->isDiscoverable($item)) continue;
             $title = $videoSearch->title($item); $path = $videoSearch->publicUrl($item);
             if ($path !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($path) : $path];
         }
         }
-        if ($this->ready('knowledge')) foreach ($this->claims->list() as $item) if ($item->active && $item->isPublic() && ($path = PublicRouteResolver::existingSemanticPath('knowledge', $item->canonicalId)) !== null && $this->matches($term, $item->claimText, $item->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => home_url($path)];
+        // Atomic Knowledge claims are projection fragments, not public detail routes.
         $offset = ($page - 1) * $perPage;
         $groups['_totals'] = [];
         foreach (['entities', 'media', 'videos', 'knowledge'] as $group) {

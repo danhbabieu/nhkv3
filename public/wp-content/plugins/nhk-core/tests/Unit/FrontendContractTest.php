@@ -38,6 +38,44 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('get_permalink()', (string) file_get_contents($theme . '/functions.php'));
         self::assertStringContainsString('wp-sitemap', (string) file_get_contents($root . '/src/Infrastructure/Http/PublicVideoSitemapRoutes.php'));
     }
+
+    public function test_task6_passes_one_governed_url_result_without_reconstructing_routes(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $seo = (string) file_get_contents($root . '/src/Application/Video/VideoSeoProjection.php');
+        self::assertStringContainsString('project(array $package, PublicUrlResult $watchUrl)', $seo);
+        self::assertStringNotContainsString('string|PublicUrlResult', $seo);
+        self::assertStringNotContainsString('new PublicUrlResult(', $seo);
+
+        $readApi = (string) file_get_contents($root . '/src/Infrastructure/Http/ReadApi.php');
+        self::assertStringContainsString("'public_url'", $readApi);
+        self::assertStringNotContainsString("'url' => $video->canonicalUrl", $readApi);
+
+        $search = (string) file_get_contents($root . '/src/Application/Search/SearchSemanticQuery.php');
+        self::assertStringNotContainsString("existingSemanticPath('media'", $search);
+        self::assertStringNotContainsString("existingSemanticPath('knowledge'", $search);
+        self::assertStringNotContainsString("'media'][]", $search);
+        self::assertStringNotContainsString("'knowledge'][]", $search);
+    }
+
+    public function test_task6_sitemap_and_video_page_share_policy_result_and_theme_has_no_raw_semantic_routes(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $sitemap = (string) file_get_contents($root . '/src/Application/Video/VideoSitemapProjection.php');
+        self::assertStringContainsString('use NHK\\Core\\Domain\\PublicIdentity\\PublicUrlResult;', $sitemap);
+        self::assertStringNotContainsString('new PublicUrlResult(', $sitemap);
+        $page = (string) file_get_contents($root . '/src/Application/Media/MediaVideoPageQuery.php');
+        self::assertStringContainsString('PublicUrlResult', $page);
+        self::assertStringNotContainsString('home_url((string) $publicUrl)', $page);
+
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['functions.php', 'index.php', 'entity.php', 'video.php', 'media.php', 'template-parts/article-card.php'] as $file) {
+            $contents = (string) file_get_contents($theme . '/' . $file);
+            self::assertStringNotContainsString("home_url('/video/'", $contents, $file);
+            self::assertStringNotContainsString("home_url('/media/'", $contents, $file);
+            self::assertStringNotContainsString("home_url('/thu-vien/'", $contents, $file);
+        }
+    }
     public function test_homepage_uses_query_service_and_semantic_modules_are_not_fixture_lists(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

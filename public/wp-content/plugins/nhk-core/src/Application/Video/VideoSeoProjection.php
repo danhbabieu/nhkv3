@@ -9,11 +9,10 @@ use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
 final class VideoSeoProjection
 {
     /** @param array<string,mixed> $package @return array<string,mixed> */
-    public function project(array $package, string|PublicUrlResult $watchUrl): array
+    public function project(array $package, PublicUrlResult $watchUrl): array
     {
-        $canonical = $watchUrl instanceof PublicUrlResult ? $watchUrl->finalPath : $watchUrl;
-        $result = $watchUrl instanceof PublicUrlResult ? $watchUrl : new PublicUrlResult(parse_url($watchUrl, PHP_URL_PATH) ?: $watchUrl, true);
-        $projection = (new PublicSeoProjection())->project($result, ['title' => $package['seo']['title'] ?? $package['editorial']['title'] ?? '', 'description' => $package['seo']['description'] ?? $package['editorial']['summary'] ?? '', 'type' => 'VideoObject']);
+        $canonical = $watchUrl->finalPath;
+        $projection = (new PublicSeoProjection())->project($watchUrl, ['title' => $package['seo']['title'] ?? $package['editorial']['title'] ?? '', 'description' => $package['seo']['description'] ?? $package['editorial']['summary'] ?? '', 'type' => 'VideoObject']);
         $watchPath = (string) $canonical;
         $source = is_array($package['source'] ?? null) ? $package['source'] : [];
         $editorial = is_array($package['editorial'] ?? null) ? $package['editorial'] : [];
@@ -48,7 +47,7 @@ final class VideoSeoProjection
             'canonical' => $canonical,
             'indexable' => $projection['indexable'],
             'open_graph' => [...$projection['open_graph'], 'type' => 'video.other'],
-            'video_object' => $object,
+            'video_object' => $watchUrl->eligible ? $object : [],
         ];
     }
 

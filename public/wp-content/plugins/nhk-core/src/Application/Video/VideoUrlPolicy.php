@@ -9,6 +9,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, SourceRepository};
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Graph\PredicateRegistry;
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoUrlPolicy
@@ -17,8 +18,7 @@ final class VideoUrlPolicy
     {
     }
 
-    /** @return array{path:?string,eligible:bool,blockers:list<string>,warnings:list<string>} */
-    public function project(Video $video, VideoPublicContextSelector $selector): array
+    public function project(Video $video, VideoPublicContextSelector $selector): PublicUrlResult
     {
         $metadata = is_array($video->metadata) ? $video->metadata : [];
         $blockers = [];
@@ -51,12 +51,13 @@ final class VideoUrlPolicy
         $context = $this->context($metadata);
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';
         $eligible = $blockers === [];
-        return [
-            'path' => $eligible ? '/video/' . $slug . '-' . strtolower($video->externalVideoId) . '/' : null,
-            'eligible' => $eligible,
-            'blockers' => array_values(array_unique($blockers)),
-            'warnings' => [],
-        ];
+        return new PublicUrlResult(
+            $eligible ? '/video/' . $slug . '-' . strtolower($video->externalVideoId) . '/' : null,
+            $eligible,
+            array_values(array_unique($blockers)),
+            [],
+            $identity?->revision,
+        );
     }
 
     private function hasApprovedAttachment(mixed $attachments): bool

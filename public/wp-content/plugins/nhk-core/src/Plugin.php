@@ -119,11 +119,12 @@ final class Plugin {
             $publicClaims = new WpdbKnowledgeRepository($wpdb);
             $publicSources = new WpdbSourceRepository($wpdb);
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
-            add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus, $publicRoutes, $publicCollection), 'extend'], 10, 3);
-            $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicEligibility);
+            $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
+            add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, $publicIdentityRepository), 'extend'], 10, 3);
+            $publicVideoPolicy = new \NHK\Core\Application\Video\VideoUrlPolicy($publicIdentityRepository, $publicAuthority, $publicTypes, $publicEvidence, $publicSources, new PredicateRegistry());
+            $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicEligibility, null, null, $publicIdentityRepository, $publicVideoPolicy);
             add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2);
             $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
-            $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
             $historicPublicRouteService = new HistoricPublicRouteService($publicIdentityRepository, static function (\NHK\Core\Domain\PublicIdentity\PublicIdentity $identity) use ($publicAuthority, $publicVideos): bool {
                 if ($identity->ownerKind === 'authority') {
                     $entity = $publicAuthority->findByCanonicalId($identity->ownerId);
@@ -170,8 +171,8 @@ final class Plugin {
             add_action('rest_after_insert_attachment', static function (\WP_Post $post, \WP_REST_Request $request, bool $creating) use ($adoptAttachment): void {
                 $adoptAttachment((int) $post->ID);
             }, 20, 3);
-            (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated), $historicPublicRouteService))->register();
-            (new PublicVideoSitemapRoutes($publicVideos, $publicStatus))->register();
+            (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated, $publicIdentityRepository), $historicPublicRouteService))->register();
+            (new PublicVideoSitemapRoutes($publicVideos, $publicStatus, $publicIdentityRepository))->register();
             $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
             if ($mediaRoot === '' && function_exists('wp_upload_dir')) { $upload = wp_upload_dir(); $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : ''; }
             (new PublicMediaAssetRoutes(new \NHK\Core\Application\Media\PublicMediaAssetDelivery($publicAssets, $publicMedia, $mediaRoot)))->register();
@@ -182,7 +183,7 @@ final class Plugin {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
             $media = new WpdbMediaRepository($wpdb); $assets = new WpdbMediaAssetRepository($wpdb); $usages = new WpdbMediaUsageRepository($wpdb); $videos = new WpdbVideoRepository($wpdb); $claims = new WpdbKnowledgeRepository($wpdb); $sources = new WpdbSourceRepository($wpdb); $evidence = new WpdbEvidenceRepository($wpdb); $authority = new WpdbAuthorityRepository($wpdb);
-            (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus()))->register();
+            (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus(), null, new WpdbPublicIdentityRepository($wpdb)))->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
             $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink());

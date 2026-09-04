@@ -79,7 +79,7 @@ final class EntityPageQuery
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
+    private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $projection = (new PublicSeoProjection())->project(($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->result($entity), ['type' => $entity->entityType, 'title' => $entity->canonicalName]); if ($projection['internal_link'] !== null) $item['url'] = $projection['internal_link']; return $item; }
     private function entityForPublicSlug(string $type, string $slug): ?AuthorityEntity
     {
         if (!$this->types->has($type)) return null;

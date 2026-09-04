@@ -8,6 +8,9 @@ use NHK\Core\Application\Graph\PredicateTraversalPolicy;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Application\Entity\PublicEntityEligibilityPolicy;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\NodeReference;
@@ -18,7 +21,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class RelatedContentQuery
 {
-    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null, private ?PublicRouteResolver $routes = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
+    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityEligibilityPolicy $eligibility = null, ?PredicateTraversalPolicy $policy = null, private ?PublicRouteResolver $routes = null, private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $videoPolicy = null) { $this->policy = $policy ?? new PredicateTraversalPolicy(new \NHK\Core\Domain\Graph\PredicateRegistry()); }
     private PredicateTraversalPolicy $policy;
 
     /** @return array{entities:list<array<string,mixed>>,articles:list<array<string,mixed>>,media:list<array<string,mixed>>,videos:list<array<string,mixed>>} */
@@ -86,7 +89,7 @@ final class RelatedContentQuery
         }
         return null;
     }
-    private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
-    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $path = PublicRouteResolver::videoPath($title, $video->externalVideoId); return ['type' => 'video', 'title' => $title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
+    private function mediaValue(Media $media): array { return ['type' => 'media', 'title' => $media->canonicalName, 'url' => '']; }
+    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $url = ($this->videoPolicy ?? new VideoUrlPolicy($this->identities))->project($video, new VideoPublicContextSelector()); $path = (new PublicSeoProjection())->project($url, ['type' => 'VideoObject'])['internal_link']; return ['type' => 'video', 'title' => $title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
     private function entityUrl(AuthorityEntity $entity): ?string { $path = ($this->routes ?? new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? null : (function_exists('home_url') ? home_url($path) : $path); }
 }

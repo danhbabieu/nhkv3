@@ -26,8 +26,9 @@ final class VideoSitemapProjection
             if (($source['availability'] ?? 'unknown') !== 'available') continue;
             if (($video->metadata['indexable'] ?? true) !== true) continue;
             $url = $policy->project($video, $selector);
-            if (!$url['eligible'] || $url['path'] === null) continue;
-            $path = $seo->project(new PublicUrlResult($url['path'], true, $url['blockers'], $url['warnings']), ['type' => 'VideoObject'])['sitemap'];
+            /** @var PublicUrlResult $url */
+            if (!$url->eligible || $url->finalPath === null) continue;
+            $path = $seo->project($url, ['type' => 'VideoObject'])['sitemap'];
             $loc = $baseUrl !== '' ? rtrim($baseUrl, '/') . $path : $path;
             $item = ['loc' => $loc, 'title' => (string) ($video->metadata['editorial']['title'] ?? $video->title), 'description' => (string) ($video->metadata['editorial']['summary'] ?? '')];
             $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';
