@@ -27,6 +27,15 @@ keeps evidence/technical imagery separate. Focused proof: 6 tests / 16
 assertions. No Media identity, asset, usage, Knowledge, Evidence or Graph data
 was written.
 
+## Governed SEO Article intent/gate projection — 2026-09-04
+
+Article slice is complete locally. `ArticleIntentOverlapPlanner` classifies
+differentiated, existing-Article, Entity and Video intent; `ArticleSeoGate`
+requires intent, subject, canonical URL, editorial fields, media,
+compliance and indexability without writing WordPress or semantic state.
+Focused proof: 18 tests / 51 assertions including Article and Living
+Knowledge regressions.
+
 ## Governed SEO sitemap/indexability projection — 2026-09-04
 
 Slice 4 is complete locally. `SitemapIndexabilityProjection` accepts only the
