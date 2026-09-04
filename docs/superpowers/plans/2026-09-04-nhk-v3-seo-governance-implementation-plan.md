@@ -21,6 +21,23 @@
 - Every non-ready decision has deterministic reason codes; numeric SEO scores are never publication truth.
 - Every task follows RED → verify failure → minimal GREEN → regression → `git diff --check`; commit each coherent slice locally.
 
+## Consumer wiring audit — 2026-09-04 continuation
+
+| Consumer | Current source | Target shared policy/projection | Status |
+|---|---|---|---|
+| Theme canonical/OG/structured-data | theme branches and context globals | route `seo_projection`; native `get_permalink()` for Articles | WIRED |
+| Theme robots | local 404/search/pagination branches | `SeoIndexabilityPolicy` plus explicit pagination noindex | WIRED |
+| Entity routes/pages | `PublicRouteResolver` path + route context | `PublicSeoProjection` page package | WIRED |
+| Video routes/pages | `VideoUrlPolicy` result + route context | `PublicSeoProjection` page package and existing Video SEO | WIRED |
+| Search/Home semantic cards | mixed `home_url()`/`videoPath()` derivation | `PublicSeoProjection` surfaces | WIRED |
+| Related/card/breadcrumb links | mixed resolver and direct URL construction | `PublicSeoProjection` internal-link surface | WIRED |
+| REST entity/search serializers | collection, native WP post owner, shared semantic projection | collection-approved URL; native Article permalink | WIRED |
+| Video sitemap | `VideoSitemapProjection` | `SitemapIndexabilityProjection` | WIRED |
+| Native WordPress sitemap | WordPress core ownership | unchanged native owner | PRESERVED |
+| Image sitemap | `ArticleMediaSeoProjection` | existing Article media projection; no MediaAsset detail URL | READ-ONLY / NO NEW WRITER |
+| MediaAsset delivery | delivery route | delivery identity only, no sitemap/page eligibility | PRESERVED |
+| Knowledge detail/public page | no registered public detail projection | `NOT_APPLICABLE`, fail closed | GAP INTENTIONAL |
+
 ---
 
 ### Task 1: Synchronize SEO documentation contracts
