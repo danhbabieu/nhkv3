@@ -6,12 +6,13 @@ namespace NHK\Core\Application\Article;
 use NHK\Core\Domain\Article\ArticleResearchResult;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
+use NHK\Core\Shared\Text\VietnameseSlugNormalizer;
 
 /** Read-only Article research orchestration; injected callbacks are application/repository boundaries. */
 final class ArticleResearchPreflight
 {
     /** @param callable(array<string,mixed>):array $subjectResolver @param callable(array<string,mixed>):array $inventoryReader @param callable(array<string,mixed>):array $publicEligibility */
-    public function __construct(private $subjectResolver, private $inventoryReader, private $publicEligibility) {}
+    public function __construct(private $subjectResolver, private $inventoryReader, private $publicEligibility, private ?VietnameseSlugNormalizer $slugNormalizer = null) {}
 
     public function research(string $topic, array $subject = []): ArticleResearchResult
     {
@@ -59,5 +60,5 @@ final class ArticleResearchPreflight
             elseif (($claim['legacy'] ?? false) === true && $status !== 'SUPPORTED_WITHIN_SCOPE') $warnings[] = 'LEGACY_EVIDENCE_DEBT';
         }
     }
-    private function slug(string $value): string { $value = function_exists('remove_accents') ? remove_accents($value) : $value; return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-') ?: 'article'; }
+    private function slug(string $value): string { $result = ($this->slugNormalizer ?? new VietnameseSlugNormalizer(191))->normalize($value); return $result->isValid() ? $result->value() : 'article'; }
 }

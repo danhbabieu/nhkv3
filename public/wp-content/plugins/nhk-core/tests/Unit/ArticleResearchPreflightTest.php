@@ -84,4 +84,31 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertContains('PUBLIC_CLAIM_EVIDENCE_REQUIRED', $result->blockers);
         self::assertFalse($result->readyForDraft);
     }
+
+    public function test_new_article_slug_uses_shared_vietnamese_normalization_once(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'brand-1', 'type' => 'brand']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [], 'categories' => [['slug' => 'odo']], 'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Phương pháp Ô Đô', ['type' => 'brand', 'name' => 'Odo']);
+
+        self::assertSame('phuong-phap-odo', $result->seoBlueprint['slug_intent']);
+    }
+
+    public function test_article_preflight_never_allocates_an_authority_public_identity(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'brand-1', 'type' => 'brand']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [], 'categories' => [], 'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Bài viết mới', ['type' => 'brand', 'name' => 'Odo']);
+
+        self::assertArrayNotHasKey('public_identity', $result->seoBlueprint);
+        self::assertArrayNotHasKey('authority_public_identity', $result->seoBlueprint);
+    }
 }

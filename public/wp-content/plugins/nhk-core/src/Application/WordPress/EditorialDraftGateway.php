@@ -9,6 +9,7 @@ use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, Edit
 use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Contracts\Article\{OwnerPublicationService, PublicationPrincipal};
+use NHK\Core\Shared\Text\VietnameseSlugNormalizer;
 
 final class EditorialDraftGateway
 {
@@ -23,7 +24,15 @@ final class EditorialDraftGateway
         if ($existing !== null) { if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()]; return $this->result($existing, $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId)); }
         $research = is_array($input['research'] ?? null) ? $input['research'] : [];
         if (($research['ready_for_draft'] ?? true) === false) return ['ok' => false, 'reason' => 'RESEARCH_PREFLIGHT_BLOCKED', 'research' => $research];
-        $state = $this->posts->createDraft(['post_title' => (string) ($input['title'] ?? ''), 'post_content' => (string) ($input['content'] ?? ''), 'post_excerpt' => (string) ($input['excerpt'] ?? ''), 'post_author' => (int) ($input['author'] ?? 0)]);
+        $fields = ['post_title' => (string) ($input['title'] ?? ''), 'post_content' => (string) ($input['content'] ?? ''), 'post_excerpt' => (string) ($input['excerpt'] ?? ''), 'post_author' => (int) ($input['author'] ?? 0)];
+        $slug = (string) ($research['seo_blueprint']['slug_intent'] ?? '');
+        if ($slug === '') {
+            $slugSource = (string) ($input['slug'] ?? $fields['post_title']);
+            $normalized = (new VietnameseSlugNormalizer(191))->normalize($slugSource);
+            $slug = $normalized->isValid() ? $normalized->value() : 'article';
+        }
+        if ($slug !== '') $fields['post_name'] = $slug;
+        $state = $this->posts->createDraft($fields);
         $receipt = $this->receipts->create(new ArticleOperationReceipt((string) ($input['operation_id'] ?? UuidCodec::newV7()), $key, $fingerprint, 'create', $state->endpointKey, $state->postId, 'draft', ArticleIngestOutcome::GOVERNANCE_PENDING, false, [], [], [], 1, null, null, $state->token, [], [], [], ['publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION'], 'research' => $research]));
         return $this->result($receipt, $state);
     }
