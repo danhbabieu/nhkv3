@@ -41,7 +41,7 @@ registry/catalog merely because its wording is present tense.
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
 | Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; physical row completeness/backfill is a separate runtime/data question |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
-| Public Identity | Authority identity is distinct from route slug | `PUBLIC_IDENTITY_STORAGE_GAP` remains: current route derivation is not durable current-slug/history/CAS storage |
+| Public Identity | persisted identity/history implementation now exists in code | `PublicIdentityService`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented locally; guarded migration/data allocation/current-route consumer parity remain runtime-unverified, so do not claim durable public identity is live without read-back |
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
 | Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance |
 | Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; planning packet itself performs no Knowledge/Evidence/Graph mutation |
@@ -58,6 +58,8 @@ Every domain has one canonical owner and authorized writer boundary:
 
 - Article editorial state → WordPress editorial gateways/read-back.
 - Authority → Authority service/repository through Governance where semantic.
+- Public Identity → dedicated Public Identity service/repository/history boundary;
+  compatibility route derivation is not a second durable identity writer.
 - Knowledge/Source/Evidence → their canonical services/repositories through
   Governance/Controlled Apply.
 - Graph relations → `GraphService` through governed relation lifecycle.
@@ -90,7 +92,9 @@ Do not rewrite history merely to make old checkpoints look current.
 
 ## 5. Known current gaps that remain intentional
 
-- durable persisted Public Identity/current-slug/history/CAS storage;
+- Public Identity runtime activation/data coverage/current-route consumer parity:
+  implementation exists locally, but guarded migration execution and live
+  allocation/read-back are not proven by the current checkpoint;
 - dedicated Product–Specimen canonical relation;
 - full physical Graph completeness/backfill where not runtime-proven;
 - Media → Living Knowledge automatic enrichment adapter;
