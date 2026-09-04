@@ -10,92 +10,97 @@ write V2, import data, or repair Graph relations.
 ## Current runtime matrix
 
 The runtime registry is the source of the type list. The current catalog has
-nine Authority types. The constitutional target is a persisted Public Identity
-consumed by one route resolver; the current implementation still uses
-`PublicRouteResolver` read-time derivation from `canonical_name`, with no durable
-current-slug/CAS/history repository. This is a `PUBLIC_IDENTITY_STORAGE_GAP` /
-`CODE_GAP`, not a completed public-identity implementation.
+nine Authority types. The persisted Public Identity implementation boundary now
+exists in code: `PublicIdentityService`, `PublicIdentityRepository`, WPDB
+persistence, additive migration 014, history records and exact one-hop historic
+route resolution are present. Focused unit evidence exists, but migration 014
+was not executed in the guarded runtime when that implementation checkpoint was
+recorded, and this audit does not prove that live/current canonical routes are
+fully allocated from persisted identities in the target environment.
 
-| Type | Internal identity | Display name source | Public slug source | Canonical pattern | Parent requirement | Legacy pattern / redirect | Indexable | List query | Detail query | Fail-closed reasons |
-|---|---|---|---|---|---|---|---|---|---|---|
-| brand | `canonical_uuid` / `stable_key` | `canonical_name` | `PublicRouteResolver::slug(canonical_name)` | `/{brand-slug}/` | none | V2-style bare slug may be resolved and redirected to the same resolver output when the match is unique; historic alias registry not implemented | yes when active, slug valid, unambiguous, non-reserved | `EntityPageQuery::archive('brand')`, active rows; does not require non-null route in the archive item itself | UUID/stable-key detail, active-only; route detail resolves by current derived slug | inactive, empty/invalid slug, reserved root, duplicate slug, hydration loss, unavailable storage |
-| model | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/{brand-slug}/{model-slug}/` | active `payload.brand_uuid` resolving to active brand for current route compatibility; canonical structural vocabulary is `model_of` | legacy two-segment slug redirect only when both current derived slug matches are unique; no historic alias table | yes only with active canonical parent and unique child slug | active rows; parent/route eligibility is not centralized in the archive contract | UUID/stable-key detail is active-only; public nested route requires active parent and unique child | missing/invalid parent, inactive parent, duplicate child slug, invalid slug, hydration loss, unavailable storage |
-| variant | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/{brand-slug}/{model-slug}/{variant-slug}/` | active `payload.model_uuid` resolving through active model/brand for current route compatibility; canonical structural vocabulary is `variant_of` | no dedicated legacy variant redirect contract | yes only with active canonical parent chain and unique child slug | active rows; parent/route eligibility is not centralized in the archive contract | UUID/stable-key detail is active-only; nested public route requires parent chain and unique variant slug | missing/invalid parent chain, inactive ancestor, duplicate child slug, invalid slug, hydration loss, unavailable storage |
-| movement | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/bo-may/{movement-slug}/` | none in route resolver | `/bo-may/` namespace; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| music | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/ban-nhac/{music-slug}/` | none; missing Brand relation must not block route | `/am-nhac/` archive alias; no historic entity-slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| component | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/linh-kien/{component-slug}/` | none | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| classification | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/phan-loai/{classification-slug}/` | none | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| specimen | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/hien-vat/{specimen-slug}/` | none in current public resolver; any compatibility `model_uuid` payload is not a substitute for canonical Graph structure | `/hien-vat/` archive alias; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| product | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/san-pham/{product-slug}/` | none in current public resolver; no approved Product–Specimen canonical relation exists | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
+Accordingly, **missing implementation is no longer the correct classification**.
+The remaining boundary is runtime activation/data/read-back parity: until the
+migration, allocation/current identity rows and consumers are verified in the
+actual environment, downstream systems must not claim durable public identity
+is live merely because the repository/service exists.
+
+Current route compatibility may still derive paths from `canonical_name` where
+no persisted Public Identity has been allocated/consumed. That compatibility
+behavior is not authorization to regenerate a published durable slug silently.
+
+| Type | Internal identity | Current compatibility slug source | Canonical pattern | Parent requirement | Legacy/history behavior | Public eligibility note |
+|---|---|---|---|---|---|---|
+| brand | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise current compatibility derivation from `canonical_name` | `/{brand-slug}/` | none | persisted history implementation supports exact one-hop lookup when rows exist; older V2 redirect data is migration evidence, not the general identity store | active, valid, unambiguous route required |
+| model | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; compatibility route currently may use name-derived slug | `/{brand-slug}/{model-slug}/` | current route compatibility still resolves `payload.brand_uuid`; canonical structural vocabulary is `model_of` | exact persisted history is a separate identity/history boundary when allocated | active parent and unique valid route required |
+| variant | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; compatibility route currently may use name-derived slug | `/{brand-slug}/{model-slug}/{variant-slug}/` | current route compatibility still resolves `payload.model_uuid`; canonical structural vocabulary is `variant_of` | exact persisted history is a separate identity/history boundary when allocated | active ancestor chain and unique valid route required |
+| movement | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise compatibility derivation | `/bo-may/{movement-slug}/` | none in route resolver | persisted exact one-hop history when rows exist | active + unique valid route |
+| music | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise compatibility derivation | `/ban-nhac/{music-slug}/` | none; missing Brand relation must not block route | persisted exact one-hop history when rows exist | active + unique valid route |
+| component | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise compatibility derivation | `/linh-kien/{component-slug}/` | none | persisted exact one-hop history when rows exist | active + unique valid route |
+| classification | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise compatibility derivation | `/phan-loai/{classification-slug}/` | none | persisted exact one-hop history when rows exist | active + unique valid route |
+| specimen | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise compatibility derivation | `/hien-vat/{specimen-slug}/` | no Product ownership implied; compatibility `model_uuid` is not Graph truth | persisted exact one-hop history when rows exist | active + unique valid route |
+| product | `canonical_uuid` / `stable_key` | persisted identity when allocated/consumed; otherwise compatibility derivation | `/san-pham/{product-slug}/` | no approved Product–Specimen canonical relation exists | persisted exact one-hop history when rows exist | active + unique valid route |
 
 ## Evidence-backed contract findings
 
-1. Authority identity is separate from the current URL string, but the URL
-   slug is not persistent. A display-name update changes the URL generated by
-   every read. This is a `SLUG_CONTRACT_FAILURE` / `DATA-CODE CONTRACT GAP`,
-   not evidence of missing Authority rows.
-2. The current resolver has no one-hop historical-slug lookup. Existing V2
-   redirect persistence is migration-owned (`nhk_v2_entity_redirects`) and is
-   not a general Authority slug-history service. A historic URL therefore
-   cannot be proven to redirect from the Authority contract alone.
-3. `EntityPageQuery::detail()` and `EntityPageQuery::archive()` do not share a
-   single public eligibility predicate. Detail requires type, storage-ready,
-   resolvable identity and active state. Archive enumerates active rows and
-   serializes them even when `publicPath()` is null. REST list is another
-   active-only path and does not attach canonical URLs. This is a
-   `PUBLIC_ELIGIBILITY_FAILURE` / `CODE_GAP` candidate when a UI path filters
-   URL-less serialized items.
+1. Authority identity remains separate from the URL string. Persisted Public
+   Identity storage/history is now implemented in code, including optimistic
+   revision/idempotency and exact one-hop history. The outstanding question is
+   environment activation and allocation/read-back, not whether a repository
+   implementation exists.
+2. The historic route service resolves persisted history exactly and one hop.
+   This does not prove every historical V2/current route has a corresponding
+   persisted identity/history row; coverage remains a data/runtime question.
+3. Current route/query compatibility is not yet proven to consume persisted
+   identity for every entity path in the target runtime. Any fallback derived
+   from `canonical_name` must be treated as compatibility behavior, not durable
+   slug ownership after publication.
 4. `PredicateRegistry` currently registers `model_of` (`model` → `brand`, ONE)
    and `variant_of` (`variant` → `model`, ONE), together with the other approved
    technical predicates. Physical Graph backfill/completeness is a separate
-   data/runtime question. Current route resolution still consumes compatibility
-   parent UUID payload fields; those fields must not be described as the
-   canonical Graph writer or as proof that structural edges are present.
+   data/runtime question. Current route compatibility may still consume parent
+   UUID payload fields; those fields are not the canonical Graph writer and do
+   not prove structural edges are present.
 5. Product–Specimen remains a separate `REGISTRY_GAP` / contract-extension
    requirement. Historical `specimen_uuid`-style payload data, broad `about`,
    taxonomy or post meta must not be interpreted as a canonical ownership link.
 6. Music has no route-level Brand requirement in the current resolver. A
    missing Brand relation must not hide a legitimate active Music row.
 
-## Required audit output when runtime access is available
+## Required audit output when guarded runtime access is available
 
-The following fields remain `UNVERIFIED` in this workspace because staging DNS
-and the local WordPress database were unavailable during the audit:
+Verify, do not infer:
 
-* `/odo/` HTTP status, `Location`, final URL, redirect count, generated HTML,
-  cache headers, title, H1 and canonical tag;
-* physical, hydrated, list, public, slug, duplicate, invalid-slug and
-  resolvable counts for each registered type;
-* the exact `/odo/` entity UUID, revision, state, stored source, aliases and
-  current database value;
-* the per-entity exclusion reason and counts for state, route ambiguity,
-  parent completeness and hydration errors;
-* Knowledge, Media, Video, Source/Evidence and native Post physical-to-public
-  parity counts using their own repositories.
+* migration 014 current/target state and schema in the exact guarded database;
+* persisted identity/current-history row counts and owner coverage by type;
+* allocation/read-back for representative Authority and Video identities;
+* exact one-hop redirect from a persisted historical path to its current path;
+* collision/native-route/CAS/idempotency behavior against the real database;
+* which public route consumers use persisted identity versus compatibility
+  derivation;
+* `/odo/` and representative nested/entity/video HTTP status, redirect count,
+  final URL, title/H1/canonical and no redirect loop;
+* per-entity exclusion reasons for inactive, ambiguous, unallocated or invalid
+  public identities.
 
-The attempted read-only probe failed before HTTP with DNS error
-`Could not resolve host: demo.1945.vn`; it is not valid evidence that `/odo/`
-is a 404 or that the Brand row is absent. Local application preflight is
-already documented as database-unavailable in `V3_EXECUTION_STATE.md`.
+No failure of DNS/database availability is evidence that the underlying
+Authority or Public Identity row is absent.
 
 ## Root-cause classification status
 
 | Classification | Status | Evidence |
 |---|---|---|
-| STORAGE_FAILURE | not established | no staging or local DB response |
-| HYDRATION_FAILURE | not established for current rows | bounded hydrator tests pass; live counts unavailable |
-| REGISTRY_FAILURE | not established | all nine catalog definitions load locally; approved structural predicates are registered |
-| SLUG_CONTRACT_FAILURE | established as code gap | slug is regenerated from `canonical_name`; no persisted history contract |
-| ROUTE_FAILURE | plausible, not endpoint-proven | resolver fail-closes ambiguity/reserved roots and nested parents |
-| PUBLIC_ELIGIBILITY_FAILURE | established as contract divergence | list/archive/detail use different route/eligibility conditions |
-| STRUCTURAL_RELATION_GAP | data/backfill/runtime completeness gap | `model_of` / `variant_of` vocabulary is registered, but this audit does not prove physical edges are populated for all entities; route compatibility still uses parent payload UUIDs |
+| PUBLIC_IDENTITY_IMPLEMENTATION | present locally | service/repository, WPDB persistence, migration 014 and historic resolver exist in current code |
+| PUBLIC_IDENTITY_RUNTIME_ACTIVATION | unverified / runtime-gated | implementation checkpoint recorded migration 014 not executed because guarded DB runtime was unavailable |
+| PUBLIC_IDENTITY_DATA_COVERAGE | unverified | this audit does not prove allocation/current/history rows for all public entities |
+| CURRENT_ROUTE_CONSUMER_PARITY | partial/unverified | compatibility routing may still derive from canonical name where persisted identity is absent/not consumed |
+| HISTORIC_ONE_HOP_RESOLUTION | implemented locally | exact persisted-history lookup and 301 route integration are present; live DB/HTTP proof remains separate |
+| REGISTRY_FAILURE | not established | all nine Authority definitions load; approved structural predicates are registered |
+| STRUCTURAL_RELATION_GAP | data/backfill/runtime completeness gap | `model_of` / `variant_of` vocabulary is registered; physical edge coverage is not proven here |
 | PRODUCT_SPECIMEN_RELATION_GAP | established contract/registry gap | no dedicated approved Product–Specimen relation; payload/about shortcuts are not canonical ownership |
-| CACHE_STALENESS | unverified | staging response unavailable; no purge performed |
-| CODE_VERSION_PARITY_FAILURE | unverified | no staging headers/body or deployment revision |
-| DATA_COMPATIBILITY_GAP | possible, not row-proven | live stored slug/alias fields unavailable |
-| CONSTITUTION_CONFLICT | applies if compatibility payload parent fields are treated as canonical Graph persistence | constitution requires registered typed relations and governed writes |
+| CACHE_STALENESS | unverified | requires target-environment response evidence |
+| CODE_VERSION_PARITY_FAILURE | unverified | requires deployed revision/read-back evidence |
+| CONSTITUTION_CONFLICT | applies if compatibility payload/derived-route behavior is promoted as canonical persistence contrary to approved contracts | compatibility is not a second semantic/public-identity writer |
 
-No corrective data action is authorized by this report. Slug assignment,
-alias-history persistence, redirect changes and Graph repair require a follow-up
-contract/implementation decision after runtime counts and the `/odo/` response
-are captured.
+No corrective live-data action is authorized by this matrix. Allocation,
+migration execution, slug/history population, redirect/data repair and Graph
+backfill require their applicable runtime/governance gates and read-back.
