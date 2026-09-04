@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Article;
 
 use NHK\Core\Domain\Article\ArticleResearchResult;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 /** Read-only Article research orchestration; injected callbacks are application/repository boundaries. */
 final class ArticleResearchPreflight

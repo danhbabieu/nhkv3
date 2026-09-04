@@ -10,6 +10,7 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Shared\Migration\MigrationStatus;
 

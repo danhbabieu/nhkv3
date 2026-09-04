@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Seo\PublicSeoProjection;
+
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
@@ -29,7 +31,8 @@ final class VideoSearchDocument
     public function publicUrl(Video $video): ?string
     {
         $result = ($this->policy ?? new VideoUrlPolicy($this->identities))->project($video, new VideoPublicContextSelector());
-        return $result['eligible'] ? $result['path'] : null;
+        $projected = (new PublicSeoProjection())->project(new \NHK\Core\Domain\PublicIdentity\PublicUrlResult($result['path'], $result['eligible'], $result['blockers'], $result['warnings']), ['type' => 'VideoObject']);
+        return $projected['indexable'] ? $projected['canonical'] : null;
     }
 
     /** @return list<string> */

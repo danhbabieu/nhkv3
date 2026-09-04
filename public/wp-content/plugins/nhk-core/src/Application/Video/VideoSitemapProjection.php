@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
@@ -15,6 +17,7 @@ final class VideoSitemapProjection
     public function project(array $videos, string $baseUrl = ''): array
     {
         $items = [];
+        $seo = new PublicSeoProjection();
         $policy = $this->policy ?? new VideoUrlPolicy($this->identities);
         $selector = new VideoPublicContextSelector();
         foreach ($videos as $video) {
@@ -24,7 +27,7 @@ final class VideoSitemapProjection
             if (($video->metadata['indexable'] ?? true) !== true) continue;
             $url = $policy->project($video, $selector);
             if (!$url['eligible'] || $url['path'] === null) continue;
-            $path = $url['path'];
+            $path = $seo->project(new PublicUrlResult($url['path'], true, $url['blockers'], $url['warnings']), ['type' => 'VideoObject'])['sitemap'];
             $loc = $baseUrl !== '' ? rtrim($baseUrl, '/') . $path : $path;
             $item = ['loc' => $loc, 'title' => (string) ($video->metadata['editorial']['title'] ?? $video->title), 'description' => (string) ($video->metadata['editorial']['summary'] ?? '')];
             $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';

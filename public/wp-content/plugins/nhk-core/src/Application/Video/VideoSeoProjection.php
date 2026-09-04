@@ -3,11 +3,18 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Domain\PublicIdentity\PublicUrlResult;
+
 final class VideoSeoProjection
 {
     /** @param array<string,mixed> $package @return array<string,mixed> */
-    public function project(array $package, string $watchUrl): array
+    public function project(array $package, string|PublicUrlResult $watchUrl): array
     {
+        $canonical = $watchUrl instanceof PublicUrlResult ? $watchUrl->finalPath : $watchUrl;
+        $result = $watchUrl instanceof PublicUrlResult ? $watchUrl : new PublicUrlResult(parse_url($watchUrl, PHP_URL_PATH) ?: $watchUrl, true);
+        $projection = (new PublicSeoProjection())->project($result, ['title' => $package['seo']['title'] ?? $package['editorial']['title'] ?? '', 'description' => $package['seo']['description'] ?? $package['editorial']['summary'] ?? '', 'type' => 'VideoObject']);
+        $watchPath = (string) $canonical;
         $source = is_array($package['source'] ?? null) ? $package['source'] : [];
         $editorial = is_array($package['editorial'] ?? null) ? $package['editorial'] : [];
         $seo = is_array($package['seo'] ?? null) ? $package['seo'] : [];
@@ -16,7 +23,7 @@ final class VideoSeoProjection
             '@context' => 'https://schema.org', '@type' => 'VideoObject',
             'name' => (string) ($editorial['title'] ?? $seo['title'] ?? ''),
             'description' => (string) ($editorial['summary'] ?? $seo['description'] ?? ''),
-            'url' => $watchUrl,
+            'url' => $watchPath,
             'embedUrl' => preg_match('/^[A-Za-z0-9_-]{11}$/', $id) === 1 ? 'https://www.youtube-nocookie.com/embed/' . $id : null,
         ];
         if (($source['published_at'] ?? null) !== null && (string) $source['published_at'] !== '') $object['uploadDate'] = (string) $source['published_at'];
@@ -31,16 +38,16 @@ final class VideoSeoProjection
                 $end = isset($chapters[$index + 1]['start_seconds']) ? (int) $chapters[$index + 1]['start_seconds'] : (isset($source['duration_seconds']) ? (int) $source['duration_seconds'] : 0);
                 $start = (int) $chapter['start_seconds'];
                 if ($end <= $start) continue;
-                $parts[] = ['@type' => 'Clip', 'name' => (string) $chapter['label'], 'startOffset' => $start, 'endOffset' => $end, 'url' => rtrim($watchUrl, '#') . '#t=' . $start];
+                $parts[] = ['@type' => 'Clip', 'name' => (string) $chapter['label'], 'startOffset' => $start, 'endOffset' => $end, 'url' => rtrim($watchPath, '#') . '#t=' . $start];
             }
             if ($parts !== []) $object['hasPart'] = $parts;
         }
         return [
             'title' => (string) ($seo['title'] ?? $editorial['title'] ?? ''),
             'description' => (string) ($seo['description'] ?? $editorial['summary'] ?? ''),
-            'canonical' => $watchUrl,
-            'indexable' => true,
-            'open_graph' => ['title' => (string) ($seo['title'] ?? $editorial['title'] ?? ''), 'description' => (string) ($seo['description'] ?? $editorial['summary'] ?? ''), 'url' => $watchUrl, 'type' => 'video.other'],
+            'canonical' => $canonical,
+            'indexable' => $projection['indexable'],
+            'open_graph' => [...$projection['open_graph'], 'type' => 'video.other'],
             'video_object' => $object,
         ];
     }

@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class EntityPageQuery
 {

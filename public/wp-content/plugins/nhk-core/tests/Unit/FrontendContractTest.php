@@ -7,6 +7,37 @@ use PHPUnit\Framework\TestCase;
 
 final class FrontendContractTest extends TestCase
 {
+    public function test_task6_consumers_share_public_seo_projection_and_keep_native_wordpress_independent(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $files = [
+            $root . '/src/Application/Video/VideoSeoProjection.php',
+            $root . '/src/Application/Video/VideoSitemapProjection.php',
+            $root . '/src/Application/Video/VideoSearchDocument.php',
+            $root . '/src/Application/Search/SearchSemanticQuery.php',
+            $root . '/src/Application/Entity/EntityPageQuery.php',
+            $root . '/src/Application/Entity/PublicEntityCollectionQuery.php',
+            $root . '/src/Application/Article/ArticleResearchPreflight.php',
+            $root . '/src/Infrastructure/Http/SearchApi.php',
+            $root . '/src/Infrastructure/Http/ReadApi.php',
+            $root . '/src/Infrastructure/Http/PublicVideoSitemapRoutes.php',
+        ];
+        foreach ($files as $file) {
+            $contents = (string) file_get_contents($file);
+            self::assertStringContainsString('PublicSeoProjection', $contents, $file);
+            self::assertStringNotContainsString('PublicRouteResolver::slug(', $contents, $file);
+            self::assertStringNotContainsString('PublicRouteResolver::videoPath(', $contents, $file);
+        }
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['functions.php', 'index.php', 'entity.php', 'video.php', 'media.php', 'template-parts/article-card.php'] as $file) {
+            $contents = (string) file_get_contents($theme . '/' . $file);
+            self::assertStringContainsString('seo_projection', $contents, $file);
+            self::assertStringNotContainsString('canonical_uuid', $contents, $file);
+            self::assertStringNotContainsString('stable_key', $contents, $file);
+        }
+        self::assertStringContainsString('get_permalink()', (string) file_get_contents($theme . '/functions.php'));
+        self::assertStringContainsString('wp-sitemap', (string) file_get_contents($root . '/src/Infrastructure/Http/PublicVideoSitemapRoutes.php'));
+    }
     public function test_homepage_uses_query_service_and_semantic_modules_are_not_fixture_lists(): void
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';

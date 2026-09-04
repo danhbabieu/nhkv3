@@ -13,6 +13,7 @@ use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Shared\Migration\MigrationStatus;
 

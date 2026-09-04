@@ -12,10 +12,13 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 
 final class ReadApi
 {
-    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
+    public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null, private ?PublicIdentityRepository $identities = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function register(): void
     {
@@ -38,7 +41,8 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->videoStorageReady(), 'video')) return $error;
         $slug = trim((string) $request['slug']);
-        $matches = array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && PublicRouteResolver::videoPath($item->title, $item->externalVideoId) === '/' . $slug . '/'));
+        $policy = new VideoUrlPolicy($this->identities);
+        $matches = array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $policy->project($item, new VideoPublicContextSelector())['path'] === '/' . $slug . '/'));
         $video = count($matches) === 1 ? $matches[0] : null;
         if (!$video || !$video->active || !$video->hasValidPublicReference()) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
         return ['platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title];

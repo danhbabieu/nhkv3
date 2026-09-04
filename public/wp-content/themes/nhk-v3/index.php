@@ -1,4 +1,5 @@
 <?php
+/* public seo_projection supplies the shared canonical link package. */
 get_header();
 $isSearch = is_search();
 $results = $isSearch ? (new NHK_V3_Search_Page_Query())->read() : null;
