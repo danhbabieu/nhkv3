@@ -34,6 +34,13 @@ one narrowest confidently supported subject per observation in the order
 upward or sideways. Equal candidates are ambiguous and produce no
 proposal-ready candidate. Brand-only context does not infer a Variant.
 
+If `intended_relations` contains an already-validated explicit `about` target,
+that canonical target is authoritative for both the Video attachment candidate
+and the enrichment subject. The planner must preserve its canonical UUID/type
+before any broader title/description/user-hint matching. This is preservation of
+an explicit resolved target, not permission to infer a Variant from Model-only
+text. Multiple conflicting explicit targets remain ambiguous and fail closed.
+
 Its output is the bounded `knowledge_enrichment` packet with `status`,
 `subject`, `candidates`, `diagnostics`, `proposal_ready` and
 `unresolved_reasons`. Each candidate exposes `classification`, `subject_id`,
@@ -68,3 +75,13 @@ Knowledge planner/factory; Video intake does not apply either result.
 Same external identity plus same intent is idempotent. Existing identity means
 reconcile/update candidate, never duplicate Video. Source changes require a
 new governed review packet; NHK fields are not overwritten by source metadata.
+
+## Verified target-handoff checkpoint — 2026-09-04
+
+Focused/unit implementation and the runtime smoke path now distinguish target
+resolution from textual research. For the `SaLpWgitdSE` / Odo 36/10 probe, the
+explicit Variant UUID `95873bfe-d978-4eda-a5a2-ce9ba79625df` is retained as both
+`about` target and `knowledge_enrichment.subject`; the candidate scope remains
+`variant` and no Model/Brand fallback is emitted. This checkpoint changes no
+semantic data and does not relax the separate Source/Evidence or Governance
+gates.
