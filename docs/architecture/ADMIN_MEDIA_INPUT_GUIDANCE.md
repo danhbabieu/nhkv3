@@ -43,18 +43,31 @@ identity. Camera-style filenames are normalized by the application boundary
 when enough context exists. Public preferred-image and sitemap projections
 exclude placeholders and non-public assets.
 
-Every new NHK-managed image byte upload must normalize before durable
-persistence: validate, auto-orient, resize, derive a contextual ASCII filename,
-encode WebP, persist the normalized primary, create only contract-required
-WebP derivatives, read back the attachment, and clean up source/work files.
-The original upload name and source binary are not durable public identity. A
-missing trustworthy context fails closed; the adapter must not invent a
-descriptive filename. This policy is scoped to the canonical Media ingest
-boundary and does not infer Authority, Knowledge, Evidence, Graph or
-`depicts`.
+Every new NHK-managed image byte upload enters one governed Media identity
+boundary. The adapter validates and auto-orients the source, creates the
+contract-required public normalized derivative (currently WebP where supported),
+applies contextual naming only when trustworthy context exists, reads back the
+WordPress attachment/projection and cleans temporary workfiles. The uploaded
+source-original bytes are retained as a private/protected `MediaAsset` under the
+same canonical Media identity according to the Constitution; they are not the
+public filename/URL identity and are not discarded merely because a derivative
+was produced.
 
-The current direct multipart MCP adapter persists one verified WebP primary and
-does not call WordPress's global intermediate-size generator, so this path is
-bounded to one physical image file until a real derivative contract requires
-more. Existing legacy attachments are read-only and are not renamed, rewritten
-or deleted by this policy.
+Derivative WebP/thumbnail/responsive sizes never become a second semantic Media.
+A WordPress attachment is a storage/projection mapping for the same Media, not a
+semantic owner. Existing public URLs remain stable after publication; a later
+SEO filename preference does not authorize silent rename/rewrite of an existing
+public attachment.
+
+A missing trustworthy naming context fails closed; the adapter must not invent
+a descriptive filename. Upload, OCR, recognition, EXIF or filename context does
+not infer Authority, Knowledge, Evidence, Graph, `about` or `depicts`.
+
+The direct multipart MCP path and Admin path must reuse the same governed Media
+application boundary. If a suitable canonical Media already exists, downstream
+systems should reuse its UUID/stable key, eligible asset and contextual Usage
+rather than creating a duplicate Media solely because the same image is needed
+in another Article, Product, Specimen or projection.
+
+Existing legacy attachments are read-only unless a separately governed repair
+or migration task explicitly authorizes changes.
