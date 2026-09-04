@@ -23,7 +23,7 @@ the operation:
 | Video | `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` |
 | Knowledge / Claim / Source / Evidence | `docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md`, `docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`, `docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` when public copy is involved |
 | Authority / Brand / Model / Variant / Movement / Music | `docs/architecture/02_AUTHORITY_BOUNDARY.md`, `docs/architecture/13_AUTHORITY_CORE_CONTRACT.md`, `docs/architecture/V3_BRAND_RELATIONSHIP_MATRIX.md`, `docs/architecture/PUBLIC_BRAND_NAMING_CONTRACT.md` |
-| Public identity / route / SEO | `docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`, `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/V3_FRONTEND_ROUTE_INVENTORY.md`, relevant SEO contracts, and the persisted-identity design/spec when in scope |
+| Public identity / route / SEO | `docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`, `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/V3_FRONTEND_ROUTE_INVENTORY.md`, relevant SEO contracts, persisted-identity design/spec and the current PublicIdentity implementation/runtime evidence when in scope |
 | MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; current tool/Ability availability must be checked against executable catalog/registration and fresh runtime discovery. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only |
 | Storage / schema / execution | current boundaries from the relevant domain contracts plus `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`; `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md` and `docs/architecture/V2_V3_PARITY_MATRIX.md` contain implementation/history evidence and must be interpreted by date/context |
 
@@ -50,10 +50,12 @@ In particular, the historical statements in `MCP_V3_ABILITY_EXPOSURE.md` about
 a 19-tool catalog, limited Video-only governed bridge, fixed exposure counts or
 “No Article Ability” must not be used as current capability truth.
 
-The persisted-identity design and implementation plan are subordinate planning
-evidence. They must not be read as proof that persistence, slug allocation or
-redirects are deployed. The current `PUBLIC_IDENTITY_STORAGE_GAP` remains until
-runtime implementation/read-back proves otherwise.
+The persisted Public Identity service/repository/history implementation and
+migration 014 now exist in code. That implementation evidence must not be
+confused with live activation: guarded migration execution, persisted row/data
+coverage, current-route consumer parity and target-environment read-back still
+need verification before claiming durable Public Identity is live everywhere.
+Compatibility name-derived routing is not a second durable identity writer.
 
 Specs, plans, audits, parity matrices, READMEs and historical V2 material are
 subordinate evidence or implementation guidance. If any source conflicts with
