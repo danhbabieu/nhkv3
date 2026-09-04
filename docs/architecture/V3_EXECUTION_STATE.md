@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+## Persisted public identity URL — Task 4 checkpoint — 2026-09-04
+
+Task 4 is complete through `bfddbed`: Video URL policy uses persisted identity
+and governed source/Hub/provenance/attachment evidence; ineligible Video is
+excluded from page, archive, search and sitemap; canonical canary URL is stable
+across source-title changes. Focused proof: 37 tests / 127 assertions; lint and
+diff checks pass.
+
+Concrete repository wiring in `Plugin.php` remains explicitly assigned to Task
+5 with Migration014 review; runtime integration is `ENVIRONMENT_BLOCKED` while
+`NHK_WP_TEST_PATH` is unavailable. No Video/data/production mutation occurred.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Persisted public identity URL — Task 3 checkpoint — 2026-09-04
 
 Completed Authority route policy and resolver adapter on branch
