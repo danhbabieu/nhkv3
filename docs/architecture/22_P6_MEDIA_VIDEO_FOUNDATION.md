@@ -10,6 +10,41 @@ applied to `nhk_v3`. Persistence services and Media/Video Graph endpoint
 resolvers are now implemented and covered by focused unit evidence; WordPress
 database integration and legacy data mapping remain in progress.
 
+## Current reusable boundary — 2026-09-04
+
+Downstream systems must read the current Constitution before interpreting older
+P6 checkpoints below. The active storage/reuse boundary is:
+
+- one uploaded image create-or-resolves one canonical `Media` identity;
+- source-original bytes are retained as a private/protected `MediaAsset` under
+  that Media;
+- normalized WebP, thumbnail and responsive outputs are derivatives under the
+  same Media identity and never become new semantic identities;
+- WordPress attachment rows/files are storage/public-projection mappings, not
+  semantic owners;
+- `MediaUsage` owns contextual placement/role/alt/caption and may be reused for
+  multiple contexts without copying Media identity;
+- checksum, filename, attachment URL and upload recency are duplicate/
+  presentation signals only and never canonical merge rules;
+- representative and evidence/technical-detail presentation roles remain
+  distinct; evidence imagery never replaces representative imagery merely
+  because it was uploaded later;
+- MCP/Admin/WordPress adapters all converge on the same Media application
+  boundary and must read back from the canonical Media + attachment mapping;
+- upload/EXIF/OCR/recognition/alt/caption do not automatically create Authority,
+  Knowledge, Source, Evidence, `about` or `depicts`.
+
+Older checkpoint sentences describing temporary source cleanup refer to request
+workfiles/public upload projection only. They must not be read as permission to
+discard the constitutionally retained source-original MediaAsset.
+
+The completed Video → Living Knowledge slice is also read-only planning at
+intake time. A valid explicit Video `about` target is preserved as the
+`knowledge_enrichment` subject before broader text resolution; no Knowledge,
+Evidence or Graph mutation occurs from the planning packet itself. Media →
+Living Knowledge remains a separate future slice and is not implied by this P6
+foundation.
+
 ## Media contract
 
 `Media` is semantic identity. `MediaAsset` owns a binary storage key, checksum,
@@ -30,11 +65,13 @@ an infrastructure projection/storage step only.
 `file` parameter. It sanitizes the explicit filename and processes a temporary
 copy with EXIF auto-orientation, aspect-preserving `max_width`/`max_height`
 resize and requested encoder `quality` before the processed bytes enter the
-WordPress Media Library. The original camera upload is never copied to uploads
-and temporary workfiles are removed after the request. The result includes the
-attachment ID, canonical URL, final filename, MIME, dimensions, filesize and
-WordPress derivatives. `nhk.media.attachment.get` provides the same reader-safe
-read-back shape.
+WordPress Media Library. The original camera upload is never copied to the
+public WordPress uploads path as the public derivative; the constitutionally
+required source-original is retained separately as a MediaAsset under the same
+Media identity. Temporary request workfiles are removed after the request. The
+result includes the attachment ID, canonical URL, final filename, MIME,
+dimensions, filesize and WordPress derivatives. `nhk.media.attachment.get`
+provides the same reader-safe read-back shape.
 
 This path is an adapter into the governed Media/MediaAsset/MediaUsage workflow;
 it does not infer semantic relations from image content. The attachment is
