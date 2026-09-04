@@ -3,14 +3,16 @@
 > **NON-NORMATIVE.** This is a runtime contract audit. If it conflicts with
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-Status: runtime audit and contract-safe implementation checkpoint, 2026-09-03.
+Status: runtime audit and contract-safe implementation checkpoint, 2026-09-04.
 
-New NHK-managed image bytes follow one scoped ingest law before durable
-persistence: validate → auto-orient → resize → contextual SEO-safe filename →
-WebP encode → normalized persistence → only required WebP derivatives →
-read-back verification → temporary/source cleanup. Missing trustworthy naming
-context and unavailable WebP conversion fail closed; original JPEG/PNG is not
-stored silently. Existing legacy files are not rewritten or deleted.
+New NHK-managed image bytes follow one scoped ingest law before durable public
+projection: validate → auto-orient → contextual processing/naming → public
+normalized derivative (WebP where the current contract requires it) → read-back
+verification → temporary-workfile cleanup. The uploaded source-original is
+retained as a private/protected `MediaAsset` under the same canonical `Media`;
+it is not the public filename/URL identity. Missing trustworthy naming context
+or unavailable required conversion fails closed. Existing legacy files are not
+rewritten or deleted.
 
 This shared guide describes the MCP V3 runtime actually present for ChatGPT and
 Codex. It does not authorize new entity types, predicates, relation types,
@@ -33,6 +35,25 @@ Modern requests use protocol `2026-07-28`; `Accept` must include both
 dispatch. Governed tools require their capability. Initialized notifications
 return HTTP 202 with no body.
 
+### Storage & Reuse Map — 2026-09-04
+
+| DATA | CANONICAL OWNER / STORAGE | DOWNSTREAM REUSE RULE | MUST NOT HAPPEN |
+|---|---|---|---|
+| Article title/body/excerpt/editorial order | WordPress `wp_posts` | reuse Post identity/state token and native read-back | copy body into Knowledge, receipt or Graph storage |
+| Media identity | `Media` | reuse canonical UUID/stable key/revision | merge/mint identity from checksum, filename or URL alone |
+| Uploaded source bytes | source-original `MediaAsset` | retain privately/protected under the same Media | discard because a WebP/public derivative exists |
+| WebP/thumbnail/responsive image | derivative asset / WordPress attachment projection | reuse under the same Media | create another semantic Media identity |
+| Image role/alt/caption/order | `MediaUsage` + WordPress editorial placement | reuse same Media with contextual usage | treat usage as Knowledge/Evidence/Graph truth |
+| Video | canonical Video external reference | reuse platform + external ID and governed attachments | download MP4 or create a WordPress Post implicitly |
+| Video-derived fact candidate | Living Knowledge planning packet | preserve explicit validated `about` target; otherwise narrowest fail-closed subject | auto-write Knowledge/Evidence/Graph from hint/transcript |
+| Knowledge claim | `Knowledge` | reuse canonical UUID/stable key/revision | duplicate claim because new prose repeats it |
+| Provenance/support | `Source` + `Evidence` | reuse canonical source/evidence chain | treat generated prose, OCR, caption or transcript as Evidence by itself |
+| Typed semantic relation | Graph | reuse registered endpoint IDs + predicate | infer relation from placement/upload/prose alone |
+
+Every write must be read back from its owning store. MCP never becomes a second
+canonical store, and Admin/WordPress adapters never become parallel semantic
+writers.
+
 ## 2. Tool catalog thực tế
 
 `McpToolCatalog::tools()` exposes the exact current registered tool list. In
@@ -46,14 +67,14 @@ must not be replaced by a static catalog assertion.
 | TOOL | DOMAIN | READ/WRITE | GOVERNED | REVISION | GRAPH | STATUS |
 |---|---|---|---|---|---|---|
 | `nhk.search` | native Post + public semantic search | READ | No | N/A | No | READY, bounded/public |
-| `nhk.semantic.resolve` | Authority context | READ | No | N/A | No | READY; ambiguity fails closed |
+| `nhk.semantic.resolve` | Authority context | READ | No | N/A | No raw edge | READY; ambiguity fails closed |
 | `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media and projects an attachment | Usage is placement; attachment is storage/projection only | READY for metadata and multipart image adoption; runtime byte proof required |
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
-| `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; source/review gates explicit |
+| `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; optional Knowledge output is planning-only |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
@@ -69,12 +90,12 @@ must not be replaced by a static catalog assertion.
 | `nhk.proposal.eligibility` | Governance check | READ | capability-gated | Revision/dependencies | N/A | READY |
 | `nhk.proposal.apply` | Governance + target | WRITE | Yes | Controlled Apply | GraphService | READY for implemented branches |
 
-The historical assertions expecting 18/19/21/22 are obsolete; the current
+Historical assertions expecting smaller tool counts are obsolete. The current
 catalog also includes the typed Category and native Article draft/publication
-operations present in `McpToolCatalog`. No prior tool was removed. Article ingest is capability-gated by
-`nhk_ingest_articles`, while
-Article preflight is read-gated. The exact current wire order is the table
-order above.
+operations present in `McpToolCatalog`; the exact live catalog must still be
+confirmed through a fresh tool discovery/wire smoke before relying on a count.
+Article ingest is capability-gated by `nhk_ingest_articles`, while Article
+preflight is read-gated.
 
 ## 3. Use-case capability matrix
 
@@ -86,15 +107,15 @@ order above.
 | Read Source/Evidence | `nhk.source.get`, `nhk.evidence.get` | READY |
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
 | Read/create relation | Governed `relation_create`; raw Graph read is admin REST only; related semantic read has no MCP tool yet | PARTIAL / IMPLEMENTATION_GAP |
-| Create/update/publish Post | No MCP Post application command | BLOCKED |
-| Upload/find Media | Governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
-| Attach MediaUsage | Nested in Media ingest only | PARTIAL |
-| Product / Specimen | Registered Authority types via generic paths | PARTIAL |
-| Album | No V3 contract | SEMANTIC_GAP |
-| Video | Governed ingest, UUID read, YouTube identity, optional thumbnail UUID | READY for current contract |
-| Publish | Semantic Apply only; no editorial Post publish operation | PARTIAL/BLOCKED |
-| Read-back | Domain reads plus native WP/Graph REST checks | PARTIAL |
-| Frontend verification | Existing route smoke/browser QA, not an MCP tool | PARTIAL |
+| Create/update/publish Post | typed Article draft create/update plus gated publish/trash/restore boundary; exact live catalog/runtime still requires discovery/read-back | PARTIAL / RUNTIME-GATED |
+| Upload/find Media | governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
+| Attach MediaUsage | nested in Media ingest only | PARTIAL |
+| Product / Specimen | registered Authority types via generic paths | PARTIAL |
+| Album | no V3 contract | SEMANTIC_GAP |
+| Video | governed ingest, UUID read, YouTube identity, optional thumbnail UUID, optional read-only Knowledge planning | READY for current contract |
+| Publish | semantic Apply is separate; Article publication uses its typed publication gate | PARTIAL / RUNTIME-GATED |
+| Read-back | domain reads plus native WP/Graph REST checks | PARTIAL |
+| Frontend verification | existing route smoke/browser QA, not an MCP tool | PARTIAL |
 
 ## 4. Post workflow
 
@@ -105,40 +126,31 @@ packet; it performs no Post, taxonomy, semantic, Graph, Media, Video or
 Governance write. The research path uses the shared bounded two-hop Graph
 reader, Post semantic-reference projection, bounded Knowledge → Evidence →
 Source inventory and public route/eligibility boundary. Without
-`research_topic`, the reconciliation contract below is
-unchanged.
+`research_topic`, the reconciliation contract below is unchanged.
 
-For Phase 1, `nhk.article.preflight` and `nhk.article.ingest` support only
+For Phase 1, `nhk.article.preflight` and `nhk.article.ingest` support
 reconciliation of an existing WordPress Post: read and fingerprint the target,
 preflight the explicit semantic bundle, create deterministic child proposals,
 wait for Governance approval, apply eligible children, and read back semantic
-and editorial state. Generic WordPress create/update/publish remains an
-independent editorial workflow and cannot be reported as completed Article
-Ingest by itself. Article create and editorial update return explicit
-`UNSUPPORTED_OPERATION` outcomes and do not write WordPress.
+and editorial state. A generic WordPress write by itself cannot be reported as
+a completed V3 knowledge Article workflow.
 
-The typed `nhk.article.draft.create` and `nhk.article.draft.update` tools now
-cover native WordPress draft creation/update only. Creation is idempotent via
-the existing Article operation receipt repository, never stores body in the
-receipt, and returns a native state token plus `DRAFT_INCOMPLETE_FOR_PUBLICATION`.
-Update requires a matching native state token and only updates an eligible
-draft. The typed `nhk.article.publish` tool remains the only V3 publication
-writer: it requires the current draft token and verified evidence, calls
-`ArticlePublicationGate` before the native status transition, and reads the
-published Post back. `nhk.article.publish.review` returns exactly `PASS`,
-`OWNER_REVIEW_REQUIRED` or `SYSTEM_BLOCKED`; eligible failures create a
-dedicated durable owner-decision record. `nhk.article.publish.approve` requires
-the authenticated owner principal, exact decision/token/policy/fingerprint
-binding and an affirmative instruction, then publishes through the same
-writer and records read-back. System-blocked results never expose approval.
-`nhk.article.trash` and `nhk.article.restore` use the same CAS/receipt
-boundary and never permanently delete a Post. The typed `nhk.category.*` tools
-similarly delegate to the shared native Category
-gateway; category membership is taxonomy truth and never a Graph edge.
+The typed Article draft create/update boundary covers native WordPress draft
+creation/update only. Creation is idempotent via the existing Article operation
+receipt repository, never stores body in the receipt, and returns a native state
+token plus `DRAFT_INCOMPLETE_FOR_PUBLICATION`. Update requires a matching native
+state token and only updates an eligible draft. The typed Article publication
+boundary is the only V3 publication writer: it requires the current draft token
+and verified evidence, calls `ArticlePublicationGate` before the native status
+transition, and reads the published Post back. Owner-review approval remains
+separate from system-blocked failures. Trash/restore uses the same CAS/receipt
+boundary and never permanently deletes a Post. Typed Category operations remain
+native taxonomy truth and never Graph truth.
 
 The publication boundary is enforced by `ArticlePublicationGate`; rendered
 public verification and exact integration runtime evidence remain separate
-completion gates.
+completion gates. Article body/excerpt stays only in WordPress editorial
+storage; receipts, Knowledge and Graph never become a second Article-body store.
 
 ## 5. Authority workflow
 
@@ -169,6 +181,12 @@ Source UUIDs. Closed runtime profiles are: claim types `fact`, `specification`,
 `supports`, `contradicts`, `qualifies`; visibility `PUBLIC`, `PRIVATE`, `HIDDEN`.
 Public reads require active records and a public evidence chain.
 
+Repeated Article prose, Video hints/transcripts and Media annotations must first
+resolve against canonical Knowledge. `same_claim` does not require a duplicate
+claim. `add_evidence` requires an existing canonical Claim and Source plus their
+revision closure. Generated text, OCR, caption, alt and transcript text are
+never Evidence merely because they are available to MCP.
+
 ## 7. Graph workflow and runtime matrix
 
 Graph is the only relation persistence. Relation create, retire and reactivate
@@ -190,11 +208,9 @@ Full boot registers 15 endpoint types: `wp_post`; Authority `brand`, `model`,
 | `variant` | `configured_with_music` | `music` | outbound MANY / inbound MANY | DIRECT | canonical endpoints and configuration evidence | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
 | `specimen` | `observed_playing_music` | `music` | outbound MANY / inbound MANY | DIRECT | concrete-object observation provenance/evidence | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
 
-At clean HEAD the registry had two predicates (`about`, `depicts`). The current
-working tree already contains the six exact approved Brand relationship
-definitions above in `PredicateRegistry`; they are pre-existing uncommitted
-work and were not added by this MCP task. No further predicate, derived
-relation, predicate-specific evidence rule or Album relation may be invented.
+Only predicates currently registered by runtime may be used. Documentation or
+historical fixture text never authorizes an additional relation. No derived
+relation, Album relation or predicate-specific evidence rule may be invented.
 
 ### 7.1 Related semantic navigation read gap
 
@@ -206,7 +222,7 @@ explainability, deduplication and public eligibility/readiness before
 serialization.
 
 The current MCP surface has no related/Graph read tool. Raw Graph REST remains
-administrator-only, and the eight WordPress read Abilities mirror the existing
+administrator-only, and the WordPress read Abilities mirror the existing
 catalog rather than adding related navigation. This is an
 `IMPLEMENTATION_GAP`/`P1` query-exposure gap, not permission to expose raw edges
 or to add a new MCP tool in this documentation task. A future MCP read review
@@ -232,35 +248,31 @@ The same `nhk.media.ingest` tool also accepts one direct multipart `file`
 parameter. The MCP envelope carries JSON-RPC arguments separately from the
 multipart file part; the file is never represented as base64 or a data URL.
 `filename`, `max_width`, `max_height` and `quality` control the binary adapter.
-Before `wp_upload_bits`, the adapter copies the upload to a temporary workfile,
-validates the image MIME, applies EXIF orientation, resizes without cropping to
-the maximum dimensions, sets the requested encoder quality and sanitizes the
-passed filename. Only that processed file is inserted into the WordPress Media
-Library as a public derivative. The source-original bytes are retained as a
-private MediaAsset under the same canonical Media identity; workfiles are not
-retained after the request. WordPress-generated image sizes are returned as
-`derivatives`.
+Before public WordPress projection, the adapter works on a temporary copy,
+validates image MIME, applies EXIF orientation, resizes without cropping to the
+maximum dimensions, applies requested encoding quality and sanitizes the public
+filename. The processed derivative is inserted/adopted in the WordPress Media
+Library. The source-original bytes are retained as a private/protected
+MediaAsset under the same canonical Media identity; temporary workfiles are not
+retained. WordPress/generated responsive representations remain derivatives.
 
 The direct file path is a binary/storage adapter inside the governed Media
-flow. It creates or resolves the NHK semantic Media identity but does not
-create Knowledge, Source, Evidence or Graph edges from image content.
-`nhk.media.attachment.get` reads back the attachment ID,
-canonical URL, sanitized filename, MIME, dimensions, filesize and derivatives.
+flow. It creates or resolves the NHK semantic Media identity but does not create
+Knowledge, Source, Evidence or Graph edges from image content.
+`nhk.media.attachment.get` reads back attachment projection state. Checksum is a
+duplicate candidate only; it never merges canonical identities. A suitable
+existing Media should be reused before creating another semantic identity.
 
 Article Ingest reconciliation uses the same `ArticleMediaCoordinator` as the
-WordPress post-created adapter. It returns a media state, mandatory-slot
+WordPress post-created adapter. It returns media state, mandatory-slot
 diagnostics and Blueprint information without copying or reordering Post body
 content. `nhk.article.preflight` previews media state read-only. A missing real
 image binds a distinct system placeholder and remains incomplete.
 
 Media detail types, SEO keyword groups, state values and diagnostic reason codes
 are controlled registries owned by NHK Core. This MCP document does not define
-their semantics; the sole source of law is
-`docs/constitution/NHK_V3_CONSTITUTION.md` and the runtime registries.
-
-The direct file boundary does not search by checksum or add a usage
-independently. Checksum detects a duplicate candidate on the governed metadata
-path; it never merges canonical identities.
+their semantics; the sole source of law is the Constitution and runtime
+registries.
 
 ## 9. Product / Specimen
 
@@ -299,8 +311,25 @@ projection. A future contract must first choose its owner and identity boundary.
 Video identity is the validated external reference. The domain supports YouTube
 watch, short, embed and `youtu.be` forms and stores one canonical watch URL plus
 platform/external ID. Optional thumbnail Media is a typed field, not an
-implicit Graph edge. Video is a Graph endpoint and may use only the two
-predicates through governed proposals. No local MP4 is downloaded.
+implicit Graph edge. No local MP4 is downloaded.
+
+`nhk.video.ingest` may additionally return a bounded `knowledge_enrichment`
+planning packet. When an already-validated explicit `about` target is supplied,
+that canonical target is authoritative for both the relation candidate and the
+enrichment subject; text research must not silently broaden Variant → Model or
+Brand. `USER_HINT` is context rather than Evidence. Transcript text must be
+atomically extracted through an approved read-only extractor and is never one
+large canonical claim. Generated editorial prose is never Evidence.
+
+At the current Video boundary no NHK Source is created implicitly. A repeated
+observation may resolve `same_claim`; `add_evidence` is proposal-ready only with
+canonical `source_id` + `source_revision`. The planning packet never submits,
+approves or applies Knowledge/Evidence and never creates Graph predicates.
+
+The runtime smoke for `SaLpWgitdSE` / Odo 36/10 verifies the target handoff:
+explicit `about → variant 95873bfe-d978-4eda-a5a2-ce9ba79625df` remains the
+enrichment subject and candidate scope. That smoke performed no Knowledge,
+Evidence or Graph mutation.
 
 ## 12. Governance
 
@@ -319,18 +348,18 @@ executor/domain services:
 Generic proposal strings are not authorization; final validation occurs at
 apply. Every semantic write retains capability checks, expected revision,
 fingerprints, idempotency, audit and controlled transaction. The MCP proposal
-schema now rejects any operation outside the nine existing executor operations
-before proposal persistence; this is an input boundary, not a new operation
-registry.
+schema rejects unsupported operations before proposal persistence; this is an
+input boundary, not a new operation registry.
 
 ## 13. Error codes and fail-closed behavior
 
 `-32600` invalid JSON-RPC request; `-32601` unknown method/tool; `-32602`
-invalid/missing argument, including an unsupported proposal operation; `-32003` origin or capability denied; `-32020`
-Streamable HTTP/header mismatch; `-32022` unsupported protocol version.
-Typed domain/governance failures return an MCP `isError=true` result. Null
-reads, ambiguity, unavailable readiness and revision/idempotency conflicts are
-not success and must not be retried with altered content under the same key.
+invalid/missing argument, including an unsupported proposal operation; `-32003`
+origin or capability denied; `-32020` Streamable HTTP/header mismatch; `-32022`
+unsupported protocol version. Typed domain/governance failures return an MCP
+`isError=true` result. Null reads, ambiguity, unavailable readiness and
+revision/idempotency conflicts are not success and must not be retried with
+altered content under the same key.
 
 ## 14. Read-back verification
 
@@ -338,10 +367,10 @@ After apply, use `result_entity_uuid`: Authority → `nhk.entity.get`; governed
 Media metadata → `nhk.media.get`; Video → `nhk.video.get`;
 Knowledge/Source/Evidence → matching read tool. Direct file attachment ingest
 must use `nhk.media.attachment.get` with the returned `attachment_id` for
-WordPress read-back. Graph requires administrator-only Graph REST. Post
-requires native WordPress read/browser verification. Verify canonical identity,
-active state, visibility, revision result, relation direction and public
-projection; apply success alone does not prove public availability.
+WordPress projection read-back. Graph requires administrator-only Graph REST.
+Post requires native WordPress read/browser verification. Verify canonical
+identity, active state, visibility, revision result, relation direction and
+public projection; apply success alone does not prove public availability.
 
 ## 15. End-to-end example
 
@@ -349,36 +378,35 @@ For “Biên soạn và đưa bài lên web, xây chặt các quan hệ liên qu
 
 ```text
 1. nhk.semantic.resolve
-   Resolve Brand/Model context; stop on missing, conflict or ambiguity.
+   Resolve canonical subject; stop on missing, conflict or ambiguity.
 2. nhk.entity.get, nhk.knowledge.get, nhk.source.get, nhk.evidence.get
-   Read canonical facts and public evidence; do not copy article body.
-3. Native WordPress editorial API/UI
-   Create/update the draft Post; do not publish yet.
-4. knowledge/source/evidence.ingest
+   Reuse canonical facts/evidence; do not copy the Article body into semantic storage.
+3. Typed Article draft create/update boundary
+   Create/update native WordPress draft with idempotency/state-token CAS.
+4. knowledge/source/evidence.ingest when new semantic truth is actually required
    Submit -> approve with fingerprints -> eligibility -> apply.
 5. nhk.proposal.create with operation=relation_create
-   Use only `about` or `depicts`, registered endpoints and valid keys; run the
-   same governed lifecycle.
+   Use only registered predicates/endpoints; run the same governed lifecycle.
 6. nhk.media.ingest / nhk.video.ingest
-   Use only current asset/usage and external-reference contracts.
-7. Read back domain records, Post and Graph; verify identity, revisions,
-   visibility, relation direction and public projection.
-8. Native WordPress editorial API/UI
-   Publish only after Article Ingest's required semantic and verification stages
-   satisfy the approved contract.
+   Reuse current Media/Video identities and their storage/planning contracts.
+7. Read back each owning domain, WordPress Post and Graph; verify identity,
+   revisions, visibility, relation direction and public projection.
+8. Typed Article publication gate
+   Publish only after semantic, media, compliance and rendered verification gates pass.
 ```
 
-MCP-native Post CRUD/publish, Graph read, standalone MediaUsage, Album, and
-Product–Specimen canonical-fact workflows remain blocked or gated. The
-approved direct image attachment path is limited to processed WordPress binary
-intake and read-back; it does not expand any of those semantic workflows.
+Standalone MediaUsage writes, raw Graph reads, Album and Product–Specimen
+canonical-fact shortcuts remain blocked or gated. Direct image attachment intake
+is only an adapter into the governed Media identity/storage boundary and does
+not expand semantic write authority.
 
 ## 16. WordPress Abilities MCP bridge
 
-On WordPress 6.9+, the plugin registers eight existing read tools and the
-minimum governed Video workflow as public Abilities under category
-`nhk-v3-content-operations`. This is a discoverability adapter, not a second persistence or
-transport path, and it is feature-detected on older WordPress versions.
+On WordPress 6.9+, the plugin registers existing read tools and the minimum
+governed Video workflow as public Abilities under category
+`nhk-v3-content-operations`. This is a discoverability adapter, not a second
+persistence or transport path, and it is feature-detected on older WordPress
+versions.
 
 | ABILITY | MCP SOURCE |
 |---|---|
@@ -391,42 +419,31 @@ transport path, and it is feature-detected on older WordPress versions.
 | `nhk-v3/source-get` | `nhk.source.get` |
 | `nhk-v3/evidence-get` | `nhk.evidence.get` |
 
-Each reuses the existing input schema, `read` capability callback and metadata
-`public=true`, `show_in_rest=true`, `readonly=true`, `destructive=false`,
-`idempotent=true`.
-
-The governed bridge additionally exposes `nhk-v3/video-ingest`,
-`nhk-v3/proposal-create`, `nhk-v3/proposal-submit`, `nhk-v3/proposal-approve`,
-`nhk-v3/proposal-reject`, `nhk-v3/proposal-eligibility` and
-`nhk-v3/proposal-apply`. These callbacks delegate to the registered custom MCP
-transport, preserving its capability mapping and lifecycle. Media, Knowledge,
-Source and Evidence writers remain unexposed through Abilities; no generic
-WordPress writer is registered.
+Each reuses the existing input schema, capability callback and reader-safe
+metadata. The governed bridge additionally exposes the registered Video and
+Proposal lifecycle Abilities. Those callbacks delegate to the custom MCP
+transport, preserving capability mapping and lifecycle. No Ability name in this
+document authorizes a writer unless it is visible in fresh runtime discovery.
 
 ## 17. Article Ingest implementation status
 
-The Phase 1 coordinator, durable receipt, deterministic child proposal planner,
+The Article coordinator, durable receipt, deterministic child proposal planner,
 read-only editorial token, verification reader and diagnostic reader are
 implemented under the approved operation-level contract. The receipt table is
 `nhk_article_operations` with a unique idempotency key and optimistic receipt
-revision. Same-key/different-fingerprint requests return
-`IDEMPOTENCY_CONFLICT` without changing the original receipt. Partial semantic
-apply is recorded and retries skip already-applied children; no compensation is
-attempted.
+revision. Same-key/different-fingerprint requests return `IDEMPOTENCY_CONFLICT`
+without changing the original receipt. Partial semantic apply is recorded and
+retries skip already-applied children; no compensation is attempted.
 
-The implementation is reconcile-only. WordPress create, editorial update,
-draft and publish are deliberately unsupported pending the separate
-`WORDPRESS_EDITORIAL_WRITE_IDEMPOTENCY_AND_CAS` review. No Article entity,
-endpoint, status or generic Governance operation was added.
+The receipt never stores the full Article body. Native WordPress draft and
+publication transitions remain bounded by the typed editorial gateway and
+publication gate; semantic changes remain separate governed operations.
+`V2MigrationService.php` is a separate migration path and Article Ingest must
+never call it. Any reachable Article path that copies legacy `post_content` into
+semantic storage or mutates Graph outside Governance is
+`CONSTITUTION_CONFLICT`.
 
-`V2MigrationService.php` can import legacy `post_content` through a separate
-migration path; Article Ingest must never call it. Any reachable Article path
-that does so is `CONSTITUTION_CONFLICT`. Likewise, if
-`PostKnowledgeLinkService` mutates Graph directly outside
-Governance/Controlled Apply, record `CONSTITUTION_CONFLICT` and route future
-implementation through the governed boundary.
-
-Until the contract is implemented and tested, a generic WordPress Post write or
-the existing semantic tools alone cannot be reported as a complete V3 knowledge
-Article workflow. Required-stage failure must remain an explicit non-success,
-retryable, unavailable, conflict or equivalent contract-defined outcome.
+A generic WordPress write, Media upload or Video preview alone cannot be
+reported as a complete V3 knowledge Article workflow. Required-stage failure
+must remain an explicit non-success, retryable, unavailable, conflict or
+contract-defined outcome.
