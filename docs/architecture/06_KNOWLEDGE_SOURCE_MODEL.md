@@ -28,3 +28,32 @@ Source/Evidence metadata blobs and Knowledge claim provenance blob. A missing
 visibility value preserves the existing V3-compatible default, but does not
 constitute approval of imported V2 provenance; the final publication policy
 remains a cutover gate.
+
+## Current enrichment and reuse boundary — 2026-09-04
+
+Knowledge remains atomic and canonical. Article body text, Video transcript,
+Video editorial copy, Media alt/caption, OCR output and generated AI prose are
+not themselves Knowledge or Evidence. They may only act as bounded input to a
+read-only enrichment/extraction planner. Any resulting semantic mutation still
+uses `Proposal → Human Approval → Eligibility → Controlled Apply → repository →
+audit → read-back`.
+
+Video `USER_HINT` and approved transcript observations may create scoped
+Knowledge candidates only after canonical subject resolution. The explicit
+validated Video `about` target, when supplied, is preserved as the enrichment
+subject; text matching must not silently broaden a Variant observation to Model
+or Brand. Transcript text is never promoted wholesale into one claim. At the
+current Video phase no canonical Source is created implicitly; `add_evidence`
+requires resolved `source_id` plus `source_revision` and otherwise remains
+review-only/diagnostic.
+
+Article enrichment is suggestion-only until it re-enters the approved Article
+workflow. Knowledge changes do not rewrite an existing WordPress body directly.
+MediaUsage, `depicts`, image recognition and technical annotations do not become
+Evidence by themselves. A future Media → Living Knowledge adapter must preserve
+this same separation and must not create a second writer.
+
+Downstream reuse must resolve canonical Knowledge/Source/Evidence UUIDs and
+revisions and attach/refer to those records; it must not copy canonical claim
+text into a parallel semantic store or create duplicate claims merely because a
+new Post, Video or Media item repeats the same observation.
