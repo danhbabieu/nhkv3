@@ -62,6 +62,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
                 $rotated = maybe_exif_rotate($work);
                 if (is_wp_error($rotated)) throw new \RuntimeException('WORDPRESS_MEDIA_AUTO_ORIENT_FAILED');
             }
+            $this->normalizePaletteImage($work);
             $editor = wp_get_image_editor($work);
             if (is_wp_error($editor)) throw new \RuntimeException('WORDPRESS_MEDIA_EDITOR_UNAVAILABLE');
             $size = method_exists($editor, 'get_size') ? $editor->get_size() : [];
@@ -135,6 +136,23 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             // The original ChatGPT upload is never moved into uploads. Only
             // the sanitized processed file may remain in WordPress storage.
             if ($uploadedPath !== null && !isset($attachmentId) && is_file($uploadedPath)) @unlink($uploadedPath);
+        }
+    }
+
+    private function normalizePaletteImage(string $path): void
+    {
+        if (!function_exists('imagecreatefromstring') || !function_exists('imageistruecolor') || !function_exists('imagepalettetotruecolor') || !function_exists('imagepng')) return;
+        $contents = file_get_contents($path);
+        if (!is_string($contents)) throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_READ_FAILED');
+        $image = @imagecreatefromstring($contents);
+        if ($image === false || imageistruecolor($image)) {
+            if ($image !== false && function_exists('imagedestroy')) imagedestroy($image);
+            return;
+        }
+        try {
+            if (!imagepalettetotruecolor($image) || !imagepng($image, $path, 6)) throw new \RuntimeException('WORDPRESS_MEDIA_TRUECOLOR_NORMALIZE_FAILED');
+        } finally {
+            if (function_exists('imagedestroy')) imagedestroy($image);
         }
     }
 

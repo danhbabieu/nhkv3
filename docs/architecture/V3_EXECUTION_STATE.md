@@ -10,15 +10,25 @@ allowlist guard. Production/read-only deployment must leave that flag unset or
 false; schema activation is a separately authorized maintenance/deployment
 step and was not run against production.
 
-The requested guarded integration rerun used
-`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` and the repository
-`NHK Integration` suite. WordPress bootstrap stopped with `Error establishing
-a database connection` against `DB_HOST=127.0.0.1`, `DB_NAME=nhk_v3_test`,
-`DB_USER=root`, empty password; TCP 3306 and the default socket were both
-unavailable, so the exact database is not proven reachable. PHPUnit cases were
-not entered. This is `ENVIRONMENT_BLOCKED`. `public` is the correct bootstrap
-path. The Unit suite passes with 485 tests / 2,252 assertions, 1 warning and 5
-PHPUnit deprecations.
+The guarded integration environment was re-probed on 2026-09-04 with
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`. Homebrew MySQL 9.7.1 is
+running on `127.0.0.1:3306` with `/tmp/mysql.sock`; TCP/socket authentication as
+`root` succeeds and both `nhk_v3` and `nhk_v3_test` exist. WordPress bootstrap
+selects `nhk_v3_test` successfully (`wp_version=7.1`, empty `$wpdb->last_error`),
+so the former sandbox-localhost database error is an environment-permission
+artifact, not a DB server/config/schema reachability failure.
+
+The full guarded `NHK Integration` suite now enters runtime: 95 tests / 536
+assertions, with 4 fixture failures, 1 media ingest error, 1 warning and 2
+skips. The Article/MCP fixture requires Post 71 and the three canonical music /
+semantic ingest fixtures, but `nhk_v3_test` contains none; the Variant UUID
+exists only in development `nhk_v3`, which is not used as the integration DB.
+The media error was traced to GD palette PNG → WebP conversion producing a
+zero-byte output; the adapter now normalizes palette images to truecolor before
+encoding, but rerun verification is blocked by the orphan left by the earlier
+failed attempt and must not be manually deleted under the current no-semantic-
+mutation task boundary. The Unit suite passes with 485 tests / 2,252
+assertions, 1 warning and 5 PHPUnit deprecations.
 
 The live read-only canary was re-attempted for Video UUID
 `01a06815-1e51-7964-b004-1ba79e488ad1`, YouTube ID `P4KaHX3LBOw`, canonical
