@@ -3,31 +3,45 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoUrlPolicy
 {
+    public function __construct(private ?PublicIdentityRepository $identities = null)
+    {
+    }
+
     /** @return array{path:?string,eligible:bool,blockers:list<string>,warnings:list<string>} */
     public function project(Video $video, VideoPublicContextSelector $selector): array
     {
         $metadata = is_array($video->metadata) ? $video->metadata : [];
-        $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
         $blockers = [];
-        $slug = trim((string) ($identity['current_slug'] ?? ''));
-        if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
+        $identity = null;
+        if ($this->identities === null) $blockers[] = 'PUBLIC_IDENTITY_UNAVAILABLE';
+        else {
+            try { $identity = $this->identities->findByOwner('video', $video->canonicalId); } catch (\Throwable) { $identity = null; }
+            if ($identity === null) $blockers[] = 'PUBLIC_IDENTITY_NOT_FOUND';
+            elseif (!UuidCodec::isValid($identity->ownerId) || $identity->ownerKind !== 'video' || $identity->ownerId !== $video->canonicalId || $identity->routeType !== 'video' || $identity->collisionScope !== 'video' || $identity->routePolicyVersion !== 'public-route-v1' || $identity->revision < 1) $blockers[] = 'PUBLIC_IDENTITY_INVALID';
+        }
+        $slug = $identity?->currentSlug ?? '';
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
 
         $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
-        if (($source['availability'] ?? 'unknown') !== 'available') $blockers[] = 'SOURCE_UNAVAILABLE';
-        if (($source['embeddable'] ?? null) !== true) $blockers[] = 'SOURCE_NOT_EMBEDDABLE';
+        try {
+            $snapshot = \NHK\Core\Domain\Video\YouTubeSourceSnapshot::fromArray($source);
+            if ($snapshot->externalVideoId !== $video->externalVideoId || $snapshot->availability !== 'available') $blockers[] = 'SOURCE_UNAVAILABLE';
+            if ($snapshot->embeddable !== true) $blockers[] = 'SOURCE_NOT_EMBEDDABLE';
+        } catch (\Throwable) { $blockers[] = 'SOURCE_SNAPSHOT_INVALID'; }
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
         if (trim((string) ($editorial['title'] ?? '')) === '' || trim((string) ($editorial['summary'] ?? '')) === '') $blockers[] = 'EDITORIAL_CONTEXT_INCOMPLETE';
-        $hub = is_array($metadata['hub'] ?? ($metadata['category'] ?? null)) ? ($metadata['hub'] ?? $metadata['category']) : [];
+        $hub = is_array($metadata['hub'] ?? null) ? $metadata['hub'] : [];
         $hubPrimary = is_array($hub['primary'] ?? null) ? ($hub['primary']['key'] ?? $hub['primary']['label'] ?? '') : ($hub['primary'] ?? '');
-        if (trim((string) $hubPrimary) === '') $blockers[] = 'VIDEO_HUB_UNRESOLVED';
-        $provenance = is_array($metadata['provenance'] ?? ($source['provenance'] ?? null)) ? ($metadata['provenance'] ?? $source['provenance']) : [];
-        if (trim((string) ($provenance['kind'] ?? '')) === '') $blockers[] = 'VIDEO_PROVENANCE_MISSING';
-        if (!is_array($metadata['semantic_attachments'] ?? null) || $metadata['semantic_attachments'] === []) $blockers[] = 'NO_SEMANTIC_ATTACHMENT';
+        if (!array_key_exists((string) $hubPrimary, VideoHubClassifier::hubs())) $blockers[] = 'VIDEO_HUB_UNRESOLVED';
+        $provenance = is_array($metadata['provenance'] ?? null) ? $metadata['provenance'] : [];
+        if (($provenance['kind'] ?? '') !== 'YOUTUBE_SOURCE' || ($provenance['source_url'] ?? '') !== ($source['canonical_source_url'] ?? '')) $blockers[] = 'VIDEO_PROVENANCE_MISSING';
+        if (!$this->hasApprovedAttachment($metadata['semantic_attachments'] ?? null)) $blockers[] = 'SEMANTIC_ATTACHMENT_UNUSABLE';
 
         $context = $this->context($metadata);
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';
@@ -40,12 +54,24 @@ final class VideoUrlPolicy
         ];
     }
 
+    private function hasApprovedAttachment(mixed $attachments): bool
+    {
+        if (!is_array($attachments)) return false;
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment) || ($attachment['approved'] ?? false) !== true || ($attachment['target_type'] ?? '') === '' || !in_array($attachment['target_type'], ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], true) || ($attachment['predicate'] ?? '') !== 'about' || !UuidCodec::isValid((string) ($attachment['target_id'] ?? $attachment['target_key'] ?? ''))) continue;
+            $evidence = $attachment['evidence_refs'] ?? null;
+            if (!is_array($evidence) || $evidence === []) continue;
+            $valid = true;
+            foreach ($evidence as $reference) if (!is_array($reference) || array_keys($reference) !== ['evidence_id'] || !UuidCodec::isValid((string) $reference['evidence_id'])) $valid = false;
+            if ($valid) return true;
+        }
+        return false;
+    }
+
     /** @return array<string,mixed> */
     private function context(array $metadata): array
     {
         $context = is_array($metadata['governed_context'] ?? null) ? $metadata['governed_context'] : [];
-        foreach (['variant', 'model', 'brand', 'music', 'editorial_context', 'user_hint'] as $key) if (array_key_exists($key, $metadata)) $context[$key] = $metadata[$key];
-        if (!isset($context['editorial_context']) && is_array($metadata['editorial']['context'] ?? null)) $context['editorial_context'] = $metadata['editorial']['context'];
         return $context;
     }
 }

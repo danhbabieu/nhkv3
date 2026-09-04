@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoSearchDocument
 {
-    public function __construct(private AuthorityRepository $authority)
+    public function __construct(private AuthorityRepository $authority, private ?PublicIdentityRepository $identities = null)
     {
     }
 
@@ -27,7 +28,7 @@ final class VideoSearchDocument
 
     public function publicUrl(Video $video): ?string
     {
-        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        $result = (new VideoUrlPolicy($this->identities))->project($video, new VideoPublicContextSelector());
         return $result['eligible'] ? $result['path'] : null;
     }
 

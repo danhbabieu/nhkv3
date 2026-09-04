@@ -3,15 +3,19 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoSitemapProjection
 {
+    public function __construct(private ?PublicIdentityRepository $identities = null)
+    {
+    }
     /** @param list<Video> $videos @return list<array<string,string>> */
     public function project(array $videos, string $baseUrl = ''): array
     {
         $items = [];
-        $policy = new VideoUrlPolicy();
+        $policy = new VideoUrlPolicy($this->identities);
         $selector = new VideoPublicContextSelector();
         foreach ($videos as $video) {
             if (!$video->active) continue;

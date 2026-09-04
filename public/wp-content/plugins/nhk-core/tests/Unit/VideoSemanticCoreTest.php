@@ -19,6 +19,7 @@ use NHK\Core\Application\Video\{
     YouTubeUrlNormalizer
 };
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
@@ -30,6 +31,7 @@ use NHK\Core\Domain\Video\{
     VideoSourceRights,
     YouTubeSourceSnapshot
 };
+use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
@@ -442,11 +444,17 @@ final class VideoSemanticCoreTest extends TestCase
 
     public function test_video_sitemap_contains_only_active_available_indexable_watch_pages(): void
     {
-        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['public_identity' => ['current_slug' => 'nhk-title'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
+        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['source_snapshot' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222', 'target_type' => 'brand', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']], 'approved' => true]]]);
         $unavailable = Video::fromUrl('https://youtu.be/9bZkp7q19f0', 'Unavailable', ['source_snapshot' => ['availability' => 'deleted']]);
         $notIndexable = Video::fromUrl('https://youtu.be/aqz-KE-bpKQ', 'No index', ['source_snapshot' => ['availability' => 'available'], 'indexable' => false]);
 
-        $items = (new VideoSitemapProjection())->project([$valid, $unavailable, $notIndexable], 'https://nhk.example');
+        $items = (new VideoSitemapProjection(new class implements PublicIdentityRepository {
+            public function findByOwner(string $ownerKind, string $ownerId): ?PublicIdentity { return $ownerKind === 'video' ? new PublicIdentity('identity-001', 'video', $ownerId, 'video', 'nhk-title', 'video', 'public-route-v1', 1) : null; }
+            public function findByRoute(string $routeType, string $collisionScope, string $slug): ?PublicIdentity { return null; }
+            public function create(PublicIdentity $identity): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
+            public function update(PublicIdentity $identity, int $expectedRevision): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
+            public function appendHistoricRoute(HistoricPublicRoute $historicRoute): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted(); }
+        }))->project([$valid, $unavailable, $notIndexable], 'https://nhk.example');
 
         self::assertCount(1, $items);
         self::assertSame('https://nhk.example/video/nhk-title-dqw4w9wgxcq/', $items[0]['loc']);

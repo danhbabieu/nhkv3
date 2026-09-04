@@ -13,7 +13,7 @@ final class VideoPublicContextSelector
     {
         $governed = is_array($context['governed_context'] ?? null) ? $context['governed_context'] : [];
         foreach (self::SOURCES as $source) {
-            $value = $this->value($context[$source] ?? $governed[$source] ?? null);
+            $value = $this->value($governed[$source] ?? null);
             if ($value !== '') return ['source' => $source, 'value' => $value];
         }
         return null;

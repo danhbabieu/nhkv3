@@ -9,6 +9,8 @@ use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligib
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentity, PublicIdentityMutationResult};
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
@@ -27,6 +29,9 @@ final class SearchSemanticQueryTest extends TestCase
         $authority = new AuthorityService($authorityRepository, $types);
         for ($index = 1; $index <= 14; $index++) $authority->create('brand', 'search-clock-' . $index, 'Clock ' . $index);
 
+        $identityRepository = $this->identityRepository(array_map(static fn (AuthorityEntity $item): PublicIdentity => new PublicIdentity('identity-' . substr($item->canonicalId, 0, 8), 'authority', $item->canonicalId, 'brand', 'clock-' . substr($item->stableKey, -1), 'root', 'public-route-v1', 1), $authorityRepository->listByType('brand')));
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identityRepository);
+        $collection = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);
         $query = new SearchSemanticQuery(
             $authorityRepository,
             new class implements MediaRepository {
@@ -51,6 +56,10 @@ final class SearchSemanticQueryTest extends TestCase
                 public function list(bool $includeRetired = false): array { return []; }
             },
             $types,
+            null,
+            $routes,
+            $collection,
+            $identityRepository,
         );
 
         $result = $query->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'clock', 2, 5);
@@ -103,12 +112,12 @@ final class SearchSemanticQueryTest extends TestCase
         $brand = $authorityRepository->create(new AuthorityEntity(UuidCodec::newV7(), 'brand', 'brand:odo', 'Odo', 1, []));
         $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Technical source title', [
             'public_identity' => ['current_slug' => 'odo'],
-            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'source_title' => 'Technical source title', 'tags' => ['bell']],
+            'source_snapshot' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'availability' => 'available', 'embeddable' => true, 'source_title' => 'Technical source title', 'tags' => ['bell']],
             'editorial' => ['title' => 'Âm thanh Odo', 'summary' => 'Bối cảnh nhận diện đồng hồ cổ.'],
             'category' => ['primary' => ['key' => '06', 'label' => 'Âm thanh đồng hồ cổ']],
             'hub' => ['primary' => '06'],
-            'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
-            'semantic_attachments' => [['target_key' => $brand->canonicalId, 'target_type' => 'brand', 'predicate' => 'about']],
+            'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+            'semantic_attachments' => [['target_key' => $brand->canonicalId, 'target_id' => $brand->canonicalId, 'target_type' => 'brand', 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']], 'approved' => true]],
         ]);
         $videos = new class($video) implements VideoRepository {
             public function __construct(private Video $item) {}
@@ -121,7 +130,7 @@ final class SearchSemanticQueryTest extends TestCase
         $emptyMedia = new class implements MediaRepository { public function findByCanonicalId(string $id): ?Media { return null; } public function findByStableKey(string $key): ?Media { return null; } public function create(Media $item): Media { return $item; } public function update(Media $item, int $expectedRevision): Media { return $item; } public function list(bool $includeRetired = false): array { return []; } };
         $emptyKnowledge = new class implements KnowledgeRepository { public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; } public function findByStableKey(string $key): ?KnowledgeClaim { return null; } public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; } public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; } public function list(bool $includeRetired = false): array { return []; } };
 
-        $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $videos, $emptyKnowledge, $types))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo');
+        $result = (new SearchSemanticQuery($authorityRepository, $emptyMedia, $videos, $emptyKnowledge, $types, null, null, null, $this->identityRepository([new PublicIdentity('identity-video', 'video', $video->canonicalId, 'video', 'odo', 'video', 'public-route-v1', 1)])))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo');
 
         self::assertSame(1, $result['_totals']['videos']);
         self::assertSame('Âm thanh Odo', $result['videos'][0]['title']);
@@ -144,5 +153,17 @@ final class SearchSemanticQueryTest extends TestCase
 
         self::assertSame([], $result['entities']);
         self::assertSame(0, $result['_totals']['entities']);
+    }
+
+    private function identityRepository(array $identities): PublicIdentityRepository
+    {
+        return new class($identities) implements PublicIdentityRepository {
+            public function __construct(private array $identities) {}
+            public function findByOwner(string $ownerKind, string $ownerId): ?PublicIdentity { foreach ($this->identities as $identity) if ($identity->ownerKind === $ownerKind && $identity->ownerId === $ownerId) return $identity; return null; }
+            public function findByRoute(string $routeType, string $collisionScope, string $slug): ?PublicIdentity { foreach ($this->identities as $identity) if ($identity->routeType === $routeType && $identity->collisionScope === $collisionScope && $identity->currentSlug === $slug) return $identity; return null; }
+            public function create(PublicIdentity $identity): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
+            public function update(PublicIdentity $identity, int $expectedRevision): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted($identity); }
+            public function appendHistoricRoute(HistoricPublicRoute $historicRoute): PublicIdentityMutationResult { return PublicIdentityMutationResult::accepted(); }
+        };
     }
 }
