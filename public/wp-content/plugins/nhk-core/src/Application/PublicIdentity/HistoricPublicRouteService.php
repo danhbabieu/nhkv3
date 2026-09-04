@@ -11,8 +11,12 @@ final class HistoricPublicRouteService implements HistoricPublicRouteResolver
     public function resolveHistoric(string $path): array
     {
         if ($path === '' || $path[0] !== '/') return ['status' => 'NOT_FOUND'];
-        $result = $this->repository->resolveHistoric($path);
-        if (($result['status'] ?? '') !== 'FOUND' || (string) ($result['target'] ?? '') === '') return ['status' => (string) ($result['status'] ?? 'NOT_FOUND')];
+        $result = method_exists($this->repository, 'resolvePath') ? $this->repository->resolvePath($path) : (method_exists($this->repository, 'resolveHistoric') ? $this->repository->resolveHistoric($path) : null);
+        if ($result instanceof PublicIdentityMutationResult) {
+            if (!$result->accepted || $result->identity === null || $result->historicRoute === null || $result->identity->currentPath === null) return ['status' => $result->code ?? 'NOT_FOUND'];
+            return ['status' => 'FOUND', 'target' => $result->identity->currentPath, 'hops' => 1];
+        }
+        if (!is_array($result) || ($result['status'] ?? '') !== 'FOUND' || (string) ($result['target'] ?? '') === '') return ['status' => is_array($result) ? (string) ($result['status'] ?? 'NOT_FOUND') : 'UNAVAILABLE_STORAGE'];
         return ['status' => 'FOUND', 'target' => (string) $result['target'], 'hops' => 1];
     }
     public function resolveExact(string $routeType, string $collisionScope, string $path): PublicIdentityMutationResult

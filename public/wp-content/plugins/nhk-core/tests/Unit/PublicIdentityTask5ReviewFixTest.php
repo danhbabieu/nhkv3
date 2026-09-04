@@ -58,6 +58,31 @@ final class PublicIdentityTask5ReviewFixTest extends TestCase
         self::assertSame('model', $result->historicRoute?->routeType);
         self::assertSame('brand:stored-parent', $result->historicRoute?->collisionScope);
     }
+
+    public function test_legacy_resolve_hydrates_the_exact_resolver_without_repository_arity_mismatch(): void
+    {
+        $result = (new HistoricPublicRouteService(new ReviewPathResolver(), static fn (): bool => true))->resolveHistoric('/old-brand/old-model/');
+        self::assertSame('FOUND', $result['status']);
+        self::assertSame('/current-brand/current-model/', $result['target']);
+    }
+
+    public function test_hydration_preserves_a_persisted_hierarchical_current_path(): void
+    {
+        $reflection = new \ReflectionMethod(\NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository::class, 'hydrate');
+        $reflection->setAccessible(true);
+        $repository = new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository(new \stdClass());
+        $row = ['identity_uuid' => \NHK\Core\Shared\Uuid\UuidCodec::toBinary('01a06815-1e51-7964-b004-1ba79e488ad1'), 'owner_kind' => 'authority', 'owner_uuid' => \NHK\Core\Shared\Uuid\UuidCodec::toBinary('01a06815-1e51-7964-b004-1ba79e488ad1'), 'route_type' => 'model', 'current_slug' => 'model-current', 'current_path' => '/brand-current/model-current/', 'collision_scope' => 'brand:stored-parent', 'route_policy_version' => 'public-route-v1', 'revision' => 4];
+        self::assertSame('/brand-current/model-current/', $reflection->invoke($repository, $row)['current_path']);
+    }
+
+    public function test_exact_query_uses_aliased_historic_and_current_columns(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php');
+        self::assertIsString($source);
+        self::assertStringContainsString('h.route_path AS historic_path', $source);
+        self::assertStringContainsString('i.current_path AS current_path', $source);
+        self::assertStringNotContainsString('SELECT h.*,i.*', $source);
+    }
 }
 
 final class ReviewPathResolver
