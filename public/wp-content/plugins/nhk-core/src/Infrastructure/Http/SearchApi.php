@@ -13,6 +13,7 @@ use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchApi
@@ -49,6 +50,6 @@ final class SearchApi
 
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
     private function media(Media $item): array { return ['type' => 'media', 'title' => $item->canonicalName]; }
-    private function video(Video $item): array { $title = (new VideoSearchDocument($this->authority))->title($item); $path = PublicRouteResolver::videoPath($title, $item->externalVideoId); return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
+    private function video(Video $item): array { $search = new VideoSearchDocument($this->authority); $title = $search->title($item); $path = $search->publicUrl($item); $url = $path === null ? null : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'VideoObject'])['search']; return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url === null ? '' : (function_exists('home_url') ? home_url($url) : $url)]; }
     private function claim(KnowledgeClaim $item): array { return ['type' => 'knowledge', 'title' => $item->claimText]; }
 }

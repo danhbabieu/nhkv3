@@ -961,3 +961,19 @@ The Odo pack is complete only when:
 - No direct SQL.
 - No semantic use of WordPress taxonomy/postmeta as a fallback graph.
 - No Odo-only entity type or table.
+
+## 22. Current media and semantic-isolation evidence — 2026-09-04
+
+The canonical technical token is `odo`; human-facing display may remain `Odo`
+or `ODO`. A September 2026 media incident affected attachments `#83` (Odo
+62/6/10) and `#86` (Odo 36/8): DB metadata had `odo-*` while five physical
+files still had `o-do-*`. The safe repair renamed originals and derivatives
+together, preserved checksums, and verified canonical HTTP `200 image/webp`.
+Legacy physical files, broken originals/derivatives and inline legacy URLs are
+now zero.
+
+Semantic rekey is not a Media rename. `_wp_attached_file`,
+`_wp_attachment_metadata`, physical filenames, derivatives and inline URLs are
+not implicit rekey targets. `OdoMediaIntegrityAuditor` and the read-only
+`tools/odo-media-integrity-audit.php` must run before and after any
+basename-sensitive change; `SemanticRekeyMediaIsolation` enforces this rule.

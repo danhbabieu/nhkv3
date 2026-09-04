@@ -38,21 +38,33 @@ turn generated copy into Evidence.
    ignored.
 2. Run semantic preflight for required claims, sources/evidence, relation
    direction, readiness, provenance, authorization and expected revisions.
-3. Create or update the native WordPress Post as a draft. The Post identity is
+   Generic Article preflight resolves subjects only through the shared
+   canonical resolver; it never hard-codes a WordPress Post ID. A concrete
+   `wp_post` stable key may identify the editorial target only where the
+   operation contract explicitly requires an existing Post.
+3. Reconcile Article Media through the governed Media V3 flow. Every file
+   ingest/adoption validates the actual image payload, fails closed for
+   corrupt/fake/unreadable bytes, retains the source-original PRIVATE and
+   exposes only eligible optimized derivatives PUBLIC under the same canonical
+   Media identity. Attachment state is projection/storage only. The result
+   must expose representative/evidence according to the Media projection
+   contract and remain idempotent.
+4. Create or update the native WordPress Post as a draft. The Post identity is
    the registered `wp_post` endpoint with stable key `<blog_id>:<post_id>`.
-4. Submit and apply semantic mutations through the existing
+5. Submit and apply semantic mutations through the existing
    Proposal → Human Approval → Eligibility → Controlled Apply → repository →
    audit boundary. Direct Graph or semantic repository writes are not a
    substitute.
-5. Read back the semantic records, Graph relations and WordPress Post. Verify
+6. Read back the semantic records, Graph relations, Media assets/usages,
+   representative/evidence projection and WordPress Post. Verify
    canonical identity, revisions, visibility, relation direction, provenance
    and public projection eligibility.
-6. Before publication of promotional/commercial copy, run the public-claim
+7. Before publication of promotional/commercial copy, run the public-claim
    compliance gate over the rendered Article and its public projections. An
    unsupported objective or superiority/uniqueness/absolute claim must be
    evidence-bound, genuinely narrowed by rewrite, or blocked for human review;
    synonym substitution alone is not a compliant rewrite.
-7. Publish the WordPress Post only when all required stages have satisfied this
+8. Publish the WordPress Post only when all required stages have satisfied this
    contract. Generic WordPress publication remains independently valid, but it
    is not a completed V3 knowledge Article workflow without these stages.
 
@@ -121,6 +133,7 @@ Subject resolution is shared by search/inventory and Article preflight. The
 generic preflight has no WordPress Post-ID exception; concrete Post IDs may
 appear only as test fixtures.
 
+
 ## Media, image and Living Knowledge reuse boundary — 2026-09-04
 
 Article editorial storage and semantic storage remain deliberately separate.
@@ -130,11 +143,11 @@ repositories must not persist a duplicate copy of the Article body as semantic
 truth.
 
 Article media must reuse canonical `Media` where available. A new upload enters
-the governed Media boundary, retains the source-original as a MediaAsset and
-projects normalized WebP/responsive/WordPress attachment outputs under the same
-Media identity. Featured/inline selection remains WordPress editorial state;
-`MediaUsage` records contextual role/SEO metadata and does not itself create a
-Graph edge or Knowledge/Evidence.
+the governed Media boundary, retains the source-original as a private/protected
+MediaAsset and projects normalized WebP/responsive/WordPress attachment outputs
+under the same Media identity. Featured/inline selection remains WordPress
+editorial state; `MediaUsage` records contextual role/SEO metadata and does not
+itself create a Graph edge or Knowledge/Evidence.
 
 An Article that repeats an existing fact should resolve and reuse the canonical
 Knowledge/Source/Evidence chain rather than minting a duplicate claim from its
@@ -153,3 +166,23 @@ read-back across the owning boundary: WordPress for Article editorial state,
 Media/MediaAsset/MediaUsage for image state, Video for external-reference state,
 Knowledge/Source/Evidence for factual state, and Graph only for registered typed
 relations.
+
+## Runtime acceptance boundary
+
+Media and semantic identity operations remain separate inside this chain:
+Article subject resolution or semantic rekey must not mutate WordPress
+attachment metadata, physical filenames, derivatives or inline URLs. Any
+basename normalization requires the independent governed Media operation and
+its complete checksum/HTTP read-back evidence.
+
+The acceptance path is one evidence chain, not a collection of isolated unit
+passes:
+
+`real image file → governed file ingest/adoption → WordPress attachment → one
+canonical Media identity → source-original PRIVATE + PUBLIC derivatives →
+MediaAsset/MediaUsage read-back → representative/evidence entity projection →
+Article preflight subject resolution`.
+
+The chain is accepted only when each boundary is proven with the real
+integration runtime. Focused unit tests may prove local behavior but cannot be
+reported as runtime acceptance or as completion of an unrun WordPress test.

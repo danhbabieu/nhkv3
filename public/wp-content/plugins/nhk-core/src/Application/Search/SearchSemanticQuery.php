@@ -10,6 +10,7 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchSemanticQuery
@@ -28,8 +29,8 @@ final class SearchSemanticQuery
         if ($this->ready('media')) foreach ($this->media->list() as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => home_url($path)];
         if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority); foreach ($this->videos->list() as $item) {
             if (!$item->active || !$item->hasValidPublicReference() || !$videoSearch->isDiscoverable($item)) continue;
-            $title = $videoSearch->title($item); $path = $videoSearch->publicUrl($item);
-            if ($path !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($path) : $path];
+            $title = $videoSearch->title($item); $path = $videoSearch->publicUrl($item); $url = $path === null ? null : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'VideoObject'])['search'];
+            if ($url !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($url) : $url];
         }
         }
         if ($this->ready('knowledge')) foreach ($this->claims->list() as $item) if ($item->active && $item->isPublic() && ($path = PublicRouteResolver::existingSemanticPath('knowledge', $item->canonicalId)) !== null && $this->matches($term, $item->claimText, $item->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => home_url($path)];

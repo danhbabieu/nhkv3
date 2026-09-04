@@ -845,6 +845,17 @@ Brand/Model/Variant/Movement relation hay bất kỳ Graph edge nào. Những s�
 Source-original upload phải được giữ lại như một `MediaAsset` dưới cùng
 canonical Media identity với WebP/responsive derivatives. Derivative chỉ là
 delivery optimization; không được xóa hoặc thay thế source-original.
+Source-original luôn `PRIVATE`; chỉ derivative đã validate, đọc lại được và
+được policy cho phép mới có thể `PUBLIC`. Hai visibility này không tạo hai
+semantic Media identity.
+
+Mọi image payload phải được kiểm tra thực sự trước khi ghi durable state:
+MIME allow-list, image structure/dimensions, byte read-back, checksum và
+storage containment phải nhất quán với payload. Corrupt, giả ảnh, thiếu byte,
+không đọc lại được hoặc path ngoài storage root phải fail-closed. Failure
+không được để lại Media, MediaAsset, MediaUsage, attachment mapping hay file
+orphan; nếu một infrastructure step đã tạo artifact trước khi failure, flow
+phải rollback/cleanup artifact đó trước khi trả non-success.
 
 #### Controlled Media Ingest boundary
 
@@ -866,6 +877,11 @@ Representative selection dùng precedence deterministic đã được contract h
 upload recency không phải tie-breaker. Evidence/technical detail không tự
 động thay thế representative đang tồn tại. Representative là lựa chọn
 presentation/editorial, không phải semantic ownership.
+
+Entity projection phải expose representative và evidence theo đúng contract:
+representative là một lựa chọn deterministic từ candidate hợp lệ; evidence và
+technical detail là tập reader-safe riêng, không được promote thành
+representative hoặc semantic authority chỉ vì attachment/placement của chúng.
 
 Bulk ingest dùng một workflow batch context. Batch chỉ giữ provenance,
 uploader, source, default context, count và ingest status; batch không phải
@@ -1095,9 +1111,44 @@ Public slug phải ổn định sau khi được cấp rõ ràng. Đổi Display
 ngầm thay entity hoặc ngầm đổi canonical URL. Đổi slug là operation explicit,
 được Governance/audit và phải lưu historic slug.
 
+Public Identity là một lớp identity riêng của resource được phép public, không
+phải bản thân Authority/Video/Media semantic identity. Bản ghi này bind owner
+canonical identity, registered resource/route type, current public slug,
+collision scope, optimistic revision/CAS, historic route history và route-policy
+version khi contract yêu cầu. UUID, stable key, title, display name, filename,
+WordPress post ID và URL không được làm stable semantic identity hoặc nguồn
+authority của slug.
+
+Public route resolver phải đọc Public Identity đã persist và resource-specific
+URL policy. Không được transliterate `canonical_name` ở mỗi request để tạo URL
+canonical. Vietnamese normalization chỉ là pure text normalization; nó không
+quyết định route, identity, relation, URL ownership hay SEO policy. Đổi display
+name không đổi `current_slug`; đổi public slug là governed, audited,
+revision-bound operation.
+
+Public Identity hiện là constitutional target nhưng persistence/allocator/history
+chưa runtime-proven ở mọi resource. Khi boundary chưa có, phải ghi
+`PUBLIC_IDENTITY_STORAGE_GAP` và `CODE_GAP`; không mô tả read-time derivation là
+public identity bền vững.
+
 Historic URL redirect trực tiếp một hop bằng HTTP 301 tới canonical URL hiện
 hành. Không tạo redirect chain. Ambiguous slug, alias collision, parent collision
 hoặc native WordPress route collision phải fail-closed; không redirect bằng guess.
+
+Historic route phải resolve exact owner → current Public Identity → current
+canonical URL. URL cũ không được trả 200, redirect qua UUID/stable-key URL hoặc
+qua historic slug trung gian. Native WordPress route ownership luôn thắng tại
+collision boundary. Article là ngoại lệ có chủ đích: native `wp_posts` giữ
+editorial `post_name`/permalink và không bị ép vào semantic Public Identity.
+
+Shared Vietnamese normalizer phải deterministic, environment-independent và có
+ít nhất các kết quả: `Ô Đô`→`odo`, `Đồng hồ cổ`→`dong-ho-co`, `được`→`duoc`,
+`người Việt`→`nguoi-viet`, `sưu tập`→`suu-tap`, `Âm thanh điểm nhạc`→
+`am-thanh-diem-nhac`, `Vì sao người Việt gọi là 54?`→
+`vi-sao-nguoi-viet-goi-la-54`, `Ô Đô 36/10 – Gai-Carillon`→
+`odo-36-10-gai-carillon`. New-upload filename normalization consumes this
+text contract but never makes filename a semantic identity; legacy physical
+files are not bulk-renamed.
 
 Nếu runtime chỉ derive slug từ Display Name mà chưa có persisted public identity
 và history, trạng thái đó là PUBLIC_IDENTITY_STORAGE_GAP. Không được mô tả
@@ -1446,6 +1497,23 @@ constitutional amendment. Không một data fixture, V2 behavior, UI request ho�
 runtime convenience nào tự sửa luật.
 
 ## 26. Acceptance invariants bắt buộc
+
+### 26.1 Semantic rekey và Media file isolation
+
+`SEMANTIC REKEY != MEDIA FILE RENAME`. A semantic stable-key operation such as
+`nhk:*:o-do...` → `nhk:*:odo...` must not implicitly mutate
+`_wp_attached_file`, `_wp_attachment_metadata`, physical upload filenames,
+derivative filenames or inline editorial URLs. A separately authorized
+basename normalization is an atomic Media operation with preflight,
+filesystem/metadata and derivative inventory, collision detection, HTTP
+read-back, checksum verification and fail-closed rollback.
+
+The DB↔filesystem audit classifications are `OK`, `DB_CANONICAL_FS_LEGACY`,
+`DB_LEGACY_FS_CANONICAL`, `BOTH_IDENTICAL`, `BOTH_DIFFERENT`,
+`MISSING_ORIGINAL`, `MISSING_DERIVATIVE`, `METADATA_MISMATCH`,
+`ORPHAN_ATTACHMENT` and `ORPHAN_FILE`. Both-different fails closed/manual
+review, and serialized WordPress metadata is never changed by blanket SQL
+replacement.
 
 Normative body của Hiến pháp kết thúc bằng các invariant có thể chuyển thành
 machine test:

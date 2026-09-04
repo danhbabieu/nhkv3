@@ -3,12 +3,13 @@
 > **NON-NORMATIVE.** This is implementation evidence. If it conflicts with
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-## Current status
+## Current status — 2026-09-04
 
-The domain boundary and schema migration are implemented and migration 004 is
-applied to `nhk_v3`. Persistence services and Media/Video Graph endpoint
-resolvers are now implemented and covered by focused unit evidence; WordPress
-database integration and legacy data mapping remain in progress.
+Media/Article implementation is present locally and the focused contract/unit
+proof passes. The real-file WordPress integration test is present but skipped
+when `NHK_WP_TEST_PATH` is unavailable; therefore runtime acceptance remains
+required and this document does not claim the full ingest-to-preflight chain
+complete. Legacy mapping/repair remains read-only and unauthorized.
 
 ## Current reusable boundary — 2026-09-04
 
@@ -56,8 +57,16 @@ not make an attachment or asset a Graph endpoint by default.
 Every multipart/file intake enters the governed Media V3 boundary and
 create-or-resolves one Media identity. The source-original remains a MediaAsset
 under that identity; optimized WebP and responsive sizes are derivatives and
-must not delete the original or create a second Media. Attachment creation is
-an infrastructure projection/storage step only.
+must not delete the original or create a second Media. The source-original is
+retained `PRIVATE`; eligible optimized derivatives are `PUBLIC` under the same
+Media identity. Attachment creation is an infrastructure projection/storage
+step only.
+
+The actual image payload must pass MIME/structure/dimension/readability,
+checksum and storage-path validation before durable persistence. Corrupt or
+fake images fail closed and the flow cleans up any partial attachment, mapping,
+semantic asset/usage or temporary file so no orphan is left behind.
+Re-adoption of the same attachment is idempotent.
 
 ### MCP direct image attachment checkpoint — 2026-09-03
 
@@ -65,11 +74,13 @@ an infrastructure projection/storage step only.
 `file` parameter. It sanitizes the explicit filename and processes a temporary
 copy with EXIF auto-orientation, aspect-preserving `max_width`/`max_height`
 resize and requested encoder `quality` before the processed bytes enter the
+
 WordPress Media Library. The original camera upload is never copied to the
-public WordPress uploads path as the public derivative; the constitutionally
-required source-original is retained separately as a MediaAsset under the same
-Media identity. Temporary request workfiles are removed after the request. The
-result includes the attachment ID, canonical URL, final filename, MIME,
+public WordPress uploads path as the public derivative. Instead, the
+source-original is retained as a `PRIVATE`/protected `MediaAsset` under the same
+canonical Media identity; eligible optimized/public outputs remain derivatives
+under that identity. Temporary request workfiles are removed after the request.
+The result includes the attachment ID, canonical URL, final filename, MIME,
 dimensions, filesize and WordPress derivatives. `nhk.media.attachment.get`
 provides the same reader-safe read-back shape.
 
@@ -200,6 +211,12 @@ candidates are selected by explicit selection, existing representative usage,
 eligibility/suitability and stable canonical tie-breakers; upload recency alone
 is not a valid precedence rule.
 
+Static evidence: the latest focused owner-decision proof is `41` tests / `259`
+assertions and covers UUID/stable-key/ambiguity resolution, role precedence,
+source/derivative replay and entity media projection. Static/full-suite counts
+below are historical checkpoints and do not override the current execution
+state gate.
+
 Static evidence: full Unit suite `265` tests / `1,355` assertions, Composer
 validation, full PHP lint and `git diff --check` pass. Live WordPress,
 migration, Article/MCP REST, sitemap and HTTP evidence is blocked in this
@@ -223,3 +240,26 @@ the database but remains non-green on the existing retired V2-writer,
 malformed-asset and route/identity contracts; frontend route smoke is 44/46.
 This recovery performed no R2 source change, legacy repair, attachment write,
 semantic write, Graph write or migration against development `nhk_v3`.
+
+### Odo media integrity checkpoint — 2026-09-03
+
+The verified Odo attachment incident is closed for the observed repair scope:
+DB canonical `odo`, physical legacy `o-do` files `0`, broken originals `0`,
+broken derivatives `0`, canonical HTTP failures `0`, and inline legacy URLs
+`0`. The incident affected attachments `#83` and `#86` and was caused by a
+semantic normalization that did not synchronously rename physical files.
+Future work must run the read-only `OdoMediaIntegrityAuditor` before and after
+basename-sensitive changes. Semantic rekey remains isolated from Media file
+rename; rename requires an atomic Media preflight, checksum, derivative,
+collision, HTTP read-back and rollback contract.
+
+### Current owner-decision matrix
+
+| Rule | Local implementation | Focused proof | Runtime status |
+|---|---|---|---|
+| Governed file ingest/adoption and one Media identity | Implemented locally | Verified by focused tests | Real-file WordPress verification still required |
+| PRIVATE source-original and PUBLIC derivatives | Implemented locally | Verified by focused tests | Runtime asset/attachment read-back still required |
+| `representative`, `evidence`, `technical_detail` and deterministic precedence | Implemented locally | Verified by focused tests | Entity projection runtime verification still required |
+| Corrupt/fake image fail-closed with no orphan | Implemented at adapter boundary | Focused contract coverage | Guarded real-file negative cases still required |
+| UUID → stable key → exact name/alias Article subject resolution | Implemented locally | Verified by focused tests | Integration preflight verification still required |
+| Real file → attachment → Media → assets/usages → projection → preflight | Wiring present locally | Partial focused evidence | **RUNTIME VERIFICATION STILL REQUIRED** |

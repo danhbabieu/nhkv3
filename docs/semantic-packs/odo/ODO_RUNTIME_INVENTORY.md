@@ -233,8 +233,8 @@ the unavailable runtime.
 
 | Source UUID/key | Target UUID/key | Decision | Runtime result |
 |---|---|---|---|
-| `32f43d4b-d6c8-4223-a89b-cc47f30cda77` / `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | `CONFIRMED_MERGE` (`DESIGN_INPUT`); owner-confirmed same identity; merge required | `RUNTIME_UNVERIFIED`; no merge operation exists in current runtime |
-| `01bead27-1308-48c1-af99-c68318e2b577` / `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | `MERGE_CANDIDATE` (`DESIGN_INPUT`); do not merge | `RUNTIME_UNVERIFIED`; intentionally untouched |
+| `32f43d4b-d6c8-4223-a89b-cc47f30cda77` / `nhk:component:o-do.dial.applied-pinned` | `48311ccd-9d45-4985-a620-ca579499f02c` / `nhk:component:odo.dial.applied-pinned` | `CONFIRMED_SAME_IDENTITY`; owner-confirmed same identity; governed merge required | `PINNED_DIAL_MERGE=BLOCKED`; live subject binding persisted `component` instead of source UUID |
+| `01bead27-1308-48c1-af99-c68318e2b577` / `nhk:component:o-do.dial.applied-glued` | `e326a326-ae8c-447f-a2a4-a83a3cf168d4` / `nhk:component:odo.dial.applied-glued` | `MERGE_CANDIDATE`; manual identity decision required; do not merge | `RUNTIME_UNVERIFIED`; intentionally untouched |
 
 ## Read-only inventory gate result
 

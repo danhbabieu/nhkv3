@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Graph\BrandAggregationQuery;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class PublicEntityCollectionQuery
 {
@@ -41,7 +42,7 @@ final class PublicEntityCollectionQuery
         if (!$this->isAvailable() || !$this->types->has($type) || trim($slug) === '') return null;
         $matches = [];
         foreach ($this->authority->listByType($type, true) as $entity) {
-            if (PublicRouteResolver::slug($entity->canonicalName) !== trim($slug)) continue;
+            if (($this->routes->resolve($type, $this->routeSegments($type, $slug))?->canonicalId ?? '') !== $entity->canonicalId) continue;
             if ($this->item($entity) !== null) $matches[] = $entity;
         }
         return count($matches) === 1 ? $matches[0] : null;
@@ -76,7 +77,7 @@ final class PublicEntityCollectionQuery
     {
         if (!$this->types->has($type)) return null;
         $matches = [];
-        foreach ($this->authority->listByType($type) as $entity) if (PublicRouteResolver::slug($entity->canonicalName) === trim($slug) && $this->eligibility->evaluate($entity)->eligible) $matches[] = $entity->stableKey;
+        foreach ($this->authority->listByType($type) as $entity) if (($this->routes->resolve($type, $this->routeSegments($type, $slug))?->canonicalId ?? '') === $entity->canonicalId && $this->eligibility->evaluate($entity)->eligible) $matches[] = $entity->stableKey;
         return count($matches) === 1 ? $matches[0] : null;
     }
 
@@ -90,7 +91,8 @@ final class PublicEntityCollectionQuery
         if ($identity === null || $path === null) return null;
         $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
-        $item = [...$identity, 'payload' => $payload, 'url' => $path];
+        $url = (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'Entity'])['card'];
+        $item = [...$identity, 'payload' => $payload, 'url' => $url];
         if ($this->entityMedia !== null) {
             $media = $this->entityMedia->forEntity($entity->entityType, $entity->canonicalId);
             $item['media'] = [
@@ -112,4 +114,10 @@ final class PublicEntityCollectionQuery
 
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
+    /** @return list<string> */
+    private function routeSegments(string $type, string $slug): array
+    {
+        $namespace = PublicRouteResolver::namespaceFor($type);
+        return $namespace === null ? [trim($slug)] : [$namespace, trim($slug)];
+    }
 }

@@ -1,5 +1,14 @@
 # Odo Semantic Reference Surface Matrix
 
+## Current status clarification — 2026-09-04
+
+The matrix remains authoritative for ownership: Graph is the only Authority
+reference movement surface observed, while Knowledge, Source, Evidence,
+MediaUsage and Video remain `NOT_APPLICABLE` for direct Authority merge
+adapters. The local merge capability exists, but the live proposal binding is
+invalid (`subject_id="component"` for the pinned source UUID), so no apply is
+authorized or claimed.
+
 **Date:** 2026-09-03
 **Status:** `CODE_OBSERVED`; runtime values remain `RUNTIME_UNVERIFIED` until
 the existing read-only inventory can complete. This matrix is an ownership

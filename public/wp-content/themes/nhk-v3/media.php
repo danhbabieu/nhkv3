@@ -1,4 +1,5 @@
 <?php
+/* public seo_projection supplies canonical link results. */
 $context = $GLOBALS['nhk_core_media_context'] ?? null;
 $archive = is_array($context) ? ($context['archive'] ?? []) : [];
 $media = is_array($context) ? ($context['media'] ?? []) : [];

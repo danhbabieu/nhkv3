@@ -3,17 +3,18 @@
 > **NON-NORMATIVE.** This is an identity audit and gap record. If it conflicts
 > with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-Status: P0 read-only parity audit, 2026-09-02. This is an evidence record and
+Status: P0 read-only parity audit, synchronized 2026-09-04. This is an evidence record and
 contract matrix; it does not assign slugs, create aliases, alter redirects,
 write V2, import data, or repair Graph relations.
 
 ## Current runtime matrix
 
 The runtime registry is the source of the type list. The current catalog has
-nine Authority types. `PublicRouteResolver` is the URL authority. In the
-current implementation, the public slug is derived at read time from
-`canonical_name`; no Authority column or contract field stores a canonical
-public slug, and no Authority alias/history repository is queried.
+nine Authority types. The constitutional target is a persisted Public Identity
+consumed by one route resolver; the current implementation still uses
+`PublicRouteResolver` read-time derivation from `canonical_name`, with no durable
+current-slug/CAS/history repository. This is a `PUBLIC_IDENTITY_STORAGE_GAP` /
+`CODE_GAP`, not a completed public-identity implementation.
 
 | Type | Internal identity | Display name source | Public slug source | Canonical pattern | Parent requirement | Legacy pattern / redirect | Indexable | List query | Detail query | Fail-closed reasons |
 |---|---|---|---|---|---|---|---|---|---|---|

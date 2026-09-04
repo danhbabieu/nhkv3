@@ -28,6 +28,11 @@ assets. They must not fabricate ratings, reviews, product/video facts or
 stronger claims than the evidence scope supports. Placeholder Media makes the
 Article media/SEO stage incomplete and is excluded from preferred structured
 data images and image sitemaps.
+The representative image is selected by the deterministic Media precedence
+contract. Evidence and `technical_detail` usages remain separate supporting
+projections and never replace a representative automatically. WordPress
+attachment identity is only storage/projection state; the canonical Media
+identity and its PUBLIC derivative eligibility control SEO output.
 
 Publication verification must inspect the actual rendered public route and
 record field-level results for title, H1, permalink/canonical, description,

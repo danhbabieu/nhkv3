@@ -369,3 +369,31 @@ execution:
     - Authority
     - Graph
     - public projection where applicable
+
+media_integrity:
+  canonical_technical_token: odo
+  semantic_rekey_is_not_media_file_rename: true
+  audit_tool: tools/odo-media-integrity-audit.php
+  auditor: OdoMediaIntegrityAuditor
+  read_only_by_default: true
+  required_before_after_basename_change: true
+  classifications:
+    - OK
+    - DB_CANONICAL_FS_LEGACY
+    - DB_LEGACY_FS_CANONICAL
+    - BOTH_IDENTICAL
+    - BOTH_DIFFERENT
+    - MISSING_ORIGINAL
+    - MISSING_DERIVATIVE
+    - METADATA_MISMATCH
+    - ORPHAN_ATTACHMENT
+    - ORPHAN_FILE
+  policy:
+    both_different: FAIL_CLOSED_MANUAL_REVIEW
+    serialized_metadata_rewrite: FORBIDDEN
+
+current_governance_gate:
+  pinned_dial_merge: BLOCKED
+  reason: LIVE_MERGE_SUBJECT_BINDING_INVALID
+  diagnostic_subject_id: component
+  semantic_data_mutated: false

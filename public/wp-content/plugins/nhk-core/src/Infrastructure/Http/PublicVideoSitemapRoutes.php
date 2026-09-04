@@ -4,11 +4,13 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Http;
 
 use NHK\Core\Application\Video\VideoSitemapProjection;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class PublicVideoSitemapRoutes
 {
+    // Native wp-sitemap.xml remains independent; this endpoint is Video-only.
     public function __construct(private VideoRepository $videos, private ?MigrationStatus $status = null)
     {
     }

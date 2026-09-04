@@ -1,4 +1,5 @@
 <?php
+/* public seo_projection supplies canonical link results; posts keep native permalinks. */
 get_header();
 $isSearch = is_search();
 $results = $isSearch ? (new NHK_V3_Search_Page_Query())->read() : null;

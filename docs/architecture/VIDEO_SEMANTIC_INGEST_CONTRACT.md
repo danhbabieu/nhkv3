@@ -8,6 +8,17 @@ policy → NHK lookup → relation candidates → optional Knowledge enrichment
 planning → Hub classification → editorial package → SEO projection →
 completeness → governed Video Proposal`.
 
+Canonical public URL policy is `/video/{semantic-slug}-{external-video-id}/`.
+Semantic slug fallback order is explicit governed NHK semantic/editorial
+context; confirmed attached Brand/Model/Variant/Movement/Music context;
+governed editorial title; governed user hint when allowed; and source-platform
+title only as a controlled last resort. A YouTube marketing title must not
+replace confirmed NHK context. URL changes are explicit Public Identity
+operations; source synchronization never changes UUID or creates a duplicate
+Video. The approved canary is YouTube `P4KaHX3LBOw`, Video UUID
+`01a06815-1e51-7964-b004-1ba79e488ad1`, expected path
+`/video/odo-36-10-gai-carillon-p4kahx3lbow/`.
+
 The public MCP entry point is the existing governed `nhk.video.ingest`. It may
 return a single preview packet with source, editorial, Hub, relation, SEO,
 warning and ambiguity information. It never approves, applies or publishes.

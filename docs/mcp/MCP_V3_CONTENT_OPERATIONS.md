@@ -5,14 +5,18 @@
 
 Status: runtime audit and contract-safe implementation checkpoint, 2026-09-04.
 
-New NHK-managed image bytes follow one scoped ingest law before durable public
-projection: validate → auto-orient → contextual processing/naming → public
-normalized derivative (WebP where the current contract requires it) → read-back
-verification → temporary-workfile cleanup. The uploaded source-original is
-retained as a private/protected `MediaAsset` under the same canonical `Media`;
-it is not the public filename/URL identity. Missing trustworthy naming context
-or unavailable required conversion fails closed. Existing legacy files are not
-rewritten or deleted.
+
+New NHK-managed image bytes follow one governed Media V3 ingest law before
+durable persistence/public projection: validate the actual payload → auto-orient
+→ resize → contextual SEO-safe naming → WebP/eligible derivative encoding →
+retain source-original `PRIVATE`/protected → persist eligible optimized
+derivatives `PUBLIC` under the same Media identity → read-back verification →
+temporary-workfile cleanup.
+
+Corrupt, fake or unreadable payloads, invalid storage paths and unavailable
+required conversion fail closed. Partial attachment, mapping, asset or usage
+artifacts must be cleaned up. Existing legacy files are not rewritten or
+deleted.
 
 This shared guide describes the MCP V3 runtime actually present for ChatGPT and
 Codex. It does not authorize new entity types, predicates, relation types,
@@ -35,6 +39,7 @@ Modern requests use protocol `2026-07-28`; `Accept` must include both
 dispatch. Governed tools require their capability. Initialized notifications
 return HTTP 202 with no body.
 
+
 ### Storage & Reuse Map — 2026-09-04
 
 | DATA | CANONICAL OWNER / STORAGE | DOWNSTREAM REUSE RULE | MUST NOT HAPPEN |
@@ -54,6 +59,22 @@ Every write must be read back from its owning store. MCP never becomes a second
 canonical store, and Admin/WordPress adapters never become parallel semantic
 writers.
 
+### How a fresh agent chooses a writer
+
+1. Resolve the requested resource through the runtime registry using canonical
+   UUID, stable key, then exact canonical name/alias. Ambiguity or an unknown
+   type fails closed.
+2. Use the bounded owner: native WordPress Article/category gateway for
+   editorial data; Authority APIs for registered Authority types;
+   `MediaIngestGateway` for Media/MediaAsset/MediaUsage; `nhk.video.ingest` plus
+   Video Governance for Video; Claim/Source/Evidence ingest for Knowledge; and
+   GraphService only for registered relations.
+3. For semantic writes, use Proposal → submit → approve → eligibility → apply
+   and read back the result. Never use generic Post, CPT, taxonomy or postmeta
+   writers as semantic fallback.
+4. If no registered owner or operation exists, return the applicable
+   `REGISTRY_GAP`, `CODE_GAP` or `SEMANTIC_GAP`; never invent a writer.
+
 ## 2. Tool catalog thực tế
 
 `McpToolCatalog::tools()` exposes the exact current registered tool list. In
@@ -72,7 +93,7 @@ must not be replaced by a static catalog assertion.
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
-| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media and projects an attachment | Usage is placement; attachment is storage/projection only | READY for metadata and multipart image adoption; runtime byte proof required |
+| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Local implementation + focused proof; real-file runtime byte/rollback proof required |
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
 | `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; optional Knowledge output is planning-only |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
@@ -151,6 +172,12 @@ The publication boundary is enforced by `ArticlePublicationGate`; rendered
 public verification and exact integration runtime evidence remain separate
 completion gates. Article body/excerpt stays only in WordPress editorial
 storage; receipts, Knowledge and Graph never become a second Article-body store.
+
+The minimum Article/Media runtime acceptance is the real-file chain:
+`file → governed ingest/adoption → attachment → one Media identity →
+MediaAsset/MediaUsage read-back → representative/evidence projection → Article
+preflight`. A static catalog or focused unit pass is not evidence that this
+WordPress/runtime chain has passed.
 
 ## 5. Authority workflow
 
@@ -257,11 +284,17 @@ MediaAsset under the same canonical Media identity; temporary workfiles are not
 retained. WordPress/generated responsive representations remain derivatives.
 
 The direct file path is a binary/storage adapter inside the governed Media
-flow. It creates or resolves the NHK semantic Media identity but does not create
-Knowledge, Source, Evidence or Graph edges from image content.
-`nhk.media.attachment.get` reads back attachment projection state. Checksum is a
-duplicate candidate only; it never merges canonical identities. A suitable
-existing Media should be reused before creating another semantic identity.
+
+flow. It creates or resolves exactly one NHK semantic Media identity; the
+source-original remains a private/protected MediaAsset and eligible optimized
+outputs remain derivatives under that same Media. It does not create Knowledge,
+Source, Evidence or Graph edges from image content.
+
+`nhk.media.attachment.get` reads back attachment projection state including the
+attachment ID, canonical URL, sanitized filename, MIME, dimensions, filesize and
+derivatives. Checksum is a duplicate candidate only; it never merges canonical
+identities. A suitable existing Media should be reused before creating another
+semantic identity.
 
 Article Ingest reconciliation uses the same `ArticleMediaCoordinator` as the
 WordPress post-created adapter. It returns media state, mandatory-slot
@@ -443,7 +476,19 @@ never call it. Any reachable Article path that copies legacy `post_content` into
 semantic storage or mutates Graph outside Governance is
 `CONSTITUTION_CONFLICT`.
 
+
 A generic WordPress write, Media upload or Video preview alone cannot be
 reported as a complete V3 knowledge Article workflow. Required-stage failure
 must remain an explicit non-success, retryable, unavailable, conflict or
 contract-defined outcome.
+
+## Ô Đô governance binding incident — 2026-09-04
+
+The live capability schema exposes `merge`; the old statement that merge is
+unavailable is historical only. The current live diagnostic is blocked because
+proposal-create with pinned-dial source UUID
+`32f43d4b-d6c8-4223-a89b-cc47f30cda77` persisted `subject_id="component"`.
+
+The diagnostic was rejected and no merge/apply occurred. The required fix is
+to bind the canonical source UUID through both the local and remote governance
+transport paths and re-verify before any owner-approved merge.

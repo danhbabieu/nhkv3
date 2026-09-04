@@ -1,5 +1,15 @@
 # Odo Demo Governed Apply Plan
 
+## Current runtime gate — 2026-09-04
+
+The generic `merge` capability is visible in the live schema, but pinned-dial
+apply is blocked by `LIVE_MERGE_SUBJECT_BINDING_INVALID`: the supplied source
+UUID was persisted as `subject_id="component"` during a rejected diagnostic.
+This is a binding/runtime defect, not `MERGE_OPERATION_NOT_EXPOSED`. The
+owner-confirmed pinned decision remains pending governed merge; the glued pair
+remains `MERGE_CANDIDATE` and requires manual identity decision. No semantic
+data was mutated.
+
 **Target:** `demo.1945.vn`
 **Status:** future human-controlled cutover packet; no demo mutation performed
 on 2026-09-03.

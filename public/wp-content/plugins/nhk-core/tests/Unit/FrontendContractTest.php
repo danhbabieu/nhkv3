@@ -79,6 +79,41 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('!$video->active', $readApi);
     }
 
+    public function test_public_url_consumers_use_the_shared_seo_projection_and_native_wordpress_stays_independent(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $files = [
+            $root . '/src/Application/Video/VideoSeoProjection.php',
+            $root . '/src/Application/Video/VideoSitemapProjection.php',
+            $root . '/src/Application/Video/VideoSearchDocument.php',
+            $root . '/src/Application/Search/SearchSemanticQuery.php',
+            $root . '/src/Application/Entity/EntityPageQuery.php',
+            $root . '/src/Application/Entity/PublicEntityCollectionQuery.php',
+            $root . '/src/Application/Article/ArticleResearchPreflight.php',
+            $root . '/src/Infrastructure/Http/SearchApi.php',
+            $root . '/src/Infrastructure/Http/ReadApi.php',
+            $root . '/src/Infrastructure/Http/PublicVideoSitemapRoutes.php',
+        ];
+        foreach ($files as $file) {
+            $contents = (string) file_get_contents($file);
+            self::assertStringContainsString('PublicSeoProjection', $contents, $file);
+            self::assertStringNotContainsString('PublicRouteResolver::slug(', $contents, $file);
+            self::assertStringNotContainsString('PublicRouteResolver::videoPath(', $contents, $file);
+        }
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        foreach (['functions.php', 'index.php', 'entity.php', 'video.php', 'media.php', 'template-parts/article-card.php'] as $file) {
+            $contents = (string) file_get_contents($theme . '/' . $file);
+            self::assertStringContainsString('seo_projection', $contents, $file);
+            self::assertStringNotContainsString('canonical_uuid', $contents, $file);
+            self::assertStringNotContainsString('stable_key', $contents, $file);
+        }
+        $functions = (string) file_get_contents($theme . '/functions.php');
+        self::assertStringContainsString('get_permalink()', $functions);
+        self::assertStringContainsString('wp_get_canonical_url()', $functions);
+        $sitemap = (string) file_get_contents($root . '/src/Infrastructure/Http/PublicVideoSitemapRoutes.php');
+        self::assertStringContainsString('wp-sitemap', $sitemap);
+    }
+
     public function test_theme_design_tokens_have_one_nhk_source(): void
     {
         $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/style.css');

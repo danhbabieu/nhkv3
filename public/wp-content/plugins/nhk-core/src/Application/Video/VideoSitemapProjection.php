@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Domain\Video\Video;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class VideoSitemapProjection
 {
@@ -11,6 +12,7 @@ final class VideoSitemapProjection
     public function project(array $videos, string $baseUrl = ''): array
     {
         $items = [];
+        $seo = new PublicSeoProjection();
         $policy = new VideoUrlPolicy();
         $selector = new VideoPublicContextSelector();
         foreach ($videos as $video) {
@@ -20,7 +22,7 @@ final class VideoSitemapProjection
             if (($video->metadata['indexable'] ?? true) !== true) continue;
             $url = $policy->project($video, $selector);
             if (!$url['eligible'] || $url['path'] === null) continue;
-            $path = $url['path'];
+            $path = $seo->project($url, ['type' => 'VideoObject'])['sitemap'];
             $loc = $baseUrl !== '' ? rtrim($baseUrl, '/') . $path : $path;
             $item = ['loc' => $loc, 'title' => (string) ($video->metadata['editorial']['title'] ?? $video->title), 'description' => (string) ($video->metadata['editorial']['summary'] ?? '')];
             $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';

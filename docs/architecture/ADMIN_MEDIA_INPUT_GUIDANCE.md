@@ -20,6 +20,11 @@ batch context. The application layer then delegates Media persistence through
 Admin must not write `nhk_media`, `nhk_media_assets` or `nhk_media_usages`
 directly, create a Graph edge from an upload, promote OCR/recognition to an
 Authority identity, or use keyword groups as meta keywords or Knowledge.
+Every file adoption/upload must validate actual image bytes before persistence;
+corrupt/fake/unreadable payloads fail closed and partial attachment/mapping or
+semantic records are cleaned up so no orphan remains. The source-original is
+retained PRIVATE and eligible optimized derivatives are PUBLIC under one
+canonical Media identity.
 
 ## Controlled input vocabulary
 
@@ -34,6 +39,10 @@ For an Article, the input adapter may select one Media for
 supporting Media. The Article coordinator reuses suitable existing Media
 before creating a placeholder. WordPress remains the owner of editorial image
 selection and content ordering.
+Entity projection must expose the selected representative separately from
+evidence and `technical_detail`; evidence/detail never silently substitutes an
+existing representative. Selection follows deterministic precedence, never
+upload recency.
 
 ## SEO and upload expectations
 

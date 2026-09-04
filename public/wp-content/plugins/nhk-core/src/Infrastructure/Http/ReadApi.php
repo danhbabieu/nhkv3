@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Http;
 
+use NHK\Core\Application\Seo\PublicSeoProjection;
+
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
@@ -12,6 +14,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 
 final class ReadApi
 {
@@ -38,7 +41,8 @@ final class ReadApi
     {
         if ($error = $this->unavailable(!$this->status || $this->status->videoStorageReady(), 'video')) return $error;
         $slug = trim((string) $request['slug']);
-        $matches = array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && PublicRouteResolver::videoPath($item->title, $item->externalVideoId) === '/' . $slug . '/'));
+        $policy = new VideoUrlPolicy();
+        $matches = array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $policy->project($item, new VideoPublicContextSelector())['path'] === '/' . $slug . '/'));
         $video = count($matches) === 1 ? $matches[0] : null;
         if (!$video || !$video->active || !$video->hasValidPublicReference()) return new \WP_Error('nhk_video_not_found', 'Video was not found.', ['status' => 404]);
         return ['platform' => $video->platform, 'external_id' => $video->externalVideoId, 'url' => $video->canonicalUrl, 'title' => $video->title];

@@ -135,6 +135,17 @@ At report creation: `a10d265`.
 
 All unrelated Video changes remain uncommitted and untouched.
 
+## 15b. Current live governance blocker — 2026-09-04
+
+The merge operation is now exposed in the live proposal schema, so
+`MERGE_OPERATION_NOT_EXPOSED` is historical and stale as a current status. A
+proposal-create diagnostic for pinned-dial source UUID
+`32f43d4b-d6c8-4223-a89b-cc47f30cda77` persisted `subject_id="component"`
+instead of the source UUID. The diagnostic was rejected; no merge/apply or
+semantic mutation occurred. Current status is
+`PINNED_DIAL_MERGE=BLOCKED` with reason
+`LIVE_MERGE_SUBJECT_BINDING_INVALID`.
+
 ## 15a. Integrity-repair continuation — 2026-09-03
 
 The live read-only Authority scan identified exactly two active collisions,

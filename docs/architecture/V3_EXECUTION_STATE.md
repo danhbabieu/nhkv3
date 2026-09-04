@@ -1,5 +1,70 @@
 # NHK V3 Execution State
 
+## Odo media integrity and semantic binding checkpoint — 2026-09-04
+
+### MEDIA: PASS
+
+The verified September 2026 incident affected attachments `#83` (Odo 62/6/10)
+and `#86` (Odo 36/8). A prior technical `o-do` → `odo` normalization changed
+WordPress attachment metadata without renaming physical files. Safe repair
+renamed the two originals and three derivatives together, retained canonical
+DB `odo`, matched checksums and verified canonical HTTP `200 image/webp`.
+
+- canonical physical naming: `odo`
+- legacy physical `o-do` files: `0`
+- broken originals: `0`
+- broken derivatives: `0`
+- HTTP failures: `0`
+- prevention: implemented (`OdoMediaIntegrityAuditor`,
+  `tools/odo-media-integrity-audit.php`, `SemanticRekeyMediaIsolation`)
+- auditor: read-only by default; run before and after basename-sensitive work
+
+### SEMANTIC: NOT COMPLETE
+
+Two active legacy collision records remain. Pinned-dial source
+`32f43d4b-d6c8-4223-a89b-cc47f30cda77` → target
+`48311ccd-9d45-4985-a620-ca579499f02c` is owner-confirmed
+`CONFIRMED_SAME_IDENTITY` and requires governed merge; applied-glued source
+`01bead27-1308-48c1-af99-c68318e2b577` → target
+`e326a326-ae8c-447f-a2a4-a83a3cf168d4` remains
+`MERGE_CANDIDATE` / manual identity decision required.
+
+### OPEN BLOCKER
+
+`PINNED_DIAL_MERGE=BLOCKED` because live proposal-create persisted
+`subject_id="component"` instead of the supplied source UUID:
+`LIVE_MERGE_SUBJECT_BINDING_INVALID`. The merge operation is exposed in the
+current capability schema; `MERGE_OPERATION_NOT_EXPOSED` is historical only.
+Diagnostic proposals were rejected, no merge/apply occurred, and no semantic
+data was mutated. Local/remote `GovernanceApi.php` and
+`McpGovernanceHandler.php` binding/runtime content must be compared and
+re-verified before any owner-approved apply.
+
+### DEPLOYMENT FACT
+
+Human-controlled rsync deployment to the configured remote project/plugin
+destination completed with a successful WordPress cache flush. Perl locale
+warnings were non-fatal. No credentials or private key material are recorded.
+
+> **NON-NORMATIVE.** This is current evidence and checkpoint state. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
+## Current Media V3 + Article V3 documentation sync — 2026-09-04
+
+This is the current gate summary for the owner decisions and implementation
+review in this documentation pass. It supersedes neither the Constitution nor
+the detailed historical evidence below; it makes the evidence status explicit.
+
+| Evidence level | Current status |
+|---|---|
+| Implemented locally | Governed file ingest/adoption; one canonical Media identity; PRIVATE source-original with PUBLIC optimized derivative projection; distinct `representative`, `evidence`, `technical_detail` roles and deterministic precedence; entity representative/evidence projection; UUID → stable key → exact canonical name/alias subject resolution; generic Article preflight has no Post-ID exception. |
+| Verified by focused tests | 41 tests / 259 assertions covering UUID/stable-key/ambiguity resolution, generic Post preflight, role precedence, source/derivative replay, idempotent adoption and entity media projection; boot-wiring regression 1 test / 5 assertions. |
+| Runtime verification still required | Guarded real-file integration against exact `nhk_v3_test`: valid file → attachment → Media identity → PRIVATE source/PUBLIC derivative assets → usages → projection → Article preflight, plus corrupt/fake negative cases and orphan cleanup/read-back. The integration test is currently skipped locally because `NHK_WP_TEST_PATH` is unset; no runtime acceptance or “complete” claim is made. |
+
+No database, WordPress content, semantic record, Graph edge, legacy asset,
+secret or runtime credential was changed by this documentation pass.
+
 ## Video canonical target handoff — 2026-09-04
 
 Preserved an explicitly supplied, already-validated Video `about` target as
@@ -3871,3 +3936,36 @@ with 12 mandatory integration failures because `NHK_WP_TEST_PATH=public` and
 the WordPress/database runtime are unavailable. Composer validation, PHP lint
 and `git diff --check` pass. No Post 87, staging, production, semantic or
 Knowledge data was changed; no publish, approval, push or deploy was attempted.
+
+## Documentation and contract synchronization checkpoint — 2026-09-04
+
+This checkpoint synchronizes the Constitution, READ_FIRST router, public
+identity/route audits, Article/Media/Video/MCP contracts and frontend route
+inventory with the current implementation evidence. The authoritative target
+is `Authority → Governance → Persistence → Projection → Frontend`; the current
+code still has no runtime-proven persisted Public Identity allocator/current
+slug/CAS/history boundary for all semantic resources. That remains
+`PUBLIC_IDENTITY_STORAGE_GAP` / `CODE_GAP`; read-time `canonical_name`
+slugification is not described as durable identity.
+
+The synchronized contract records these classifications:
+
+- `CONSTITUTION_CONFLICT`: treating `/media/{uuid}/` as an indexable standalone
+  semantic Media page; MediaAsset delivery remains separate.
+- `CODE_GAP` / runtime evidence pending: Video semantic-context URL projection,
+  persisted public identity/history, and active Video canary/browser proof.
+- `STORAGE_GAP` / policy gap: approved public asset/privacy publication policy
+  and any future persisted Public Identity storage are not represented as
+  deployed production schema.
+- `REGISTRY_GAP`: Album/Gallery and any unregistered Product–Specimen relation;
+  no new type, endpoint, predicate, field or writer was invented.
+- Article remains WordPress-owned editorial content; Knowledge, Claim, Source
+  and Evidence retain separate boundaries and no atomic Claim/Source/Evidence
+  standalone SEO route is authorized.
+
+The fresh-agent MCP writer decision guide now routes Article to WordPress,
+semantic entities to their registered Authority/Knowledge/Video/Media owners,
+relations to GraphService under Governance, and rejects generic WordPress
+Post/CPT/taxonomy/postmeta semantic fallback. No data, URL, schema migration,
+production/staging/V2 record, publication, deploy or push was performed by this
+documentation checkpoint.

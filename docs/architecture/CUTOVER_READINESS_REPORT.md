@@ -450,3 +450,15 @@ checkpoint count is authoritative.
 Until every blocking gate is evidenced and the parity matrix is reconciled,
 the system must remain pre-cutover. No production data, V2 live system or
 production routing was changed during this work.
+
+## Odo incident and current gate — 2026-09-04
+
+The observed Odo Media repair is verified complete: canonical physical naming
+is `odo`; legacy physical files, broken originals, broken derivatives and
+canonical HTTP failures are zero. The read-only auditor and semantic/media
+isolation guard are implemented. This closes the observed Media incident but
+does not close semantic cleanup: two active legacy collision records remain.
+Pinned-dial has owner decision `CONFIRMED_SAME_IDENTITY` but apply is blocked
+by `LIVE_MERGE_SUBJECT_BINDING_INVALID`; applied-glued remains
+`MERGE_CANDIDATE` and requires a manual identity decision. No semantic record
+was mutated by the failed diagnostics.

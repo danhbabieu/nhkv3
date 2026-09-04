@@ -27,3 +27,11 @@ reset, clean, overwrite, delete or commit the unrelated server
 The preflight does not import SQL, restore data, seed entities, repair Graph
 edges or change database state. A successful `git pull` alone is not release
 evidence.
+
+### Odo runtime deployment evidence — 2026-09-03
+
+A human-controlled rsync deployment was executed to the configured remote
+project and plugin destination, followed by a successful WordPress cache
+flush. Perl locale warnings were non-fatal. Credentials, host secrets and
+private key material are intentionally not recorded here. This evidence does
+not authorize semantic apply or final production cutover.

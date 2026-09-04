@@ -24,7 +24,8 @@ an MCP-managed V3 Article is complete only after the Article Ingest contract.
 | Authority | Authority registry | entity application services | governed revision/lifecycle |
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
-| Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is retained, derivatives share that Media, representative/evidence roles are distinct, and attachment mapping is idempotent |
+
+| Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is PRIVATE/protected, eligible derivatives are PUBLIC under that Media, representative/evidence/detail roles are distinct, and attachment mapping is idempotent |
 | Video | Video | Video intake/sync services | governed canonical external reference; optional Living Knowledge output is planning-only |
 | Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
 | Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |
@@ -44,6 +45,12 @@ The source-original is retained as a MediaAsset; WebP/responsive outputs are
 derivatives under the same Media identity. It does not use base64/data URLs or
 infer semantic relations from image content. No `nhk-v3/media-ingest` Ability
 is authorized or required.
+Actual image bytes must validate before persistence. Corrupt/fake/unreadable
+payloads fail closed and partial attachment, mapping or semantic artifacts must
+be cleaned up. WordPress attachment is never semantic authority. Entity
+projection exposes representative and evidence separately; evidence and
+`technical_detail` never replace a representative, whose precedence is
+deterministic.
 
 ## Storage and reuse map — 2026-09-04
 
@@ -69,6 +76,10 @@ adapter, not a second writer.
 `nhk.article.preflight` must complete semantic inventory, overlap analysis,
 relation plan, internal-link plan, SEO blueprint, media/video plan and claim
 compliance before an Article draft or publication orchestration proceeds.
+Subject resolution is canonical UUID → stable key → exact canonical name/alias;
+ambiguity fails closed and generic preflight never hard-codes a WordPress Post
+ID. Runtime acceptance must prove real file → attachment → one Media identity
+→ assets/usages → representative/evidence projection → Article preflight.
 `nhk.article.ingest` remains the governed coordinator and must preserve
 idempotency, revision binding, read-back and fail-closed outcomes. The
 operation-level `ArticlePublicationGate` consumes those verified results and
@@ -98,3 +109,13 @@ require their own governed proposal and read-back.
 | Article → Living Knowledge automatic body update | not implemented by design | suggestion-only until separately governed |
 | Product–Specimen persistence | unavailable | REGISTRY_GAP/CONTRACT_EXTENSION_REQUIRED |
 | Live data application | prohibited in this slice | HUMAN GATE |
+
+## Current semantic merge blocker
+
+`rekey` and `merge` are present in the governed operation schema. They are not
+currently safe for the pinned-dial apply because the live proposal binding
+maps the supplied source UUID to `subject_id="component"`.
+Classification: `PINNED_DIAL_MERGE=BLOCKED`,
+`LIVE_MERGE_SUBJECT_BINDING_INVALID`. Diagnostic proposals were rejected; no
+semantic data was mutated. This replaces stale `MERGE_OPERATION_NOT_EXPOSED`
+wording while preserving the historical record.

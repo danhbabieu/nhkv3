@@ -1,4 +1,5 @@
 <?php
+/* public seo_projection supplies canonical link results. */
 $context = $GLOBALS['nhk_core_entity_context'] ?? null;
 $labels = ['brand' => 'Thương hiệu', 'model' => 'Mẫu đồng hồ', 'variant' => 'Biến thể', 'movement' => 'Bộ máy', 'music' => 'Bản nhạc', 'component' => 'Linh kiện', 'classification' => 'Phân loại', 'specimen' => 'Hiện vật', 'product' => 'Sản phẩm'];
 $type = is_array($context) ? (string) ($context['type'] ?? '') : '';

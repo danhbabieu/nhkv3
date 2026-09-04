@@ -1,7 +1,10 @@
 # Generic Namespace and Identity-Merge Runtime Design Review
 
-**Status:** `DESIGN_REVIEW_REQUIRED` — design only; no runtime operation,
-registry entry, migration or database change is implemented.
+**Status:** `IMPLEMENTED_LOCALLY_RUNTIME_BINDING_BLOCKED` — governed `rekey`
+and `merge` operation vocabulary/executor are implemented locally and exposed
+in the live schema; no semantic data mutation has been applied. Pinned-dial is
+blocked by `LIVE_MERGE_SUBJECT_BINDING_INVALID` because live proposal binding
+persisted `subject_id="component"` instead of the supplied source UUID.
 
 **Scope:** generic NHK V3 capability for registered semantic endpoint types.
 This is not an Odo-specific operation and must not be implemented as an Odo
@@ -9,10 +12,9 @@ adapter, a manifest shortcut or a direct SQL path.
 
 ## 1. Decision boundary
 
-The current runtime has no governed stable-key `rekey`, semantic `merge`, or
-reference-movement capability. The existing operation allowlist remains
-unchanged. This document records the minimum contract that would need human
-approval before any implementation:
+The current runtime has governed stable-key `rekey` and semantic `merge`
+capability in the operation allowlist and local executor. This document
+records the contract and the remaining live binding gate:
 
 1. a generic Authority identity rekey capability that preserves canonical UUID;
 2. a generic same-type semantic merge capability that moves/deduplicates all

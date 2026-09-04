@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class EntityPageQuery
 {
@@ -54,10 +55,8 @@ final class EntityPageQuery
         $slug = trim($slug);
         if ($slug === '') return null;
         $matches = [];
-        foreach ($this->authority->listByType($type) as $entity) {
-            if (!$entity->active() || $this->publicSlug($entity->canonicalName) !== $slug) continue;
-            $matches[] = $entity->stableKey;
-        }
+        $resolved = ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->resolve($type, $this->routeSegments($type, $slug));
+        if ($resolved !== null && $resolved->active()) $matches[] = $resolved->stableKey;
         return count($matches) === 1 ? $matches[0] : null;
     }
 
@@ -82,16 +81,17 @@ final class EntityPageQuery
     {
         if (!$this->types->has($type)) return null;
         $matches = [];
-        foreach ($this->authority->listByType($type, true) as $entity) {
-            if ($entity->active() && PublicRouteResolver::slug($entity->canonicalName) === trim($slug) && $this->publicPath($entity) !== null) $matches[] = $entity;
-        }
+        $resolved = ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->resolve($type, $this->routeSegments($type, $slug));
+        if ($resolved !== null && $resolved->active() && $this->publicPath($resolved) !== null) $matches[] = $resolved;
         return count($matches) === 1 ? $matches[0] : null;
     }
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
-    private function publicSlug(string $value): string
+    /** @return list<string> */
+    private function routeSegments(string $type, string $slug): array
     {
-        return PublicRouteResolver::slug($value);
+        $namespace = PublicRouteResolver::namespaceFor($type);
+        return $namespace === null ? [trim($slug)] : [$namespace, trim($slug)];
     }
 }
