@@ -1,19 +1,37 @@
 # MCP V3 Ability Exposure
 
-> **NON-NORMATIVE.** Đây là implementation checkpoint. Nếu mâu thuẫn với
-> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+> **HISTORICAL / SUPERSEDED CHECKPOINT — 2026-09-03.**
+> The fixed MCP tool counts, limited Ability allowlists and the statement that no
+> Article Ability existed below describe an earlier implementation checkpoint.
+> They MUST NOT be used as the current MCP/Abilities capability surface.
+>
+> For current downstream work, read:
+> - `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`;
+> - `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`;
+> - the current `McpToolCatalog` / Ability registration implementation;
+> - and fresh runtime tool/Ability discovery plus read-back when capability
+>   availability matters.
+>
+> `nhk.media.ingest` remains a special multipart path on the custom MCP
+> transport. This historical file does not authorize a base64, data-URL, remote
+> URL or alternate Ability upload writer.
 
-Status: implementation checkpoint, 2026-09-03.
+> **NON-NORMATIVE HISTORICAL EVIDENCE.** If any historical statement below
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, a current approved
+> contract, the executable registry/catalog, or fresh runtime discovery, the
+> current authority controls.
 
-## Root cause
+Status: superseded implementation checkpoint originally recorded 2026-09-03.
 
-`nhk-core` had the governed local Streamable HTTP endpoint and a 19-entry `McpToolCatalog`, but it did not register any NHK ability on WordPress's `wp_abilities_api_init` hook. The existing `nhk_mcp_register_tools` action has no consumer in this repository, so an Easy MCP/WordPress generic connector could discover only generic WordPress abilities.
+## Historical root cause
+
+`nhk-core` had the governed local Streamable HTTP endpoint and a 19-entry `McpToolCatalog`, but it did not register any NHK ability on WordPress's `wp_abilities_api_init` hook. The existing `nhk_mcp_register_tools` action had no consumer at that checkpoint, so an Easy MCP/WordPress generic connector could discover only generic WordPress abilities.
 
 WordPress Abilities use a namespaced `namespace/action` name. Client exposure uses `public=true`; REST discovery/execution additionally uses `show_in_rest=true`. Registration is feature-detected because the plugin declares WordPress 6.8 compatibility while the Abilities API is available in WordPress 6.9+.
 
-## Read allowlist
+## Historical read allowlist
 
-The adapter registers only these existing read tools:
+At this checkpoint the adapter registered only these existing read tools:
 
 | Existing MCP tool | WordPress ability | Permission | Exposure |
 |---|---|---|---|
@@ -26,11 +44,11 @@ The adapter registers only these existing read tools:
 | `nhk.source.get` | `nhk-v3/source-get` | WordPress `read` | public + REST/MCP |
 | `nhk.evidence.get` | `nhk-v3/evidence-get` | WordPress `read` | public + REST/MCP |
 
-Each ability delegates to `McpReadHandler` and reuses the existing catalog input schema. Results remain reader-safe; no raw Graph storage, lifecycle fields, provenance internals or second persistence path is exposed.
+Each ability delegated to `McpReadHandler` and reused the then-existing catalog input schema. Results remained reader-safe; no raw Graph storage, lifecycle fields, provenance internals or second persistence path was exposed.
 
-## Governed workflow bridge
+## Historical governed workflow bridge
 
-The connector-facing bridge now exposes the minimum governed Video workflow:
+At this checkpoint the connector-facing bridge exposed the minimum governed Video workflow:
 
 | Existing MCP tool | WordPress ability | Capability |
 |---|---|---|
@@ -42,38 +60,35 @@ The connector-facing bridge now exposes the minimum governed Video workflow:
 | `nhk.proposal.eligibility` | `nhk-v3/proposal-eligibility` | `nhk_view_governance` |
 | `nhk.proposal.apply` | `nhk-v3/proposal-apply` | `nhk_apply_proposals` |
 
-`nhk.proposal.eligibility` is deliberately a read-only Ability with a
-`nhk_view_governance` capability gate; it is not marked governed merely for
-discoverability. Each governed Ability delegates to the registered `/nhk/v1/mcp` transport. It
-does not write WordPress directly, create a second proposal path or bypass
+`nhk.proposal.eligibility` was deliberately a read-only Ability with a
+`nhk_view_governance` capability gate; it was not marked governed merely for
+discoverability. Each governed Ability delegated to the registered `/nhk/v1/mcp` transport. It
+did not write WordPress directly, create a second proposal path or bypass
 MCP validation, capability checks, Proposal → Approval → Eligibility →
 Controlled Apply, audit or Graph execution. The remaining semantic ingest
-writers stay on the custom MCP endpoint until separately reviewed.
+writers stayed on the custom MCP endpoint until separately reviewed.
 
-`nhk.media.ingest` is explicitly excluded from the Ability bridge because its
+`nhk.media.ingest` was explicitly excluded from the Ability bridge because its
 canonical file path is multipart and an Ability callback cannot carry the file
-part. Its metadata/file contract remains on the existing MCP transport; no
-base64, data URL, URL adapter or persistence path is introduced. Every other
-catalog tool is either mapped to an Ability or carries an explicit exclusion
-reason in `McpAbilityRegistration`.
+part. Its metadata/file contract remained on the existing MCP transport; no
+base64, data URL, URL adapter or persistence path was introduced.
 
-No `wp_create_post`, taxonomy, post meta, direct SQL semantic mutation or ungoverned ability was introduced.
+No `wp_create_post`, taxonomy, post meta, direct SQL semantic mutation or ungoverned ability was introduced by this checkpoint.
 
-These read-only abilities do not constitute Article Ingest. A generic
-WordPress Post write or these abilities alone cannot be reported as a completed
-V3 knowledge Article workflow; the approved semantic-preflight → draft →
-governed-apply → read-back → publish boundary remains a future implementation
-contract. No Article ability is added by this documentation checkpoint.
+At that checkpoint these read-only abilities did not constitute Article Ingest,
+and no Article Ability had yet been added. **That last sentence is historical
+only and is explicitly superseded by the current MCP/Article contracts and
+runtime catalog/Ability registration.**
 
-## Verification boundary
+## Historical verification boundary
 
-Unit tests assert the exact read and governed allowlists. Guarded integration
-tests assert runtime registration, metadata, capability boundaries and
-authenticated read execution, but the current local WordPress/DB bootstrap is
-unavailable. The custom MCP wire smoke and external Easy MCP deployment call
-verification remain environment-dependent. On 2026-09-03 the live Easy MCP
-Browser showed `Nhk-v3` as 32/32 enabled (12 read, 20 write), implying 32 Easy
-MCP exposed tools. A separate actual connector/client MCP-29 `tools/list`
-evidence still returned only 8 read/status tools and none of `video-ingest` or
-the Proposal lifecycle; this is an exposure-state blocker (stale snapshot,
-endpoint/profile or authorization scope), not a Video backend failure.
+Unit tests at the checkpoint asserted the then-current read and governed
+allowlists. Guarded integration tests covered runtime registration, metadata,
+capability boundaries and authenticated read execution, but the local
+WordPress/DB bootstrap was unavailable. The custom MCP wire smoke and external
+Easy MCP deployment verification remained environment-dependent. On 2026-09-03
+the live Easy MCP Browser showed `Nhk-v3` as 32/32 enabled (12 read, 20 write),
+while a separate connector/client MCP-29 `tools/list` returned only 8
+read/status tools and none of `video-ingest` or the Proposal lifecycle. Those
+counts are retained solely as historical deployment evidence and are not a
+current catalog contract.
