@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+## Public Identity missing-table boot regression — 2026-09-04
+
+Fixed the schema gate for `PublicIdentityMigration014`: pending migration
+execution now checks the actual presence of both Public Identity tables in
+addition to the stored migration version. This repairs the drift case shown by
+the `/tri-thuc/` error, where `nhk_core_migration_current=14` could suppress a
+retry while `nhk_public_identity_history` was absent. The existing explicit
+`NHK_RUN_MIGRATIONS` boot gate and `nhk_v3`/`nhk_v3_test` database guard remain
+unchanged; no live or semantic data was modified.
+
+The WPDB historic-route resolver also fails closed with `UNAVAILABLE` when the
+identity schema is absent, so ordinary requests do not expose a database fatal
+while maintenance migration is pending.
+
+Focused regression proof: 3 migration/repository schema tests and 2 boot-wiring
+tests pass. Guarded runtime migration/read-back was not run against the demo
+site.
+
 ## Pre-cutover verification checkpoint — 2026-09-04
 
 The migration/configuration regression is resolved locally. `Plugin::boot()` no

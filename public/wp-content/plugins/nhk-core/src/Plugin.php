@@ -342,7 +342,8 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < OwnerPublicationDecisionMigration013::VERSION) (new OwnerPublicationDecisionMigration013())->up();
-        if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION) (new PublicIdentityMigration014())->up();
+        global $wpdb;
+        if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);

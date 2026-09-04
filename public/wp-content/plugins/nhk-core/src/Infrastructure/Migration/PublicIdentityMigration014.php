@@ -5,6 +5,17 @@ namespace NHK\Core\Infrastructure\Migration;
 final class PublicIdentityMigration014
 {
     public const VERSION = 14;
+
+    public static function schemaReady(object $wpdb): bool
+    {
+        foreach (['nhk_public_identities', 'nhk_public_identity_history'] as $suffix) {
+            $table = $wpdb->prefix . $suffix;
+            if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) return false;
+        }
+
+        return true;
+    }
+
     public function up(): void
     {
         global $wpdb;

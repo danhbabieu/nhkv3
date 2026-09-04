@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\PublicIdentity;
 
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class WpdbPublicIdentityRepository implements PublicIdentityRepository
@@ -41,7 +42,7 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
         $r['revision']=$expectedRevision+1; return $r;
     }
     public function findCurrentById(string $id): ?array { $row=$this->wpdb->get_row($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE identity_uuid=%s',UuidCodec::toBinary($id)),ARRAY_A); return is_array($row)?$this->hydrate($row):null; }
-    public function resolveHistoric(string $path): array { $rows=$this->wpdb->get_results($this->wpdb->prepare('SELECT h.*,i.current_slug,i.route_type,i.revision FROM '.$this->historyTable().' h LEFT JOIN '.$this->currentTable().' i ON i.identity_uuid=h.identity_uuid WHERE h.route_path=%s',$path),ARRAY_A)?:[]; if(count($rows)!==1)return ['status'=>count($rows)>1?'AMBIGUOUS':'NOT_FOUND']; $r=$rows[0]; if(!isset($r['current_slug']))return ['status'=>'INELIGIBLE']; return ['status'=>'FOUND','target'=>$this->path((string)$r['route_type'],(string)$r['current_slug']),'hops'=>1]; }
+    public function resolveHistoric(string $path): array { if (!PublicIdentityMigration014::schemaReady($this->wpdb)) return ['status'=>'UNAVAILABLE']; $rows=$this->wpdb->get_results($this->wpdb->prepare('SELECT h.*,i.current_slug,i.route_type,i.revision FROM '.$this->historyTable().' h LEFT JOIN '.$this->currentTable().' i ON i.identity_uuid=h.identity_uuid WHERE h.route_path=%s',$path),ARRAY_A)?:[]; if(count($rows)!==1)return ['status'=>count($rows)>1?'AMBIGUOUS':'NOT_FOUND']; $r=$rows[0]; if(!isset($r['current_slug']))return ['status'=>'INELIGIBLE']; return ['status'=>'FOUND','target'=>$this->path((string)$r['route_type'],(string)$r['current_slug']),'hops'=>1]; }
     private function path(string $type,string $slug):string { $prefix=match($type){'video'=>'/video/','movement'=>'/bo-may/','music'=>'/ban-nhac/','component'=>'/linh-kien/','classification'=>'/phan-loai/','specimen'=>'/hien-vat/','product'=>'/san-pham/',default=>'/'}; return $prefix.$slug.'/'; }
     private function hydrate(array $r):array { return ['identity_id'=>UuidCodec::fromBinary((string)$r['identity_uuid']),'owner_kind'=>(string)$r['owner_kind'],'owner_id'=>UuidCodec::fromBinary((string)$r['owner_uuid']),'route_type'=>(string)$r['route_type'],'current_slug'=>(string)$r['current_slug'],'collision_scope'=>(string)$r['collision_scope'],'route_policy_version'=>(string)$r['route_policy_version'],'revision'=>(int)$r['revision'],'current_path'=>$this->path((string)$r['route_type'],(string)$r['current_slug'])]; }
 }
