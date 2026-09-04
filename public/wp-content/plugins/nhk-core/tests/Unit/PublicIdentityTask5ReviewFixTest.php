@@ -12,7 +12,7 @@ final class PublicIdentityTask5ReviewFixTest extends TestCase
 {
     public function test_exact_resolution_preserves_stored_identity_scope_and_old_slug(): void
     {
-        $service = new HistoricPublicRouteService(new ReviewExactResolver());
+        $service = new HistoricPublicRouteService(new ReviewExactResolver(), static fn (): bool => true);
         $result = $service->resolveExact('video', 'youtube', '/video/odo-36-10-gai-carillon-P4KaHX3LBOw/');
         self::assertTrue($result->accepted);
         self::assertSame('01a06815-1e51-7964-b004-1ba79e488ad1', $result->historicRoute?->identityId);
@@ -25,6 +25,23 @@ final class PublicIdentityTask5ReviewFixTest extends TestCase
         $routes = new PublicMediaVideoRoutes(null, new HistoricPublicRouteService(new ReviewExactResolver(false)));
         self::assertSame(['status' => 404], $routes->historicRedirect('/video/old/'));
     }
+
+    public function test_missing_owner_eligibility_callback_fails_closed(): void
+    {
+        $result = (new HistoricPublicRouteService(new ReviewExactResolver()))->resolveExact('video', 'youtube', '/video/old/');
+        self::assertFalse($result->accepted);
+        self::assertSame(PublicIdentityMutationResult::CONFLICT, $result->code);
+    }
+
+    public function test_wpdb_change_and_historic_lookup_are_scoped(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../src/Infrastructure/PublicIdentity/WpdbPublicIdentityRepository.php');
+        self::assertIsString($source);
+        self::assertStringContainsString('(identity_uuid,route_type,collision_scope,route_path', $source);
+        self::assertStringContainsString('WHERE h.route_type=%s AND h.collision_scope=%s AND h.route_path=%s', $source);
+        self::assertStringNotContainsString("public function resolveHistoric(string \$path): array { return ['status'=>'NOT_FOUND']; }", $source);
+    }
+
 
     public function test_migration_history_scope_is_part_of_exact_storage_boundary(): void
     {

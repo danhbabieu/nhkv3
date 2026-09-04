@@ -124,7 +124,17 @@ final class Plugin {
             add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2);
             $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
             $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
-            $historicPublicRouteService = new HistoricPublicRouteService($publicIdentityRepository);
+            $historicPublicRouteService = new HistoricPublicRouteService($publicIdentityRepository, static function (\NHK\Core\Domain\PublicIdentity\PublicIdentity $identity) use ($publicAuthority, $publicVideos): bool {
+                if ($identity->ownerKind === 'authority') {
+                    $entity = $publicAuthority->findByCanonicalId($identity->ownerId);
+                    return $entity !== null && $entity->active();
+                }
+                if ($identity->ownerKind !== 'video') return false;
+                $video = $publicVideos->findByCanonicalId($identity->ownerId);
+                if ($video === null || !$video->active) return false;
+                $source = is_array($video->metadata['source'] ?? null) ? $video->metadata['source'] : $video->metadata;
+                return ($source['availability'] ?? null) === 'available' && ($source['embeddable'] ?? null) === true;
+            });
             (new PublicEntityRoutes($publicEntityQuery, $publicTypes, $historicPublicRouteService))->register();
             (new PublicComparisonRoutes(new ComparisonPageQuery($publicEntityQuery)))->register();
             $publicAssets = new WpdbMediaAssetRepository($wpdb);

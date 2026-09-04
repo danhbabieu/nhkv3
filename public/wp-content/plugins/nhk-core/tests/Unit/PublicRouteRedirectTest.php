@@ -11,7 +11,7 @@ final class PublicRouteRedirectTest extends TestCase
 {
     public function test_malformed_canary_path_redirects_once_to_current_video_path(): void
     {
-        $routes = new PublicMediaVideoRoutes(null, new HistoricPublicRouteService(new FakeHistoricResolverRepository()));
+        $routes = new PublicMediaVideoRoutes(null, new HistoricPublicRouteService(new FakeHistoricResolverRepository(), static fn (): bool => true));
 
         self::assertSame([
             'status' => 301,

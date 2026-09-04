@@ -17,6 +17,7 @@ final class HistoricPublicRouteService implements HistoricPublicRouteResolver
     }
     public function resolveExact(string $routeType, string $collisionScope, string $path): PublicIdentityMutationResult
     {
+        if ($this->eligible === null) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
         if (!preg_match('#^/[a-z0-9/-]+/$#i', $path) || $routeType === '' || $collisionScope === '') return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNKNOWN_ROUTE);
         if (!method_exists($this->repository, 'resolveExact')) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNAVAILABLE_STORAGE);
         $result = $this->repository->resolveExact($routeType, $collisionScope, $path);

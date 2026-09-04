@@ -40,9 +40,13 @@ final class PublicEntityRoutes
         if ($this->historic === null || is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli' || !is_404()) return;
         $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
         if (!is_string($path) || str_starts_with($path, '/video/')) return;
-        $result = $this->historic->resolveHistoric($path);
-        if (($result['status'] ?? '') !== 'FOUND' || (string) ($result['target'] ?? '') === $path) return;
-        wp_safe_redirect(home_url((string) $result['target']), 301, 'NHK historic public route'); exit;
+        $segments = array_values(array_filter(explode('/', trim($path, '/')), static fn (string $segment): bool => $segment !== ''));
+        $routeType = count($segments) === 1 ? 'brand' : (count($segments) === 2 ? 'model' : 'variant');
+        $result = $this->historic->resolveExact($routeType, 'root', $path);
+        if (!$result->accepted || $result->identity === null) return;
+        $target = '/' . $result->identity->currentSlug . '/';
+        if ($target === $path) return;
+        wp_safe_redirect(home_url($target), 301, 'NHK historic public route'); exit;
     }
 
     public function rewrite(): void
