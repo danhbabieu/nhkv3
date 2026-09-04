@@ -19,6 +19,14 @@ including runtime-unavailable versus empty, canonical mismatch and structured
 data not-applicable. No migration, semantic write, URL allocation or runtime
 data mutation was performed.
 
+## Governed SEO sitemap/indexability projection — 2026-09-04
+
+Slice 4 is complete locally. `SitemapIndexabilityProjection` accepts only the
+shared READY/indexable canonical URL, excludes historic, redirect, noindex,
+private, technical and incomplete projections, and tracks `lastmod` by owner
+and projection fingerprints. Focused proof: 11 tests / 73 assertions. No route
+allocation, migration or data mutation was performed.
+
 ## Governed SEO Entity projection — 2026-09-04
 
 Slice 3 is complete locally. Entity SEO projection has explicit profiles for
