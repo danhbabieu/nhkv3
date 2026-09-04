@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Http;
 use NHK\Core\Application\Entity\EntityPageQuery;
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
 
 final class PublicEntityRoutes
 {
@@ -20,7 +21,7 @@ final class PublicEntityRoutes
         'component' => 'linh-kien', 'classification' => 'phan-loai', 'specimen' => 'hien-vat', 'product' => 'san-pham',
     ];
 
-    public function __construct(private EntityPageQuery $query, private EntityTypeRegistry $types) {}
+    public function __construct(private EntityPageQuery $query, private EntityTypeRegistry $types, private ?HistoricPublicRouteService $historic = null) {}
 
     public function register(): void
     {
@@ -30,7 +31,18 @@ final class PublicEntityRoutes
         add_action('template_redirect', [$this, 'legacyArchiveRedirect'], 1);
         add_action('template_redirect', [$this, 'legacyIdentityRedirect'], 1);
         add_action('template_redirect', [$this, 'legacyDetailRedirect'], 1);
+        add_action('template_redirect', [$this, 'historicRouteRedirect'], 1);
         add_filter('template_include', [$this, 'template']);
+    }
+
+    public function historicRouteRedirect(): void
+    {
+        if ($this->historic === null || is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli' || !is_404()) return;
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        if (!is_string($path) || str_starts_with($path, '/video/')) return;
+        $result = $this->historic->resolveHistoric($path);
+        if (($result['status'] ?? '') !== 'FOUND' || (string) ($result['target'] ?? '') === $path) return;
+        wp_safe_redirect(home_url((string) $result['target']), 301, 'NHK historic public route'); exit;
     }
 
     public function rewrite(): void

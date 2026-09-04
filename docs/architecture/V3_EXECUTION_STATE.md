@@ -1439,6 +1439,15 @@ Video detail remains unavailable because the local query has no active Video row
 
 ## Checkpoint journal
 
+- 2026-09-04: Task 5 public-identity implementation added locally under the
+  persisted identity/history boundary. Focused red evidence was 9 tests with
+  9 missing-class/constructor failures; focused green evidence is 12 tests / 23
+  assertions. Migration 014 is additive and its UP path accepts only exact
+  `nhk_v3` or `nhk_v3_test`; no migration was executed because no guarded
+  database runtime was available. Historic resolution is exact and one-hop;
+  the P4KaHX3LBOw canary is covered by a direct 301 unit assertion. No existing
+  semantic, Video, Graph, WordPress, V2, staging or production data changed.
+
 - 2026-09-02: Closed the MCP connector registration gap with an explicit
   eight-ability read allowlist. Unit tests and PHP lint pass; guarded
   WordPress integration cannot start because the local database bootstrap is
