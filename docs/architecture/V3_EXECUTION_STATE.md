@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+## Product–Specimen relation fail-closed checkpoint — 2026-09-04
+
+The shared `GraphService::create()` boundary now rejects both
+`product → about → specimen` and `specimen → about → product` with the typed
+`UnapprovedRelationPair` domain error. Governed `relation_create` reaches this
+same boundary through `AuthorityProposalExecutor`; no MCP/UI-only guard or
+generic fallback was added. The broad `about` predicate remains valid for
+approved endpoint pairs, including Video → Variant, and all six registered
+typed predicates remain creatable. No Product–Specimen predicate, payload
+linkage, semantic record, Graph edge or database data was added or changed.
+
+Focused Graph/Governance proof: 31 tests / 82 assertions; Video semantic proof:
+29 tests / 113 assertions; full Unit proof: 473 tests / 2,222 assertions, with
+the repository's existing warnings/deprecations. Remaining status:
+`PRODUCT_SPECIMEN_RELATION_GAP` — the dedicated canonical relation is still
+not designed, approved or registered; generic fallbacks are fail-closed; a
+real Product–Specimen relation requires a separate contract decision.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
+## Persisted public identity URL — Task 6 checkpoint — 2026-09-04
+
+Canonical `PublicUrlResult` projection is wired through SEO, sitemap, search,
+REST, entity/archive/card/breadcrumb and theme consumers through `0f8ec9e`.
+Video policy dependencies are shared and fully governed; ineligible technical
+links and VideoObject output fail closed while native WordPress routes remain
+independent. Focused proof: 79 tests / 761 assertions; lint, Composer and diff
+checks pass. Integration remains `ENVIRONMENT_BLOCKED` because
+`NHK_WP_TEST_PATH` is unavailable.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Odo media integrity and semantic binding checkpoint — 2026-09-04
 
 ### MEDIA: PASS
