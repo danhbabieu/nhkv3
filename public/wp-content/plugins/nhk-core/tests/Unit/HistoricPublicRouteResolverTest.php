@@ -43,6 +43,6 @@ final class FakeHistoricResolverRepository
     public function resolveExact(string $routeType, string $scope, string $path): PublicIdentityMutationResult
     {
         if ($this->status !== 'FOUND') return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
-        return PublicIdentityMutationResult::acceptedHistoricRoute(new HistoricPublicRoute('01a06815-1e51-7964-b004-1ba79e488ad1', $routeType, $scope, $path, 'odo-36-10-gai-carillon-P4KaHX3LBOw', 3), new PublicIdentity('01a06815-1e51-7964-b004-1ba79e488ad1', 'video', '01a06815-1e51-7964-b004-1ba79e488ad1', 'video', 'odo-36-10-gai-carillon-p4kahx3lbow', $scope, 'public-route-v1', 4));
+        return PublicIdentityMutationResult::accepted(new PublicIdentity('01a06815-1e51-7964-b004-1ba79e488ad1', 'video', '01a06815-1e51-7964-b004-1ba79e488ad1', 'video', 'odo-36-10-gai-carillon-p4kahx3lbow', $scope, 'public-route-v1', 4, null, null, '/video/odo-36-10-gai-carillon-p4kahx3lbow/'), new HistoricPublicRoute('01a06815-1e51-7964-b004-1ba79e488ad1', $routeType, $scope, $path, 'odo-36-10-gai-carillon-P4KaHX3LBOw', 3));
     }
 }

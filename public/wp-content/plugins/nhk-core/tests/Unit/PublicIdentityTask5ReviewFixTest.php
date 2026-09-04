@@ -50,6 +50,27 @@ final class PublicIdentityTask5ReviewFixTest extends TestCase
         self::assertStringContainsString('collision_scope VARCHAR(191) NOT NULL', $sql);
         self::assertStringContainsString('route_type,collision_scope,route_path', $sql);
     }
+
+    public function test_path_resolution_uses_the_stored_route_context_instead_of_guessing_type_or_scope(): void
+    {
+        $result = (new HistoricPublicRouteService(new ReviewPathResolver(), static fn (): bool => true))->resolvePath('/old-brand/old-model/');
+        self::assertTrue($result->accepted);
+        self::assertSame('model', $result->historicRoute?->routeType);
+        self::assertSame('brand:stored-parent', $result->historicRoute?->collisionScope);
+    }
+}
+
+final class ReviewPathResolver
+{
+    public function resolvePath(string $path): PublicIdentityMutationResult
+    {
+        return PublicIdentityMutationResult::accepted(new PublicIdentity(
+            '01a06815-1e51-7964-b004-1ba79e488ad1', 'authority',
+            '01a06815-1e51-7964-b004-1ba79e488ad1', 'model', 'current-model',
+            'brand:stored-parent', 'public-route-v1', 4, null, null,
+            '/current-brand/current-model/',
+        ), new HistoricPublicRoute('01a06815-1e51-7964-b004-1ba79e488ad1', 'model', 'brand:stored-parent', $path, 'old-model', 4));
+    }
 }
 
 final class ReviewExactResolver
@@ -63,10 +84,11 @@ final class ReviewExactResolver
             $path, 'odo-36-10-gai-carillon-P4KaHX3LBOw', 3,
         );
         if (!$this->eligible) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
-        return PublicIdentityMutationResult::acceptedHistoricRoute($history, new PublicIdentity(
+        return PublicIdentityMutationResult::accepted(new PublicIdentity(
             '01a06815-1e51-7964-b004-1ba79e488ad1', 'video',
             '01a06815-1e51-7964-b004-1ba79e488ad1', 'video',
             'odo-36-10-gai-carillon-p4kahx3lbow', $scope, 'public-route-v1', 4,
-        ));
+            null, null, '/video/odo-36-10-gai-carillon-p4kahx3lbow/',
+        ), $history);
     }
 }

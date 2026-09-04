@@ -25,5 +25,12 @@ final class HistoricPublicRouteService implements HistoricPublicRouteResolver
         if ($result->identity !== null && $this->eligible !== null && !($this->eligible)($result->identity)) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
         return $result;
     }
+    public function resolvePath(string $path): PublicIdentityMutationResult
+    {
+        if ($this->eligible === null || !method_exists($this->repository, 'resolvePath')) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
+        $result = $this->repository->resolvePath($path);
+        if (!$result instanceof PublicIdentityMutationResult || !$result->accepted) return $result instanceof PublicIdentityMutationResult ? $result : PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNAVAILABLE_STORAGE);
+        return ($result->identity !== null && ($this->eligible)($result->identity)) ? $result : PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
+    }
     public function resolve(string $path): array { return $this->resolveHistoric($path); }
 }

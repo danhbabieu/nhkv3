@@ -11,5 +11,6 @@ final class WpdbHistoricPublicRouteResolver implements HistoricPublicRouteResolv
     {
         return $this->repository->resolveExact($routeType, $collisionScope, $path);
     }
+    public function resolvePath(string $path): PublicIdentityMutationResult { return $this->repository->resolvePath($path); }
     public function resolveHistoric(string $path): array { return $this->repository->resolveHistoric($path); }
 }

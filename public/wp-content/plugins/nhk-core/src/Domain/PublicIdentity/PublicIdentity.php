@@ -16,6 +16,7 @@ final readonly class PublicIdentity
         public int $revision,
         public ?string $createdAt = null,
         public ?string $updatedAt = null,
+        public ?string $currentPath = null,
     ) {
         if ($identityId === '' || !self::isToken($ownerKind) || trim($ownerId) === '') {
             throw new \InvalidArgumentException('Public identity owner is invalid.');

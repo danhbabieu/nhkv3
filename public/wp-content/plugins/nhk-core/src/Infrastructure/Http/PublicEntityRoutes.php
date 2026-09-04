@@ -40,13 +40,19 @@ final class PublicEntityRoutes
         if ($this->historic === null || is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli' || !is_404()) return;
         $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
         if (!is_string($path) || str_starts_with($path, '/video/')) return;
-        $segments = array_values(array_filter(explode('/', trim($path, '/')), static fn (string $segment): bool => $segment !== ''));
-        $routeType = count($segments) === 1 ? 'brand' : (count($segments) === 2 ? 'model' : 'variant');
-        $result = $this->historic->resolveExact($routeType, 'root', $path);
+        $result = $this->historic->resolvePath($path);
         if (!$result->accepted || $result->identity === null) return;
-        $target = '/' . $result->identity->currentSlug . '/';
+        $target = self::historicCanonicalPath($result);
+        if ($target === null) return;
         if ($target === $path) return;
         wp_safe_redirect(home_url($target), 301, 'NHK historic public route'); exit;
+    }
+
+    public static function historicCanonicalPath(\NHK\Core\Domain\PublicIdentity\PublicIdentityMutationResult $result): ?string
+    {
+        if (!$result->accepted || $result->identity === null || $result->historicRoute === null) return null;
+        $path = $result->identity->currentPath;
+        return is_string($path) && preg_match('#^/[a-z0-9/-]+/$#i', $path) === 1 ? $path : null;
     }
 
     public function rewrite(): void
