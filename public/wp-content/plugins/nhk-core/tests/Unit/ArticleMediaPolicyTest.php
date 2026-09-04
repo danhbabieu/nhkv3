@@ -82,6 +82,22 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertStringNotContainsString('DSCF8291', $filename);
     }
 
+    public function test_metadata_only_legacy_physical_path_is_never_renamed(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+
+        $service->ingest('legacy-image', 'Ô Đô', 'ready', ['source' => 'legacy-audit'], [[
+            'kind' => 'original',
+            'storage_key' => 'uploads/legacy/IMG_1234.JPG',
+            'original_filename' => 'IMG_1234.JPG',
+            'checksum' => hash('sha256', 'legacy'),
+            'mime_type' => 'image/jpeg',
+            'byte_size' => 6,
+        ]]);
+
+        self::assertSame('uploads/legacy/IMG_1234.JPG', $assets->listByMediaId($media->items[array_key_first($media->items)]->canonicalId)[0]->storageKey);
+    }
+
     public function test_managed_image_filename_is_always_contextual_ascii_webp_and_not_camera_name(): void
     {
         $filename = (new MediaFilenameNormalizer())->normalizeWebp('Máy ảnh Odo 36/8', 'image', 'IMG_1234.JPG', 'a71c');

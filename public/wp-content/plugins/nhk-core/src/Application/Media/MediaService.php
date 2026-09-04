@@ -196,13 +196,6 @@ final class MediaService
             foreach ($metadata['keyword_groups'] as $group) SeoKeywordGroupRegistry::assertKnown((string) $group);
         }
         $storageKey = (string) ($spec['storage_key'] ?? '');
-        $original = (string) ($spec['original_filename'] ?? basename($storageKey));
-        if ($original !== '' && preg_match('/^(IMG|DSC|DSCF|PXL)[-_]?/i', $original) === 1) {
-            $view = (string) ($metadata['view'] ?? $metadata['detail_type'] ?? 'image');
-            $normalized = (new MediaFilenameNormalizer())->normalize($subject, $view, $original, isset($metadata['filename_suffix']) ? (string) $metadata['filename_suffix'] : null);
-            $directory = trim(str_replace('\\', '/', dirname($storageKey)), './');
-            $storageKey = ($directory !== '' ? $directory . '/' : '') . $normalized;
-        }
         $spec['storage_key'] = $storageKey;
         $spec['metadata'] = $metadata;
         return $spec;

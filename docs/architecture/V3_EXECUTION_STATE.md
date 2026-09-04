@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+## Persisted public identity URL — Task 8 checkpoint — 2026-09-04
+
+Task 8 is implemented on `codex/persisted-public-identity-url`: Media filename
+generation injects the shared `VietnameseSlugNormalizer`, preserves supported
+extensions and bounded empty context, and is limited to new upload packets at
+the `MediaIngestGateway` boundary. Generic Media persistence no longer rewrites
+physical storage keys, so legacy paths remain unchanged. No Media identity,
+MediaUsage, URL, alt/SEO field, semantic relation, migration or data record was
+mutated.
+
+Focused proof: 19 tests / 64 assertions passed across the filename, Article
+Media, canonical delivery and completion suites. Full Unit proof remains
+non-green on 8 pre-existing public-identity/entity failures, with 5 warnings
+and PHPUnit deprecations; no failure is in the Task 8 focused tests.
+
+No production, V2, staging or legacy file operation was performed.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Persisted public identity URL — Task 4 checkpoint — 2026-09-04
 
 Task 4 is complete through `bfddbed`: Video URL policy uses persisted identity
