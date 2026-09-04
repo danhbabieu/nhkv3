@@ -102,9 +102,12 @@ final class SearchSemanticQueryTest extends TestCase
         $authorityRepository = new InMemoryAuthorityRepository();
         $brand = $authorityRepository->create(new AuthorityEntity(UuidCodec::newV7(), 'brand', 'brand:odo', 'Odo', 1, []));
         $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Technical source title', [
-            'source_snapshot' => ['availability' => 'available', 'source_title' => 'Technical source title', 'tags' => ['bell']],
+            'public_identity' => ['current_slug' => 'odo'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'source_title' => 'Technical source title', 'tags' => ['bell']],
             'editorial' => ['title' => 'Âm thanh Odo', 'summary' => 'Bối cảnh nhận diện đồng hồ cổ.'],
             'category' => ['primary' => ['key' => '06', 'label' => 'Âm thanh đồng hồ cổ']],
+            'hub' => ['primary' => '06'],
+            'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
             'semantic_attachments' => [['target_key' => $brand->canonicalId, 'target_type' => 'brand', 'predicate' => 'about']],
         ]);
         $videos = new class($video) implements VideoRepository {
