@@ -4086,3 +4086,24 @@ relations to GraphService under Governance, and rejects generic WordPress
 Post/CPT/taxonomy/postmeta semantic fallback. No data, URL, schema migration,
 production/staging/V2 record, publication, deploy or push was performed by this
 documentation checkpoint.
+
+## Article preflight inventory dependency wiring checkpoint — 2026-09-04
+
+The reported `Call to a member function listByEndpoint() on null` was traced
+through `McpTransport::callTool()` → `McpArticleIngestHandler::preflight()` →
+`ArticleResearchPreflight::research()` → the inventory callback constructed in
+`Plugin::boot()`. Commit `60d7b785` added Post-71 MediaUsage inventory calls to
+that callback but omitted `$usages` from its static closure capture. PHP then
+resolved the uncaptured variable as null and the call at `Plugin.php:266`
+failed; the callback converted that programming error into the contract's
+`inventory.status=unavailable` / `RUNTIME_UNAVAILABLE` packet.
+
+The source wiring fix captures the already-constructed `WpdbMediaUsageRepository`
+in the inventory callback. A real MCP regression test now exercises
+`nhk.article.preflight` with Post 71 and the canonical Variant/Music UUID
+subjects, asserting inventory availability and absence of the null-call
+diagnostic. The guarded request remains `ENVIRONMENT_BLOCKED` in this checkout:
+WordPress cannot establish its database connection, so no runtime PASS is
+claimed. Focused Unit tests pass 9 tests / 32 assertions; PHP lint, Composer
+validation and `git diff --check` pass. No Post, semantic record, Graph edge,
+Knowledge record, publication or external runtime data was changed.

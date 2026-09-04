@@ -252,7 +252,7 @@ final class Plugin {
                     $subjects = array_values($resolved['resolved']);
                     return ['status' => 'resolved', 'primary' => $subjects[0], 'subjects' => $subjects, 'resolved' => $resolved['resolved']];
                 },
-                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $videos, $graphService, $predicates): array {
+                static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $usages, $videos, $graphService, $predicates): array {
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
                     $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
                     $articlePostId = (int) ($input['article_context']['post_id'] ?? 0);
