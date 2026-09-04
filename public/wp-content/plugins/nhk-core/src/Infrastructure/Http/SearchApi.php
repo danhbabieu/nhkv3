@@ -13,13 +13,14 @@ use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Application\Video\VideoUrlPolicy;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchApi
 {
-    public function __construct(private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityCollectionQuery $collection = null, private ?PublicIdentityRepository $identities = null) {}
+    public function __construct(private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityCollectionQuery $collection = null, private ?PublicIdentityRepository $identities = null, private ?VideoUrlPolicy $videoPolicy = null) {}
 
     public function register(): void
     {
@@ -37,7 +38,7 @@ final class SearchApi
         $groups['entities'] = [];
         if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->types->all() as $definition) foreach (($this->collection?->archive($definition->type, 1, 100, $term)['items'] ?? []) as $item) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => home_url($item['url'])];
         $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $item->active && $item->readiness === 'ready' && $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
-        $videoSearch = new VideoSearchDocument($this->authority, $this->identities);
+        $videoSearch = new VideoSearchDocument($this->authority, $this->identities, $this->videoPolicy);
         $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $videoSearch->isDiscoverable($item) && $videoSearch->publicUrl($item) !== null && $this->matches($term, ...$videoSearch->values($item))))) : [];
         $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $item->active && $item->isPublic() && $this->matches($term, $item->claimText, $item->stableKey)))) : [];
         $semanticTotals = [];
@@ -51,6 +52,6 @@ final class SearchApi
 
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
     private function media(Media $item): array { return ['type' => 'media', 'title' => $item->canonicalName]; }
-    private function video(Video $item): array { $search = new VideoSearchDocument($this->authority, $this->identities); $title = $search->title($item); $path = $search->publicUrl($item); return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
+    private function video(Video $item): array { $search = new VideoSearchDocument($this->authority, $this->identities, $this->videoPolicy); $title = $search->title($item); $path = $search->publicUrl($item); return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
     private function claim(KnowledgeClaim $item): array { return ['type' => 'knowledge', 'title' => $item->claimText]; }
 }
