@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Seo;
 
+use NHK\Core\Domain\Seo\SeoReadinessResult;
+
 /** Read-only, shared public URL package for SEO and visitor-facing links. */
 final class PublicSeoProjection
 {
@@ -10,7 +12,8 @@ final class PublicSeoProjection
     public function project(array $urlResult, array $page = []): array
     {
         $path = isset($urlResult['path']) && is_string($urlResult['path']) ? trim($urlResult['path']) : '';
-        $eligible = ($urlResult['eligible'] ?? false) === true && $path !== '';
+        $readiness = $urlResult['readiness'] ?? (($urlResult['eligible'] ?? false) === true ? SeoReadinessResult::READY : SeoReadinessResult::BLOCKED);
+        $eligible = ($urlResult['eligible'] ?? false) === true && $readiness === SeoReadinessResult::READY && $path !== '';
         $path = $eligible ? $path : null;
         $title = trim((string) ($page['title'] ?? ''));
         $description = trim((string) ($page['description'] ?? ''));
@@ -30,6 +33,7 @@ final class PublicSeoProjection
             'search' => $path,
             'internal_link' => $path,
             'indexable' => $eligible,
+            'readiness' => $readiness,
             'blockers' => array_values(array_unique(array_map('strval', is_array($urlResult['blockers'] ?? null) ? $urlResult['blockers'] : []))),
             'warnings' => array_values(array_unique(array_map('strval', is_array($urlResult['warnings'] ?? null) ? $urlResult['warnings'] : []))),
             'revision' => $urlResult['revision'] ?? ($urlResult['identity_revision'] ?? null),
