@@ -76,7 +76,7 @@ final class DictionaryResolverTest extends TestCase
             entityLookup: static fn (): array => [],
             knowledgeLookup: static fn (): array => [],
             articleLookup: static fn (): array => [],
-            suppressionLookup: static fn (string $term): bool => $term === 'may dep',
+            suppressionLookup: static fn (string $term): bool => $term === 'máy đẹp',
         );
 
         $result = $resolver->resolve('Máy đẹp');
