@@ -33,6 +33,7 @@ final class MediaIngestGateway
                     'file_path' => $filePath,
                     'wordpress_attachment_id' => (int) ($spec['wordpress_attachment_id'] ?? 0),
                     'original_filename' => (string) ($spec['original_filename'] ?? basename($asset->storageKey)),
+                    'normalized_filename' => basename($asset->storageKey),
                     'view' => (string) (($spec['metadata']['view'] ?? $spec['metadata']['detail_type'] ?? 'image')),
                     'filename_suffix' => (string) ($spec['metadata']['filename_suffix'] ?? ''),
                 ]);

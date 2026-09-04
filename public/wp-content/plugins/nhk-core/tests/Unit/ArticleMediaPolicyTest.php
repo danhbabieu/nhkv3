@@ -98,6 +98,40 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('uploads/legacy/IMG_1234.JPG', $assets->listByMediaId($media->items[array_key_first($media->items)]->canonicalId)[0]->storageKey);
     }
 
+    public function test_new_upload_forwards_exact_generated_filename_to_wordpress_adapter(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $adapter = new class implements WordPressArticleMediaAdapter {
+            public array $contexts = [];
+            public function read(int $postId): array { return []; }
+            public function synchronize(int $postId, array $result): array { return []; }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array
+            {
+                $this->contexts[] = [$asset->storageKey, $context];
+                return [];
+            }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+
+        $gateway = new MediaIngestGateway($service, $adapter);
+        $gateway->ingest([
+            'stable_key' => 'new-upload-convergence',
+            'name' => 'Ô Đô',
+            'assets' => [[
+                'storage_key' => 'uploads/incoming/IMG_1234.JPG',
+                'original_filename' => 'IMG_1234.JPG',
+                'file_path' => '/tmp/new-upload.jpg',
+                'checksum' => hash('sha256', 'new-upload'),
+                'mime_type' => 'image/jpeg',
+                'byte_size' => 10,
+            ]],
+        ]);
+
+        self::assertCount(1, $adapter->contexts);
+        self::assertSame('uploads/incoming/odo-image-7c3e9409.jpg', $adapter->contexts[0][0]);
+        self::assertSame('odo-image-7c3e9409.jpg', $adapter->contexts[0][1]['normalized_filename'] ?? null);
+    }
+
     public function test_managed_image_filename_is_always_contextual_ascii_webp_and_not_camera_name(): void
     {
         $filename = (new MediaFilenameNormalizer())->normalizeWebp('Máy ảnh Odo 36/8', 'image', 'IMG_1234.JPG', 'a71c');
