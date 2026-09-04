@@ -22,9 +22,19 @@ All types use the same generic Authority storage and service contract:
 ## Product/specimen boundary
 
 `specimen` identifies a concrete physical object. `product` identifies a
-commercial listing or offer and may refer to a specimen through a semantic Graph
-relation or a typed payload reference. Product is never treated as the physical
-object's identity.
+commercial listing or offer. Product is never treated as the physical object's
+identity.
+
+The current V3 runtime has **no approved Product–Specimen persistence relation**.
+No Product payload field, broad `about` edge, taxonomy, post meta or other
+shortcut may be treated as canonical Product→Specimen ownership/identity
+binding. A future Product–Specimen relation requires an explicit Constitution/
+contract decision covering endpoints, direction, cardinality, provenance,
+Governance and read-back before implementation or data population.
+
+Any historical payload such as `specimen_uuid` is compatibility/evidence data
+only unless and until a separately approved migration/repair task interprets it;
+it is not authorization for a current semantic writer.
 
 ## Acceptance evidence
 
