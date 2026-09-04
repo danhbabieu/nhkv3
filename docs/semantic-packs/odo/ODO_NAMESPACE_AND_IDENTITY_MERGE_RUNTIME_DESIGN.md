@@ -43,13 +43,13 @@ These are `CODE_OBSERVED` facts from the current worktree, not runtime facts:
 
 The current `AuthorityRepository::update()` updates name/payload/state and
 increments revision, but does not change stable key. The current executor and
-MCP allowlist contain no rekey or merge branch. The current repositories also
+MCP allowlist now contain `rekey` and `merge` branches. The current repositories also
 do not expose a generic reference-move method. These are capability gaps, not
 permission to bypass the boundaries.
 
 ## 3. Governed stable-key rekey
 
-### 3.1 Command contract (proposed, not registered)
+### 3.1 Command contract and runtime binding
 
 The future generic command must bind:
 
@@ -64,10 +64,9 @@ The future generic command must bind:
 | `dependency_fingerprint` | Fingerprint of the identity and collision preflight inputs |
 | `reason/provenance` | Human-reviewed reason and attributable audit context |
 
-The exact public operation identifier is not yet approved. If the architecture
-approves the proposed generic `rekey` identifier, it must be added to the
-Governance allowlist and schema as a contract change; this document does not
-add it.
+The runtime operation identifier is `rekey`; its capability exposure does not
+authorize a data mutation. Subject UUID, old/new key, revision and dependency
+binding remain governed inputs.
 
 ### 3.2 Preflight and apply invariants
 
@@ -117,7 +116,7 @@ durable historical record and this limitation must be explicit.
 
 ## 4. Governed semantic merge
 
-### 4.1 Command contract (proposed, not registered)
+### 4.1 Command contract and runtime binding
 
 The future generic merge command must bind:
 
