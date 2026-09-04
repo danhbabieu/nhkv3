@@ -5,16 +5,19 @@ namespace NHK\Core\Application\Seo;
 
 final class SitemapIndexabilityProjection
 {
+    public function __construct(private ?SeoIndexabilityPolicy $policy = null) {}
+
     /** @param array<string,mixed> $snapshot @return array{included:bool,url:?string,reasons:list<string>} */
     public function include(array $snapshot): array
     {
+        $policy = ($this->policy ??= new SeoIndexabilityPolicy())->evaluate($snapshot);
         $reasons = [];
         if (($snapshot['historic'] ?? false) === true) $reasons[] = 'HISTORIC_ROUTE';
         if (($snapshot['noindex'] ?? false) === true) $reasons[] = 'NOINDEX';
         if (($snapshot['technical'] ?? false) === true) $reasons[] = 'TECHNICAL_ENDPOINT';
         if (($snapshot['public_eligible'] ?? false) !== true) $reasons[] = 'PRIVATE_OR_UNAVAILABLE';
         if (strtoupper((string) ($snapshot['readiness'] ?? '')) !== 'READY') $reasons[] = strtoupper((string) ($snapshot['readiness'] ?? 'INCOMPLETE'));
-        if (($snapshot['indexable'] ?? false) !== true) $reasons[] = 'NOT_INDEXABLE';
+        if (!$policy->indexable()) $reasons = [...$reasons, ...$policy->reasons()];
         $url = trim((string) ($snapshot['canonical_url'] ?? ''));
         if ($url === '') $reasons[] = 'MISSING_CANONICAL_URL';
         if (($snapshot['rendered_url'] ?? $url) !== $url) $reasons[] = 'CANONICAL_URL_MISMATCH';
