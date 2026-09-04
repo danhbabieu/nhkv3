@@ -19,14 +19,14 @@ current-slug/CAS/history repository. This is a `PUBLIC_IDENTITY_STORAGE_GAP` /
 | Type | Internal identity | Display name source | Public slug source | Canonical pattern | Parent requirement | Legacy pattern / redirect | Indexable | List query | Detail query | Fail-closed reasons |
 |---|---|---|---|---|---|---|---|---|---|---|
 | brand | `canonical_uuid` / `stable_key` | `canonical_name` | `PublicRouteResolver::slug(canonical_name)` | `/{brand-slug}/` | none | V2-style bare slug may be resolved and redirected to the same resolver output when the match is unique; historic alias registry not implemented | yes when active, slug valid, unambiguous, non-reserved | `EntityPageQuery::archive('brand')`, active rows; does not require non-null route in the archive item itself | UUID/stable-key detail, active-only; route detail resolves by current derived slug | inactive, empty/invalid slug, reserved root, duplicate slug, hydration loss, unavailable storage |
-| model | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/{brand-slug}/{model-slug}/` | active `payload.brand_uuid` resolving to active brand | legacy two-segment slug redirect only when both current derived slug matches are unique; no historic alias table | yes only with active canonical parent and unique child slug | active rows; parent/route eligibility is not centralized in the archive contract | UUID/stable-key detail is active-only; public nested route requires active parent and unique child | missing/invalid parent, inactive parent, duplicate child slug, invalid slug, hydration loss, unavailable storage |
-| variant | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/{brand-slug}/{model-slug}/{variant-slug}/` | active `payload.model_uuid` resolving through active model/brand | no dedicated legacy variant redirect contract | yes only with active canonical parent chain and unique child slug | active rows; parent/route eligibility is not centralized in the archive contract | UUID/stable-key detail is active-only; nested public route requires parent chain and unique variant slug | missing/invalid parent chain, inactive ancestor, duplicate child slug, invalid slug, hydration loss, unavailable storage |
+| model | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/{brand-slug}/{model-slug}/` | active `payload.brand_uuid` resolving to active brand for current route compatibility; canonical structural vocabulary is `model_of` | legacy two-segment slug redirect only when both current derived slug matches are unique; no historic alias table | yes only with active canonical parent and unique child slug | active rows; parent/route eligibility is not centralized in the archive contract | UUID/stable-key detail is active-only; public nested route requires active parent and unique child | missing/invalid parent, inactive parent, duplicate child slug, invalid slug, hydration loss, unavailable storage |
+| variant | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/{brand-slug}/{model-slug}/{variant-slug}/` | active `payload.model_uuid` resolving through active model/brand for current route compatibility; canonical structural vocabulary is `variant_of` | no dedicated legacy variant redirect contract | yes only with active canonical parent chain and unique child slug | active rows; parent/route eligibility is not centralized in the archive contract | UUID/stable-key detail is active-only; nested public route requires parent chain and unique variant slug | missing/invalid parent chain, inactive ancestor, duplicate child slug, invalid slug, hydration loss, unavailable storage |
 | movement | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/bo-may/{movement-slug}/` | none in route resolver | `/bo-may/` namespace; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
 | music | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/ban-nhac/{music-slug}/` | none; missing Brand relation must not block route | `/am-nhac/` archive alias; no historic entity-slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
 | component | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/linh-kien/{component-slug}/` | none | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
 | classification | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/phan-loai/{classification-slug}/` | none | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| specimen | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/hien-vat/{specimen-slug}/` | none in current public resolver; payload may contain `model_uuid`, but it is not used for this route | `/hien-vat/` archive alias; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
-| product | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/san-pham/{product-slug}/` | none in current public resolver; payload may contain `specimen_uuid`, but it is not used for this route | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
+| specimen | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/hien-vat/{specimen-slug}/` | none in current public resolver; any compatibility `model_uuid` payload is not a substitute for canonical Graph structure | `/hien-vat/` archive alias; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
+| product | `canonical_uuid` / `stable_key` | `canonical_name` | derived from `canonical_name` | `/san-pham/{product-slug}/` | none in current public resolver; no approved Product–Specimen canonical relation exists | namespace route; no historic slug registry | yes when active and unique | active rows | UUID/stable-key detail, active-only | inactive, empty/invalid or duplicate slug, hydration loss, unavailable storage |
 
 ## Evidence-backed contract findings
 
@@ -45,12 +45,16 @@ current-slug/CAS/history repository. This is a `PUBLIC_IDENTITY_STORAGE_GAP` /
    active-only path and does not attach canonical URLs. This is a
    `PUBLIC_ELIGIBILITY_FAILURE` / `CODE_GAP` candidate when a UI path filters
    URL-less serialized items.
-4. Model and Variant route resolution depends on payload parent UUIDs. The
-   structural `model_of` / `variant_of` predicates remain registry gaps, so
-   physical existence and structural completeness must be reported separately.
-   Treating absent physical edges as proof of absent entities would be a
-   `CONSTITUTION_CONFLICT`.
-5. Music has no route-level Brand requirement in the current resolver. A
+4. `PredicateRegistry` currently registers `model_of` (`model` → `brand`, ONE)
+   and `variant_of` (`variant` → `model`, ONE), together with the other approved
+   technical predicates. Physical Graph backfill/completeness is a separate
+   data/runtime question. Current route resolution still consumes compatibility
+   parent UUID payload fields; those fields must not be described as the
+   canonical Graph writer or as proof that structural edges are present.
+5. Product–Specimen remains a separate `REGISTRY_GAP` / contract-extension
+   requirement. Historical `specimen_uuid`-style payload data, broad `about`,
+   taxonomy or post meta must not be interpreted as a canonical ownership link.
+6. Music has no route-level Brand requirement in the current resolver. A
    missing Brand relation must not hide a legitimate active Music row.
 
 ## Required audit output when runtime access is available
@@ -80,15 +84,16 @@ already documented as database-unavailable in `V3_EXECUTION_STATE.md`.
 |---|---|---|
 | STORAGE_FAILURE | not established | no staging or local DB response |
 | HYDRATION_FAILURE | not established for current rows | bounded hydrator tests pass; live counts unavailable |
-| REGISTRY_FAILURE | not established | all nine catalog definitions load locally |
+| REGISTRY_FAILURE | not established | all nine catalog definitions load locally; approved structural predicates are registered |
 | SLUG_CONTRACT_FAILURE | established as code gap | slug is regenerated from `canonical_name`; no persisted history contract |
 | ROUTE_FAILURE | plausible, not endpoint-proven | resolver fail-closes ambiguity/reserved roots and nested parents |
 | PUBLIC_ELIGIBILITY_FAILURE | established as contract divergence | list/archive/detail use different route/eligibility conditions |
-| STRUCTURAL_RELATION_GAP | established as design/runtime gap | `model_of` / `variant_of` are not registered; payload parent fields drive routes |
+| STRUCTURAL_RELATION_GAP | data/backfill/runtime completeness gap | `model_of` / `variant_of` vocabulary is registered, but this audit does not prove physical edges are populated for all entities; route compatibility still uses parent payload UUIDs |
+| PRODUCT_SPECIMEN_RELATION_GAP | established contract/registry gap | no dedicated approved Product–Specimen relation; payload/about shortcuts are not canonical ownership |
 | CACHE_STALENESS | unverified | staging response unavailable; no purge performed |
 | CODE_VERSION_PARITY_FAILURE | unverified | no staging headers/body or deployment revision |
 | DATA_COMPATIBILITY_GAP | possible, not row-proven | live stored slug/alias fields unavailable |
-| CONSTITUTION_CONFLICT | applies only if payload parent fields are treated as canonical Graph structure | constitution requires registered typed relations |
+| CONSTITUTION_CONFLICT | applies if compatibility payload parent fields are treated as canonical Graph persistence | constitution requires registered typed relations and governed writes |
 
 No corrective data action is authorized by this report. Slug assignment,
 alias-history persistence, redirect changes and Graph repair require a follow-up
