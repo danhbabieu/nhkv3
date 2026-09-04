@@ -200,7 +200,7 @@ function nhk_v3_article_media_seo(int $postId): array
 
 function nhk_v3_context_seo_projection(): array
 {
-    foreach (['nhk_core_entity_context', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_core_knowledge_context'] as $key) {
+    foreach (['nhk_core_entity_context', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_core_knowledge_context', 'nhk_core_comparison_context'] as $key) {
         $context = $GLOBALS[$key] ?? null;
         if (is_array($context) && is_array($context['seo_projection'] ?? null)) return $context['seo_projection'];
         if ($key === 'nhk_core_entity_context' && is_array($context['entity']['seo_projection'] ?? null)) return $context['entity']['seo_projection'];
@@ -286,20 +286,20 @@ function nhk_v3_seo_head(): void
     }
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
-        if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ ' . (string) $entity['name'] . ' trong kho NHK.'; $canonical = nhk_v3_public_url($entity['url'] ?? null); }
-        elseif (($context['mode'] ?? '') === 'archive') { $label = nhk_v3_entity_label((string) ($context['type'] ?? '')); $title = 'Khám phá ' . $label . ' — Đồng Hồ Nhà Kho'; $description = 'Khám phá ' . $label . ' trong kho tri thức NHK.'; $canonical = nhk_v3_public_url($context['archive_url'] ?? null); }
+        if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ ' . (string) $entity['name'] . ' trong kho NHK.'; }
+        elseif (($context['mode'] ?? '') === 'archive') { $label = nhk_v3_entity_label((string) ($context['type'] ?? '')); $title = 'Khám phá ' . $label . ' — Đồng Hồ Nhà Kho'; $description = 'Khám phá ' . $label . ' trong kho tri thức NHK.'; }
     }
     if (is_array($media_context)) {
-        if (($media_context['mode'] ?? '') === 'detail' && is_array($media_context['media'] ?? null)) { $media = $media_context['media']; $title = (string) ($media['name'] ?? 'Hình ảnh') . ' — Đồng Hồ Nhà Kho'; $description = 'Hình ảnh liên quan trong thư viện NHK.'; $canonical = nhk_v3_public_url($media['public_url'] ?? null); }
-        elseif (($media_context['mode'] ?? '') === 'archive') { $title = 'Hình ảnh — Đồng Hồ Nhà Kho'; $description = 'Thư viện hình ảnh của NHK.'; $canonical = nhk_v3_public_url($media_context['archive_url'] ?? null); }
+        if (($media_context['mode'] ?? '') === 'detail' && is_array($media_context['media'] ?? null)) { $media = $media_context['media']; $title = (string) ($media['name'] ?? 'Hình ảnh') . ' — Đồng Hồ Nhà Kho'; $description = 'Hình ảnh liên quan trong thư viện NHK.'; }
+        elseif (($media_context['mode'] ?? '') === 'archive') { $title = 'Hình ảnh — Đồng Hồ Nhà Kho'; $description = 'Thư viện hình ảnh của NHK.'; }
     }
     if (is_array($video_context)) {
-        if (($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; $title = (string) (($video['title'] ?? '') ?: 'Video NHK') . ' — Đồng Hồ Nhà Kho'; $description = 'Video tham chiếu từ nguồn bên ngoài trong thư viện NHK.'; $canonical = nhk_v3_public_url($video['public_url'] ?? null); }
-        elseif (($video_context['mode'] ?? '') === 'archive') { $title = 'Video — Đồng Hồ Nhà Kho'; $description = 'Các video từ nguồn bên ngoài được NHK kiểm soát.'; $canonical = nhk_v3_public_url($video_context['archive_url'] ?? null); }
+        if (($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; $title = (string) (($video['title'] ?? '') ?: 'Video NHK') . ' — Đồng Hồ Nhà Kho'; $description = 'Video tham chiếu từ nguồn bên ngoài trong thư viện NHK.'; }
+        elseif (($video_context['mode'] ?? '') === 'archive') { $title = 'Video — Đồng Hồ Nhà Kho'; $description = 'Các video từ nguồn bên ngoài được NHK kiểm soát.'; }
     }
     if (is_array($knowledge_context)) {
-        if (($knowledge_context['mode'] ?? '') === 'detail' && is_array($knowledge_context['claim'] ?? null)) { $claim = $knowledge_context['claim']; $title = (string) $claim['text'] . ' — Tri thức NHK'; $description = 'Tri thức được kiểm soát trong kho NHK.'; $canonical = nhk_v3_public_url($claim['url'] ?? null); }
-        elseif (($knowledge_context['mode'] ?? '') === 'archive') { $title = 'Kho tri thức — Đồng Hồ Nhà Kho'; $description = 'Các tri thức đang hoạt động trong kho NHK.'; $canonical = nhk_v3_public_url($knowledge_context['archive_url'] ?? null); }
+        if (($knowledge_context['mode'] ?? '') === 'detail' && is_array($knowledge_context['claim'] ?? null)) { $claim = $knowledge_context['claim']; $title = (string) $claim['text'] . ' — Tri thức NHK'; $description = 'Tri thức được kiểm soát trong kho NHK.'; }
+        elseif (($knowledge_context['mode'] ?? '') === 'archive') { $title = 'Kho tri thức — Đồng Hồ Nhà Kho'; $description = 'Các tri thức đang hoạt động trong kho NHK.'; }
     }
     if (is_string($sharedSeo['canonical'] ?? null) && $sharedSeo['canonical'] !== '') $canonical = (string) $sharedSeo['canonical'];
     if (is_array($comparison_context) && ($comparison_context['mode'] ?? '') === 'compare') { $title = 'So sánh hồ sơ — Đồng Hồ Nhà Kho'; $description = 'Đọc cạnh nhau các dữ kiện công khai của hai hồ sơ NHK.'; $canonical = home_url('/so-sanh/'); }
