@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+## Public identity Tasks 9–11 Owner ruling checkpoint — 2026-09-04
+
+The Owner ruled that the Constitution remains authoritative: MediaAsset has no
+standalone indexable public detail page by default, asset URLs are delivery
+identities only, and filename/UUID/alt/caption/relation/slug/page identity stay
+separate. Existing `/media/{slug}/` detail exposure was classified `CODE_GAP`
+and retired. `/media/` archive and `/media/asset/{uuid}/` delivery remain;
+delivery is explicitly `noindex`. Atomic Knowledge Claim/Source/Evidence HTML
+detail remains unavailable without a registered public projection, and
+Album/Gallery is `REGISTRY_GAP`.
+
+The Task 11 audit is read-only with `mutation_count=0`; live runtime status is
+`ENVIRONMENT_BLOCKED`. Task 12 remains Owner-gated: no production mutation,
+live canonical URL change, push, merge or publish without explicit approval.
+No legacy asset filename or physical URL was changed and no production data was
+mutated. Full evidence is in the SDD ledger at
+`.superpowers/sdd/2026-09-03-persisted-public-identity-url-implementation-plan/progress.md`.
+
+## Tasks 1–12 implementation phase completion — 2026-09-04
+
+Tasks 1–12 are complete for the non-production/read-only implementation phase.
+Task 12 is pre-cutover only: `CanaryPublicIdentityProjection` verifies the
+bounded canary contract without a writer or live re-projection. The expected
+Video UUID, YouTube ID and canonical path are preserved as evidence:
+`01a06815-1e51-7964-b004-1ba79e488ad1`, `P4KaHX3LBOw`,
+`/video/odo-36-10-gai-carillon-p4kahx3lbow/`.
+
+The final whole-branch review covers persisted Public Identity, Authority URL
+projection, historic one-hop 301, Video URL policy, Media/Knowledge route
+rulings, SEO/internal consumers, collision fail-closed behavior, prohibited
+canonical-name runtime slug derivation and the absence of a generic
+WordPress semantic fallback writer. No production/staging/V2 data or live
+canonical URL was changed. Guarded integration/live canary read-back remains
+`ENVIRONMENT_BLOCKED` when `NHK_WP_TEST_PATH` is unavailable. Production
+canary/cutover is explicitly `PENDING_OWNER_APPROVAL`.
+
 ## Product–Specimen relation fail-closed checkpoint — 2026-09-04
 
 The shared `GraphService::create()` boundary now rejects both

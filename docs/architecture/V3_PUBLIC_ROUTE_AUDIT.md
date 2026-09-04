@@ -10,6 +10,11 @@ presentation code exist, but persisted Public Identity/current-slug/history is
 not runtime-proven. Media and atomic Knowledge remain non-indexable where no
 governed public projection exists.
 
+Owner Task 9 ruling is recorded in
+`MEDIA_PUBLIC_ROUTE_DECISION_2026-09-03.md`; the former Media detail route is a
+`CODE_GAP` and now fails closed. Asset delivery remains a separate delivery
+identity.
+
 ## Odo token correction — 2026-09-03
 
 The former `o-do` public slug was produced by Vietnamese transliteration of

@@ -8,6 +8,8 @@ use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 final class PublicKnowledgeRoutes
 {
     public function __construct(private KnowledgePageQuery $query) {}
+    public static function atomicDetailIsPublic(): bool { return false; }
+    public static function publicAtomicDetail(?KnowledgePageQuery $query, string $key): ?array { return null; }
 
     public function register(): void
     {
@@ -18,8 +20,6 @@ final class PublicKnowledgeRoutes
 
     public function rewrite(): void
     {
-        add_rewrite_rule('^tri-thuc/([^/]+)/?$', 'index.php?nhk_knowledge_slug=$matches[1]', 'top');
-        add_rewrite_rule('^knowledge/claim/([a-z0-9][a-z0-9._:-]{0,190})/?$', 'index.php?nhk_knowledge_key=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/page/([1-9][0-9]*)/?$', 'index.php?nhk_knowledge_page=$matches[1]', 'top');
         add_rewrite_rule('^knowledge/?$', 'index.php?nhk_knowledge_page=1', 'top');
     }
@@ -29,14 +29,9 @@ final class PublicKnowledgeRoutes
         $key = (string) get_query_var('nhk_knowledge_key');
         $slug = (string) get_query_var('nhk_knowledge_slug');
         $page = get_query_var('nhk_knowledge_page');
-        if ($slug !== '') {
-            $claim = $this->query->bySlug(rawurldecode($slug));
-            if ($claim === null) { $this->set404(); return get_404_template(); }
-            $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'detail', 'claim' => $claim, 'archive_url' => home_url('/tri-thuc/')];
-        } elseif ($key !== '') {
-            $claim = $this->query->detail(rawurldecode($key));
-            if ($claim === null) { $this->set404(); return get_404_template(); }
-            $target = (string) ($claim['url'] ?? ''); if ($target === '') { $this->set404(); return get_404_template(); } wp_safe_redirect(home_url($target), 301, 'NHK canonical knowledge route'); exit;
+        if ($slug !== '' || $key !== '') {
+            $this->set404();
+            return get_404_template();
         } elseif ($page !== '') {
             $GLOBALS['nhk_core_knowledge_context'] = ['mode' => 'archive', 'archive' => $this->query->archive(max(1, (int) $page)), 'archive_url' => home_url('/tri-thuc/')];
         } else return $template;

@@ -38,6 +38,8 @@ final class PublicEndpointEligibilityResolver
         return ['eligible' => true, 'status' => 'eligible', 'route' => $route, 'reason' => 'PUBLIC_CANONICAL_ROUTE', 'reasons' => []];
     }
 
+    public function projectionGap(string $type): array { return ['eligible' => false, 'status' => 'blocked', 'route' => null, 'reason' => 'REGISTRY_GAP', 'reasons' => ['REGISTRY_GAP', strtoupper(trim($type))]]; }
+
     private function blocked(string $reason): array { return ['eligible' => false, 'status' => 'blocked', 'route' => null, 'reason' => $reason, 'reasons' => [$reason]]; }
     private function unavailable(string $reason): array { return ['eligible' => false, 'status' => 'unavailable', 'route' => null, 'reason' => $reason, 'reasons' => [$reason]]; }
 }

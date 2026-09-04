@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Infrastructure\Http\PublicMediaVideoRoutes;
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
+use NHK\Tests\Support\FakeHistoricResolverRepository;
 use PHPUnit\Framework\TestCase;
 
 final class PublicRouteRedirectTest extends TestCase

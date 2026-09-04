@@ -10,14 +10,13 @@ use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
-use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
 
 final class MediaVideoPageQuery
 {
     public function __construct(private MediaRepository $media, private MediaAssetRepository $assets, private MediaUsageRepository $usages, private VideoRepository $videos, private ?MigrationStatus $status = null, private ?PublicMediaAssetDelivery $delivery = null, private ?RelatedContentQuery $related = null) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
     public function mediaDetail(string $id): ?array { if (!$this->available('media') || !UuidCodec::isValid($id)) return null; $media = $this->media->findByCanonicalId($id); if (!$media || !$media->active || $media->readiness !== 'ready') return null; $assets = array_values(array_filter($this->assets->listByMediaId($id), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null))); return ['name' => $media->canonicalName, 'assets' => array_map($this->asset(...), $assets), 'usages' => array_map($this->usage(...), $this->usages->listByMediaId($id))]; }
-    public function mediaBySlug(string $slug): ?array { if (!$this->available('media')) return null; $slug = trim($slug); $matches = array_values(array_filter($this->media->list(), fn (Media $media): bool => $media->active && $media->readiness === 'ready' && PublicRouteResolver::slug($media->canonicalName) === $slug)); return count($matches) === 1 ? $this->mediaDetail($matches[0]->canonicalId) : null; }
+    public function mediaBySlug(string $slug): ?array { return null; }
     public function videoDetail(string $id): ?array { if (!$this->available('video') || !UuidCodec::isValid($id)) return null; $video = $this->videos->findByCanonicalId($id); return $video && $video->active && $video->hasValidPublicReference() ? $this->video($video) : null; }
     public function videoBySlug(string $slug): ?array { if (!$this->available('video')) return null; $slug = trim($slug); $policy = new VideoUrlPolicy(); $selector = new VideoPublicContextSelector(); $matches = array_values(array_filter($this->videos->list(), fn (Video $video): bool => $video->active && ($result = $policy->project($video, $selector))['eligible'] && $result['path'] === '/' . $slug . '/')); return count($matches) === 1 ? $this->video($matches[0]) : null; }
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */

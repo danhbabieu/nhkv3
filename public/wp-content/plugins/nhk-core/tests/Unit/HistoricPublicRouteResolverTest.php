@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
 use PHPUnit\Framework\TestCase;
+use NHK\Tests\Support\FakeHistoricResolverRepository;
 
 final class HistoricPublicRouteResolverTest extends TestCase
 {
@@ -28,15 +29,5 @@ final class HistoricPublicRouteResolverTest extends TestCase
     public static function failClosedCases(): array
     {
         return [['NOT_FOUND'], ['AMBIGUOUS'], ['INELIGIBLE'], ['NATIVE_ROUTE_CONFLICT'], ['LOOP']];
-    }
-}
-
-final class FakeHistoricResolverRepository
-{
-    public function __construct(private string $status = 'FOUND') {}
-    public function resolveHistoric(string $path): array
-    {
-        if ($this->status !== 'FOUND') return ['status' => $this->status];
-        return ['status' => 'FOUND', 'target' => '/video/odo-36-10-gai-carillon-p4kahx3lbow/', 'hops' => 1];
     }
 }

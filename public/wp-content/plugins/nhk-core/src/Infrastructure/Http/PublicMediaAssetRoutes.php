@@ -48,6 +48,7 @@ final class PublicMediaAssetRoutes
         header('Content-Length: ' . $size);
         header('Content-Disposition: inline');
         header('Cache-Control: public, max-age=31536000, immutable');
+        header('X-Robots-Tag: noindex, nofollow');
         header('X-Content-Type-Options: nosniff');
         readfile($resolved['path']);
         exit;
