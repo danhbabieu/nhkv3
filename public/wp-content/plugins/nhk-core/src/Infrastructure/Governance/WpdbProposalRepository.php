@@ -33,7 +33,8 @@ final class WpdbProposalRepository implements ProposalRepository
             if ($stateValue < 1 || $stateValue > count($states)) return null;
             $state = $states[$stateValue - 1];
             $targetBinary = (string) ($row['target_uuid'] ?? '');
-            $target = $targetBinary !== '' && trim($targetBinary, "\0") !== '' ? UuidCodec::fromBinary($targetBinary) : null;
+            $hasTargetUuid = $targetBinary !== '' && strlen($targetBinary) === 16 && strtolower(bin2hex($targetBinary)) !== str_repeat('0', 32);
+            $target = $hasTargetUuid ? UuidCodec::fromBinary($targetBinary) : null;
             $decisionActor = null;
             $supersededBy = null;
             $proposalDbId = (int) ($row['id'] ?? 0);
@@ -47,7 +48,11 @@ final class WpdbProposalRepository implements ProposalRepository
             }
             $payload = json_decode((string) ($row['command_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
             if (!is_array($payload)) return null;
-            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $row['expected_revision'] === null ? null : (int) $row['expected_revision'], !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
+            $isCreateWithoutTarget = in_array((string) ($row['operation'] ?? ''), ['create', 'ingest', 'relation_create'], true) && !$hasTargetUuid;
+            $expectedRevision = $isCreateWithoutTarget && ($row['expected_revision'] === null || $row['expected_revision'] === '' || (string) $row['expected_revision'] === '0')
+                ? null
+                : ($row['expected_revision'] === null || $row['expected_revision'] === '' ? null : (int) $row['expected_revision']);
+            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $expectedRevision, !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
         } catch (\InvalidArgumentException|\JsonException) {
             return null;
         }

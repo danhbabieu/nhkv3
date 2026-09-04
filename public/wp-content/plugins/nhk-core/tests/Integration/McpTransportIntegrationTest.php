@@ -293,7 +293,7 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertFalse($create->get_data()['result']['isError']);
             self::assertSame('media', $created['entity_type']);
             self::assertSame('ingest', $created['operation']);
-            $proposalId = (string) $created['id'];
+            $proposalId = (string) $created['proposal_id'];
             $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
             self::assertNotNull($proposal);
 
@@ -369,7 +369,7 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertFalse($create->get_data()['result']['isError']);
             self::assertSame('video', $created['entity_type']);
             self::assertSame('ingest', $created['operation']);
-            $proposalId = (string) $created['id'];
+            $proposalId = (string) $created['proposal_id'];
             $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
             self::assertNotNull($proposal);
 
@@ -474,7 +474,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(200, $create->get_status(), (string) wp_json_encode($create->get_data()));
         $created = $create->get_data()['result']['structuredContent'];
         self::assertFalse($create->get_data()['result']['isError'], (string) wp_json_encode($create->get_data()));
-        $proposalId = (string) $created['id'];
+        $proposalId = (string) $created['proposal_id'];
         $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
         self::assertNotNull($proposal);
 

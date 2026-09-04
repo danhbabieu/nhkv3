@@ -14,10 +14,10 @@ use NHK\Core\Domain\Governance\{DependencyGraph, Proposal, ProposalState};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
-use NHK\Core\Infrastructure\Graph\{AuthorityEndpointResolver, CoreEndpointResolverRegistrar, WpdbGraphRepository};
-use NHK\Core\Infrastructure\Governance\{WpdbApplyAttemptRepository, WpdbAuditSink, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
+use NHK\Core\Infrastructure\Graph\{AuthorityEndpointResolver, CoreEndpointResolverRegistrar, WpdbAuditSink, WpdbGraphRepository};
+use NHK\Core\Infrastructure\Governance\{WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
-use NHK\Core\Infrastructure\Migration\{AuthorityMigration002, GovernanceMigration003, GraphMigration001, KnowledgeEvidenceMetadataMigration007, KnowledgeMigration005, MediaMigration004};
+use NHK\Core\Infrastructure\Migration\{AuthorityMigration002, GovernanceMigration003, GraphMigration001, KnowledgeEvidenceMetadataMigration007, KnowledgeMigration005};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
@@ -38,7 +38,6 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();
-        (new MediaMigration004())->up();
         (new KnowledgeMigration005())->up();
         (new KnowledgeEvidenceMetadataMigration007())->up();
         do_action('rest_api_init');
@@ -57,17 +56,20 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_entities WHERE canonical_uuid=%s", UuidCodec::toBinary($id)));
         }
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_proposals WHERE idempotency_key LIKE %s", $this->prefix . '%'));
-        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_graph_edges WHERE edge_uuid IN (SELECT edge_uuid FROM {$wpdb->prefix}nhk_graph_edges) AND source_node_id IN (SELECT id FROM {$wpdb->prefix}nhk_graph_nodes WHERE endpoint_key IN (%s,%s))", $this->owned[0] ?? '', $this->owned[1] ?? ''));
-        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_graph_nodes WHERE endpoint_key IN (%s,%s)", ...[$this->owned[0] ?? '', $this->owned[1] ?? '']));
+        $ownedKeys = array_values(array_unique(array_merge($this->owned, array_map(static fn (string $id): string => 'video:' . $id, $this->owned))));
+        $placeholders = implode(',', array_fill(0, count($ownedKeys), '%s'));
+        $nodeIds = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$wpdb->prefix}nhk_graph_nodes WHERE endpoint_key IN ($placeholders)", ...$ownedKeys));
+        if ($nodeIds !== []) $wpdb->query("DELETE FROM {$wpdb->prefix}nhk_graph_edges WHERE source_node_id IN (" . implode(',', array_map('intval', $nodeIds)) . ") OR target_node_id IN (" . implode(',', array_map('intval', $nodeIds)) . ")");
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_graph_nodes WHERE endpoint_key IN ($placeholders)", ...$ownedKeys));
     }
 
     public function test_governed_full_flow_reads_back_source_claim_evidence_video_and_variant_relation(): void
     {
         [$authority, $variant, $governance, $apply] = $this->fixture();
-        $source = $this->run($governance, $apply, 'source', ['stable_key' => $this->prefix . '-source', 'title' => 'Independent catalogue', 'source_type' => 'catalog', 'locator' => 'https://example.test/source']);
-        $claim = $this->run($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-claim', 'text' => 'The variant uses a spring-driven movement.', 'claim_type' => 'technical', 'provenance' => ['test' => $this->prefix]]);
-        $evidence = $this->run($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Spring-driven movement', 'relation' => 'supports', 'locator' => 'https://example.test/source#movement', 'metadata' => ['visibility' => 'PUBLIC']]);
-        $video = $this->run($governance, $apply, 'video', [
+        $source = $this->runGoverned($governance, $apply, 'source', ['stable_key' => $this->prefix . '-source', 'title' => 'Independent catalogue', 'source_type' => 'catalog', 'locator' => 'https://example.test/source']);
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-claim', 'text' => 'The variant uses a spring-driven movement.', 'claim_type' => 'technical', 'provenance' => ['test' => $this->prefix]]);
+        $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Spring-driven movement', 'relation' => 'supports', 'locator' => 'https://example.test/source#movement', 'metadata' => ['visibility' => 'PUBLIC']]);
+        $video = $this->runGoverned($governance, $apply, 'video', [
             'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
             'title' => 'Governed test video',
             'metadata' => ['intake_version' => 1, 'semantic_attachments' => [[
@@ -89,21 +91,96 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
     public function test_fail_closed_rejects_proposal_uuid_as_canonical_dependency(): void
     {
         [, , $governance, ] = $this->fixture();
-        $proposal = $governance->createFromArguments(['operation' => 'ingest', 'entity_type' => 'source', 'idempotency_key' => $this->prefix . '-invalid', 'payload' => ['stable_key' => $this->prefix . '-invalid']]);
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'source', 'ingest', ['stable_key' => $this->prefix . '-invalid'], hash('sha256', 'invalid'), null, hash('sha256', 'invalid-dependency'), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-invalid', entityType: 'source'));
         $validator = new CanonicalDependencyValidator(new WpdbKnowledgeRepository($GLOBALS['wpdb']), new WpdbSourceRepository($GLOBALS['wpdb']), new WpdbEvidenceRepository($GLOBALS['wpdb']));
         $this->expectExceptionMessage('Claim must resolve by canonical UUID.');
         $validator->claim($proposal->id);
     }
 
+    public function test_fail_closed_rejects_proposal_uuid_as_source_dependency(): void
+    {
+        [, , $governance, ] = $this->fixture();
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'source', 'ingest', ['stable_key' => $this->prefix . '-invalid-source'], hash('sha256', 'invalid-source'), null, hash('sha256', 'invalid-source-dependency'), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-invalid-source', entityType: 'source'));
+        $validator = new CanonicalDependencyValidator(new WpdbKnowledgeRepository($GLOBALS['wpdb']), new WpdbSourceRepository($GLOBALS['wpdb']), new WpdbEvidenceRepository($GLOBALS['wpdb']));
+        $this->expectExceptionMessage('Source must resolve by canonical UUID.');
+        $validator->source($proposal->id);
+    }
+
+    public function test_fail_closed_rejects_proposal_uuid_as_evidence_dependency(): void
+    {
+        [, , $governance, ] = $this->fixture();
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'evidence', 'ingest', ['excerpt' => 'invalid'], hash('sha256', 'invalid-evidence'), null, hash('sha256', 'invalid-evidence-dependency'), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-invalid-evidence', entityType: 'evidence'));
+        $validator = new CanonicalDependencyValidator(new WpdbKnowledgeRepository($GLOBALS['wpdb']), new WpdbSourceRepository($GLOBALS['wpdb']), new WpdbEvidenceRepository($GLOBALS['wpdb']));
+        $this->expectExceptionMessage('Evidence must resolve by canonical UUID.');
+        $validator->evidence($proposal->id);
+    }
+
     public function test_fail_closed_requires_evidence_refs_and_keeps_private_evidence_internal_only(): void
     {
         [, $variant, $governance, $apply] = $this->fixture();
-        $source = $this->run($governance, $apply, 'source', ['stable_key' => $this->prefix . '-private-source', 'title' => 'Private', 'source_type' => 'archive', 'locator' => 'https://example.test/private']);
-        $claim = $this->run($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-private-claim', 'text' => 'Private claim', 'claim_type' => 'fact']);
-        $evidence = $this->run($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Private excerpt', 'metadata' => ['visibility' => 'PRIVATE']]);
+        $source = $this->runGoverned($governance, $apply, 'source', ['stable_key' => $this->prefix . '-private-source', 'title' => 'Private', 'source_type' => 'archive', 'locator' => 'https://example.test/private']);
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-private-claim', 'text' => 'Private claim', 'claim_type' => 'fact']);
+        $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Private excerpt', 'metadata' => ['visibility' => 'PRIVATE']]);
         $this->expectExceptionMessage('EVIDENCE_REFS_REQUIRED');
-        $this->run($governance, $apply, 'video', ['url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11), 'title' => 'No refs', 'metadata' => ['intake_version' => 1, 'semantic_attachments' => [['target_type' => 'variant', 'target_key' => $variant->canonicalId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'evidence_refs' => []]]]);
+        $this->runGoverned($governance, $apply, 'video', [
+            'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
+            'title' => 'No refs',
+            'metadata' => [
+                'intake_version' => 1,
+                'semantic_attachments' => [[
+                    'target_type' => 'variant',
+                    'target_key' => $variant->canonicalId,
+                    'predicate' => 'about',
+                    'origin' => 'EXPLICIT_USER_RELATION',
+                    'evidence_refs' => [],
+                ]],
+            ],
+        ]);
         self::assertNotNull((new WpdbEvidenceRepository($GLOBALS['wpdb']))->findByCanonicalId($evidence['canonical_id']));
+        self::assertSame(404, rest_do_request(new \WP_REST_Request('GET', '/nhk/v1/knowledge/evidence/' . $evidence['canonical_id']))->get_status());
+    }
+
+    public function test_fail_closed_rejects_inactive_canonical_claim(): void
+    {
+        [, , $governance, $apply] = $this->fixture();
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-inactive-claim', 'text' => 'Inactive claim', 'claim_type' => 'fact']);
+        $validator = new CanonicalDependencyValidator(new WpdbKnowledgeRepository($GLOBALS['wpdb']), new WpdbSourceRepository($GLOBALS['wpdb']), new WpdbEvidenceRepository($GLOBALS['wpdb']));
+        (new KnowledgeService(new WpdbKnowledgeRepository($GLOBALS['wpdb']), new WpdbSourceRepository($GLOBALS['wpdb']), new WpdbEvidenceRepository($GLOBALS['wpdb'])))->retireClaim($claim['canonical_id'], 1);
+        $this->expectExceptionMessage('Claim dependency is not active.');
+        $validator->claim($claim['canonical_id']);
+    }
+
+    public function test_same_idempotency_key_reuses_same_command_and_rejects_changed_fingerprint(): void
+    {
+        [, , $governance, ] = $this->fixture();
+        $key = $this->prefix . '-idempotency';
+        $payload = ['stable_key' => $this->prefix . '-idempotent', 'title' => 'Same source', 'source_type' => 'catalog'];
+        $one = new Proposal(UuidCodec::newV7(), 'source', 'ingest', $payload, hash('sha256', 'same'), null, hash('sha256', 'deps'), ProposalState::DRAFT, idempotencyKey: $key, entityType: 'source');
+        $same = new Proposal(UuidCodec::newV7(), 'source', 'ingest', $payload, hash('sha256', 'same'), null, hash('sha256', 'deps'), ProposalState::DRAFT, idempotencyKey: $key, entityType: 'source');
+        self::assertSame($governance->create($one)->id, $governance->create($same)->id);
+        $changed = new Proposal(UuidCodec::newV7(), 'source', 'ingest', ['stable_key' => $this->prefix . '-changed'], hash('sha256', 'changed'), null, hash('sha256', 'deps'), ProposalState::DRAFT, idempotencyKey: $key, entityType: 'source');
+        $this->expectExceptionMessage('Idempotency key is already bound to different content.');
+        $governance->create($changed);
+    }
+
+    public function test_dependency_revision_change_rejects_apply(): void
+    {
+        [$authority, $variant, $governance, $apply] = $this->fixture();
+        $proposal = new Proposal(UuidCodec::newV7(), 'variant', 'update', ['entity_payload' => ['description' => 'stale'], 'dependency_revisions' => [$variant->canonicalId => 1]], hash('sha256', 'stale'), 1, hash('sha256', 'stale-deps'), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-stale', targetUuid: $variant->canonicalId, entityType: 'variant');
+        $proposal = $governance->create($proposal);
+        $proposal = $governance->approve($governance->submit($proposal->id)->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'test-policy');
+        $authority->update($variant->canonicalId, ['description' => 'changed first'], 1);
+        $this->expectExceptionMessage('Proposal is not eligible for apply.');
+        $apply->apply($proposal->id);
+    }
+
+    public function test_canonical_readback_failure_blocks_downstream_result(): void
+    {
+        [, , $governance, ] = $this->fixture();
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'source', 'ingest', ['stable_key' => $this->prefix . '-readback', 'title' => 'Readback', 'source_type' => 'catalog'], hash('sha256', 'readback'), null, hash('sha256', 'deps'), ProposalState::APPROVED, idempotencyKey: $this->prefix . '-readback', entityType: 'source'));
+        $verifier = new CanonicalApplyReadBackVerifier(static fn (string $type, string $id): ?array => null);
+        $this->expectExceptionMessage('CANONICAL_READBACK_VERIFICATION_FAILED');
+        $verifier->verify($proposal, UuidCodec::newV7());
     }
 
     private function fixture(): array
@@ -117,18 +194,20 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         array_push($this->owned, $brand->canonicalId, $model->canonicalId, $variant->canonicalId);
         $claims = new WpdbKnowledgeRepository($wpdb); $sources = new WpdbSourceRepository($wpdb); $evidence = new WpdbEvidenceRepository($wpdb); $videos = new WpdbVideoRepository($wpdb);
         $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authorityRepo, new \NHK\Core\Infrastructure\Media\WpdbMediaRepository($wpdb), $videos, $claims, $sources, $evidence);
-        $graph = new GraphService(new WpdbGraphRepository($wpdb), $endpoints, new PredicateRegistry(), new WpdbAuditSink($wpdb));
+        $graph = new GraphService(new WpdbGraphRepository($wpdb), $endpoints, new PredicateRegistry(), new WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
         $proposalRepo = new WpdbProposalRepository($wpdb); $eligibility = new ProposalEligibilityService($proposalRepo, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authorityRepo, $proposalRepo, new WpdbGraphRepository($wpdb), null, $videos, $claims, $sources, $evidence));
         $knowledge = new KnowledgeService($claims, $sources, $evidence); $dependencyValidator = new CanonicalDependencyValidator($claims, $sources, $evidence);
         $executor = new \NHK\Core\Application\Governance\AuthorityProposalExecutor($authority, $graph, null, new VideoService($videos), $knowledge, null, null, null, $dependencyValidator);
         $reader = new CanonicalApplyReadBackVerifier(static function (string $type, string $id) use ($authorityRepo, $claims, $sources, $evidence, $videos, $graph): ?array { $entity = match ($type) { 'source' => $sources->findByCanonicalId($id), 'knowledge' => $claims->findByCanonicalId($id), 'evidence' => $evidence->findByCanonicalId($id), 'video' => $videos->findByCanonicalId($id), 'relation' => $graph->findByUuid($id), default => $authorityRepo->findByCanonicalId($id) }; if ($entity === null) return null; return ['entity_type' => $type, 'canonical_id' => $id, 'active' => property_exists($entity, 'active') ? (bool) $entity->active : (method_exists($entity, 'isActive') ? $entity->isActive() : true), 'revision' => property_exists($entity, 'revision') ? (int) $entity->revision : 1, 'snapshot' => ['id' => $id]]; });
-        $apply = new ControlledApplyService($proposalRepo, new WpdbApplyAttemptRepository($wpdb), new WpdbTransactionManager($wpdb), $executor, new WpdbAuditSink($wpdb), $eligibility, null, new class implements GovernanceAuthorizer { public function require(string $capability): void {} }, $reader);
-        return [$authority, $variant, new GovernanceService($proposalRepo, new WpdbAuditSink($wpdb), new WpdbTransactionManager($wpdb)), $apply];
+        $audit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb);
+        $apply = new ControlledApplyService($proposalRepo, new WpdbApplyAttemptRepository($wpdb), new WpdbTransactionManager($wpdb), $executor, $audit, $eligibility, null, new class implements GovernanceAuthorizer { public function require(string $capability): void {} }, $reader);
+        return [$authority, $variant, new GovernanceService($proposalRepo, $audit, new WpdbTransactionManager($wpdb)), $apply];
     }
 
-    private function run(GovernanceService $governance, ControlledApplyService $apply, string $type, array $payload): array
+    private function runGoverned(GovernanceService $governance, ControlledApplyService $apply, string $type, array $payload): array
     {
         $proposal = $governance->create(new Proposal(UuidCodec::newV7(), $type, 'ingest', $payload, hash('sha256', json_encode($payload)), null, hash('sha256', $type), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-' . $type . '-' . count($this->owned), entityType: $type));
+        self::assertNotNull((new WpdbProposalRepository($GLOBALS['wpdb']))->find($proposal->id));
         $proposal = $governance->submit($proposal->id); $proposal = $governance->approve($proposal->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'test-policy');
         self::assertTrue($governance->review($proposal->id)->state === ProposalState::APPROVED);
         self::assertTrue($apply->apply($proposal->id)['canonical_readback'] !== null);
