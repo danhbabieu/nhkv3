@@ -1,5 +1,62 @@
 # Public Identity Cutover Readiness Report
 
+## Verification checkpoint — 2026-09-04
+
+### Blocker resolution
+
+The live migration blocker was a code regression in `Plugin::boot()`: every
+normal WordPress request attempted pending migrations, including migration 014,
+before registering public routes. Migration 014 correctly failed closed because
+the live database is not one of the explicitly permitted `nhk_v3` or
+`nhk_v3_test` databases. Boot now leaves migration execution untouched unless
+the explicit `NHK_RUN_MIGRATIONS=true` gate is defined; plugin activation remains
+the explicit migration entrypoint and the database safety guard is unchanged.
+
+Required deployment configuration: leave `NHK_RUN_MIGRATIONS` unset or false
+for production/read-only traffic. A separately authorized maintenance/activation
+operation must provision and verify the governed schema before canary traffic;
+production/read-only request traffic must not be used to execute migration-up.
+No production migration was run by this checkpoint.
+
+### Integration result
+
+The requested command was rerun with `NHK_WP_TEST_PATH=public` and the exact
+guarded database selector `NHK_WP_TEST_DB=nhk_v3_test`:
+
+```text
+NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'
+```
+
+The run did not enter PHPUnit test execution. WordPress bootstrap terminated
+with `Error establishing a database connection`; the configured values are
+`DB_HOST=127.0.0.1`, `DB_NAME=nhk_v3_test`, `DB_USER=root`, and an empty
+`DB_PASSWORD`. Both TCP port 3306 and the default local socket were unavailable,
+so database existence/reachability remains unverified. `NHK_WP_TEST_PATH=public`
+is correct and resolves to the repository WordPress bootstrap. The suite is
+therefore `ENVIRONMENT_BLOCKED` at bootstrap. The executable Unit suite passes:
+485 tests, 2,252 assertions, 1 warning and 5 PHPUnit deprecations.
+
+### Live canary read-back
+
+Read-only GETs were re-attempted in the connected Chrome browser for the
+expected canonical and historic routes on `https://demo.1945.vn`. Both requests
+confirmed the deployed old code still terminates during WordPress plugin boot
+with:
+
+```text
+PUBLIC_IDENTITY_MIGRATION_UP_REQUIRES_NHK_V3_OR_TEST
+```
+
+The corrected code is not deployed, so live route resolution and identity
+read-back remain `UNVERIFIED`. The requests were GETs and stopped before route
+resolution; no semantic projection/cutover/push/merge occurred. A strict
+zero-write claim is not available because the old boot path may update
+WordPress options before the fatal.
+
+`READY_FOR_OWNER_CUTOVER = NO` pending a usable exact `nhk_v3_test` runtime and
+a live deployment whose migration state is safely brought to the governed
+target before repeating the read-only canary.
+
 Status: `PENDING_OWNER_APPROVAL` / `PRE_CUTOVER_ONLY` — 2026-09-04
 
 Task 12 was completed as a read-only evidence checkpoint. No production,

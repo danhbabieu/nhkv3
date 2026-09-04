@@ -21,4 +21,22 @@ final class PluginBootWiringTest extends TestCase
         self::assertLessThan($projection, $assets);
         self::assertLessThan($projection, $usages);
     }
+
+    public function test_boot_does_not_run_migrations_without_explicit_runtime_gate(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString(
+            "if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();",
+            $plugin
+        );
+        self::assertStringContainsString(
+            "defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true",
+            $plugin
+        );
+        self::assertStringContainsString(
+            'self::runPendingMigrations();',
+            substr($plugin, strpos($plugin, 'public static function activate(): void'))
+        );
+    }
 }

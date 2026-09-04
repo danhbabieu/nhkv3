@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+## Pre-cutover verification checkpoint — 2026-09-04
+
+The migration/configuration regression is resolved locally. `Plugin::boot()` no
+longer executes pending migrations on ordinary requests; it requires the
+explicit `NHK_RUN_MIGRATIONS=true` gate. Activation remains the explicit
+migration entrypoint and `PublicIdentityMigration014` retains its database
+allowlist guard. Production/read-only deployment must leave that flag unset or
+false; schema activation is a separately authorized maintenance/deployment
+step and was not run against production.
+
+The requested guarded integration rerun used
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` and the repository
+`NHK Integration` suite. WordPress bootstrap stopped with `Error establishing
+a database connection` against `DB_HOST=127.0.0.1`, `DB_NAME=nhk_v3_test`,
+`DB_USER=root`, empty password; TCP 3306 and the default socket were both
+unavailable, so the exact database is not proven reachable. PHPUnit cases were
+not entered. This is `ENVIRONMENT_BLOCKED`. `public` is the correct bootstrap
+path. The Unit suite passes with 485 tests / 2,252 assertions, 1 warning and 5
+PHPUnit deprecations.
+
+The live read-only canary was re-attempted for Video UUID
+`01a06815-1e51-7964-b004-1ba79e488ad1`, YouTube ID `P4KaHX3LBOw`, canonical
+`/video/odo-36-10-gai-carillon-p4kahx3lbow/`, and historic
+`/video/odo-36-10-gai-carillon-P4KaHX3LBOw/`. Both live GETs stopped at plugin
+boot with `PUBLIC_IDENTITY_MIGRATION_UP_REQUIRES_NHK_V3_OR_TEST`, before route
+resolution. The local fix prevents this boot-time migration attempt, but it is
+not deployed. Canonical identity, duplicate Video, UUID preservation, semantic
+relations, duplicate `200` route count and historic one-hop `301` remain
+`UNVERIFIED`. The GETs performed no semantic projection, cutover, push or
+merge; zero WordPress-option writes cannot be strictly proven because the old
+boot path may update migration metadata before the fatal.
+
+Remaining pre-cutover blockers are the unavailable exact integration database
+connection and the live deployment migration-state/configuration failure.
+`READY_FOR_OWNER_CUTOVER = NO`.
+
 ## Public identity Tasks 9–11 Owner ruling checkpoint — 2026-09-04
 
 The Owner ruled that the Constitution remains authoritative: MediaAsset has no

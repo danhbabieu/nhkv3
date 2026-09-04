@@ -69,11 +69,7 @@ final class Plugin {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
         update_option('nhk_core_migration_target', PublicIdentityMigration014::VERSION, false);
-        if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
-        if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
-        if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
-        if ((int) get_option('nhk_core_migration_current', 0) < OwnerPublicationDecisionMigration013::VERSION) (new OwnerPublicationDecisionMigration013())->up();
-        if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION) (new PublicIdentityMigration014())->up();
+        if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
@@ -336,6 +332,18 @@ final class Plugin {
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
     }
+    private static function runtimeMigrationsEnabled(): bool
+    {
+        return defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true;
+    }
+    private static function runPendingMigrations(): void
+    {
+        if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < OwnerPublicationDecisionMigration013::VERSION) (new OwnerPublicationDecisionMigration013())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION) (new PublicIdentityMigration014())->up();
+    }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);
         add_option('nhk_core_migration_target', PublicIdentityMigration014::VERSION, '', false);
@@ -348,11 +356,7 @@ final class Plugin {
         (new KnowledgeEvidenceMetadataMigration007())->up();
         (new MediaAssetMetadataMigration008())->up();
         (new ProjectionContextMigration009())->up();
-        (new ArticleIngestMigration010())->up();
-        (new ArticleMediaMigration011())->up();
-        (new MediaWordPressBridgeMigration012())->up();
-        (new OwnerPublicationDecisionMigration013())->up();
-        (new PublicIdentityMigration014())->up();
+        self::runPendingMigrations();
         GovernanceCapabilities::register();
         flush_rewrite_rules(false);
     }
