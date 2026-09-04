@@ -44,6 +44,14 @@ remain unchanged. Focused proof: 34 tests / 124 assertions across Video SEO,
 URL and semantic regressions. No local binary, Post, Video identity or
 semantic record was created.
 
+## Governed SEO runtime read-back — 2026-09-04
+
+The shared `SeoRuntimeReadback` and `SeoRuntimeReadbackResult` boundary now
+returns field-level PASS, MISMATCH or ENVIRONMENT_BLOCKED evidence from an
+injected read-only runtime reader. It does not claim Search Console, Google
+indexing or ranking state. Focused proof: 7 tests / 49 assertions; Composer
+validation passed with only the repository's missing-license warning.
+
 ## Governed SEO sitemap/indexability projection — 2026-09-04
 
 Slice 4 is complete locally. `SitemapIndexabilityProjection` accepts only the
