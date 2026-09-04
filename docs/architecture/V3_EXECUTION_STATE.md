@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+## Persisted public identity URL — Task 3 checkpoint — 2026-09-04
+
+Completed Authority route policy and resolver adapter on branch
+`codex/persisted-public-identity-url` through commits `a57ad2e` and
+`c3bc95e`. Public Authority paths now use persisted PublicIdentity results via
+resource policy projection; Brand, Model, Variant and registered namespace
+routes fail closed on missing identity, hierarchy ambiguity, collision,
+ineligibility or unavailable storage. Authority page/archive/eligibility and
+related projections exclude URL-less entities. No Video, Media, Knowledge,
+Article, SEO, migration, WPDB or data mutation was added.
+
+Focused proof: resolver 14 tests / 59 assertions, collection/eligibility 12
+tests / 38 assertions, RelatedContent 6 tests / 11 assertions. Full Unit proof
+is 463 tests / 2,219 assertions with 9 legacy contract-transition failures, 3
+warnings and 2 deprecations. Integration remains `ENVIRONMENT_BLOCKED` because
+`NHK_WP_TEST_PATH` is unavailable. Initial review findings were fixed and local
+re-review passed; the dispatched re-review agent was usage-limit blocked.
+
+> **NON-NORMATIVE.** This is a mutable evidence/checkpoint record. If it
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
+
 ## Owner Publication Override final release verification — 2026-09-03
 
 Fresh local verification used the supported WordPress vhost at
