@@ -25,7 +25,13 @@ final class EditorialDraftGateway
         $research = is_array($input['research'] ?? null) ? $input['research'] : [];
         if (($research['ready_for_draft'] ?? true) === false) return ['ok' => false, 'reason' => 'RESEARCH_PREFLIGHT_BLOCKED', 'research' => $research];
         $fields = ['post_title' => (string) ($input['title'] ?? ''), 'post_content' => (string) ($input['content'] ?? ''), 'post_excerpt' => (string) ($input['excerpt'] ?? ''), 'post_author' => (int) ($input['author'] ?? 0)];
-        $slug = (string) ($research['seo_blueprint']['slug_intent'] ?? '');
+        $slugIntent = trim((string) ($research['seo_blueprint']['slug_intent'] ?? ''));
+        $slug = '';
+        if ($slugIntent !== '') {
+            $normalizedIntent = (new VietnameseSlugNormalizer(191))->normalize($slugIntent);
+            if (!$normalizedIntent->isValid()) return ['ok' => false, 'reason' => 'ARTICLE_SLUG_INTENT_INVALID', 'slug_reason' => $normalizedIntent->code(), 'research' => $research];
+            $slug = $normalizedIntent->value();
+        }
         if ($slug === '') {
             $slugSource = (string) ($input['slug'] ?? $fields['post_title']);
             $normalized = (new VietnameseSlugNormalizer(191))->normalize($slugSource);

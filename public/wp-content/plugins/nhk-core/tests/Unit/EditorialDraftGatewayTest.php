@@ -25,13 +25,27 @@ final class EditorialDraftGatewayTest extends TestCase
         self::assertSame('EDITORIAL_STATE_CONFLICT', $gateway->update($created['post_id'], ['post_title' => 'C'], str_repeat('0', 64))['reason']);
         self::assertSame('RESEARCH_PREFLIGHT_BLOCKED', $gateway->create(['idempotency_key' => 'draft-3', 'research' => ['ready_for_draft' => false]])['reason']);
     }
+
+    public function test_untrusted_research_slug_intent_is_normalized_before_native_draft_creation(): void
+    {
+        $posts = new FakeEditorialStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+
+        $gateway->create([
+            'idempotency_key' => 'draft-untrusted-slug',
+            'title' => 'Tiêu đề mới',
+            'research' => ['ready_for_draft' => true, 'seo_blueprint' => ['slug_intent' => 'Phương pháp Ô Đô!!!']],
+        ]);
+
+        self::assertSame('phuong-phap-odo', $posts->lastFields['post_name']);
+    }
 }
 
 final class FakeEditorialStore implements EditorialPostStore
 {
-    /** @var array<int,EditorialPostState> */ public array $rows = []; public int $creates = 0;
+    /** @var array<int,EditorialPostState> */ public array $rows = []; public array $lastFields = []; public int $creates = 0;
     public function read(int $postId): ?EditorialPostState { return $this->rows[$postId] ?? null; }
-    public function createDraft(array $fields): EditorialPostState { $this->creates++; return $this->rows[1] = new EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', '', '/?p=1', 0, 0); }
+    public function createDraft(array $fields): EditorialPostState { $this->creates++; $this->lastFields = $fields; return $this->rows[1] = new EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', (string) ($fields['post_name'] ?? ''), '/?p=1', 0, 0); }
     public function update(int $postId, array $fields): EditorialPostState { $old = $this->rows[$postId]; return $this->rows[$postId] = new EditorialPostState($postId, $old->endpointKey, $old->postType, 'draft', (string) ($fields['post_title'] ?? $old->title), $old->content, $old->excerpt, $old->slug, $old->permalink, $old->latestRevisionId, $old->revisionCount + 1); }
     public function publish(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'publish'); }
     public function trash(int $postId): EditorialPostState { return $this->rows[$postId] = $this->withStatus($this->rows[$postId], 'trash'); }
