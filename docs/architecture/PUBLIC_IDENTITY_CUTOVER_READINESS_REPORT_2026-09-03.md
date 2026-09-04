@@ -24,6 +24,9 @@ receipt always reports `mutation_count=0` and `live_projection_performed=false`.
 Live read-back is `ENVIRONMENT_BLOCKED` when `NHK_WP_TEST_PATH` is unavailable;
 therefore no live canary pass is claimed. Owner approval and a separately
 authorized governed execution remain required before any projection/cutover.
+The full guarded Integration run recorded 12 environment failures and 81
+skips for the unavailable WordPress runtime; all 12 are classified
+`ENVIRONMENT_BLOCKED`, not test passes.
 
 ## Final review classification
 
