@@ -11,7 +11,9 @@ slug, canonical tag, H1 identity, established SEO title/identity, primary search
 intent, robots/indexability, schema entity identity/`@id` or redirect rules.
 Existing
 public canonical pages are SEO-protected by default. Indexed status is never
-guessed.
+guessed. Living Knowledge uses the shared SEO Core result and may enrich only
+eligible fragments/facets. FAQ remains optional editorial projection, not a
+rich-result architecture requirement.
 
 ## Living content
 

@@ -8,6 +8,10 @@ Status: approved contract, 2026-09-03. Article research supplies semantic
 references, bounded evidence inventory, explainable related paths and
 route-gated candidates; SEO remains read-only and cannot create semantic truth.
 
+The shared SEO Core and Sitemap/Indexability contracts govern readiness,
+canonical URL agreement and sitemap inclusion. Article-specific planning does
+not create a semantic writer or a fallback public identity.
+
 ## Blueprint boundary
 
 `ArticleSeoBlueprint` is derived planning data. It may contain user intent,

@@ -68,7 +68,11 @@ For an approved V3 knowledge Article workflow, also read
 
 For MCP/Admin content operations, also read
 `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`. For Article research or
-SEO work, read
+SEO work, read the shared and applicable projection contracts first:
+`docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`,
+`docs/seo/ENTITY_SEO_PROJECTION_CONTRACT.md`,
+`docs/seo/MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, and
+`docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md`. Then read
 `docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md` and
 `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` before implementation.
 

@@ -50,7 +50,7 @@ registry/catalog merely because its wording is present tense.
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
 | MCP | transport/orchestration over existing owners | fixed tool counts in historical docs are snapshots only; use current `McpToolCatalog` plus fresh runtime discovery when availability matters |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; multipart Media ingest remains on its approved custom MCP boundary |
-| SEO/Public Projection | read/projection layer | may synthesize presentation only from eligible canonical data; may not invent facts, identity or semantic writes |
+| SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge contracts | read/projection-only layer; shared readiness/indexability must be reused; may not invent facts, identity or semantic writes |
 
 ## 3. Current storage and writer rule
 

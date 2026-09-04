@@ -1,5 +1,14 @@
 # NHK V3 Execution State
 
+# Governed SEO Projection documentation sync — 2026-09-04
+
+Slice 1 is complete locally: the shared SEO Core, Entity, Media/Image and
+Sitemap/Indexability projection contracts exist; Article, Video and Living
+Knowledge SEO contracts route through the shared boundary; READ_FIRST and the
+current documentation index identify the contract set. Focused proof is
+`SeoDocumentationContractTest`: 3 tests / 24 assertions. No code, semantic
+record, route, migration, backfill or runtime data was changed.
+
 ## Public Identity missing-table boot regression — 2026-09-04
 
 Fixed the schema gate for `PublicIdentityMigration014`: pending migration
