@@ -92,6 +92,20 @@ never submits, approves or applies a Knowledge proposal, writes
 Knowledge/Evidence directly, or creates a Graph predicate. Media annotations
 remain outside this Video slice; `MediaUsage`/`depicts` alone is not Evidence.
 
+When Video intake receives an already-validated explicit `about` relation, that
+canonical target is preserved as the enrichment subject before text matching.
+The planner must not broaden an explicit Variant to Model/Brand merely because a
+title or hint also matches a broader name. This is a target-handoff invariant,
+not a new inference rule; absent an explicit target the normal narrowest,
+fail-closed resolution still applies.
+
+Media → Living Knowledge and Article → Living Knowledge write integration are
+not implemented by the completed Video slice. Future adapters may emit planning
+or update-suggestion packets only until their own governed boundary is reviewed.
+Image OCR/recognition, MediaUsage, `depicts`, Article body text and generated copy
+remain candidate inputs at most; none is Evidence or canonical truth merely by
+existing in Media/WordPress storage.
+
 Semantic apply remains `Proposal → Human Approval → Eligibility → Controlled
 Apply → canonical repository → audit → read-back`. Same-intent repeats are
 idempotent and produce no duplicate claim, Evidence or relation.
@@ -147,6 +161,12 @@ The focused in-memory E2E acceptance closes the implementation
 `CODE_GAP: end-to-end governed apply/read-back` for the approved slice. It does
 not claim database/runtime verification: that gate is currently
 `ENVIRONMENT_BLOCKED` because the exact WordPress test runtime was unavailable.
+
+The Video planning slice has focused/unit proof plus a runtime target-handoff
+smoke for the explicit Odo 36/10 Variant. That smoke proves preservation of the
+resolved target and planning packet shape only; it is not evidence of a
+Knowledge/Evidence apply and does not change the `ENVIRONMENT_BLOCKED` status of
+the guarded integration suite.
 
 Durable public identity remains a separately reported
 `PUBLIC_IDENTITY_STORAGE_GAP` unless additive storage can be implemented without
