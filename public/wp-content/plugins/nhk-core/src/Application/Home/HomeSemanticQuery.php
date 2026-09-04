@@ -9,6 +9,9 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Domain\Seo\SeoReadinessResult;
+use NHK\Core\Application\Video\{VideoUrlPolicy, VideoPublicContextSelector};
 
 final class HomeSemanticQuery
 {
@@ -19,7 +22,7 @@ final class HomeSemanticQuery
         if ($this->ready('authority')) {
             foreach ($this->types->all() as $definition) {
                 foreach ($this->collection()->archive($definition->type, 1, 6)['items'] as $item) {
-                    $modules['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => home_url($item['url'])];
+                    $modules['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => (new PublicSeoProjection())->project(['path' => $item['url'], 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $item['url'], 'public_eligible' => true], ['type' => 'Entity'])['internal_link']];
                     if (count($modules['entities']) >= 6) break 2;
                 }
             }
@@ -28,7 +31,7 @@ final class HomeSemanticQuery
             foreach ($this->media->list() as $item) {
                 if (!$item->active || $item->readiness !== 'ready') continue;
                 $path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId); if ($path === null) continue;
-                $modules['media'][] = ['title' => $item->canonicalName, 'url' => home_url($path)];
+                $modules['media'][] = ['title' => $item->canonicalName, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $path, 'public_eligible' => true], ['type' => 'ImageObject'])['internal_link']];
                 if (count($modules['media']) >= 4) break;
             }
         }
@@ -40,8 +43,7 @@ final class HomeSemanticQuery
                 if (isset($source['availability']) && $source['availability'] !== 'available' && $source['availability'] !== 'unknown') continue;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video NHK');
-                $path = PublicRouteResolver::videoPath($title, $item->externalVideoId); if ($path === null) continue;
-                $modules['videos'][] = ['title' => $title, 'platform' => $item->platform, 'url' => home_url($path)];
+                $modules['videos'][] = ['title' => $title, 'platform' => $item->platform, 'url' => (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($item, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link']];
                 if (count($modules['videos']) >= 4) break;
             }
         }

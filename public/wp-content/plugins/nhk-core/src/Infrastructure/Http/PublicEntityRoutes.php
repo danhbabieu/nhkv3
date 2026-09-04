@@ -7,6 +7,7 @@ use NHK\Core\Application\Entity\EntityPageQuery;
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class PublicEntityRoutes
 {
@@ -94,7 +95,8 @@ final class PublicEntityRoutes
                 exit;
             }
             $this->set200();
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $this->query->publicPath($entity)];
+            $path = $this->query->publicPath($entity);
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $path, 'seo_projection' => $this->seo($path)];
             $themeTemplate = locate_template('entity.php');
             return $themeTemplate !== '' ? $themeTemplate : $template;
         }
@@ -112,7 +114,8 @@ final class PublicEntityRoutes
             exit;
         } else {
             $page = max(1, (int) get_query_var('nhk_entity_page', 1)); $query = trim((string) get_query_var('nhk_entity_q'));
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'archive' => $this->query->archive($type, $page, 24, $query), 'archive_url' => home_url($this->query->archivePath($type) ?? '/')];
+            $path = $this->query->archivePath($type) ?? '/';
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'archive' => $this->query->archive($type, $page, 24, $query), 'archive_url' => home_url($path), 'seo_projection' => $this->seo($path)];
         }
         $themeTemplate = locate_template('entity.php');
         return $themeTemplate !== '' ? $themeTemplate : $template;
@@ -132,6 +135,11 @@ final class PublicEntityRoutes
         if ($canonicalPath === null || $canonicalPath === '') return null;
         $normalize = static fn (string $path): string => rtrim('/' . trim($path, '/'), '/');
         return $normalize($requestPath) === $normalize($canonicalPath) ? null : $canonicalPath;
+    }
+
+    private function seo(?string $path): array
+    {
+        return (new PublicSeoProjection())->project(['path' => $path, 'eligible' => $path !== null, 'readiness' => $path !== null ? 'READY' : 'BLOCKED', 'canonical_url' => $path ?? '', 'public_eligible' => $path !== null], ['type' => 'CollectionPage']);
     }
 
     /** @return object|null */

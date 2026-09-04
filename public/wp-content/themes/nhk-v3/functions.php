@@ -198,6 +198,16 @@ function nhk_v3_article_media_seo(int $postId): array
     return is_array($value) ? $value : [];
 }
 
+function nhk_v3_context_seo_projection(): array
+{
+    foreach (['nhk_core_entity_context', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_core_knowledge_context'] as $key) {
+        $context = $GLOBALS[$key] ?? null;
+        if (is_array($context) && is_array($context['seo_projection'] ?? null)) return $context['seo_projection'];
+        if ($key === 'nhk_core_entity_context' && is_array($context['entity']['seo_projection'] ?? null)) return $context['entity']['seo_projection'];
+    }
+    return [];
+}
+
 function nhk_v3_document_title(string $title): string
 {
     $entity = $GLOBALS['nhk_core_entity_context'] ?? null;
@@ -237,6 +247,7 @@ function nhk_v3_seo_head(): void
     $knowledge_context = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     $comparison_context = $GLOBALS['nhk_core_comparison_context'] ?? null;
     $title = wp_get_document_title(); $description = get_bloginfo('description'); $canonical = '';
+    $sharedSeo = nhk_v3_context_seo_projection();
     if (is_404()) {
         $title = 'Không tìm thấy trang — Đồng Hồ Nhà Kho';
         $description = 'Trang bạn tìm kiếm không tồn tại hoặc đã được chuyển sang địa chỉ khác trong kho NHK.';
@@ -290,6 +301,7 @@ function nhk_v3_seo_head(): void
         if (($knowledge_context['mode'] ?? '') === 'detail' && is_array($knowledge_context['claim'] ?? null)) { $claim = $knowledge_context['claim']; $title = (string) $claim['text'] . ' — Tri thức NHK'; $description = 'Tri thức được kiểm soát trong kho NHK.'; $canonical = nhk_v3_public_url($claim['url'] ?? null); }
         elseif (($knowledge_context['mode'] ?? '') === 'archive') { $title = 'Kho tri thức — Đồng Hồ Nhà Kho'; $description = 'Các tri thức đang hoạt động trong kho NHK.'; $canonical = nhk_v3_public_url($knowledge_context['archive_url'] ?? null); }
     }
+    if (is_string($sharedSeo['canonical'] ?? null) && $sharedSeo['canonical'] !== '') $canonical = (string) $sharedSeo['canonical'];
     if (is_array($comparison_context) && ($comparison_context['mode'] ?? '') === 'compare') { $title = 'So sánh hồ sơ — Đồng Hồ Nhà Kho'; $description = 'Đọc cạnh nhau các dữ kiện công khai của hai hồ sơ NHK.'; $canonical = home_url('/so-sanh/'); }
     if ($canonical === '') {
         if (is_front_page() || is_home() || is_search()) $canonical = home_url('/');
@@ -302,7 +314,7 @@ function nhk_v3_seo_head(): void
     echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     echo '<meta property="og:type" content="' . esc_attr(is_singular('post') ? 'article' : 'website') . '"><meta property="og:title" content="' . esc_attr($title) . '"><meta property="og:description" content="' . esc_attr(wp_strip_all_tags($description)) . '"><meta property="og:url" content="' . esc_url($canonical) . '"><meta property="og:site_name" content="Đồng Hồ Nhà Kho">' . "\n";
     $articleSeo = is_singular('post') ? nhk_v3_article_media_seo((int) get_queried_object_id()) : [];
-    $articleImage = (($articleSeo['eligible'] ?? false) === true && trim((string) ($articleSeo['image_url'] ?? '')) !== '') ? (string) $articleSeo['image_url'] : (has_post_thumbnail() ? (string) get_the_post_thumbnail_url(null, 'large') : '');
+    $articleImage = (($articleSeo['eligible'] ?? false) === true && trim((string) ($articleSeo['image_url'] ?? '')) !== '') ? (string) $articleSeo['image_url'] : '';
     if (is_singular('post') && $articleImage !== '') echo '<meta property="og:image" content="' . esc_url($articleImage) . '">' . "\n";
     $breadcrumb = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => [['@type' => 'ListItem', 'position' => 1, 'name' => 'NHK', 'item' => home_url('/')]]];
     if (is_singular('post')) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => get_the_title(), 'item' => get_permalink()];
@@ -312,6 +324,7 @@ function nhk_v3_seo_head(): void
     if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/tri-thuc/')];
     if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/so-sanh/')];
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+    if (!is_singular('post') && !is_array($video_context) && is_array($sharedSeo['json_ld'] ?? null) && $sharedSeo['json_ld'] !== []) echo '<script type="application/ld+json">' . wp_json_encode($sharedSeo['json_ld'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'image' => $articleImage !== '' ? $articleImage : null, 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     // VideoObject is emitted from the canonical Video SEO projection.
     if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; $videoObject = is_array($video['seo_projection']['video_object'] ?? null) && $video['seo_projection']['video_object'] !== [] ? $video['seo_projection']['video_object'] : null; if ($videoObject !== null) { $videoObject['url'] = $canonical; echo '<script type="application/ld+json">' . wp_json_encode($videoObject, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; } }
@@ -328,13 +341,15 @@ function nhk_v3_robots(array $robots): array
             break;
         }
     }
-    if (is_404() || is_search() || $isPaginated) {
-        unset($robots['index']);
-        $robots['noindex'] = true;
-    } else {
-        unset($robots['noindex']);
-        $robots['index'] = true;
-    }
+    $mustNoindex = is_404() || is_search() || $isPaginated;
+    $canonical = nhk_v3_context_seo_projection()['canonical'] ?? (function_exists('wp_get_canonical_url') ? wp_get_canonical_url() : home_url('/'));
+    $decision = (new \NHK\Core\Application\Seo\SeoIndexabilityPolicy())->evaluate([
+        'readiness' => $mustNoindex ? 'BLOCKED' : 'READY',
+        'public_eligible' => !$mustNoindex,
+        'canonical_url' => is_string($canonical) ? $canonical : '',
+    ]);
+    unset($robots['index'], $robots['noindex']);
+    $robots[$decision->indexable() && !$mustNoindex ? 'index' : 'noindex'] = true;
     $robots['follow'] = true;
     return $robots;
 }

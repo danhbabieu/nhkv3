@@ -50,4 +50,11 @@ final class PublicSeoProjectionTest extends TestCase
             self::assertArrayNotHasKey('url', $result['json_ld'], $state);
         }
     }
+
+    public function test_structured_data_uses_the_same_canonical_url_as_id(): void
+    {
+        $result = (new PublicSeoProjection())->project(['path' => '/odo/', 'eligible' => true], ['type' => 'Entity']);
+        self::assertSame('/odo/', $result['json_ld']['url']);
+        self::assertSame('/odo/', $result['json_ld']['@id']);
+    }
 }

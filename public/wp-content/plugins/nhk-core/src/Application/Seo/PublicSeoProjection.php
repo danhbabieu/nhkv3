@@ -13,13 +13,19 @@ final class PublicSeoProjection
     {
         $path = isset($urlResult['path']) && is_string($urlResult['path']) ? trim($urlResult['path']) : '';
         $readiness = $urlResult['readiness'] ?? (($urlResult['eligible'] ?? false) === true ? SeoReadinessResult::READY : SeoReadinessResult::BLOCKED);
-        $eligible = ($urlResult['eligible'] ?? false) === true && $readiness === SeoReadinessResult::READY && $path !== '';
+        $indexability = (new SeoIndexabilityPolicy())->evaluate([
+            'readiness' => $readiness,
+            'public_eligible' => $urlResult['public_eligible'] ?? (($urlResult['eligible'] ?? false) === true),
+            'canonical_url' => $urlResult['canonical_url'] ?? $path,
+            'rendered_url' => $urlResult['rendered_url'] ?? ($urlResult['canonical_url'] ?? $path),
+        ]);
+        $eligible = ($urlResult['eligible'] ?? false) === true && $path !== '' && $indexability->indexable();
         $path = $eligible ? $path : null;
         $title = trim((string) ($page['title'] ?? ''));
         $description = trim((string) ($page['description'] ?? ''));
         $jsonLd = [];
         if ($eligible) {
-            $jsonLd = ['url' => $path];
+            $jsonLd = ['url' => $path, '@id' => $path];
             if (isset($page['type']) && is_string($page['type']) && $page['type'] !== '') $jsonLd['@type'] = $page['type'];
             $jsonLd['mainEntityOfPage'] = $path;
         }

@@ -114,6 +114,41 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString('wp-sitemap', $sitemap);
     }
 
+    public function test_public_consumers_do_not_rebuild_semantic_urls_or_indexability(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $files = [
+            $root . '/src/Application/Entity/RelatedContentQuery.php',
+            $root . '/src/Application/Home/HomeSemanticQuery.php',
+            $root . '/src/Application/Search/SearchSemanticQuery.php',
+            $root . '/src/Infrastructure/Http/SearchApi.php',
+        ];
+        foreach ($files as $file) {
+            $contents = (string) file_get_contents($file);
+            self::assertStringContainsString('PublicSeoProjection', $contents, $file);
+            self::assertStringNotContainsString('PublicRouteResolver::videoPath(', $contents, $file);
+            self::assertStringNotContainsString('home_url($path)', $contents, $file);
+        }
+
+        $theme = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString('SeoIndexabilityPolicy', $theme);
+        self::assertStringNotContainsString("\$robots['index'] = true", $theme);
+        self::assertStringNotContainsString("\$robots['noindex'] = true", $theme);
+        self::assertStringNotContainsString('has_post_thumbnail() ? (string) get_the_post_thumbnail_url', $theme);
+    }
+
+    public function test_semantic_route_contexts_carry_the_shared_page_seo_projection(): void
+    {
+        $root = dirname(__DIR__, 2);
+        foreach ([
+            $root . '/src/Infrastructure/Http/PublicEntityRoutes.php',
+            $root . '/src/Infrastructure/Http/PublicMediaVideoRoutes.php',
+        ] as $file) {
+            self::assertStringContainsString('PublicSeoProjection', (string) file_get_contents($file), $file);
+            self::assertStringContainsString("'seo_projection'", (string) file_get_contents($file), $file);
+        }
+    }
+
     public function test_theme_design_tokens_have_one_nhk_source(): void
     {
         $style = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/style.css');
@@ -185,8 +220,8 @@ final class FrontendContractTest extends TestCase
         $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
         self::assertStringContainsString('function nhk_v3_robots(array $robots): array', $functions);
         self::assertStringContainsString("'nhk_entity_page', 'nhk_media_page', 'nhk_video_page', 'nhk_knowledge_page'", $functions);
-        self::assertStringContainsString('$robots[\'noindex\'] = true', $functions);
-        self::assertStringContainsString('$robots[\'index\'] = true', $functions);
+        self::assertStringContainsString('SeoIndexabilityPolicy', $functions);
+        self::assertStringContainsString("\$robots[\$decision->indexable() && !\$mustNoindex ? 'index' : 'noindex'] = true", $functions);
         self::assertStringContainsString("add_filter('wp_robots', 'nhk_v3_robots', 20)", $functions);
         self::assertStringContainsString('nhk_v3_allow_semantic_search_pages', $functions);
         self::assertStringContainsString("add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2)", $functions);
@@ -336,7 +371,7 @@ final class FrontendContractTest extends TestCase
         self::assertStringContainsString("\$canonical = home_url('/' . \$editorialRoute . '/')", $functions);
         self::assertStringContainsString("if (is_404()) return 'Không tìm thấy trang — Đồng Hồ Nhà Kho';", $functions);
         self::assertStringContainsString("if (is_404()) {", $functions);
-        self::assertStringContainsString("if (is_404() || is_search() || \$isPaginated)", $functions);
+        self::assertStringContainsString('$mustNoindex = is_404() || is_search() || $isPaginated;', $functions);
         self::assertStringContainsString('nhk_v3_public_archive_title()', (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/index.php'));
         self::assertStringContainsString("is_category() || is_tag() || is_author()", $functions);
         self::assertStringContainsString("if (is_category())", $functions);

@@ -15,6 +15,9 @@ use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Domain\Seo\SeoReadinessResult;
+use NHK\Core\Application\Video\{VideoUrlPolicy, VideoPublicContextSelector};
 
 final class RelatedContentQuery
 {
@@ -85,7 +88,7 @@ final class RelatedContentQuery
         }
         return null;
     }
-    private function mediaValue(Media $media): array { $path = PublicRouteResolver::existingSemanticPath('media', $media->canonicalId); return ['type' => 'media', 'title' => $media->canonicalName, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path)]; }
-    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $path = PublicRouteResolver::videoPath($title, $video->externalVideoId); return ['type' => 'video', 'title' => $title, 'url' => $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path), 'source_url' => $video->canonicalUrl]; }
-    private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (function_exists('home_url') ? home_url($path) : $path); }
+    private function mediaValue(Media $media): array { return ['type' => 'media', 'title' => $media->canonicalName, 'url' => '']; }
+    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link']; return ['type' => 'video', 'title' => $title, 'url' => $url ?? '', 'source_url' => $video->canonicalUrl]; }
+    private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $path, 'public_eligible' => true], ['type' => 'Entity'])['internal_link'] ?? ''; }
 }
