@@ -25,6 +25,12 @@ final class VideoSearchDocument
         return trim((string) ($editorial['title'] ?? '')) ?: ($video->title ?: 'Video NHK');
     }
 
+    public function publicUrl(Video $video): ?string
+    {
+        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        return $result['eligible'] ? $result['path'] : null;
+    }
+
     /** @return list<string> */
     public function values(Video $video): array
     {

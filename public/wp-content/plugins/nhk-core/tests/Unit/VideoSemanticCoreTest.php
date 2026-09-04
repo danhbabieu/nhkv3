@@ -636,7 +636,7 @@ final class VideoSemanticCoreTest extends TestCase
 
     public function test_video_sitemap_contains_only_active_available_indexable_watch_pages(): void
     {
-        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['source_snapshot' => ['availability' => 'available', 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary']]);
+        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['public_identity' => ['current_slug' => 'nhk-title'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
         $unavailable = Video::fromUrl('https://youtu.be/9bZkp7q19f0', 'Unavailable', ['source_snapshot' => ['availability' => 'deleted']]);
         $notIndexable = Video::fromUrl('https://youtu.be/aqz-KE-bpKQ', 'No index', ['source_snapshot' => ['availability' => 'available'], 'indexable' => false]);
 

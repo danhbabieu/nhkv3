@@ -28,7 +28,7 @@ final class SearchSemanticQuery
         if ($this->ready('media')) foreach ($this->media->list() as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => home_url($path)];
         if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority); foreach ($this->videos->list() as $item) {
             if (!$item->active || !$item->hasValidPublicReference() || !$videoSearch->isDiscoverable($item)) continue;
-            $title = $videoSearch->title($item); $path = PublicRouteResolver::videoPath($title, $item->externalVideoId);
+            $title = $videoSearch->title($item); $path = $videoSearch->publicUrl($item);
             if ($path !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => function_exists('home_url') ? home_url($path) : $path];
         }
         }
