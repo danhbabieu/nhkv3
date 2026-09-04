@@ -7,31 +7,58 @@ Before architectural or implementation work, read in this order:
 1. `AGENTS.md`.
 2. `docs/constitution/READ_FIRST.md`.
 3. `docs/constitution/NHK_V3_CONSTITUTION.md`.
-4. The relevant normative contracts and current execution state.
+4. `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md` to distinguish
+   current contracts/runtime sources from dated implementation evidence.
+5. The relevant approved contracts and current executable/runtime boundary.
 
 ## Authoritative contract map
 
-After the Constitution, read the contracts relevant to the operation:
+After the Constitution and current-status index, read the contracts relevant to
+the operation:
 
 | Concern | Required documents |
 |---|---|
 | Article / News / editorial | `docs/architecture/ARTICLE_INGEST_CONTRACT.md`, `docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md`, `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` |
-| Media / Image | `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, relevant Media contracts and runtime registries |
+| Media / Image | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, relevant Media contracts and runtime registries |
 | Video | `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` |
 | Knowledge / Claim / Source / Evidence | `docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md`, `docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`, `docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` when public copy is involved |
 | Authority / Brand / Model / Variant / Movement / Music | `docs/architecture/02_AUTHORITY_BOUNDARY.md`, `docs/architecture/13_AUTHORITY_CORE_CONTRACT.md`, `docs/architecture/V3_BRAND_RELATIONSHIP_MATRIX.md`, `docs/architecture/PUBLIC_BRAND_NAMING_CONTRACT.md` |
 | Public identity / route / SEO | `docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`, `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/V3_FRONTEND_ROUTE_INVENTORY.md`, relevant SEO contracts, and the persisted-identity design/spec when in scope |
-| MCP / Admin | `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` |
-| Storage / schema / execution | `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md`, `docs/architecture/V2_V3_PARITY_MATRIX.md` |
+| MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; current tool/Ability availability must be checked against executable catalog/registration and fresh runtime discovery. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only |
+| Storage / schema / execution | current boundaries from the relevant domain contracts plus `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`; `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md` and `docs/architecture/V2_V3_PARITY_MATRIX.md` contain implementation/history evidence and must be interpreted by date/context |
+
+## Current versus historical evidence
+
+The Constitution is the only normative authority. Current approved contracts
+are subordinate to it. Executable registries/catalogs define the currently
+implemented vocabulary/capability inside that constitutional boundary, and
+fresh runtime discovery/read-back determines actual environment availability.
+
+The following are **dated evidence**, not timeless current law unless explicitly
+reaffirmed by a current contract/runtime source:
+
+- exact MCP tool or WordPress Ability counts;
+- historical Ability allowlists;
+- test/assertion counts;
+- old `READY` / `PARTIAL` / `BLOCKED` statements;
+- migration/probe outcomes;
+- numbered phase checkpoint conclusions;
+- parity/audit snapshots;
+- older sections of `V3_EXECUTION_STATE.md`.
+
+In particular, the historical statements in `MCP_V3_ABILITY_EXPOSURE.md` about
+a 19-tool catalog, limited Video-only governed bridge, fixed exposure counts or
+“No Article Ability” must not be used as current capability truth.
 
 The persisted-identity design and implementation plan are subordinate planning
 evidence. They must not be read as proof that persistence, slug allocation or
-redirects are deployed; current status belongs in implementation evidence.
+redirects are deployed. The current `PUBLIC_IDENTITY_STORAGE_GAP` remains until
+runtime implementation/read-back proves otherwise.
 
-The Constitution is the only normative authority. Specs, plans, audits,
-parity matrices, READMEs and historical V2 material are subordinate evidence
-or implementation guidance. If a source conflicts with the Constitution, mark
-`CONSTITUTION_CONFLICT` and stop at the applicable human gate.
+Specs, plans, audits, parity matrices, READMEs and historical V2 material are
+subordinate evidence or implementation guidance. If any source conflicts with
+the Constitution, mark `CONSTITUTION_CONFLICT` and stop at the applicable human
+gate.
 
 For an approved V3 knowledge Article workflow, also read
 `docs/architecture/ARTICLE_INGEST_CONTRACT.md` and the current
