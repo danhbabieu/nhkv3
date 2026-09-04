@@ -19,6 +19,15 @@ including runtime-unavailable versus empty, canonical mismatch and structured
 data not-applicable. No migration, semantic write, URL allocation or runtime
 data mutation was performed.
 
+## Governed SEO Entity projection — 2026-09-04
+
+Slice 3 is complete locally. Entity SEO projection has explicit profiles for
+the nine registered Authority types, reuses supplied public identity routes,
+and fails closed for unknown, thin or ambiguous entities. Product projection
+does not infer Specimen from broad relations or payload. Focused proof: 11
+tests / 70 assertions. No semantic write, relation, identity allocation or
+data mutation was performed.
+
 ## Public Identity missing-table boot regression — 2026-09-04
 
 Fixed the schema gate for `PublicIdentityMigration014`: pending migration
