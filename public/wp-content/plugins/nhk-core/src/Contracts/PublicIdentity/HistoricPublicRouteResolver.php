@@ -1,6 +1,5 @@
 <?php
 declare(strict_types=1);
-
 namespace NHK\Core\Contracts\PublicIdentity;
 
 use NHK\Core\Domain\PublicIdentity\PublicIdentityMutationResult;

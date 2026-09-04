@@ -51,6 +51,11 @@ final class LegacyUrlRedirects
 
     public static function filterCanonicalRedirect(?string $redirectUrl, string $requestPath, string $publicEntityType): ?string
     {
-        return self::shouldDeferForSemanticRoot($requestPath, $publicEntityType) ? null : $redirectUrl;
+        if (self::shouldDeferForSemanticRoot($requestPath, $publicEntityType)) return null;
+        if ($redirectUrl === null || $redirectUrl === '') return null;
+        $targetPath = parse_url($redirectUrl, PHP_URL_PATH);
+        if (!is_string($targetPath) || rtrim('/' . trim($targetPath, '/'), '/') === rtrim('/' . trim($requestPath, '/'), '/')) return null;
+        if (preg_match('#/(?:brand|model|variant|movement|music|component|classification|specimen|product)/[^/]+/?$#', $targetPath)) return null;
+        return $redirectUrl;
     }
 }
