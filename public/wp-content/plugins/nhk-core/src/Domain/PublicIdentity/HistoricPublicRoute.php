@@ -27,11 +27,11 @@ final readonly class HistoricPublicRoute
 
     private static function isSlug(string $value): bool
     {
-        return preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $value) === 1;
+        return preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/i', $value) === 1;
     }
 
     private static function isPath(string $value): bool
     {
-        return preg_match('#^/[a-z0-9/-]+/$#', $value) === 1;
+        return preg_match('#^/[a-z0-9/-]+/$#i', $value) === 1;
     }
 }

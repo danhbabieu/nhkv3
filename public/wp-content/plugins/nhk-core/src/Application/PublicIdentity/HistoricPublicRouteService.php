@@ -3,11 +3,11 @@ declare(strict_types=1);
 namespace NHK\Core\Application\PublicIdentity;
 
 use NHK\Core\Contracts\PublicIdentity\HistoricPublicRouteResolver;
-use NHK\Core\Domain\PublicIdentity\{HistoricPublicRoute, PublicIdentityMutationResult};
+use NHK\Core\Domain\PublicIdentity\PublicIdentityMutationResult;
 
 final class HistoricPublicRouteService implements HistoricPublicRouteResolver
 {
-    public function __construct(private object $repository) {}
+    public function __construct(private object $repository, private ?\Closure $eligible = null) {}
     public function resolveHistoric(string $path): array
     {
         if ($path === '' || $path[0] !== '/') return ['status' => 'NOT_FOUND'];
@@ -17,10 +17,12 @@ final class HistoricPublicRouteService implements HistoricPublicRouteResolver
     }
     public function resolveExact(string $routeType, string $collisionScope, string $path): PublicIdentityMutationResult
     {
-        $result = $this->resolveHistoric($path);
-        if (($result['status'] ?? '') === 'AMBIGUOUS') return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::AMBIGUOUS_HISTORY);
-        if (($result['status'] ?? '') !== 'FOUND') return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNAVAILABLE_STORAGE);
-        return PublicIdentityMutationResult::acceptedHistoricRoute(new HistoricPublicRoute((string)($result['identity_id'] ?? 'history'),$routeType,$collisionScope,$path,(string)($result['old_slug'] ?? trim($path,'/')),1));
+        if (!preg_match('#^/[a-z0-9/-]+/$#i', $path) || $routeType === '' || $collisionScope === '') return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNKNOWN_ROUTE);
+        if (!method_exists($this->repository, 'resolveExact')) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNAVAILABLE_STORAGE);
+        $result = $this->repository->resolveExact($routeType, $collisionScope, $path);
+        if (!$result instanceof PublicIdentityMutationResult || !$result->accepted) return $result instanceof PublicIdentityMutationResult ? $result : PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::UNAVAILABLE_STORAGE);
+        if ($result->identity !== null && $this->eligible !== null && !($this->eligible)($result->identity)) return PublicIdentityMutationResult::rejected(PublicIdentityMutationResult::CONFLICT);
+        return $result;
     }
     public function resolve(string $path): array { return $this->resolveHistoric($path); }
 }

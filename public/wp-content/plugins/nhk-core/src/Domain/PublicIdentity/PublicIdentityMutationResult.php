@@ -24,9 +24,9 @@ final readonly class PublicIdentityMutationResult
         return new self(true, null, $identity, $historicRoute);
     }
 
-    public static function acceptedHistoricRoute(HistoricPublicRoute $historicRoute): self
+    public static function acceptedHistoricRoute(HistoricPublicRoute $historicRoute, ?PublicIdentity $identity = null): self
     {
-        return new self(true, null, null, $historicRoute);
+        return new self(true, null, $identity, $historicRoute);
     }
 
     public static function rejected(string $code): self

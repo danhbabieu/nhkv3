@@ -11,8 +11,9 @@ final class PublicMediaVideoRoutes
     public function __construct(private ?MediaVideoPageQuery $query, private ?HistoricPublicRouteService $historic = null) {}
     public function historicRedirect(string $path): array
     {
-        $result = $this->historic?->resolveHistoric($path) ?? ['status' => 'NOT_FOUND'];
-        return ($result['status'] ?? '') === 'FOUND' ? ['status' => 301, 'location' => (string)$result['target']] : ['status' => 404];
+        $result = $this->historic?->resolveExact('video', 'youtube', $path);
+        if ($result === null || !$result->accepted || $result->identity === null) return ['status' => 404];
+        return ['status' => 301, 'location' => '/video/' . $result->identity->currentSlug . '/'];
     }
     public function register(): void { add_filter('query_vars', function (array $vars): array { foreach (['nhk_video_key', 'nhk_video_slug', 'nhk_video_page', 'nhk_media_key', 'nhk_media_slug', 'nhk_media_page', 'nhk_media_route'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; }); add_action('init', [$this, 'rewrite']); add_action('template_redirect', [$this, 'historicVideoRedirect'], 1); add_action('template_redirect', [$this, 'legacyVideoRedirect'], 1); add_action('template_redirect', [$this, 'legacyMediaRedirect'], 1); add_filter('template_include', [$this, 'template']); }
     public function historicVideoRedirect(): void
