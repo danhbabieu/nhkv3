@@ -25,7 +25,7 @@ an MCP-managed V3 Article is complete only after the Article Ingest contract.
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
 | Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is retained, derivatives share that Media, representative/evidence roles are distinct, and attachment mapping is idempotent |
-| Video | Video | Video intake/sync services | governed canonical external reference |
+| Video | Video | Video intake/sync services | governed canonical external reference; optional Living Knowledge output is planning-only |
 | Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
 | Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |
 
@@ -45,6 +45,25 @@ derivatives under the same Media identity. It does not use base64/data URLs or
 infer semantic relations from image content. No `nhk-v3/media-ingest` Ability
 is authorized or required.
 
+## Storage and reuse map — 2026-09-04
+
+| Data | Canonical owner/storage | Reuse rule | Never infer/duplicate |
+|---|---|---|---|
+| Article title/body/excerpt/editorial order | WordPress `wp_posts` | reuse native Post identity/state token | do not copy body into Knowledge, receipt or Graph storage |
+| Media identity | `Media` | reuse canonical UUID/stable key/revision | checksum/filename/URL does not mint or merge identity |
+| Uploaded source bytes | source-original `MediaAsset` | retain privately/protected under same Media | do not discard because WebP exists |
+| WebP/thumbnail/responsive image | derivative asset / WordPress attachment projection | reuse under same Media identity | derivative is not a new Media |
+| Image placement/alt/caption | `MediaUsage` + WordPress editorial placement | reuse same Media with contextual usage | usage is not Knowledge/Evidence/Graph truth |
+| Video | canonical Video external reference | reuse platform + external ID and canonical target attachments | no local MP4 or Post identity implied |
+| Video-derived fact candidate | Living Knowledge planning packet | resolve narrowest canonical subject; explicit valid `about` target wins | no automatic Knowledge/Evidence/Graph mutation |
+| Knowledge claim | `Knowledge` | reuse UUID/stable key/revision | repeated prose does not create a duplicate claim |
+| Provenance/support | `Source` + `Evidence` | reuse canonical source/evidence chain | generated text, transcript, OCR or caption is not Evidence by itself |
+| Typed semantic relation | Graph | reuse registered endpoint IDs and predicate | no relation from placement, upload or prose alone |
+
+All downstream adapters must read back from the owning store after a write. MCP
+is orchestration/transport, not a canonical data store; Admin is an input
+adapter, not a second writer.
+
 ## Required Article sequence
 
 `nhk.article.preflight` must complete semantic inventory, overlap analysis,
@@ -58,6 +77,12 @@ semantic read-back, MediaUsage completion, SEO/public-route verification and
 claim-compliance acceptance. It returns explicit blocker codes and does not
 publish or replace any bounded-context policy.
 
+Video intake may expose `knowledge_enrichment`, but that packet is read-only
+planning output. An explicitly validated Video `about` target is handed through
+to enrichment as the canonical subject before broader text research. No MCP
+preview packet is evidence that Knowledge/Evidence was applied; those records
+require their own governed proposal and read-back.
+
 ## Current gap classification
 
 | Area | Status | Classification |
@@ -68,5 +93,8 @@ publish or replace any bounded-context policy.
 | WordPress editorial gateway | draft create/update boundary | runtime-unverified pending exact integration DB | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |
 | Taxonomy gateway | typed category facade exposed in MCP | runtime-unverified pending exact integration DB | no fuzzy-create, no Graph/semantic mutation, guarded delete |
 | Related semantic query | existing bounded query, policy gaps remain | CODE_GAP/REGISTRY_GAP where traversal policy is absent |
+| Video → Living Knowledge | planning seam implemented; target-handoff smoke verified | apply remains separate Governance boundary; guarded integration still ENVIRONMENT_BLOCKED |
+| Media → Living Knowledge | not implemented | CODE_GAP; MediaUsage/depicts/OCR must not be promoted implicitly |
+| Article → Living Knowledge automatic body update | not implemented by design | suggestion-only until separately governed |
 | Product–Specimen persistence | unavailable | REGISTRY_GAP/CONTRACT_EXTENSION_REQUIRED |
 | Live data application | prohibited in this slice | HUMAN GATE |
