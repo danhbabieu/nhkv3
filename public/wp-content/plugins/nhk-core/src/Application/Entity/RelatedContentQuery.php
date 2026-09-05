@@ -111,6 +111,10 @@ final class RelatedContentQuery
             $value['width'] = $visual['width'] ?? null;
             $value['height'] = $visual['height'] ?? null;
         }
+        if (function_exists('apply_filters')) {
+            $enriched = apply_filters('nhk_v3_related_media_item', $value, $media);
+            if (is_array($enriched)) $value = $enriched;
+        }
         return $value;
     }
 
