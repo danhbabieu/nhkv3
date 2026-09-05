@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Dictionary\{DictionaryLinkPlanner, DictionaryPlanningService, DictionaryResolver, DictionaryTermDetector};
 use NHK\Core\Contracts\Dictionary\{DictionaryCandidateRepository, DictionaryMentionRepository};
-use NHK\Core\Domain\Dictionary\{DictionaryCandidate, DictionaryMention};
+use NHK\Core\Domain\Dictionary\{DictionaryCandidate, DictionaryCandidateState, DictionaryMention};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryPlanningServiceTest extends TestCase
@@ -96,12 +96,13 @@ final class DictionaryPlanningServiceTest extends TestCase
         self::assertCount(1, $mentionRepo->items);
     }
 
-    public function test_ambiguous_term_is_reported_and_never_linked(): void
+    public function test_ambiguous_term_is_persisted_for_review_and_never_linked(): void
     {
         $candidateRepo = new class implements DictionaryCandidateRepository {
-            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { return $candidate; }
+            public array $items = [];
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { $this->items[] = $candidate; return $candidate; }
             public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
-            public function listForReview(int $limit = 100): array { return []; }
+            public function listForReview(int $limit = 100): array { return $this->items; }
             public function findById(string $candidateId): ?DictionaryCandidate { return null; }
             public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
         };
@@ -120,5 +121,36 @@ final class DictionaryPlanningServiceTest extends TestCase
         self::assertCount(1, $plan['ambiguous_terms']);
         self::assertSame([], $plan['internal_link_candidates']);
         self::assertFalse($plan['blocking']);
+        self::assertCount(1, $candidateRepo->items);
+        self::assertSame(DictionaryCandidateState::AMBIGUOUS, $candidateRepo->items[0]->state);
+        self::assertNotEmpty($candidateRepo->items[0]->suggestions);
+    }
+
+    public function test_source_specific_fields_do_not_fragment_candidate_context(): void
+    {
+        $candidateRepo = new class implements DictionaryCandidateRepository {
+            public array $items = [];
+            public function upsertObservation(DictionaryCandidate $candidate): DictionaryCandidate { $this->items[] = $candidate; return $candidate; }
+            public function suppressed(string $normalizedTerm, string $contextHash): bool { return false; }
+            public function listForReview(int $limit = 100): array { return $this->items; }
+            public function findById(string $candidateId): ?DictionaryCandidate { return null; }
+            public function saveDecision(DictionaryCandidate $candidate, int $expectedRevision): DictionaryCandidate { return $candidate; }
+        };
+        $mentionRepo = new class implements DictionaryMentionRepository {
+            public array $items = [];
+            public function upsert(DictionaryMention $mention): DictionaryMention { $this->items[] = $mention; return $mention; }
+            public function listBySource(string $sourceKind, string $sourceId): array { return $this->items; }
+        };
+        $resolver = new DictionaryResolver(static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): array => [], static fn (): bool => false);
+        $service = new DictionaryPlanningService(new DictionaryTermDetector(), $resolver, $candidateRepo, $mentionRepo, new DictionaryLinkPlanner());
+
+        $service->plan('Có cụm “côn lòng máng”.', 'ARTICLE', '101', ['post_id' => 101, 'post_status' => 'publish', 'domain' => 'clock'], ['côn lòng máng']);
+        $service->plan('Lại nhắc “côn lòng máng”.', 'ARTICLE', '202', ['post_id' => 202, 'post_status' => 'draft', 'domain' => 'clock'], ['côn lòng máng']);
+
+        self::assertCount(2, $candidateRepo->items);
+        self::assertSame($candidateRepo->items[0]->contextHash, $candidateRepo->items[1]->contextHash);
+        self::assertSame(['domain' => 'clock'], $candidateRepo->items[0]->context);
+        self::assertSame(['domain' => 'clock'], $candidateRepo->items[1]->context);
+        self::assertNotSame($mentionRepo->items[0]->sourceId, $mentionRepo->items[1]->sourceId);
     }
 }
