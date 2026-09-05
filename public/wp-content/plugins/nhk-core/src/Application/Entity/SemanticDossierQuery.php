@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\RelatedSemanticQuery;
 use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
+use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
@@ -49,6 +50,8 @@ final class SemanticDossierQuery
         private EntityMediaProjection $mediaProjection,
         private MediaRepository $media,
         private VideoRepository $videos,
+        private ?\Closure $postProjector = null,
+        private ?PublicMediaGalleryQuery $mediaGallery = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -65,8 +68,7 @@ final class SemanticDossierQuery
         $relationResult = $this->relations->query(new NodeReference($entity->entityType, $entity->canonicalId), array_keys(self::GROUPS), 2, 100);
         $sections = $this->relationSections($relationResult);
         $warnings = is_array($knowledge['warnings'] ?? null) ? array_values($knowledge['warnings']) : [];
-        if (($relationResult['status'] ?? '') === 'unavailable') $warnings[] = 'GRAPH_UNAVAILABLE';
-        if (($relationResult['status'] ?? '') === 'unsupported') $warnings[] = 'GRAPH_QUERY_UNSUPPORTED';
+        $warnings = $this->relationWarnings($relationResult, $warnings);
 
         $payload = $this->identity->payload($entity);
         foreach (array_keys($payload) as $key) if (str_ends_with((string) $key, '_uuid')) unset($payload[$key]);
@@ -78,13 +80,7 @@ final class SemanticDossierQuery
             'public_eligible' => true,
         ], ['type' => 'Entity']);
 
-        $gallery = [];
-        foreach ((array) ($media['gallery'] ?? []) as $item) {
-            $safe = $this->safeMedia($item);
-            if ($safe !== null) $gallery[] = $safe;
-        }
-        $primary = $this->safeMedia(is_array($media['representative'] ?? null) ? $media['representative'] : null);
-
+        [$primary, $gallery] = $this->mediaPacket($media);
         return [
             'status' => 'AVAILABLE',
             'identity' => [
@@ -98,18 +94,48 @@ final class SemanticDossierQuery
             'media_gallery' => $gallery,
             'knowledge' => $knowledge,
             'relation_sections' => $sections,
-            'coverage' => [
-                'relation_count' => array_sum(array_map('count', $sections)),
-                'knowledge_claim_count' => (int) ($knowledge['claim_count'] ?? 0),
-                'public_evidence_count' => (int) ($knowledge['evidence_count'] ?? 0),
-                'media_count' => count($gallery),
-                'video_count' => count($sections['videos'] ?? []),
-                'article_count' => count($sections['articles'] ?? []),
-            ],
+            'coverage' => $this->coverage($sections, $gallery, (int) ($knowledge['claim_count'] ?? 0), (int) ($knowledge['evidence_count'] ?? 0)),
             'warnings' => array_values(array_unique($warnings)),
             'availability' => [
                 'graph' => strtoupper((string) ($relationResult['status'] ?? 'unavailable')),
                 'knowledge' => (string) ($knowledge['status'] ?? 'UNAVAILABLE'),
+            ],
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    public function forPost(int $postId): array
+    {
+        if ($postId < 1) return $this->unavailable('ARTICLE_NOT_PUBLIC');
+        $post = $this->projectPost($postId);
+        if ($post === null) return $this->unavailable('ARTICLE_NOT_PUBLIC');
+        $blogId = function_exists('get_current_blog_id') ? max(1, (int) get_current_blog_id()) : 1;
+        $endpointKey = $blogId . ':' . $postId;
+        $media = $this->mediaProjection->forEntity('wp_post', $endpointKey);
+        $relationResult = $this->relations->query(new NodeReference('wp_post', $endpointKey), array_keys(self::GROUPS), 2, 100);
+        $sections = $this->relationSections($relationResult);
+        [$primary, $gallery] = $this->mediaPacket($media);
+        $warnings = $this->relationWarnings($relationResult, []);
+
+        return [
+            'status' => 'AVAILABLE',
+            'identity' => [
+                'type' => 'wp_post',
+                'title' => (string) ($post['title'] ?? ''),
+                'url' => (string) ($post['url'] ?? ''),
+                'excerpt' => (string) ($post['excerpt'] ?? ''),
+            ],
+            // Native WordPress owns Article canonical/permalink truth.
+            'seo_projection' => null,
+            'primary_media' => $primary,
+            'media_gallery' => $gallery,
+            'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0],
+            'relation_sections' => $sections,
+            'coverage' => $this->coverage($sections, $gallery, 0, 0),
+            'warnings' => array_values(array_unique($warnings)),
+            'availability' => [
+                'graph' => strtoupper((string) ($relationResult['status'] ?? 'unavailable')),
+                'knowledge' => 'NOT_APPLICABLE',
             ],
         ];
     }
@@ -159,7 +185,15 @@ final class SemanticDossierQuery
         if ($type === 'media') {
             $media = $this->media->findByCanonicalId($id);
             if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
-            return ['type' => 'media', 'title' => $media->canonicalName, 'origin' => $origin];
+            $value = ['type' => 'media', 'title' => $media->canonicalName, 'origin' => $origin];
+            $visual = $this->mediaGallery?->forMedia($media->canonicalId);
+            if (is_array($visual)) {
+                $value['image_url'] = $visual['image_url'] ?? null;
+                $value['alt'] = $visual['alt'] ?? $media->canonicalName;
+                $value['width'] = $visual['width'] ?? null;
+                $value['height'] = $visual['height'] ?? null;
+            }
+            return $value;
         }
 
         if ($type === 'video') {
@@ -176,10 +210,10 @@ final class SemanticDossierQuery
             return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null, 'origin' => $origin];
         }
 
-        if ($type === 'wp_post' && function_exists('get_post') && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {
-            $post = get_post((int) $match[1]);
-            if (!$post instanceof \WP_Post || get_post_status($post) !== 'publish') return null;
-            return ['type' => 'wp_post', 'title' => get_the_title($post), 'url' => get_permalink($post), 'origin' => $origin];
+        if ($type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {
+            $post = $this->projectPost((int) $match[1]);
+            if ($post === null || trim((string) ($post['url'] ?? '')) === '') return null;
+            return ['type' => 'wp_post', 'title' => (string) ($post['title'] ?? ''), 'url' => (string) $post['url'], 'origin' => $origin];
         }
 
         return null;
@@ -209,6 +243,18 @@ final class SemanticDossierQuery
         ];
     }
 
+    /** @return array{0:?array<string,mixed>,1:list<array<string,mixed>>} */
+    private function mediaPacket(array $media): array
+    {
+        $gallery = [];
+        foreach ((array) ($media['gallery'] ?? []) as $item) {
+            $safe = $this->safeMedia(is_array($item) ? $item : null);
+            if ($safe !== null) $gallery[] = $safe;
+        }
+        $primary = $this->safeMedia(is_array($media['representative'] ?? null) ? $media['representative'] : null);
+        return [$primary, $gallery];
+    }
+
     /** @return array<string,mixed>|null */
     private function safeMedia(?array $item): ?array
     {
@@ -217,6 +263,44 @@ final class SemanticDossierQuery
             'url' => (string) $item['url'],
             'alt' => (string) ($item['alt'] ?? ''),
             'role' => (string) ($item['role'] ?? ''),
+        ];
+    }
+
+    /** @return array<string,mixed>|null */
+    private function projectPost(int $postId): ?array
+    {
+        if ($this->postProjector !== null) {
+            $result = ($this->postProjector)($postId);
+            return is_array($result) ? $result : null;
+        }
+        if (!function_exists('get_post') || !function_exists('get_post_status') || !function_exists('get_permalink') || !function_exists('get_the_title')) return null;
+        $post = get_post($postId);
+        if (!$post instanceof \WP_Post || get_post_status($post) !== 'publish') return null;
+        return [
+            'title' => (string) get_the_title($post),
+            'url' => (string) get_permalink($post),
+            'excerpt' => function_exists('get_the_excerpt') ? (string) get_the_excerpt($post) : '',
+        ];
+    }
+
+    /** @param list<string> $warnings @return list<string> */
+    private function relationWarnings(array $relationResult, array $warnings): array
+    {
+        if (($relationResult['status'] ?? '') === 'unavailable') $warnings[] = 'GRAPH_UNAVAILABLE';
+        if (($relationResult['status'] ?? '') === 'unsupported') $warnings[] = 'GRAPH_QUERY_UNSUPPORTED';
+        return $warnings;
+    }
+
+    /** @return array<string,int> */
+    private function coverage(array $sections, array $gallery, int $knowledgeClaims, int $evidenceCount): array
+    {
+        return [
+            'relation_count' => array_sum(array_map('count', $sections)),
+            'knowledge_claim_count' => $knowledgeClaims,
+            'public_evidence_count' => $evidenceCount,
+            'media_count' => count($gallery),
+            'video_count' => count($sections['videos'] ?? []),
+            'article_count' => count($sections['articles'] ?? []),
         ];
     }
 
