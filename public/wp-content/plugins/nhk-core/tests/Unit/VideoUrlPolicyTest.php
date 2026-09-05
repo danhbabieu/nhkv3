@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Application\Video\VideoPublicContextSelector;
 use NHK\Core\Application\Video\VideoUrlPolicy;
 use NHK\Core\Domain\Video\Video;
@@ -12,7 +13,7 @@ final class VideoUrlPolicyTest extends TestCase
 {
     private const VIDEO_ID = '01a06815-1e51-7964-b004-1ba79e488ad1';
 
-    public function test_governed_persisted_identity_projects_the_video_canary_shape(): void
+    public function test_governed_persisted_identity_projects_slug_only_video_url(): void
     {
         $video = new Video(self::VIDEO_ID, 'youtube', 'P4KaHX3LBOw', 'https://www.youtube.com/watch?v=P4KaHX3LBOw', 'Changed source title', [
             'public_identity' => ['current_slug' => 'odo-36-10-gai-carillon'],
@@ -26,7 +27,8 @@ final class VideoUrlPolicyTest extends TestCase
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
 
         self::assertTrue($result['eligible']);
-        self::assertSame('/video/odo-36-10-gai-carillon-p4kahx3lbow/', $result['path']);
+        self::assertSame('/video/odo-36-10-gai-carillon/', $result['path']);
+        self::assertStringNotContainsString(strtolower($video->externalVideoId), strtolower((string) $result['path']));
     }
 
     public function test_source_title_changes_do_not_change_the_persisted_video_url(): void
@@ -41,8 +43,16 @@ final class VideoUrlPolicyTest extends TestCase
         ]);
 
         self::assertSame(
-            '/video/odo-36-10-gai-carillon-p4kahx3lbow/',
+            '/video/odo-36-10-gai-carillon/',
             (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector())['path'],
+        );
+    }
+
+    public function test_title_derived_video_candidate_never_appends_external_id(): void
+    {
+        self::assertSame(
+            '/video/chat-am-lam-nen-ten-tuoi-nha-kho/',
+            PublicRouteResolver::videoPath('Chất âm làm nên tên tuổi NHK', 'P4KaHX3LBOw'),
         );
     }
 
