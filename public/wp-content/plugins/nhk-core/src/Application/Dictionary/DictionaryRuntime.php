@@ -74,7 +74,7 @@ final class DictionaryRuntime
             normalizer: $this->normalizer,
         );
 
-        $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner($this->normalizer));
+        $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner());
         $this->curation = new DictionaryCurationService($this->candidates, $this->concepts, null, $this->normalizer);
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
         $this->publicQuery = new DictionaryPublicQuery($this->concepts, static function (string $conceptId) use ($mediaProjection): ?array {
