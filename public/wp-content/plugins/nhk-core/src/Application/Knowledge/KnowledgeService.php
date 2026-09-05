@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Knowledge;
 
+use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, KnowledgeException, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -94,8 +95,11 @@ final class KnowledgeService
 
     private function observe(KnowledgeClaim $claim): void
     {
-        if (!is_callable($this->dictionaryObserver)) return;
-        try { ($this->dictionaryObserver)('KNOWLEDGE', $claim->canonicalId, $claim->claimText, ['claim_type' => $claim->claimType, 'provenance' => $claim->provenance]); }
-        catch (\Throwable) { /* lexical observation is non-blocking after canonical write */ }
+        $context = ['claim_type' => $claim->claimType, 'provenance' => $claim->provenance];
+        if (is_callable($this->dictionaryObserver)) {
+            try { ($this->dictionaryObserver)('KNOWLEDGE', $claim->canonicalId, $claim->claimText, $context); } catch (\Throwable) {}
+            return;
+        }
+        DictionaryObservationRegistry::observe('KNOWLEDGE', $claim->canonicalId, $claim->claimText, $context);
     }
 }
