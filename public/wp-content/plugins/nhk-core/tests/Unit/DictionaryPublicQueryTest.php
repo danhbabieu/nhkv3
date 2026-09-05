@@ -20,12 +20,14 @@ final class DictionaryPublicQueryTest extends TestCase
         ]);
 
         $packet = (new DictionaryPublicQuery($repo, static fn (string $id): ?array => $id === 'c2' ? ['url' => '/media/vai-bo.webp', 'alt' => 'Vai bò'] : null))->hub();
+        $items = [];
+        foreach ($packet['items'] as $item) $items[$item['title']] = $item;
 
-        self::assertSame('/ban-nhac/westminster/', $packet['items'][0]['url']);
-        self::assertFalse($packet['items'][0]['dedicated']);
-        self::assertSame('/tu-dien/vai-bo/', $packet['items'][1]['url']);
-        self::assertTrue($packet['items'][1]['dedicated']);
-        self::assertSame('/media/vai-bo.webp', $packet['items'][1]['image']['url']);
+        self::assertSame('/ban-nhac/westminster/', $items['Westminster']['url']);
+        self::assertFalse($items['Westminster']['dedicated']);
+        self::assertSame('/tu-dien/vai-bo/', $items['Vai bò']['url']);
+        self::assertTrue($items['Vai bò']['dedicated']);
+        self::assertSame('/media/vai-bo.webp', $items['Vai bò']['image']['url']);
     }
 
     public function test_detail_does_not_create_duplicate_page_for_owner_delegated_concept(): void
