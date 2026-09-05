@@ -3,18 +3,20 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
-use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
+use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry};
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoUrlPolicy
 {
+    public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
+
     /** @return array{path:?string,eligible:bool,blockers:list<string>,warnings:list<string>} */
     public function project(Video $video, VideoPublicContextSelector $selector): array
     {
         $metadata = is_array($video->metadata) ? $video->metadata : [];
-        $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
         $blockers = [];
-        $slug = trim((string) ($identity['current_slug'] ?? ''));
+        $slug = $this->publicSlug($video, $metadata, $blockers);
         $normalizedSlug = (new CanonicalPublicSlugPolicy())->slug($slug);
         if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
             $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
@@ -39,13 +41,35 @@ final class VideoUrlPolicy
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';
         $eligible = $blockers === [];
         return [
-            // External/source IDs remain metadata identity only. The public
-            // watch route is the persisted canonical slug and nothing else.
+            // Source IDs remain source identity only. The public watch route
+            // is owned by durable Public Identity and never contains them.
             'path' => $eligible ? '/video/' . $slug . '/' : null,
             'eligible' => $eligible,
             'blockers' => array_values(array_unique($blockers)),
             'warnings' => [],
         ];
+    }
+
+    /** @param list<string> $blockers */
+    private function publicSlug(Video $video, array $metadata, array &$blockers): string
+    {
+        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
+        if ($repository !== null) {
+            try {
+                $identity = $repository->findCurrentByOwner('video', $video->canonicalId, 'video');
+            } catch (\Throwable) {
+                $blockers[] = 'PUBLIC_IDENTITY_STORAGE_UNAVAILABLE';
+                return '';
+            }
+            if (!is_array($identity)) return '';
+            return trim((string) ($identity['current_slug'] ?? ''));
+        }
+
+        // Compatibility-only path for isolated tests or a pre-cutover runtime
+        // where central Public Identity has not been composed yet. Once a
+        // repository is present, metadata is never allowed to override it.
+        $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
+        return trim((string) ($identity['current_slug'] ?? ''));
     }
 
     /** @return array<string,mixed> */
