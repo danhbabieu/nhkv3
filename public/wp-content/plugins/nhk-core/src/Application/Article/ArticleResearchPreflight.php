@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Article;
 
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\Article\ArticleResearchResult;
 
 /** Read-only Article research orchestration; injected callbacks are application/repository boundaries. */
@@ -83,6 +84,15 @@ final class ArticleResearchPreflight
     private function relations(array $items, array &$blockers): array { $out = []; foreach ($items as $item) { $class = (string) ($item['class'] ?? 'UNSUPPORTED'); if (!in_array($class, ['DIRECT', 'DERIVED', 'PROPOSED_DIRECT', 'EDITORIAL_RELATED', 'AMBIGUOUS', 'UNSUPPORTED'], true)) $class = 'UNSUPPORTED'; if ($class === 'DERIVED' && count((array) ($item['path'] ?? [])) > 2) $class = 'UNSUPPORTED'; if (in_array($class, ['AMBIGUOUS', 'UNSUPPORTED'], true)) $blockers[] = $class . '_RELATION'; $item['classification'] = ['DIRECT' => 'EXISTING_DIRECT', 'DERIVED' => 'EXISTING_DERIVED', 'PROPOSED_DIRECT' => 'PROPOSED_DIRECT', 'EDITORIAL_RELATED' => 'EDITORIAL_RELATED', 'AMBIGUOUS' => 'AMBIGUOUS', 'UNSUPPORTED' => 'UNSUPPORTED'][$class]; $out[] = $item; } return $out; }
     private function links(array $relations, array $posts, array &$warnings): array { $links = []; foreach ($relations as $relation) if (in_array($relation['classification'], ['EXISTING_DIRECT', 'EXISTING_DERIVED'], true)) { try { $eligible = ($this->publicEligibility)($relation); } catch (\Throwable) { $eligible = ['eligible' => false, 'status' => 'unavailable']; } if (($eligible['status'] ?? '') === 'unavailable') { $warnings[] = 'PUBLIC_ROUTE_ELIGIBILITY_UNAVAILABLE'; continue; } if (($eligible['eligible'] ?? false) && trim((string) ($eligible['route'] ?? '')) !== '') $links[] = ['route' => $eligible['route'], 'relation_class' => $relation['classification'], 'reason' => $relation['reason'] ?? 'registered semantic context', 'source' => 'graph', 'path' => $relation['path'] ?? []]; } return $links; }
     private function categoryPlan(array $categories): array { foreach ($categories as $category) if (isset($category['slug'])) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null]; return ['status' => 'CATEGORY_MISSING', 'category' => null, 'current_category' => null, 'recommendation' => 'CREATE_CATEGORY_BEFORE_DRAFT']; }
-    private function claimEvidencePolicy(array $claims, array &$blockers, array &$warnings): void { foreach ($claims as $claim) { $status = (string) ($claim['evidence_status'] ?? 'NO_EVIDENCE'); $isNewOrModified = ($claim['new_or_modified'] ?? false) === true || ($claim['legacy'] ?? true) === false; if ($isNewOrModified && $status !== 'SUPPORTED_WITHIN_SCOPE') $blockers[] = 'PUBLIC_CLAIM_EVIDENCE_REQUIRED'; elseif (($claim['legacy'] ?? false) === true && $status !== 'SUPPORTED_WITHIN_SCOPE') $warnings[] = 'LEGACY_EVIDENCE_DEBT'; } }
+    /** @param list<array<string,mixed>> $claims @param list<string> $blockers @param list<string> $warnings */
+    private function claimEvidencePolicy(array $claims, array &$blockers, array &$warnings): void
+    {
+        foreach ($claims as $claim) {
+            $status = (string) ($claim['evidence_status'] ?? 'NO_EVIDENCE');
+            $isNewOrModified = ($claim['new_or_modified'] ?? false) === true || ($claim['legacy'] ?? true) === false;
+            if ($isNewOrModified && $status !== 'SUPPORTED_WITHIN_SCOPE') $blockers[] = 'PUBLIC_CLAIM_EVIDENCE_REQUIRED';
+            elseif (($claim['legacy'] ?? false) === true && $status !== 'SUPPORTED_WITHIN_SCOPE') $warnings[] = 'LEGACY_EVIDENCE_DEBT';
+        }
+    }
     private function slug(string $value): string { $value = function_exists('remove_accents') ? remove_accents($value) : $value; return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-') ?: 'article'; }
 }
