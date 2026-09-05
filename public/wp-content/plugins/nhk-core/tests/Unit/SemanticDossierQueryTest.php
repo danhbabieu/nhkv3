@@ -93,4 +93,86 @@ final class SemanticDossierQueryTest extends TestCase
         self::assertStringNotContainsString($movement->canonicalId, json_encode($result, JSON_THROW_ON_ERROR));
         self::assertArrayNotHasKey('brands', $result['relation_sections'], 'A three-hop Brand must not leak into a two-hop Movement dossier.');
     }
+
+    private function mediaRepository(array $items): MediaRepository
+    {
+        return new class($items) implements MediaRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Media { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByStableKey(string $key): ?Media { foreach ($this->items as $item) if ($item->stableKey === $key) return $item; return null; }
+            public function create(Media $media): Media { return $media; }
+            public function update(Media $media, int $expectedRevision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+    }
+
+    private function assetRepository(array $items): MediaAssetRepository
+    {
+        return new class($items) implements MediaAssetRepository {
+            public function __construct(private array $items) {}
+            public function findByAssetId(string $id): ?MediaAsset { foreach ($this->items as $item) if ($item->assetId === $id) return $item; return null; }
+            public function create(MediaAsset $asset): MediaAsset { return $asset; }
+            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
+            public function listByMediaId(string $mediaId): array { return array_values(array_filter($this->items, static fn(MediaAsset $item): bool => $item->mediaId === $mediaId)); }
+            public function findByChecksum(string $checksum): array { return []; }
+        };
+    }
+
+    private function usageRepository(array $items): MediaUsageRepository
+    {
+        return new class($items) implements MediaUsageRepository {
+            public function __construct(private array $items) {}
+            public function create(MediaUsage $usage): MediaUsage { return $usage; }
+            public function listByMediaId(string $mediaId, ?string $role = null): array { return array_values(array_filter($this->items, static fn(MediaUsage $item): bool => $item->mediaId === $mediaId && ($role === null || $item->role === $role))); }
+            public function listByEndpoint(string $endpointType, string $endpointKey, ?string $role = null): array { return array_values(array_filter($this->items, static fn(MediaUsage $item): bool => $item->endpointType === $endpointType && $item->endpointKey === $endpointKey && ($role === null || $item->role === $role))); }
+        };
+    }
+
+    private function videoRepository(array $items): VideoRepository
+    {
+        return new class($items) implements VideoRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Video { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { foreach ($this->items as $item) if ($item->platform === $platform && $item->externalVideoId === $id) return $item; return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+    }
+
+    private function knowledgeRepository(array $items): KnowledgeRepository
+    {
+        return new class($items) implements KnowledgeRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { foreach ($this->items as $item) if ($item->stableKey === $stableKey) return $item; return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+    }
+
+    private function evidenceRepository(array $items): EvidenceRepository
+    {
+        return new class($items) implements EvidenceRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Evidence { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return array_values(array_filter($this->items, static fn(Evidence $item): bool => $item->claimId === $claimId)); }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return array_values(array_filter($this->items, static fn(Evidence $item): bool => $item->sourceId === $sourceId)); }
+        };
+    }
+
+    private function sourceRepository(array $items): SourceRepository
+    {
+        return new class($items) implements SourceRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Source { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByStableKey(string $stableKey): ?Source { foreach ($this->items as $item) if ($item->stableKey === $stableKey) return $item; return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+    }
 }
