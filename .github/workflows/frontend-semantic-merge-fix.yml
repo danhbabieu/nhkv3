@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   fix:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,60 +25,61 @@ jobs:
           text = dossier.read_text()
           marker = "    /** @return array<string,list<array<string,mixed>>> */\n    private function relationSections"
           if 'public function forVideo(Video $video): array' not in text:
-              method = r'''    /** @return array<string,mixed> */
-    public function forVideo(Video $video): array
-    {
-        if (!$video->active || !$video->hasValidPublicReference()) return $this->unavailable('VIDEO_NOT_PUBLIC');
-        $route = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
-        $seo = (new PublicSeoProjection())->project($route, ['type' => 'VideoObject']);
-        $url = $seo['internal_link'] ?? null;
-        if (!is_string($url) || $url === '') return $this->unavailable('PUBLIC_ROUTE_UNAVAILABLE');
-
-        $metadata = is_array($video->metadata) ? $video->metadata : [];
-        $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
-        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
-        $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;
-        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';
-        if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
-
-        $media = $this->mediaProjection->forEntity('video', $video->canonicalId);
-        [$primary, $gallery] = $this->mediaPacket($media);
-        $relationResult = $this->relations->query(new NodeReference('video', $video->canonicalId), array_keys(self::GROUPS), 2, 100);
-        $sections = $this->relationSections($relationResult);
-        $warnings = $this->relationWarnings($relationResult, []);
-
-        return [
-            'status' => 'AVAILABLE',
-            'identity' => [
-                'type' => 'video',
-                'title' => $title,
-                'url' => $url,
-                'source_url' => $video->canonicalUrl,
-                'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null,
-            ],
-            'seo_projection' => $seo,
-            'primary_media' => $primary,
-            'media_gallery' => $gallery,
-            'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0],
-            'relation_sections' => $sections,
-            'coverage' => $this->coverage($sections, $gallery, 0, 0),
-            'warnings' => array_values(array_unique($warnings)),
-            'availability' => [
-                'graph' => strtoupper((string) ($relationResult['status'] ?? 'unavailable')),
-                'knowledge' => 'NOT_APPLICABLE',
-            ],
-        ];
-    }
-
-'''
+              lines = [
+                  "    /** @return array<string,mixed> */",
+                  "    public function forVideo(Video $video): array",
+                  "    {",
+                  "        if (!$video->active || !$video->hasValidPublicReference()) return $this->unavailable('VIDEO_NOT_PUBLIC');",
+                  "        $route = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());",
+                  "        $seo = (new PublicSeoProjection())->project($route, ['type' => 'VideoObject']);",
+                  "        $url = $seo['internal_link'] ?? null;",
+                  "        if (!is_string($url) || $url === '') return $this->unavailable('PUBLIC_ROUTE_UNAVAILABLE');",
+                  "",
+                  "        $metadata = is_array($video->metadata) ? $video->metadata : [];",
+                  "        $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];",
+                  "        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];",
+                  "        $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;",
+                  "        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';",
+                  "        if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';",
+                  "",
+                  "        $media = $this->mediaProjection->forEntity('video', $video->canonicalId);",
+                  "        [$primary, $gallery] = $this->mediaPacket($media);",
+                  "        $relationResult = $this->relations->query(new NodeReference('video', $video->canonicalId), array_keys(self::GROUPS), 2, 100);",
+                  "        $sections = $this->relationSections($relationResult);",
+                  "        $warnings = $this->relationWarnings($relationResult, []);",
+                  "",
+                  "        return [",
+                  "            'status' => 'AVAILABLE',",
+                  "            'identity' => [",
+                  "                'type' => 'video',",
+                  "                'title' => $title,",
+                  "                'url' => $url,",
+                  "                'source_url' => $video->canonicalUrl,",
+                  "                'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null,",
+                  "            ],",
+                  "            'seo_projection' => $seo,",
+                  "            'primary_media' => $primary,",
+                  "            'media_gallery' => $gallery,",
+                  "            'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0],",
+                  "            'relation_sections' => $sections,",
+                  "            'coverage' => $this->coverage($sections, $gallery, 0, 0),",
+                  "            'warnings' => array_values(array_unique($warnings)),",
+                  "            'availability' => [",
+                  "                'graph' => strtoupper((string) ($relationResult['status'] ?? 'unavailable')),",
+                  "                'knowledge' => 'NOT_APPLICABLE',",
+                  "            ],",
+                  "        ];",
+                  "    }",
+                  "",
+                  "",
+              ]
+              method = "\n".join(lines)
               if marker not in text:
                   raise SystemExit('SemanticDossierQuery insertion marker not found')
-              text = text.replace(marker, method + marker, 1)
-              dossier.write_text(text)
+              dossier.write_text(text.replace(marker, method + marker, 1))
 
           test = Path('public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticDossierTest.php')
-          text = test.read_text()
-          text = text.replace("self::assertSame('/am-thanh-hien-vat/', $result['identity']['url']);", "self::assertSame('/video/am-thanh-hien-vat-dqw4w9wgxcq/', $result['identity']['url']);")
+          text = test.read_text().replace("self::assertSame('/am-thanh-hien-vat/', $result['identity']['url']);", "self::assertSame('/video/am-thanh-hien-vat-dqw4w9wgxcq/', $result['identity']['url']);")
           test.write_text(text)
 
           video = Path('public/wp-content/themes/nhk-v3/video.php')
@@ -94,15 +95,13 @@ jobs:
               text = text.replace("$fallback = get_theme_file_uri('/assets/default-archive.svg');\n", "$fallback = get_theme_file_uri('/assets/default-archive.svg');\n" + helper, 1)
           old = '<a class="related-card" href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item[\'title\'] ?? \'\'))); ?></strong></a>'
           new = '<a class="related-card" href="<?php echo esc_url($url); ?>"><span class="related-type"><?php echo esc_html($nhkReaderType($item)); ?></span><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item[\'title\'] ?? \'\'))); ?></strong></a>'
-          text = text.replace(old, new)
-          entity.write_text(text)
+          entity.write_text(text.replace(old, new))
 
           media = Path('public/wp-content/themes/nhk-v3/media.php')
           text = media.read_text()
           detail_marker = "<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && $media !== []): ?>"
-          replacement = detail_marker + "\n  <?php $displayAssets = is_array($media['display_assets'] ?? null) ? $media['display_assets'] : []; ?>"
           if '$displayAssets =' not in text:
-              text = text.replace(detail_marker, replacement, 1)
+              text = text.replace(detail_marker, detail_marker + "\n  <?php $displayAssets = is_array($media['display_assets'] ?? null) ? $media['display_assets'] : []; ?>", 1)
           text = text.replace("!empty($media['assets'])", "!empty($displayAssets)")
           text = text.replace("foreach ($media['assets'] as $asset)", "foreach ($displayAssets as $asset)")
           media.write_text(text)
