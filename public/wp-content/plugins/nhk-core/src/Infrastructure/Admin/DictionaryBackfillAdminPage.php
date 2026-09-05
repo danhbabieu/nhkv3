@@ -45,25 +45,42 @@ final class DictionaryBackfillAdminPage
         }
 
         $noWrite = (bool) ($report['no_write'] ?? false);
-        echo '<p><strong>no_write:</strong> ' . esc_html($noWrite ? 'true' : 'false') . '</p>';
-        echo '<p><strong>status:</strong> ' . esc_html((string) ($report['status'] ?? 'UNKNOWN')) . '</p>';
-        echo '<p><strong>scanned:</strong> ' . esc_html((string) ($report['scanned'] ?? 0)) . '</p>';
+        $mode = (string) ($report['mode'] ?? 'UNKNOWN');
+        $totals = is_array($report['totals'] ?? null) ? $report['totals'] : [];
+        $sourceCounts = is_array($report['source_counts'] ?? null) ? $report['source_counts'] : [];
+        $items = is_array($report['items'] ?? null) ? $report['items'] : [];
 
-        $byKind = is_array($report['by_kind'] ?? null) ? $report['by_kind'] : [];
-        if ($byKind !== []) {
+        echo '<p><strong>no_write:</strong> ' . esc_html($noWrite ? 'true' : 'false') . '</p>';
+        echo '<p><strong>mode:</strong> ' . esc_html($mode) . '</p>';
+        echo '<p><strong>scanned:</strong> ' . esc_html((string) ($totals['sources'] ?? 0)) . '</p>';
+
+        echo '<h2>Tổng hợp</h2><table class="widefat striped"><thead><tr><th>Đã resolve</th><th>Candidate mới</th><th>Mơ hồ</th><th>Đã suppress</th><th>Unavailable</th></tr></thead><tbody><tr>';
+        foreach (['resolved_existing', 'candidate_new', 'ambiguous', 'suppressed', 'unavailable'] as $key) {
+            echo '<td>' . esc_html((string) ($totals[$key] ?? 0)) . '</td>';
+        }
+        echo '</tr></tbody></table>';
+
+        if ($sourceCounts !== []) {
             echo '<h2>Theo nguồn</h2><table class="widefat striped"><thead><tr><th>Nguồn</th><th>Số lượng</th></tr></thead><tbody>';
-            foreach ($byKind as $kind => $count) {
+            foreach ($sourceCounts as $kind => $count) {
                 echo '<tr><td>' . esc_html((string) $kind) . '</td><td>' . esc_html((string) $count) . '</td></tr>';
             }
             echo '</tbody></table>';
         }
 
-        $candidates = is_array($report['candidates'] ?? null) ? $report['candidates'] : [];
-        if ($candidates !== []) {
-            echo '<h2>Candidate phát hiện</h2><table class="widefat striped"><thead><tr><th>Thuật ngữ</th><th>Nguồn</th><th>Trạng thái</th></tr></thead><tbody>';
-            foreach ($candidates as $item) {
+        if ($items !== []) {
+            echo '<h2>Chi tiết dry-run</h2><table class="widefat striped"><thead><tr><th>Nguồn</th><th>ID</th><th>Trạng thái</th><th>Đã resolve</th><th>Candidate mới</th><th>Mơ hồ</th><th>Đã suppress</th></tr></thead><tbody>';
+            foreach ($items as $item) {
                 if (!is_array($item)) continue;
-                echo '<tr><td>' . esc_html((string) ($item['term'] ?? $item['normalized_term'] ?? '')) . '</td><td>' . esc_html((string) ($item['source_kind'] ?? '')) . '</td><td>' . esc_html((string) ($item['status'] ?? '')) . '</td></tr>';
+                echo '<tr>';
+                echo '<td>' . esc_html((string) ($item['kind'] ?? '')) . '</td>';
+                echo '<td>' . esc_html((string) ($item['id'] ?? '')) . '</td>';
+                echo '<td>' . esc_html((string) ($item['status'] ?? '')) . '</td>';
+                echo '<td>' . esc_html((string) ($item['resolved_existing'] ?? 0)) . '</td>';
+                echo '<td>' . esc_html((string) ($item['candidate_new'] ?? 0)) . '</td>';
+                echo '<td>' . esc_html((string) ($item['ambiguous'] ?? 0)) . '</td>';
+                echo '<td>' . esc_html((string) ($item['suppressed'] ?? 0)) . '</td>';
+                echo '</tr>';
             }
             echo '</tbody></table>';
         }
