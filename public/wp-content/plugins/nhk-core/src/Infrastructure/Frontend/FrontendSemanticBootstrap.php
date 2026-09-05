@@ -3,12 +3,13 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Frontend;
 
-use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierQuery};
+use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierCoverageAudit, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
 use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaGalleryQuery};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
+use NHK\Core\Infrastructure\Admin\SemanticDossierCoverageAdminPage;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
@@ -75,6 +76,8 @@ final class FrontendSemanticBootstrap
             $postProjector,
             $gallery,
         );
+        $coverageAudit = new SemanticDossierCoverageAudit($types, $authority, static fn(AuthorityEntity $entity): array => $dossier->forEntity($entity));
+        (new SemanticDossierCoverageAdminPage($coverageAudit))->register();
 
         add_filter('nhk_v3_home_semantic_modules', static function(array $modules) use ($status, $gallery, $knowledgeArchive): array {
             if ($status->mediaStorageReady()) $modules['media'] = $gallery->archive(1, 8)['items'];
