@@ -1,0 +1,121 @@
+name: Frontend semantic merge readiness fix
+
+on:
+  push:
+    branches:
+      - feature/frontend-semantic-projection-v2
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/frontend-semantic-projection-v2
+      - name: Apply bounded merge-readiness fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dossier = Path('public/wp-content/plugins/nhk-core/src/Application/Entity/SemanticDossierQuery.php')
+          text = dossier.read_text()
+          marker = "    /** @return array<string,list<array<string,mixed>>> */\n    private function relationSections"
+          if 'public function forVideo(Video $video): array' not in text:
+              method = r'''    /** @return array<string,mixed> */
+    public function forVideo(Video $video): array
+    {
+        if (!$video->active || !$video->hasValidPublicReference()) return $this->unavailable('VIDEO_NOT_PUBLIC');
+        $route = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        $seo = (new PublicSeoProjection())->project($route, ['type' => 'VideoObject']);
+        $url = $seo['internal_link'] ?? null;
+        if (!is_string($url) || $url === '') return $this->unavailable('PUBLIC_ROUTE_UNAVAILABLE');
+
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
+        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+        $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;
+        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';
+        if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
+
+        $media = $this->mediaProjection->forEntity('video', $video->canonicalId);
+        [$primary, $gallery] = $this->mediaPacket($media);
+        $relationResult = $this->relations->query(new NodeReference('video', $video->canonicalId), array_keys(self::GROUPS), 2, 100);
+        $sections = $this->relationSections($relationResult);
+        $warnings = $this->relationWarnings($relationResult, []);
+
+        return [
+            'status' => 'AVAILABLE',
+            'identity' => [
+                'type' => 'video',
+                'title' => $title,
+                'url' => $url,
+                'source_url' => $video->canonicalUrl,
+                'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null,
+            ],
+            'seo_projection' => $seo,
+            'primary_media' => $primary,
+            'media_gallery' => $gallery,
+            'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0],
+            'relation_sections' => $sections,
+            'coverage' => $this->coverage($sections, $gallery, 0, 0),
+            'warnings' => array_values(array_unique($warnings)),
+            'availability' => [
+                'graph' => strtoupper((string) ($relationResult['status'] ?? 'unavailable')),
+                'knowledge' => 'NOT_APPLICABLE',
+            ],
+        ];
+    }
+
+'''
+              if marker not in text:
+                  raise SystemExit('SemanticDossierQuery insertion marker not found')
+              text = text.replace(marker, method + marker, 1)
+              dossier.write_text(text)
+
+          test = Path('public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticDossierTest.php')
+          text = test.read_text()
+          text = text.replace("self::assertSame('/am-thanh-hien-vat/', $result['identity']['url']);", "self::assertSame('/video/am-thanh-hien-vat-dqw4w9wgxcq/', $result['identity']['url']);")
+          test.write_text(text)
+
+          video = Path('public/wp-content/themes/nhk-v3/video.php')
+          text = video.read_text()
+          if 'seo_projection remains the canonical URL/indexability owner' not in text:
+              text = text.replace('<?php\n', "<?php\n/* public seo_projection remains the canonical URL/indexability owner. */\n", 1)
+          video.write_text(text)
+
+          entity = Path('public/wp-content/themes/nhk-v3/entity.php')
+          text = entity.read_text()
+          helper = "$nhkReaderType = static fn(array $item): string => nhk_v3_public_type((string) ($item['type'] ?? ''));\n"
+          if helper not in text:
+              text = text.replace("$fallback = get_theme_file_uri('/assets/default-archive.svg');\n", "$fallback = get_theme_file_uri('/assets/default-archive.svg');\n" + helper, 1)
+          old = '<a class="related-card" href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item[\'title\'] ?? \'\'))); ?></strong></a>'
+          new = '<a class="related-card" href="<?php echo esc_url($url); ?>"><span class="related-type"><?php echo esc_html($nhkReaderType($item)); ?></span><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item[\'title\'] ?? \'\'))); ?></strong></a>'
+          text = text.replace(old, new)
+          entity.write_text(text)
+
+          media = Path('public/wp-content/themes/nhk-v3/media.php')
+          text = media.read_text()
+          detail_marker = "<?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && $media !== []): ?>"
+          replacement = detail_marker + "\n  <?php $displayAssets = is_array($media['display_assets'] ?? null) ? $media['display_assets'] : []; ?>"
+          if '$displayAssets =' not in text:
+              text = text.replace(detail_marker, replacement, 1)
+          text = text.replace("!empty($media['assets'])", "!empty($displayAssets)")
+          text = text.replace("foreach ($media['assets'] as $asset)", "foreach ($displayAssets as $asset)")
+          media.write_text(text)
+          PY
+      - name: Commit bounded fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/wp-content/plugins/nhk-core/src/Application/Entity/SemanticDossierQuery.php \
+                  public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticDossierTest.php \
+                  public/wp-content/themes/nhk-v3/video.php \
+                  public/wp-content/themes/nhk-v3/entity.php \
+                  public/wp-content/themes/nhk-v3/media.php
+          git diff --cached --check
+          git commit -m "fix: complete frontend semantic merge readiness"
+          git push origin HEAD:feature/frontend-semantic-projection-v2
