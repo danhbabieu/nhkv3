@@ -19,4 +19,16 @@ final class DictionaryBackfillAdminBoundaryTest extends TestCase
         self::assertStringNotContainsString('->plan(', $source);
         self::assertStringNotContainsString('->curation(', $source);
     }
+
+    public function test_backfill_admin_consumes_actual_dry_run_report_shape(): void
+    {
+        $path = dirname(__DIR__, 2) . '/src/Infrastructure/Admin/DictionaryBackfillAdminPage.php';
+        $source = (string) file_get_contents($path);
+
+        self::assertStringContainsString("$report['source_counts']", $source);
+        self::assertStringContainsString("$report['totals']", $source);
+        self::assertStringContainsString("$report['items']", $source);
+        self::assertStringNotContainsString("$report['by_kind']", $source);
+        self::assertStringNotContainsString("$report['candidates']", $source);
+    }
 }
