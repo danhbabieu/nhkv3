@@ -8,7 +8,7 @@ use NHK\Core\Domain\Video\{Video, VideoException};
 
 final class VideoService
 {
-    public function __construct(private VideoRepository $videos)
+    public function __construct(private VideoRepository $videos, private $dictionaryObserver = null)
     {
     }
 
@@ -20,14 +20,18 @@ final class VideoService
             if ($existing->canonicalUrl === $candidate->canonicalUrl) return $existing;
             throw new VideoException('Video external reference already maps to another canonical URL.');
         }
-        return $this->videos->create($candidate);
+        $video = $this->videos->create($candidate);
+        $this->observe($video);
+        return $video;
     }
 
     public function update(string $id, string $title, array $metadata, ?string $thumbnailMediaId, int $revision): Video
     {
         $current = $this->videos->findByCanonicalId($id);
         if (!$current) throw new VideoException('Video not found.');
-        return $this->videos->update(new Video($current->canonicalId, $current->platform, $current->externalVideoId, $current->canonicalUrl, $title, $metadata, $thumbnailMediaId, $current->active, $current->revision), $revision);
+        $video = $this->videos->update(new Video($current->canonicalId, $current->platform, $current->externalVideoId, $current->canonicalUrl, $title, $metadata, $thumbnailMediaId, $current->active, $current->revision), $revision);
+        $this->observe($video);
+        return $video;
     }
 
     public function retire(string $id, int $revision): Video { return $this->changeState($id, $revision, false); }
@@ -39,5 +43,17 @@ final class VideoService
         if (!$current) throw new VideoException('Video not found.');
         if ($current->active === $active) return $current;
         return $this->videos->update(new Video($current->canonicalId, $current->platform, $current->externalVideoId, $current->canonicalUrl, $current->title, $current->metadata, $current->thumbnailMediaId, $active, $current->revision), $revision);
+    }
+
+    private function observe(Video $video): void
+    {
+        if (!is_callable($this->dictionaryObserver)) return;
+        $source = is_array($video->metadata['source'] ?? null) ? $video->metadata['source'] : [];
+        $editorial = is_array($video->metadata['editorial'] ?? null) ? $video->metadata['editorial'] : [];
+        $parts = [$video->title, (string) ($source['source_title'] ?? ''), (string) ($source['source_description'] ?? ''), (string) ($editorial['summary'] ?? '')];
+        foreach ((array) ($source['tags'] ?? []) as $tag) if (is_string($tag)) $parts[] = $tag;
+        $text = implode("\n", array_values(array_filter(array_map('trim', $parts))));
+        try { ($this->dictionaryObserver)('VIDEO', $video->canonicalId, $text, ['platform' => $video->platform, 'external_video_id' => $video->externalVideoId, 'semantic_attachments' => $video->metadata['semantic_attachments'] ?? []]); }
+        catch (\Throwable) { /* lexical observation is non-blocking after canonical write */ }
     }
 }
