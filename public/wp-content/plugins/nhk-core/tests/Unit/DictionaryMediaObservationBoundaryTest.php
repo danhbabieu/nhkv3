@@ -12,6 +12,7 @@ final class DictionaryMediaObservationBoundaryTest extends TestCase
         $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Dictionary/DictionaryWordPressBridge.php');
         self::assertStringContainsString("'weak_sources' => ['title', 'alt', 'filename']", $source);
         self::assertStringNotContainsString('$hints = array_values(array_filter([(string) $post->post_title, $alt]));', $source);
-        self::assertStringContainsString("$this->observe('MEDIA', (string) $attachmentId, $text, ['attachment_id' => $attachmentId, 'weak_sources' => ['title', 'alt', 'filename']]);", $source);
+        self::assertStringNotContainsString(", ['attachment_id' => \$attachmentId], \$hints)", $source);
+        self::assertStringContainsString("'MEDIA', (string) \$attachmentId, \$text, ['attachment_id' => \$attachmentId, 'weak_sources' => ['title', 'alt', 'filename']]", $source);
     }
 }
