@@ -69,11 +69,11 @@ final class FrontendSemanticProjectionV2Test extends TestCase
     public function test_entity_knowledge_projection_groups_only_public_subject_scoped_claims_with_public_evidence(): void
     {
         $subjectId = UuidCodec::newV7();
-        $source = new Source(UuidCodec::newV7(), 'source-a', 'Tư liệu A', 'archive', 'box-1');
+        $source = new Source(UuidCodec::newV7(), 'source-a', 'Tư liệu A', 'archive', 'box-1', ['visibility' => 'PUBLIC']);
         $publicClaim = new KnowledgeClaim($claimId = UuidCodec::newV7(), 'claim-a', 'Khác biệt nằm ở tỷ số truyền phía bộ thoát.', 'technical', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'movement', 'scope' => 'movement']]);
         $otherClaim = new KnowledgeClaim(UuidCodec::newV7(), 'claim-b', 'Không thuộc chủ thể này.', 'fact', ['metadata' => ['subject_id' => UuidCodec::newV7(), 'facet' => 'identity', 'scope' => 'movement']]);
         $privateClaim = new KnowledgeClaim(UuidCodec::newV7(), 'claim-c', 'Chưa xác minh.', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'recognition', 'scope' => 'movement', 'verification_status' => 'UNVERIFIED']]);
-        $evidence = new Evidence(UuidCodec::newV7(), $claimId, $source->canonicalId, 'supports', 'Trích đoạn hỗ trợ', 'p.1');
+        $evidence = new Evidence(UuidCodec::newV7(), $claimId, $source->canonicalId, 'supports', 'Trích đoạn hỗ trợ', 'p.1', true, 1, ['visibility' => 'PUBLIC']);
         $projection = new EntityKnowledgeProjection($this->knowledgeRepository([$publicClaim, $otherClaim, $privateClaim]), $this->evidenceRepository([$evidence]), $this->sourceRepository([$source]));
 
         $result = $projection->forSubject($subjectId);
