@@ -85,6 +85,15 @@ final class DictionaryTermDetector
     private function trimStopWords(string $phrase): string
     {
         $parts = preg_split('/\s+/u', trim($phrase)) ?: [];
+        if (count($parts) > 1) {
+            foreach ($parts as $index => $part) {
+                if ($index === 0) continue;
+                if (in_array($this->lower((string) $part), self::STOP_WORDS, true)) {
+                    $parts = array_slice($parts, 0, $index);
+                    break;
+                }
+            }
+        }
         while ($parts !== []) {
             $last = $this->lower((string) end($parts));
             if (!in_array($last, self::STOP_WORDS, true)) break;
