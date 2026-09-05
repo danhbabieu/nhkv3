@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace NHK\Core;
 
+use NHK\Core\Infrastructure\Dictionary\DictionaryBootstrap;
+
 if (! defined('ABSPATH')) { exit; }
 define('NHK_CORE_VERSION', '0.1.0');
 define('NHK_CORE_API_VERSION', 'v1');
@@ -27,5 +29,7 @@ else {
     });
 }
 Plugin::boot(__FILE__);
+DictionaryBootstrap::boot();
 register_activation_hook(__FILE__, [Plugin::class, 'activate']);
+register_activation_hook(__FILE__, [DictionaryBootstrap::class, 'activate']);
 register_deactivation_hook(__FILE__, [Plugin::class, 'deactivate']);

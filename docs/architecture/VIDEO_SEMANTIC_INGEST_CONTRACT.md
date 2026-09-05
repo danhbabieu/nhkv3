@@ -5,33 +5,35 @@
 
 Workflow: `YouTube URL + user hint → source resolution → snapshot → transcript
 policy → NHK lookup → relation candidates → optional Knowledge enrichment
-planning → Hub classification → editorial package → SEO projection →
-completeness → governed Video Proposal`.
+planning → optional Dictionary lexical preview → Hub classification → editorial
+package → SEO projection → completeness → governed Video Proposal`.
 
 Canonical public URL policy is `/video/{semantic-slug}-{external-video-id}/`.
 Semantic slug fallback order is explicit governed NHK semantic/editorial
 context; confirmed attached Brand/Model/Variant/Movement/Music context;
 governed editorial title; governed user hint when allowed; and source-platform
-title only as a controlled last resort. A YouTube marketing title must not
-replace confirmed NHK context. URL changes are explicit Public Identity
+title only as a controlled last resort. A source-platform marketing title must
+not replace confirmed NHK context. URL changes are explicit Public Identity
 operations; source synchronization never changes UUID or creates a duplicate
-Video. The approved canary is YouTube `P4KaHX3LBOw`, Video UUID
-`01a06815-1e51-7964-b004-1ba79e488ad1`, expected path
-`/video/odo-36-10-gai-carillon-p4kahx3lbow/`.
+Video.
 
 The public MCP entry point is the existing governed `nhk.video.ingest`. It may
 return a single preview packet with source, editorial, Hub, relation, SEO,
 warning and ambiguity information. It never approves, applies or publishes.
+Dictionary-specific MCP tools are not implied by this contract and must not be
+claimed unless present in the current executable catalog and fresh runtime
+discovery.
 
 Input is intentionally small: `url`, optional `user_hint`, optional
 `intended_category`, optional already-resolved `intended_relations`, optional
 `editorial_instruction` and optional `idempotency_key`. User hints are retained
 as `USER_HINT`; they are high-value context, not Authority truth.
 
-The source adapter is the only boundary allowed to call YouTube. The preferred
-client is the official YouTube Data API with an environment-provided key. A
-missing key is an explicit configuration/unavailable warning. No HTML scraping,
-SSRF, arbitrary host or transcript workaround is permitted.
+The source adapter is the only boundary allowed to call the external video
+platform. The preferred client is its official data API with an
+environment-provided key. A missing key is an explicit
+configuration/unavailable warning. No HTML scraping, SSRF, arbitrary host or
+transcript workaround is permitted.
 
 The Proposal payload reuses the dedicated Video metadata boundary for the
 normalized source snapshot, transcript policy, editorial package, Hub result,
@@ -83,19 +85,41 @@ the complete Video intake preview and its existing `about` relation/proposal
 flow. Same-claim and add-Evidence idempotency remain governed by the shared
 Knowledge planner/factory; Video intake does not apply either result.
 
+## Dictionary lexical integration — 2026-09-05
+
+Dictionary behavior follows
+`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`.
+
+- Video title, source description, tags, user-supplied lexical hints and only an
+  authorized transcript may be inspected for lexical terms.
+- Dictionary preview is read-only. It may report resolved labels, ambiguity and
+  review candidates but must not write Candidate/Mention rows during Video
+  intake preview.
+- After the governed Video canonical create/update succeeds, a non-blocking
+  Dictionary observer may persist idempotent Mention/Candidate rows from the
+  stored Video metadata/text. Lexical observation failure never turns a
+  successful canonical Video write into semantic failure.
+- An explicit validated `about` target may be supplied as context to
+  disambiguate a term, but Dictionary must not broaden, replace or manufacture
+  that target.
+- Video metadata, transcript text and generated editorial copy are never
+  Evidence merely because Dictionary recognized a term.
+- An existing approved lexical label/current canonical owner is reused. An
+  unresolved term becomes a private review candidate, never a public concept
+  automatically.
+
 Same external identity plus same intent is idempotent. Existing identity means
 reconcile/update candidate, never duplicate Video. Source changes require a
 new governed review packet; NHK fields are not overwritten by source metadata.
 
 ## Verified target-handoff checkpoint — 2026-09-04
 
-Focused/unit implementation and the runtime smoke path now distinguish target
-resolution from textual research. For the `SaLpWgitdSE` / Odo 36/10 probe, the
-explicit Variant UUID `95873bfe-d978-4eda-a5a2-ce9ba79625df` is retained as both
-`about` target and `knowledge_enrichment.subject`; the candidate scope remains
-`variant` and no Model/Brand fallback is emitted. This checkpoint changes no
-semantic data and does not relax the separate Source/Evidence or Governance
-gates.
+Focused/unit implementation and the runtime smoke path distinguish target
+resolution from textual research. A validated explicit Variant UUID is retained
+as both `about` target and `knowledge_enrichment.subject`; the candidate scope
+remains `variant` and no Model/Brand fallback is emitted. This checkpoint
+changes no semantic data and does not relax the separate Source/Evidence or
+Governance gates.
 
 ## Governed dependency lifecycle
 

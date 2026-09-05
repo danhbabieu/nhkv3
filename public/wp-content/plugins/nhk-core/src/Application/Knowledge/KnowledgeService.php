@@ -3,19 +3,22 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Knowledge;
 
+use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, KnowledgeException, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class KnowledgeService
 {
-    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence) {}
+    public function __construct(private KnowledgeRepository $claims, private SourceRepository $sources, private EvidenceRepository $evidence, private $dictionaryObserver = null) {}
 
     public function createClaim(string $stableKey, string $text, string $type = 'fact', array $provenance = []): KnowledgeClaim
     {
         $existing = $this->claims->findByStableKey($stableKey);
         if ($existing) { if ($existing->claimText === $text && $existing->claimType === $type && $existing->provenance === $provenance) return $existing; throw new KnowledgeException('Knowledge claim stable key already exists.'); }
-        return $this->claims->create(new KnowledgeClaim(UuidCodec::newV7(), $stableKey, $text, $type, $provenance));
+        $claim = $this->claims->create(new KnowledgeClaim(UuidCodec::newV7(), $stableKey, $text, $type, $provenance));
+        $this->observe($claim);
+        return $claim;
     }
 
     public function createSource(string $stableKey, string $title, string $type = 'website', ?string $locator = null, array $metadata = []): Source
@@ -29,7 +32,9 @@ final class KnowledgeService
     {
         $current = $this->claims->findByCanonicalId($id);
         if (!$current) throw new KnowledgeException('Knowledge claim not found.');
-        return $this->claims->update(new KnowledgeClaim($current->canonicalId, $current->stableKey, $text, $type, $provenance, $current->active, $current->revision), $revision);
+        $claim = $this->claims->update(new KnowledgeClaim($current->canonicalId, $current->stableKey, $text, $type, $provenance, $current->active, $current->revision), $revision);
+        $this->observe($claim);
+        return $claim;
     }
 
     public function retireClaim(string $id, int $revision): KnowledgeClaim { return $this->changeClaimState($id, $revision, false); }
@@ -86,5 +91,15 @@ final class KnowledgeService
         if (!$current) throw new KnowledgeException('Evidence not found.');
         if ($current->active === $active) return $current;
         return $this->evidence->update(new Evidence($current->canonicalId, $current->claimId, $current->sourceId, $current->relation, $current->excerpt, $current->locator, $active, $current->revision, $current->metadata), $revision);
+    }
+
+    private function observe(KnowledgeClaim $claim): void
+    {
+        $context = ['claim_type' => $claim->claimType, 'provenance' => $claim->provenance];
+        if (is_callable($this->dictionaryObserver)) {
+            try { ($this->dictionaryObserver)('KNOWLEDGE', $claim->canonicalId, $claim->claimText, $context); } catch (\Throwable) {}
+            return;
+        }
+        DictionaryObservationRegistry::observe('KNOWLEDGE', $claim->canonicalId, $claim->claimText, $context);
     }
 }

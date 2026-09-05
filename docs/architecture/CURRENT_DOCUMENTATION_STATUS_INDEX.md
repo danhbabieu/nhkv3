@@ -1,6 +1,6 @@
 # NHK V3 Current Documentation Status Index
 
-> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-04.**
+> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-05.**
 > This file is not a second Constitution and does not create semantic vocabulary,
 > operations, predicates, storage, routes or data. Its purpose is to tell
 > downstream systems which sources are current law/contract, which sources are
@@ -38,25 +38,30 @@ registry/catalog merely because its wording is present tense.
 | Area | Current boundary | Current status / reuse rule |
 |---|---|---|
 | Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts |
+| Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
 | Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; physical row completeness/backfill is a separate runtime/data question |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
 | Public Identity | persisted identity/history implementation now exists in code | `PublicIdentityService`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented locally; guarded migration/data allocation/current-route consumer parity remain runtime-unverified, so do not claim durable public identity is live without read-back |
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
-| Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance |
-| Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; planning packet itself performs no Knowledge/Evidence/Graph mutation |
-| Media | `Media` identity separate from `MediaAsset`, `MediaUsage` and WP attachment | source-original retained private/protected; derivatives remain under same Media; checksum does not auto-merge identity |
+| Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |
+| Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; Dictionary observation after canonical write is lexical/non-blocking and does not broaden the target |
+| Media | `Media` identity separate from `MediaAsset`, `MediaUsage` and WP attachment | source-original retained private/protected; derivatives remain under same Media; checksum does not auto-merge identity; caption/alt/filename observations may feed Dictionary candidates only |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | transport/orchestration over existing owners | fixed tool counts in historical docs are snapshots only; use current `McpToolCatalog` plus fresh runtime discovery when availability matters |
+| MCP | transport/orchestration over existing owners | fixed tool counts in historical docs are snapshots only; use current `McpToolCatalog` plus fresh runtime discovery when availability matters; no dedicated Dictionary MCP surface should be claimed unless current catalog/runtime exposes it |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; multipart Media ingest remains on its approved custom MCP boundary |
-| SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge contracts | read/projection-only layer; shared readiness/indexability must be reused; may not invent facts, identity or semantic writes |
+| SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; shared readiness/indexability must be reused; delegated Dictionary concepts use the existing canonical owner; only eligible dedicated Dictionary pages may index |
 
 ## 3. Current storage and writer rule
 
 Every domain has one canonical owner and authorized writer boundary:
 
 - Article editorial state → WordPress editorial gateways/read-back.
+- Dictionary lexical state → dedicated Concept/Label/Candidate/Mention repository;
+  automatic content detection may persist only lexical observations/candidates
+  after the owning content write, while curation uses its dedicated authorized
+  boundary. Dictionary persistence is not a semantic writer.
 - Authority → Authority service/repository through Governance where semantic.
 - Public Identity → dedicated Public Identity service/repository/history boundary;
   compatibility route derivation is not a second durable identity writer.
@@ -71,7 +76,8 @@ Every domain has one canonical owner and authorized writer boundary:
 
 Downstream systems should resolve/reuse canonical UUID/stable key/revision and
 read back from the owning store instead of cloning semantic data into a new
-context.
+context. Dictionary owner delegation must be revalidated at read time; a stale
+stored destination is not permission to publish/link an invalid canonical URL.
 
 ## 4. Historical-document interpretation
 
@@ -95,6 +101,12 @@ Do not rewrite history merely to make old checkpoints look current.
 - Public Identity runtime activation/data coverage/current-route consumer parity:
   implementation exists locally, but guarded migration execution and live
   allocation/read-back are not proven by the current checkpoint;
+- Dictionary migration 015/runtime activation, initial curated data, dry-run
+  legacy backfill and target-environment public-route/read-back are not proven
+  until executed in the target WordPress runtime; code presence alone is not
+  live acceptance;
+- dedicated Dictionary MCP tools are not current capability truth unless they
+  are added to the executable catalog and confirmed by fresh runtime discovery;
 - dedicated Product–Specimen canonical relation;
 - full physical Graph completeness/backfill where not runtime-proven;
 - Media → Living Knowledge automatic enrichment adapter;
@@ -119,6 +131,10 @@ Before implementing or mutating data:
 5. fail closed on ambiguity or a missing approved writer/relation;
 6. use Governance for semantic mutation;
 7. read back from the canonical owner before claiming completion.
+
+For Dictionary work specifically, detection is not semantic identity: resolve
+approved labels/current canonical owners first, create a private candidate only
+when unresolved, and keep ambiguous terms unlinked until human curation.
 
 This index should remain compact. Detailed law belongs in the Constitution or
 approved domain contracts, not duplicated here.

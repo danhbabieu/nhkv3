@@ -19,6 +19,7 @@ the operation:
 | Concern | Required documents |
 |---|---|
 | Article / News / editorial | `docs/architecture/ARTICLE_INGEST_CONTRACT.md`, `docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md`, `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` |
+| Dictionary / lexical curation / auto-link | `docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` plus the owning Article, Knowledge, Media/Image, Video, public-route and SEO contracts for the content being detected or linked |
 | Media / Image | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, relevant Media contracts and runtime registries |
 | Video | `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` |
 | Knowledge / Claim / Source / Evidence | `docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md`, `docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`, `docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` when public copy is involved |
@@ -57,13 +58,25 @@ coverage, current-route consumer parity and target-environment read-back still
 need verification before claiming durable Public Identity is live everywhere.
 Compatibility name-derived routing is not a second durable identity writer.
 
+The Dictionary lexical layer is governed by
+`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`. Dictionary
+Concept/Label/Candidate/Mention records are lexical curation state only: they do
+not become Authority, Knowledge, Evidence or Graph truth. Detection during
+Article, Knowledge, Media/Image or Video workflows must therefore be read with
+the corresponding owning-domain contract. Research/preflight is preview-only;
+persistence of Dictionary observations happens only after an owning content
+write or an explicit human curation action.
+
 Specs, plans, audits, parity matrices, READMEs and historical V2 material are
 subordinate evidence or implementation guidance. If any source conflicts with
 the Constitution, mark `CONSTITUTION_CONFLICT` and stop at the applicable human
 gate.
 
 For an approved V3 knowledge Article workflow, also read
-`docs/architecture/ARTICLE_INGEST_CONTRACT.md` and the current
+`docs/architecture/ARTICLE_INGEST_CONTRACT.md`,
+`docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md`,
+`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` when lexical
+detection/linking is in scope, and the current
 `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` contract before implementation.
 
 For MCP/Admin content operations, also read
@@ -73,25 +86,32 @@ SEO work, read the shared and applicable projection contracts first:
 `docs/seo/ENTITY_SEO_PROJECTION_CONTRACT.md`,
 `docs/seo/MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, and
 `docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md`. Then read
-`docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md` and
+`docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md`,
+`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` when relevant, and
 `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` before implementation.
 
 For Media/image upload, storage, attachment projection or Article image work,
 also read `docs/architecture/04_MEDIA_MODEL.md`,
 `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`,
-`docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md` and the Media section of
+`docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`,
+`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` when lexical
+observation is enabled, and the Media section of
 `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`. The source-original/derivative,
 Media/MediaAsset/MediaUsage and WordPress-attachment boundaries must be read as
 one contract set; historical checkpoint wording never overrides the current
-Constitution.
+Constitution. OCR, filename, caption, alt or recognition may be lexical
+observations only; they do not become semantic truth automatically.
 
 For Video intake or Video-derived Knowledge planning, also read
 `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`,
 `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`,
-`docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` and
-`docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`. An explicit validated
-Video `about` target must remain the semantic/enrichment target; Video-derived
-Knowledge output is planning-only unless separately governed and applied.
+`docs/mcp/MCP_V3_VIDEO_WORKFLOW.md`,
+`docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md` and
+`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` when lexical
+observation is enabled. An explicit validated Video `about` target must remain
+the semantic/enrichment target; Video-derived Knowledge output is planning-only
+unless separately governed and applied. Dictionary detection must not broaden
+that target.
 
 For any workflow that drafts, generates, edits, projects or publishes public
 promotional/commercial copy — including WordPress Article text, Product copy,
