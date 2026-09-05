@@ -9,17 +9,21 @@ get_header();
   <section class="hero home-hero-v2">
     <div class="hero-copy-block">
       <p class="eyebrow">Kho tri thức · hình ảnh · video · hiện vật</p>
-      <h1>Khám phá đồng hồ cổ<br><em>từ hiện vật đến tri thức.</em></h1>
-      <p class="hero-copy">Một cửa vào chung cho bài nghiên cứu, thương hiệu, mẫu, biến thể, bộ máy, bản nhạc, hình ảnh, video và từ điển đang được lưu trữ trong hệ thống.</p>
+      <h1>Mỗi chiếc đồng hồ cổ<br> <em>mang một câu chuyện.</em></h1>
+      <p class="hero-copy">Một cửa vào chung cho bài nghiên cứu, thương hiệu, mẫu, biến thể, bộ máy, bản nhạc, linh kiện, hiện vật, hình ảnh, video và từ điển đang được lưu trữ trong hệ thống.</p>
       <?php get_search_form(); ?>
     </div>
     <aside class="hero-index" aria-label="Lối vào nhanh">
       <a href="<?php echo esc_url(home_url('/thuong-hieu/')); ?>"><span>01</span><strong>Thương hiệu</strong></a>
       <a href="<?php echo esc_url(home_url('/mau/')); ?>"><span>02</span><strong>Mẫu & biến thể</strong></a>
       <a href="<?php echo esc_url(home_url('/bo-may/')); ?>"><span>03</span><strong>Bộ máy</strong></a>
-      <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>"><span>04</span><strong>Hình ảnh</strong></a>
-      <a href="<?php echo esc_url(home_url('/video/')); ?>"><span>05</span><strong>Video</strong></a>
-      <a href="<?php echo esc_url(home_url('/tu-dien/')); ?>"><span>06</span><strong>Từ điển</strong></a>
+      <a href="<?php echo esc_url(home_url('/ban-nhac/')); ?>"><span>04</span><strong>Bản nhạc</strong></a>
+      <a href="<?php echo esc_url(home_url('/linh-kien/')); ?>"><span>05</span><strong>Linh kiện</strong></a>
+      <a href="<?php echo esc_url(home_url('/hien-vat/')); ?>"><span>06</span><strong>Hiện vật</strong></a>
+      <a href="<?php echo esc_url(home_url('/so-sanh/')); ?>"><span>07</span><strong>So sánh</strong></a>
+      <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>"><span>08</span><strong>Hình ảnh</strong></a>
+      <a href="<?php echo esc_url(home_url('/video/')); ?>"><span>09</span><strong>Video</strong></a>
+      <a href="<?php echo esc_url(home_url('/tu-dien/')); ?>"><span>10</span><strong>Từ điển</strong></a>
     </aside>
   </section>
 
@@ -72,7 +76,7 @@ get_header();
     <div class="section-head"><div><p class="eyebrow">Hồ sơ nổi bật</p><h2>Đi từ hiện vật sang cấu trúc</h2></div></div>
     <div class="visual-card-grid">
       <?php foreach ($entities as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $image = trim((string) ($item['image_url'] ?? '')) ?: $fallback; ?>
-      <a class="visual-card" href="<?php echo esc_url($url); ?>"><span class="visual-frame"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['image_alt'] ?? '')); ?>" loading="lazy"></span><span class="visual-card-body"><small><?php echo esc_html(nhk_v3_public_type((string) ($item['type'] ?? ''))); ?></small><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></span></a>
+      <a class="visual-card" href="<?php echo esc_url($url); ?>"><span class="visual-frame"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['image_alt'] ?? '')); ?>" loading="lazy"></span><span class="visual-card-body"><small><?php echo esc_html(nhk_v3_public_type((string) $item['type'])); ?></small><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></span></a>
       <?php endforeach; ?>
     </div>
   </section>
