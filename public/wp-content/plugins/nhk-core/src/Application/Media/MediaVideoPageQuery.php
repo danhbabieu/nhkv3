@@ -38,22 +38,57 @@ final class MediaVideoPageQuery
         $assets = array_values(array_filter($this->assets->listByMediaId($id), fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC' && ($this->delivery === null || $this->delivery->resolve($asset->assetId) !== null)));
         return [
             'name' => $media->canonicalName,
-            // Compatibility shape: reader-safe facts only.
             'assets' => array_map($this->asset(...), $assets),
-            // Presentation-only projection adds the delivery URL without
-            // changing the legacy assets contract.
             'display_assets' => array_map($this->displayAsset(...), $assets),
             'usages' => array_map($this->usage(...), $this->usages->listByMediaId($id)),
         ];
     }
-    public function mediaBySlug(string $slug): ?array { return null; }
-    public function videoDetail(string $id): ?array { if (!$this->available('video') || !UuidCodec::isValid($id)) return null; $video = $this->videos->findByCanonicalId($id); return $video && $video->active && $video->hasValidPublicReference() ? $this->video($video) : null; }
-    public function videoBySlug(string $slug): ?array { if (!$this->available('video')) return null; $slug = trim($slug); $policy = new VideoUrlPolicy(); $selector = new VideoPublicContextSelector(); $matches = array_values(array_filter($this->videos->list(), fn (Video $video): bool => $video->active && ($result = $policy->project($video, $selector))['eligible'] && $result['path'] === '/' . $slug . '/')); return count($matches) === 1 ? $this->video($matches[0]) : null; }
 
-    public function mediaArchive(int $page = 1, int $perPage = 24): array { return $this->available('media') ? $this->gallery->archive($page, $perPage) : ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'items' => []]; }
-    public function videoArchive(int $page = 1, int $perPage = 12): array { return $this->archive($this->available('video') ? $this->videos->list() : [], $page, $perPage, fn (Video $item): array => $this->video($item), static fn (object $item): bool => $item->active && $item->hasValidPublicReference()); }
+    public function mediaBySlug(string $slug): ?array { return null; }
+
+    public function videoDetail(string $id): ?array
+    {
+        if (!$this->available('video') || !UuidCodec::isValid($id)) return null;
+        $video = $this->videos->findByCanonicalId($id);
+        if (!$video || !$video->active || !$video->hasValidPublicReference() || !$this->videoPublicEligible($video)) return null;
+        return $this->video($video);
+    }
+
+    public function videoBySlug(string $slug): ?array
+    {
+        if (!$this->available('video')) return null;
+        $slug = trim($slug);
+        if ($slug === '') return null;
+        $policy = new VideoUrlPolicy();
+        $selector = new VideoPublicContextSelector();
+        $matches = array_values(array_filter($this->videos->list(), fn (Video $video): bool => $video->active && ($result = $policy->project($video, $selector))['eligible'] && $result['path'] === '/video/' . $slug . '/'));
+        return count($matches) === 1 ? $this->video($matches[0]) : null;
+    }
+
+    public function mediaArchive(int $page = 1, int $perPage = 24): array
+    {
+        return $this->available('media') ? $this->gallery->archive($page, $perPage) : ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'items' => []];
+    }
+
+    public function videoArchive(int $page = 1, int $perPage = 12): array
+    {
+        return $this->archive(
+            $this->available('video') ? $this->videos->list() : [],
+            $page,
+            $perPage,
+            fn (Video $item): array => $this->video($item),
+            fn (object $item): bool => $item instanceof Video && $item->active && $item->hasValidPublicReference() && $this->videoPublicEligible($item),
+        );
+    }
+
     private function available(string $domain): bool { return !$this->status || ($domain === 'media' ? $this->status->mediaStorageReady() : $this->status->videoStorageReady()); }
     private function archive(array $items, int $page, int $perPage, callable $map, ?callable $filter = null): array { $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $items = array_values(array_filter($items, $filter ?? static fn (object $item): bool => $item->active)); $items = array_map($map, $items); return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)]; }
+
+    private function videoPublicEligible(Video $video): bool
+    {
+        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        return $result['eligible'] && is_string($result['path']) && $result['path'] !== '';
+    }
 
     private function asset(MediaAsset $asset): array
     {
