@@ -8,17 +8,20 @@ use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
 
 final class DictionaryPublicQuery
 {
-    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null) {}
+    public function __construct(private DictionaryConceptRepository $concepts, private $imageResolver = null, private $destinationValidator = null) {}
 
     public function hub(int $limit = 500): array
     {
         $items = [];
+        $warnings = [];
         foreach ($this->concepts->listApproved($limit) as $concept) {
             if (!$concept instanceof DictionaryConcept || !$concept->approved()) continue;
-            $items[] = $this->item($concept);
+            $item = $this->item($concept);
+            if (($item['eligible'] ?? false) !== true) { $warnings[] = 'DICTIONARY_DESTINATION_INCOMPLETE:' . $concept->conceptId; continue; }
+            $items[] = $item;
         }
         usort($items, static fn (array $a, array $b): int => strnatcasecmp((string) $a['title'], (string) $b['title']));
-        return ['status' => 'AVAILABLE', 'items' => $items, 'count' => count($items), 'canonical_url' => '/tu-dien/'];
+        return ['status' => 'AVAILABLE', 'items' => $items, 'count' => count($items), 'canonical_url' => '/tu-dien/', 'warnings' => $warnings];
     }
 
     public function detail(string $slug): array
@@ -33,9 +36,9 @@ final class DictionaryPublicQuery
         }
         if (count($matches) !== 1) return ['status' => count($matches) > 1 ? 'AMBIGUOUS' : 'NOT_FOUND'];
         $concept = $matches[0];
-        if (trim((string) $concept->destinationUrl) !== '') return ['status' => 'REDIRECT', 'destination_url' => $concept->destinationUrl, 'concept_id' => $concept->conceptId];
         $item = $this->item($concept);
-        if (($item['url'] ?? null) === null) return ['status' => 'INCOMPLETE', 'reason' => 'PUBLIC_SLUG_REQUIRED', 'concept_id' => $concept->conceptId];
+        if (($item['eligible'] ?? false) !== true) return ['status' => 'INCOMPLETE', 'reason' => 'CANONICAL_DESTINATION_NOT_READY', 'concept_id' => $concept->conceptId];
+        if (($item['dedicated'] ?? true) === false) return ['status' => 'REDIRECT', 'destination_url' => $item['url'], 'concept_id' => $concept->conceptId];
         return ['status' => 'READY', 'item' => $item, 'labels' => $item['labels'], 'canonical_url' => $item['url'], 'indexable' => true];
     }
 
@@ -49,8 +52,13 @@ final class DictionaryPublicQuery
         $delegated = trim((string) $concept->destinationUrl) !== '';
         $slug = $this->slug((string) ($concept->context['public_slug'] ?? ''));
         $url = $delegated ? $concept->destinationUrl : ($slug !== '' ? '/tu-dien/' . $slug . '/' : null);
+        $eligible = $url !== null;
+        if ($delegated && is_callable($this->destinationValidator)) {
+            try { $eligible = (bool) ($this->destinationValidator)($concept->destinationType, $concept->destinationId, $concept->destinationUrl); }
+            catch (\Throwable) { $eligible = false; }
+        }
         $image = null;
-        if (is_callable($this->imageResolver)) {
+        if ($eligible && is_callable($this->imageResolver)) {
             try { $value = ($this->imageResolver)($concept->conceptId); if (is_array($value)) $image = $value; }
             catch (\Throwable) { $image = null; }
         }
@@ -62,12 +70,13 @@ final class DictionaryPublicQuery
             'category' => (string) ($concept->context['category'] ?? ''),
             'usage_scope' => is_array($concept->context['usage_scope'] ?? null) ? $concept->context['usage_scope'] : [],
             'labels' => $labels,
-            'url' => $url,
+            'url' => $eligible ? $url : null,
             'dedicated' => !$delegated,
             'destination_type' => $concept->destinationType,
             'destination_id' => $concept->destinationId,
             'image' => $image,
-            'indexable' => !$delegated && $url !== null,
+            'eligible' => $eligible,
+            'indexable' => $eligible && !$delegated,
         ];
     }
 
