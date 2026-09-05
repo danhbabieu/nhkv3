@@ -35,7 +35,14 @@ final class SemanticDossierQueryTest extends TestCase
         $media = new Media($mediaId = UuidCodec::newV7(), 'movement-front', 'Ảnh mặt máy', 'ready');
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'movement-front.jpg', hash('sha256', 'img'), 'image/jpeg', 3, 1200, 900, 'PUBLIC', ['canonical_filename' => 'movement-front.jpg']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'movement', $movement->canonicalId, 'representative', 0, 'Mặt trước bộ máy');
-        $video = new Video($videoId = UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video âm thanh', ['source_snapshot' => ['availability' => 'available', 'thumbnail_urls' => ['https://img.example.test/video.jpg']]]);
+        $video = new Video($videoId = UuidCodec::newV7(), 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video âm thanh', [
+            'public_identity' => ['current_slug' => 'video-am-thanh'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://img.example.test/video.jpg']],
+            'editorial' => ['title' => 'Video âm thanh', 'summary' => 'Ghi nhận âm thanh liên quan.'],
+            'hub' => ['primary' => 'movement'],
+            'provenance' => ['kind' => 'TEST_SOURCE'],
+            'semantic_attachments' => [['target_id' => $movement->canonicalId]],
+        ]);
 
         $endpoints = new EndpointTypeRegistry();
         foreach (['brand' => $brand, 'model' => $model, 'variant' => $variant, 'movement' => $movement, 'music' => $music] as $type => $entity) $endpoints->register($type, new FakeEndpointResolver($type, [$entity->canonicalId]));
