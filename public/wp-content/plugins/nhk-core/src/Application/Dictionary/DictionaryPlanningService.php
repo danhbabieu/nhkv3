@@ -18,14 +18,19 @@ final class DictionaryPlanningService
         private $idGenerator = null,
     ) {}
 
-    public function plan(
-        string $text,
-        string $sourceKind,
-        string $sourceId,
-        array $context = [],
-        array $hints = [],
-        array $approvedLabels = [],
-    ): array {
+    public function preview(string $text, string $sourceKind, string $sourceId, array $context = [], array $hints = [], array $approvedLabels = []): array
+    {
+        return $this->run($text, $sourceKind, $sourceId, $context, $hints, $approvedLabels, false);
+    }
+
+    public function plan(string $text, string $sourceKind, string $sourceId, array $context = [], array $hints = [], array $approvedLabels = []): array
+    {
+        if (trim($sourceId) === '') throw new \InvalidArgumentException('DICTIONARY_SOURCE_ID_REQUIRED');
+        return $this->run($text, $sourceKind, $sourceId, $context, $hints, $approvedLabels, true);
+    }
+
+    private function run(string $text, string $sourceKind, string $sourceId, array $context, array $hints, array $approvedLabels, bool $persist): array
+    {
         $resolved = [];
         $ambiguous = [];
         $candidateTerms = [];
@@ -36,19 +41,22 @@ final class DictionaryPlanningService
         foreach ($this->detector->detect($text, $approvedLabels, $hints) as $observation) {
             $resolution = $this->resolver->resolve((string) $observation['term'], $context);
             $conceptId = $resolution->conceptId;
-            $mention = new DictionaryMention(
-                $this->id(),
-                $this->fingerprint($sourceKind, $sourceId, $resolution->normalizedTerm, $contextHash),
-                strtoupper(trim($sourceKind)),
-                trim($sourceId),
-                $resolution->normalizedTerm,
-                $contextHash,
-                $conceptId,
-                $context,
-                (string) $observation['strength'],
-                gmdate('Y-m-d H:i:s'),
-            );
-            $this->mentions->upsert($mention);
+
+            if ($persist) {
+                $mention = new DictionaryMention(
+                    $this->id(),
+                    $this->fingerprint($sourceKind, $sourceId, $resolution->normalizedTerm, $contextHash),
+                    strtoupper(trim($sourceKind)),
+                    trim($sourceId),
+                    $resolution->normalizedTerm,
+                    $contextHash,
+                    $conceptId,
+                    $context,
+                    (string) $observation['strength'],
+                    gmdate('Y-m-d H:i:s'),
+                );
+                $this->mentions->upsert($mention);
+            }
 
             if ($resolution->status === DictionaryResolution::RESOLVED) {
                 $row = [
@@ -82,6 +90,18 @@ final class DictionaryPlanningService
                 continue;
             }
 
+            if (!$persist) {
+                $candidateTerms[] = [
+                    'candidate_id' => null,
+                    'term' => $observation['term'],
+                    'normalized_term' => $resolution->normalizedTerm,
+                    'state' => DictionaryCandidateState::NEEDS_REVIEW,
+                    'occurrences' => null,
+                    'origin' => $observation['origin'],
+                ];
+                continue;
+            }
+
             $candidate = new DictionaryCandidate(
                 $this->id(),
                 $resolution->normalizedTerm,
@@ -107,6 +127,8 @@ final class DictionaryPlanningService
         }
 
         return [
+            'status' => 'AVAILABLE',
+            'mode' => $persist ? 'PERSIST' : 'PREVIEW',
             'resolved_terms' => $resolved,
             'ambiguous_terms' => $ambiguous,
             'candidate_terms' => $candidateTerms,
