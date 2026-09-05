@@ -28,23 +28,26 @@ final class FrontendPresentationContractTest extends TestCase
         foreach (['image_url', 'thumbnail_url', "['knowledge']", "['dictionary']", '/thu-vien/', '/video/', '/tu-dien/'] as $needle) self::assertStringContainsString($needle, $source);
     }
 
-    public function test_entity_detail_renders_knowledge_gallery_and_direct_vs_derived_related_content(): void
+    public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
     {
         $source = $this->read('entity.php');
+        self::assertStringContainsString("['dossier']", $source);
         self::assertStringContainsString("['knowledge']", $source);
-        self::assertStringContainsString("['gallery']", $source);
-        self::assertStringContainsString('relationship_class', $source);
+        self::assertStringContainsString("['relation_sections']", $source);
+        self::assertStringContainsString("['origin']", $source);
         self::assertStringContainsString('Liên quan trực tiếp', $source);
         self::assertStringContainsString('Mở rộng từ quan hệ nền', $source);
         self::assertStringContainsString('nhk_v3_public_dictionary_terms_for_text', $source);
     }
 
-    public function test_article_detail_uses_canonical_media_gallery_and_separates_relation_depth(): void
+    public function test_article_detail_uses_post_dossier_canonical_media_gallery_and_path_aware_relations(): void
     {
         $source = $this->read('single.php');
+        self::assertStringContainsString('nhk_v3_post_dossier', $source);
         self::assertStringContainsString('nhk_v3_article_media_gallery', $source);
+        self::assertStringContainsString("['relation_sections']", $source);
+        self::assertStringContainsString("['origin']", $source);
         self::assertStringContainsString('default-archive.svg', $source);
-        self::assertStringContainsString('relationship_class', $source);
         self::assertStringContainsString('nhk_v3_public_dictionary_terms_for_text', $source);
     }
 
