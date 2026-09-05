@@ -52,8 +52,7 @@ final class DictionaryWordPressBridge
         $alt = (string) get_post_meta($attachmentId, '_wp_attachment_image_alt', true);
         $filename = function_exists('get_attached_file') ? basename((string) get_attached_file($attachmentId)) : '';
         $text = implode("\n", array_filter([(string) $post->post_title, (string) $post->post_excerpt, (string) $post->post_content, $alt, $filename]));
-        $hints = array_values(array_filter([(string) $post->post_title, $alt]));
-        try { $this->observe('MEDIA', (string) $attachmentId, $text, ['attachment_id' => $attachmentId, 'weak_sources' => ['filename']], $hints); }
+        try { $this->observe('MEDIA', (string) $attachmentId, $text, ['attachment_id' => $attachmentId, 'weak_sources' => ['title', 'alt', 'filename']]); }
         catch (\Throwable $error) { do_action('nhk_v3_dictionary_observation_failure', 'MEDIA', (string) $attachmentId, $error->getMessage()); }
     }
 
