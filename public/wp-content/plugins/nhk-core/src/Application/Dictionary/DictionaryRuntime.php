@@ -12,6 +12,7 @@ use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryCandidateRepository, WpdbD
 use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
+use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 
 final class DictionaryRuntime
 {
@@ -121,6 +122,48 @@ final class DictionaryRuntime
     {
         if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
         return $this->planning->plan($text, $sourceKind, $sourceId, $context, $hints, $this->detectionLabels());
+    }
+
+    public function backfillDryRun(int $limitPerKind = 500): array
+    {
+        if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
+        $limit = max(1, min(2000, $limitPerKind));
+        $sources = [];
+
+        if (function_exists('get_posts')) {
+            foreach (get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => $limit, 'orderby' => 'ID', 'order' => 'ASC', 'no_found_rows' => true]) as $post) {
+                if (!$post instanceof \WP_Post) continue;
+                $text = implode("\n", array_filter([(string) $post->post_title, (string) $post->post_excerpt, function_exists('wp_strip_all_tags') ? wp_strip_all_tags((string) $post->post_content) : strip_tags((string) $post->post_content)]));
+                if (trim($text) !== '') $sources[] = ['kind' => 'ARTICLE', 'id' => (string) $post->ID, 'text' => $text, 'context' => ['post_id' => (int) $post->ID, 'post_status' => (string) $post->post_status]];
+            }
+            foreach (get_posts(['post_type' => 'attachment', 'post_status' => 'inherit', 'post_mime_type' => 'image', 'posts_per_page' => $limit, 'orderby' => 'ID', 'order' => 'ASC', 'no_found_rows' => true]) as $post) {
+                if (!$post instanceof \WP_Post) continue;
+                $id = (int) $post->ID;
+                $alt = function_exists('get_post_meta') ? (string) get_post_meta($id, '_wp_attachment_image_alt', true) : '';
+                $filename = function_exists('get_attached_file') ? basename((string) get_attached_file($id)) : '';
+                $text = implode("\n", array_filter([(string) $post->post_title, (string) $post->post_excerpt, (string) $post->post_content, $alt, $filename]));
+                if (trim($text) !== '') $sources[] = ['kind' => 'MEDIA', 'id' => (string) $id, 'text' => $text, 'context' => ['attachment_id' => $id, 'weak_sources' => ['title', 'alt', 'filename']]];
+            }
+        }
+
+        foreach (array_slice($this->knowledge->list(), 0, $limit) as $claim) {
+            if (!$claim instanceof KnowledgeClaim || !$claim->active || trim($claim->claimText) === '') continue;
+            $sources[] = ['kind' => 'KNOWLEDGE', 'id' => $claim->canonicalId, 'text' => $claim->claimText, 'context' => ['claim_type' => $claim->claimType]];
+        }
+
+        foreach (array_slice((new WpdbVideoRepository($this->database))->list(), 0, $limit) as $video) {
+            if (!is_object($video) || !($video->active ?? false)) continue;
+            $metadata = is_array($video->metadata ?? null) ? $video->metadata : [];
+            $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : [];
+            $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
+            $parts = [(string) ($video->title ?? ''), (string) ($source['source_title'] ?? ''), (string) ($source['source_description'] ?? ''), (string) ($editorial['summary'] ?? '')];
+            foreach ((array) ($source['tags'] ?? []) as $tag) if (is_string($tag)) $parts[] = $tag;
+            $text = implode("\n", array_filter(array_map('trim', $parts)));
+            if ($text === '') continue;
+            $sources[] = ['kind' => 'VIDEO', 'id' => (string) ($video->canonicalId ?? ''), 'text' => $text, 'context' => ['platform' => (string) ($video->platform ?? ''), 'external_video_id' => (string) ($video->externalVideoId ?? '')]];
+        }
+
+        return (new DictionaryBackfillDryRun(fn (string $text, string $kind, array $context, array $hints): array => $this->preview($text, $kind, '', $context, $hints)))->scan($sources);
     }
 
     public function publicTerms(): array
