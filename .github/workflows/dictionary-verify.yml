@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  lint-unit:
+  lint-unit-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,10 +34,13 @@ jobs:
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite 'NHK Unit'
 
-  dictionary-integration:
-    needs: lint-unit
+      - name: Contract tests
+        run: vendor/bin/phpunit --testsuite 'NHK Contract'
+
+  full-integration:
+    needs: lint-unit-contract
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       mysql:
         image: mysql:8.0
@@ -72,8 +75,8 @@ jobs:
           ADMIN_PASS="$(openssl rand -hex 16)"
           wp core install --path=public --url=http://localhost --title='NHK V3 Test' --admin_user=admin --admin_password="$ADMIN_PASS" --admin_email=test@example.test --skip-email
 
-      - name: Dictionary migration integration
+      - name: Full integration tests
         env:
           NHK_WP_TEST_PATH: public
           NHK_WP_TEST_DB: nhk_v3_test
-        run: vendor/bin/phpunit public/wp-content/plugins/nhk-core/tests/Integration/DictionaryMigration015IntegrationTest.php
+        run: vendor/bin/phpunit --testsuite 'NHK Integration'
