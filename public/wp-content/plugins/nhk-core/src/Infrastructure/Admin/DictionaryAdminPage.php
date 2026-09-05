@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Admin;
 
 use NHK\Core\Application\Dictionary\DictionaryRuntime;
-use NHK\Core\Domain\Dictionary\{DictionaryCandidateState, DictionaryLabel};
+use NHK\Core\Domain\Dictionary\{DictionaryCandidateState, DictionaryConcept, DictionaryLabel};
 
 final class DictionaryAdminPage
 {
@@ -13,12 +13,11 @@ final class DictionaryAdminPage
     public static function register(DictionaryRuntime $runtime): void
     {
         self::$runtime = $runtime;
-        add_action('admin_menu', static function (): void {
-            add_submenu_page('nhk-v3', 'Từ điển', 'Từ điển', 'nhk_curate_dictionary', 'nhk-v3-dictionary', [self::class, 'render']);
-        }, 20);
+        add_action('admin_menu', static function (): void { add_submenu_page('nhk-v3', 'Từ điển', 'Từ điển', 'nhk_curate_dictionary', 'nhk-v3-dictionary', [self::class, 'render']); }, 20);
         add_action('admin_post_nhk_dictionary_decide', [self::class, 'decide']);
         add_action('admin_post_nhk_dictionary_draft', [self::class, 'draft']);
         add_action('admin_post_nhk_dictionary_attach', [self::class, 'attach']);
+        add_action('admin_post_nhk_dictionary_approve', [self::class, 'approve']);
     }
 
     public static function render(): void
@@ -27,10 +26,35 @@ final class DictionaryAdminPage
         $runtime = self::$runtime;
         echo '<div class="wrap"><h1>Từ điển — hộp thư duyệt</h1>';
         if (!$runtime || !$runtime->available()) { echo '<div class="notice notice-warning"><p>Dictionary storage chưa sẵn sàng. Không hiển thị kết quả rỗng giả.</p></div></div>'; return; }
+        echo '<p>Candidate tự động chỉ là gợi ý; không tự tạo Knowledge, Evidence hay Graph relation.</p>';
+        self::renderDrafts($runtime);
+        self::renderCandidates($runtime);
+        echo '</div>';
+    }
+
+    private static function renderDrafts(DictionaryRuntime $runtime): void
+    {
+        $drafts = $runtime->concepts()->listByStatus(DictionaryConcept::DRAFT, 200);
+        echo '<h2>Mục từ nháp</h2>';
+        if ($drafts === []) { echo '<p>Không có mục nháp.</p>'; return; }
+        echo '<table class="widefat striped"><thead><tr><th>Tên</th><th>Định nghĩa</th><th>Revision</th><th>Canonical destination</th><th>Thao tác</th></tr></thead><tbody>';
+        foreach ($drafts as $concept) {
+            echo '<tr><td><strong>' . esc_html($concept->preferredLabel) . '</strong><br><code>' . esc_html($concept->conceptId) . '</code></td><td>' . esc_html($concept->definition) . '</td><td>' . esc_html((string) $concept->revision) . '</td><td>';
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">'; self::nonce();
+            echo '<input type="hidden" name="action" value="nhk_dictionary_approve"><input type="hidden" name="concept_id" value="' . esc_attr($concept->conceptId) . '"><input type="hidden" name="revision" value="' . esc_attr((string) $concept->revision) . '">';
+            echo '<p><input name="public_slug" value="' . esc_attr((string) ($concept->context['public_slug'] ?? '')) . '" placeholder="slug riêng"></p>';
+            echo '<p><input name="destination_type" value="' . esc_attr((string) ($concept->destinationType ?? '')) . '" placeholder="owner type"></p><p><input name="destination_id" value="' . esc_attr((string) ($concept->destinationId ?? '')) . '" placeholder="owner id" size="38"></p><p><input name="destination_url" value="' . esc_attr((string) ($concept->destinationUrl ?? '')) . '" placeholder="/canonical/url/" size="38"></p>';
+            echo '</td><td><button class="button button-primary">Duyệt mục từ</button></form></td></tr>';
+        }
+        echo '</tbody></table>';
+    }
+
+    private static function renderCandidates(DictionaryRuntime $runtime): void
+    {
         $items = $runtime->candidates()->listForReview(200);
-        echo '<p>Candidate tự động chỉ là gợi ý. Duyệt tại đây không tự tạo Knowledge, Evidence hay Graph relation.</p>';
-        if ($items === []) { echo '<p>Không có candidate cần duyệt.</p></div>'; return; }
-        echo '<table class="widefat striped"><thead><tr><th>Thuật ngữ</th><th>Nguồn/ngữ cảnh</th><th>Lần gặp</th><th>Gợi ý xử lý</th><th>Thao tác</th></tr></thead><tbody>';
+        echo '<h2>Candidate cần xem</h2>';
+        if ($items === []) { echo '<p>Không có candidate cần duyệt.</p>'; return; }
+        echo '<table class="widefat striped"><thead><tr><th>Thuật ngữ</th><th>Nguồn/ngữ cảnh</th><th>Lần gặp</th><th>Gợi ý</th><th>Thao tác</th></tr></thead><tbody>';
         foreach ($items as $candidate) {
             $raw = implode(', ', array_map('strval', $candidate->rawForms));
             $context = (string) wp_json_encode($candidate->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -43,14 +67,13 @@ final class DictionaryAdminPage
             echo '<input type="hidden" name="action" value="nhk_dictionary_attach"><input type="hidden" name="candidate_id" value="' . esc_attr($candidate->candidateId) . '"><input type="hidden" name="revision" value="' . esc_attr((string) $candidate->revision) . '"><p><input name="concept_id" placeholder="Concept UUID" required size="38"></p><p><select name="label_kind"><option value="ALTERNATE">Alias</option><option value="COLLOQUIAL">Dân gian</option><option value="TECHNICAL">Kỹ thuật</option><option value="PHONETIC">Phiên âm</option></select></p><button class="button">Gắn</button></form></details>';
             echo '</td></tr>';
         }
-        echo '</tbody></table></div>';
+        echo '</tbody></table>';
     }
 
     public static function decide(): void
     {
         self::authorize(); self::verifyNonce();
-        $state = sanitize_key((string) ($_POST['state'] ?? '')); $state = strtoupper($state);
-        self::$runtime?->curation()->decide(self::candidateId(), self::revision(), $state);
+        self::$runtime?->curation()->decide(self::candidateId(), self::revision(), strtoupper(sanitize_key((string) ($_POST['state'] ?? ''))));
         self::redirect();
     }
 
@@ -64,9 +87,19 @@ final class DictionaryAdminPage
     public static function attach(): void
     {
         self::authorize(); self::verifyNonce();
-        $kind = strtoupper(sanitize_key((string) ($_POST['label_kind'] ?? DictionaryLabel::ALTERNATE)));
-        self::$runtime?->curation()->attachToExisting(self::candidateId(), self::revision(), sanitize_text_field((string) ($_POST['concept_id'] ?? '')), $kind, 'vi-VN');
+        self::$runtime?->curation()->attachToExisting(self::candidateId(), self::revision(), sanitize_text_field((string) ($_POST['concept_id'] ?? '')), strtoupper(sanitize_key((string) ($_POST['label_kind'] ?? DictionaryLabel::ALTERNATE))), 'vi-VN');
         self::$runtime?->invalidateLabelCache(); self::redirect();
+    }
+
+    public static function approve(): void
+    {
+        self::authorize(); self::verifyNonce();
+        $runtime = self::$runtime; if (!$runtime) wp_die('Dictionary runtime unavailable.');
+        $conceptId = sanitize_text_field((string) ($_POST['concept_id'] ?? ''));
+        $current = $runtime->concepts()->findById($conceptId); if (!$current) wp_die('Dictionary concept not found.');
+        $slug = sanitize_title((string) ($_POST['public_slug'] ?? ($current->context['public_slug'] ?? '')));
+        $runtime->curation()->approveConcept($conceptId, self::revision(), self::nullable('destination_type'), self::nullable('destination_id'), self::nullable('destination_url'), ['public_slug' => $slug]);
+        $runtime->invalidateLabelCache(); self::redirect();
     }
 
     private static function decisionForm(string $id, int $revision, string $state, string $label): void
@@ -80,5 +113,6 @@ final class DictionaryAdminPage
     private static function authorize(): void { if (!current_user_can('nhk_curate_dictionary')) wp_die('Dictionary curation capability required.'); }
     private static function candidateId(): string { return sanitize_text_field((string) ($_POST['candidate_id'] ?? '')); }
     private static function revision(): int { return max(1, (int) ($_POST['revision'] ?? 0)); }
+    private static function nullable(string $key): ?string { $value = trim(sanitize_text_field((string) ($_POST[$key] ?? ''))); return $value === '' ? null : $value; }
     private static function redirect(): void { wp_safe_redirect(admin_url('admin.php?page=nhk-v3-dictionary')); exit; }
 }
