@@ -18,7 +18,7 @@ final class PublicRouteResolver
 
     /** @var list<string> */
     private const RESERVED_ROOTS = [
-        'thuong-hieu', 'mau', 'tri-thuc', 'so-sanh', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai',
+        'thuong-hieu', 'mau', 'tri-thuc', 'tu-dien', 'so-sanh', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai',
         'hien-vat', 'san-pham', 'video', 'goc-chia-se', 'thu-vien', 'media',
         'wp-admin', 'wp-json', 'wp-content', 'wp-includes', 'feed', 'search', 'sitemap', 'category', 'tag', 'author', 'knowledge',
         'brand', 'model', 'movement', 'music', 'component', 'classification', 'specimen', 'product', 'comparison',
