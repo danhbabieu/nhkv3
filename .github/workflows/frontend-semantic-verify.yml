@@ -1,0 +1,30 @@
+name: Frontend semantic verification
+on:
+  push:
+    branches: [feature/frontend-semantic-projection-v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Diff check
+        run: |
+          git fetch origin main
+          git diff --check origin/main...HEAD
+      - name: PHP lint
+        run: composer lint
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite 'NHK Unit'
