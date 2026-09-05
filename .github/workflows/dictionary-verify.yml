@@ -1,0 +1,35 @@
+name: Dictionary verification
+
+on:
+  push:
+    branches:
+      - feature/dictionary-lexical-knowledge
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHP syntax lint
+        run: composer lint
+
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite 'NHK Unit'
