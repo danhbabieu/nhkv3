@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" role="img" aria-labelledby="title desc">
+  <title id="title">Hình minh họa kho sưu tầm</title>
+  <desc id="desc">Họa tiết đồng hồ cổ tối giản dùng khi bài viết chưa có ảnh hiển thị.</desc>
+  <rect width="1200" height="750" fill="#eee7dd"/>
+  <rect x="72" y="72" width="1056" height="606" rx="12" fill="#f8f4ed" stroke="#cdbfae" stroke-width="3"/>
+  <circle cx="600" cy="330" r="165" fill="none" stroke="#8c4f2f" stroke-width="10"/>
+  <circle cx="600" cy="330" r="12" fill="#8c4f2f"/>
+  <path d="M600 330 L600 220 M600 330 L690 375" fill="none" stroke="#5d5147" stroke-width="12" stroke-linecap="round"/>
+  <path d="M600 495 C545 545 545 610 600 642 C655 610 655 545 600 495Z" fill="none" stroke="#b18a5a" stroke-width="8"/>
+  <path d="M480 150 Q600 85 720 150" fill="none" stroke="#cdbfae" stroke-width="4"/>
+  <text x="600" y="690" text-anchor="middle" fill="#70685f" font-family="Georgia, serif" font-size="30" letter-spacing="5">KHO SƯU TẦM</text>
+</svg>

@@ -3,22 +3,25 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class EntityPageQuery
 {
+    private const EMPTY_RELATED = ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
+
     public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null) {}
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
     public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
     public function detailForEntity(AuthorityEntity $entity): ?array
     {
-        if ($this->collection !== null) return $this->collection->detailForEntity($entity);
+        if ($this->collection !== null) return $this->withRelated($this->collection->detailForEntity($entity), $entity);
         if (!$this->types->has($entity->entityType) || !$entity->active() || $this->publicPath($entity) === null) return null;
-        return $this->serialize($entity);
+        return $this->withRelated($this->serialize($entity), $entity);
     }
     public function publicPathForKey(string $type, string $key): ?string
     {
@@ -34,20 +37,15 @@ final class EntityPageQuery
     {
         if ($this->collection !== null) {
             $item = $this->collection->detail($type, $key);
-            if ($item !== null) {
-                $entity = $this->collection->resolvePublicSlug($type, $key);
-                $item['related'] = $entity === null ? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []] : ($this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []]);
-            }
-            return $item;
+            $entity = $item === null ? null : $this->collection->resolvePublicSlug($type, $key);
+            return $item === null ? null : $this->withRelated($item, $entity);
         }
         if (!$this->types->has($type) || !$this->available()) return null;
         $entity = $this->entityForPublicSlug($type, $key);
         if (!$entity || $entity->entityType !== $type || !$entity->active()) return null;
-        $serialized = $this->serialize($entity); $serialized['related'] = $this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
-        return $serialized;
+        return $this->withRelated($this->serialize($entity), $entity);
     }
 
-    /** Return a canonical stable key for a legacy visitor-facing slug only when the match is unambiguous. */
     public function stableKeyForPublicSlug(string $type, string $slug): ?string
     {
         if ($this->collection !== null) return $this->collection->stableKeyForPublicSlug($type, $slug);
@@ -60,7 +58,6 @@ final class EntityPageQuery
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    /** @return array{type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
     public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
     {
         if ($this->collection !== null) return $this->collection->archive($type, $page, $perPage, $query);
@@ -76,7 +73,34 @@ final class EntityPageQuery
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
-    private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
+    private function withRelated(?array $item, ?AuthorityEntity $entity): ?array
+    {
+        if ($item === null) return null;
+        $item['related'] = $entity === null ? self::EMPTY_RELATED : ($this->related?->forEntity($entity->entityType, $entity->canonicalId) ?? self::EMPTY_RELATED);
+        if ($entity !== null && function_exists('apply_filters')) {
+            $enriched = apply_filters('nhk_v3_entity_detail_projection', $item, $entity);
+            if (is_array($enriched)) $item = $enriched;
+        }
+        return $item;
+    }
+
+    private function serialize(AuthorityEntity $entity): array
+    {
+        $payload = (new PublicIdentityContract($this->types))->payload($entity);
+        $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload];
+        $path = $this->publicPath($entity);
+        if ($path !== null) {
+            $item['url'] = (new PublicSeoProjection())->project([
+                'path' => $path,
+                'eligible' => true,
+                'readiness' => SeoReadinessResult::READY,
+                'canonical_url' => $path,
+                'public_eligible' => true,
+            ], ['type' => 'Entity'])['card'];
+        }
+        return $item;
+    }
+
     private function entityForPublicSlug(string $type, string $slug): ?AuthorityEntity
     {
         if (!$this->types->has($type)) return null;
@@ -88,7 +112,6 @@ final class EntityPageQuery
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
-    /** @return list<string> */
     private function routeSegments(string $type, string $slug): array
     {
         $namespace = PublicRouteResolver::namespaceFor($type);
