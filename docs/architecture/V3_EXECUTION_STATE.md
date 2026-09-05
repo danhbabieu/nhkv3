@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+## Connected Media + Video transport design checkpoint — 2026-09-05
+
+The current transport gap and its approved design are recorded in
+`docs/superpowers/specs/2026-09-05-connected-media-video-transport-design.md`.
+The investigation confirms that raw multipart Media intake exists, while the
+WordPress Ability bridge intentionally excludes it and therefore cannot accept
+an attached file from a JSON-only connected app. The current direct file branch
+also creates the WordPress attachment before canonical adoption/read-back has
+completed, does not fully compensate every later failure, and stores the
+source-original beneath the public uploads tree despite semantic `PRIVATE`
+metadata. These are implementation conflicts to resolve, not permission to
+weaken the Constitution.
+
+The selected design retains raw multipart as one transport, adds a bounded
+connector upload-session fallback, binds sealed bytes into the normal Proposal
+lifecycle, and converges both paths at one controlled-apply Media service with
+protected source storage, public derivative projection, artifact-journal
+cleanup and canonical read-back. The existing governed Video/Proposal Ability
+bridge remains the only Video write flow and gains catalog, permission and
+runtime parity evidence rather than a second writer.
+
+This checkpoint changes documentation only. No Media, attachment, Video,
+Proposal, Graph, WordPress content, database, deployment or live data was
+created or mutated. PHP, Composer and PHPUnit are unavailable in the current
+scratch runtime; implementation verification is therefore not claimed.
+
 ## Governed SEO Projection consumer-wiring continuation — 2026-09-04
 
 Concrete consumer audit and read-only wiring are complete for the approved SEO
