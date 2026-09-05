@@ -38,9 +38,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         $collection = new PublicEntityCollectionQuery($authorityRepo, $types, new PublicIdentityContract($types), new PublicEntityEligibilityPolicy($authorityRepo, $types, $routes), $routes);
         $related = new RelatedContentQuery($graph, $authorityRepo, $this->mediaRepository([]), $this->videoRepository([]), $types);
         $query = new EntityPageQuery($authorityRepo, $types, $related, null, $routes, $collection);
-
         $detail = $query->detailForEntity($brand);
-
         self::assertIsArray($detail);
         self::assertSame('Model A', $detail['related']['entities'][0]['title'] ?? null);
     }
@@ -75,9 +73,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         $privateClaim = new KnowledgeClaim(UuidCodec::newV7(), 'claim-c', 'Chưa xác minh.', 'fact', ['metadata' => ['subject_id' => $subjectId, 'facet' => 'recognition', 'scope' => 'movement', 'verification_status' => 'UNVERIFIED']]);
         $evidence = new Evidence(UuidCodec::newV7(), $claimId, $source->canonicalId, 'supports', 'Trích đoạn hỗ trợ', 'p.1', true, 1, ['visibility' => 'PUBLIC']);
         $projection = new EntityKnowledgeProjection($this->knowledgeRepository([$publicClaim, $otherClaim, $privateClaim]), $this->evidenceRepository([$evidence]), $this->sourceRepository([$source]));
-
         $result = $projection->forSubject($subjectId);
-
         self::assertSame('AVAILABLE', $result['status']);
         self::assertCount(1, $result['facets']['movement'] ?? []);
         self::assertSame('Khác biệt nằm ở tỷ số truyền phía bộ thoát.', $result['facets']['movement'][0]['text'] ?? null);
@@ -152,6 +148,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
             public function create(Evidence $evidence): Evidence { return $evidence; }
             public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
             public function listByClaim(string $claimId, bool $includeRetired = false): array { return array_values(array_filter($this->items, static fn(Evidence $item): bool => $item->claimId === $claimId)); }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return array_values(array_filter($this->items, static fn(Evidence $item): bool => $item->sourceId === $sourceId)); }
         };
     }
 
