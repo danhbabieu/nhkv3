@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Dictionary;
 
 use NHK\Core\Application\Dictionary\{DictionaryObservationRegistry, DictionaryRuntime};
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Infrastructure\Admin\DictionaryAdminPage;
+use NHK\Core\Infrastructure\Admin\{DictionaryAdminPage, DictionaryBackfillAdminPage};
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 
 final class DictionaryBootstrap
@@ -27,6 +27,7 @@ final class DictionaryBootstrap
         );
         (new DictionaryWordPressBridge(self::$runtime))->register();
         DictionaryAdminPage::register(self::$runtime);
+        DictionaryBackfillAdminPage::register(self::$runtime);
         GovernanceCapabilities::register();
 
         if ((string) get_option('nhk_dictionary_rewrite_version', '') !== '1') {
