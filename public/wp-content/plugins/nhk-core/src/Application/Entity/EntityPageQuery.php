@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
+use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class EntityPageQuery
@@ -82,7 +84,23 @@ final class EntityPageQuery
         return $item;
     }
 
-    private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
+    private function serialize(AuthorityEntity $entity): array
+    {
+        $payload = (new PublicIdentityContract($this->types))->payload($entity);
+        $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload];
+        $path = $this->publicPath($entity);
+        if ($path !== null) {
+            $item['url'] = (new PublicSeoProjection())->project([
+                'path' => $path,
+                'eligible' => true,
+                'readiness' => SeoReadinessResult::READY,
+                'canonical_url' => $path,
+                'public_eligible' => true,
+            ], ['type' => 'Entity'])['card'];
+        }
+        return $item;
+    }
+
     private function entityForPublicSlug(string $type, string $slug): ?AuthorityEntity
     {
         if (!$this->types->has($type)) return null;
