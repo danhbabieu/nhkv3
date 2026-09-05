@@ -3,14 +3,13 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Video\{Video, VideoException};
 
 final class VideoService
 {
-    public function __construct(private VideoRepository $videos, private $dictionaryObserver = null)
-    {
-    }
+    public function __construct(private VideoRepository $videos, private $dictionaryObserver = null) {}
 
     public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null): Video
     {
@@ -47,13 +46,16 @@ final class VideoService
 
     private function observe(Video $video): void
     {
-        if (!is_callable($this->dictionaryObserver)) return;
         $source = is_array($video->metadata['source'] ?? null) ? $video->metadata['source'] : [];
         $editorial = is_array($video->metadata['editorial'] ?? null) ? $video->metadata['editorial'] : [];
         $parts = [$video->title, (string) ($source['source_title'] ?? ''), (string) ($source['source_description'] ?? ''), (string) ($editorial['summary'] ?? '')];
         foreach ((array) ($source['tags'] ?? []) as $tag) if (is_string($tag)) $parts[] = $tag;
         $text = implode("\n", array_values(array_filter(array_map('trim', $parts))));
-        try { ($this->dictionaryObserver)('VIDEO', $video->canonicalId, $text, ['platform' => $video->platform, 'external_video_id' => $video->externalVideoId, 'semantic_attachments' => $video->metadata['semantic_attachments'] ?? []]); }
-        catch (\Throwable) { /* lexical observation is non-blocking after canonical write */ }
+        $context = ['platform' => $video->platform, 'external_video_id' => $video->externalVideoId, 'semantic_attachments' => $video->metadata['semantic_attachments'] ?? []];
+        if (is_callable($this->dictionaryObserver)) {
+            try { ($this->dictionaryObserver)('VIDEO', $video->canonicalId, $text, $context); } catch (\Throwable) {}
+            return;
+        }
+        DictionaryObservationRegistry::observe('VIDEO', $video->canonicalId, $text, $context);
     }
 }
