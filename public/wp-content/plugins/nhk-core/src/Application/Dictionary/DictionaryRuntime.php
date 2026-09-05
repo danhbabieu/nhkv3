@@ -77,10 +77,29 @@ final class DictionaryRuntime
         $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner());
         $this->curation = new DictionaryCurationService($this->candidates, $this->concepts, null, $this->normalizer);
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
-        $this->publicQuery = new DictionaryPublicQuery($this->concepts, static function (string $conceptId) use ($mediaProjection): ?array {
-            $projection = $mediaProjection->forEntity('dictionary_concept', $conceptId);
-            return is_array($projection['representative'] ?? null) ? $projection['representative'] : null;
-        });
+        $this->publicQuery = new DictionaryPublicQuery(
+            $this->concepts,
+            static function (string $conceptId) use ($mediaProjection): ?array {
+                $projection = $mediaProjection->forEntity('dictionary_concept', $conceptId);
+                return is_array($projection['representative'] ?? null) ? $projection['representative'] : null;
+            },
+            function (?string $type, ?string $id, ?string $url): bool {
+                $type = trim((string) $type); $id = trim((string) $id); $url = trim((string) $url);
+                if ($type === '' || $id === '' || $url === '') return false;
+                if ($this->types->has($type)) {
+                    $entity = $this->authority->findByCanonicalId($id);
+                    return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active() && $this->sameUrl($this->routes->path($entity), $url);
+                }
+                if ($type === 'article' && function_exists('get_post')) {
+                    $postId = (int) preg_replace('/^.*:/', '', $id);
+                    $post = $postId > 0 ? get_post($postId) : null;
+                    if (!$post instanceof \WP_Post || $post->post_type !== 'post' || $post->post_status !== 'publish') return false;
+                    $permalink = function_exists('get_permalink') ? get_permalink($post) : false;
+                    return is_string($permalink) && $this->sameUrl($permalink, $url);
+                }
+                return false;
+            },
+        );
     }
 
     public function available(): bool
@@ -158,6 +177,19 @@ final class DictionaryRuntime
         $forms = [$entity->canonicalName];
         foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) if (is_string($alias) && trim($alias) !== '') $forms[] = trim($alias);
         return array_values(array_unique($forms));
+    }
+
+    private function sameUrl(?string $left, ?string $right): bool
+    {
+        if ($left === null || $right === null) return false;
+        $normalize = static function (string $value): string {
+            $value = trim($value);
+            if ($value === '') return '';
+            $parts = function_exists('wp_parse_url') ? wp_parse_url($value) : parse_url($value);
+            if (is_array($parts) && isset($parts['path'])) return '/' . trim((string) $parts['path'], '/') . '/';
+            return '/' . trim($value, '/') . '/';
+        };
+        return $normalize($left) === $normalize($right);
     }
 
     private function contextHash(array $context): string
