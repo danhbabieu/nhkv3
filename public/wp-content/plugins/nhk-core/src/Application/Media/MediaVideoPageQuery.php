@@ -45,7 +45,16 @@ final class MediaVideoPageQuery
     public function videoArchive(int $page = 1, int $perPage = 12): array { return $this->archive($this->available('video') ? $this->videos->list() : [], $page, $perPage, fn (Video $item): array => $this->video($item), static fn (object $item): bool => $item->active && $item->hasValidPublicReference()); }
     private function available(string $domain): bool { return !$this->status || ($domain === 'media' ? $this->status->mediaStorageReady() : $this->status->videoStorageReady()); }
     private function archive(array $items, int $page, int $perPage, callable $map, ?callable $filter = null): array { $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $items = array_values(array_filter($items, $filter ?? static fn (object $item): bool => $item->active)); $items = array_map($map, $items); return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)]; }
-    private function asset(MediaAsset $asset): array { return ['kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height]; }
+
+    private function asset(MediaAsset $asset): array
+    {
+        $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== ''
+            ? (string) $asset->metadata['canonical_filename']
+            : basename(str_replace('\\', '/', $asset->storageKey));
+        $publicUrl = $filename === '' ? null : (new PublicMediaAssetUrlResolver())->path($filename);
+        return ['kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'public_url' => $publicUrl];
+    }
+
     private function usage(MediaUsage $usage): array { return ['role' => $usage->role, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption]; }
 
     private function video(Video $video): array
