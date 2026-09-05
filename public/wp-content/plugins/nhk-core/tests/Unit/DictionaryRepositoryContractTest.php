@@ -30,7 +30,8 @@ final class DictionaryRepositoryContractTest extends TestCase
         $hash = hash('sha256', '{}');
         $first = new DictionaryCandidate('c1', 'côn lòng máng', $hash, ['Côn lòng máng'], DictionaryCandidateState::NEEDS_REVIEW, [], [], 1, '2026-09-05 01:00:00', '2026-09-05 01:00:00');
         $second = new DictionaryCandidate('c2', 'côn lòng máng', $hash, ['côn lòng máng'], DictionaryCandidateState::NEEDS_REVIEW, [], [], 1, '2026-09-05 02:00:00', '2026-09-05 02:00:00');
-        self::assertSame(2, $repo->upsertObservation($repo->upsertObservation($first) && $second)->occurrences);
+        $repo->upsertObservation($first);
+        self::assertSame(2, $repo->upsertObservation($second)->occurrences);
 
         $current = $repo->listForReview()[0];
         $suppressed = new DictionaryCandidate($current->candidateId, $current->normalizedTerm, $current->contextHash, $current->rawForms, DictionaryCandidateState::DO_NOT_SUGGEST, $current->context, $current->suggestions, $current->occurrences, $current->firstSeenAt, $current->lastSeenAt, $current->revision + 1);
