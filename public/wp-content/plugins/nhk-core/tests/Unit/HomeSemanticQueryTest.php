@@ -36,7 +36,7 @@ final class HomeSemanticQueryTest extends TestCase
         $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepo, $this->videos([$video]), new EntityTypeRegistry(), null, null, null, $gallery))
             ->extend(['entities' => [], 'media' => [], 'videos' => []]);
 
-        self::assertStringContainsString('/anh/front.jpg', (string) ($modules['media'][0]['image_url'] ?? ''));
+        self::assertStringContainsString('/anh/front.webp', (string) ($modules['media'][0]['image_url'] ?? ''));
         self::assertArrayNotHasKey('url', $modules['media'][0]);
         self::assertSame('https://img.example.test/video.jpg', $modules['videos'][0]['thumbnail_url'] ?? null);
     }
