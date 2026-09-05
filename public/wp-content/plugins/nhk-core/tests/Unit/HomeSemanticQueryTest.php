@@ -33,7 +33,7 @@ final class HomeSemanticQueryTest extends TestCase
         $mediaRepo = $this->media([$media]);
         $gallery = new PublicMediaGalleryQuery($mediaRepo, $this->assets([$asset]));
 
-        $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepo, $this->videos([$video]), new EntityTypeRegistry(), null, $gallery))
+        $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepo, $this->videos([$video]), new EntityTypeRegistry(), null, null, null, $gallery))
             ->extend(['entities' => [], 'media' => [], 'videos' => []]);
 
         self::assertStringContainsString('/anh/front.jpg', (string) ($modules['media'][0]['image_url'] ?? ''));
