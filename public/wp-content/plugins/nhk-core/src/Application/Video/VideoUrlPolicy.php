@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoUrlPolicy
@@ -14,7 +15,12 @@ final class VideoUrlPolicy
         $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
         $blockers = [];
         $slug = trim((string) ($identity['current_slug'] ?? ''));
-        if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
+        $normalizedSlug = (new CanonicalPublicSlugPolicy())->slug($slug);
+        if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
+            $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
+        } elseif ($normalizedSlug !== $slug) {
+            $blockers[] = 'PUBLIC_IDENTITY_REPROJECTION_REQUIRED';
+        }
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
 
         $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
@@ -33,7 +39,9 @@ final class VideoUrlPolicy
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';
         $eligible = $blockers === [];
         return [
-            'path' => $eligible ? '/video/' . $slug . '-' . strtolower($video->externalVideoId) . '/' : null,
+            // External/source IDs remain metadata identity only. The public
+            // watch route is the persisted canonical slug and nothing else.
+            'path' => $eligible ? '/video/' . $slug . '/' : null,
             'eligible' => $eligible,
             'blockers' => array_values(array_unique($blockers)),
             'warnings' => [],
