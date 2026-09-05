@@ -56,7 +56,7 @@ final class FrontendSemanticProjectionV2Test extends TestCase
             $gallery = new PublicMediaGalleryQuery($mediaRepo, $assetRepo, new PublicMediaAssetDelivery($assetRepo, $mediaRepo, $root));
             $item = $gallery->archive(1, 12)['items'][0] ?? [];
             self::assertSame('Ảnh mặt trước', $item['title'] ?? null);
-            self::assertStringContainsString('/anh/front.jpg', (string) ($item['image_url'] ?? ''));
+            self::assertStringContainsString('/anh/front.webp', (string) ($item['image_url'] ?? ''));
             self::assertArrayNotHasKey('url', $item);
             self::assertArrayNotHasKey('media_id', $item);
         } finally {
