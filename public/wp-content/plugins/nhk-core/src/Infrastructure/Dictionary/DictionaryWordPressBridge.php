@@ -18,6 +18,8 @@ final class DictionaryWordPressBridge
                 if (isset($sitemaps->registry) && is_object($sitemaps->registry) && method_exists($sitemaps->registry, 'add_provider')) $sitemaps->registry->add_provider('dictionary', new WordPressDictionarySitemapProvider($this->runtime->publicQuery()));
             });
             add_filter('nhk_v3_search_semantic_results', [$this, 'extendSearch'], 20, 3);
+            add_filter('nhk_v3_home_semantic_modules', [$this, 'extendHome'], 30, 1);
+            add_filter('nhk_v3_public_dictionary_terms_for_text', [$this, 'termsForText'], 10, 2);
             add_filter('the_content', [$this, 'linkContent'], 20);
         }
         add_action('wp_after_insert_post', [$this, 'observePost'], 40, 3);
@@ -72,6 +74,51 @@ final class DictionaryWordPressBridge
         $groups['_totals']['dictionary'] = count($items);
         $groups['_availability']['dictionary'] = 'AVAILABLE';
         return $groups;
+    }
+
+    public function extendHome(array $modules): array
+    {
+        $modules['dictionary'] = [];
+        if (!$this->runtime->available()) return $modules;
+        foreach ((array) ($this->runtime->publicQuery()->hub(12)['items'] ?? []) as $item) {
+            if (!is_array($item) || empty($item['url']) || trim((string) ($item['title'] ?? '')) === '') continue;
+            $modules['dictionary'][] = [
+                'title' => (string) $item['title'],
+                'url' => (string) $item['url'],
+                'description' => (string) ($item['description'] ?? ''),
+                'term_type' => (string) ($item['term_type'] ?? ''),
+            ];
+            if (count($modules['dictionary']) >= 8) break;
+        }
+        return $modules;
+    }
+
+    /**
+     * Lexical-only lookup for a rendered page. This does not assert a semantic
+     * relation; it only returns already approved Dictionary concepts whose
+     * public label literally occurs in the supplied visitor-facing text.
+     */
+    public function termsForText(array $value, string $text): array
+    {
+        if (!$this->runtime->available() || trim($text) === '') return $value;
+        $seen = [];
+        foreach ((array) ($this->runtime->publicQuery()->hub(1000)['items'] ?? []) as $item) {
+            if (!is_array($item) || empty($item['url'])) continue;
+            $labels = [(string) ($item['title'] ?? '')];
+            foreach ((array) ($item['labels'] ?? []) as $label) if (is_array($label)) $labels[] = (string) ($label['label'] ?? '');
+            $matched = false;
+            foreach ($labels as $label) {
+                $label = trim($label);
+                if ($label !== '' && (function_exists('mb_stripos') ? mb_stripos($text, $label) : stripos($text, $label)) !== false) { $matched = true; break; }
+            }
+            if (!$matched) continue;
+            $key = (string) $item['url'];
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $value[] = ['title' => (string) ($item['title'] ?? ''), 'url' => $key, 'description' => (string) ($item['description'] ?? '')];
+            if (count($value) >= 8) break;
+        }
+        return $value;
     }
 
     public function linkContent(string $content): string
