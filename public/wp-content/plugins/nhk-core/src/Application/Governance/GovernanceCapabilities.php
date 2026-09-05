@@ -7,7 +7,7 @@ use NHK\Core\Governance\Exception\GovernancePermissionDenied;
 
 final class GovernanceCapabilities
 {
-    public const ALL = ['nhk_view_governance','nhk_create_proposals','nhk_submit_proposals','nhk_approve_proposals','nhk_apply_proposals','nhk_ingest_articles'];
+    public const ALL = ['nhk_view_governance','nhk_create_proposals','nhk_submit_proposals','nhk_approve_proposals','nhk_apply_proposals','nhk_ingest_articles','nhk_curate_dictionary'];
     public static function register(): void {
         foreach (self::ALL as $capability) {
             $role = get_role('administrator');
