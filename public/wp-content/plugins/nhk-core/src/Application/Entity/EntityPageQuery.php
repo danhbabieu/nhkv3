@@ -15,14 +15,12 @@ final class EntityPageQuery
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
     public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
-
     public function detailForEntity(AuthorityEntity $entity): ?array
     {
         if ($this->collection !== null) return $this->withRelated($this->collection->detailForEntity($entity), $entity);
         if (!$this->types->has($entity->entityType) || !$entity->active() || $this->publicPath($entity) === null) return null;
         return $this->withRelated($this->serialize($entity), $entity);
     }
-
     public function publicPathForKey(string $type, string $key): ?string
     {
         if ($this->collection !== null) return $this->collection->publicPathForStableKey($type, $key);
@@ -30,7 +28,6 @@ final class EntityPageQuery
         $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
         return $entity && $entity->entityType === $type && $entity->active() ? $this->publicPath($entity) : null;
     }
-
     /** @param list<string> $segments */
     public function resolvePublic(string $type, array $segments): ?AuthorityEntity { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->resolve($type, $segments); }
 
@@ -47,7 +44,6 @@ final class EntityPageQuery
         return $this->withRelated($this->serialize($entity), $entity);
     }
 
-    /** Return a canonical stable key for a legacy visitor-facing slug only when the match is unambiguous. */
     public function stableKeyForPublicSlug(string $type, string $slug): ?string
     {
         if ($this->collection !== null) return $this->collection->stableKeyForPublicSlug($type, $slug);
@@ -60,7 +56,6 @@ final class EntityPageQuery
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    /** @return array{type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
     public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
     {
         if ($this->collection !== null) return $this->collection->archive($type, $page, $perPage, $query);
@@ -80,6 +75,10 @@ final class EntityPageQuery
     {
         if ($item === null) return null;
         $item['related'] = $entity === null ? self::EMPTY_RELATED : ($this->related?->forEntity($entity->entityType, $entity->canonicalId) ?? self::EMPTY_RELATED);
+        if ($entity !== null && function_exists('apply_filters')) {
+            $enriched = apply_filters('nhk_v3_entity_detail_projection', $item, $entity);
+            if (is_array($enriched)) $item = $enriched;
+        }
         return $item;
     }
 
@@ -95,7 +94,6 @@ final class EntityPageQuery
     private function available(): bool { return !$this->status || $this->status->authorityStorageReady(); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $query) : stripos($value, $query)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
-    /** @return list<string> */
     private function routeSegments(string $type, string $slug): array
     {
         $namespace = PublicRouteResolver::namespaceFor($type);
