@@ -51,6 +51,16 @@ final class FrontendSemanticBootstrap
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status);
         $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status);
+        $postProjector = static function(int $postId): ?array {
+            if ($postId < 1 || !function_exists('get_post') || !function_exists('get_post_status') || !function_exists('get_permalink') || !function_exists('get_the_title')) return null;
+            $post = get_post($postId);
+            if (!$post instanceof \WP_Post || get_post_status($post) !== 'publish') return null;
+            return [
+                'title' => (string) get_the_title($post),
+                'url' => (string) get_permalink($post),
+                'excerpt' => function_exists('get_the_excerpt') ? (string) get_the_excerpt($post) : '',
+            ];
+        };
         $dossier = new SemanticDossierQuery(
             $authority,
             $types,
@@ -62,6 +72,8 @@ final class FrontendSemanticBootstrap
             $entityMedia,
             $media,
             $videos,
+            $postProjector,
+            $gallery,
         );
 
         add_filter('nhk_v3_home_semantic_modules', static function(array $modules) use ($status, $gallery, $knowledgeArchive): array {
@@ -79,6 +91,12 @@ final class FrontendSemanticBootstrap
         add_filter('nhk_v3_entity_detail_projection', static function(array $item, object $entity) use ($dossier): array {
             if ($entity instanceof AuthorityEntity) $item['dossier'] = $dossier->forEntity($entity);
             return $item;
+        }, 10, 2);
+
+        add_filter('nhk_v3_post_dossier', static function(array $value, int $postId) use ($dossier): array {
+            if ($postId < 1) return $value;
+            $projection = $dossier->forPost($postId);
+            return is_array($projection) ? $projection : $value;
         }, 10, 2);
 
         add_filter('nhk_v3_article_media_gallery', static function(array $value, int $postId) use ($entityMedia): array {
