@@ -13,4 +13,4 @@
     <div class="meta"><span><?php echo esc_html(get_the_author()); ?></span><time datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(nhk_v3_public_date()); ?></time></div>
   </div>
 </article>
-<?php /* Display fallback is presentation-only; native editorial permalink and semantic media/SEO remain separate. */ ?>
+<?php /* Display fallback is presentation-only; native editorial permalink stays authoritative and semantic seo_projection remains a separate read boundary. */ ?>
