@@ -33,3 +33,47 @@ jobs:
 
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite 'NHK Unit'
+
+  dictionary-integration:
+    needs: lint-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: nhk_v3_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP and WordPress CLI
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, mysqli
+          coverage: none
+          tools: composer:v2, wp-cli
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Configure isolated WordPress test database
+        run: |
+          wp config create --path=public --dbname=nhk_v3_test --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check --force
+          ADMIN_PASS="$(openssl rand -hex 16)"
+          wp core install --path=public --url=http://localhost --title='NHK V3 Test' --admin_user=admin --admin_password="$ADMIN_PASS" --admin_email=test@example.test --skip-email
+
+      - name: Dictionary migration integration
+        env:
+          NHK_WP_TEST_PATH: public
+          NHK_WP_TEST_DB: nhk_v3_test
+        run: vendor/bin/phpunit public/wp-content/plugins/nhk-core/tests/Integration/DictionaryMigration015IntegrationTest.php
