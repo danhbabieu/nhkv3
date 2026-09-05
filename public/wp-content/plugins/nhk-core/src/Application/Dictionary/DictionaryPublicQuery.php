@@ -54,8 +54,19 @@ final class DictionaryPublicQuery
         $url = $delegated ? $concept->destinationUrl : ($slug !== '' ? '/tu-dien/' . $slug . '/' : null);
         $eligible = $url !== null;
         if ($delegated && is_callable($this->destinationValidator)) {
-            try { $eligible = (bool) ($this->destinationValidator)($concept->destinationType, $concept->destinationId, $concept->destinationUrl); }
-            catch (\Throwable) { $eligible = false; }
+            try {
+                $validated = ($this->destinationValidator)($concept->destinationType, $concept->destinationId, $concept->destinationUrl);
+                if (is_string($validated) && trim($validated) !== '') {
+                    $url = trim($validated);
+                    $eligible = true;
+                } else {
+                    $eligible = $validated === true;
+                    if (!$eligible) $url = null;
+                }
+            } catch (\Throwable) {
+                $eligible = false;
+                $url = null;
+            }
         }
         $image = null;
         if ($eligible && is_callable($this->imageResolver)) {
