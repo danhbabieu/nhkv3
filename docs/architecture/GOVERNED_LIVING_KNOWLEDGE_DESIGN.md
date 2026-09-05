@@ -1,6 +1,6 @@
 # Governed Living Knowledge Design
 
-**Status:** owner-approved incremental design, 2026-09-03.
+**Status:** owner-approved incremental design, updated 2026-09-05.
 
 ## Ownership
 
@@ -10,6 +10,11 @@ WordPress native `wp_posts` owns Article title, body, author, dates, categories
 and editorial URLs. Media, MediaAsset, MediaUsage and Video keep their existing
 bounded contexts. Public Projection is a presentation/read model. Governance
 owns durable semantic mutation.
+
+Dictionary lexical state is a separate curation boundary governed by
+`DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`. Dictionary Concept, Label,
+Candidate and Mention records do not become Authority, Knowledge, Evidence or
+Graph records merely by existing.
 
 No Article, FAQ, Cluster, Projection or KnowledgeCell Authority type is added.
 No new Graph predicate is added by this design.
@@ -36,6 +41,13 @@ an active claim in the same subject/facet/scope. It is not broad semantic
 equivalence. Fuzzy or AI similarity cannot decide canonical identity. Explicit
 structured relation context is required for add-Evidence, qualification and
 contradiction; ambiguous or unsupported input fails closed.
+
+Dictionary labels may assist lexical lookup and disambiguation before Living
+Knowledge planning. They do not establish semantic equivalence by themselves.
+Before a new factual claim is proposed, Current Truth/Knowledge must be checked
+and an existing canonical claim reused or enriched when applicable. A
+Dictionary definition or repeated wording is never sufficient evidence to mint
+a duplicate Knowledge claim.
 
 ## Read model pipeline
 
@@ -70,7 +82,7 @@ deterministic and Vietnamese-first. If synthesis is unavailable, the system
 retains last-known-good eligible content or deterministic reader-safe content;
 it never emits fabricated prose or turns unavailable into empty.
 
-## Article, Video and Media boundaries
+## Article, Video, Media and Dictionary boundaries
 
 Knowledge changes affecting an Article create an enrichment/update suggestion
 packet only. They never write an Article body or bypass the Article workflow.
@@ -98,6 +110,26 @@ The planner must not broaden an explicit Variant to Model/Brand merely because a
 title or hint also matches a broader name. This is a target-handoff invariant,
 not a new inference rule; absent an explicit target the normal narrowest,
 fail-closed resolution still applies.
+
+Dictionary detection may run alongside Article/Knowledge/Media/Video workflows,
+but it is lexical only. Research/preflight uses read-only Dictionary preview.
+After a canonical Knowledge or Video write, or after an actual WordPress
+Article/Media save, the Dictionary observer may idempotently store a lexical
+Mention or private Candidate. That post-write observation is non-blocking and
+never rolls the canonical write back merely because lexical curation is
+unavailable.
+
+For Media/Image, caption, alt, filename, OCR or recognition may produce only
+bounded lexical observations/candidates. For Video, title, description, tags
+and an authorized transcript may do the same. None of these signals becomes
+Knowledge/Evidence or a Graph relation through Dictionary. An explicit Video
+semantic target may be passed as context for disambiguation but must never be
+broadened by the lexical detector.
+
+A Dictionary review that discovers a real new fact hands that fact to this
+Living Knowledge planner; Dictionary curation itself does not write the claim.
+Likewise, attaching a colloquial/technical/phonetic label to an existing
+Dictionary concept is not proof that a semantic entity relation exists.
 
 Media → Living Knowledge and Article → Living Knowledge write integration are
 not implemented by the completed Video slice. Future adapters may emit planning
@@ -147,27 +179,21 @@ The approval record binds the complete proposal binding fingerprint, which
 includes content and dependency fingerprints. Integration evidence is a
 separate gate and may only be reported when the exact guarded `nhk_v3_test`
 runtime is available. If unavailable, the result is `ENVIRONMENT_BLOCKED`, not
-PASS. Odo 62 remains in-memory acceptance/reference data only and never mutates
-live semantic, Graph, WordPress URL, H1 or SEO state.
+PASS.
 
 ## Acceptance and non-goals
 
-The Odo corpus is acceptance/reference data only. Tests cover Odo 62 white pegs,
-Sonodo/Movement 24 scope, 54/57/62 configuration parity, Odo 30 non-cloning,
-Odo 39 evidence-only enrichment, stable `/odo/` and `/o-do/` routes, and all
-scope/contradiction/idempotency rules. No Odo production/demo data is mutated.
+Reference corpora used in focused tests remain acceptance/reference data only
+and do not mutate production/demo semantic state.
 
-The focused in-memory E2E acceptance closes the implementation
-`CODE_GAP: end-to-end governed apply/read-back` for the approved slice. It does
-not claim database/runtime verification: that gate is currently
-`ENVIRONMENT_BLOCKED` because the exact WordPress test runtime was unavailable.
+The focused in-memory E2E acceptance closes the implementation code gap for the
+approved Living Knowledge slice. It does not claim database/runtime verification
+when the exact WordPress test runtime is unavailable.
 
-The Video planning slice has focused/unit proof plus a runtime target-handoff
-smoke for the explicit Odo 36/10 Variant. That smoke proves preservation of the
-resolved target and planning packet shape only; it is not evidence of a
-Knowledge/Evidence apply and does not change the `ENVIRONMENT_BLOCKED` status of
-the guarded integration suite.
+Dictionary lexical implementation has its own acceptance criteria in
+`DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`; it cannot be used to claim Living
+Knowledge semantic acceptance, and vice versa.
 
-Durable public identity remains a separately reported
-`PUBLIC_IDENTITY_STORAGE_GAP` unless additive storage can be implemented without
-bulk migration. No slug migration is part of this feature.
+Durable public identity remains a separately reported storage/runtime concern
+unless additive storage is verified in the target environment. No bulk slug
+migration is part of this feature.
