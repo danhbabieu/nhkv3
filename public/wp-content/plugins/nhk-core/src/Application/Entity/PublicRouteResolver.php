@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
-use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Application\Graph\StructuralContextQuery;
+use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -73,9 +74,11 @@ final class PublicRouteResolver
 
     public static function videoPath(string $title, string $externalId): ?string
     {
+        // The external ID remains a validated source identity input, but it is
+        // not canonical public-slug material.
         if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)) return null;
         $slug = self::slug($title);
-        return '/video/' . ($slug !== '' ? $slug . '-' . strtolower($externalId) : 'video-' . strtolower($externalId)) . '/';
+        return $slug === '' ? null : '/video/' . $slug . '/';
     }
 
     /** @param list<string> $segments */
@@ -100,12 +103,7 @@ final class PublicRouteResolver
 
     public static function slug(string $value): string
     {
-        $value = trim($value);
-        $value = strtr($value, ['Đ' => 'D', 'đ' => 'd', 'À' => 'A', 'Á' => 'A', 'Ả' => 'A', 'Ã' => 'A', 'Ạ' => 'A', 'Ă' => 'A', 'Ắ' => 'A', 'Ằ' => 'A', 'Ặ' => 'A', 'Â' => 'A', 'Ấ' => 'A', 'Ầ' => 'A', 'Ậ' => 'A', 'à' => 'a', 'á' => 'a', 'ả' => 'a', 'ã' => 'a', 'ạ' => 'a', 'ă' => 'a', 'ắ' => 'a', 'ằ' => 'a', 'ặ' => 'a', 'â' => 'a', 'ấ' => 'a', 'ầ' => 'a', 'ậ' => 'a', 'È' => 'E', 'É' => 'E', 'Ẹ' => 'E', 'Ê' => 'E', 'Ế' => 'E', 'Ề' => 'E', 'Ệ' => 'E', 'è' => 'e', 'é' => 'e', 'ẹ' => 'e', 'ê' => 'e', 'ế' => 'e', 'ề' => 'e', 'ệ' => 'e', 'Ì' => 'I', 'Í' => 'I', 'Ị' => 'I', 'ì' => 'i', 'í' => 'i', 'ị' => 'i', 'Ò' => 'O', 'Ó' => 'O', 'Ọ' => 'O', 'Ô' => 'O', 'Ố' => 'O', 'Ồ' => 'O', 'Ộ' => 'O', 'ò' => 'o', 'ó' => 'o', 'ọ' => 'o', 'ô' => 'o', 'ố' => 'o', 'ồ' => 'o', 'ộ' => 'o', 'Ù' => 'U', 'Ú' => 'U', 'Ụ' => 'U', 'ù' => 'u', 'ú' => 'u', 'ụ' => 'u', 'Ỳ' => 'Y', 'Ý' => 'Y', 'Ỵ' => 'Y', 'ỳ' => 'y', 'ý' => 'y', 'ỵ' => 'y']);
-        $value = strtolower($value);
-        $value = (string) preg_replace('/[^a-z0-9]+/', '-', $value);
-        $value = trim($value, '-');
-        return (string) preg_replace('/(^|-)o-do(?=-|$)/', '$1odo', $value);
+        return (new CanonicalPublicSlugPolicy())->slug($value);
     }
 
     /** @return list<string> */
