@@ -6,20 +6,23 @@ namespace NHK\Core\Application\Entity;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class EntityPageQuery
 {
+    private const EMPTY_RELATED = ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
+
     public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?RelatedContentQuery $related = null, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null) {}
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
     public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
+
     public function detailForEntity(AuthorityEntity $entity): ?array
     {
-        if ($this->collection !== null) return $this->collection->detailForEntity($entity);
+        if ($this->collection !== null) return $this->withRelated($this->collection->detailForEntity($entity), $entity);
         if (!$this->types->has($entity->entityType) || !$entity->active() || $this->publicPath($entity) === null) return null;
-        return $this->serialize($entity);
+        return $this->withRelated($this->serialize($entity), $entity);
     }
+
     public function publicPathForKey(string $type, string $key): ?string
     {
         if ($this->collection !== null) return $this->collection->publicPathForStableKey($type, $key);
@@ -27,6 +30,7 @@ final class EntityPageQuery
         $entity = preg_match('/^[0-9a-f-]{36}$/i', $key) === 1 ? $this->authority->findByCanonicalId($key) : $this->authority->findByStableKey($type, $key);
         return $entity && $entity->entityType === $type && $entity->active() ? $this->publicPath($entity) : null;
     }
+
     /** @param list<string> $segments */
     public function resolvePublic(string $type, array $segments): ?AuthorityEntity { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->resolve($type, $segments); }
 
@@ -34,17 +38,13 @@ final class EntityPageQuery
     {
         if ($this->collection !== null) {
             $item = $this->collection->detail($type, $key);
-            if ($item !== null) {
-                $entity = $this->collection->resolvePublicSlug($type, $key);
-                $item['related'] = $entity === null ? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []] : ($this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []]);
-            }
-            return $item;
+            $entity = $item === null ? null : $this->collection->resolvePublicSlug($type, $key);
+            return $item === null ? null : $this->withRelated($item, $entity);
         }
         if (!$this->types->has($type) || !$this->available()) return null;
         $entity = $this->entityForPublicSlug($type, $key);
         if (!$entity || $entity->entityType !== $type || !$entity->active()) return null;
-        $serialized = $this->serialize($entity); $serialized['related'] = $this->related?->forEntity($type, $entity->canonicalId) ?? ['entities' => [], 'articles' => [], 'media' => [], 'videos' => []];
-        return $serialized;
+        return $this->withRelated($this->serialize($entity), $entity);
     }
 
     /** Return a canonical stable key for a legacy visitor-facing slug only when the match is unambiguous. */
@@ -74,6 +74,13 @@ final class EntityPageQuery
         }
         $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $total = count($items);
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
+    }
+
+    private function withRelated(?array $item, ?AuthorityEntity $entity): ?array
+    {
+        if ($item === null) return null;
+        $item['related'] = $entity === null ? self::EMPTY_RELATED : ($this->related?->forEntity($entity->entityType, $entity->canonicalId) ?? self::EMPTY_RELATED);
+        return $item;
     }
 
     private function serialize(AuthorityEntity $entity): array { $payload = (new PublicIdentityContract($this->types))->payload($entity); $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload]; $path = $this->publicPath($entity); if ($path !== null) $item['url'] = $path; return $item; }
