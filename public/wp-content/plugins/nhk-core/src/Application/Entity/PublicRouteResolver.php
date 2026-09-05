@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\StructuralContextQuery;
-use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
+use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
@@ -81,8 +81,6 @@ final class PublicRouteResolver
 
     public static function videoPath(string $title, string $externalId): ?string
     {
-        // The external ID remains a validated source identity input, but it is
-        // not canonical public-slug material.
         if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)) return null;
         $slug = self::slug($title);
         return $slug === '' ? null : '/video/' . $slug . '/';
@@ -108,10 +106,7 @@ final class PublicRouteResolver
         return null;
     }
 
-    public static function slug(string $value): string
-    {
-        return (new CanonicalPublicSlugPolicy())->slug($value);
-    }
+    public static function slug(string $value): string { return (new CanonicalPublicSlugPolicy())->slug($value); }
 
     /** @return list<string> */
     public static function reservedRoots(): array { return self::RESERVED_ROOTS; }
@@ -119,16 +114,17 @@ final class PublicRouteResolver
 
     private function publicSlug(AuthorityEntity $entity): string
     {
-        if ($this->publicIdentities !== null) {
+        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
+        if ($repository !== null) {
             try {
-                $identity = $this->publicIdentities->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
+                $identity = $repository->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
                 if (is_array($identity)) {
                     $stored = trim((string) ($identity['current_slug'] ?? ''));
                     return $stored !== '' && self::slug($stored) === $stored ? $stored : '';
                 }
             } catch (\Throwable) {
-                // Public identity storage unavailable must not corrupt the
-                // compatibility projection for demo records not yet reprojected.
+                // Compatibility fallback for demo records when the projection
+                // storage is unavailable; semantic identity is never altered.
             }
         }
         return self::slug($entity->canonicalName);
@@ -164,17 +160,13 @@ final class PublicRouteResolver
 
     private function uniqueEntity(string $type, string $slug, string $id): bool
     {
-        foreach ($this->authority->listByType($type) as $item) {
-            if ($item->active() && $item->canonicalId !== $id && $this->publicSlug($item) === $slug) return false;
-        }
+        foreach ($this->authority->listByType($type) as $item) if ($item->active() && $item->canonicalId !== $id && $this->publicSlug($item) === $slug) return false;
         return true;
     }
 
     private function uniqueChildAvailable(string $type, string $slug, string $parentId, string $id): bool
     {
-        foreach ($this->authority->listByType($type) as $item) {
-            if ($item->active() && $item->canonicalId !== $id && $this->publicSlug($item) === $slug && $this->parentForRoute($item) === $parentId) return false;
-        }
+        foreach ($this->authority->listByType($type) as $item) if ($item->active() && $item->canonicalId !== $id && $this->publicSlug($item) === $slug && $this->parentForRoute($item) === $parentId) return false;
         return true;
     }
 
