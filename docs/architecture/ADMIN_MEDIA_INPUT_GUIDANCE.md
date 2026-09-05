@@ -44,6 +44,28 @@ evidence and `technical_detail`; evidence/detail never silently substitutes an
 existing representative. Selection follows deterministic precedence, never
 upload recency.
 
+## Dictionary lexical observation — 2026-09-05
+
+When `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` is enabled, Media/Image input may
+feed the lexical detector only after the normal Media/attachment write boundary
+has completed, or through an explicitly read-only preview.
+
+Allowed lexical observation inputs include editor-supplied caption/alt/context
+and weak signals such as filename, OCR, EXIF or visual recognition. The
+observation must preserve its source and strength. Weak signals never become an
+approved alias, semantic identity, Knowledge/Evidence or Graph relation by
+themselves.
+
+The Dictionary resolver must search approved labels and current canonical
+owners before creating a private Candidate. Ambiguous matches remain unlinked.
+A newly detected image term must never cause a new Media, Authority, Knowledge,
+Evidence or `depicts` relation automatically.
+
+An approved Dictionary concept may reuse an existing eligible Media as an
+illustration through the existing MediaUsage/projection boundary. The binary is
+not copied into a Dictionary-specific store. Representative, evidence and
+technical-detail precedence remains governed by the Media contracts.
+
 ## SEO and upload expectations
 
 Alt text and caption are usage-context fields. Subject, view and filename
