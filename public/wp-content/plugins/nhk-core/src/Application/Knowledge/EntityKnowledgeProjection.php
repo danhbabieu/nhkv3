@@ -17,15 +17,24 @@ final class EntityKnowledgeProjection
         private ?MigrationStatus $status = null,
     ) {}
 
-    /** @return array{status:string,facets:array<string,list<array<string,mixed>>>,claim_count:int,evidence_count:int} */
+    /** @return array<string,mixed> */
     public function forSubject(string $subjectId): array
     {
+        $emptyCoverage = [
+            'sourced_claim_count' => 0,
+            'unsourced_claim_count' => 0,
+            'qualification_count' => 0,
+            'contradiction_count' => 0,
+            'specimen_observation_count' => 0,
+        ];
         if ($this->status !== null && !$this->status->knowledgeStorageReady()) {
-            return ['status' => 'UNAVAILABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0];
+            return ['status' => 'UNAVAILABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0, 'coverage' => $emptyCoverage, 'warnings' => ['KNOWLEDGE_UNAVAILABLE']];
         }
+
         $facets = [];
         $claimCount = 0;
         $evidenceCount = 0;
+        $coverage = $emptyCoverage;
         foreach ($this->claims->list() as $claim) {
             if (!$claim instanceof KnowledgeClaim || !$claim->active || !$claim->isPublic()) continue;
             $metadata = $claim->provenance['metadata'] ?? null;
@@ -33,19 +42,44 @@ final class EntityKnowledgeProjection
             $facet = (string) ($metadata['facet'] ?? '');
             $scope = (string) ($metadata['scope'] ?? '');
             if (!in_array($facet, KnowledgeFacetProfile::FACETS, true) || !in_array($scope, KnowledgeFacetProfile::SCOPES, true)) continue;
+
             $citations = $this->publicEvidence($claim);
             $evidenceCount += count($citations);
+            $relations = array_values(array_unique(array_map(static fn(array $item): string => (string) ($item['relation'] ?? ''), $citations)));
+            if ($citations === []) $coverage['unsourced_claim_count']++;
+            else $coverage['sourced_claim_count']++;
+            $coverage['qualification_count'] += count(array_filter($citations, static fn(array $item): bool => ($item['relation'] ?? '') === 'qualifies'));
+            $coverage['contradiction_count'] += count(array_filter($citations, static fn(array $item): bool => ($item['relation'] ?? '') === 'contradicts'));
+            if ($facet === 'specimen_observation' || $scope === 'specimen_observation') $coverage['specimen_observation_count']++;
+
             $facets[$facet][] = [
                 'text' => $claim->claimText,
                 'type' => $claim->claimType,
+                'facet' => $facet,
+                'scope' => $scope,
                 'evidence' => $citations,
                 'has_evidence' => $citations !== [],
+                'evidence_state' => $citations === [] ? 'PUBLIC_UNSOURCED' : 'SOURCED',
+                'evidence_relations' => $relations,
             ];
             $claimCount++;
         }
+
         foreach ($facets as &$items) usort($items, static fn(array $a, array $b): int => strcmp((string) $a['text'], (string) $b['text']));
         unset($items);
-        return ['status' => 'AVAILABLE', 'facets' => $facets, 'claim_count' => $claimCount, 'evidence_count' => $evidenceCount];
+        $warnings = [];
+        if ($coverage['unsourced_claim_count'] > 0) $warnings[] = 'PUBLIC_CLAIMS_WITHOUT_EVIDENCE';
+        if ($coverage['contradiction_count'] > 0) $warnings[] = 'PUBLIC_CONTRADICTION_PRESENT';
+        if ($claimCount > 0 && $coverage['specimen_observation_count'] === $claimCount) $warnings[] = 'SPECIMEN_OBSERVATION_SCOPE_ONLY';
+
+        return [
+            'status' => 'AVAILABLE',
+            'facets' => $facets,
+            'claim_count' => $claimCount,
+            'evidence_count' => $evidenceCount,
+            'coverage' => $coverage,
+            'warnings' => $warnings,
+        ];
     }
 
     /** @return list<array<string,mixed>> */
