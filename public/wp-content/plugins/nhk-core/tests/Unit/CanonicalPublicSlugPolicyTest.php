@@ -26,7 +26,7 @@ final class CanonicalPublicSlugPolicyTest extends TestCase
         $policy = new CanonicalPublicSlugPolicy();
 
         self::assertSame('aaaaaaaaaaaaaaaaaa', $policy->slug('aàáảãạăằắẳẵặâầấẩẫậ'));
-        self::assertSame('eeeeeeeeeee', $policy->slug('eèéẻẽẹêềếểễệ'));
+        self::assertSame('eeeeeeeeeeee', $policy->slug('eèéẻẽẹêềếểễệ'));
         self::assertSame('iiiiii', $policy->slug('iìíỉĩị'));
         self::assertSame('oooooooooooooooooo', $policy->slug('oòóỏõọôồốổỗộơờớởỡợ'));
         self::assertSame('uuuuuuuuuuuu', $policy->slug('uùúủũụưừứửữự'));
