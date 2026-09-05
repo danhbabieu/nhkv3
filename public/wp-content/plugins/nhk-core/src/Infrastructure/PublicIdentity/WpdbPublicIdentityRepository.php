@@ -22,7 +22,9 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
         $now = gmdate('Y-m-d H:i:s.u'); $id = UuidCodec::newV7();
         $ok = $this->wpdb->query($this->wpdb->prepare('INSERT INTO '.$this->currentTable().' (identity_uuid,owner_kind,owner_uuid,route_type,current_slug,collision_scope,route_policy_version,revision,idempotency_key,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s)', UuidCodec::toBinary($id),$r['owner_kind'],UuidCodec::toBinary($r['owner_id']),$r['route_type'],$r['current_slug'],$r['collision_scope'],$r['route_policy_version'],$key,$now,$now));
         if ($ok !== 1) throw new \RuntimeException('PUBLIC_IDENTITY_STORAGE_UNAVAILABLE');
-        $r['identity_id']=$id; $r['revision']=1; return $r;
+        $row = $this->wpdb->get_row($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE identity_uuid=%s', UuidCodec::toBinary($id)), ARRAY_A);
+        if (!is_array($row)) throw new \RuntimeException('PUBLIC_IDENTITY_READBACK_FAILED');
+        return $this->hydrate($row);
     }
 
     public function change(array $r, string $oldPath, int $expectedRevision, string $key): array
@@ -41,7 +43,9 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
         $historyOk=$this->wpdb->query($this->wpdb->prepare('INSERT INTO '.$this->historyTable().' (identity_uuid,route_type,route_path,old_slug,revision,created_at) VALUES (%s,%s,%s,%s,%d,%s)',UuidCodec::toBinary((string)$r['identity_id']),$current['route_type'],$oldPath,$current['current_slug'],$expectedRevision,$now));
         if ($historyOk !== 1) { $this->wpdb->query('ROLLBACK'); throw new \RuntimeException('PUBLIC_IDENTITY_STORAGE_UNAVAILABLE'); }
         $this->wpdb->query('COMMIT');
-        $r['revision']=$expectedRevision+1; return $r;
+        $row = $this->wpdb->get_row($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE identity_uuid=%s', UuidCodec::toBinary((string)$r['identity_id'])), ARRAY_A);
+        if (!is_array($row)) throw new \RuntimeException('PUBLIC_IDENTITY_READBACK_FAILED');
+        return $this->hydrate($row);
     }
 
     public function findCurrentById(string $id): ?array
@@ -72,15 +76,17 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
     public function resolveHistoric(string $path): array
     {
         if (!PublicIdentityMigration014::schemaReady($this->wpdb)) return ['status'=>'UNAVAILABLE'];
-        $rows=$this->wpdb->get_results($this->wpdb->prepare('SELECT h.*,i.current_slug,i.route_type,i.owner_kind,i.owner_uuid,i.revision FROM '.$this->historyTable().' h LEFT JOIN '.$this->currentTable().' i ON i.identity_uuid=h.identity_uuid WHERE h.route_path=%s',$path),ARRAY_A)?:[];
+        $rows=$this->wpdb->get_results($this->wpdb->prepare('SELECT h.*,i.current_slug,i.route_type,i.owner_kind,i.owner_uuid,i.collision_scope,i.revision FROM '.$this->historyTable().' h LEFT JOIN '.$this->currentTable().' i ON i.identity_uuid=h.identity_uuid WHERE h.route_path=%s',$path),ARRAY_A)?:[];
         if(count($rows)!==1)return ['status'=>count($rows)>1?'AMBIGUOUS':'NOT_FOUND'];
         $r=$rows[0];
-        if(!isset($r['current_slug'],$r['owner_kind'],$r['owner_uuid'],$r['route_type']))return ['status'=>'INELIGIBLE'];
+        if(!isset($r['current_slug'],$r['owner_kind'],$r['owner_uuid'],$r['route_type'],$r['collision_scope']))return ['status'=>'INELIGIBLE'];
         try { $ownerId = UuidCodec::fromBinary((string)$r['owner_uuid']); }
         catch (\Throwable) { return ['status'=>'INELIGIBLE']; }
+        $target = $this->pathForRow($r);
+        if ($target === null) return ['status'=>'INELIGIBLE'];
         return [
             'status'=>'FOUND',
-            'target'=>$this->path((string)$r['route_type'],(string)$r['current_slug']),
+            'target'=>$target,
             'hops'=>1,
             'owner_kind'=>(string)$r['owner_kind'],
             'owner_id'=>$ownerId,
@@ -88,6 +94,39 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
         ];
     }
 
-    private function path(string $type,string $slug):string { $prefix=match($type){'video'=>'/video/','movement'=>'/bo-may/','music'=>'/ban-nhac/','component'=>'/linh-kien/','classification'=>'/phan-loai/','specimen'=>'/hien-vat/','product'=>'/san-pham/',default=>'/'}; return $prefix.$slug.'/'; }
-    private function hydrate(array $r):array { return ['identity_id'=>UuidCodec::fromBinary((string)$r['identity_uuid']),'owner_kind'=>(string)$r['owner_kind'],'owner_id'=>UuidCodec::fromBinary((string)$r['owner_uuid']),'route_type'=>(string)$r['route_type'],'current_slug'=>(string)$r['current_slug'],'collision_scope'=>(string)$r['collision_scope'],'route_policy_version'=>(string)$r['route_policy_version'],'revision'=>(int)$r['revision'],'current_path'=>$this->path((string)$r['route_type'],(string)$r['current_slug'])]; }
+    private function pathForRow(array $row): ?string
+    {
+        $type = (string)($row['route_type'] ?? '');
+        $slug = (string)($row['current_slug'] ?? '');
+        $scope = (string)($row['collision_scope'] ?? '');
+        if ($slug === '') return null;
+        if ($type === 'brand') return $scope === 'root' ? '/' . $slug . '/' : null;
+        if ($type === 'model') {
+            $parent = $this->scopeParent($scope, 'brand');
+            return $parent === null ? null : $this->pathForRow($parent) . $slug . '/';
+        }
+        if ($type === 'variant') {
+            $parent = $this->scopeParent($scope, 'model');
+            return $parent === null ? null : $this->pathForRow($parent) . $slug . '/';
+        }
+        $prefix = match($type){'video'=>'/video/','movement'=>'/bo-may/','music'=>'/ban-nhac/','component'=>'/linh-kien/','classification'=>'/phan-loai/','specimen'=>'/hien-vat/','product'=>'/san-pham/',default=>null};
+        return $prefix === null ? null : $prefix . $slug . '/';
+    }
+
+    private function scopeParent(string $scope, string $expectedType): ?array
+    {
+        $prefix = $expectedType . ':';
+        if (!str_starts_with($scope, $prefix)) return null;
+        $ownerId = substr($scope, strlen($prefix));
+        if (!UuidCodec::isValid($ownerId)) return null;
+        $row = $this->wpdb->get_row($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE owner_kind=%s AND owner_uuid=%s AND route_type=%s', 'authority', UuidCodec::toBinary($ownerId), $expectedType), ARRAY_A);
+        return is_array($row) ? $row : null;
+    }
+
+    private function hydrate(array $r):array
+    {
+        $path = $this->pathForRow($r);
+        if ($path === null) throw new \RuntimeException('PUBLIC_IDENTITY_PATH_UNRESOLVED');
+        return ['identity_id'=>UuidCodec::fromBinary((string)$r['identity_uuid']),'owner_kind'=>(string)$r['owner_kind'],'owner_id'=>UuidCodec::fromBinary((string)$r['owner_uuid']),'route_type'=>(string)$r['route_type'],'current_slug'=>(string)$r['current_slug'],'collision_scope'=>(string)$r['collision_scope'],'route_policy_version'=>(string)$r['route_policy_version'],'revision'=>(int)$r['revision'],'current_path'=>$path];
+    }
 }
