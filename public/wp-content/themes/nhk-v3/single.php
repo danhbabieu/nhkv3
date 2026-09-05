@@ -2,6 +2,7 @@
 /* Native WordPress permalink/canonical remains authoritative; dossier is read-only context projection. */
 get_header();
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
+$nhkReaderType = static fn(array $item): string => nhk_v3_public_type((string) ($item['type'] ?? ''));
 $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng hồ', 'variants' => 'Biến thể', 'movements' => 'Bộ máy', 'music' => 'Bản nhạc', 'components' => 'Linh kiện', 'classifications' => 'Phân loại', 'specimens' => 'Hiện vật', 'products' => 'Sản phẩm', 'articles' => 'Bài viết liên quan', 'media' => 'Hình ảnh', 'videos' => 'Video'];
 ?>
 <main id="main-content" class="site-main article-shell article-v2">
@@ -63,7 +64,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
       <?php else: ?><div class="related-grid"><?php foreach ($items as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?><a class="related-card" href="<?php echo esc_url($url); ?>"><span class="related-type"><?php echo esc_html(($item['origin']['kind'] ?? '') === 'DIRECT' ? 'Liên quan trực tiếp' : 'Mở rộng từ quan hệ nền'); ?></span><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong><?php $via = is_array($item['origin']['via_types'] ?? null) ? $item['origin']['via_types'] : []; if ($via !== []): ?><small>Qua <?php echo esc_html(implode(' → ', array_map('nhk_v3_public_type', $via))); ?></small><?php endif; ?></a><?php endforeach; ?></div><?php endif; ?>
     </section>
   <?php endforeach; elseif (array_filter($legacyRelated)): ?>
-    <section class="post-related"><div class="section-head"><div><p class="eyebrow">Liên quan</p><h2>Nội dung có liên hệ</h2></div></div><div class="related-grid"><?php foreach (['entities','articles','videos'] as $group): foreach ((array) ($legacyRelated[$group] ?? []) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?><a class="related-card" href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></a><?php endforeach; endforeach; ?></div></section>
+    <section class="post-related"><div class="section-head"><div><p class="eyebrow">Liên quan</p><h2>Nội dung có liên hệ</h2></div></div><div class="related-grid"><?php foreach (['entities','articles','videos'] as $group): foreach ((array) ($legacyRelated[$group] ?? []) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?><a class="related-card" href="<?php echo esc_url($url); ?>"><span class="related-type"><?php echo esc_html($nhkReaderType($item)); ?></span><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></a><?php endforeach; endforeach; ?></div></section>
   <?php endif; ?>
 <?php endwhile; ?>
 </main>
