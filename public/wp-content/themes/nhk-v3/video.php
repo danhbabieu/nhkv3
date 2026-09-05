@@ -1,4 +1,5 @@
 <?php
+/* public seo_projection remains the canonical URL/indexability owner. */
 $context = $GLOBALS['nhk_core_video_context'] ?? null;
 $archive = is_array($context) ? ($context['archive'] ?? []) : [];
 $video = is_array($context) ? ($context['video'] ?? []) : [];

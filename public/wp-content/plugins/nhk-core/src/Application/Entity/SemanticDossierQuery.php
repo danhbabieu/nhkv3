@@ -140,6 +140,51 @@ final class SemanticDossierQuery
         ];
     }
 
+    /** @return array<string,mixed> */
+    public function forVideo(Video $video): array
+    {
+        if (!$video->active || !$video->hasValidPublicReference()) return $this->unavailable('VIDEO_NOT_PUBLIC');
+        $route = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+        $seo = (new PublicSeoProjection())->project($route, ['type' => 'VideoObject']);
+        $url = $seo['internal_link'] ?? null;
+        if (!is_string($url) || $url === '') return $this->unavailable('PUBLIC_ROUTE_UNAVAILABLE');
+
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
+        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+        $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;
+        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';
+        if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
+
+        $media = $this->mediaProjection->forEntity('video', $video->canonicalId);
+        [$primary, $gallery] = $this->mediaPacket($media);
+        $relationResult = $this->relations->query(new NodeReference('video', $video->canonicalId), array_keys(self::GROUPS), 2, 100);
+        $sections = $this->relationSections($relationResult);
+        $warnings = $this->relationWarnings($relationResult, []);
+
+        return [
+            'status' => 'AVAILABLE',
+            'identity' => [
+                'type' => 'video',
+                'title' => $title,
+                'url' => $url,
+                'source_url' => $video->canonicalUrl,
+                'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null,
+            ],
+            'seo_projection' => $seo,
+            'primary_media' => $primary,
+            'media_gallery' => $gallery,
+            'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => [], 'claim_count' => 0, 'evidence_count' => 0],
+            'relation_sections' => $sections,
+            'coverage' => $this->coverage($sections, $gallery, 0, 0),
+            'warnings' => array_values(array_unique($warnings)),
+            'availability' => [
+                'graph' => strtoupper((string) ($relationResult['status'] ?? 'unavailable')),
+                'knowledge' => 'NOT_APPLICABLE',
+            ],
+        ];
+    }
+
     /** @return array<string,list<array<string,mixed>>> */
     private function relationSections(array $relationResult): array
     {

@@ -19,6 +19,7 @@ $profiles = [
 $type = is_array($context) ? (string) ($context['type'] ?? '') : '';
 $label = $labels[$type] ?? 'Khám phá';
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
+$nhkReaderType = static fn(array $item): string => nhk_v3_public_type((string) ($item['type'] ?? ''));
 get_header();
 ?>
 <main id="main-content" class="site-main entity-shell entity-v2">
@@ -106,7 +107,7 @@ get_header();
       <?php endforeach; ?>
 
       <?php if ($dossier === null && array_filter($relatedGroups)): ?>
-      <section class="dossier-section"><div class="section-head"><div><p class="eyebrow">Liên quan</p><h2>Nội dung có liên hệ</h2></div></div><div class="related-grid"><?php foreach (['entities','articles','videos'] as $group): foreach ((array) ($relatedGroups[$group] ?? []) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?><a class="related-card" href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></a><?php endforeach; endforeach; ?></div></section>
+      <section class="dossier-section"><div class="section-head"><div><p class="eyebrow">Liên quan</p><h2>Nội dung có liên hệ</h2></div></div><div class="related-grid"><?php foreach (['entities','articles','videos'] as $group): foreach ((array) ($relatedGroups[$group] ?? []) as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; ?><a class="related-card" href="<?php echo esc_url($url); ?>"><span class="related-type"><?php echo esc_html($nhkReaderType($item)); ?></span><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></a><?php endforeach; endforeach; ?></div></section>
       <?php endif; ?>
     </div>
 
