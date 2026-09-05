@@ -51,7 +51,16 @@ final class HomeSemanticQuery
             }
         }
 
-        if ($this->ready('media') && $this->gallery !== null) $modules['media'] = $this->gallery->archive(1, 8)['items'];
+        if ($this->ready('media') && $this->gallery !== null) {
+            $modules['media'] = [];
+            foreach ($this->media->list() as $item) {
+                if (!$item->active || $item->readiness !== 'ready' || $item->isSystemPlaceholder()) continue;
+                $visual = $this->gallery->forMedia($item->canonicalId);
+                if (!is_array($visual)) continue;
+                $modules['media'][] = $visual;
+                if (count($modules['media']) >= 8) break;
+            }
+        }
 
         if ($this->ready('video')) {
             foreach ($this->videos->list() as $item) {
