@@ -62,8 +62,14 @@ final class WpdbDictionaryConceptRepository implements DictionaryConceptReposito
 
     public function listApproved(int $limit = 500): array
     {
+        return $this->listByStatus(DictionaryConcept::APPROVED, $limit);
+    }
+
+    public function listByStatus(string $status, int $limit = 500): array
+    {
+        if (!in_array($status, [DictionaryConcept::DRAFT, DictionaryConcept::APPROVED, DictionaryConcept::RETIRED], true)) return [];
         $limit = max(1, min(2000, $limit));
-        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->concepts} WHERE status=%s ORDER BY preferred_label,id LIMIT %d", DictionaryConcept::APPROVED, $limit), ARRAY_A) ?: [];
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->concepts} WHERE status=%s ORDER BY preferred_label,id LIMIT %d", $status, $limit), ARRAY_A) ?: [];
         return array_values(array_filter(array_map(fn (array $row): ?DictionaryConcept => $this->hydrateConcept($row), $rows)));
     }
 
