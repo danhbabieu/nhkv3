@@ -41,6 +41,19 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('/ban-nhac/westminster/', $result['destination_url']);
     }
 
+    public function test_delegated_owner_uses_revalidated_current_url_instead_of_stale_snapshot(): void
+    {
+        $owner = new DictionaryConcept('c1', 'Westminster', 'Bản nhạc được tra cứu.', DictionaryConcept::APPROVED, 'music', 'music-1', '/ban-nhac/cu/', ['public_slug' => 'westminster']);
+        $repo = $this->repository([$owner], ['c1' => [new DictionaryLabel('c1', 'Westminster', 'westminster', DictionaryLabel::PREFERRED)]]);
+        $query = new DictionaryPublicQuery($repo, null, static fn (?string $type, ?string $id, ?string $url): ?string => '/ban-nhac/westminster/');
+
+        $packet = $query->hub();
+
+        self::assertCount(1, $packet['items']);
+        self::assertSame('/ban-nhac/westminster/', $packet['items'][0]['url']);
+        self::assertFalse($packet['items'][0]['indexable']);
+    }
+
     private function repository(array $concepts, array $labels): DictionaryConceptRepository
     {
         return new class($concepts, $labels) implements DictionaryConceptRepository {
