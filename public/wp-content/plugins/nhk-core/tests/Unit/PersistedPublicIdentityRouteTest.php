@@ -25,7 +25,7 @@ final class PersistedPublicIdentityRouteTest extends TestCase
         $resolver = new PublicRouteResolver($authorityRepo, $types, null, null, $identities);
         $identity = new PublicIdentityContract($types, $identities);
 
-        $renamed = $authority->update($brand->canonicalId, 'Tên mới hoàn toàn', [], 1);
+        $renamed = $authority->rename($brand->canonicalId, 'Tên mới hoàn toàn', 1);
 
         self::assertSame('/ten-cu/', $resolver->path($renamed));
         self::assertSame('ten-cu', $identity->resolve($renamed)['slug']);
