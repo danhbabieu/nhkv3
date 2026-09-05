@@ -72,10 +72,20 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
     public function resolveHistoric(string $path): array
     {
         if (!PublicIdentityMigration014::schemaReady($this->wpdb)) return ['status'=>'UNAVAILABLE'];
-        $rows=$this->wpdb->get_results($this->wpdb->prepare('SELECT h.*,i.current_slug,i.route_type,i.revision FROM '.$this->historyTable().' h LEFT JOIN '.$this->currentTable().' i ON i.identity_uuid=h.identity_uuid WHERE h.route_path=%s',$path),ARRAY_A)?:[];
+        $rows=$this->wpdb->get_results($this->wpdb->prepare('SELECT h.*,i.current_slug,i.route_type,i.owner_kind,i.owner_uuid,i.revision FROM '.$this->historyTable().' h LEFT JOIN '.$this->currentTable().' i ON i.identity_uuid=h.identity_uuid WHERE h.route_path=%s',$path),ARRAY_A)?:[];
         if(count($rows)!==1)return ['status'=>count($rows)>1?'AMBIGUOUS':'NOT_FOUND'];
-        $r=$rows[0]; if(!isset($r['current_slug']))return ['status'=>'INELIGIBLE'];
-        return ['status'=>'FOUND','target'=>$this->path((string)$r['route_type'],(string)$r['current_slug']),'hops'=>1];
+        $r=$rows[0];
+        if(!isset($r['current_slug'],$r['owner_kind'],$r['owner_uuid'],$r['route_type']))return ['status'=>'INELIGIBLE'];
+        try { $ownerId = UuidCodec::fromBinary((string)$r['owner_uuid']); }
+        catch (\Throwable) { return ['status'=>'INELIGIBLE']; }
+        return [
+            'status'=>'FOUND',
+            'target'=>$this->path((string)$r['route_type'],(string)$r['current_slug']),
+            'hops'=>1,
+            'owner_kind'=>(string)$r['owner_kind'],
+            'owner_id'=>$ownerId,
+            'route_type'=>(string)$r['route_type'],
+        ];
     }
 
     private function path(string $type,string $slug):string { $prefix=match($type){'video'=>'/video/','movement'=>'/bo-may/','music'=>'/ban-nhac/','component'=>'/linh-kien/','classification'=>'/phan-loai/','specimen'=>'/hien-vat/','product'=>'/san-pham/',default=>'/'}; return $prefix.$slug.'/'; }
