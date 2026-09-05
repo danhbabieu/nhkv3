@@ -10,9 +10,9 @@ get_header();
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && $media !== []): ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Thư viện hình ảnh</a></p>
   <header class="archive-intro media-library-header"><p class="eyebrow">Hình ảnh</p><h1><?php echo esc_html(nhk_v3_public_brand_text((string) ($media['name'] ?? 'Hình ảnh hiện vật'))); ?></h1><p class="archive-summary">Các phiên bản ảnh công khai đã đủ điều kiện hiển thị.</p></header>
-  <?php if (!empty($media['assets'])): ?>
+  <?php $displayAssets = is_array($media['display_assets'] ?? null) ? $media['display_assets'] : []; if ($displayAssets !== []): ?>
     <div class="media-asset-grid media-detail-gallery">
-      <?php foreach ($media['assets'] as $asset): $isImage = str_starts_with(strtolower((string) ($asset['mime_type'] ?? '')), 'image/'); $publicUrl = trim((string) ($asset['public_url'] ?? '')); ?>
+      <?php foreach ($displayAssets as $asset): $isImage = str_starts_with(strtolower((string) ($asset['mime_type'] ?? '')), 'image/'); $publicUrl = trim((string) ($asset['public_url'] ?? '')); ?>
         <article class="media-asset visual-media-detail">
           <?php if ($isImage && $publicUrl !== ''): ?><figure><img src="<?php echo esc_url(home_url((string) $asset['public_url'])); ?>" alt="<?php echo esc_attr((string) ($media['name'] ?? 'Hình ảnh hiện vật')); ?>" loading="lazy"<?php if (!empty($asset['width'])): ?> width="<?php echo esc_attr((string) $asset['width']); ?>"<?php endif; ?><?php if (!empty($asset['height'])): ?> height="<?php echo esc_attr((string) $asset['height']); ?>"<?php endif; ?>></figure><?php else: ?><figure><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"></figure><?php endif; ?>
           <div><span class="eyebrow">Tài nguyên hình ảnh</span><?php if (!empty($asset['width']) || !empty($asset['height'])): ?><p><?php echo esc_html((string) ($asset['width'] ?? '—')); ?> × <?php echo esc_html((string) ($asset['height'] ?? '—')); ?></p><?php endif; ?></div>
