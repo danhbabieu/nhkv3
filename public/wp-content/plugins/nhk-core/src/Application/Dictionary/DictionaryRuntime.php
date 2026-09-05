@@ -14,13 +14,16 @@ use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 final class DictionaryRuntime
 {
     private DictionaryTermNormalizer $normalizer;
+    private EntityTypeRegistry $types;
+    private WpdbAuthorityRepository $authority;
+    private PublicRouteResolver $routes;
     private WpdbDictionaryConceptRepository $concepts;
     private WpdbDictionaryCandidateRepository $candidates;
     private WpdbDictionaryMentionRepository $mentions;
     private DictionaryPlanningService $planning;
     private DictionaryCurationService $curation;
     private DictionaryPublicQuery $publicQuery;
-    private ?array $approvedLabels = null;
+    private ?array $detectionLabels = null;
 
     public function __construct(private object $database)
     {
@@ -28,34 +31,32 @@ final class DictionaryRuntime
         $this->concepts = new WpdbDictionaryConceptRepository($database);
         $this->candidates = new WpdbDictionaryCandidateRepository($database);
         $this->mentions = new WpdbDictionaryMentionRepository($database);
-
-        $types = new EntityTypeRegistry();
-        CanonicalEntityTypeCatalog::registerInto($types);
-        $authority = new WpdbAuthorityRepository($database);
-        $routes = new PublicRouteResolver($authority, $types);
+        $this->types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($this->types);
+        $this->authority = new WpdbAuthorityRepository($database);
+        $this->routes = new PublicRouteResolver($this->authority, $this->types);
 
         $contextHash = fn (array $context): string => $this->contextHash($context);
         $resolver = new DictionaryResolver(
             approvedLabelLookup: fn (string $term, array $context): array => $this->concepts->findApprovedByNormalizedLabel($term, $context),
-            entityLookup: function (string $term, array $context) use ($types, $authority, $routes): array {
+            entityLookup: function (string $term, array $context): array {
                 $out = [];
-                foreach ($types->all() as $definition) {
-                    foreach ($authority->listByType($definition->type) as $entity) {
+                foreach ($this->types->all() as $definition) {
+                    foreach ($this->authority->listByType($definition->type) as $entity) {
                         if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
-                        $forms = [$entity->canonicalName];
-                        foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) if (is_string($alias)) $forms[] = $alias;
-                        $matches = false;
-                        foreach ($forms as $form) if ($this->normalizer->normalize((string) $form) === $term) { $matches = true; break; }
-                        if (!$matches) continue;
-                        $out[] = [
-                            'preferred_label' => $entity->canonicalName,
-                            'destination_type' => $entity->entityType,
-                            'destination_id' => $entity->canonicalId,
-                            'destination_url' => $routes->path($entity),
-                        ];
+                        foreach ($this->entityForms($entity) as $form) {
+                            if ($this->normalizer->normalize($form) !== $term) continue;
+                            $out[$entity->canonicalId] = [
+                                'preferred_label' => $entity->canonicalName,
+                                'destination_type' => $entity->entityType,
+                                'destination_id' => $entity->canonicalId,
+                                'destination_url' => $this->routes->path($entity),
+                            ];
+                            break;
+                        }
                     }
                 }
-                return $out;
+                return array_values($out);
             },
             knowledgeLookup: static fn (string $term, array $context): array => [],
             articleLookup: function (string $term, array $context): array {
@@ -75,7 +76,6 @@ final class DictionaryRuntime
 
         $this->planning = new DictionaryPlanningService(new DictionaryTermDetector($this->normalizer), $resolver, $this->candidates, $this->mentions, new DictionaryLinkPlanner($this->normalizer));
         $this->curation = new DictionaryCurationService($this->candidates, $this->concepts, null, $this->normalizer);
-
         $mediaProjection = new EntityMediaProjection(new WpdbMediaRepository($database), new WpdbMediaAssetRepository($database), new WpdbMediaUsageRepository($database));
         $this->publicQuery = new DictionaryPublicQuery($this->concepts, static function (string $conceptId) use ($mediaProjection): ?array {
             $projection = $mediaProjection->forEntity('dictionary_concept', $conceptId);
@@ -92,13 +92,13 @@ final class DictionaryRuntime
     public function preview(string $text, string $sourceKind, string $sourceId = '', array $context = [], array $hints = []): array
     {
         if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
-        return $this->planning->preview($text, $sourceKind, $sourceId, $context, $hints, $this->approvedLabels());
+        return $this->planning->preview($text, $sourceKind, $sourceId, $context, $hints, $this->detectionLabels());
     }
 
     public function plan(string $text, string $sourceKind, string $sourceId, array $context = [], array $hints = []): array
     {
         if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
-        return $this->planning->plan($text, $sourceKind, $sourceId, $context, $hints, $this->approvedLabels());
+        return $this->planning->plan($text, $sourceKind, $sourceId, $context, $hints, $this->detectionLabels());
     }
 
     public function publicTerms(): array
@@ -109,13 +109,24 @@ final class DictionaryRuntime
             if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;
             $conceptId = trim((string) ($item['concept_id'] ?? ''));
             foreach ((array) ($item['labels'] ?? []) as $label) {
-                if (!is_array($label) || in_array((string) ($label['kind'] ?? ''), [DictionaryLabel::HIDDEN], true)) continue;
+                if (!is_array($label) || (string) ($label['kind'] ?? '') === DictionaryLabel::HIDDEN) continue;
                 $text = trim((string) ($label['label'] ?? ''));
                 if ($conceptId === '' || $text === '') continue;
-                $items[] = ['concept_id' => $conceptId, 'label' => $text, 'url' => (string) $item['url']];
+                $items[$conceptId . "\0" . $this->normalizer->normalize($text)] = ['concept_id' => $conceptId, 'label' => $text, 'url' => (string) $item['url']];
             }
         }
-        return $items;
+        foreach ($this->types->all() as $definition) {
+            foreach ($this->authority->listByType($definition->type) as $entity) {
+                if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
+                $url = $this->routes->path($entity);
+                if ($url === null) continue;
+                foreach ($this->entityForms($entity) as $form) {
+                    $key = 'entity:' . $entity->canonicalId . "\0" . $this->normalizer->normalize($form);
+                    $items[$key] = ['concept_id' => 'entity:' . $entity->canonicalId, 'label' => $form, 'url' => $url];
+                }
+            }
+        }
+        return array_values($items);
     }
 
     public function curation(): DictionaryCurationService { return $this->curation; }
@@ -124,20 +135,30 @@ final class DictionaryRuntime
     public function candidates(): WpdbDictionaryCandidateRepository { return $this->candidates; }
     public function mentions(): WpdbDictionaryMentionRepository { return $this->mentions; }
 
-    public function approvedLabels(): array
+    public function detectionLabels(): array
     {
-        if ($this->approvedLabels !== null) return $this->approvedLabels;
+        if ($this->detectionLabels !== null) return $this->detectionLabels;
         $labels = [];
-        foreach ($this->concepts->listApproved(2000) as $concept) {
-            foreach ($this->concepts->listLabels($concept->conceptId) as $label) {
-                if (!$label instanceof DictionaryLabel || !$label->active) continue;
-                $labels[$label->normalizedLabel] = $label->label;
-            }
+        foreach ($this->concepts->listApproved(2000) as $concept) foreach ($this->concepts->listLabels($concept->conceptId) as $label) {
+            if (!$label instanceof DictionaryLabel || !$label->active) continue;
+            $labels[$label->normalizedLabel] = $label->label;
         }
-        return $this->approvedLabels = array_values($labels);
+        foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) {
+            if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
+            foreach ($this->entityForms($entity) as $form) $labels[$this->normalizer->normalize($form)] = $form;
+        }
+        return $this->detectionLabels = array_values(array_filter($labels));
     }
 
-    public function invalidateLabelCache(): void { $this->approvedLabels = null; }
+    public function approvedLabels(): array { return $this->detectionLabels(); }
+    public function invalidateLabelCache(): void { $this->detectionLabels = null; }
+
+    private function entityForms(AuthorityEntity $entity): array
+    {
+        $forms = [$entity->canonicalName];
+        foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) if (is_string($alias) && trim($alias) !== '') $forms[] = trim($alias);
+        return array_values(array_unique($forms));
+    }
 
     private function contextHash(array $context): string
     {
