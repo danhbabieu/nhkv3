@@ -11,7 +11,7 @@ final class FrontendPresentationContractTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->theme = dirname(__DIR__, 2) . '/../../../themes/nhk-v3';
+        $this->theme = dirname(__DIR__, 2) . '/../../themes/nhk-v3';
     }
 
     public function test_article_cards_always_have_a_display_visual(): void
