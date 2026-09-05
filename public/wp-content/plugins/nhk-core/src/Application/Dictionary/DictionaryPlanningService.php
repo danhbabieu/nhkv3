@@ -36,10 +36,11 @@ final class DictionaryPlanningService
         $candidateTerms = [];
         $warnings = [];
         $linkItems = [];
-        $contextHash = $this->hash($context);
+        $lexicalContext = $this->lexicalContext($context);
+        $contextHash = $this->hash($lexicalContext);
 
         foreach ($this->detector->detect($text, $approvedLabels, $hints) as $observation) {
-            $resolution = $this->resolver->resolve((string) $observation['term'], $context);
+            $resolution = $this->resolver->resolve((string) $observation['term'], $lexicalContext);
             $conceptId = $resolution->conceptId;
 
             if ($persist) {
@@ -80,13 +81,36 @@ final class DictionaryPlanningService
                 continue;
             }
 
-            if ($resolution->status === DictionaryResolution::AMBIGUOUS) {
-                $ambiguous[] = ['term' => $observation['term'], 'normalized_term' => $resolution->normalizedTerm, 'candidates' => $resolution->candidates];
+            if ($resolution->status === DictionaryResolution::SUPPRESSED || $this->candidates->suppressed($resolution->normalizedTerm, $contextHash)) {
+                $warnings[] = 'DICTIONARY_TERM_SUPPRESSED';
                 continue;
             }
 
-            if ($resolution->status === DictionaryResolution::SUPPRESSED || $this->candidates->suppressed($resolution->normalizedTerm, $contextHash)) {
-                $warnings[] = 'DICTIONARY_TERM_SUPPRESSED';
+            if ($resolution->status === DictionaryResolution::AMBIGUOUS) {
+                $row = [
+                    'candidate_id' => null,
+                    'term' => $observation['term'],
+                    'normalized_term' => $resolution->normalizedTerm,
+                    'candidates' => $resolution->candidates,
+                ];
+                if ($persist) {
+                    $saved = $this->candidates->upsertObservation(new DictionaryCandidate(
+                        $this->id(),
+                        $resolution->normalizedTerm,
+                        $contextHash,
+                        [(string) $observation['term']],
+                        DictionaryCandidateState::AMBIGUOUS,
+                        $lexicalContext,
+                        [['kind' => 'RESOLUTION_CANDIDATES', 'candidates' => $resolution->candidates]],
+                        1,
+                        gmdate('Y-m-d H:i:s'),
+                        gmdate('Y-m-d H:i:s'),
+                        1,
+                    ));
+                    $row['candidate_id'] = $saved->candidateId;
+                    $row['occurrences'] = $saved->occurrences;
+                }
+                $ambiguous[] = $row;
                 continue;
             }
 
@@ -108,7 +132,7 @@ final class DictionaryPlanningService
                 $contextHash,
                 [(string) $observation['term']],
                 DictionaryCandidateState::NEEDS_REVIEW,
-                $context,
+                $lexicalContext,
                 [],
                 1,
                 gmdate('Y-m-d H:i:s'),
@@ -144,6 +168,27 @@ final class DictionaryPlanningService
         if (class_exists(UuidCodec::class)) return UuidCodec::newV7();
         $hex = bin2hex(random_bytes(16));
         return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-4' . substr($hex, 13, 3) . '-a' . substr($hex, 17, 3) . '-' . substr($hex, 20, 12);
+    }
+
+    private function lexicalContext(array $context): array
+    {
+        $bounded = [];
+        foreach (['locale', 'domain', 'usage_scope', 'region', 'community', 'scope', 'term_type'] as $key) {
+            if (!array_key_exists($key, $context)) continue;
+            $value = $context[$key];
+            if (is_string($value)) {
+                $value = trim($value);
+                if ($value !== '') $bounded[$key] = $value;
+            } elseif (is_array($value) && $value !== []) {
+                $bounded[$key] = $value;
+            }
+        }
+        if (is_array($context['subject'] ?? null)) {
+            $type = trim((string) ($context['subject']['type'] ?? ''));
+            $id = trim((string) ($context['subject']['id'] ?? ''));
+            if ($type !== '' || $id !== '') $bounded['subject'] = array_filter(['type' => $type, 'id' => $id], static fn (string $value): bool => $value !== '');
+        }
+        return $this->sort($bounded);
     }
 
     private function hash(array $context): string
