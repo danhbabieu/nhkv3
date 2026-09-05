@@ -89,10 +89,33 @@ final class DictionaryRuntime
         catch (\Throwable) { return false; }
     }
 
+    public function preview(string $text, string $sourceKind, string $sourceId = '', array $context = [], array $hints = []): array
+    {
+        if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
+        return $this->planning->preview($text, $sourceKind, $sourceId, $context, $hints, $this->approvedLabels());
+    }
+
     public function plan(string $text, string $sourceKind, string $sourceId, array $context = [], array $hints = []): array
     {
         if (!$this->available()) throw new \RuntimeException('DICTIONARY_STORAGE_UNAVAILABLE');
         return $this->planning->plan($text, $sourceKind, $sourceId, $context, $hints, $this->approvedLabels());
+    }
+
+    public function publicTerms(): array
+    {
+        if (!$this->available()) return [];
+        $items = [];
+        foreach ((array) ($this->publicQuery->hub(2000)['items'] ?? []) as $item) {
+            if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;
+            $conceptId = trim((string) ($item['concept_id'] ?? ''));
+            foreach ((array) ($item['labels'] ?? []) as $label) {
+                if (!is_array($label) || in_array((string) ($label['kind'] ?? ''), [DictionaryLabel::HIDDEN], true)) continue;
+                $text = trim((string) ($label['label'] ?? ''));
+                if ($conceptId === '' || $text === '') continue;
+                $items[] = ['concept_id' => $conceptId, 'label' => $text, 'url' => (string) $item['url']];
+            }
+        }
+        return $items;
     }
 
     public function curation(): DictionaryCurationService { return $this->curation; }
