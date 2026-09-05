@@ -5,9 +5,11 @@ namespace NHK\Core\Application\Dictionary;
 
 use NHK\Core\Application\Entity\{EntityMediaProjection, PublicRouteResolver};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
-use NHK\Core\Domain\Dictionary\DictionaryLabel;
+use NHK\Core\Domain\Dictionary\{DictionaryConcept, DictionaryLabel};
+use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Dictionary\{WpdbDictionaryCandidateRepository, WpdbDictionaryConceptRepository, WpdbDictionaryMentionRepository};
+use NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 
@@ -16,6 +18,7 @@ final class DictionaryRuntime
     private DictionaryTermNormalizer $normalizer;
     private EntityTypeRegistry $types;
     private WpdbAuthorityRepository $authority;
+    private WpdbKnowledgeRepository $knowledge;
     private PublicRouteResolver $routes;
     private WpdbDictionaryConceptRepository $concepts;
     private WpdbDictionaryCandidateRepository $candidates;
@@ -34,11 +37,12 @@ final class DictionaryRuntime
         $this->types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($this->types);
         $this->authority = new WpdbAuthorityRepository($database);
+        $this->knowledge = new WpdbKnowledgeRepository($database);
         $this->routes = new PublicRouteResolver($this->authority, $this->types);
 
         $contextHash = fn (array $context): string => $this->contextHash($context);
         $resolver = new DictionaryResolver(
-            approvedLabelLookup: fn (string $term, array $context): array => $this->concepts->findApprovedByNormalizedLabel($term, $context),
+            approvedLabelLookup: fn (string $term, array $context): array => $this->approvedLabelRows($term, $context),
             entityLookup: function (string $term, array $context): array {
                 $out = [];
                 foreach ($this->types->all() as $definition) {
@@ -46,11 +50,12 @@ final class DictionaryRuntime
                         if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
                         foreach ($this->entityForms($entity) as $form) {
                             if ($this->normalizer->normalize($form) !== $term) continue;
+                            $url = $this->routes->path($entity);
                             $out[$entity->canonicalId] = [
                                 'preferred_label' => $entity->canonicalName,
                                 'destination_type' => $entity->entityType,
                                 'destination_id' => $entity->canonicalId,
-                                'destination_url' => $this->routes->path($entity),
+                                'destination_url' => $url,
                             ];
                             break;
                         }
@@ -58,7 +63,20 @@ final class DictionaryRuntime
                 }
                 return array_values($out);
             },
-            knowledgeLookup: static fn (string $term, array $context): array => [],
+            knowledgeLookup: function (string $term, array $context): array {
+                $out = [];
+                foreach ($this->knowledge->list() as $claim) {
+                    if (!$claim instanceof KnowledgeClaim || !$claim->active) continue;
+                    if ($this->normalizer->normalize($claim->claimText) !== $term) continue;
+                    $out[$claim->canonicalId] = [
+                        'preferred_label' => $claim->claimText,
+                        'destination_type' => 'knowledge',
+                        'destination_id' => $claim->canonicalId,
+                        'destination_url' => null,
+                    ];
+                }
+                return array_values($out);
+            },
             articleLookup: function (string $term, array $context): array {
                 if (!function_exists('get_posts')) return [];
                 $posts = get_posts(['post_type' => 'post', 'post_status' => 'publish', 's' => $term, 'posts_per_page' => 20, 'no_found_rows' => true]);
@@ -83,22 +101,7 @@ final class DictionaryRuntime
                 $projection = $mediaProjection->forEntity('dictionary_concept', $conceptId);
                 return is_array($projection['representative'] ?? null) ? $projection['representative'] : null;
             },
-            function (?string $type, ?string $id, ?string $url): bool {
-                $type = trim((string) $type); $id = trim((string) $id); $url = trim((string) $url);
-                if ($type === '' || $id === '' || $url === '') return false;
-                if ($this->types->has($type)) {
-                    $entity = $this->authority->findByCanonicalId($id);
-                    return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active() && $this->sameUrl($this->routes->path($entity), $url);
-                }
-                if ($type === 'article' && function_exists('get_post')) {
-                    $postId = (int) preg_replace('/^.*:/', '', $id);
-                    $post = $postId > 0 ? get_post($postId) : null;
-                    if (!$post instanceof \WP_Post || $post->post_type !== 'post' || $post->post_status !== 'publish') return false;
-                    $permalink = function_exists('get_permalink') ? get_permalink($post) : false;
-                    return is_string($permalink) && $this->sameUrl($permalink, $url);
-                }
-                return false;
-            },
+            fn (?string $type, ?string $id, ?string $url): ?string => $this->revalidateDelegatedDestination($type, $id, $url),
         );
     }
 
@@ -134,17 +137,6 @@ final class DictionaryRuntime
                 $items[$conceptId . "\0" . $this->normalizer->normalize($text)] = ['concept_id' => $conceptId, 'label' => $text, 'url' => (string) $item['url']];
             }
         }
-        foreach ($this->types->all() as $definition) {
-            foreach ($this->authority->listByType($definition->type) as $entity) {
-                if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
-                $url = $this->routes->path($entity);
-                if ($url === null) continue;
-                foreach ($this->entityForms($entity) as $form) {
-                    $key = 'entity:' . $entity->canonicalId . "\0" . $this->normalizer->normalize($form);
-                    $items[$key] = ['concept_id' => 'entity:' . $entity->canonicalId, 'label' => $form, 'url' => $url];
-                }
-            }
-        }
         return array_values($items);
     }
 
@@ -172,6 +164,59 @@ final class DictionaryRuntime
     public function approvedLabels(): array { return $this->detectionLabels(); }
     public function invalidateLabelCache(): void { $this->detectionLabels = null; }
 
+    private function approvedLabelRows(string $term, array $context): array
+    {
+        $rows = [];
+        foreach ($this->concepts->findApprovedByNormalizedLabel($term, $context) as $row) {
+            if (!is_array($row)) continue;
+            $conceptId = trim((string) ($row['concept_id'] ?? ''));
+            if ($conceptId === '') continue;
+            $type = trim((string) ($row['destination_type'] ?? ''));
+            $id = trim((string) ($row['destination_id'] ?? ''));
+            $storedUrl = trim((string) ($row['destination_url'] ?? ''));
+            if ($type !== '' || $id !== '' || $storedUrl !== '') {
+                $current = $this->revalidateDelegatedDestination($type, $id, $storedUrl);
+                if ($current === null) continue;
+                $row['destination_url'] = $current;
+                $rows[] = $row;
+                continue;
+            }
+
+            $concept = $this->concepts->findById($conceptId);
+            if (!$concept instanceof DictionaryConcept || !$concept->approved()) continue;
+            $slug = $this->slug((string) ($concept->context['public_slug'] ?? ''));
+            $row['destination_type'] = 'dictionary';
+            $row['destination_id'] = $concept->conceptId;
+            $row['destination_url'] = $slug !== '' ? '/tu-dien/' . $slug . '/' : null;
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    private function revalidateDelegatedDestination(?string $type, ?string $id, ?string $storedUrl): ?string
+    {
+        $type = trim((string) $type);
+        $id = trim((string) $id);
+        if ($type === '' || $id === '') return null;
+
+        if ($this->types->has($type)) {
+            $entity = $this->authority->findByCanonicalId($id);
+            if (!$entity instanceof AuthorityEntity || $entity->entityType !== $type || !$entity->active()) return null;
+            $current = $this->routes->path($entity);
+            return is_string($current) && trim($current) !== '' ? $current : null;
+        }
+
+        if ($type === 'article' && function_exists('get_post')) {
+            $postId = (int) preg_replace('/^.*:/', '', $id);
+            $post = $postId > 0 ? get_post($postId) : null;
+            if (!$post instanceof \WP_Post || $post->post_type !== 'post' || $post->post_status !== 'publish') return null;
+            $permalink = function_exists('get_permalink') ? get_permalink($post) : false;
+            return is_string($permalink) && trim($permalink) !== '' ? $permalink : null;
+        }
+
+        return null;
+    }
+
     private function entityForms(AuthorityEntity $entity): array
     {
         $forms = [$entity->canonicalName];
@@ -179,17 +224,13 @@ final class DictionaryRuntime
         return array_values(array_unique($forms));
     }
 
-    private function sameUrl(?string $left, ?string $right): bool
+    private function slug(string $value): string
     {
-        if ($left === null || $right === null) return false;
-        $normalize = static function (string $value): string {
-            $value = trim($value);
-            if ($value === '') return '';
-            $parts = function_exists('wp_parse_url') ? wp_parse_url($value) : parse_url($value);
-            if (is_array($parts) && isset($parts['path'])) return '/' . trim((string) $parts['path'], '/') . '/';
-            return '/' . trim($value, '/') . '/';
-        };
-        return $normalize($left) === $normalize($right);
+        $value = trim($value);
+        if ($value === '') return '';
+        if (function_exists('sanitize_title')) return (string) sanitize_title($value);
+        $value = function_exists('iconv') ? (string) (iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value) : $value;
+        return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-');
     }
 
     private function contextHash(array $context): string
