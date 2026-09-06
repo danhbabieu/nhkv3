@@ -4341,3 +4341,36 @@ database mutation, production/staging/V2 change or push is claimed. Guarded
 integration and route smoke remain environment-blocked. The migration service
 does not rename media files, rewrite article bodies, alter UUID/stable_key or
 relations, or create redirects.
+
+## Graph relation foundation checkpoint — 2026-09-06
+
+The confirmed Controlled Apply root cause was a registry mismatch: relation
+lifecycle operations were registered only for `entity_type=relation`, while
+the executor dispatches relation packets by operation. Knowledge relation
+proposals therefore failed before Graph endpoint validation with
+`REGISTRY_GAP: Unsupported Controlled Apply combination: knowledge+relation_create`.
+The registry/executor path now accepts governed Knowledge relation lifecycle
+commands and preserves explicit `source_type/source_uuid` and
+`target_type/target_uuid` independently from Proposal `subject_id`.
+
+The existing Graph repository remains canonical. Direct outbound/inbound reads
+now support endpoint-type filtering before cursor pagination. A bounded,
+registry-driven semantic neighborhood query is available to frontend/MCP
+seams, and `nhk.entity.neighborhood` is exposed as read-only MCP/Ability
+capability. A generic dry-run/apply backfill coordinator reports deterministic,
+ambiguous, unsupported, evidence-gap and registry-gap outcomes and marks a
+second run zero-change when existing edges are found.
+
+`classified_as` was not added: the current approved Authority/Graph vocabulary
+does not formalize it, so Classification membership remains `REGISTRY_GAP` and
+`about` is not used as a substitute. Product–Specimen remains unapproved.
+
+Focused Graph/Governance/MCP/backfill tests pass; the complete Unit suite passes
+596 tests / 2,805 assertions with 2 warnings and 5 PHPUnit deprecations. The
+full suite reaches 704 tests but remains `ENVIRONMENT_BLOCKED`: WordPress
+integration tests require `NHK_WP_TEST_PATH=public` and two Dictionary tests
+require a bootstrapped WordPress `update_option()`. No Cuckoo/Odo live backfill,
+canonical data mutation or production/staging/V2 change is claimed in this
+checkout. The remaining owner action is to provide the development WordPress
+runtime/database, then run governed dry-run → approval/apply → canonical and
+inverse readback for the named fixtures.

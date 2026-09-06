@@ -40,7 +40,7 @@ registry/catalog merely because its wording is present tense.
 | Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts |
 | Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
-| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; physical row completeness/backfill is a separate runtime/data question |
+| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; governed relation commands now preserve explicit endpoint UUIDs, bounded direct/inverse reads and a read-only semantic-neighborhood MCP seam exist; `classified_as` remains a documented `REGISTRY_GAP` pending approved Authority vocabulary, and physical row completeness/backfill is a separate runtime/data question |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
 | Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates, while guarded migration/data allocation/current-route durable consumer parity and live re-projection remain runtime-unverified |
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
@@ -109,6 +109,7 @@ Do not rewrite history merely to make old checkpoints look current.
 - dedicated Dictionary MCP tools are not current capability truth unless they
   are added to the executable catalog and confirmed by fresh runtime discovery;
 - dedicated Product–Specimen canonical relation;
+- approved Classification membership predicate (`classified_as`) and live Graph relation backfill runtime;
 - full physical Graph completeness/backfill where not runtime-proven;
 - Media → Living Knowledge automatic enrichment adapter;
 - automatic Article body rewrite from Knowledge (prohibited by design; only
