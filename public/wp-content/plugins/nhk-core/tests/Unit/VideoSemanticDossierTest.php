@@ -63,8 +63,9 @@ final class VideoSemanticDossierTest extends TestCase
         $result = $query->forVideo($video);
 
         self::assertSame('AVAILABLE', $result['status']);
+        self::assertSame('video', $result['profile']['identity']['type']);
         self::assertSame('Âm thanh hiện vật', $result['identity']['title']);
-        self::assertSame('/video/am-thanh-hien-vat-dqw4w9wgxcq/', $result['identity']['url']);
+        self::assertSame('/video/am-thanh-hien-vat/', $result['identity']['url']);
         self::assertSame('https://www.youtube.com/watch?v=dQw4w9WgXcQ', $result['identity']['source_url']);
         self::assertSame('https://img.example.test/v.jpg', $result['identity']['thumbnail_url']);
         self::assertSame('DIRECT', $result['relation_sections']['movements'][0]['origin']['kind'] ?? null);

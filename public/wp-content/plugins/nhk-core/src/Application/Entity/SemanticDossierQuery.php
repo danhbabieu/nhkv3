@@ -120,7 +120,7 @@ final class SemanticDossierQuery
         [$primary, $gallery] = $this->mediaPacket($media);
         $warnings = $this->relationWarnings($relationResult, []);
 
-        return [
+        $dossier = [
             'status' => 'AVAILABLE',
             'identity' => [
                 'type' => 'wp_post',
@@ -141,6 +141,8 @@ final class SemanticDossierQuery
                 'knowledge' => 'NOT_APPLICABLE',
             ],
         ];
+        $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose('wp_post', $dossier);
+        return $dossier;
     }
 
     /** @return array<string,mixed> */
@@ -165,7 +167,7 @@ final class SemanticDossierQuery
         $sections = $this->relationSections($relationResult);
         $warnings = $this->relationWarnings($relationResult, []);
 
-        return [
+        $dossier = [
             'status' => 'AVAILABLE',
             'identity' => [
                 'type' => 'video',
@@ -186,6 +188,8 @@ final class SemanticDossierQuery
                 'knowledge' => 'NOT_APPLICABLE',
             ],
         ];
+        $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose('video', $dossier);
+        return $dossier;
     }
 
     /** @return array<string,list<array<string,mixed>>> */

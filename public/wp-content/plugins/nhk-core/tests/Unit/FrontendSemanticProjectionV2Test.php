@@ -23,6 +23,13 @@ use PHPUnit\Framework\TestCase;
 
 final class FrontendSemanticProjectionV2Test extends TestCase
 {
+    public function test_entity_template_consumes_the_reader_safe_profile_contract(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php');
+        self::assertStringContainsString("['profile']", $template);
+        self::assertStringContainsString("['section_order']", $template);
+    }
+
     public function test_canonical_entity_detail_keeps_graph_related_projection(): void
     {
         $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
