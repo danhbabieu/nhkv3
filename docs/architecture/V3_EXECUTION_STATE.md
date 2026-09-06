@@ -1,5 +1,19 @@
 # NHK V3 Execution State
 
+## Public slug policy and existing-URL migration design revision — 2026-09-06
+
+The public slug design now makes existing-site migration/reprojection mandatory
+and defines the sequence `audit → dry-run → collision detection → apply →
+reprojection → read-back verification`. It specifies a zero-write dry-run row
+contract, idempotent/CAS-safe apply, canonical freeze, deterministic semantic
+collision handling, one-hop historic redirect backlog, and one persisted route
+source of truth for frontend/SEO consumers. It explicitly separates public slug
+policy from Media filename normalization and preserves all internal identity and
+Video external-ID metadata. Video contract reconciliation is a prerequisite
+before implementation because the current Video contract still documents an
+external-ID URL suffix. This is documentation only; no migration, reprojection,
+route allocation or runtime data was mutated.
+
 ## Semantic frontend discovery design checkpoint — 2026-09-06
 
 The approved design is recorded in
