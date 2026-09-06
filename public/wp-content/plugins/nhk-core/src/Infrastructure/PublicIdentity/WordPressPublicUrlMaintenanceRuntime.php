@@ -47,7 +47,7 @@ final class WordPressPublicUrlMaintenanceRuntime
         return new PublicUrlMaintenanceService(
             fn (): array => $this->inventory(),
             fn (array $item, string $candidate): bool => $this->externallyOccupied($item, $candidate),
-            fn (array $item, string $idempotencyKey): void => $this->apply($item, $idempotencyKey),
+            function (array $item, string $idempotencyKey): void { $this->apply($item, $idempotencyKey); },
         );
     }
 
