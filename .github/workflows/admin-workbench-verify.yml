@@ -1,0 +1,45 @@
+name: Admin hybrid workbench verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/wp-content/plugins/nhk-core/nhk-core.php'
+      - 'public/wp-content/plugins/nhk-core/src/Infrastructure/Admin/**'
+      - 'public/wp-content/plugins/nhk-core/src/Plugin.php'
+      - 'public/wp-content/plugins/nhk-core/assets/admin/**'
+      - 'public/wp-content/plugins/nhk-core/tests/Unit/Admin/**'
+      - 'docs/superpowers/specs/2026-09-06-admin-hybrid-workbench-design.md'
+      - 'docs/superpowers/plans/2026-09-06-admin-hybrid-workbench.md'
+      - 'docs/architecture/V3_EXECUTION_STATE.md'
+      - 'docs/architecture/checkpoints/**'
+      - '.github/workflows/admin-workbench-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Composer validation
+        run: composer validate --no-interaction
+      - name: Diff check
+        run: |
+          git fetch origin main
+          git diff --check origin/main...HEAD
+      - name: PHP lint
+        run: composer lint
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite 'NHK Unit'
