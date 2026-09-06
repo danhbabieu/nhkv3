@@ -42,6 +42,7 @@ final class PublicUrlReprojectionPlanner
             $scope = trim((string)($item['scope'] ?? ''));
             $name = trim((string)($item['name'] ?? ''));
             $current = trim((string)($item['current_slug'] ?? ''));
+            $currentScope = trim((string)($item['current_scope'] ?? $scope));
             $qualifiers = array_values(array_filter(array_map(static fn(mixed $value): string => is_scalar($value) ? trim((string)$value) : '', (array)($item['qualifiers'] ?? [])), static fn(string $value): bool => $value !== ''));
             $planned = $item;
             $planned['desired_slug'] = null;
@@ -71,7 +72,7 @@ final class PublicUrlReprojectionPlanner
 
             $reserved[$keyPrefix . $desired] = true;
             $planned['desired_slug'] = $desired;
-            if ($current === $desired) {
+            if ($current === $desired && $currentScope === $scope) {
                 $planned['action'] = 'KEEP';
                 $kept++;
             } else {
