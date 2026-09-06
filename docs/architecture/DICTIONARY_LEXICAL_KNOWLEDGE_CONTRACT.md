@@ -1,6 +1,6 @@
 # NHK V3 Dictionary Lexical Knowledge Contract
 
-> **APPROVED SUBORDINATE CONTRACT — 2026-09-05.**
+> **APPROVED SUBORDINATE CONTRACT — updated 2026-09-06.**
 > This contract is subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md`.
 > It introduces a bounded lexical/curation layer. It does **not** create a new
 > Authority entity type, Graph predicate, semantic evidence source, Article body
@@ -25,6 +25,13 @@ The governing rule is:
 
 A detected term is never permission to mint a new Authority, Knowledge claim,
 Source, Evidence, Graph relation, Media identity, Video identity or public URL.
+
+Dictionary has three product goals:
+
+1. help editors curate the language actually used by collectors/readers;
+2. help readers understand terminology and move to the correct canonical owner;
+3. improve discovery/internal linking without creating a second semantic truth
+   system.
 
 ## 2. Lexical objects
 
@@ -66,6 +73,10 @@ Label kinds are:
 A label may include locale and context qualifiers. One raw string may map to
 multiple concepts only when the contextual rules make the ambiguity explicit;
 such a label must never auto-link without a unique contextual resolution.
+
+Display text and lookup normalization are separate concerns. Vietnamese display
+labels must remain human-readable and must not be replaced by their normalized
+lookup form merely to simplify search or URL generation.
 
 ### 2.3 Dictionary Candidate
 
@@ -139,6 +150,8 @@ If multiple viable destinations remain, resolution is `AMBIGUOUS`; auto-linking
 and auto-attachment fail closed while the underlying Article/Media/Video ingest
 may continue if no other contract requires the lexical decision.
 
+Repeated resolution of the same approved input/context must be deterministic.
+
 ## 5. Canonical destination ownership
 
 One public concept should have one canonical search destination.
@@ -163,6 +176,10 @@ Media and Video are supporting/illustrative content by default and are not
 chosen as the lexical canonical destination merely because a term was detected
 inside them.
 
+A delegated concept may remain visible in the `/tu-dien/` hub as a lexical entry,
+but its clickable destination and canonical ownership belong to the delegated
+owner. The system must not publish a competing indexable dictionary detail page.
+
 ## 6. Candidate creation and human curation
 
 Automatic detection may create or increment a **candidate**, never silently
@@ -174,6 +191,9 @@ The review inbox must support these decisions:
 - add label/alias to existing concept;
 - create a new draft concept;
 - approve concept;
+- edit preferred label, definition and bounded lexical context;
+- delegate canonical destination to an existing approved owner;
+- merge duplicate lexical concepts/labels without rekeying the semantic owner;
 - mark ambiguous and require context;
 - reject;
 - ignore;
@@ -184,6 +204,10 @@ The review inbox must support these decisions:
 AI-assisted review may summarize occurrences, contrast likely meanings and ask
 targeted questions. Its generated explanation is advisory editorial content,
 not Evidence and not an approval event.
+
+Curation should expose enough provenance for the editor to see observed forms,
+where the term appeared, current suggestions, destination candidates and why a
+candidate is ambiguous before deciding.
 
 ## 7. Duplicate prevention
 
@@ -201,6 +225,10 @@ term was detected.
 
 A dictionary concept may point to an existing owner without creating a second
 public page.
+
+Aliases, colloquial forms, phonetic forms and technical forms that resolve to
+one meaning should normally remain labels of one concept rather than being
+published as multiple equivalent concepts.
 
 ## 8. Article integration
 
@@ -234,6 +262,10 @@ factual assertion that should become Knowledge, it must be handed to the
 existing Living Knowledge planner and Governance lifecycle with normal Source /
 Evidence requirements.
 
+A public dictionary page may point readers to existing Knowledge, but it must
+not copy a Knowledge claim into lexical storage and then present the copied text
+as an independently sourced fact.
+
 ## 10. Media/Image integration
 
 Media ingestion and identity remain governed by the Media contracts.
@@ -246,6 +278,9 @@ Evidence automatically.
 An approved concept may select existing eligible Media as an illustration
 through the existing MediaUsage/projection boundary. The image is reused; it is
 not copied into a dictionary-owned binary store.
+
+A dictionary illustration is presentation context only and does not prove the
+term's definition or semantic relation.
 
 ## 11. Video integration
 
@@ -273,10 +308,15 @@ The linker must:
 - normally link the first occurrence of a concept per Article/page;
 - never link an ambiguous or review-pending candidate;
 - use the resolved canonical destination directly, not a compatibility URL;
+- revalidate delegated destination/public eligibility at read time;
 - never mutate semantic truth because a link was rendered.
 
 The stored WordPress Article body remains unchanged unless an independent
 editorial write is explicitly approved.
+
+When a canonical destination changes, future render projection must point
+straight to the current canonical owner instead of deliberately preserving an
+old redirect as an internal link.
 
 ## 13. Search and public dictionary hub
 
@@ -289,6 +329,15 @@ labels. If a concept delegates ownership to an existing Entity, Knowledge or
 Article, the hub item links directly to that owner. A dedicated dictionary
 route exists only for concepts whose canonical destination is the dictionary
 page itself.
+
+The hub is a first-class discovery surface and should support reader-oriented
+browse/search such as preferred label, aliases and bounded lexical grouping when
+those fields are actually curated. It must not manufacture taxonomies or
+semantic classifications merely to create navigation.
+
+Public search should match approved preferred/alternate/colloquial/technical or
+phonetic labels according to current resolver rules, while hiding private
+candidate and hidden administrative state from readers.
 
 ## 14. SEO and structured data
 
@@ -306,6 +355,13 @@ Sitemap/indexability rules apply normally. Do not index draft, ambiguous,
 rejected, ignored, suppressed, duplicate, redirected or owner-delegated
 non-canonical dictionary pages.
 
+Standalone dictionary public slugs must use the current shared public URL/slug
+contract. The lexical UUID, semantic owner UUID, internal database IDs or
+technical source keys are not SEO slug material.
+
+Canonical, Open Graph URL, structured-data URL, sitemap URL and internal links
+for a standalone dictionary page must resolve to the same canonical path.
+
 ## 15. MCP and Admin control plane
 
 MCP/Admin are orchestration/input surfaces, not lexical truth stores.
@@ -322,6 +378,19 @@ proposal approval unless they actually mutate those bounded contexts. If a
 curation decision additionally proposes a Knowledge/Graph change, that
 secondary change enters the existing Proposal → Human Approval → Eligibility →
 Controlled Apply lifecycle separately.
+
+A usable curator workspace should expose, subject to current runtime capability:
+
+- candidate queue by state and recency;
+- exact/alias lookup before create;
+- occurrence/source-context inspection;
+- resolve/delegate/merge/reject/suppress decisions;
+- concept and label editing with optimistic revision;
+- preview of public destination and auto-link effect;
+- read-back/audit result after a curated write.
+
+Code presence alone is not proof that a dedicated Dictionary MCP action is live;
+runtime availability must be confirmed by current catalog/discovery.
 
 ## 16. Runtime/storage requirements
 
@@ -362,23 +431,126 @@ The dry-run report must separate at least:
 Bulk apply must never auto-approve new public concepts. It may only persist
 mentions/candidates and approved deterministic reuse allowed by this contract.
 
-## 18. Acceptance criteria
+Backfill must be replay-safe. A second scan of unchanged content should not
+create duplicate mentions or duplicate candidates.
+
+## 18. Functional capability requirements
+
+Dictionary implementation is expected to provide the following bounded
+capabilities. These are product/UX requirements inside the ownership rules above;
+they do not expand semantic authority.
+
+### 18.1 Reader-facing capabilities
+
+- browse the public Dictionary hub;
+- search by approved preferred and accepted alternate lexical forms;
+- open a dedicated Dictionary detail page only when Dictionary owns the reader
+  destination;
+- follow owner-delegated entries directly to the current canonical owner;
+- see concise lexical definition/explanation, approved aliases and contextual
+  usage information where curated;
+- see eligible representative/illustrative Media when available through the
+  existing Media projection;
+- discover approved Dictionary terms contextually from Article and Entity detail
+  surfaces without duplicating the owning content;
+- return a clear no-match state instead of inventing a definition or destination.
+
+### 18.2 Editor/curator capabilities
+
+- inspect unresolved and ambiguous candidate terms;
+- inspect raw forms, normalized form, occurrences and source contexts;
+- search/reuse an existing concept or canonical owner before create;
+- add/retire labels without changing semantic owner identity;
+- create a draft lexical concept;
+- approve/retire a lexical concept through the dedicated curation boundary;
+- delegate a concept to an existing canonical owner;
+- merge/reconcile duplicate lexical concepts where ownership is lexical;
+- reject, ignore or durably suppress unwanted suggestions;
+- preview public destination and projected internal-link behavior before a
+  consequential curation decision;
+- receive explicit conflict/unavailable states instead of silent fallback.
+
+### 18.3 Contextual projection capabilities
+
+Dictionary may enrich these public/read surfaces when approved data exists:
+
+- homepage Dictionary module/highlights;
+- `/tu-dien/` browse/search hub;
+- standalone Dictionary detail pages;
+- Article contextual terms/sidebar/rail;
+- Entity dossier contextual terms/sidebar/rail;
+- site search alias expansion;
+- render-time internal lexical linking.
+
+A contextual list is a lexical aid, not a claim that every displayed term is a
+semantic child/relation of the current page.
+
+## 19. Public UX and presentation contract
+
+Dictionary public UX is Vietnamese-first, reader-oriented and intentionally
+lighter than a semantic dossier.
+
+A standalone Dictionary detail page should project, when available and actually
+owned by that concept:
+
+1. preferred label;
+2. concise definition/explanation;
+3. accepted alternate/colloquial/technical/phonetic labels suitable for public
+   display;
+4. bounded usage/context note when needed for disambiguation;
+5. canonical owner link when ownership is delegated rather than duplicated;
+6. eligible illustrative Media;
+7. related public reading destinations only when produced by an existing
+   approved read/projection boundary;
+8. clear canonical/indexability state.
+
+The page must not expose internal lexical UUIDs, revisions, candidate confidence,
+private review notes, source-system IDs or hidden resolver labels as reader copy.
+
+Contextual Dictionary widgets on homepage, Article and Entity pages should be
+compact discovery components. They must deduplicate concepts, prefer the
+approved public label, and never display a private/ambiguous candidate as if it
+were an approved term.
+
+When no eligible public term exists, the component should be omitted or report
+an unavailable/no-match state appropriate to the host surface; it must not fill
+space with invented lexical content.
+
+## 20. Acceptance criteria
 
 The capability is not READY until tests and runtime read-back demonstrate:
 
-1. existing approved term reuses one canonical destination;
-2. unknown term creates/updates one private candidate without semantic writes;
-3. ambiguous term does not auto-link;
-4. suppression prevents candidate recreation;
-5. longest-phrase-first linking avoids nested links and changes no stored body;
-6. Article research exposes dictionary planning without making candidates a
+1. an existing approved term reuses one canonical destination;
+2. an approved alias resolves to the same concept/destination as its preferred
+   label;
+3. an unknown term creates/updates one private candidate without semantic
+   writes;
+4. an ambiguous term does not auto-link;
+5. durable suppression prevents equivalent candidate recreation;
+6. longest-phrase-first linking avoids nested links and changes no stored body;
+7. Article research exposes dictionary planning without making candidates a
    publication blocker;
-7. Knowledge reuse does not mint duplicate claims;
-8. Media weak observations create candidates only;
-9. Video metadata/transcript observations create candidates only and preserve
-   explicit semantic target scope;
-10. search expands approved aliases only;
-11. owner-delegated dictionary entries do not create duplicate indexable pages;
-12. dedicated dictionary pages have one canonical URL and correct indexability;
-13. all curated writes enforce authorization/revision/idempotency/read-back;
-14. runtime failure is surfaced as unavailable, never an empty success.
+8. Knowledge reuse does not mint duplicate claims;
+9. Media weak observations create candidates only;
+10. Video metadata/transcript observations create candidates only and preserve
+    explicit semantic target scope;
+11. search expands approved aliases only;
+12. owner-delegated dictionary entries do not create duplicate indexable pages;
+13. a dedicated dictionary page exists only when Dictionary owns the canonical
+    reader destination;
+14. dedicated dictionary pages have one canonical URL and correct indexability;
+15. homepage/Article/Entity contextual Dictionary projection emits only approved
+    public concepts and deduplicates repeated labels;
+16. delegated terms link directly to the current canonical owner, not an old
+    compatibility/redirect URL;
+17. changing a label or lexical definition does not rekey the delegated
+    semantic owner;
+18. hidden/private/candidate state is absent from public archive, search,
+    contextual widgets, sitemap and indexable detail projection;
+19. all curated writes enforce authorization/revision/idempotency/read-back;
+20. repeated unchanged scans/projections are deterministic and replay-safe;
+21. canonical/Open Graph/schema/sitemap/internal-link URL surfaces agree for a
+    standalone Dictionary page;
+22. no Dictionary operation implicitly creates Authority, Knowledge, Source,
+    Evidence or Graph truth;
+23. runtime failure is surfaced as unavailable, never an empty success.
