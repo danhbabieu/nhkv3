@@ -41,6 +41,7 @@ registry/catalog merely because its wording is present tense.
 | Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
 | Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; physical row completeness/backfill is a separate runtime/data question |
+| Public Entity Dossier | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`; detail-only read model over existing canonical owners | shared dossier seam is wired through `nhk_v3_entity_detail_projection`; Brand is the first complete typed path-recipe projection; direct subject Knowledge remains subject-scoped, deep Brand context keeps origin path, archives stay outside the heavy dossier path, and no display shortcut relation is persisted |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
 | Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates, while guarded migration/data allocation/current-route durable consumer parity and live re-projection remain runtime-unverified |
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
@@ -71,6 +72,7 @@ Every domain has one canonical owner and authorized writer boundary:
 - Media/MediaAsset/MediaUsage → governed Media application boundary; WordPress
   attachment is storage/public projection, not semantic owner.
 - Video → governed Video intake/apply boundary.
+- Public Entity Dossier → read-only composition only; never a canonical writer.
 - MCP/Admin/WordPress adapters → orchestration/input adapters only; never a
   second semantic store or writer.
 
@@ -102,6 +104,10 @@ Do not rewrite history merely to make old checkpoints look current.
   parity and target-runtime re-projection are not proven. The current canary
   projection is intentionally read-only; no bulk persisted-identity rewrite or
   governed re-projection executor is claimed by code presence alone;
+- Brand is the first complete explicit deep-path Public Entity Dossier recipe;
+  equivalent type-specific completeness recipes for Model, Movement, Variant
+  and the remaining Entity types must be added deliberately rather than by
+  increasing the generic graph traversal bound;
 - Dictionary migration 015/runtime activation, initial curated data, dry-run
   legacy backfill and target-environment public-route/read-back are not proven
   until executed in the target WordPress runtime; code presence alone is not
@@ -132,6 +138,11 @@ Before implementing or mutating data:
 5. fail closed on ambiguity or a missing approved writer/relation;
 6. use Governance for semantic mutation;
 7. read back from the canonical owner before claiming completion.
+
+For public Entity display work, also resolve the applicable dossier recipe. A
+reachable graph node is not automatically approved public inherited truth; use
+only current registered/contracted paths and preserve direct-versus-derived
+scope in the emitted dossier.
 
 For Dictionary work specifically, detection is not semantic identity: resolve
 approved labels/current canonical owners first, create a private candidate only

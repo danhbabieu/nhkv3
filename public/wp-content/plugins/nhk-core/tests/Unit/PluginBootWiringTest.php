@@ -22,6 +22,14 @@ final class PluginBootWiringTest extends TestCase
         self::assertLessThan($projection, $usages);
     }
 
+    public function test_plugin_entrypoint_boots_dedicated_entity_dossier_projection(): void
+    {
+        $entrypoint = (string) file_get_contents(__DIR__ . '/../../nhk-core.php');
+
+        self::assertStringContainsString('use NHK\\Core\\Infrastructure\\Frontend\\EntityDossierBootstrap;', $entrypoint);
+        self::assertStringContainsString('EntityDossierBootstrap::boot();', $entrypoint);
+    }
+
     public function test_boot_does_not_run_migrations_without_explicit_runtime_gate(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');

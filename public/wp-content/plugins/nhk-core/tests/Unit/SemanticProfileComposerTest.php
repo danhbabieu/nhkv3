@@ -49,6 +49,22 @@ final class SemanticProfileComposerTest extends TestCase
         self::assertSame([], $profile['articles']);
     }
 
+    public function test_brand_section_order_exposes_every_supported_relation_group(): void
+    {
+        $profile = (new SemanticProfileComposer())->compose('brand', [
+            'identity' => ['type' => 'brand', 'name' => 'Maker A', 'url' => '/maker-a/'],
+            'relation_sections' => [
+                'models' => [], 'variants' => [], 'movements' => [], 'music' => [],
+                'components' => [], 'classifications' => [], 'specimens' => [], 'products' => [],
+                'media' => [], 'videos' => [], 'articles' => [],
+            ],
+        ]);
+
+        foreach (['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'] as $section) {
+            self::assertContains($section, $profile['section_order'], 'Brand dossier section order must not hide ' . $section . '.');
+        }
+    }
+
     public function test_keeps_unavailable_dependency_distinct_from_empty_available_profile(): void
     {
         $composer = new SemanticProfileComposer();

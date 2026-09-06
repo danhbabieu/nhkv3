@@ -11,7 +11,11 @@ final class SemanticProfileComposer
 {
     /** @var array<string,list<string>> */
     private const SECTION_ORDER = [
-        'brand' => ['identity', 'summary', 'hierarchy', 'models', 'movements', 'variants', 'knowledge', 'evidence_context', 'media_gallery', 'videos', 'articles', 'navigation'],
+        'brand' => [
+            'identity', 'summary', 'hierarchy', 'models', 'variants', 'movements', 'music',
+            'components', 'classifications', 'specimens', 'products', 'knowledge',
+            'evidence_context', 'media_gallery', 'media', 'videos', 'articles', 'navigation',
+        ],
         'movement' => ['identity', 'parent_context', 'related_movements', 'technical_configuration', 'music', 'components', 'recognition', 'variants', 'knowledge', 'evidence_context', 'media_gallery', 'videos', 'articles', 'navigation'],
         'variant' => ['identity', 'parent_context', 'configuration', 'music', 'components', 'recognition', 'evidence_context', 'nearby_variants', 'media_gallery', 'videos', 'articles', 'navigation'],
     ];
