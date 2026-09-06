@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoUrlPolicy
@@ -14,7 +15,7 @@ final class VideoUrlPolicy
         $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
         $blockers = [];
         $slug = trim((string) ($identity['current_slug'] ?? ''));
-        if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
+        if (!CanonicalPublicSlugPolicy::isCanonical($slug)) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
 
         $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
