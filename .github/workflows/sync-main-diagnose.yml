@@ -51,8 +51,24 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - name: PHP lint
         run: composer lint
-      - name: Full unit suite
-        run: vendor/bin/phpunit --testsuite 'NHK Unit'
+      - name: Full unit suite and diagnostic
+        shell: bash
+        run: |
+          set +e
+          vendor/bin/phpunit --testsuite 'NHK Unit' > /tmp/unit.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/unit.log
+          if [ "$code" -ne 0 ]; then
+            git merge --abort || true
+            cp /tmp/unit.log tools/sync-test-failure.txt
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add tools/sync-test-failure.txt
+            git commit -m 'ci: record URL sync unit failure [skip sync-main]' || true
+            git push origin HEAD:feature/canonical-public-slug-policy || true
+            exit "$code"
+          fi
       - name: Commit verified merge and push
         shell: bash
         run: |
