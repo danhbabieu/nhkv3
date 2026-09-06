@@ -86,6 +86,16 @@ final class AdminWorkbenchRegistry
                 'kind' => 'workbench',
             ],
             [
+                'id' => 'coverage',
+                'slug' => 'nhk-v3-dossier-coverage',
+                'label' => 'Hồ sơ dữ liệu',
+                'description' => 'Audit read-only về coverage của entity, quan hệ, tri thức, ảnh, Video và Article.',
+                'owner' => 'Read-only Projection',
+                'capability' => 'manage_options',
+                'href' => 'admin.php?page=nhk-v3-dossier-coverage',
+                'kind' => 'workbench',
+            ],
+            [
                 'id' => 'system',
                 'slug' => 'nhk-v3-system',
                 'label' => 'Hệ thống',
