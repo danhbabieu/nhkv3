@@ -69,6 +69,8 @@ final class McpContractTest extends TestCase
             'nhk.knowledge.ingest',
             'nhk.source.ingest',
             'nhk.evidence.ingest',
+            'nhk.public-url.audit',
+            'nhk.public-url.reproject',
             'nhk.proposal.create',
             'nhk.proposal.submit',
             'nhk.proposal.review',
