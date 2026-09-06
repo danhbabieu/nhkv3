@@ -56,6 +56,7 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         self::assertStringContainsString('AdminWorkbenchPage::register();', $entry);
         self::assertStringContainsString('AdminAssets::register(__FILE__);', $entry);
         self::assertStringContainsString("add_action('admin_menu', [AdminPage::class, 'register']);", $plugin);
+        self::assertStringContainsString("remove_action('toplevel_page_nhk-v3', [AdminPage::class, 'render']);", $page);
         self::assertStringContainsString("remove_menu_page('nhk-v3');", $page);
         self::assertStringContainsString("'nhk-v3-advanced', [AdminPage::class, 'render']", $page);
     }
