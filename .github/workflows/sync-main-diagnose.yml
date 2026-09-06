@@ -1,4 +1,4 @@
-name: Diagnose main sync conflicts
+name: Sync main into canonical URL branch
 
 on:
   push:
@@ -8,30 +8,23 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
-    if: ${{ !contains(github.event.head_commit.message, '[skip sync-diagnose]') }}
+  sync:
+    if: ${{ !contains(github.event.head_commit.message, '[skip sync-main]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Diagnose merge and persist conflict list
+      - name: Merge current main and push
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           git fetch origin main
-          set +e
-          git merge --no-commit --no-ff origin/main
-          code=$?
-          set -e
-          conflicts="$(git diff --name-only --diff-filter=U || true)"
-          git merge --abort || true
-          printf '%s\n' "$conflicts" > tools/merge-conflicts.txt
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo 'feature already contains main'
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tools/merge-conflicts.txt
-          if ! git diff --cached --quiet; then
-            git commit -m 'ci: record main sync conflicts [skip sync-diagnose]'
-            git push origin HEAD:feature/canonical-public-slug-policy
-          fi
-          exit $code
+          git merge --no-ff origin/main -m 'chore: sync main into canonical URL branch [skip sync-main]'
+          git push origin HEAD:feature/canonical-public-slug-policy
