@@ -14,7 +14,7 @@ final class AdminWorkbenchRegistryTest extends TestCase
         $sections = $registry->sections();
 
         self::assertSame(
-            ['overview', 'content', 'media', 'video', 'knowledge', 'governance', 'dictionary', 'system', 'advanced'],
+            ['overview', 'content', 'media', 'video', 'knowledge', 'governance', 'dictionary', 'coverage', 'system', 'advanced'],
             array_column($sections, 'id')
         );
         self::assertCount(count($sections), array_unique(array_column($sections, 'id')));
@@ -36,7 +36,7 @@ final class AdminWorkbenchRegistryTest extends TestCase
         self::assertSame('upload_files', $registry->section('media')['capability']);
     }
 
-    public function test_registry_preserves_governance_and_dictionary_capabilities(): void
+    public function test_registry_preserves_governance_dictionary_and_read_only_coverage_boundaries(): void
     {
         $registry = new AdminWorkbenchRegistry();
 
@@ -44,6 +44,9 @@ final class AdminWorkbenchRegistryTest extends TestCase
         self::assertSame('Governance', $registry->section('governance')['owner']);
         self::assertSame('nhk_curate_dictionary', $registry->section('dictionary')['capability']);
         self::assertSame('Dictionary', $registry->section('dictionary')['owner']);
+        self::assertSame('manage_options', $registry->section('coverage')['capability']);
+        self::assertSame('Read-only Projection', $registry->section('coverage')['owner']);
+        self::assertSame('admin.php?page=nhk-v3-dossier-coverage', $registry->section('coverage')['href']);
     }
 
     public function test_every_section_has_human_copy_owner_capability_and_safe_destination(): void
