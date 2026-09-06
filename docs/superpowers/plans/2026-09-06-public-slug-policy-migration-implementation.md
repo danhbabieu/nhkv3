@@ -10,6 +10,28 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-06-public-slug-policy-migration-design.md`
 
+## Current checkpoint status — 2026-09-06
+
+- **Task 1 — DONE:** shared policy and semantic-only Video route are covered by
+  fresh focused tests; the current Video contract and route inventories agree.
+- **Task 2 — PARTIAL / ENVIRONMENT_BLOCKED:** deterministic dry-run rows now
+  expose typed counts, route ownership, invalid-route/unavailable/ambiguous
+  blockers and meaningful collision review; live inventory across all current
+  owners is not executable without the WordPress runtime.
+- **Task 3 — BLOCKED:** the existing Public Identity repository has CAS/history
+  primitives, but governed migration apply/read-back against `nhk_v3_test` is
+  not verified because no WordPress runtime is available.
+- **Task 4 — PARTIAL / ENVIRONMENT_BLOCKED:** unit consumer parity is covered;
+  persisted-route reprojection and HTTP read-back remain unverified.
+- **Task 5 — ENVIRONMENT_BLOCKED:** guarded integration, migration checks and
+  historic 301/canonical 200 smoke require `NHK_WP_TEST_PATH=public` and the
+  exact `nhk_v3_test` runtime.
+- **Task 6 — BLOCKED:** fresh Unit/lint/Composer/diff/secret checks pass, but
+  full integration and working-tree-clean/remote-push closure are not claimed.
+
+**Manual review:** any unresolved collision emitted by dry-run remains
+`MANUAL_REVIEW_REQUIRED`; no ambiguous candidate is eligible for apply.
+
 ## Global Constraints
 
 - UUID, stable key, `nhk:*` identity, database ID, external video ID, idempotency key, source key, hash, revision and internal contract identifier remain unchanged.

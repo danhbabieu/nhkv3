@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\StructuralContextQuery;
-use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
+use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry};
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -30,7 +31,7 @@ final class PublicRouteResolver
      *        boundary probe. The application remains usable without WP in
      *        unit tests and non-HTTP consumers.
      */
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null, private ?\Closure $nativeRootExists = null) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null, private ?\Closure $nativeRootExists = null, private ?PublicIdentityRepository $publicIdentities = null) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
@@ -146,6 +147,18 @@ final class PublicRouteResolver
 
     private function publicSlug(AuthorityEntity $entity, ?string $parentId = null): ?string
     {
+        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
+        if ($repository !== null) {
+            try {
+                $identity = $repository->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
+                if (is_array($identity)) {
+                    $stored = trim((string) ($identity['current_slug'] ?? ''));
+                    return $stored !== '' && CanonicalPublicSlugPolicy::isCanonical($stored) ? $stored : null;
+                }
+            } catch (\Throwable) {
+                // Demo compatibility fallback only; semantic identity is never changed.
+            }
+        }
         foreach ($this->candidateSlugs($entity) as $candidate) {
             if ($this->candidateAvailable($entity, $candidate, $parentId)) return $candidate;
         }

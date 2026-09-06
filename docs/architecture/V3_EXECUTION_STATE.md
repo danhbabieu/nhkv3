@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+## Graph Relation live verification continuation — 2026-09-06
+
+The requested live Graph Relation verification was attempted from the current
+HEAD with the guarded development target `NHK_WP_TEST_PATH=public`
+`NHK_WP_TEST_DB=nhk_v3_test`. The repository contains the Graph, governed
+`knowledge + relation_create`, bidirectional read, bounded neighborhood and
+generic backfill implementation; focused unit proof is 60 tests / 380
+assertions PASS. The MCP naming boundary is also statically aligned:
+`nhk.entity.neighborhood` is the MCP tool and its WordPress Ability bridge is
+`nhk-v3/entity-neighborhood`.
+
+Live verification remains `ENVIRONMENT_BLOCKED`: WordPress bootstrap exits with
+`Error establishing a database connection` before `$wpdb` or any fixture can be
+read. Local MySQL is configured through the Homebrew service, but this runner
+cannot handshake with `127.0.0.1:3306` or `/tmp/mysql.sock`; an escalated
+read-only probe was rejected by the execution policy. No migration, proposal,
+Knowledge, Graph edge, WordPress record or backfill mutation was performed.
+Consequently Cuckoo/Odo existing/created/skipped/ambiguous/blocked counters,
+canonical UUID read-back, inverse retrieval, neighborhood retrieval and
+second-run idempotency remain unverified rather than being inferred.
+
+Fresh available verification: NHK Unit 650 tests / 3,166 assertions PASS with
+2 warnings and 5 PHPUnit deprecations; Composer validation, PHP lint and
+`git diff --check` pass. The full unguarded suite is not a valid runtime result
+because it omits `NHK_WP_TEST_PATH`; the guarded Integration suite cannot
+bootstrap WordPress until the local DB connection is available.
+
 ## Semantic frontend discovery implementation checkpoint — 2026-09-06
 
 The approved semantic frontend design now has an implementation plan at
@@ -21,6 +48,18 @@ Browser/runtime QA and responsive route smoke remain ENVIRONMENT_BLOCKED until
 the local WordPress runtime/data availability is established. No semantic
 record, Graph edge, WordPress content, route identity or live/demo data was
 mutated.
+
+Follow-up completion checkpoint: `origin/main` was fetched and merged through
+`a142f7b`, including the current Brand dossier/public-identity consumers. The
+typed profile seam now also exposes a concrete `relation_order` for template
+rendering, so Movement and Variant preserve Graph-backed parent, music,
+component, variant, media, video and article groups without confusing those
+render keys with conceptual profile section names. Fresh Unit verification is
+648 tests / 3,154 assertions PASS with 2 existing warnings and 5 PHPUnit
+deprecations; PHP lint and diff check are clean. Localhost still returns no
+HTTP response for homepage and representative entity routes, so browser visual
+QA remains `ENVIRONMENT_BLOCKED`; no completion claim is made for live Odo or
+responsive runtime evidence.
 
 ## Public slug policy and existing-URL migration design revision — 2026-09-06
 
@@ -4341,3 +4380,49 @@ database mutation, production/staging/V2 change or push is claimed. Guarded
 integration and route smoke remain environment-blocked. The migration service
 does not rename media files, rewrite article bodies, alter UUID/stable_key or
 relations, or create redirects.
+
+Continuation checkpoint: fresh HEAD `faef994` is identical to `origin/main` after
+an explicit `git fetch origin main`. Focused slug/public-identity/Video tests
+pass 35 tests / 124 assertions after adding typed dry-run blocker counts,
+route-owner preservation and governed writer-result propagation. The migration
+dry-run now reports candidate, changed, no-op, collision, manual-review,
+ambiguous, missing-identity, invalid-route, unavailable and blocked counts;
+apply reports `PARTIAL_FAILURE` for typed writer failures instead of claiming
+success. Historical route inventories were reconciled to the constitutional
+semantic-only Video path `/video/{slug}/`. WordPress runtime remains absent, so
+real-owner inventory, `nhk_v3_test` guarded dry-run/apply, persisted read-back,
+historic 301 and canonical 200 remain `ENVIRONMENT_BLOCKED`; no data, media
+filename, redirect, UUID, stable key or relation was mutated.
+
+## Graph relation foundation checkpoint — 2026-09-06
+
+The confirmed Controlled Apply root cause was a registry mismatch: relation
+lifecycle operations were registered only for `entity_type=relation`, while
+the executor dispatches relation packets by operation. Knowledge relation
+proposals therefore failed before Graph endpoint validation with
+`REGISTRY_GAP: Unsupported Controlled Apply combination: knowledge+relation_create`.
+The registry/executor path now accepts governed Knowledge relation lifecycle
+commands and preserves explicit `source_type/source_uuid` and
+`target_type/target_uuid` independently from Proposal `subject_id`.
+
+The existing Graph repository remains canonical. Direct outbound/inbound reads
+now support endpoint-type filtering before cursor pagination. A bounded,
+registry-driven semantic neighborhood query is available to frontend/MCP
+seams, and `nhk.entity.neighborhood` is exposed as read-only MCP/Ability
+capability. A generic dry-run/apply backfill coordinator reports deterministic,
+ambiguous, unsupported, evidence-gap and registry-gap outcomes and marks a
+second run zero-change when existing edges are found.
+
+`classified_as` was not added: the current approved Authority/Graph vocabulary
+does not formalize it, so Classification membership remains `REGISTRY_GAP` and
+`about` is not used as a substitute. Product–Specimen remains unapproved.
+
+Focused Graph/Governance/MCP/backfill tests pass; the complete Unit suite passes
+596 tests / 2,805 assertions with 2 warnings and 5 PHPUnit deprecations. The
+full suite reaches 704 tests but remains `ENVIRONMENT_BLOCKED`: WordPress
+integration tests require `NHK_WP_TEST_PATH=public` and two Dictionary tests
+require a bootstrapped WordPress `update_option()`. No Cuckoo/Odo live backfill,
+canonical data mutation or production/staging/V2 change is claimed in this
+checkout. The remaining owner action is to provide the development WordPress
+runtime/database, then run governed dry-run → approval/apply → canonical and
+inverse readback for the named fixtures.

@@ -10,12 +10,25 @@ use NHK\Tests\Support\InMemoryGraphRepository;
 use PHPUnit\Framework\TestCase;
 
 final class GraphCoreContractTest extends TestCase {
-    private function service(?PredicateRegistry $predicates=null): array { $repo=new InMemoryGraphRepository();$types=new EndpointTypeRegistry();foreach(['wp_post','brand','model','variant','movement','music','media','knowledge','product','specimen','video'] as $type)$types->register($type,new FakeEndpointResolver($type,['1:1','1:2','a','b']));$audit=new InMemoryAuditSink();return [new GraphService($repo,$types,$predicates??new PredicateRegistry(),$audit),$repo,$audit]; }
+    private function service(?PredicateRegistry $predicates=null): array { $repo=new InMemoryGraphRepository();$types=new EndpointTypeRegistry();foreach(['wp_post','brand','model','variant','movement','music','media','knowledge','product','specimen','video','classification'] as $type)$types->register($type,new FakeEndpointResolver($type,['1:1','1:2','a','b']));$audit=new InMemoryAuditSink();return [new GraphService($repo,$types,$predicates??new PredicateRegistry(),$audit),$repo,$audit]; }
     public function test_uuid_v7_and_legacy_uuid_round_trip(): void { $v7=UuidCodec::newV7();self::assertSame($v7,UuidCodec::fromBinary(UuidCodec::toBinary($v7)));$v4='550e8400-e29b-41d4-a716-446655440000';self::assertSame($v4,UuidCodec::fromBinary(UuidCodec::toBinary($v4)));self::assertSame('7',explode('-',$v7)[2][0]); }
     public function test_graph_edge_rejects_malformed_uuid_and_revision(): void { $this->expectException(\InvalidArgumentException::class); new GraphEdge('not-a-uuid',new GraphNode(1,new NodeReference('brand','a')),'about',new GraphNode(2,new NodeReference('brand','b')),\NHK\Core\Domain\Graph\EdgeState::ACTIVE,0); }
     public function test_predicate_definition_rejects_empty_or_malformed_endpoint_type_lists(): void { $this->expectException(\NHK\Core\Graph\Exception\InvalidPredicateDefinition::class); new PredicateDefinition('about',[],['brand']); }
     public function test_node_reference_and_resolution_are_idempotent(): void { [$service,$repo]= $this->service();$a=new NodeReference('brand','A');$b=new NodeReference('brand','a');$e=$service->create($a,'about',new NodeReference('brand','b'));self::assertSame($e->source->internal_node_id,$repo->resolveNode(new NodeReference('brand','a'))->internal_node_id);self::assertSame(1,count($service->findOutgoing(new NodeReference('brand','a'))['items'])); }
     public function test_reading_an_existing_endpoint_without_graph_edges_does_not_materialize_a_node(): void { [$service,$repo]= $this->service(); self::assertNull($repo->findNode(new NodeReference('brand','a'))); self::assertSame([], $service->findOutgoing(new NodeReference('brand','a'))['items']); self::assertNull($repo->findNode(new NodeReference('brand','a'))); }
+    public function test_graph_reads_filter_target_type_before_pagination(): void
+    {
+        [$service] = $this->service();
+        $source = new NodeReference('knowledge', 'a');
+        $service->create($source, 'about', new NodeReference('brand', 'a'));
+        $service->create($source, 'about', new NodeReference('model', 'a'));
+
+        $result = $service->findOutgoing($source, 'about', 0, 1, false, 'model');
+
+        self::assertCount(1, $result['items']);
+        self::assertSame('model', $result['items'][0]->target->reference->endpoint_type);
+        self::assertNull($result['next_cursor']);
+    }
     public function test_unknown_endpoint_and_predicate_are_rejected(): void { [$service]= $this->service();$this->expectException(\NHK\Core\Graph\Exception\UnsupportedEndpointType::class);$service->create(new NodeReference('unknown','a'),'about',new NodeReference('brand','b')); }
     public function test_create_is_idempotent_and_audited(): void { [$service,$repo,$audit]=$this->service();$a=new NodeReference('brand','a');$b=new NodeReference('brand','b');$one=$service->create($a,'about',$b);$two=$service->create($a,'about',$b);self::assertSame($one->edge_uuid,$two->edge_uuid);self::assertCount(2,$audit->events); }
     public function test_forward_reverse_retire_reactivate_and_no_resurrection(): void { [$service]= $this->service();$a=new NodeReference('brand','a');$b=new NodeReference('brand','b');$edge=$service->create($a,'about',$b);self::assertCount(1,$service->findIncoming($b)['items']);$retired=$service->retire($edge->edge_uuid,1);self::assertCount(0,$service->findOutgoing($a)['items']);self::assertCount(1,$service->findOutgoing($a,null,0,50,true)['items']);$this->expectException(RelationAlreadyRetired::class);$service->create($a,'about',$b); }

@@ -11,6 +11,7 @@ final class McpAbilityRegistration
     private const READ_TOOL_MAP = [
         'nhk.search' => 'nhk-v3/search',
         'nhk.semantic.resolve' => 'nhk-v3/semantic-resolve',
+        'nhk.entity.neighborhood' => 'nhk-v3/entity-neighborhood',
         'nhk.article.preflight' => 'nhk-v3/article-preflight',
         'nhk.category.resolve' => 'nhk-v3/category-resolve',
         'nhk.entity.get' => 'nhk-v3/entity-get',
@@ -26,10 +27,12 @@ final class McpAbilityRegistration
     private const CAPABILITY_GATED_READ_TOOL_MAP = [
         'nhk.proposal.eligibility' => 'nhk-v3/proposal-eligibility',
         'nhk.proposal.review' => 'nhk-v3/proposal-review',
+        'nhk.public-url.audit' => 'nhk-v3/public-url-audit',
     ];
 
     /** @var array<string,string> */
     private const GOVERNED_TOOL_MAP = [
+        'nhk.public-url.reproject' => 'nhk-v3/public-url-reproject',
         'nhk.article.ingest' => 'nhk-v3/article-ingest',
         'nhk.category.create' => 'nhk-v3/category-create',
         'nhk.category.update' => 'nhk-v3/category-update',
@@ -220,6 +223,7 @@ final class McpAbilityRegistration
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
             'nhk.proposal.apply' => 'nhk_apply_proposals',
+            'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
             default => 'nhk_create_proposals',
         };
         return !function_exists('current_user_can') || current_user_can($capability);
@@ -231,7 +235,8 @@ final class McpAbilityRegistration
         try {
             return match ($tool) {
                 'nhk.search' => $read->search((string) ($input['q'] ?? ''), (int) ($input['page'] ?? 1), (int) ($input['per_page'] ?? 20)),
-            'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
+                'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
+                'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
                 'nhk.category.resolve' => self::executeMcp($tool, $input),
                 'nhk.entity.get' => $read->entityGet((string) ($input['type'] ?? ''), (string) ($input['id'] ?? '')),
@@ -259,6 +264,8 @@ final class McpAbilityRegistration
     private static function label(string $tool): string
     {
         return [
+            'nhk.public-url.audit' => 'NHK Public URL Audit',
+            'nhk.public-url.reproject' => 'NHK Public URL Reproject',
             'nhk.search' => 'NHK Search',
             'nhk.semantic.resolve' => 'NHK Semantic Resolve',
             'nhk.entity.get' => 'NHK Entity Get',

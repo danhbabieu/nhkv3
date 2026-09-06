@@ -47,6 +47,7 @@ final class SemanticProfileComposer
             'warnings' => array_values(is_array($dossier['warnings'] ?? null) ? $dossier['warnings'] : []),
             'seo_projection' => is_array($dossier['seo_projection'] ?? null) ? $dossier['seo_projection'] : null,
             'section_order' => self::SECTION_ORDER[$type] ?? ['identity', 'relation_sections', 'knowledge', 'media_gallery', 'videos', 'articles', 'navigation'],
+            'relation_order' => $this->relationOrder($type),
         ];
     }
 
@@ -72,6 +73,17 @@ final class SemanticProfileComposer
             'coverage' => is_array($knowledge['coverage'] ?? null) ? $knowledge['coverage'] : [],
             'warnings' => array_values(is_array($knowledge['warnings'] ?? null) ? $knowledge['warnings'] : []),
         ];
+    }
+
+    /** @return list<string> */
+    private function relationOrder(string $type): array
+    {
+        return match ($type) {
+            'brand' => ['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'],
+            'movement' => ['models', 'movements', 'music', 'components', 'variants', 'media', 'videos', 'articles'],
+            'variant' => ['models', 'movements', 'music', 'components', 'variants', 'media', 'videos', 'articles'],
+            default => ['brands', 'models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'],
+        };
     }
 
     /** @return array<string,list<array<string,mixed>>> */

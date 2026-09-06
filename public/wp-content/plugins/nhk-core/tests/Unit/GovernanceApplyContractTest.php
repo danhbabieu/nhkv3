@@ -84,8 +84,18 @@ final class GovernanceApplyContractTest extends TestCase
         $registry = new ControlledApplyOperationRegistry();
         foreach (['knowledge', 'source', 'evidence'] as $entityType) {
             foreach (['create', 'ingest', 'update', 'retire', 'reactivate'] as $operation) self::assertTrue($registry->supports($entityType, $operation), $entityType . '+' . $operation);
-            foreach (['relation_create', 'rename'] as $operation) self::assertFalse($registry->supports($entityType, $operation), $entityType . '+' . $operation);
+            foreach (['relation_create', 'relation_retire', 'relation_reactivate'] as $operation) self::assertSame($entityType === 'knowledge', $registry->supports($entityType, $operation), $entityType . '+' . $operation);
+            self::assertFalse($registry->supports($entityType, 'rename'), $entityType . '+rename');
         }
+    }
+
+    public function test_controlled_apply_registry_accepts_knowledge_relation_commands(): void
+    {
+        $registry = new ControlledApplyOperationRegistry();
+
+        self::assertTrue($registry->supports('knowledge', 'relation_create'));
+        self::assertTrue($registry->supports('knowledge', 'relation_retire'));
+        self::assertTrue($registry->supports('knowledge', 'relation_reactivate'));
     }
 
     public function test_controlled_apply_rejects_a_global_but_entity_unsupported_operation_before_dispatch(): void
@@ -169,6 +179,33 @@ final class GovernanceApplyContractTest extends TestCase
         self::assertFalse($retired->isActive());
         $reactivated = $executor(new Proposal('relation-reactivate-1', $edge->edge_uuid, 'relation_reactivate', [], 'content', 2, 'deps', ProposalState::APPROVED, '1', '2', null, 'idem-relation-reactivate', 1, null, null, $edge->edge_uuid, 'relation'));
         self::assertTrue($reactivated->isActive());
+    }
+
+    public function test_knowledge_relation_proposal_preserves_source_and_target_uuid_endpoints(): void
+    {
+        $sourceUuid = UuidCodec::newV7();
+        $targetUuid = UuidCodec::newV7();
+        $types = new EndpointTypeRegistry();
+        $types->register('knowledge', new FakeEndpointResolver('knowledge', [$sourceUuid]));
+        $types->register('classification', new FakeEndpointResolver('classification', [$targetUuid]));
+        $graph = new GraphService(new InMemoryGraphRepository(), $types, new PredicateRegistry(), new InMemoryAuditSink());
+        $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()), $graph);
+
+        $edge = $executor(new Proposal(
+            UuidCodec::newV7(),
+            'knowledge',
+            'relation_create',
+            ['source_type' => 'knowledge', 'source_uuid' => $sourceUuid, 'predicate' => 'about', 'target_type' => 'classification', 'target_uuid' => $targetUuid],
+            'content',
+            null,
+            'deps',
+            ProposalState::APPROVED,
+            idempotencyKey: 'knowledge-relation-uuid',
+            entityType: 'knowledge',
+        ));
+
+        self::assertSame($sourceUuid, $edge->source->reference->endpoint_key);
+        self::assertSame($targetUuid, $edge->target->reference->endpoint_key);
     }
 
     public function test_authority_executor_applies_generic_rekey_without_recreating_the_entity(): void

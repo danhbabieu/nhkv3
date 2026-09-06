@@ -75,4 +75,49 @@ final class PublicSlugMigrationServiceTest extends TestCase
         self::assertSame('STALE_DRY_RUN', $service->apply($dry, 'approved', 'other-fingerprint')['status']);
         self::assertSame(2, $calls);
     }
+
+    public function test_dry_run_emits_route_owner_and_typed_blockers_without_writing(): void
+    {
+        $source = new class implements PublicSlugMigrationSource {
+            public function candidates(): array
+            {
+                return [
+                    ['type' => 'video', 'id' => 'video-1', 'title' => 'Video', 'current_slug' => 'old', 'current_url' => '/video/old/', 'scope' => 'video', 'revision' => 1, 'fingerprint' => 'fp', 'meaningful_context' => [], 'route_owner' => 'semantic'],
+                    ['type' => 'brand', 'id' => 'brand-1', 'title' => '', 'current_slug' => '', 'current_url' => '', 'scope' => 'root', 'revision' => 0, 'fingerprint' => '', 'meaningful_context' => [], 'route_owner' => 'semantic'],
+                    ['type' => 'wp_post', 'id' => 'post-1', 'title' => 'Bài', 'current_slug' => 'bai', 'current_url' => '/bai/', 'scope' => 'wordpress', 'revision' => 1, 'fingerprint' => 'fp-post', 'meaningful_context' => [], 'route_owner' => 'wordpress', 'availability' => 'unavailable'],
+                    ['type' => 'model', 'id' => 'model-1', 'title' => 'Mẫu', 'current_slug' => 'mau', 'current_url' => 'not-a-route', 'scope' => 'brand-1', 'revision' => 1, 'fingerprint' => 'fp-model', 'meaningful_context' => [], 'route_owner' => 'semantic', 'ambiguous' => true],
+                ];
+            }
+        };
+        $writes = 0;
+        $report = (new PublicSlugMigrationService($source, static function () use (&$writes): array { $writes++; return []; }))->dryRun();
+
+        self::assertSame(4, $report['candidate_count']);
+        self::assertSame(4, $report['counts']['candidate_count']);
+        self::assertSame(1, $report['counts']['ambiguous']);
+        self::assertSame(1, $report['counts']['unavailable']);
+        self::assertSame(1, $report['counts']['missing_identity']);
+        self::assertSame(1, $report['counts']['invalid_route']);
+        self::assertSame('semantic', $report['rows'][0]['route_owner']);
+        self::assertSame('UNAVAILABLE', $report['rows'][3]['status']);
+        self::assertSame(0, $writes);
+    }
+
+    public function test_apply_propagates_writer_readback_and_typed_failure(): void
+    {
+        $source = new class implements PublicSlugMigrationSource {
+            public function candidates(): array
+            {
+                return [['type' => 'brand', 'id' => 'brand-1', 'title' => 'Ô Đô', 'current_slug' => 'o-do', 'current_url' => '/o-do/', 'scope' => 'root', 'revision' => 2, 'fingerprint' => 'fp', 'meaningful_context' => [], 'route_owner' => 'semantic']];
+            }
+        };
+        $service = new PublicSlugMigrationService($source, static fn (array $row): array => ['status' => 'STALE', 'persisted' => ['revision' => 3, 'current_slug' => 'other'], 'request' => $row]);
+        $dry = $service->dryRun();
+
+        $result = $service->apply($dry, 'approved', $dry['fingerprint']);
+
+        self::assertSame('PARTIAL_FAILURE', $result['status']);
+        self::assertSame('STALE', $result['rows'][0]['status']);
+        self::assertSame(['revision' => 3, 'current_slug' => 'other'], $result['rows'][0]['persisted']);
+    }
 }

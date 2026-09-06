@@ -54,6 +54,31 @@ final class CanonicalPublicSlugPolicy
         return trim((string) preg_replace('/-+/', '-', $value), '-');
     }
 
+    /** Compatibility instance API for application services. */
+    public function slug(string $value): string
+    {
+        return self::normalize($value);
+    }
+
+    /**
+     * Resolve the shortest available meaningful public slug. Technical IDs,
+     * hashes and timestamps are never invented by this policy.
+     *
+     * @param list<string> $meaningfulQualifiers
+     * @param callable(string):bool $isTaken
+     */
+    public function resolve(string $value, array $meaningfulQualifiers, callable $isTaken): string
+    {
+        $base = self::normalize($value);
+        if ($base === '') throw new \InvalidArgumentException('PUBLIC_SLUG_INVALID');
+        if (!$isTaken($base)) return $base;
+        foreach (self::candidates($value, $meaningfulQualifiers) as $candidate) {
+            if ($candidate === $base) continue;
+            if (!$isTaken($candidate)) return $candidate;
+        }
+        throw new \RuntimeException('PUBLIC_SLUG_COLLISION_REQUIRES_RECONCILIATION');
+    }
+
     /**
      * Build shortest-first public slug candidates from meaningful domain data.
      * Callers remain responsible for checking route-scope availability.

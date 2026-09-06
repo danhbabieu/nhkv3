@@ -50,7 +50,7 @@ governed redirect/retirement review.
 | `/comparison/` | Comparison surface | English namespace | `/so-sanh/` | pending route alias | `PublicComparisonRoutes` |
 | `/knowledge/claim/{uuid}/` | Atomic Claim | No public entity projection | none; consume in related projections | 404/non-indexable | `PublicKnowledgeRoutes` |
 | `/media/{uuid}/` | Media identity | No standalone public entity page | none; use related entity/Post and asset URL | 404/non-indexable | `PublicMediaVideoRoutes` |
-| `/video/{uuid}/` | Video detail | Legacy internal identity | `/video/{semantic-slug}-{external-id}/` | 301 one hop when exact owner/history is available | `PublicMediaVideoRoutes` |
+| `/video/{uuid}/` | Video detail | Legacy internal identity | `/video/{semantic-slug}/` | 301 one hop when exact owner/history is available | `PublicMediaVideoRoutes` |
 | `/tim-kiem/?q=` | Search compatibility | Legacy query shape | `/?s=` | 301 | `PublicEditorialRoutes` |
 
 ## Implemented invariants
@@ -80,7 +80,7 @@ governed redirect/retirement review.
 | Classification | Yes when active | `/phan-loai/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
 | Specimen | Yes when active | `/hien-vat/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
 | Product | Yes when active | `/san-pham/{slug}/` | canonical name | Yes | legacy detail | Yes / route smoke |
-| Video | Yes when valid/public | `/video/{semantic-slug}-{external-id}/` | governed NHK context + external ID | Yes | one-hop historic/technical redirect | policy/storage/canary pending |
+| Video | Yes when valid/public | `/video/{semantic-slug}/` | governed NHK context; external ID remains internal metadata | Yes | one-hop historic/technical redirect | policy implemented; persisted identity/runtime pending |
 | Knowledge Claim | No atomic page | none | none | No | 404 | No public resolver |
 | Media | No standalone page | none | none | No | 404 | Asset route only |
 | Post | Yes | native WordPress permalink | WordPress editorial slug | Yes by WP status | native WP | WordPress |

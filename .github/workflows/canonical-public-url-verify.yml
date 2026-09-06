@@ -1,0 +1,45 @@
+name: Canonical public URL verification
+
+on:
+  push:
+    branches: [feature/canonical-public-slug-policy]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Diff check
+        run: |
+          git fetch origin main
+          git diff --check origin/main...HEAD
+      - name: PHP lint
+        run: composer lint
+      - name: Focused public URL tests
+        run: |
+          vendor/bin/phpunit \
+            public/wp-content/plugins/nhk-core/tests/Unit/CanonicalPublicSlugPolicyTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/PublicRouteResolverTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/VideoUrlPolicyTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/VideoSeoProjectionTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/PublicSeoProjectionTest.php \
+            public/wp-content/plugins/nhk-core/tests/Unit/ArticleMediaPolicyTest.php
+      - name: Full unit suite
+        run: vendor/bin/phpunit --testsuite 'NHK Unit'

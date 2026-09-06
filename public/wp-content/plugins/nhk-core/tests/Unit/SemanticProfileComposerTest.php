@@ -39,7 +39,7 @@ final class SemanticProfileComposerTest extends TestCase
         self::assertSame([
             'identity', 'hierarchy', 'relation_sections', 'knowledge', 'evidence_context',
             'primary_media', 'media_gallery', 'videos', 'articles', 'navigation',
-            'coverage', 'availability', 'warnings', 'seo_projection', 'section_order',
+            'coverage', 'availability', 'warnings', 'seo_projection', 'section_order', 'relation_order',
         ], array_keys($profile));
         self::assertSame('Maker A', $profile['identity']['name']);
         self::assertArrayNotHasKey('canonical_id', $profile['identity']);
@@ -47,6 +47,7 @@ final class SemanticProfileComposerTest extends TestCase
         self::assertSame('AVAILABLE', $profile['availability']['graph']);
         self::assertSame([], $profile['videos']);
         self::assertSame([], $profile['articles']);
+        self::assertSame(['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'], $profile['relation_order']);
     }
 
     public function test_brand_section_order_exposes_every_supported_relation_group(): void
@@ -97,6 +98,7 @@ final class SemanticProfileComposerTest extends TestCase
         ]);
 
         self::assertSame('parent_context', $profile['section_order'][1]);
+        self::assertSame(['models', 'movements', 'music', 'components', 'variants', 'media', 'videos', 'articles'], $profile['relation_order']);
         self::assertCount(1, $profile['relation_sections']['models']);
         self::assertSame('DIRECT', $profile['relation_sections']['models'][0]['origin']['kind']);
     }

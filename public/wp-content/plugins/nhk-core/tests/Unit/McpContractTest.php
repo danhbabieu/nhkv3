@@ -46,6 +46,7 @@ final class McpContractTest extends TestCase
         self::assertSame([
             'nhk.search',
             'nhk.semantic.resolve',
+            'nhk.entity.neighborhood',
             'nhk.article.preflight',
             'nhk.article.ingest',
             'nhk.category.resolve',
@@ -69,6 +70,8 @@ final class McpContractTest extends TestCase
             'nhk.knowledge.ingest',
             'nhk.source.ingest',
             'nhk.evidence.ingest',
+            'nhk.public-url.audit',
+            'nhk.public-url.reproject',
             'nhk.proposal.create',
             'nhk.proposal.submit',
             'nhk.proposal.review',
@@ -251,6 +254,7 @@ final class McpContractTest extends TestCase
         self::assertSame([
             'nhk-v3/search',
             'nhk-v3/semantic-resolve',
+            'nhk-v3/entity-neighborhood',
             'nhk-v3/article-preflight',
             'nhk-v3/category-resolve',
             'nhk-v3/entity-get',
@@ -264,6 +268,7 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
         self::assertSame([
+            'nhk-v3/public-url-reproject',
             'nhk-v3/article-ingest',
             'nhk-v3/category-create',
             'nhk-v3/category-update',
