@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace NHK\Core;
 
+use NHK\Core\Infrastructure\Admin\{AdminAssets, AdminWorkbenchPage};
 use NHK\Core\Infrastructure\Dictionary\DictionaryBootstrap;
 use NHK\Core\Infrastructure\Frontend\FrontendSemanticBootstrap;
 
@@ -30,6 +31,8 @@ else {
     });
 }
 Plugin::boot(__FILE__);
+AdminWorkbenchPage::register();
+AdminAssets::register(__FILE__);
 DictionaryBootstrap::boot();
 FrontendSemanticBootstrap::boot();
 register_activation_hook(__FILE__, [Plugin::class, 'activate']);
