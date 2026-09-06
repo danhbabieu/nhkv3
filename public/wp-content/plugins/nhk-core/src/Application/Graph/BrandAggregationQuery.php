@@ -26,15 +26,35 @@ final class BrandAggregationQuery
         if (!$brand || !$brand->active() || $brand->entityType !== 'brand') return $result;
 
         $buckets = array_fill_keys(array_values(self::GROUPS), []);
-        $models = $this->edges('brand', $brandId, false, 'model_of');
-        foreach ($models as $modelEdge) {
+        foreach ($this->edges('brand', $brandId, false, 'model_of') as $modelEdge) {
             $model = $this->entity($modelEdge->source->reference->endpoint_type, $modelEdge->source->reference->endpoint_key);
             if (!$model || $model->entityType !== 'model' || !$model->active()) continue;
             $this->add($buckets, $model, 'DIRECT', ['model_of']);
+
             foreach ($this->edges('model', $model->canonicalId, false, 'variant_of') as $variantEdge) {
-                $variant = $this->entity('variant', $variantEdge->source->reference->endpoint_key);
-                if (!$variant || !$variant->active()) continue;
-                $this->add($buckets, $variant, 'DERIVED', ['variant_of', 'model_of']);
+                $variant = $this->entity($variantEdge->source->reference->endpoint_type, $variantEdge->source->reference->endpoint_key);
+                if (!$variant || $variant->entityType !== 'variant' || !$variant->active()) continue;
+                $variantPath = ['model_of', 'variant_of'];
+                $this->add($buckets, $variant, 'DERIVED', $variantPath);
+
+                foreach ($this->edges('variant', $variant->canonicalId, true, 'uses_movement') as $movementEdge) {
+                    $movement = $this->entity($movementEdge->target->reference->endpoint_type, $movementEdge->target->reference->endpoint_key);
+                    if (!$movement || $movement->entityType !== 'movement' || !$movement->active()) continue;
+                    $movementPath = [...$variantPath, 'uses_movement'];
+                    $this->add($buckets, $movement, 'DERIVED', $movementPath);
+
+                    foreach ($this->edges('movement', $movement->canonicalId, true, 'supports_music') as $musicEdge) {
+                        $music = $this->entity($musicEdge->target->reference->endpoint_type, $musicEdge->target->reference->endpoint_key);
+                        if (!$music || $music->entityType !== 'music' || !$music->active()) continue;
+                        $this->add($buckets, $music, 'DERIVED', [...$movementPath, 'supports_music']);
+                    }
+                }
+
+                foreach ($this->edges('variant', $variant->canonicalId, true, 'configured_with_music') as $musicEdge) {
+                    $music = $this->entity($musicEdge->target->reference->endpoint_type, $musicEdge->target->reference->endpoint_key);
+                    if (!$music || $music->entityType !== 'music' || !$music->active()) continue;
+                    $this->add($buckets, $music, 'DERIVED', [...$variantPath, 'configured_with_music']);
+                }
             }
         }
 
