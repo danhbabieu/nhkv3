@@ -1,0 +1,69 @@
+name: URL Docs Amendment
+
+on:
+  push:
+    branches:
+      - feature/canonical-public-slug-policy
+    paths:
+      - .github/workflows/url-doc-amendment.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply narrow canonical URL amendment
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          constitution_path = Path('docs/constitution/NHK_V3_CONSTITUTION.md')
+          video_contract_path = Path('docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md')
+
+          constitution = constitution_path.read_text()
+
+          route_old = '    Video:         /video/{title-slug}-{external-id}/'
+          route_new = '    Video:         /video/{slug}/'
+          assert constitution.count(route_old) == 1, 'unexpected Constitution Video route marker count'
+          constitution = constitution.replace(route_old, route_new, 1)
+
+          amendment_marker = '## Amendment record — 2026-09-02 — Article Ingest Boundary\n'
+          amendment = '''## Amendment record — 2026-09-06 — Canonical Public URL Identity\n\n**WHY:** Public URLs must project persisted public identity rather than re-encode\nexternal-source identity or mutable display text. Video source identity remains\nnecessary for source reconciliation but must not be coupled to the canonical\npublic route.\n\n**WHAT:** Canonical public routes use the persisted public `slug` owned by the\nPublic Identity boundary. For Video the canonical detail route is\n`/video/{slug}/`. The external platform/video identifier remains source identity\nfor resolution, idempotency and reconciliation and is not removed or changed by\nURL reprojection. URL audit is read-only; reprojection is an explicit governed\nPublic Identity operation with collision checks, confirmation, idempotency and\nread-back.\n\n**BOUNDARIES:** URL reprojection does not mutate semantic UUID, stable source\nidentity, Knowledge, Evidence or Graph truth. Media public filename metadata may\nbe reprojected only within its existing MediaAsset contract; this amendment does\nnot authorize physical file rename, attachment-path change or checksum change.\nAmbiguity, collision or unavailable ownership fails closed.\n\n**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no bulk mutation or\nimplicit backfill. Existing public URLs are changed only through the governed\nURL-maintenance operation after audit/eligibility checks. Redirect/canonical\nprojection must remain one-owner and one-hop under the SEO/public route law.\n\n**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-06.\n\n'''
+          assert constitution.count(amendment_marker) == 1, 'unexpected amendment insertion marker count'
+          assert '## Amendment record — 2026-09-06 — Canonical Public URL Identity' not in constitution, 'amendment already present'
+          constitution = constitution.replace(amendment_marker, amendment + amendment_marker, 1)
+
+          video_law_old = '''10. Deleted/private/region-blocked/embed-disabled source giữ Video identity,\n    provenance và history; public watch/sitemap áp dụng unavailable policy.\n'''
+          video_law_new = video_law_old + '''11. Canonical public Video route là `/video/{slug}/`, với `slug` được persist\n    bởi Public Identity boundary. External video ID vẫn là source identity và\n    không được nhúng bắt buộc vào canonical public route. Audit URL là read-only;\n    reprojection phải explicit, governed, collision-safe, idempotent và không\n    đổi semantic UUID, Knowledge, Evidence hoặc Graph truth.\n'''
+          assert constitution.count(video_law_old) == 1, 'unexpected Video Law marker count'
+          constitution = constitution.replace(video_law_old, video_law_new, 1)
+          constitution_path.write_text(constitution)
+
+          video_contract = video_contract_path.read_text()
+          policy_old = '''Canonical public URL policy is `/video/{semantic-slug}-{external-video-id}/`.\nSemantic slug fallback order is explicit governed NHK semantic/editorial\ncontext; confirmed attached Brand/Model/Variant/Movement/Music context;\ngoverned editorial title; governed user hint when allowed; and source-platform\ntitle only as a controlled last resort. A source-platform marketing title must\nnot replace confirmed NHK context. URL changes are explicit Public Identity\noperations; source synchronization never changes UUID or creates a duplicate\nVideo.\n'''
+          policy_new = '''Canonical public URL policy is `/video/{slug}/`, where `slug` is persisted by\nthe Public Identity boundary. Slug derivation may use explicit governed NHK\nsemantic/editorial context; confirmed attached Brand/Model/Variant/Movement/Music\ncontext; governed editorial title; governed user hint when allowed; and\nsource-platform title only as a controlled last resort. A source-platform\nmarketing title must not replace confirmed NHK context. External platform/video\nID remains the source identity for resolution, idempotency and reconciliation;\nit is not required in the canonical public route. URL changes are explicit,\ngoverned Public Identity reprojection operations with collision checks,\nconfirmation, idempotency and read-back; source synchronization never changes\nUUID, Knowledge, Evidence, Graph truth or creates a duplicate Video.\n'''
+          assert video_contract.count(policy_old) == 1, 'unexpected Video contract URL policy marker count'
+          video_contract = video_contract.replace(policy_old, policy_new, 1)
+          video_contract_path.write_text(video_contract)
+          PY
+
+      - name: Validate patch
+        run: |
+          git diff --check
+          git diff -- docs/constitution/NHK_V3_CONSTITUTION.md docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md
+
+      - name: Commit amendment
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/constitution/NHK_V3_CONSTITUTION.md docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md
+          git diff --cached --quiet && exit 1
+          git commit -m 'docs: align canonical public URL law [skip url-doc-amendment]'
+          git push origin HEAD:feature/canonical-public-slug-policy
