@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+## Graph Relation live verification continuation — 2026-09-06
+
+The requested live Graph Relation verification was attempted from the current
+HEAD with the guarded development target `NHK_WP_TEST_PATH=public`
+`NHK_WP_TEST_DB=nhk_v3_test`. The repository contains the Graph, governed
+`knowledge + relation_create`, bidirectional read, bounded neighborhood and
+generic backfill implementation; focused unit proof is 60 tests / 380
+assertions PASS. The MCP naming boundary is also statically aligned:
+`nhk.entity.neighborhood` is the MCP tool and its WordPress Ability bridge is
+`nhk-v3/entity-neighborhood`.
+
+Live verification remains `ENVIRONMENT_BLOCKED`: WordPress bootstrap exits with
+`Error establishing a database connection` before `$wpdb` or any fixture can be
+read. Local MySQL is configured through the Homebrew service, but this runner
+cannot handshake with `127.0.0.1:3306` or `/tmp/mysql.sock`; an escalated
+read-only probe was rejected by the execution policy. No migration, proposal,
+Knowledge, Graph edge, WordPress record or backfill mutation was performed.
+Consequently Cuckoo/Odo existing/created/skipped/ambiguous/blocked counters,
+canonical UUID read-back, inverse retrieval, neighborhood retrieval and
+second-run idempotency remain unverified rather than being inferred.
+
+Fresh available verification: NHK Unit 650 tests / 3,166 assertions PASS with
+2 warnings and 5 PHPUnit deprecations; Composer validation, PHP lint and
+`git diff --check` pass. The full unguarded suite is not a valid runtime result
+because it omits `NHK_WP_TEST_PATH`; the guarded Integration suite cannot
+bootstrap WordPress until the local DB connection is available.
+
 ## Semantic frontend discovery implementation checkpoint — 2026-09-06
 
 The approved semantic frontend design now has an implementation plan at

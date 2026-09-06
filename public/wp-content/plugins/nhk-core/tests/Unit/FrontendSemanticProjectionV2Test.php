@@ -28,6 +28,10 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php');
         self::assertStringContainsString("['profile']", $template);
         self::assertStringContainsString("['section_order']", $template);
+        self::assertStringContainsString('$visiblePayload', $template);
+        self::assertStringContainsString('$hasLegacyAggregation', $template);
+        self::assertStringContainsString('nhk_v3_public_copy', $template);
+        self::assertStringContainsString('if ($hasLegacyAggregation): ?><a href="#cau-truc"', $template);
     }
 
     public function test_canonical_entity_detail_keeps_graph_related_projection(): void

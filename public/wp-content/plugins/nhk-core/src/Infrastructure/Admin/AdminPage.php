@@ -21,16 +21,23 @@ final class AdminPage
     {
         if (!current_user_can('manage_options')) wp_die('You do not have permission to view this page.');
         $status = new MigrationStatus();
+        $workspace = AdminWorkspaceViewModel::fromHealth((new HealthCheck($status))->read(), [], []);
         echo '<div class="wrap"><h1>NHK V3</h1><p>Trung tâm vận hành domain canonical, Graph, Governance và dữ liệu semantic.</p>';
-        self::renderHealth((new HealthCheck($status))->read()); self::renderMigrationLedgerSummary(); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
+        self::renderHealth($workspace['health']); self::renderMigrationLedgerSummary(); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
         echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p></div>';
         self::scripts(); self::readScripts();
     }
 
+    /** @param array<string,array<string,mixed>> $health */
     private static function renderHealth(array $health): void
     {
         echo '<h2>Health</h2><table class="widefat striped"><tbody>';
-        foreach ($health as $key => $value) echo '<tr><th scope="row">' . esc_html((string) $key) . '</th><td>' . esc_html(is_bool($value) ? ($value ? 'OK' : 'NO') : (string) $value) . '</td></tr>';
+        foreach ($health as $item) {
+            echo '<tr><th scope="row">' . esc_html((string) ($item['label'] ?? '')) . '</th><td><strong>' . esc_html((string) ($item['state_label'] ?? 'Không khả dụng')) . '</strong> — ' . esc_html((string) ($item['display'] ?? 'Không khả dụng'));
+            $diagnostic = $item['diagnostic'] ?? null;
+            if (is_array($diagnostic)) echo '<div><code>' . esc_html((string) $diagnostic['code']) . '</code> — ' . esc_html((string) $diagnostic['message']) . '</div>';
+            echo '</td></tr>';
+        }
         echo '</tbody></table>';
     }
 
@@ -89,12 +96,9 @@ final class AdminPage
         $dependencyDisplay = $dependencyIds === [] ? 'none' : implode(', ', $dependencyIds);
         $lastAttempt = $attempts !== [] ? $attempts[count($attempts) - 1] : null;
         $applyStatus = $lastAttempt?->state ?? 'not_started';
-        $eligibilityHint = match ($proposal->state->value) {
-            'approved' => 'ready check required',
-            'applied' => 'ALREADY_APPLIED',
-            'submitted' => 'APPROVAL_MISSING',
-            default => 'NOT_APPROVED',
-        };
+        // AdminDiagnosticPresenter owns legacy display codes such as APPROVAL_MISSING and ALREADY_APPLIED.
+        $eligibility = AdminDiagnosticPresenter::forProposalState($proposal->state->value);
+        $eligibilityHint = $eligibility['title'] . ' — ' . $eligibility['message'] . ' [' . $eligibility['code'] . ']';
         echo '<table class="widefat striped"><tbody><tr><th>State</th><td>' . esc_html($proposal->state->value) . '</td></tr><tr><th>Subject</th><td><code>' . esc_html($proposal->subjectId) . '</code></td></tr><tr><th>Operation</th><td>' . esc_html($proposal->operation) . '</td></tr><tr><th>Expected revision</th><td>' . esc_html((string) $proposal->expectedRevision) . '</td></tr><tr><th>Proposal revision</th><td>' . esc_html((string) $proposal->revision) . '</td></tr><tr><th>Dependencies</th><td><div><strong>IDs:</strong> <code>' . esc_html($dependencyDisplay) . '</code></div><div><strong>Binding:</strong> <code>' . esc_html($proposal->dependencyFingerprint) . '</code></div></td></tr><tr><th>Apply status</th><td><strong>' . esc_html($applyStatus) . '</strong></td></tr><tr><th>Eligibility / block reason</th><td><span id="nhk-eligibility-summary">' . esc_html($eligibilityHint) . ' — bấm Eligibility để tải reason code đầy đủ.</span></td></tr></tbody></table><p class="nhk-governance-actions">';
         self::button('Eligibility', $base . '/eligibility', 'GET'); self::button('Submit', $base . '/submit', 'POST', 'nhk_submit_proposals'); self::button('Approve', $base . '/approve', 'POST', 'nhk_approve_proposals', $payload); self::button('Reject', $base . '/reject', 'POST', 'nhk_approve_proposals'); self::button('Controlled Apply', $base . '/apply', 'POST', 'nhk_apply_proposals');
         echo '</p><pre class="nhk-governance-result" aria-live="polite"></pre>';

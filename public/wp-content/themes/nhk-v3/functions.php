@@ -57,6 +57,25 @@ function nhk_v3_public_brand_text(string $text): string
     return $text;
 }
 
+function nhk_v3_public_copy(string $text): string
+{
+    $text = nhk_v3_public_brand_text($text);
+    $replacements = [
+        '/\bMovement family\b/iu' => 'Dòng bộ máy',
+        '/\bBrand identity\b/iu' => 'Danh tính thương hiệu',
+        '/\bBrand\b/iu' => 'thương hiệu',
+        '/\bModel\b/iu' => 'mẫu đồng hồ',
+        '/\bVariant\b/iu' => 'biến thể',
+        '/\bMovement\b/iu' => 'bộ máy',
+        '/\bComponent\b/iu' => 'linh kiện',
+    ];
+    foreach ($replacements as $pattern => $replacement) {
+        $normalized = preg_replace($pattern, $replacement, $text);
+        if (is_string($normalized)) $text = $normalized;
+    }
+    return $text;
+}
+
 function nhk_v3_public_html(string $html): string
 {
     if (class_exists('NHK\\Core\\Application\\Projection\\PublicBrandNamePolicy')) {
