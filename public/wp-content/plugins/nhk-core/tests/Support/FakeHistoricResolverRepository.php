@@ -11,6 +11,6 @@ final class FakeHistoricResolverRepository
     public function resolveHistoric(string $path): array
     {
         if ($this->status !== 'FOUND') return ['status' => $this->status];
-        return ['status' => 'FOUND', 'target' => '/video/odo-36-10-gai-carillon-p4kahx3lbow/', 'hops' => 1];
+        return ['status' => 'FOUND', 'target' => '/video/odo-36-10-gai-carillon/', 'hops' => 1];
     }
 }

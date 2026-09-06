@@ -63,6 +63,7 @@ final class ArticleSemanticDossierTest extends TestCase
         $result = $query->forPost(55);
 
         self::assertSame('AVAILABLE', $result['status']);
+        self::assertSame('wp_post', $result['profile']['identity']['type']);
         self::assertSame('Bài nghiên cứu', $result['identity']['title']);
         self::assertSame('/bai-nghien-cuu/', $result['identity']['url']);
         self::assertStringContainsString('/anh/article-image.webp', (string) ($result['primary_media']['url'] ?? ''));

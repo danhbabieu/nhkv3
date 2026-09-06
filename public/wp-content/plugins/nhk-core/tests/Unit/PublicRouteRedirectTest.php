@@ -16,7 +16,7 @@ final class PublicRouteRedirectTest extends TestCase
 
         self::assertSame([
             'status' => 301,
-            'location' => '/video/odo-36-10-gai-carillon-p4kahx3lbow/',
+            'location' => '/video/odo-36-10-gai-carillon/',
         ], $routes->historicRedirect('/video/odo-36-10-gai-carillon-P4KaHX3LBOw/'));
     }
 

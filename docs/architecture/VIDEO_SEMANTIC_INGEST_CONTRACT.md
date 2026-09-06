@@ -8,17 +8,15 @@ policy → NHK lookup → relation candidates → optional Knowledge enrichment
 planning → optional Dictionary lexical preview → Hub classification → editorial
 package → SEO projection → completeness → governed Video Proposal`.
 
-Canonical public URL policy is `/video/{slug}/`, where `slug` is persisted by
-the Public Identity boundary. Slug derivation may use explicit governed NHK
-semantic/editorial context; confirmed attached Brand/Model/Variant/Movement/Music
-context; governed editorial title; governed user hint when allowed; and
-source-platform title only as a controlled last resort. A source-platform
-marketing title must not replace confirmed NHK context. External platform/video
-ID remains the source identity for resolution, idempotency and reconciliation;
-it is not required in the canonical public route. URL changes are explicit,
-governed Public Identity reprojection operations with collision checks,
-confirmation, idempotency and read-back; source synchronization never changes
-UUID, Knowledge, Evidence, Graph truth or creates a duplicate Video.
+Canonical public URL policy is `/video/{semantic-slug}/`; the external video ID
+remains internal identity metadata and is not a default public slug suffix.
+Semantic slug fallback order is explicit governed NHK semantic/editorial
+context; confirmed attached Brand/Model/Variant/Movement/Music context;
+governed editorial title; governed user hint when allowed; and source-platform
+title only as a controlled last resort. A source-platform marketing title must
+not replace confirmed NHK context. URL changes are explicit Public Identity
+operations; source synchronization never changes UUID or creates a duplicate
+Video.
 
 The public MCP entry point is the existing governed `nhk.video.ingest`. It may
 return a single preview packet with source, editorial, Hub, relation, SEO,

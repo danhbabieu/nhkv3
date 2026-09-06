@@ -10,19 +10,13 @@ use NHK\Core\Domain\Video\Video;
 final class VideoUrlPolicy
 {
     public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
-
     /** @return array{path:?string,eligible:bool,blockers:list<string>,warnings:list<string>} */
     public function project(Video $video, VideoPublicContextSelector $selector): array
     {
         $metadata = is_array($video->metadata) ? $video->metadata : [];
         $blockers = [];
         $slug = $this->publicSlug($video, $metadata, $blockers);
-        $normalizedSlug = (new CanonicalPublicSlugPolicy())->slug($slug);
-        if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
-            $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
-        } elseif ($normalizedSlug !== $slug) {
-            $blockers[] = 'PUBLIC_IDENTITY_REPROJECTION_REQUIRED';
-        }
+        if ($slug === '' || !CanonicalPublicSlugPolicy::isCanonical($slug)) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
 
         $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
@@ -41,8 +35,6 @@ final class VideoUrlPolicy
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';
         $eligible = $blockers === [];
         return [
-            // Source IDs remain source identity only. The public watch route
-            // is owned by durable Public Identity and never contains them.
             'path' => $eligible ? '/video/' . $slug . '/' : null,
             'eligible' => $eligible,
             'blockers' => array_values(array_unique($blockers)),
@@ -61,13 +53,8 @@ final class VideoUrlPolicy
                 $blockers[] = 'PUBLIC_IDENTITY_STORAGE_UNAVAILABLE';
                 return '';
             }
-            if (!is_array($identity)) return '';
-            return trim((string) ($identity['current_slug'] ?? ''));
+            if (is_array($identity)) return trim((string) ($identity['current_slug'] ?? ''));
         }
-
-        // Compatibility-only path for isolated tests or a pre-cutover runtime
-        // where central Public Identity has not been composed yet. Once a
-        // repository is present, metadata is never allowed to override it.
         $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
         return trim((string) ($identity['current_slug'] ?? ''));
     }

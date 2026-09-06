@@ -16,6 +16,17 @@ use PHPUnit\Framework\TestCase;
 
 final class HomeSemanticQueryTest extends TestCase
 {
+    public function test_home_semantic_modules_have_bounded_purpose_labels_and_hide_empty_discovery_sections(): void
+    {
+        $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $this->media([]), $this->videos([]), new EntityTypeRegistry()))
+            ->extend([]);
+
+        self::assertSame(['entities', 'media', 'videos', 'knowledge', 'hubs', 'explore_next'], array_keys($modules));
+        self::assertSame([], $modules['entities']);
+        self::assertSame([], $modules['explore_next']);
+        self::assertArrayNotHasKey('odo', json_decode(json_encode($modules), true));
+    }
+
     public function test_home_hides_invalid_public_video_references(): void
     {
         $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');

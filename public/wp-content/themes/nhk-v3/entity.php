@@ -25,25 +25,25 @@ get_header();
 <main id="main-content" class="site-main entity-shell entity-v2">
 <?php if (is_array($context) && ($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)): $entity = $context['entity'];
     $dossier = is_array($entity['dossier'] ?? null) && ($entity['dossier']['status'] ?? '') === 'AVAILABLE' ? $entity['dossier'] : null;
-    $identity = is_array($dossier['identity'] ?? null) ? $dossier['identity'] : ['type' => $type, 'name' => (string) ($entity['name'] ?? ''), 'payload' => is_array($entity['payload'] ?? null) ? $entity['payload'] : [], 'url' => $entity['url'] ?? null];
+    $profile = is_array($entity['dossier']['profile'] ?? null) ? $entity['dossier']['profile'] : [];
+    $identity = is_array($profile['identity'] ?? null) ? $profile['identity'] : (is_array($dossier['identity'] ?? null) ? $dossier['identity'] : ['type' => $type, 'name' => (string) ($entity['name'] ?? ''), 'payload' => is_array($entity['payload'] ?? null) ? $entity['payload'] : [], 'url' => $entity['url'] ?? null]);
     $payload = is_array($identity['payload'] ?? null) ? $identity['payload'] : [];
-    $knowledge = is_array($dossier['knowledge'] ?? null) ? $dossier['knowledge'] : (is_array($entity['knowledge'] ?? null) ? $entity['knowledge'] : []);
+    $knowledge = is_array($profile['knowledge'] ?? null) ? $profile['knowledge'] : (is_array($dossier['knowledge'] ?? null) ? $dossier['knowledge'] : (is_array($entity['knowledge'] ?? null) ? $entity['knowledge'] : []));
     $facets = is_array($knowledge['facets'] ?? null) ? $knowledge['facets'] : [];
     $legacyMedia = is_array($entity['media'] ?? null) ? $entity['media'] : [];
     $legacyGallery = is_array($legacyMedia['gallery'] ?? null) ? $legacyMedia['gallery'] : [];
-    $primary = is_array($dossier['primary_media'] ?? null) ? $dossier['primary_media'] : (is_array($legacyMedia['representative'] ?? null) ? $legacyMedia['representative'] : null);
-    $gallery = is_array($dossier['media_gallery'] ?? null) ? $dossier['media_gallery'] : $legacyGallery;
-    $relationSections = is_array($dossier['relation_sections'] ?? null) ? $dossier['relation_sections'] : [];
+    $primary = is_array($profile['primary_media'] ?? null) ? $profile['primary_media'] : (is_array($dossier['primary_media'] ?? null) ? $dossier['primary_media'] : (is_array($legacyMedia['representative'] ?? null) ? $legacyMedia['representative'] : null));
+    $gallery = is_array($profile['media_gallery'] ?? null) ? $profile['media_gallery'] : (is_array($dossier['media_gallery'] ?? null) ? $dossier['media_gallery'] : $legacyGallery);
+    $relationSections = is_array($profile['relation_sections'] ?? null) ? $profile['relation_sections'] : (is_array($dossier['relation_sections'] ?? null) ? $dossier['relation_sections'] : []);
     $relatedGroups = is_array($entity['related'] ?? null) ? $entity['related'] : [];
     if ($type === 'brand') unset($relatedGroups['entities']);
-    if ($type === 'brand') foreach (['brands','models','variants','movements','music','components','classifications','specimens','products'] as $group) unset($relationSections[$group]);
     $heroImage = trim((string) ($primary['url'] ?? '')) ?: $fallback;
     $lexicalText = (string) ($identity['name'] ?? '') . ' ' . wp_json_encode($payload);
     foreach ($facets as $claims) foreach ((array) $claims as $claim) if (is_array($claim)) $lexicalText .= ' ' . (string) ($claim['text'] ?? '');
     $dictionaryTerms = apply_filters('nhk_v3_public_dictionary_terms_for_text', [], $lexicalText);
     $dictionaryTerms = is_array($dictionaryTerms) ? $dictionaryTerms : [];
-    $warnings = is_array($dossier['warnings'] ?? null) ? $dossier['warnings'] : [];
-    $coverage = is_array($dossier['coverage'] ?? null) ? $dossier['coverage'] : [];
+    $warnings = is_array($profile['warnings'] ?? null) ? $profile['warnings'] : (is_array($dossier['warnings'] ?? null) ? $dossier['warnings'] : []);
+    $coverage = is_array($profile['coverage'] ?? null) ? $profile['coverage'] : (is_array($dossier['coverage'] ?? null) ? $dossier['coverage'] : []);
 ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url(home_url($archivePaths[$type] ?? '/')); ?>"><?php echo esc_html($label); ?></a></p>
 
@@ -92,13 +92,13 @@ get_header();
       <section id="hinh-anh" class="dossier-section"><div class="section-head"><div><p class="eyebrow">Hiện vật</p><h2>Hình ảnh liên quan trực tiếp</h2></div><a class="text-link" href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Mở thư viện →</a></div><div class="media-mosaic entity-gallery"><?php foreach ($gallery as $item): $image = trim((string) ($item['url'] ?? '')); if ($image === '') continue; ?><figure class="media-figure"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['alt'] ?? $identity['name'] ?? '')); ?>" loading="lazy"></figure><?php endforeach; ?></div></section>
       <?php endif; ?>
 
-      <?php if ($type === 'brand' && is_array($entity['aggregation'] ?? null)): $aggregationLabels = ['models' => 'Mẫu đồng hồ', 'variants' => 'Biến thể', 'movements' => 'Bộ máy', 'music' => 'Bản nhạc', 'components' => 'Linh kiện', 'classifications' => 'Phân loại', 'specimens' => 'Hiện vật', 'products' => 'Sản phẩm']; ?>
+      <?php if ($dossier === null && $type === 'brand' && is_array($entity['aggregation'] ?? null)): $aggregationLabels = ['models' => 'Mẫu đồng hồ', 'variants' => 'Biến thể', 'movements' => 'Bộ máy', 'music' => 'Bản nhạc', 'components' => 'Linh kiện', 'classifications' => 'Phân loại', 'specimens' => 'Hiện vật', 'products' => 'Sản phẩm']; ?>
       <section id="cau-truc" class="dossier-section brand-aggregation"><div class="section-head"><div><p class="eyebrow">Cấu trúc thương hiệu</p><h2>Những hồ sơ đang kết nối</h2></div></div>
         <?php foreach ($aggregationLabels as $group => $heading): $items = is_array($entity['aggregation'][$group] ?? null) ? $entity['aggregation'][$group] : []; if ($items === []) continue; ?><div class="aggregation-block"><h3><?php echo esc_html($heading); ?></h3><div class="related-grid"><?php foreach ($items as $item): $url = nhk_v3_public_url($item['url'] ?? null); ?><article class="related-card"><?php if ($url !== ''): ?><a href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['name'] ?? ''))); ?></strong></a><?php else: ?><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['name'] ?? ''))); ?></strong><?php endif; ?><span class="related-type"><?php echo esc_html(($item['origin']['kind'] ?? '') === 'DIRECT' ? 'Liên kết trực tiếp' : 'Liên kết suy ra'); ?></span></article><?php endforeach; ?></div></div><?php endforeach; ?>
       </section>
       <?php endif; ?>
 
-      <?php $order = $profiles[$type] ?? array_keys($relationLabels); foreach ($order as $group): $items = is_array($relationSections[$group] ?? null) ? $relationSections[$group] : []; if ($items === []) continue; $heading = $relationLabels[$group] ?? 'Liên quan'; ?>
+      <?php $profileOrder = is_array($profile['section_order'] ?? null) ? $profile['section_order'] : []; $order = array_values(array_filter($profileOrder, static fn(string $group): bool => isset($relationLabels[$group]))); if ($order === []) $order = $profiles[$type] ?? array_keys($relationLabels); foreach ($order as $group): $items = is_array($relationSections[$group] ?? null) ? $relationSections[$group] : []; if ($items === []) continue; $heading = $relationLabels[$group] ?? 'Liên quan'; ?>
       <section class="dossier-section relation-section relation-group-<?php echo esc_attr($group); ?>"><div class="section-head"><div><p class="eyebrow">Liên quan</p><h2><?php echo esc_html($heading); ?></h2></div></div>
         <?php if ($group === 'videos'): ?><div class="video-card-grid"><?php foreach ($items as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $thumb = trim((string) ($item['thumbnail_url'] ?? '')) ?: $fallback; ?><a class="video-card" href="<?php echo esc_url($url); ?>"><span class="visual-frame video-thumb"><img src="<?php echo esc_url($thumb); ?>" alt="" loading="lazy"><span class="play-mark" aria-hidden="true">▶</span></span><span class="visual-card-body"><small><?php echo esc_html(($item['origin']['kind'] ?? '') === 'DIRECT' ? 'Liên quan trực tiếp' : 'Mở rộng từ quan hệ nền'); ?></small><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></span></a><?php endforeach; ?></div>
         <?php elseif ($group === 'media'): ?><div class="media-mosaic related-media-grid"><?php foreach ($items as $item): $image = trim((string) ($item['image_url'] ?? '')) ?: $fallback; ?><figure class="media-figure"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['alt'] ?? $item['title'] ?? '')); ?>" loading="lazy"><figcaption><?php echo esc_html((string) ($item['title'] ?? 'Hình ảnh')); ?> · <?php echo esc_html(($item['origin']['kind'] ?? '') === 'DIRECT' ? 'liên quan trực tiếp' : 'liên quan mở rộng'); ?></figcaption></figure><?php endforeach; ?></div>

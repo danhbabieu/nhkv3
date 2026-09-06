@@ -12,6 +12,7 @@ final class SeoDocumentationContractTest extends TestCase
         $root = dirname(__DIR__, 6);
         $files = [
             'docs/seo/NHK_V3_SEO_CORE_CONTRACT.md',
+            'docs/seo/PUBLIC_URL_SLUG_CONTRACT.md',
             'docs/seo/ENTITY_SEO_PROJECTION_CONTRACT.md',
             'docs/seo/MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md',
             'docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md',
@@ -34,9 +35,28 @@ final class SeoDocumentationContractTest extends TestCase
         foreach (['docs/constitution/READ_FIRST.md', 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md'] as $file) {
             $contents = (string) file_get_contents($root . '/' . $file);
             self::assertStringContainsString('NHK_V3_SEO_CORE_CONTRACT.md', $contents);
+            self::assertStringContainsString('PUBLIC_URL_SLUG_CONTRACT.md', $contents);
             self::assertStringContainsString('ENTITY_SEO_PROJECTION_CONTRACT.md', $contents);
             self::assertStringContainsString('MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md', $contents);
             self::assertStringContainsString('SITEMAP_INDEXABILITY_CONTRACT.md', $contents);
+        }
+    }
+
+    public function test_router_and_index_route_entity_detail_projection_through_dossier_contract(): void
+    {
+        $root = dirname(__DIR__, 6);
+        $contract = $root . '/docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md';
+        self::assertFileExists($contract);
+        $contents = strtolower((string) file_get_contents($contract));
+        self::assertStringContainsString('read-only', $contents);
+        self::assertStringContainsString('subject-scoped', $contents);
+        self::assertStringContainsString('model_of', $contents);
+        self::assertStringContainsString('uses_movement', $contents);
+        self::assertStringContainsString('configured_with_music', $contents);
+        self::assertStringContainsString('supports_music', $contents);
+
+        foreach (['docs/constitution/READ_FIRST.md', 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md'] as $file) {
+            self::assertStringContainsString('PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md', (string) file_get_contents($root . '/' . $file));
         }
     }
 

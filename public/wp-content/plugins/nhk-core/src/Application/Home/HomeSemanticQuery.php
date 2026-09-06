@@ -31,7 +31,7 @@ final class HomeSemanticQuery
 
     public function extend(array $modules): array
     {
-        foreach (['entities','media','videos','knowledge','hubs'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
+        foreach (['entities','media','videos','knowledge','hubs','explore_next'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
 
         if ($this->ready('authority')) {
             foreach ($this->types->all() as $definition) {

@@ -5,8 +5,8 @@ namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\StructuralContextQuery;
 use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry};
-use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -31,34 +31,36 @@ final class PublicRouteResolver
      *        boundary probe. The application remains usable without WP in
      *        unit tests and non-HTTP consumers.
      */
-    public function __construct(
-        private AuthorityRepository $authority,
-        private EntityTypeRegistry $types,
-        private ?StructuralContextQuery $contexts = null,
-        private ?\Closure $nativeRootExists = null,
-        private ?PublicIdentityRepository $publicIdentities = null,
-    ) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null, private ?\Closure $nativeRootExists = null, private ?PublicIdentityRepository $publicIdentities = null) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
     public function path(AuthorityEntity $entity): ?string
     {
         if (!$this->types->has($entity->entityType) || !$entity->active()) return null;
-        $slug = $this->publicSlug($entity);
-        if ($slug === '') return null;
-        if ($entity->entityType === 'brand') return in_array($slug, self::RESERVED_ROOTS, true) || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) || $this->nativeRootExists($slug) ? null : '/' . $slug . '/';
+        if ($entity->entityType === 'brand') {
+            $slug = $this->publicSlug($entity);
+            return $slug === null || in_array($slug, self::RESERVED_ROOTS, true) || $this->nativeRootExists($slug) ? null : '/' . $slug . '/';
+        }
         if ($entity->entityType === 'model') {
             $context = $this->context($entity);
             $brand = $context === null ? $this->parent($entity, 'brand_uuid', 'brand') : ($context->brandId === null || $context->reasons !== [] ? null : $this->authority->findByCanonicalId($context->brandId));
-            return $brand && $brand->entityType === 'brand' && $brand->active() && $this->uniqueChildAvailable($entity->entityType, $slug, $brand->canonicalId, $entity->canonicalId) && ($parentPath = $this->path($brand)) !== null ? $parentPath . $slug . '/' : null;
+            if (!$brand || $brand->entityType !== 'brand' || !$brand->active()) return null;
+            $slug = $this->publicSlug($entity, $brand->canonicalId);
+            $parentPath = $this->path($brand);
+            return $slug !== null && $parentPath !== null ? $parentPath . $slug . '/' : null;
         }
         if ($entity->entityType === 'variant') {
             $context = $this->context($entity);
             $model = $context === null ? $this->parent($entity, 'model_uuid', 'model') : ($context->modelId === null || $context->reasons !== [] ? null : $this->authority->findByCanonicalId($context->modelId));
-            return $model && $model->entityType === 'model' && $model->active() && $this->uniqueChildAvailable($entity->entityType, $slug, $model->canonicalId, $entity->canonicalId) && ($parentPath = $this->path($model)) !== null ? $parentPath . $slug . '/' : null;
+            if (!$model || $model->entityType !== 'model' || !$model->active()) return null;
+            $slug = $this->publicSlug($entity, $model->canonicalId);
+            $parentPath = $this->path($model);
+            return $slug !== null && $parentPath !== null ? $parentPath . $slug . '/' : null;
         }
         $namespace = self::NAMESPACES[$entity->entityType] ?? null;
-        return $namespace === null || !$this->uniqueEntity($entity->entityType, $slug, $entity->canonicalId) ? null : '/' . $namespace . '/' . $slug . '/';
+        $slug = $namespace === null ? null : $this->publicSlug($entity);
+        return $namespace === null || $slug === null ? null : '/' . $namespace . '/' . $slug . '/';
     }
 
     public function archivePath(string $type): ?string
@@ -83,7 +85,7 @@ final class PublicRouteResolver
     {
         if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)) return null;
         $slug = self::slug($title);
-        return $slug === '' ? null : '/video/' . $slug . '/';
+        return $slug !== '' ? '/video/' . $slug . '/' : null;
     }
 
     /** @param list<string> $segments */
@@ -106,29 +108,14 @@ final class PublicRouteResolver
         return null;
     }
 
-    public static function slug(string $value): string { return (new CanonicalPublicSlugPolicy())->slug($value); }
+    public static function slug(string $value): string
+    {
+        return CanonicalPublicSlugPolicy::normalize($value);
+    }
 
     /** @return list<string> */
     public static function reservedRoots(): array { return self::RESERVED_ROOTS; }
     public static function namespaceFor(string $type): ?string { return self::NAMESPACES[$type] ?? null; }
-
-    private function publicSlug(AuthorityEntity $entity): string
-    {
-        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
-        if ($repository !== null) {
-            try {
-                $identity = $repository->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
-                if (is_array($identity)) {
-                    $stored = trim((string) ($identity['current_slug'] ?? ''));
-                    return $stored !== '' && self::slug($stored) === $stored ? $stored : '';
-                }
-            } catch (\Throwable) {
-                // Compatibility fallback for demo records when the projection
-                // storage is unavailable; semantic identity is never altered.
-            }
-        }
-        return self::slug($entity->canonicalName);
-    }
 
     private function nativeRootExists(string $slug): bool
     {
@@ -152,22 +139,71 @@ final class PublicRouteResolver
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    private function uniqueChild(string $type, string $slug, string $parentId, ?string $excludeId = null): ?AuthorityEntity
+    private function uniqueChild(string $type, string $slug, string $parentId): ?AuthorityEntity
     {
-        $matches = array_values(array_filter($this->authority->listByType($type), fn (AuthorityEntity $item): bool => $item->active() && $this->publicSlug($item) === $slug && $this->parentForRoute($item) === $parentId && ($excludeId === null || $item->canonicalId !== $excludeId)));
+        $matches = array_values(array_filter($this->authority->listByType($type), fn (AuthorityEntity $item): bool => $item->active() && $this->parentForRoute($item) === $parentId && $this->publicSlug($item, $parentId) === $slug));
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    private function uniqueEntity(string $type, string $slug, string $id): bool
+    private function publicSlug(AuthorityEntity $entity, ?string $parentId = null): ?string
     {
-        foreach ($this->authority->listByType($type) as $item) if ($item->active() && $item->canonicalId !== $id && $this->publicSlug($item) === $slug) return false;
+        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
+        if ($repository !== null) {
+            try {
+                $identity = $repository->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
+                if (is_array($identity)) {
+                    $stored = trim((string) ($identity['current_slug'] ?? ''));
+                    return $stored !== '' && CanonicalPublicSlugPolicy::isCanonical($stored) ? $stored : null;
+                }
+            } catch (\Throwable) {
+                // Demo compatibility fallback only; semantic identity is never changed.
+            }
+        }
+        foreach ($this->candidateSlugs($entity) as $candidate) {
+            if ($this->candidateAvailable($entity, $candidate, $parentId)) return $candidate;
+        }
+        return null;
+    }
+
+    private function candidateAvailable(AuthorityEntity $entity, string $candidate, ?string $parentId): bool
+    {
+        foreach ($this->authority->listByType($entity->entityType) as $other) {
+            if (!$other->active() || $other->canonicalId === $entity->canonicalId) continue;
+            if ($parentId !== null && $this->parentForRoute($other) !== $parentId) continue;
+            if (in_array($candidate, $this->candidateSlugs($other), true)) return false;
+        }
         return true;
     }
 
-    private function uniqueChildAvailable(string $type, string $slug, string $parentId, string $id): bool
+    /** @return list<string> */
+    private function candidateSlugs(AuthorityEntity $entity): array
     {
-        foreach ($this->authority->listByType($type) as $item) if ($item->active() && $item->canonicalId !== $id && $this->publicSlug($item) === $slug && $this->parentForRoute($item) === $parentId) return false;
-        return true;
+        return CanonicalPublicSlugPolicy::candidates($entity->canonicalName, $this->meaningfulCollisionValues($entity));
+    }
+
+    /** @return list<string> */
+    private function meaningfulCollisionValues(AuthorityEntity $entity): array
+    {
+        $fields = match ($entity->entityType) {
+            'brand' => ['founded_year', 'country'],
+            'model' => ['launch_year'],
+            'variant' => ['reference'],
+            'movement' => ['caliber', 'manufacturer'],
+            'music' => ['release_year', 'artist', 'album'],
+            'component' => ['kind', 'manufacturer'],
+            'classification' => ['family'],
+            'specimen' => ['serial_number', 'acquired_at'],
+            'product' => ['vendor', 'listing_title'],
+            default => [],
+        };
+        $values = [];
+        foreach ($fields as $field) {
+            $value = $entity->payload[$field] ?? null;
+            if (!is_scalar($value)) continue;
+            $value = trim((string) $value);
+            if ($value !== '') $values[] = $value;
+        }
+        return $values;
     }
 
     private function parent(AuthorityEntity $entity, string $field, string $type): ?AuthorityEntity
