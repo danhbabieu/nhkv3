@@ -262,7 +262,6 @@ final class McpContractTest extends TestCase
             'nhk-v3/knowledge-get',
             'nhk-v3/source-get',
             'nhk-v3/evidence-get',
-            'nhk-v3/public-url-audit',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
