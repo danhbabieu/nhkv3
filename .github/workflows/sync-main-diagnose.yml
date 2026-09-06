@@ -18,13 +18,32 @@ jobs:
       - name: Merge current main and push
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           git fetch origin main
-          if git merge-base --is-ancestor origin/main HEAD; then
-            echo 'feature already contains main'
-            exit 0
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git merge --no-ff origin/main -m 'chore: sync main into canonical URL branch [skip sync-main]'
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo 'feature already contains main' > tools/sync-main-result.txt
+            exit 0
+          fi
+          set +e
+          git merge --no-ff origin/main -m 'chore: sync main into canonical URL branch [skip sync-main]' > /tmp/sync-main.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/sync-main.log
+          if [ "$code" -ne 0 ]; then
+            git diff --name-only --diff-filter=U > /tmp/conflicts.txt || true
+            git merge --abort || true
+            {
+              echo "MERGE_EXIT=$code"
+              echo 'CONFLICTS:'
+              cat /tmp/conflicts.txt
+              echo 'LOG:'
+              cat /tmp/sync-main.log
+            } > tools/sync-main-result.txt
+            git add tools/sync-main-result.txt
+            git commit -m 'ci: record failed main sync [skip sync-main]' || true
+            git push origin HEAD:feature/canonical-public-slug-policy || true
+            exit "$code"
+          fi
           git push origin HEAD:feature/canonical-public-slug-policy
