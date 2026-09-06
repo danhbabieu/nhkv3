@@ -8,7 +8,8 @@ policy → NHK lookup → relation candidates → optional Knowledge enrichment
 planning → optional Dictionary lexical preview → Hub classification → editorial
 package → SEO projection → completeness → governed Video Proposal`.
 
-Canonical public URL policy is `/video/{semantic-slug}-{external-video-id}/`.
+Canonical public URL policy is `/video/{semantic-slug}/`; the external video ID
+remains internal identity metadata and is not a default public slug suffix.
 Semantic slug fallback order is explicit governed NHK semantic/editorial
 context; confirmed attached Brand/Model/Variant/Movement/Music context;
 governed editorial title; governed user hint when allowed; and source-platform

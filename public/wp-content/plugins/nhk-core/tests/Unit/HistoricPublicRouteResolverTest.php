@@ -15,7 +15,7 @@ final class HistoricPublicRouteResolverTest extends TestCase
         $result = $resolver->resolve('/old-video/');
 
         self::assertSame('FOUND', $result['status']);
-        self::assertSame('/video/odo-36-10-gai-carillon-p4kahx3lbow/', $result['target']);
+        self::assertSame('/video/odo-36-10-gai-carillon/', $result['target']);
         self::assertSame(1, $result['hops']);
     }
 

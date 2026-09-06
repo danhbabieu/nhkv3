@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+## Semantic frontend discovery implementation checkpoint — 2026-09-06
+
+The approved semantic frontend design now has an implementation plan at
+`docs/superpowers/plans/2026-09-06-semantic-frontend-discovery.md`. The first
+vertical slice adds `SemanticProfileComposer` as a pure reader-safe mapper,
+wires the profile to Authority, native WordPress Post and Video dossiers, and
+makes the public entity template consume the profile contract when present.
+The composer preserves direct/derived relation origins, bounded metadata and
+deduplicates relation targets with direct precedence; unavailable dependencies
+remain distinguishable from empty modules. `HomeSemanticQuery` now initializes
+the bounded `explore_next` module without adding a new data source.
+
+Focused verification is 13 tests / 74 assertions PASS, including dossier,
+relation, homepage and theme contract regressions. Fresh full Unit verification
+is also PASS at 589 tests / 2,777 assertions, with 2 existing warnings and 5
+PHPUnit deprecations; PHP lint, Composer validation and `git diff --check` are
+clean (Composer reports only the pre-existing missing-license warning).
+Browser/runtime QA and responsive route smoke remain ENVIRONMENT_BLOCKED until
+the local WordPress runtime/data availability is established. No semantic
+record, Graph edge, WordPress content, route identity or live/demo data was
+mutated.
+
 ## Public slug policy and existing-URL migration design revision — 2026-09-06
 
 The public slug design now makes existing-site migration/reprojection mandatory
@@ -4300,3 +4322,22 @@ success signal. The governed orchestration service calls create, submit,
 review/approve according to an injected approval policy, eligibility and apply,
 and stops downstream progression on missing read-back. No production/staging/V2
 data was migrated, seeded or mutated. Integration remains environment-gated.
+
+## Canonical public slug policy migration checkpoint — 2026-09-06
+
+From approved commit `6ea0b38`, `origin/main` was fetched and confirmed as the
+direct parent with no divergence. The shared public slug policy now drives the
+semantic-only Video canonical path; the YouTube external ID remains internal
+metadata for identity, lookup, dedupe and source resolution. A governed,
+read-only-first `PublicSlugMigrationService` now emits deterministic candidate
+rows, meaningful collision/manual-review outcomes, migration fingerprints and
+CAS/idempotency inputs for its injected domain writer. Focused evidence is 47
+tests / 205 assertions, including dry-run zero-write, first apply, replay no-op,
+stale fingerprint rejection, collision classification and URL consumer reuse.
+
+This checkout has no WordPress runtime (`NHK_WP_TEST_PATH` unset and no
+`public/wp-config.php`), so no live existing-data audit/apply/reprojection,
+database mutation, production/staging/V2 change or push is claimed. Guarded
+integration and route smoke remain environment-blocked. The migration service
+does not rename media files, rewrite article bodies, alter UUID/stable_key or
+relations, or create redirects.

@@ -84,7 +84,7 @@ final class PublicRouteResolver
     {
         if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $externalId)) return null;
         $slug = self::slug($title);
-        return '/video/' . ($slug !== '' ? $slug . '-' . strtolower($externalId) : 'video-' . strtolower($externalId)) . '/';
+        return $slug !== '' ? '/video/' . $slug . '/' : null;
     }
 
     /** @param list<string> $segments */

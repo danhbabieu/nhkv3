@@ -26,7 +26,7 @@ final class VideoUrlPolicyTest extends TestCase
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
 
         self::assertTrue($result['eligible']);
-        self::assertSame('/video/odo-36-10-gai-carillon-p4kahx3lbow/', $result['path']);
+        self::assertSame('/video/odo-36-10-gai-carillon/', $result['path']);
     }
 
     public function test_source_title_changes_do_not_change_the_persisted_video_url(): void
@@ -41,9 +41,26 @@ final class VideoUrlPolicyTest extends TestCase
         ]);
 
         self::assertSame(
-            '/video/odo-36-10-gai-carillon-p4kahx3lbow/',
+            '/video/odo-36-10-gai-carillon/',
             (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector())['path'],
         );
+    }
+
+    public function test_external_video_id_remains_metadata_and_never_enters_default_slug(): void
+    {
+        $video = new Video(self::VIDEO_ID, 'youtube', 'P4KaHX3LBOw', 'https://www.youtube.com/watch?v=P4KaHX3LBOw', 'Title', [
+            'public_identity' => ['current_slug' => 'tuoi-tho-nha-kho'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true],
+            'editorial' => ['title' => 'Title', 'summary' => 'Summary'],
+            'hub' => ['primary' => '06'],
+            'provenance' => ['kind' => 'YOUTUBE_SOURCE'],
+            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+
+        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+
+        self::assertSame('/video/tuoi-tho-nha-kho/', $result['path']);
+        self::assertStringNotContainsString($video->externalVideoId, (string) $result['path']);
     }
 
     public function test_context_selector_uses_governed_context_before_editorial_and_user_hint(): void

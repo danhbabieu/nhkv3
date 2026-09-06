@@ -33,7 +33,7 @@ final class VideoUrlPolicy
         if ($selector->select($context) === null && $slug === '') $blockers[] = 'GOVERNED_CONTEXT_MISSING';
         $eligible = $blockers === [];
         return [
-            'path' => $eligible ? '/video/' . $slug . '-' . strtolower($video->externalVideoId) . '/' : null,
+            'path' => $eligible ? '/video/' . $slug . '/' : null,
             'eligible' => $eligible,
             'blockers' => array_values(array_unique($blockers)),
             'warnings' => [],

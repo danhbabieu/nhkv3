@@ -643,7 +643,7 @@ final class VideoSemanticCoreTest extends TestCase
         $items = (new VideoSitemapProjection())->project([$valid, $unavailable, $notIndexable], 'https://nhk.example');
 
         self::assertCount(1, $items);
-        self::assertSame('https://nhk.example/video/nhk-title-dqw4w9wgxcq/', $items[0]['loc']);
+        self::assertSame('https://nhk.example/video/nhk-title/', $items[0]['loc']);
         self::assertSame('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', $items[0]['thumbnail_url']);
     }
 }

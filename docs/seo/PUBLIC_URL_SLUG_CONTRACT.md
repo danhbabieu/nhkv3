@@ -44,11 +44,10 @@ UUIDs, database IDs, hashes, source keys and external platform IDs are not
 semantic/title-derived SEO slug material and must not be appended merely to
 avoid a collision.
 
-Current Video routing is a constitutional exception: the Constitution and
-`VIDEO_SEMANTIC_INGEST_CONTRACT.md` presently require an external platform ID as
-a route suffix. The shared policy normalizes only the semantic/title-derived
-portion; removing that mandated suffix requires a Constitution/contract
-amendment and is not authorized by this implementation change.
+Video routing keeps the external platform ID in internal identity metadata for
+lookup, dedupe and source resolution, but the default canonical public slug is
+semantic-only. A collision may use meaningful governed context; an external ID
+is never a default technical suffix.
 
 ## 4. Collision strategy
 
