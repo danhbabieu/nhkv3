@@ -42,7 +42,7 @@ final class AdminWorkspaceViewModel
                 'state' => $state,
                 'state_label' => self::stateLabel($state),
                 'value' => $displayValue,
-                'display' => self::display($displayValue),
+                'display' => self::display($value, $displayValue),
                 'reason_code' => $reasonCode,
                 'diagnostic' => $reasonCode !== null ? AdminDiagnosticPresenter::present($reasonCode) : null,
             ];
@@ -53,6 +53,7 @@ final class AdminWorkspaceViewModel
     private static function state(string $key, mixed $value, string $kind): string
     {
         if ($value === null) return 'unavailable';
+        if ($value instanceof \Throwable) return 'blocked';
 
         if (is_array($value)) {
             $explicit = strtolower(trim((string) ($value['state'] ?? '')));
@@ -95,18 +96,20 @@ final class AdminWorkspaceViewModel
 
     private static function displayValue(mixed $value): mixed
     {
+        if ($value instanceof \Throwable) return null;
         if (!is_array($value)) return $value;
         if (array_key_exists('ok', $value)) return $value['ok'];
         if (array_key_exists('configured', $value)) return $value['configured'];
         return $value;
     }
 
-    private static function display(mixed $value): string
+    private static function display(mixed $originalValue, mixed $displayValue): string
     {
-        if ($value === null) return 'Không khả dụng';
-        if (is_bool($value)) return $value ? 'Có' : 'Không';
-        if (is_array($value)) return (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        return (string) $value;
+        if ($originalValue instanceof \Throwable) return 'Lỗi runtime';
+        if ($displayValue === null) return 'Không khả dụng';
+        if (is_bool($displayValue)) return $displayValue ? 'Có' : 'Không';
+        if (is_array($displayValue)) return (string) json_encode($displayValue, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return (string) $displayValue;
     }
 
     private static function stateLabel(string $state): string

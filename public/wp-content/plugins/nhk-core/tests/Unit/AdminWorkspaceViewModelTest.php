@@ -29,6 +29,17 @@ final class AdminWorkspaceViewModelTest extends TestCase
         self::assertSame('system_blocked', $view['health']['runtime']['diagnostic']['severity']);
     }
 
+    public function test_runtime_exception_is_blocked_without_becoming_a_success_value(): void
+    {
+        $view = AdminWorkspaceViewModel::fromHealth([
+            'runtime' => new \RuntimeException('sensitive infrastructure detail'),
+        ], [], []);
+
+        self::assertSame('blocked', $view['health']['runtime']['state']);
+        self::assertNull($view['health']['runtime']['value']);
+        self::assertSame('Lỗi runtime', $view['health']['runtime']['display']);
+    }
+
     public function test_capabilities_and_counts_keep_truthful_presentation_states(): void
     {
         $view = AdminWorkspaceViewModel::fromHealth(

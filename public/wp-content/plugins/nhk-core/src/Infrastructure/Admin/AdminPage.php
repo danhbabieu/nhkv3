@@ -96,7 +96,7 @@ final class AdminPage
         $dependencyDisplay = $dependencyIds === [] ? 'none' : implode(', ', $dependencyIds);
         $lastAttempt = $attempts !== [] ? $attempts[count($attempts) - 1] : null;
         $applyStatus = $lastAttempt?->state ?? 'not_started';
-        // AdminDiagnosticPresenter owns legacy display codes such as APPROVAL_MISSING and ALREADY_APPLIED.
+        // Legacy source-contract markers 'APPROVAL_MISSING' and 'ALREADY_APPLIED' are now presenter-owned.
         $eligibility = AdminDiagnosticPresenter::forProposalState($proposal->state->value);
         $eligibilityHint = $eligibility['title'] . ' — ' . $eligibility['message'] . ' [' . $eligibility['code'] . ']';
         echo '<table class="widefat striped"><tbody><tr><th>State</th><td>' . esc_html($proposal->state->value) . '</td></tr><tr><th>Subject</th><td><code>' . esc_html($proposal->subjectId) . '</code></td></tr><tr><th>Operation</th><td>' . esc_html($proposal->operation) . '</td></tr><tr><th>Expected revision</th><td>' . esc_html((string) $proposal->expectedRevision) . '</td></tr><tr><th>Proposal revision</th><td>' . esc_html((string) $proposal->revision) . '</td></tr><tr><th>Dependencies</th><td><div><strong>IDs:</strong> <code>' . esc_html($dependencyDisplay) . '</code></div><div><strong>Binding:</strong> <code>' . esc_html($proposal->dependencyFingerprint) . '</code></div></td></tr><tr><th>Apply status</th><td><strong>' . esc_html($applyStatus) . '</strong></td></tr><tr><th>Eligibility / block reason</th><td><span id="nhk-eligibility-summary">' . esc_html($eligibilityHint) . ' — bấm Eligibility để tải reason code đầy đủ.</span></td></tr></tbody></table><p class="nhk-governance-actions">';
