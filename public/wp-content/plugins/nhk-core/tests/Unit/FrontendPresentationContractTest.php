@@ -44,8 +44,8 @@ final class FrontendPresentationContractTest extends TestCase
     {
         $source = $this->read('entity.php');
 
-        self::assertStringNotContainsString("if ($type === 'brand') foreach (['brands','models','variants','movements','music','components','classifications','specimens','products'] as $group) unset($relationSections[$group]);", $source);
-        self::assertStringContainsString("$dossier === null && $type === 'brand' && is_array($entity['aggregation'] ?? null)", $source);
+        self::assertStringNotContainsString('if ($type === \'brand\') foreach ([\'brands\',\'models\',\'variants\',\'movements\',\'music\',\'components\',\'classifications\',\'specimens\',\'products\'] as $group) unset($relationSections[$group]);', $source);
+        self::assertStringContainsString('$dossier === null && $type === \'brand\' && is_array($entity[\'aggregation\'] ?? null)', $source);
     }
 
     public function test_article_detail_uses_post_dossier_canonical_media_gallery_and_path_aware_relations(): void
