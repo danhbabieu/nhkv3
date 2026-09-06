@@ -12,6 +12,7 @@ final class SeoDocumentationContractTest extends TestCase
         $root = dirname(__DIR__, 6);
         $files = [
             'docs/seo/NHK_V3_SEO_CORE_CONTRACT.md',
+            'docs/seo/PUBLIC_URL_SLUG_CONTRACT.md',
             'docs/seo/ENTITY_SEO_PROJECTION_CONTRACT.md',
             'docs/seo/MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md',
             'docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md',
@@ -34,6 +35,7 @@ final class SeoDocumentationContractTest extends TestCase
         foreach (['docs/constitution/READ_FIRST.md', 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md'] as $file) {
             $contents = (string) file_get_contents($root . '/' . $file);
             self::assertStringContainsString('NHK_V3_SEO_CORE_CONTRACT.md', $contents);
+            self::assertStringContainsString('PUBLIC_URL_SLUG_CONTRACT.md', $contents);
             self::assertStringContainsString('ENTITY_SEO_PROJECTION_CONTRACT.md', $contents);
             self::assertStringContainsString('MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md', $contents);
             self::assertStringContainsString('SITEMAP_INDEXABILITY_CONTRACT.md', $contents);

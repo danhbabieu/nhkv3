@@ -18,9 +18,25 @@ final class PublicIdentityServiceTest extends TestCase
         $replayed = $service->changeSlug($first['identity_id'], 'odo-moi', 2, 'request-2');
 
         self::assertSame('/odo-moi/', $changed['current_path']);
+        self::assertSame('2', $changed['route_policy_version']);
         self::assertSame($changed, $replayed);
         self::assertSame(2, $repository->current()['revision']);
         self::assertSame(['/odo/'], $repository->historicPaths());
+    }
+
+    public function test_public_identity_uses_shared_slug_policy_without_changing_owner_identity(): void
+    {
+        $repository = new FakeIdentityRepository();
+        $service = new PublicIdentityService($repository, static fn (string $slug): bool => false);
+        $ownerId = '01a06815-1e51-7964-b004-1ba79e488ad1';
+
+        $identity = $service->allocate('authority', $ownerId, 'brand', 'root', 'Tri thức NHK tuổi ở xưởng', 'request-shared-slug');
+
+        self::assertSame($ownerId, $identity['owner_id']);
+        self::assertSame('tri-thuc-nha-kho-tuoi-o-xuong', $identity['current_slug']);
+        self::assertSame('/tri-thuc-nha-kho-tuoi-o-xuong/', $identity['current_path']);
+        self::assertSame('2', $identity['route_policy_version']);
+        self::assertStringNotContainsString($ownerId, $identity['current_path']);
     }
 
     public function test_stale_revision_and_native_collision_fail_closed(): void
