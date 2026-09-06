@@ -92,7 +92,7 @@ final class Plugin {
             $evidence = new WpdbEvidenceRepository($wpdb);
             $graphEndpoints = new EndpointTypeRegistry();
             CoreEndpointResolverRegistrar::register($graphEndpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
-            $graphRead = new GraphService(new WpdbGraphRepository($wpdb), $graphEndpoints, new PredicateRegistry(), new WpdbAuditSink($wpdb));
+            $graphRead = new GraphService(new WpdbGraphRepository($wpdb), $graphEndpoints, new PredicateRegistry(), new WpdbAuditSink());
             $neighborhood = new SemanticNeighborhoodQuery(new RelatedSemanticQuery($graphRead, new PredicateTraversalPolicy(new PredicateRegistry())));
             McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
