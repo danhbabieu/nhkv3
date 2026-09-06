@@ -68,13 +68,25 @@ final class PublicSlugMigrationService
 
         $changed = count(array_filter($baseRows, static fn (array $row): bool => $row['status'] === 'CHANGED'));
         $collisions = count(array_filter($baseRows, static fn (array $row): bool => $row['collision'] === true));
-        $manual = count(array_filter($baseRows, static fn (array $row): bool => $row['status'] === 'COLLISION'));
+        $manual = count(array_filter($baseRows, static fn (array $row): bool => in_array($row['status'], ['COLLISION', 'AMBIGUOUS'], true)));
+        $countBy = static fn (string $status): int => count(array_filter($baseRows, static fn (array $row): bool => $row['status'] === $status));
         return [
             'candidate_count' => count($baseRows),
             'changed' => $changed,
-            'no_op' => count($baseRows) - $changed - $manual,
+            'no_op' => $countBy('NOOP'),
             'collisions' => $collisions,
             'manual_review' => $manual,
+            'counts' => [
+                'candidate_count' => count($baseRows),
+                'changed' => $changed,
+                'no_op' => $countBy('NOOP'),
+                'collision' => $countBy('COLLISION'),
+                'ambiguous' => $countBy('AMBIGUOUS'),
+                'missing_identity' => $countBy('MISSING_IDENTITY'),
+                'invalid_route' => count(array_filter($baseRows, static fn (array $row): bool => ($row['invalid_route'] ?? false) === true)),
+                'unavailable' => $countBy('UNAVAILABLE'),
+                'blocked' => count(array_filter($baseRows, static fn (array $row): bool => ($row['write_eligibility'] ?? '') === 'BLOCKED')),
+            ],
             'fingerprint' => hash('sha256', (string) json_encode($baseRows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)),
             'rows' => $baseRows,
         ];
@@ -88,15 +100,25 @@ final class PublicSlugMigrationService
         $results = [];
         foreach (($dryRun['rows'] ?? []) as $row) {
             if (!is_array($row) || $row['status'] !== 'CHANGED') continue;
-            $results[] = ($this->writer)([
+            $result = ($this->writer)([
                 'resource_type' => $row['resource_type'], 'resource_id' => $row['resource_id'],
                 'current_slug' => $row['current_public_slug'], 'proposed_slug' => $row['proposed_public_slug'],
                 'current_url' => $row['current_url'], 'proposed_url' => $row['proposed_url'],
                 'expected_revision' => $row['revision'], 'source_fingerprint' => $row['source_fingerprint'],
                 'idempotency_key' => hash('sha256', $fingerprint . '|' . $row['resource_type'] . '|' . $row['resource_id']),
             ]);
+            if (!is_array($result)) $result = ['status' => 'UNAVAILABLE'];
+            $results[] = $result;
         }
-        return ['status' => 'APPLIED', 'rows' => $results, 'changed' => count(array_filter($results, static fn (array $row): bool => ($row['status'] ?? '') === 'CHANGED')), 'collisions' => (int) ($dryRun['collisions'] ?? 0)];
+        $failed = array_filter($results, static fn (array $row): bool => !in_array(($row['status'] ?? ''), ['CHANGED', 'NOOP'], true));
+        return [
+            'status' => $failed === [] ? 'APPLIED' : 'PARTIAL_FAILURE',
+            'rows' => $results,
+            'changed' => count(array_filter($results, static fn (array $row): bool => ($row['status'] ?? '') === 'CHANGED')),
+            'no_op' => count(array_filter($results, static fn (array $row): bool => ($row['status'] ?? '') === 'NOOP')),
+            'failed' => count($failed),
+            'collisions' => (int) ($dryRun['collisions'] ?? 0),
+        ];
     }
 
     /** @param array<string,mixed> $candidate @return array<string,mixed> */
@@ -109,6 +131,11 @@ final class PublicSlugMigrationService
         $status = $proposed === null ? 'MISSING_IDENTITY' : ($proposed === $current ? 'NOOP' : 'CHANGED');
         $currentUrl = trim((string) ($candidate['current_url'] ?? ''));
         $proposedUrl = $proposed === null ? null : $this->replaceSlug($currentUrl, $current, $proposed);
+        $invalidRoute = $currentUrl !== '' && (str_starts_with($currentUrl, '/') === false || str_ends_with($currentUrl, '/') === false || $proposedUrl === $currentUrl && $proposed !== $current);
+        $availability = strtolower(trim((string) ($candidate['availability'] ?? 'available')));
+        if ($availability !== 'available') $status = 'UNAVAILABLE';
+        if (($candidate['ambiguous'] ?? false) === true) $status = 'AMBIGUOUS';
+        if ($status === 'CHANGED' && $invalidRoute) $status = 'INVALID_ROUTE';
         return [
             'resource_type' => (string) ($candidate['type'] ?? ''), 'resource_id' => (string) ($candidate['id'] ?? ''),
             'current_public_slug' => $current, 'proposed_public_slug' => $proposed,
@@ -117,7 +144,8 @@ final class PublicSlugMigrationService
             'resolution' => $status === 'NOOP' ? 'NOOP' : null, 'status' => $status,
             'write_eligibility' => $status === 'CHANGED' ? 'ELIGIBLE' : ($status === 'NOOP' ? 'NOOP' : 'BLOCKED'),
             'scope' => (string) ($candidate['scope'] ?? ''), 'revision' => (int) ($candidate['revision'] ?? 0),
-            'source_fingerprint' => (string) ($candidate['fingerprint'] ?? ''),
+            'source_fingerprint' => (string) ($candidate['fingerprint'] ?? ''), 'route_owner' => (string) ($candidate['route_owner'] ?? ''),
+            'invalid_route' => $invalidRoute,
             'base_slug' => $base, 'meaningful_context' => $candidate['meaningful_context'] ?? [],
         ];
     }

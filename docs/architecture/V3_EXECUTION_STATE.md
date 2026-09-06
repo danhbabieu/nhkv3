@@ -4354,6 +4354,19 @@ integration and route smoke remain environment-blocked. The migration service
 does not rename media files, rewrite article bodies, alter UUID/stable_key or
 relations, or create redirects.
 
+Continuation checkpoint: fresh HEAD `faef994` is identical to `origin/main` after
+an explicit `git fetch origin main`. Focused slug/public-identity/Video tests
+pass 35 tests / 124 assertions after adding typed dry-run blocker counts,
+route-owner preservation and governed writer-result propagation. The migration
+dry-run now reports candidate, changed, no-op, collision, manual-review,
+ambiguous, missing-identity, invalid-route, unavailable and blocked counts;
+apply reports `PARTIAL_FAILURE` for typed writer failures instead of claiming
+success. Historical route inventories were reconciled to the constitutional
+semantic-only Video path `/video/{slug}/`. WordPress runtime remains absent, so
+real-owner inventory, `nhk_v3_test` guarded dry-run/apply, persisted read-back,
+historic 301 and canonical 200 remain `ENVIRONMENT_BLOCKED`; no data, media
+filename, redirect, UUID, stable key or relation was mutated.
+
 ## Graph relation foundation checkpoint — 2026-09-06
 
 The confirmed Controlled Apply root cause was a registry mismatch: relation
