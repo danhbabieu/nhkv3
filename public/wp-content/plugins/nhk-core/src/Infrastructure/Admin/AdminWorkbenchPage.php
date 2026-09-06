@@ -16,8 +16,9 @@ final class AdminWorkbenchPage
     public static function registerMenu(): void
     {
         // AdminPage registers the historical top-level item at priority 10.
-        // Replace only that menu entry; its render callback remains available
-        // through the Advanced submenu below.
+        // Detach that page callback before reusing the same slug so the new
+        // dashboard cannot render together with the legacy technical surface.
+        remove_action('toplevel_page_nhk-v3', [AdminPage::class, 'render']);
         remove_menu_page('nhk-v3');
         add_menu_page(
             'NHK V3',
@@ -76,7 +77,7 @@ final class AdminWorkbenchPage
         foreach ($sections as $section) {
             if ($section['id'] === 'overview') continue;
             $mode = match ($section['kind']) {
-                'native' => 'WordPress native',
+                'native' => 'WordPress gốc',
                 'advanced' => 'Nâng cao',
                 default => 'Workbench',
             };
@@ -84,7 +85,7 @@ final class AdminWorkbenchPage
             echo '<div class="nhk-admin-card__top"><span class="nhk-admin-pill">' . esc_html($mode) . '</span><span class="nhk-admin-access">Có quyền truy cập</span></div>';
             echo '<h3><a href="' . esc_url(self::adminHref($section['href'])) . '">' . esc_html($section['label']) . '</a></h3>';
             echo '<p>' . esc_html($section['description']) . '</p>';
-            echo '<dl class="nhk-admin-card__meta"><div><dt>Owner</dt><dd>' . esc_html($section['owner']) . '</dd></div><div><dt>Quyền</dt><dd><code>' . esc_html($section['capability']) . '</code></dd></div></dl>';
+            echo '<dl class="nhk-admin-card__meta"><div><dt>Chủ sở hữu</dt><dd>' . esc_html($section['owner']) . '</dd></div><div><dt>Quyền</dt><dd><code>' . esc_html($section['capability']) . '</code></dd></div></dl>';
             echo '<a class="button button-secondary nhk-admin-card__action" href="' . esc_url(self::adminHref($section['href'])) . '">Mở ' . esc_html($section['label']) . '</a>';
             echo '</article>';
         }
@@ -96,12 +97,12 @@ final class AdminWorkbenchPage
         $state = new AdminWorkbenchState([
             ['label' => 'Sẵn sàng', 'value' => 'Đã có điều kiện cần thiết ở lớp đang xem', 'tone' => 'ready'],
             ['label' => 'Cần chú ý', 'value' => 'Còn bước duyệt, bổ sung hoặc xác minh', 'tone' => 'attention'],
-            ['label' => 'Bị chặn', 'value' => 'Fail-closed; không được tự tạo đường tắt', 'tone' => 'blocked'],
+            ['label' => 'Bị chặn', 'value' => 'Đóng an toàn; không được tự tạo đường tắt', 'tone' => 'blocked'],
             ['label' => 'Thông tin', 'value' => 'Chưa đủ dữ liệu để kết luận hoặc không áp dụng', 'tone' => 'neutral'],
         ]);
 
         echo '<section class="nhk-admin-panel" aria-labelledby="nhk-admin-state-heading"><h2 id="nhk-admin-state-heading">Cách đọc trạng thái</h2>';
-        echo '<p>Màu chỉ hỗ trợ nhận biết; nội dung chữ mới là tín hiệu chính. Các trạng thái editorial, lifecycle, visibility, Governance, readiness và verification không bị gộp thành một nhãn.</p>';
+        echo '<p>Màu chỉ hỗ trợ nhận biết; nội dung chữ mới là tín hiệu chính. Trạng thái biên tập, vòng đời, hiển thị, Governance, readiness và verification không bị gộp thành một nhãn.</p>';
         echo '<div class="nhk-admin-state-list">';
         foreach ($state->rows() as $row) {
             echo '<div class="nhk-admin-state nhk-admin-state--' . esc_attr($row['tone']) . '"><strong>' . esc_html($row['label']) . '</strong><span>' . esc_html($row['value']) . '</span></div>';
