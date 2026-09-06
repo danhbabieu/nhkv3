@@ -1,11 +1,10 @@
 name: Admin hybrid workbench verification
 
 on:
-  push:
-    branches: [feature/admin-hybrid-workbench]
   pull_request:
     branches: [main]
     paths:
+      - 'public/wp-content/plugins/nhk-core/nhk-core.php'
       - 'public/wp-content/plugins/nhk-core/src/Infrastructure/Admin/**'
       - 'public/wp-content/plugins/nhk-core/src/Plugin.php'
       - 'public/wp-content/plugins/nhk-core/assets/admin/**'
@@ -13,6 +12,7 @@ on:
       - 'docs/superpowers/specs/2026-09-06-admin-hybrid-workbench-design.md'
       - 'docs/superpowers/plans/2026-09-06-admin-hybrid-workbench.md'
       - 'docs/architecture/V3_EXECUTION_STATE.md'
+      - 'docs/architecture/checkpoints/**'
       - '.github/workflows/admin-workbench-verify.yml'
 
 permissions:
