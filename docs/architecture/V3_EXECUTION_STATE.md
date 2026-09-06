@@ -22,6 +22,18 @@ the local WordPress runtime/data availability is established. No semantic
 record, Graph edge, WordPress content, route identity or live/demo data was
 mutated.
 
+Follow-up completion checkpoint: `origin/main` was fetched and merged through
+`a142f7b`, including the current Brand dossier/public-identity consumers. The
+typed profile seam now also exposes a concrete `relation_order` for template
+rendering, so Movement and Variant preserve Graph-backed parent, music,
+component, variant, media, video and article groups without confusing those
+render keys with conceptual profile section names. Fresh Unit verification is
+648 tests / 3,154 assertions PASS with 2 existing warnings and 5 PHPUnit
+deprecations; PHP lint and diff check are clean. Localhost still returns no
+HTTP response for homepage and representative entity routes, so browser visual
+QA remains `ENVIRONMENT_BLOCKED`; no completion claim is made for live Odo or
+responsive runtime evidence.
+
 ## Public slug policy and existing-URL migration design revision — 2026-09-06
 
 The public slug design now makes existing-site migration/reprojection mandatory
