@@ -28,6 +28,7 @@ final class PublicIdentityService
         $record = $current;
         $record['current_slug'] = $slug;
         $record['current_path'] = $this->path((string) $current['route_type'], $slug);
+        $record['route_policy_version'] = '2';
         return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
     }
 
