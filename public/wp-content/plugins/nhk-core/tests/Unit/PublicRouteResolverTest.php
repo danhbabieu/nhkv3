@@ -70,6 +70,61 @@ final class PublicRouteResolverTest extends TestCase
         self::assertSame('odometer', PublicRouteResolver::slug('Odometer'));
     }
 
+    public function test_canonical_slug_normalizes_full_vietnamese_unicode_before_ascii_cleanup(): void
+    {
+        foreach (['à','á','ả','ã','ạ','ă','ằ','ắ','ẳ','ẵ','ặ','â','ầ','ấ','ẩ','ẫ','ậ'] as $value) self::assertSame('a', PublicRouteResolver::slug($value), $value);
+        foreach (['è','é','ẻ','ẽ','ẹ','ê','ề','ế','ể','ễ','ệ'] as $value) self::assertSame('e', PublicRouteResolver::slug($value), $value);
+        foreach (['ì','í','ỉ','ĩ','ị'] as $value) self::assertSame('i', PublicRouteResolver::slug($value), $value);
+        foreach (['ò','ó','ỏ','õ','ọ','ô','ồ','ố','ổ','ỗ','ộ','ơ','ờ','ớ','ở','ỡ','ợ'] as $value) self::assertSame('o', PublicRouteResolver::slug($value), $value);
+        foreach (['ù','ú','ủ','ũ','ụ','ư','ừ','ứ','ử','ữ','ự'] as $value) self::assertSame('u', PublicRouteResolver::slug($value), $value);
+        foreach (['ỳ','ý','ỷ','ỹ','ỵ'] as $value) self::assertSame('y', PublicRouteResolver::slug($value), $value);
+        self::assertSame('d', PublicRouteResolver::slug('đ'));
+        self::assertSame('tuoi-tho-o-xuong', PublicRouteResolver::slug('Tuổi thọ ở xưởng'));
+        self::assertSame('u-o-tuoi', PublicRouteResolver::slug("u\u{031B} o\u{031B} tuo\u{0302}\u{0309}i"));
+    }
+
+    public function test_canonical_slug_normalizes_separators_and_public_nhk_token_only(): void
+    {
+        self::assertSame('a-b-c-d-e', PublicRouteResolver::slug('  A / B – C — D _ E  '));
+        self::assertSame('a-b', PublicRouteResolver::slug('---A///___B---'));
+        self::assertSame('nha-kho-tri-thuc', PublicRouteResolver::slug('NHK tri thức'));
+        self::assertSame('tri-thuc-nha-kho', PublicRouteResolver::slug('tri thức nhk'));
+        self::assertSame('nhkv3', PublicRouteResolver::slug('nhkv3'));
+        self::assertSame('abcnhkxyz', PublicRouteResolver::slug('abcnhkxyz'));
+        self::assertSame('ascii-slug-123', PublicRouteResolver::slug('ASCII Slug 123'));
+    }
+
+    public function test_collision_uses_meaningful_suffix_and_remains_deterministic(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $brand = $authority->create('brand', 'nhk:brand:collision', 'Acme');
+        $first = $authority->create('model', 'nhk:model:collision-a', 'Series', ['brand_uuid' => $brand->canonicalId, 'launch_year' => 1970]);
+        $second = $authority->create('model', 'nhk:model:collision-b', 'Series', ['brand_uuid' => $brand->canonicalId, 'launch_year' => 1980]);
+        $unique = $authority->create('model', 'nhk:model:unique', 'Unique', ['brand_uuid' => $brand->canonicalId, 'launch_year' => 1990]);
+
+        self::assertSame('/acme/series-1970/', $resolver->path($first));
+        self::assertSame('/acme/series-1980/', $resolver->path($second));
+        self::assertSame('/acme/unique/', $resolver->path($unique));
+        self::assertSame($first->canonicalId, $resolver->resolve('model', ['acme', 'series-1970'])?->canonicalId);
+        self::assertSame('/acme/series-1970/', $resolver->path($first));
+    }
+
+    public function test_collision_without_meaningful_discriminator_is_reconciliation_problem(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $brand = $authority->create('brand', 'nhk:brand:duplicate', 'Acme Duplicate');
+        $first = $authority->create('model', 'nhk:model:duplicate-a', 'Same', ['brand_uuid' => $brand->canonicalId]);
+        $second = $authority->create('model', 'nhk:model:duplicate-b', 'Same', ['brand_uuid' => $brand->canonicalId]);
+
+        self::assertNull($resolver->path($first));
+        self::assertNull($resolver->path($second));
+        self::assertNull($resolver->resolve('model', ['acme-duplicate', 'same']));
+    }
+
     public function test_every_registered_cross_brand_type_has_a_vietnamese_archive(): void
     {
         $repository = new InMemoryAuthorityRepository(); $types = null;
