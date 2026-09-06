@@ -84,6 +84,9 @@ final class SemanticDossierQueryTest extends TestCase
 
         self::assertSame('AVAILABLE', $result['status']);
         self::assertSame('Machine 39', $result['identity']['name']);
+        self::assertSame('movement', $result['profile']['identity']['type']);
+        self::assertContains('music', $result['profile']['section_order']);
+        self::assertSame([], $result['profile']['articles']);
         self::assertSame('/bo-may/machine-39/', $result['identity']['url']);
         self::assertSame('DIRECT', $result['relation_sections']['variants'][0]['origin']['kind'] ?? null);
         self::assertSame('DERIVED', $result['relation_sections']['models'][0]['origin']['kind'] ?? null);

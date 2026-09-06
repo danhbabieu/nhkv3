@@ -52,6 +52,7 @@ final class SemanticDossierQuery
         private VideoRepository $videos,
         private ?\Closure $postProjector = null,
         private ?PublicMediaGalleryQuery $mediaGallery = null,
+        private ?SemanticProfileComposer $profileComposer = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -81,7 +82,7 @@ final class SemanticDossierQuery
         ], ['type' => 'Entity']);
 
         [$primary, $gallery] = $this->mediaPacket($media);
-        return [
+        $dossier = [
             'status' => 'AVAILABLE',
             'identity' => [
                 'type' => $entity->entityType,
@@ -101,6 +102,8 @@ final class SemanticDossierQuery
                 'knowledge' => (string) ($knowledge['status'] ?? 'UNAVAILABLE'),
             ],
         ];
+        $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose($entity->entityType, $dossier);
+        return $dossier;
     }
 
     /** @return array<string,mixed> */
