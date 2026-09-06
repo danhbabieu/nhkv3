@@ -165,16 +165,7 @@ final class PublicRouteResolver
     /** @return list<string> */
     private function candidateSlugs(AuthorityEntity $entity): array
     {
-        $base = self::slug($entity->canonicalName);
-        if ($base === '') return [];
-        $candidates = [$base];
-        foreach ($this->meaningfulCollisionValues($entity) as $value) {
-            $suffix = self::slug($value);
-            if ($suffix === '') continue;
-            $candidate = $base . '-' . $suffix;
-            if (!in_array($candidate, $candidates, true)) $candidates[] = $candidate;
-        }
-        return $candidates;
+        return CanonicalPublicSlugPolicy::candidates($entity->canonicalName, $this->meaningfulCollisionValues($entity));
     }
 
     /** @return list<string> */
