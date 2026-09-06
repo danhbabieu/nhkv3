@@ -1,0 +1,30 @@
+name: Diagnose main sync conflicts
+
+on:
+  push:
+    branches: [feature/canonical-public-slug-policy]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Diagnose merge
+        shell: bash
+        run: |
+          set -uo pipefail
+          git fetch origin main
+          set +e
+          git merge --no-commit --no-ff origin/main
+          code=$?
+          set -e
+          echo '=== CONFLICT FILES ==='
+          git diff --name-only --diff-filter=U || true
+          echo '=== STATUS ==='
+          git status --short
+          exit $code
