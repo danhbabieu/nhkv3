@@ -23,6 +23,21 @@ final class PublicIdentityServiceTest extends TestCase
         self::assertSame(['/odo/'], $repository->historicPaths());
     }
 
+    public function test_pre_public_reprojection_can_change_slug_and_collision_scope_without_touching_owner_identity(): void
+    {
+        $repository = new FakeIdentityRepository();
+        $service = new PublicIdentityService($repository, static fn (string $slug): bool => false);
+        $ownerId = '01a06815-1e51-7964-b004-1ba79e488ad1';
+        $identity = $service->allocate('authority', $ownerId, 'model', 'root', 'Mẫu cũ', 'scope-1');
+
+        $changed = $service->reproject($identity['identity_id'], 'Mẫu mới', 'brand:11111111-1111-4111-8111-111111111111', 1, 'scope-2');
+
+        self::assertSame($ownerId, $changed['owner_id']);
+        self::assertSame('mau-moi', $changed['current_slug']);
+        self::assertSame('brand:11111111-1111-4111-8111-111111111111', $changed['collision_scope']);
+        self::assertSame($identity['identity_id'], $changed['identity_id']);
+    }
+
     public function test_stale_revision_and_native_collision_fail_closed(): void
     {
         $repository = new FakeIdentityRepository();
