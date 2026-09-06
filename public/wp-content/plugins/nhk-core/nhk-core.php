@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace NHK\Core;
 
 use NHK\Core\Infrastructure\Dictionary\DictionaryBootstrap;
+use NHK\Core\Infrastructure\Frontend\EntityDossierBootstrap;
 use NHK\Core\Infrastructure\Frontend\FrontendSemanticBootstrap;
 
 if (! defined('ABSPATH')) { exit; }
@@ -32,6 +33,7 @@ else {
 Plugin::boot(__FILE__);
 DictionaryBootstrap::boot();
 FrontendSemanticBootstrap::boot();
+EntityDossierBootstrap::boot();
 register_activation_hook(__FILE__, [Plugin::class, 'activate']);
 register_activation_hook(__FILE__, [DictionaryBootstrap::class, 'activate']);
 register_deactivation_hook(__FILE__, [Plugin::class, 'deactivate']);
