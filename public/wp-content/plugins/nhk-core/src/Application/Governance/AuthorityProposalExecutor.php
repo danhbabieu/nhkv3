@@ -72,10 +72,10 @@ final class AuthorityProposalExecutor
             if ($proposal->operation === 'update') $this->applyVideoAttachments($proposal, $video);
             return $video;
         }
-        if (in_array($proposal->entityType, ['knowledge', 'source', 'evidence'], true)) return $this->knowledge($proposal);
         if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
             return $this->relation($proposal);
         }
+        if (in_array($proposal->entityType, ['knowledge', 'source', 'evidence'], true)) return $this->knowledge($proposal);
         $payload = $proposal->payload;
         $target = $proposal->targetUuid ?: $proposal->subjectId;
         if ($proposal->operation === 'merge') {
@@ -137,10 +137,17 @@ final class AuthorityProposalExecutor
     {
         if (!$this->graph) throw new \RuntimeException('Graph executor is not configured.');
         if ($proposal->operation === 'relation_create') {
+            $sourceType = (string) ($proposal->payload['source_type'] ?? '');
+            $sourceKey = (string) ($proposal->payload['source_uuid'] ?? $proposal->payload['source_key'] ?? '');
+            $targetType = (string) ($proposal->payload['target_type'] ?? '');
+            $targetKey = (string) ($proposal->payload['target_uuid'] ?? $proposal->payload['target_key'] ?? '');
+            if ($sourceType === '' || $sourceKey === '' || $targetType === '' || $targetKey === '') {
+                throw new \InvalidArgumentException('Relation endpoint identity is required.');
+            }
             return $this->graph->create(
-                new NodeReference((string) ($proposal->payload['source_type'] ?? ''), (string) ($proposal->payload['source_key'] ?? '')),
+                new NodeReference($sourceType, $sourceKey),
                 (string) ($proposal->payload['predicate'] ?? ''),
-                new NodeReference((string) ($proposal->payload['target_type'] ?? ''), (string) ($proposal->payload['target_key'] ?? '')),
+                new NodeReference($targetType, $targetKey),
             );
         }
         $edgeId = $proposal->targetUuid ?: $proposal->subjectId;
