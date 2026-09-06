@@ -1,0 +1,32 @@
+MERGE_EXIT=1
+CONFLICTS:
+docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md
+public/wp-content/plugins/nhk-core/nhk-core.php
+public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php
+public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/CanonicalPublicSlugPolicy.php
+public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicIdentityService.php
+public/wp-content/plugins/nhk-core/src/Application/Video/VideoUrlPolicy.php
+public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php
+public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php
+public/wp-content/plugins/nhk-core/tests/Unit/VideoUrlPolicyTest.php
+LOG:
+Auto-merging docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md
+CONFLICT (content): Merge conflict in docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md
+Auto-merging public/wp-content/plugins/nhk-core/nhk-core.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/nhk-core.php
+Auto-merging public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php
+Auto-merging public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/CanonicalPublicSlugPolicy.php
+CONFLICT (add/add): Merge conflict in public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/CanonicalPublicSlugPolicy.php
+Auto-merging public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicIdentityService.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/src/Application/PublicIdentity/PublicIdentityService.php
+Auto-merging public/wp-content/plugins/nhk-core/src/Application/Video/VideoUrlPolicy.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/src/Application/Video/VideoUrlPolicy.php
+Auto-merging public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php
+Auto-merging public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php
+Auto-merging public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticDossierTest.php
+Auto-merging public/wp-content/plugins/nhk-core/tests/Unit/VideoUrlPolicyTest.php
+CONFLICT (content): Merge conflict in public/wp-content/plugins/nhk-core/tests/Unit/VideoUrlPolicyTest.php
+Automatic merge failed; fix conflicts and then commit the result.
