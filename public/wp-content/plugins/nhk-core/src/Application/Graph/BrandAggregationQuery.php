@@ -35,7 +35,9 @@ final class BrandAggregationQuery
                 $variant = $this->entity($variantEdge->source->reference->endpoint_type, $variantEdge->source->reference->endpoint_key);
                 if (!$variant || $variant->entityType !== 'variant' || !$variant->active()) continue;
                 $variantPath = ['model_of', 'variant_of'];
-                $this->add($buckets, $variant, 'DERIVED', $variantPath);
+                // Keep the established legacy aggregation packet stable while
+                // descendant recipes use Brand-perspective predicate order.
+                $this->add($buckets, $variant, 'DERIVED', ['variant_of', 'model_of']);
 
                 foreach ($this->edges('variant', $variant->canonicalId, true, 'uses_movement') as $movementEdge) {
                     $movement = $this->entity($movementEdge->target->reference->endpoint_type, $movementEdge->target->reference->endpoint_key);
