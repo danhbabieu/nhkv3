@@ -3,18 +3,20 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry};
+use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Domain\Video\Video;
 
 final class VideoUrlPolicy
 {
+    public function __construct(private ?PublicIdentityRepository $publicIdentities = null) {}
     /** @return array{path:?string,eligible:bool,blockers:list<string>,warnings:list<string>} */
     public function project(Video $video, VideoPublicContextSelector $selector): array
     {
         $metadata = is_array($video->metadata) ? $video->metadata : [];
-        $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
         $blockers = [];
-        $slug = trim((string) ($identity['current_slug'] ?? ''));
-        if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
+        $slug = $this->publicSlug($video, $metadata, $blockers);
+        if ($slug === '' || !CanonicalPublicSlugPolicy::isCanonical($slug)) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
 
         $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
@@ -38,6 +40,23 @@ final class VideoUrlPolicy
             'blockers' => array_values(array_unique($blockers)),
             'warnings' => [],
         ];
+    }
+
+    /** @param list<string> $blockers */
+    private function publicSlug(Video $video, array $metadata, array &$blockers): string
+    {
+        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
+        if ($repository !== null) {
+            try {
+                $identity = $repository->findCurrentByOwner('video', $video->canonicalId, 'video');
+            } catch (\Throwable) {
+                $blockers[] = 'PUBLIC_IDENTITY_STORAGE_UNAVAILABLE';
+                return '';
+            }
+            if (is_array($identity)) return trim((string) ($identity['current_slug'] ?? ''));
+        }
+        $identity = is_array($metadata['public_identity'] ?? null) ? $metadata['public_identity'] : [];
+        return trim((string) ($identity['current_slug'] ?? ''));
     }
 
     /** @return array<string,mixed> */

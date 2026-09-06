@@ -7,5 +7,7 @@ interface PublicIdentityRepository
     public function allocate(array $record, string $idempotencyKey): array;
     public function change(array $record, string $oldPath, int $expectedRevision, string $idempotencyKey): array;
     public function findCurrentById(string $identityId): ?array;
+    public function findCurrentByOwner(string $ownerKind, string $ownerId, string $routeType): ?array;
+    public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool;
     public function resolveHistoric(string $path): array;
 }

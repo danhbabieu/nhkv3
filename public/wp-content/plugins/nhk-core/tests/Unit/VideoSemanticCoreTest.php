@@ -636,14 +636,14 @@ final class VideoSemanticCoreTest extends TestCase
 
     public function test_video_sitemap_contains_only_active_available_indexable_watch_pages(): void
     {
-        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['public_identity' => ['current_slug' => 'nhk-title'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
+        $valid = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'NHK title', ['public_identity' => ['current_slug' => 'nha-kho-title'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'thumbnail_urls' => ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg']], 'editorial' => ['title' => 'NHK title', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'YOUTUBE_SOURCE'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
         $unavailable = Video::fromUrl('https://youtu.be/9bZkp7q19f0', 'Unavailable', ['source_snapshot' => ['availability' => 'deleted']]);
         $notIndexable = Video::fromUrl('https://youtu.be/aqz-KE-bpKQ', 'No index', ['source_snapshot' => ['availability' => 'available'], 'indexable' => false]);
 
         $items = (new VideoSitemapProjection())->project([$valid, $unavailable, $notIndexable], 'https://nhk.example');
 
         self::assertCount(1, $items);
-        self::assertSame('https://nhk.example/video/nhk-title/', $items[0]['loc']);
+        self::assertSame('https://nhk.example/video/nha-kho-title/', $items[0]['loc']);
         self::assertSame('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', $items[0]['thumbnail_url']);
     }
 }

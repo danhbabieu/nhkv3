@@ -69,6 +69,8 @@ final class McpContractTest extends TestCase
             'nhk.knowledge.ingest',
             'nhk.source.ingest',
             'nhk.evidence.ingest',
+            'nhk.public-url.audit',
+            'nhk.public-url.reproject',
             'nhk.proposal.create',
             'nhk.proposal.submit',
             'nhk.proposal.review',
@@ -264,6 +266,7 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
         self::assertSame([
+            'nhk-v3/public-url-reproject',
             'nhk-v3/article-ingest',
             'nhk-v3/category-create',
             'nhk-v3/category-update',

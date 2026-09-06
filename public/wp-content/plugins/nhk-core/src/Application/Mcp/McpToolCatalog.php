@@ -106,6 +106,8 @@ final class McpToolCatalog
                 'visibility' => ['type' => 'string', 'enum' => ['PUBLIC', 'PRIVATE', 'HIDDEN']],
                 'metadata' => ['type' => 'object'],
             ], ['claim_id', 'source_id', 'excerpt'], true),
+            self::tool('nhk.public-url.audit', 'Audit all canonical public URL owners and return deterministic KEEP, ALLOCATE, CHANGE or BLOCKED decisions without writing data.', [], []),
+            self::tool('nhk.public-url.reproject', 'Apply the pre-public canonical URL reprojection only after a clean audit, explicit confirmation and idempotency binding, then run read-back.', ['idempotency_key' => ['type' => 'string', 'minLength' => 1], 'pre_public_confirmed' => ['type' => 'boolean']], ['idempotency_key', 'pre_public_confirmed'], true),
             self::tool('nhk.proposal.create', 'Create a governed semantic proposal.', [
                 'operation' => ['type' => 'string', 'enum' => self::governedOperations()],
                 'entity_type' => ['type' => 'string'],

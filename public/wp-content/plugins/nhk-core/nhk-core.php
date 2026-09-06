@@ -11,10 +11,12 @@ declare(strict_types=1);
 
 namespace NHK\Core;
 
+use NHK\Core\Application\PublicIdentity\PublicIdentityReadRegistry;
 use NHK\Core\Infrastructure\Admin\{AdminAssets, AdminWorkbenchPage};
 use NHK\Core\Infrastructure\Dictionary\DictionaryBootstrap;
 use NHK\Core\Infrastructure\Frontend\EntityDossierBootstrap;
 use NHK\Core\Infrastructure\Frontend\FrontendSemanticBootstrap;
+use NHK\Core\Infrastructure\PublicIdentity\{WordPressPublicSlugBridge, WpdbPublicIdentityRepository};
 
 if (! defined('ABSPATH')) { exit; }
 define('NHK_CORE_VERSION', '0.1.0');
@@ -31,7 +33,10 @@ else {
         if (is_readable($path)) { require_once $path; }
     });
 }
+global $wpdb;
+if (is_object($wpdb)) PublicIdentityReadRegistry::register(new WpdbPublicIdentityRepository($wpdb));
 Plugin::boot(__FILE__);
+(new WordPressPublicSlugBridge())->register();
 AdminWorkbenchPage::register();
 AdminAssets::register(__FILE__);
 DictionaryBootstrap::boot();
