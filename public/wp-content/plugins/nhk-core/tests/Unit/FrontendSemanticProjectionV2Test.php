@@ -32,6 +32,10 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         self::assertStringContainsString('$hasLegacyAggregation', $template);
         self::assertStringContainsString('nhk_v3_public_copy', $template);
         self::assertStringContainsString('if ($hasLegacyAggregation): ?><a href="#cau-truc"', $template);
+        $functions = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/functions.php');
+        self::assertStringContainsString("'Dòng bộ máy'", $functions);
+        self::assertStringContainsString("'cấu hình thành phần'", $functions);
+        self::assertStringContainsString("'ký hiệu'", $functions);
     }
 
     public function test_canonical_entity_detail_keeps_graph_related_projection(): void

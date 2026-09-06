@@ -29,6 +29,27 @@ bootstrap WordPress until the local DB connection is available.
 
 ## Semantic frontend discovery implementation checkpoint — 2026-09-06
 
+Final frontend QA continuation — 2026-09-06: read-only browser verification
+against the local WordPress runtime exercised the real homepage, Brand
+`Junghans`, Movement `Máy Odo 36`, semantic archives, search, Media, Video and
+404 at 390px and the key homepage/detail surfaces at 1440px. The sweep found
+no horizontal overflow, broken images, dead fragment anchors or browser
+console warnings/errors. During that pass, Brand/Movement semantic copy was
+corrected at the theme presentation boundary: empty payload arrays are omitted,
+the legacy Brand rail anchor is emitted only when its section is rendered, and
+internal English domain terms in public dossier copy are localized. Variant
+has no active public archive/detail row in the current runtime; this remains a
+DATA_GAP and no fixture or semantic write was introduced.
+
+Focused frontend regression is 4 tests / 21 assertions PASS. The complete Unit
+suite is 657 tests / 3,198 assertions PASS with 2 pre-existing warnings and 5
+PHPUnit deprecations. The unfiltered full suite remains ENVIRONMENT_BLOCKED:
+two Dictionary integration tests call WordPress `update_option()` without a
+WordPress bootstrap, while twelve P4 integration acceptance tests fail closed
+because `NHK_WP_TEST_PATH=public` is not configured in this runner. PHP lint,
+Composer validation and `git diff --check` are clean. No semantic record, Graph
+edge, WordPress content, route identity or live data was mutated.
+
 The approved semantic frontend design now has an implementation plan at
 `docs/superpowers/plans/2026-09-06-semantic-frontend-discovery.md`. The first
 vertical slice adds `SemanticProfileComposer` as a pure reader-safe mapper,

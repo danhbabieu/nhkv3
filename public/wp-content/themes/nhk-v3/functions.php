@@ -62,6 +62,9 @@ function nhk_v3_public_copy(string $text): string
     $text = nhk_v3_public_brand_text($text);
     $replacements = [
         '/\bMovement family\b/iu' => 'Dòng bộ máy',
+        '/\bsub-configuration\b/iu' => 'cấu hình thành phần',
+        '/\bmarking\b/iu' => 'ký hiệu',
+        '/\bcatalog\b/iu' => 'catalogue',
         '/\bBrand identity\b/iu' => 'Danh tính thương hiệu',
         '/\bBrand\b/iu' => 'thương hiệu',
         '/\bModel\b/iu' => 'mẫu đồng hồ',
