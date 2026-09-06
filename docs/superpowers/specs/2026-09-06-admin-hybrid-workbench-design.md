@@ -1,7 +1,7 @@
 # NHK V3 Admin Hybrid Workbench Design
 
-**Status:** Approved implementation design, 2026-09-06  
-**Scope:** WordPress Admin information architecture, presentation, navigation, capability-aware surfaces and operator diagnostics.  
+**Status:** Approved implementation design, 2026-09-06
+**Scope:** WordPress Admin information architecture, presentation, navigation, capability-aware surfaces and operator diagnostics.
 **Authority:** Subordinate to `docs/constitution/NHK_V3_CONSTITUTION.md` and the current contracts routed by `docs/constitution/READ_FIRST.md`.
 
 ## 1. Goal
