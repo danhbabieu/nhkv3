@@ -21,10 +21,10 @@ the operation:
 | Article / News / editorial | `docs/architecture/ARTICLE_INGEST_CONTRACT.md`, `docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md`, `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` |
 | Dictionary / lexical curation / auto-link | `docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` plus the owning Article, Knowledge, Media/Image, Video, public-route and SEO contracts for the content being detected or linked |
 | Media / Image | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, relevant Media contracts and runtime registries |
-| Video | `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` |
+| Video | `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/seo/PUBLIC_URL_SLUG_CONTRACT.md`, `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` |
 | Knowledge / Claim / Source / Evidence | `docs/architecture/06_KNOWLEDGE_SOURCE_MODEL.md`, `docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md`, `docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` when public copy is involved |
 | Authority / Brand / Model / Variant / Movement / Music | `docs/architecture/02_AUTHORITY_BOUNDARY.md`, `docs/architecture/13_AUTHORITY_CORE_CONTRACT.md`, `docs/architecture/V3_BRAND_RELATIONSHIP_MATRIX.md`, `docs/architecture/PUBLIC_BRAND_NAMING_CONTRACT.md` |
-| Public identity / route / SEO | `docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`, `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/V3_FRONTEND_ROUTE_INVENTORY.md`, relevant SEO contracts, persisted-identity design/spec and the current PublicIdentity implementation/runtime evidence when in scope |
+| Public identity / route / SEO | `docs/seo/PUBLIC_URL_SLUG_CONTRACT.md`, `docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`, `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/V3_FRONTEND_ROUTE_INVENTORY.md`, relevant SEO contracts, persisted-identity design/spec and the current PublicIdentity implementation/runtime evidence when in scope |
 | MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; current tool/Ability availability must be checked against executable catalog/registration and fresh runtime discovery. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only |
 | Storage / schema / execution | current boundaries from the relevant domain contracts plus `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`; `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md` and `docs/architecture/V2_V3_PARITY_MATRIX.md` contain implementation/history evidence and must be interpreted by date/context |
 
@@ -83,6 +83,7 @@ For MCP/Admin content operations, also read
 `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`. For Article research or
 SEO work, read the shared and applicable projection contracts first:
 `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`,
+`docs/seo/PUBLIC_URL_SLUG_CONTRACT.md`,
 `docs/seo/ENTITY_SEO_PROJECTION_CONTRACT.md`,
 `docs/seo/MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, and
 `docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md`. Then read
@@ -106,6 +107,7 @@ For Video intake or Video-derived Knowledge planning, also read
 `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`,
 `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`,
 `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md`,
+`docs/seo/PUBLIC_URL_SLUG_CONTRACT.md`,
 `docs/architecture/GOVERNED_LIVING_KNOWLEDGE_DESIGN.md` and
 `docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` when lexical
 observation is enabled. An explicit validated Video `about` target must remain
