@@ -3,6 +3,8 @@ name: Canonical public URL verification
 on:
   push:
     branches: [feature/canonical-public-slug-policy]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
