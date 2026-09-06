@@ -1,0 +1,39 @@
+name: Restore MCP contract test
+on:
+  push:
+    branches: [feature/canonical-public-slug-policy]
+permissions:
+  contents: write
+jobs:
+  restore:
+    if: ${{ contains(github.event.head_commit.message, '[restore mcp contract]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore known-good test and add only URL abilities
+        run: |
+          git checkout c26632f2a31a2afe21fbaa563c85592efaa19f47 -- public/wp-content/plugins/nhk-core/tests/Unit/McpContractTest.php
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/wp-content/plugins/nhk-core/tests/Unit/McpContractTest.php')
+          s=p.read_text()
+          old="            'nhk-v3/evidence-get',\n        ], McpAbilityRegistration::readAbilityNames());"
+          new="            'nhk-v3/evidence-get',\n            'nhk-v3/public-url-audit',\n        ], McpAbilityRegistration::readAbilityNames());"
+          if old not in s: raise SystemExit('read allowlist marker missing')
+          s=s.replace(old,new,1)
+          old="        self::assertSame([\n            'nhk-v3/article-ingest',"
+          new="        self::assertSame([\n            'nhk-v3/public-url-reproject',\n            'nhk-v3/article-ingest',"
+          if old not in s: raise SystemExit('governed allowlist marker missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          git diff --check
+      - name: Commit restored test
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add public/wp-content/plugins/nhk-core/tests/Unit/McpContractTest.php
+          git commit -m 'test: restore current MCP contract with URL abilities [skip url-mcp-patch]'
+          git push origin HEAD:feature/canonical-public-slug-policy
