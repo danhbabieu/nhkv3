@@ -11,6 +11,7 @@ final class McpAbilityRegistration
     private const READ_TOOL_MAP = [
         'nhk.search' => 'nhk-v3/search',
         'nhk.semantic.resolve' => 'nhk-v3/semantic-resolve',
+        'nhk.entity.neighborhood' => 'nhk-v3/entity-neighborhood',
         'nhk.article.preflight' => 'nhk-v3/article-preflight',
         'nhk.category.resolve' => 'nhk-v3/category-resolve',
         'nhk.entity.get' => 'nhk-v3/entity-get',
@@ -231,7 +232,8 @@ final class McpAbilityRegistration
         try {
             return match ($tool) {
                 'nhk.search' => $read->search((string) ($input['q'] ?? ''), (int) ($input['page'] ?? 1), (int) ($input['per_page'] ?? 20)),
-            'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
+                'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
+                'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
                 'nhk.category.resolve' => self::executeMcp($tool, $input),
                 'nhk.entity.get' => $read->entityGet((string) ($input['type'] ?? ''), (string) ($input['id'] ?? '')),

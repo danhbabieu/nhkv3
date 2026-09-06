@@ -46,6 +46,7 @@ final class McpContractTest extends TestCase
         self::assertSame([
             'nhk.search',
             'nhk.semantic.resolve',
+            'nhk.entity.neighborhood',
             'nhk.article.preflight',
             'nhk.article.ingest',
             'nhk.category.resolve',
@@ -251,6 +252,7 @@ final class McpContractTest extends TestCase
         self::assertSame([
             'nhk-v3/search',
             'nhk-v3/semantic-resolve',
+            'nhk-v3/entity-neighborhood',
             'nhk-v3/article-preflight',
             'nhk-v3/category-resolve',
             'nhk-v3/entity-get',

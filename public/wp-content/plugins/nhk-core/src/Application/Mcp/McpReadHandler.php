@@ -15,6 +15,8 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Media\PublicMediaAssetDelivery;
 use NHK\Core\Application\Video\VideoSearchDocument;
+use NHK\Core\Application\Graph\SemanticNeighborhoodQuery;
+use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 
 final class McpReadHandler
@@ -33,6 +35,7 @@ final class McpReadHandler
         private ?PublicMediaAssetDelivery $delivery = null,
         private ?McpSemanticContextResolver $resolver = null,
         private ?WordPressMediaAttachmentIngestor $wordpressAttachments = null,
+        private ?SemanticNeighborhoodQuery $neighborhood = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -98,6 +101,13 @@ final class McpReadHandler
     {
         if ($this->resolver === null) throw new \InvalidArgumentException('Semantic context resolver is unavailable.');
         return $this->resolver->resolve($context);
+    }
+
+    /** @return array{status:string,items:list<array<string,mixed>>,reason?:string} */
+    public function entityNeighborhood(string $type, string $id, string $profile, int $maxHops = 2, int $limit = 50): array
+    {
+        if ($this->neighborhood === null || !UuidCodec::isValid($id)) return ['status' => 'unavailable', 'items' => [], 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE'];
+        return $this->neighborhood->query(new NodeReference($type, $id), $profile, $maxHops, $limit);
     }
 
     public function search(string $term, int $page = 1, int $perPage = 20): array
