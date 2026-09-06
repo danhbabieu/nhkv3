@@ -23,6 +23,34 @@ viết cũ; không cho phép seed, sửa, backfill, merge hoặc xóa semantic r
 không cho phép ghi Graph edge; và không cho phép thay đổi V2, staging hoặc
 production. Những hành động đó cần contract, governance và gate riêng.
 
+## Amendment record — 2026-09-06 — Canonical Public URL Identity
+
+**WHY:** Public URLs must project persisted public identity rather than re-encode
+external-source identity or mutable display text. Video source identity remains
+necessary for source reconciliation but must not be coupled to the canonical
+public route.
+
+**WHAT:** Canonical public routes use the persisted public `slug` owned by the
+Public Identity boundary. For Video the canonical detail route is
+`/video/{slug}/`. The external platform/video identifier remains source identity
+for resolution, idempotency and reconciliation and is not removed or changed by
+URL reprojection. URL audit is read-only; reprojection is an explicit governed
+Public Identity operation with collision checks, confirmation, idempotency and
+read-back.
+
+**BOUNDARIES:** URL reprojection does not mutate semantic UUID, stable source
+identity, Knowledge, Evidence or Graph truth. Media public filename metadata may
+be reprojected only within its existing MediaAsset contract; this amendment does
+not authorize physical file rename, attachment-path change or checksum change.
+Ambiguity, collision or unavailable ownership fails closed.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no bulk mutation or
+implicit backfill. Existing public URLs are changed only through the governed
+URL-maintenance operation after audit/eligibility checks. Redirect/canonical
+projection must remain one-owner and one-hop under the SEO/public route law.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-06.
+
 ## Amendment record — 2026-09-02 — Article Ingest Boundary
 
 **WHY:** A V3 knowledge Article request may cross the editorial and semantic
@@ -998,6 +1026,11 @@ yêu cầu; derived Brand visibility dùng Graph traversal, không dùng fake ow
    overwrite NHK editorial, semantic relation hoặc Authority history âm thầm.
 10. Deleted/private/region-blocked/embed-disabled source giữ Video identity,
     provenance và history; public watch/sitemap áp dụng unavailable policy.
+11. Canonical public Video route là `/video/{slug}/`, với `slug` được persist
+    bởi Public Identity boundary. External video ID vẫn là source identity và
+    không được nhúng bắt buộc vào canonical public route. Audit URL là read-only;
+    reprojection phải explicit, governed, collision-safe, idempotent và không
+    đổi semantic UUID, Knowledge, Evidence hoặc Graph truth.
 
 ## 14. WordPress editorial law
 
@@ -1203,7 +1236,7 @@ Detail routes:
     Classification: /phan-loai/{slug}/
     Specimen:      /hien-vat/{slug}/
     Product:       /san-pham/{slug}/
-    Video:         /video/{title-slug}-{external-id}/
+    Video:         /video/{slug}/
 
 Mẫu hub là discovery only; không tạo Model canonical detail thứ hai. Variant
 không cần global enumeration hub mặc định; được discover qua Model/Brand context.
