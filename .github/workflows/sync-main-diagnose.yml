@@ -37,7 +37,7 @@ jobs:
           if [ "$code" -ne 0 ]; then
             git checkout --theirs -- docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md
             git checkout --theirs -- public/wp-content/plugins/nhk-core/tests/Unit/PublicIdentityServiceTest.php
-            git checkout --theirs -- public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php
+            git checkout --ours -- public/wp-content/plugins/nhk-core/tests/Unit/VideoSemanticCoreTest.php
             git checkout --theirs -- public/wp-content/plugins/nhk-core/tests/Unit/VideoUrlPolicyTest.php
             git checkout --theirs -- public/wp-content/plugins/nhk-core/nhk-core.php
             git checkout --theirs -- public/wp-content/plugins/nhk-core/src/Application/Entity/PublicRouteResolver.php
