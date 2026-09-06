@@ -125,3 +125,106 @@ implementation commit contained exactly six Task 2 files, 412 insertions and
   to the same NHK V3 screens.
 - Per the Task 2 allowlist, the already modified execution-state ledger was read
   before the checkpoint but not edited.
+
+## Fix round 1 — 2026-09-07
+
+Status: `FIXED_WITH_CONCERNS`
+
+### Reviewer findings addressed
+
+- Governance now uses `nhk_view_governance` for read availability and projects
+  `nhk_create_proposals`, `nhk_submit_proposals`,
+  `nhk_approve_proposals` and `nhk_apply_proposals` independently. No granted
+  operation implies another. Zero granted mutation capabilities is
+  `read_only`, a proper subset is `limited`, all four is `full`, and missing
+  view capability is `unavailable` even when Apply is granted.
+- `AdminPage` obtains every capability named by `AdminShell::capabilityNames()`;
+  this includes view, create, submit, approve and apply rather than supplying
+  only create/apply. Eligibility is explicitly gated by
+  `nhk_view_governance`; the existing Submit, Approve/Reject and Controlled
+  Apply controls retain their existing individual capability gates.
+- Every enabled fragment navigation destination is rendered through the shared
+  `AdminShell::renderWorkspaceRegion()` ID builder. The former dangling
+  `semantic` and `system` destinations were replaced by real Semantic and Vận
+  hành regions.
+- The approved IA is represented in order: Tổng quan, Governance, Biên tập,
+  Semantic, Media & Video and Vận hành. The not-yet-implemented Biên tập and
+  Media & Video slices render truthful unavailable placeholders rather than
+  pretending to expose a finished workspace.
+- Tests now cover Governance capability parity, mixed grants, view denial,
+  full grants, approved IA/order, navigation-target/region matching, read-only
+  explanation with a retained Eligibility control, and NHK-only asset screen
+  scoping.
+
+### TDD evidence
+
+Expanded RED command:
+
+```text
+vendor/bin/phpunit --filter AdminShellTest
+```
+
+Output before the fix:
+
+```text
+FFFFF.EFE  9 / 9
+Tests: 9, Assertions: 9, Errors: 2, Failures: 6,
+PHPUnit Deprecations: 5, Risky: 1
+exit code 2
+```
+
+The failures identified the old `manage_options` Governance read capability,
+single Apply write capability, three-item IA, missing workspace-region helper,
+missing asset-scope helper and absent read-only message.
+
+Final shell/Admin command:
+
+```text
+vendor/bin/phpunit --filter 'Admin(Shell|WorkspaceViewModel|DiagnosticPresenter)Test|AdminWorkbenchArchitectureTest'
+```
+
+Output:
+
+```text
+....................  20 / 20 (100%)
+Tests: 20, Assertions: 106, PHPUnit Deprecations: 5
+exit code 0
+```
+
+Existing Admin control compatibility command:
+
+```text
+vendor/bin/phpunit --filter 'FrontendContractTest::test_admin_contract_associates_labels_with_operational_controls'
+```
+
+Output:
+
+```text
+.  1 / 1 (100%)
+Tests: 1, Assertions: 45, PHPUnit Deprecations: 5
+exit code 0
+```
+
+Changed-PHP lint reported no syntax errors for `AdminShell.php`,
+`AdminPage.php`, `Plugin.php` and `AdminShellTest.php`. `git diff --check`
+exited `0`, and the scoped secret-pattern review returned no matches.
+
+### Asset loader decision
+
+The existing `AdminAssets` loader was inspected. Its public API registers a
+fixed pair of `assets/admin/admin-workbench.css` and
+`assets/admin/admin-workbench.js`; it cannot enqueue the Task 2-required
+`assets/admin.css` and `assets/admin.js` without editing `AdminAssets.php` or
+the plugin entrypoint, neither of which is in the Task 2 fix allowlist. The
+shell therefore retains its distinct handles. Duplicate screen-detection logic
+was removed from `Plugin`: both the implementation and tests now use the pure
+`AdminShell::isNhkScreen()` boundary for the shell loader.
+
+### Scope and concerns
+
+- Fix files are limited to `AdminShell.php`, `AdminPage.php`, `Plugin.php`,
+  `AdminShellTest.php` and this report. CSS/JS behavior did not require a fix.
+- The five existing PHPUnit deprecations remain visible and unsuppressed.
+- The pre-existing modified execution-state and Public Slug Migration files,
+  plus the untracked Public Slug Migration integration test, remain untouched
+  and must not be included in the fix commit.

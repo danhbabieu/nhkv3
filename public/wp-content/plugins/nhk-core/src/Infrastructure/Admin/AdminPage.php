@@ -22,15 +22,35 @@ final class AdminPage
         if (!current_user_can('manage_options')) wp_die('You do not have permission to view this page.');
         $status = new MigrationStatus();
         $workspace = AdminWorkspaceViewModel::fromHealth((new HealthCheck($status))->read(), [], []);
-        $workspaces = AdminShell::workspaceDefinitions([
-            'manage_options' => current_user_can('manage_options'),
-            'nhk_create_proposals' => current_user_can('nhk_create_proposals'),
-            'nhk_apply_proposals' => current_user_can('nhk_apply_proposals'),
-        ]);
-        AdminShell::render('governance', $workspaces, static function () use ($status, $workspace): void {
-            echo '<section id="nhk-workspace-governance" aria-labelledby="nhk-governance-content-heading"><h2 id="nhk-governance-content-heading">Bảng điều khiển hiện tại</h2><p>Trung tâm vận hành domain canonical, Graph, Governance và dữ liệu semantic.</p>';
-            self::renderHealth($workspace['health']); self::renderMigrationLedgerSummary(); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
-            echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p></section>';
+        $capabilities = [];
+        foreach (AdminShell::capabilityNames() as $capability) $capabilities[$capability] = current_user_can($capability);
+        $workspaces = AdminShell::workspaceDefinitions($capabilities);
+        AdminShell::render('governance', $workspaces, static function () use ($status, $workspace, $workspaces): void {
+            AdminShell::renderWorkspaceRegion('overview', $workspaces['overview']['label'], static function () use ($workspace): void {
+                self::renderHealth($workspace['health']);
+            });
+            AdminShell::renderWorkspaceRegion('governance', $workspaces['governance']['label'], static function () use ($status, $workspaces): void {
+                if (!$workspaces['governance']['available']) {
+                    echo '<p class="notice notice-warning">' . esc_html($workspaces['governance']['reason']) . '</p>';
+                    return;
+                }
+                self::renderProposalComposer();
+                self::renderProposalLookup($status);
+            });
+            AdminShell::renderWorkspaceRegion('editorial', $workspaces['editorial']['label'], static function () use ($workspaces): void {
+                echo '<p class="notice notice-info">' . esc_html($workspaces['editorial']['reason']) . '</p>';
+            });
+            AdminShell::renderWorkspaceRegion('semantic', $workspaces['semantic']['label'], static function () use ($status): void {
+                self::renderEntityLookup($status);
+                self::renderSemanticReadTools();
+            });
+            AdminShell::renderWorkspaceRegion('media-video', $workspaces['media-video']['label'], static function () use ($workspaces): void {
+                echo '<p class="notice notice-info">' . esc_html($workspaces['media-video']['reason']) . '</p>';
+            });
+            AdminShell::renderWorkspaceRegion('operations', $workspaces['operations']['label'], static function (): void {
+                self::renderMigrationLedgerSummary();
+            });
+            echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p>';
         });
         self::scripts(); self::readScripts();
     }
@@ -107,7 +127,7 @@ final class AdminPage
         $eligibility = AdminDiagnosticPresenter::forProposalState($proposal->state->value);
         $eligibilityHint = $eligibility['title'] . ' — ' . $eligibility['message'] . ' [' . $eligibility['code'] . ']';
         echo '<table class="widefat striped"><tbody><tr><th>State</th><td>' . esc_html($proposal->state->value) . '</td></tr><tr><th>Subject</th><td><code>' . esc_html($proposal->subjectId) . '</code></td></tr><tr><th>Operation</th><td>' . esc_html($proposal->operation) . '</td></tr><tr><th>Expected revision</th><td>' . esc_html((string) $proposal->expectedRevision) . '</td></tr><tr><th>Proposal revision</th><td>' . esc_html((string) $proposal->revision) . '</td></tr><tr><th>Dependencies</th><td><div><strong>IDs:</strong> <code>' . esc_html($dependencyDisplay) . '</code></div><div><strong>Binding:</strong> <code>' . esc_html($proposal->dependencyFingerprint) . '</code></div></td></tr><tr><th>Apply status</th><td><strong>' . esc_html($applyStatus) . '</strong></td></tr><tr><th>Eligibility / block reason</th><td><span id="nhk-eligibility-summary">' . esc_html($eligibilityHint) . ' — bấm Eligibility để tải reason code đầy đủ.</span></td></tr></tbody></table><p class="nhk-governance-actions">';
-        self::button('Eligibility', $base . '/eligibility', 'GET'); self::button('Submit', $base . '/submit', 'POST', 'nhk_submit_proposals'); self::button('Approve', $base . '/approve', 'POST', 'nhk_approve_proposals', $payload); self::button('Reject', $base . '/reject', 'POST', 'nhk_approve_proposals'); self::button('Controlled Apply', $base . '/apply', 'POST', 'nhk_apply_proposals');
+        self::button('Eligibility', $base . '/eligibility', 'GET', 'nhk_view_governance'); self::button('Submit', $base . '/submit', 'POST', 'nhk_submit_proposals'); self::button('Approve', $base . '/approve', 'POST', 'nhk_approve_proposals', $payload); self::button('Reject', $base . '/reject', 'POST', 'nhk_approve_proposals'); self::button('Controlled Apply', $base . '/apply', 'POST', 'nhk_apply_proposals');
         echo '</p><pre class="nhk-governance-result" aria-live="polite"></pre>';
         if ($attempts) { echo '<h3>Apply attempts</h3><table class="widefat striped"><thead><tr><th>#</th><th>State</th><th>Error code</th><th>Result</th></tr></thead><tbody>'; foreach ($attempts as $attempt) echo '<tr><td>' . esc_html((string) $attempt->number) . '</td><td>' . esc_html($attempt->state) . '</td><td>' . esc_html((string) ($attempt->errorCode ?? '')) . '</td><td>' . esc_html((string) ($attempt->resultEntityUuid ?? '')) . '</td></tr>'; echo '</tbody></table>'; }
     }

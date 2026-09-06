@@ -37,6 +37,7 @@ use NHK\Core\Infrastructure\Http\PublicKnowledgeRoutes;
 use NHK\Core\Infrastructure\Http\PublicVideoSitemapRoutes;
 use NHK\Core\Infrastructure\Http\McpApi;
 use NHK\Core\Infrastructure\Admin\AdminPage;
+use NHK\Core\Infrastructure\Admin\AdminShell;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository;
@@ -359,7 +360,7 @@ final class Plugin {
         add_action('admin_menu', [AdminPage::class, 'register']);
         add_action('admin_enqueue_scripts', static function (string $hookSuffix) use ($pluginFile): void {
             $page = isset($_GET['page']) ? sanitize_key((string) $_GET['page']) : '';
-            if (!str_contains($hookSuffix, 'nhk-v3') && $page !== 'nhk-v3' && !str_starts_with($page, 'nhk-v3-')) return;
+            if (!AdminShell::isNhkScreen($hookSuffix, $page)) return;
 
             $version = defined('NHK_CORE_VERSION') ? (string) NHK_CORE_VERSION : '0.1.0';
             wp_register_style('nhk-v3-admin-shell', plugins_url('assets/admin.css', $pluginFile), [], $version);
