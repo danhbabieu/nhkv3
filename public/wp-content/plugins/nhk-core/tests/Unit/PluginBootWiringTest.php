@@ -22,6 +22,25 @@ final class PluginBootWiringTest extends TestCase
         self::assertLessThan($projection, $usages);
     }
 
+    public function test_public_entity_detail_runtime_wires_semantic_dossier_through_existing_detail_projection_hook(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        $knowledge = strpos($plugin, 'new EntityKnowledgeProjection(');
+        $relations = strpos($plugin, 'new RelatedSemanticQuery(');
+        $dossier = strpos($plugin, 'new SemanticDossierQuery(');
+        $hook = strpos($plugin, "add_filter('nhk_v3_entity_detail_projection'");
+
+        self::assertNotFalse($knowledge);
+        self::assertNotFalse($relations);
+        self::assertNotFalse($dossier);
+        self::assertNotFalse($hook);
+        self::assertLessThan($dossier, $knowledge);
+        self::assertLessThan($dossier, $relations);
+        self::assertLessThan($hook, $dossier);
+        self::assertStringContainsString("$value['dossier'] = $publicDossier->forEntity($entity);", $plugin);
+    }
+
     public function test_boot_does_not_run_migrations_without_explicit_runtime_gate(): void
     {
         $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
