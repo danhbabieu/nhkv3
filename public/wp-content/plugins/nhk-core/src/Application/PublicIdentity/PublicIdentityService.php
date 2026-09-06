@@ -41,18 +41,46 @@ final class PublicIdentityService
 
     public function changeSlug(string $identityId, string $slug, int $expectedRevision, string $idempotencyKey): array
     {
+        $current = $this->currentForChange($identityId, $expectedRevision, $idempotencyKey);
+        $slug = $this->validatedSlug($slug);
+        $record = $current;
+        $record['current_slug'] = $slug;
+        $record['route_policy_version'] = '2';
+        return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
+    }
+
+    /**
+     * Pre-public maintenance operation for canonical Public Identity only.
+     * Semantic owner UUID/stable identity is preserved; this changes only the
+     * URL projection (slug + collision scope) under revision/idempotency gates.
+     */
+    public function reproject(string $identityId, string $publicName, string $scope, int $expectedRevision, string $idempotencyKey): array
+    {
+        if (trim($scope) === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
+        $current = $this->currentForChange($identityId, $expectedRevision, $idempotencyKey);
+        $record = $current;
+        $record['current_slug'] = $this->validatedSlug($publicName);
+        $record['collision_scope'] = trim($scope);
+        $record['route_policy_version'] = '2';
+        return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
+    }
+
+    /** @return array<string,mixed> */
+    private function currentForChange(string $identityId, int $expectedRevision, string $idempotencyKey): array
+    {
         if ($identityId === '' || $expectedRevision < 1 || $idempotencyKey === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
         $current = $this->repository->findCurrentById($identityId);
         if ($current === null) throw new \RuntimeException('NOT_FOUND');
         if ((int) ($current['revision'] ?? 0) !== $expectedRevision) throw new \RuntimeException('STALE_REVISION');
-        $slug = $this->slugs->slug($slug);
+        return $current;
+    }
+
+    private function validatedSlug(string $value): string
+    {
+        $slug = $this->slugs->slug($value);
         if ($slug === '') throw new \InvalidArgumentException('PUBLIC_SLUG_INVALID');
         if (($this->nativeRouteExists)($slug)) throw new \RuntimeException('NATIVE_ROUTE_CONFLICT');
-        $record = $current;
-        $record['current_slug'] = $slug;
-        $record['current_path'] = $this->path((string) $current['route_type'], $slug);
-        $record['route_policy_version'] = '2';
-        return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
+        return $slug;
     }
 
     private function record(string $ownerKind, string $ownerId, string $routeType, string $scope, string $slug): array
