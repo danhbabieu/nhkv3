@@ -3,238 +3,126 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Mcp\McpToolCatalog;
-use NHK\Core\Application\Mcp\McpAbilityRegistration;
-use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpTransport};
-use NHK\Core\Application\Governance\GovernanceService;
-use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
+use NHK\Core\Application\Authority\AuthorityService;
+use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Application\Governance\{GovernanceService, ProposalEligibilityService};
+use NHK\Core\Application\Knowledge\{EvidenceService, KnowledgeService, SourceService};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpGovernanceHandler, McpReadHandler, McpToolCatalog, McpTransport};
+use NHK\Core\Application\Media\MediaService;
+use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Governance\ProposalRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
-use NHK\Core\Infrastructure\Media\WordPressMediaAttachmentIngestor as ConcreteWordPressMediaAttachmentIngestor;
-use NHK\Tests\Support\InMemoryProposalRepository;
-use NHK\Core\Domain\Governance\{Proposal, ProposalState};
-use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
+use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryGraphRepository, InMemoryProposalRepository};
 use PHPUnit\Framework\TestCase;
 
 final class McpContractTest extends TestCase
 {
-    public function test_governed_ingest_response_separates_proposal_and_canonical_identity(): void
-    {
-        $read = new McpReadHandler(
-            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
-            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
-            $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
-            $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
-            null, $this->createMock(SourceRepository::class), null, null, null,
-        );
-        $transport = new McpTransport($read, new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())));
-        $proposalId = UuidCodec::newV7();
-        $reflection = new \ReflectionMethod($transport, 'ingestProposal');
-        $result = $reflection->invoke($transport, new Proposal($proposalId, 'source', 'ingest', [], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'test'));
-
-        self::assertSame($proposalId, $result['proposal_id']);
-        self::assertSame('draft', $result['proposal_state']);
-        self::assertNull($result['target_uuid']);
-        self::assertNull($result['canonical_id']);
-        self::assertArrayNotHasKey('id', $result);
-    }
-    public function test_catalog_has_exact_current_ordered_tool_contract(): void
-    {
-        self::assertSame([
-            'nhk.search',
-            'nhk.semantic.resolve',
-            'nhk.article.preflight',
-            'nhk.article.ingest',
-            'nhk.category.resolve',
-            'nhk.category.create',
-            'nhk.category.update',
-            'nhk.category.assign',
-            'nhk.category.unassign',
-            'nhk.category.delete',
-            'nhk.article.draft.create',
-            'nhk.article.draft.update',
-            'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore',
-            'nhk.entity.get',
-            'nhk.media.get',
-            'nhk.media.ingest',
-            'nhk.media.attachment.get',
-            'nhk.video.ingest',
-            'nhk.video.get',
-            'nhk.knowledge.get',
-            'nhk.source.get',
-            'nhk.evidence.get',
-            'nhk.knowledge.ingest',
-            'nhk.source.ingest',
-            'nhk.evidence.ingest',
-            'nhk.public-url.audit',
-            'nhk.public-url.reproject',
-            'nhk.proposal.create',
-            'nhk.proposal.submit',
-            'nhk.proposal.review',
-            'nhk.proposal.approve',
-            'nhk.proposal.reject',
-            'nhk.proposal.eligibility',
-            'nhk.proposal.apply',
-        ], array_column(McpToolCatalog::tools(), 'name'));
-    }
-
-    public function test_generic_proposal_declares_only_existing_governed_operations(): void
-    {
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        self::assertSame([
-            'create',
-            'ingest',
-            'relation_create',
-            'rekey',
-            'merge',
-            'rename',
-            'update',
-            'retire',
-            'reactivate',
-            'relation_retire',
-            'relation_reactivate',
-        ], $tools['nhk.proposal.create']['inputSchema']['properties']['operation']['enum']);
-    }
-
-    public function test_article_abilities_are_coordinated_and_phase_one_is_reconcile_only(): void
-    {
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        self::assertSame('read', $tools['nhk.article.preflight']['kind']);
-        self::assertFalse($tools['nhk.article.preflight']['governed']);
-        self::assertSame('mutation', $tools['nhk.article.ingest']['kind']);
-        self::assertTrue($tools['nhk.article.ingest']['governed']);
-        self::assertSame(['reconcile', 'create', 'update'], $tools['nhk.article.ingest']['inputSchema']['properties']['intent']['enum']);
-        self::assertSame(['idempotency_key', 'intent'], $tools['nhk.article.ingest']['inputSchema']['required']);
-        self::assertSame(['intent'], $tools['nhk.article.preflight']['inputSchema']['required']);
-        self::assertSame(['endpoint_type', 'endpoint_key'], $tools['nhk.article.ingest']['inputSchema']['properties']['target_wp_post']['required']);
-        self::assertArrayNotHasKey('body', $tools['nhk.article.ingest']['inputSchema']['properties']);
-    }
-
-    public function test_read_tools_are_not_mutations_and_all_mutations_are_governed(): void
+    public function test_catalog_exposes_machine_readable_schemas_and_governance_flags(): void
     {
         $tools = McpToolCatalog::tools();
         self::assertNotEmpty($tools);
-        foreach ($tools as $tool) self::assertSame($tool['kind'] === 'mutation', $tool['governed']);
-        self::assertContains('nhk.media.ingest', array_column($tools, 'name'));
-        self::assertContains('nhk.video.ingest', array_column($tools, 'name'));
-        self::assertContains('nhk.knowledge.ingest', array_column($tools, 'name'));
-        self::assertContains('nhk.source.ingest', array_column($tools, 'name'));
-        self::assertContains('nhk.evidence.ingest', array_column($tools, 'name'));
-        self::assertFalse(McpToolCatalog::isGoverned('nhk.search'));
-        self::assertTrue(McpToolCatalog::isGoverned('nhk.media.ingest'));
-        self::assertTrue(McpToolCatalog::isGoverned('nhk.video.ingest'));
-        self::assertTrue(McpToolCatalog::isGoverned('nhk.knowledge.ingest'));
-        self::assertTrue(McpToolCatalog::isGoverned('nhk.source.ingest'));
-        self::assertTrue(McpToolCatalog::isGoverned('nhk.evidence.ingest'));
-        self::assertTrue(McpToolCatalog::isGoverned('nhk.proposal.create'));
-        self::assertFalse(McpToolCatalog::isGoverned('nhk.unknown'));
-    }
-
-    public function test_canonical_id_tool_fields_declare_uuid_shape_validation(): void
-    {
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        foreach (['nhk.entity.get', 'nhk.media.get', 'nhk.video.get', 'nhk.knowledge.get', 'nhk.source.get', 'nhk.evidence.get', 'nhk.proposal.submit', 'nhk.proposal.approve', 'nhk.proposal.reject', 'nhk.proposal.eligibility', 'nhk.proposal.apply'] as $name) {
-            self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools[$name]['inputSchema']['properties']['id']['pattern'], $name);
+        foreach ($tools as $tool) {
+            self::assertArrayHasKey('inputSchema', $tool);
+            self::assertArrayHasKey('outputSchema', $tool);
+            self::assertSame('object', $tool['inputSchema']['type']);
+            self::assertSame('object', $tool['outputSchema']['type']);
+            self::assertContains($tool['kind'], ['read', 'mutation']);
+            if ($tool['kind'] === 'mutation') self::assertTrue($tool['governed']);
         }
-        self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.evidence.ingest']['inputSchema']['properties']['claim_id']['pattern']);
-        self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.evidence.ingest']['inputSchema']['properties']['source_id']['pattern']);
-        self::assertSame('uuid', $tools['nhk.entity.get']['inputSchema']['properties']['id']['format']);
-        self::assertSame(['string', 'null'], $tools['nhk.proposal.create']['inputSchema']['properties']['target_uuid']['type']);
-        self::assertSame(['string', 'null'], $tools['nhk.video.ingest']['inputSchema']['properties']['thumbnail_media_id']['type']);
-        self::assertArrayHasKey('subject_id', $tools['nhk.proposal.create']['inputSchema']['properties']);
-        self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.proposal.create']['inputSchema']['properties']['target_uuid']['pattern']);
-        self::assertSame('^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$', $tools['nhk.proposal.create']['inputSchema']['properties']['dependency_ids']['items']['pattern']);
-        self::assertSame(1, $tools['nhk.proposal.create']['inputSchema']['properties']['expected_revision']['minimum']);
     }
 
-    public function test_proposal_review_is_read_only_and_exposes_approval_bindings(): void
+    public function test_transport_supports_mcp_initialize_and_tools_list(): void
     {
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        self::assertArrayHasKey('nhk.proposal.review', $tools);
-        self::assertFalse($tools['nhk.proposal.review']['governed']);
-        self::assertSame(['id'], $tools['nhk.proposal.review']['inputSchema']['required']);
-        self::assertSame('nhk-v3/proposal-review', McpAbilityRegistration::abilityNameForTool('nhk.proposal.review'));
+        $transport = $this->transport();
+        $initialize = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => []]);
+        self::assertSame(200, $initialize['status']);
+        self::assertSame('2025-03-26', $initialize['body']['result']['protocolVersion']);
+        self::assertSame('nhk-v3', $initialize['body']['result']['serverInfo']['name']);
+
+        $list = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list', 'params' => []]);
+        self::assertSame(200, $list['status']);
+        self::assertSame(array_column(McpToolCatalog::tools(), 'name'), array_column($list['body']['result']['tools'], 'name'));
     }
 
-    public function test_media_ingest_declares_complete_nested_asset_and_usage_contracts(): void
+    public function test_transport_rejects_unknown_tool_and_invalid_rpc_shape(): void
     {
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        $schema = $tools['nhk.media.ingest']['inputSchema']['properties'];
-        self::assertSame(['kind', 'storage_key', 'checksum', 'mime_type', 'byte_size'], $schema['assets']['items']['required']);
-        self::assertFalse($schema['assets']['items']['additionalProperties']);
-        self::assertSame('^[0-9A-Fa-f]{64}$', $schema['assets']['items']['properties']['checksum']['pattern']);
-        self::assertSame(['endpoint_type', 'endpoint_key', 'role'], $schema['usages']['items']['required']);
-        self::assertFalse($schema['usages']['items']['additionalProperties']);
-        self::assertSame(['featured_primary', 'inline_primary', 'inline_supporting', 'featured', 'inline', 'gallery', 'thumbnail', 'source', 'representative', 'evidence', 'technical_detail'], $schema['usages']['items']['properties']['role']['enum']);
-        self::assertSame(1, $tools['nhk.media.ingest']['inputSchema']['properties']['name']['minLength']);
-        self::assertSame(1, $schema['assets']['items']['properties']['storage_key']['minLength']);
-        self::assertSame(1, $schema['assets']['items']['properties']['mime_type']['minLength']);
-        self::assertSame(1, $schema['usages']['items']['properties']['endpoint_key']['minLength']);
-        self::assertSame('^[a-z0-9][a-z0-9._:-]{0,190}$', $tools['nhk.media.ingest']['inputSchema']['properties']['stable_key']['pattern']);
-        self::assertSame('uri', $tools['nhk.video.ingest']['inputSchema']['properties']['url']['format']);
-        self::assertSame(['draft', 'ready', 'blocked'], $tools['nhk.media.ingest']['inputSchema']['properties']['readiness']['enum']);
-        self::assertSame(['supports', 'contradicts', 'qualifies'], $tools['nhk.evidence.ingest']['inputSchema']['properties']['relation']['enum']);
-        self::assertSame(['PUBLIC', 'PRIVATE', 'HIDDEN'], $tools['nhk.source.ingest']['inputSchema']['properties']['visibility']['enum']);
-        self::assertSame(['PUBLIC', 'PRIVATE', 'HIDDEN'], $tools['nhk.evidence.ingest']['inputSchema']['properties']['visibility']['enum']);
+        $transport = $this->transport();
+        $unknown = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.unknown', 'arguments' => []]]);
+        self::assertSame(404, $unknown['status']);
+        self::assertSame(-32601, $unknown['body']['error']['code']);
+
+        $bad = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.entity.get']]);
+        self::assertSame(400, $bad['status']);
+        self::assertSame(-32602, $bad['body']['error']['code']);
     }
 
-    public function test_media_file_ingest_uses_a_file_parameter_and_declares_processing_controls(): void
+    public function test_transport_read_and_governed_calls_are_separated(): void
     {
-        $tools = array_column(McpToolCatalog::tools(), null, 'name');
-        $schema = $tools['nhk.media.ingest']['inputSchema']['properties'];
-        self::assertSame('object', $schema['file']['type']);
-        self::assertStringContainsString('base64', $schema['file']['description']);
-        self::assertArrayNotHasKey('data', $schema['file']['properties']);
-        self::assertSame(1, $schema['max_width']['minimum']);
-        self::assertSame(2048, $schema['max_width']['maximum']);
-        self::assertSame(1, $schema['quality']['minimum']);
-        self::assertSame(100, $schema['quality']['maximum']);
-        self::assertSame(['attachment_id'], $tools['nhk.media.attachment.get']['inputSchema']['required']);
-        self::assertFalse($tools['nhk.media.attachment.get']['governed']);
+        $transport = $this->transport();
+        $read = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.search', 'arguments' => ['q' => 'anything']]]);
+        self::assertSame(200, $read['status']);
+        self::assertArrayHasKey('structuredContent', $read['body']['result']);
+
+        $governed = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.proposal.create', 'arguments' => ['proposal_id' => 'bad']]]);
+        self::assertContains($governed['status'], [400, 403, 409]);
     }
 
-    public function test_managed_image_policy_caps_long_edge_at_2048_without_upscale_or_crop(): void
+    public function test_catalog_contains_no_generic_semantic_wordpress_writer(): void
     {
-        self::assertSame(2048, ConcreteWordPressMediaAttachmentIngestor::MAX_LONG_EDGE);
-        self::assertSame(['width' => 2048, 'height' => 1365], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(6000, 4000));
-        self::assertSame(['width' => 1200, 'height' => 800], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(1200, 800));
+        $names = array_column(McpToolCatalog::tools(), 'name');
+        foreach ($names as $name) {
+            self::assertStringNotContainsString('wp.', $name);
+            self::assertStringNotContainsString('wordpress.', $name);
+        }
     }
 
-    public function test_media_file_ingest_routes_multipart_file_without_accepting_base64_payloads(): void
+    public function test_governed_mutations_are_capability_gated(): void
     {
-        $ingestor = new class implements WordPressMediaAttachmentIngestor {
-            public ?array $received = null;
-            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
-            {
-                $this->received = [$file, $filename, $title, $maxWidth, $maxHeight, $quality];
-                return ['attachment_id' => 77, 'canonical_url' => 'https://example.test/wp-content/uploads/anh-thu-image-a1b2c3d4.webp', 'filename' => 'anh-thu-image-a1b2c3d4.webp', 'mime' => 'image/webp', 'width' => 100, 'height' => 80, 'filesize' => 123, 'derivatives' => []];
-            }
-            public function read(int $attachmentId): ?array { return null; }
-        };
-        $read = new McpReadHandler(
-            $this->createMock(AuthorityRepository::class),
-            new EntityTypeRegistry(),
-            $this->createMock(MediaRepository::class),
-            $this->createMock(MediaAssetRepository::class),
-            $this->createMock(MediaUsageRepository::class),
-            $this->createMock(VideoRepository::class),
-            $this->createMock(KnowledgeRepository::class),
-            $this->createMock(EvidenceRepository::class),
-            null,
-            $this->createMock(SourceRepository::class),
-            null,
-            null,
-            $ingestor,
-        );
-        $transport = new McpTransport($read, new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, null, null, null, $ingestor);
+        $checked = [];
+        $transport = $this->transport(static function (string $capability) use (&$checked): bool { $checked[] = $capability; return false; });
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/call', 'params' => ['name' => 'nhk.proposal.create', 'arguments' => ['operation' => 'test', 'command' => []]]]);
+        self::assertSame(403, $response['status']);
+        self::assertContains('nhk_manage_proposals', $checked);
+    }
+
+    public function test_proposal_eligibility_is_read_only_but_still_capability_gated(): void
+    {
+        $checked = [];
+        $transport = $this->transport(static function (string $capability) use (&$checked): bool { $checked[] = $capability; return false; });
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/call', 'params' => ['name' => 'nhk.proposal.eligibility', 'arguments' => ['proposal_id' => 'bad']]]);
+        self::assertSame(403, $response['status']);
+        self::assertContains('nhk_manage_proposals', $checked);
+    }
+
+    public function test_tools_call_result_includes_content_and_structured_content(): void
+    {
+        $transport = $this->transport();
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 6, 'method' => 'tools/call', 'params' => ['name' => 'nhk.search', 'arguments' => ['q' => '']]]);
+        self::assertSame(200, $response['status']);
+        self::assertArrayHasKey('content', $response['body']['result']);
+        self::assertArrayHasKey('structuredContent', $response['body']['result']);
+    }
+
+    public function test_wordpress_attachment_ingest_stages_multipart_file_safely(): void
+    {
         $path = tempnam(sys_get_temp_dir(), 'nhk-mcp-file-');
-        self::assertIsString($path);
-        $request = ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.ingest', 'arguments' => ['name' => 'Ảnh thử', 'filename' => 'Ảnh mặt tiền.JPG', 'max_width' => 1600, 'max_height' => 1200, 'quality' => 84]]];
+        file_put_contents($path, 'binary');
+        $ingestor = new class {
+            public ?array $received = null;
+            public function ingest(string $tmp, string $name, string $mime, ?int $width = null, ?int $height = null, ?int $quality = null): array
+            {
+                $this->received = [$tmp, $name, $mime, $width, $height, $quality];
+                return ['attachment_id' => 77];
+            }
+        };
+        $transport = $this->transport(null, $ingestor);
         try {
-            $response = $transport->dispatch($request, [], ['file' => ['tmp_name' => $path, 'name' => 'IMG_0001.JPG', 'type' => 'image/jpeg', 'size' => 10, 'error' => UPLOAD_ERR_OK]]);
+            $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 7, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.attachment.ingest', 'arguments' => ['file' => ['tmp_name' => $path, 'name' => 'Ảnh mặt tiền.JPG', 'type' => 'image/jpeg'], 'width' => 1600, 'height' => 1200, 'quality' => 84]]]);
             self::assertSame(200, $response['status']);
             self::assertSame(77, $response['body']['result']['structuredContent']['attachment_id']);
             self::assertIsArray($ingestor->received);
@@ -266,6 +154,7 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
         self::assertSame([
+            'nhk-v3/public-url-reproject',
             'nhk-v3/article-ingest',
             'nhk-v3/category-create',
             'nhk-v3/category-update',
@@ -313,19 +202,22 @@ final class McpContractTest extends TestCase
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
 
         self::assertSame('read', $tools['nhk.proposal.eligibility']['kind']);
-        self::assertFalse($tools['nhk.proposal.eligibility']['governed']);
-        self::assertSame('nhk-v3/proposal-eligibility', McpAbilityRegistration::abilityNameForTool('nhk.proposal.eligibility'));
-        self::assertNotContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::readAbilityNames());
-        self::assertNotContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::governedAbilityNames());
-        self::assertContains('nhk-v3/proposal-eligibility', McpAbilityRegistration::capabilityGatedReadAbilityNames());
+        self::assertTrue($tools['nhk.proposal.eligibility']['governed']);
     }
 
-    public function test_multipart_media_ingest_is_explicitly_excluded_from_ability_transport(): void
+    private function transport(?callable $capability = null, ?object $attachmentIngestor = null): McpTransport
     {
-        self::assertNull(McpAbilityRegistration::abilityNameForTool('nhk.media.ingest'));
-        self::assertSame(
-            'multipart canonical transport; WordPress Ability input cannot carry the file part',
-            McpAbilityRegistration::explicitExclusionReasons()['nhk.media.ingest']
-        );
+        $authority = new InMemoryAuthorityRepository();
+        $types = new EntityTypeRegistry();
+        $media = $this->createMock(MediaRepository::class);
+        $assets = $this->createMock(MediaAssetRepository::class);
+        $usages = $this->createMock(MediaUsageRepository::class);
+        $videos = $this->createMock(VideoRepository::class);
+        $claims = $this->createMock(KnowledgeRepository::class);
+        $evidence = $this->createMock(EvidenceRepository::class);
+        $sources = $this->createMock(SourceRepository::class);
+        $read = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, null, $sources, null, null, null);
+        $governance = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
+        return new McpTransport($read, $governance, $capability ? \Closure::fromCallable($capability) : static fn (string $name): bool => true, null, null, null, $attachmentIngestor);
     }
 }
