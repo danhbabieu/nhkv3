@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+## Semantic frontend discovery design checkpoint — 2026-09-06
+
+The approved design is recorded in
+`docs/superpowers/specs/2026-09-06-semantic-frontend-discovery-design.md`.
+The audit confirms that `HomeSemanticQuery`, `SemanticDossierQuery`,
+`RelatedSemanticQuery` and the domain projections already provide the main
+read boundaries, while the theme seam still presents thin, loosely shaped
+modules and generic entity payloads. The selected implementation direction is
+a bounded vertical slice: projection/profile tests, shared composition,
+homepage discovery, then Brand/Movement/Variant proof.
+
+This checkpoint changes documentation only. The local WordPress database and
+HTTP runtime were unavailable, so live Odo coverage and browser verification
+remain environment-gated. No semantic records, Graph edges, WordPress content,
+route identities, migrations or production/V2 data were mutated.
+
 ## Connected Media + Video transport design checkpoint — 2026-09-05
 
 The current transport gap and its approved design are recorded in
