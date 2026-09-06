@@ -18,6 +18,7 @@ final class PublicIdentityServiceTest extends TestCase
         $replayed = $service->changeSlug($first['identity_id'], 'odo-moi', 2, 'request-2');
 
         self::assertSame('/odo-moi/', $changed['current_path']);
+        self::assertSame('2', $changed['route_policy_version']);
         self::assertSame($changed, $replayed);
         self::assertSame(2, $repository->current()['revision']);
         self::assertSame(['/odo/'], $repository->historicPaths());
@@ -34,6 +35,7 @@ final class PublicIdentityServiceTest extends TestCase
         self::assertSame($ownerId, $identity['owner_id']);
         self::assertSame('tri-thuc-nha-kho-tuoi-o-xuong', $identity['current_slug']);
         self::assertSame('/tri-thuc-nha-kho-tuoi-o-xuong/', $identity['current_path']);
+        self::assertSame('2', $identity['route_policy_version']);
         self::assertStringNotContainsString($ownerId, $identity['current_path']);
     }
 
