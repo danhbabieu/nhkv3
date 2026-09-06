@@ -54,6 +54,27 @@ final class CanonicalPublicSlugPolicy
         return trim((string) preg_replace('/-+/', '-', $value), '-');
     }
 
+    /**
+     * Build shortest-first public slug candidates from meaningful domain data.
+     * Callers remain responsible for checking route-scope availability.
+     *
+     * @param list<string> $meaningfulSuffixValues
+     * @return list<string>
+     */
+    public static function candidates(string $value, array $meaningfulSuffixValues = []): array
+    {
+        $base = self::normalize($value);
+        if ($base === '') return [];
+        $candidates = [$base];
+        foreach ($meaningfulSuffixValues as $value) {
+            $suffix = self::normalize($value);
+            if ($suffix === '') continue;
+            $candidate = $base . '-' . $suffix;
+            if (!in_array($candidate, $candidates, true)) $candidates[] = $candidate;
+        }
+        return $candidates;
+    }
+
     public static function isCanonical(string $value): bool
     {
         return $value !== ''
