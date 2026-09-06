@@ -45,15 +45,19 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         }
     }
 
-    public function test_plugin_wires_workbench_as_primary_admin_entrypoint(): void
+    public function test_plugin_entrypoint_wires_workbench_without_replacing_the_existing_control_plane_boot(): void
     {
+        $entry = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/nhk-core.php');
         $plugin = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Plugin.php');
+        $page = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Infrastructure/Admin/AdminWorkbenchPage.php');
 
-        self::assertStringContainsString('use NHK\\Core\\Infrastructure\\Admin\\AdminWorkbenchPage;', $plugin);
-        self::assertStringContainsString('use NHK\\Core\\Infrastructure\\Admin\\AdminAssets;', $plugin);
-        self::assertStringContainsString('AdminWorkbenchPage::register', $plugin);
-        self::assertStringContainsString('AdminAssets::register', $plugin);
-        self::assertStringNotContainsString("add_action('admin_menu', [AdminPage::class, 'register']);", $plugin);
+        self::assertStringContainsString('use NHK\\Core\\Infrastructure\\Admin\\{AdminAssets, AdminWorkbenchPage};', $entry);
+        self::assertStringContainsString('Plugin::boot(__FILE__);', $entry);
+        self::assertStringContainsString('AdminWorkbenchPage::register();', $entry);
+        self::assertStringContainsString('AdminAssets::register(__FILE__);', $entry);
+        self::assertStringContainsString("add_action('admin_menu', [AdminPage::class, 'register']);", $plugin);
+        self::assertStringContainsString("remove_menu_page('nhk-v3');", $page);
+        self::assertStringContainsString("'nhk-v3-advanced', [AdminPage::class, 'render']", $page);
     }
 
     /** @return list<string> */
