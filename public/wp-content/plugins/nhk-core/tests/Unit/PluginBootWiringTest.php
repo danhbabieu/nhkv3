@@ -38,7 +38,7 @@ final class PluginBootWiringTest extends TestCase
         self::assertLessThan($dossier, $knowledge);
         self::assertLessThan($dossier, $relations);
         self::assertLessThan($hook, $dossier);
-        self::assertStringContainsString("$value['dossier'] = $publicDossier->forEntity($entity);", $plugin);
+        self::assertStringContainsString('$value[\'dossier\'] = $publicDossier->forEntity($entity);', $plugin);
     }
 
     public function test_boot_does_not_run_migrations_without_explicit_runtime_gate(): void
