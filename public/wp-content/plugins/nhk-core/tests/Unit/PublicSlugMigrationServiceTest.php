@@ -120,4 +120,24 @@ final class PublicSlugMigrationServiceTest extends TestCase
         self::assertSame('STALE', $result['rows'][0]['status']);
         self::assertSame(['revision' => 3, 'current_slug' => 'other'], $result['rows'][0]['persisted']);
     }
+
+    public function test_resolved_collision_is_noop_when_persisted_slug_already_matches(): void
+    {
+        $source = new class implements PublicSlugMigrationSource {
+            public function candidates(): array
+            {
+                return [
+                    ['type' => 'brand', 'id' => 'a', 'title' => 'Trùng', 'current_slug' => 'trung', 'current_url' => '/trung/', 'scope' => 'root', 'revision' => 1, 'fingerprint' => 'a', 'meaningful_context' => ['country' => 'Việt Nam']],
+                    ['type' => 'brand', 'id' => 'b', 'title' => 'Trùng', 'current_slug' => 'trung-nhat-ban', 'current_url' => '/trung-nhat-ban/', 'scope' => 'root', 'revision' => 2, 'fingerprint' => 'b', 'meaningful_context' => ['country' => 'Nhật Bản']],
+                ];
+            }
+        };
+
+        $report = (new PublicSlugMigrationService($source, static function (): array { throw new \LogicException('NO_WRITE_EXPECTED'); }))->dryRun();
+
+        self::assertSame(0, $report['changed']);
+        self::assertSame(2, $report['no_op']);
+        self::assertSame('NOOP', $report['rows'][1]['status']);
+        self::assertFalse($report['rows'][1]['changed']);
+    }
 }

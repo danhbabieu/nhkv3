@@ -48,6 +48,13 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('$dossier === null && $type === \'brand\' && is_array($entity[\'aggregation\'] ?? null)', $source);
     }
 
+    public function test_entity_relation_sections_are_not_rendered_when_all_items_lack_public_urls(): void
+    {
+        $source = $this->read('entity.php');
+        self::assertStringContainsString('$renderableItems', $source);
+        self::assertStringContainsString('if ($renderableItems === []) continue;', $source);
+    }
+
     public function test_article_detail_uses_post_dossier_canonical_media_gallery_and_path_aware_relations(): void
     {
         $source = $this->read('single.php');

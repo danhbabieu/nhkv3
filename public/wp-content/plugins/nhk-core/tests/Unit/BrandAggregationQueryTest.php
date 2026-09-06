@@ -133,7 +133,7 @@ final class BrandAggregationQueryTest extends TestCase
         self::assertArrayNotHasKey('id', $result['models'][0]);
         self::assertSame('DIRECT', $result['models'][0]['origin']['kind']);
         self::assertArrayNotHasKey('id', $result['variants'][0]);
-        self::assertSame(['variant_of', 'model_of'], $result['variants'][0]['origin']['path']);
+        self::assertSame(['model_of', 'variant_of'], $result['variants'][0]['origin']['path']);
         self::assertSame([], $result['movements']);
     }
 }

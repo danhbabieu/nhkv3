@@ -127,12 +127,17 @@ final class MediaService
         if ($media->readiness === 'ready' && $asset->visibility === 'PUBLIC') return $media;
 
         $completedMetadata = array_replace($asset->metadata, $metadata);
-        $public = new MediaAsset($asset->assetId, $asset->mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize, $asset->width, $asset->height, 'PUBLIC', $completedMetadata);
-        $this->assets->update($public);
+        $assetWasUpdated = $asset->visibility !== 'PUBLIC' || $asset->metadata !== $completedMetadata;
+        if ($assetWasUpdated) {
+            $public = new MediaAsset($asset->assetId, $asset->mediaId, $asset->kind, $asset->storageKey, $asset->checksum, $asset->mimeType, $asset->byteSize, $asset->width, $asset->height, 'PUBLIC', $completedMetadata);
+            $this->assets->update($public);
+        }
         try {
             return $this->update($mediaId, $media->canonicalName, 'ready', $media->provenance, $media->revision);
         } catch (\Throwable $error) {
-            try { $this->assets->update($asset); } catch (\Throwable) { }
+            if ($assetWasUpdated) {
+                try { $this->assets->update($asset); } catch (\Throwable) { }
+            }
             throw $error;
         }
     }

@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+## Graph Relation runtime recovery recheck — 2026-09-06
+
+The repository runtime convention was re-verified without changing application
+code or configuration: guarded Integration uses `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`, loads `public/wp-load.php`, and relies on the
+Homebrew service `mysql (homebrew.mxcl.mysql)` at `127.0.0.1:3306` with the
+secondary `/tmp/mysql.sock` path. The active root `wp-config.php` resolves
+`DB_USER=root`, an empty development password, `DB_HOST=127.0.0.1`, and the
+database name from `NHK_WP_TEST_DB`. No Docker/Compose/bootstrap container or
+repo-local DB helper exists.
+
+The in-sandbox TCP/socket probes were blocked by the sandbox, but the narrowly
+escalated read-only probe completed: `mysqladmin ... ping` returned `mysqld is
+alive`; `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public php -r ...` loaded
+WordPress and verified `SELECT DATABASE() = nhk_v3_test` with an empty
+`$wpdb->last_error`. Homebrew was already running, with `127.0.0.1:3306`,
+`/tmp/mysql.sock`, and the MySQL log's `ready for connections`; no restart or
+configuration change was needed.
+
+The exact guarded full Integration command was then run. Runtime entry passed,
+but the suite did not pass: 108 tests / 698 assertions, 1 error, 2 failures,
+1 warning and 2 skips. The failures are not MySQL connectivity failures:
+`McpTransportIntegrationTest` requires missing `wp_posts.ID=71`; the concurrent
+untracked `PublicSlugMigrationIntegrationTest` observed `2` instead of its
+expected second-run `changed=0`; and the real-file media test hit
+`Media asset update conflict`. MySQL 9.7 also reported the existing migration
+statement attempting `wp_nhk_media_usages.id DEFAULT ''`. The test database has
+12 posts and no Post 71; no repository fixture/bootstrap loader was found.
+
+Therefore the required Integration PASS gate is not met. Cuckoo and Odo 36/8
+governed backfill, canonical/inverse Graph readback, neighborhood retrieval,
+MCP retrieval and second-run idempotency were not run. Their counters remain
+`RUNTIME_UNVERIFIED`, not inferred. No Knowledge, Authority, Graph edge,
+WordPress record, migration or raw database relation write was performed.
+
+Status remains `RUNTIME_VERIFICATION_BLOCKED` (not `ENVIRONMENT_BLOCKED`): the
+development WordPress/MySQL runtime is available, while the repository's full
+Integration fixture/state gate is currently failing. Existing concurrent
+changes were preserved and not staged.
+
 ## Graph Relation live verification continuation — 2026-09-06
 
 The requested live Graph Relation verification was attempted from the current

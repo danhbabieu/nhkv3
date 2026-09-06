@@ -85,38 +85,58 @@ final class McpTransportIntegrationTest extends TestCase
 
     public function test_article_preflight_research_for_existing_post_reads_media_usage_inventory(): void
     {
-        $post = get_post(71);
-        self::assertNotNull($post, 'The governed Article preflight fixture requires WordPress Post 71.');
+        $postId = wp_insert_post([
+            'post_title' => 'NHK Article preflight integration fixture',
+            'post_content' => 'Disposable integration fixture.',
+            'post_status' => 'draft',
+            'post_type' => 'post',
+        ], true);
+        self::assertIsInt($postId);
+        self::assertGreaterThan(0, $postId);
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        $administrator = get_role('administrator');
+        self::assertNotNull($administrator);
+        $administrator->add_cap('read');
+        $previousUser = get_current_user_id();
+        wp_set_current_user((int) $users[0]->ID);
+        try {
+            $post = get_post($postId);
+            self::assertNotNull($post);
 
-        $response = $this->request('tools/call', [
-            'id' => 71,
-            'params' => [
-                'name' => 'nhk.article.preflight',
-                'arguments' => [
-                    'intent' => 'reconcile',
-                    'research_topic' => (string) $post->post_title,
-                    'target_wp_post' => [
-                        'endpoint_type' => 'wp_post',
-                        'endpoint_key' => '1:71',
-                    ],
-                    'research_subject' => [
-                        'subjects' => [
-                            ['type' => 'variant', 'id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df'],
-                            ['type' => 'music', 'id' => '4b01eb30-2b44-4c9c-a000-781bb8cb9206'],
-                            ['type' => 'music', 'id' => '1ffade21-4cb8-44b5-ac1f-16de4ee533f6'],
+            $response = $this->request('tools/call', [
+                'id' => $postId,
+                'params' => [
+                    'name' => 'nhk.article.preflight',
+                    'arguments' => [
+                        'intent' => 'reconcile',
+                        'research_topic' => (string) $post->post_title,
+                        'target_wp_post' => [
+                            'endpoint_type' => 'wp_post',
+                            'endpoint_key' => '1:' . $postId,
+                        ],
+                        'research_subject' => [
+                            'subjects' => [
+                                ['type' => 'variant', 'id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df'],
+                                ['type' => 'music', 'id' => '4b01eb30-2b44-4c9c-a000-781bb8cb9206'],
+                                ['type' => 'music', 'id' => '1ffade21-4cb8-44b5-ac1f-16de4ee533f6'],
+                            ],
                         ],
                     ],
                 ],
-            ],
-        ], ['Mcp-Name' => 'nhk.article.preflight']);
+            ], ['Mcp-Name' => 'nhk.article.preflight']);
 
-        self::assertSame(200, $response->get_status(), (string) wp_json_encode($response->get_data()));
-        $result = $response->get_data()['result'];
-        self::assertFalse($result['isError'] ?? true, (string) wp_json_encode($result));
-        $packet = $result['structuredContent'];
-        self::assertNotSame('unavailable', $packet['inventory']['status'] ?? null, (string) wp_json_encode($packet));
-        self::assertNotContains('RUNTIME_UNAVAILABLE', $packet['blockers'] ?? [], (string) wp_json_encode($packet));
-        self::assertNotContains('Call to a member function listByEndpoint() on null', $packet['inventory']['reason'] ?? '', (string) wp_json_encode($packet));
+            self::assertSame(200, $response->get_status(), (string) wp_json_encode($response->get_data()));
+            $result = $response->get_data()['result'];
+            self::assertFalse($result['isError'] ?? true, (string) wp_json_encode($result));
+            $packet = $result['structuredContent'];
+            self::assertNotSame('unavailable', $packet['inventory']['status'] ?? null, (string) wp_json_encode($packet));
+            self::assertNotContains('RUNTIME_UNAVAILABLE', $packet['blockers'] ?? [], (string) wp_json_encode($packet));
+            self::assertStringNotContainsString('Call to a member function listByEndpoint() on null', (string) ($packet['inventory']['reason'] ?? ''), (string) wp_json_encode($packet));
+        } finally {
+            wp_set_current_user($previousUser);
+            wp_delete_post($postId, true);
+        }
     }
 
     public function test_tools_call_enforces_required_and_uuid_schema_arguments(): void

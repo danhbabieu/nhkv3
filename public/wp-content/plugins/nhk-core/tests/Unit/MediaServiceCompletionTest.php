@@ -45,6 +45,20 @@ final class MediaServiceCompletionTest extends TestCase
         self::assertSame([], $primary?->metadata['sizes'] ?? null);
     }
 
+    public function test_completion_does_not_update_an_already_public_asset_without_metadata_changes(): void
+    {
+        [$media, $assets, $service] = $this->stores();
+        $item = $service->ingest('wp-attachment:1:83', 'Đồng hồ đã xử lý', 'draft', ['source' => 'wordpress_attachment_adoption'], [[
+            'kind' => 'derivative', 'storage_key' => 'uploads/da-xu-ly.webp', 'checksum' => hash('sha256', 'webp-public'), 'mime_type' => 'image/webp', 'byte_size' => 4, 'width' => 996, 'height' => 1280, 'visibility' => 'PUBLIC', 'metadata' => ['sizes' => []],
+        ]]);
+        $asset = $assets->listByMediaId($item->canonicalId)[0];
+
+        $completed = $service->completeIngest($item->canonicalId, $asset->assetId);
+
+        self::assertSame('ready', $completed->readiness);
+        self::assertSame(0, $assets->updates);
+    }
+
     /** @return array{0:object,1:object,2:MediaService} */
     private function stores(): array
     {
@@ -58,9 +72,10 @@ final class MediaServiceCompletionTest extends TestCase
         };
         $assets = new class implements MediaAssetRepository {
             public array $items = [];
+            public int $updates = 0;
             public function findByAssetId(string $id): ?MediaAsset { return $this->items[$id] ?? null; }
             public function create(MediaAsset $asset): MediaAsset { return $this->items[$asset->assetId] = $asset; }
-            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $this->items[$asset->assetId] = $asset; }
+            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { $this->updates++; return $this->items[$asset->assetId] = $asset; }
             public function listByMediaId(string $id): array { return array_values(array_filter($this->items, static fn (MediaAsset $asset): bool => $asset->mediaId === $id)); }
             public function findByChecksum(string $checksum): array { return array_values(array_filter($this->items, static fn (MediaAsset $asset): bool => $asset->checksum === $checksum)); }
         };

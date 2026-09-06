@@ -37,9 +37,30 @@ final class PublicSlugMigrationService
         }
         foreach ($groups as $indexes) {
             if (count($indexes) < 2) continue;
+            $baseSlug = (string) $baseRows[$indexes[0]]['proposed_public_slug'];
+            $persistedBase = array_values(array_filter($indexes, static fn (int $index): bool => $baseRows[$index]['current_public_slug'] === $baseSlug));
+            if (count($persistedBase) > 1) {
+                foreach ($indexes as $index) {
+                    $baseRows[$index]['status'] = 'COLLISION';
+                    $baseRows[$index]['changed'] = false;
+                    $baseRows[$index]['collision'] = true;
+                    $baseRows[$index]['collision_reason'] = 'NO_UNIQUE_MEANINGFUL_DISCRIMINATOR';
+                    $baseRows[$index]['resolution'] = 'MANUAL_REVIEW_REQUIRED';
+                }
+                continue;
+            }
             $resolved = [];
             foreach ($indexes as $index) {
                 $row = $baseRows[$index];
+                if ($persistedBase !== [] && $index === $persistedBase[0]) {
+                    $row['status'] = 'NOOP';
+                    $row['changed'] = false;
+                    $row['collision'] = true;
+                    $row['collision_reason'] = 'ROUTE_SCOPE_COLLISION';
+                    $row['resolution'] = 'PERSISTED_BASE';
+                    $baseRows[$index] = $row;
+                    continue;
+                }
                 $context = is_array($row['meaningful_context'] ?? null) ? $row['meaningful_context'] : [];
                 foreach ($context as $key => $value) {
                     if (in_array((string) $key, ['uuid', 'canonical_id', 'stable_key', 'external_video_id', 'database_id', 'source_key', 'hash', 'idempotency_key'], true)) continue;
@@ -49,7 +70,8 @@ final class PublicSlugMigrationService
                         $resolved[] = $candidate;
                         $row['proposed_public_slug'] = $candidate;
                         $row['proposed_url'] = $this->replaceSlug((string) $row['proposed_url'], (string) $baseRows[$index]['base_slug'], $candidate);
-                        $row['status'] = 'CHANGED';
+                        $row['status'] = $row['current_public_slug'] === $candidate ? 'NOOP' : 'CHANGED';
+                        $row['changed'] = $row['status'] === 'CHANGED';
                         $row['collision'] = true;
                         $row['collision_reason'] = 'ROUTE_SCOPE_COLLISION';
                         $row['resolution'] = 'MEANINGFUL_CONTEXT';
@@ -104,6 +126,7 @@ final class PublicSlugMigrationService
                 'resource_type' => $row['resource_type'], 'resource_id' => $row['resource_id'],
                 'current_slug' => $row['current_public_slug'], 'proposed_slug' => $row['proposed_public_slug'],
                 'current_url' => $row['current_url'], 'proposed_url' => $row['proposed_url'],
+                'scope' => $row['scope'],
                 'expected_revision' => $row['revision'], 'source_fingerprint' => $row['source_fingerprint'],
                 'idempotency_key' => hash('sha256', $fingerprint . '|' . $row['resource_type'] . '|' . $row['resource_id']),
             ]);
