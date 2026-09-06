@@ -28,6 +28,7 @@ final class McpCapabilityManifest
             'graph' => ['owner' => 'graph', 'endpoint_types' => [], 'tools' => ['nhk.proposal.create', 'nhk.proposal.submit', 'nhk.proposal.approve', 'nhk.proposal.eligibility', 'nhk.proposal.apply'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
             'media' => ['owner' => 'media', 'endpoint_types' => ['media'], 'tools' => ['nhk.media.get', 'nhk.media.ingest', 'nhk.media.attachment.get'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
             'video' => ['owner' => 'video', 'endpoint_types' => ['video'], 'tools' => ['nhk.video.get', 'nhk.video.ingest'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
+            'public_url' => ['owner' => 'public_identity', 'endpoint_types' => [], 'tools' => ['nhk.public-url.audit', 'nhk.public-url.reproject'], 'seo_preflight' => true, 'relation_support' => false, 'media_support' => false, 'read_back' => true],
             'product' => ['owner' => 'authority', 'endpoint_types' => ['product'], 'tools' => ['nhk.entity.get'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
             'specimen' => ['owner' => 'authority', 'endpoint_types' => ['specimen'], 'tools' => ['nhk.entity.get'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
         ];
@@ -50,7 +51,7 @@ final class McpCapabilityManifest
                 'writes' => $writes,
                 'governed' => $writes !== [],
                 'expected_revision' => $writes !== [],
-                'idempotency' => in_array($kind, ['article', 'category', 'media', 'video', 'knowledge', 'source', 'evidence'], true),
+                'idempotency' => in_array($kind, ['article', 'category', 'media', 'video', 'knowledge', 'source', 'evidence', 'public_url'], true),
                 'relation_support' => $definition['relation_support'],
                 'media_support' => $definition['media_support'],
                 'seo_preflight' => $definition['seo_preflight'],

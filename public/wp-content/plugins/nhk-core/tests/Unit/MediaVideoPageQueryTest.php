@@ -20,7 +20,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $retiredMedia = new Media(UuidCodec::newV7(), 'retired', 'Retired', 'ready', [], false);
         $draftMedia = new Media(UuidCodec::newV7(), 'draft', 'Draft', 'draft');
         $activeMedia = new Media($mediaId, 'active', 'Active', 'ready');
-        $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Reference');
+        $video = Video::fromUrl('https://youtu.be/dQw4w9WgXcQ', 'Reference', ['public_identity' => ['current_slug' => 'reference'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true], 'editorial' => ['title' => 'Reference', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
         $retiredVideo = new Video(UuidCodec::newV7(), 'youtube', '9bZkp7q19f0', 'https://www.youtube.com/watch?v=9bZkp7q19f0', 'Retired', [], null, false);
         $query = $this->query([$retiredMedia, $draftMedia, $activeMedia], [$video, $retiredVideo]);
 
@@ -35,7 +35,7 @@ final class MediaVideoPageQueryTest extends TestCase
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/front.jpg', hash('sha256', 'image'), 'image/jpeg', 5, 1200, 800, 'PUBLIC');
         $privateAsset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'original', 'uploads/odo/private.jpg', hash('sha256', 'private-image'), 'image/jpeg', 7, 1200, 800, 'PRIVATE', ['status' => 'private']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured');
-        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', ['source' => 'internal-test']);
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', ['public_identity' => ['current_slug' => 'reference'], 'source_snapshot' => ['availability' => 'available', 'embeddable' => true], 'editorial' => ['title' => 'Reference', 'summary' => 'Summary'], 'hub' => ['primary' => '06'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']]]);
         $query = $this->query([new Media($mediaId, 'odo-front', 'Odo front', 'ready', ['source' => 'v2', 'metadata' => ['legacy_id' => '42']])], [$video], [$asset, $privateAsset], [$usage]);
 
         $media = $query->mediaDetail($mediaId);

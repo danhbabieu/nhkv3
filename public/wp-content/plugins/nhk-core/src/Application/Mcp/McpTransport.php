@@ -8,6 +8,7 @@ use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
@@ -28,6 +29,7 @@ final class McpTransport
         private ?CategoryGateway $categories = null,
         private ?EditorialDraftGateway $drafts = null,
         private ?CanonicalDependencyValidator $dependencies = null,
+        private ?PublicUrlMaintenanceService $publicUrls = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -104,11 +106,14 @@ final class McpTransport
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
             'nhk.proposal.apply' => 'nhk_apply_proposals',
+            'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
             default => null,
         };
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
         $this->validateArguments($definition['inputSchema'], $arguments);
         $result = match ($name) {
+            'nhk.public-url.audit' => $this->publicUrls?->audit() ?? throw new \RuntimeException('PUBLIC_URL_MAINTENANCE_UNAVAILABLE'),
+            'nhk.public-url.reproject' => $this->publicUrls?->reproject((string) ($arguments['idempotency_key'] ?? ''), (bool) ($arguments['pre_public_confirmed'] ?? false)) ?? throw new \RuntimeException('PUBLIC_URL_MAINTENANCE_UNAVAILABLE'),
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
             'nhk.entity.neighborhood' => $this->read->entityNeighborhood((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? ''), (string) ($arguments['profile'] ?? ''), (int) ($arguments['max_hops'] ?? 2), (int) ($arguments['limit'] ?? 50)),

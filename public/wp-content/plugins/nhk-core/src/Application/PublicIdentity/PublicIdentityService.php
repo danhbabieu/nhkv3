@@ -16,6 +16,18 @@ final class PublicIdentityService
         return $this->repository->allocate($this->record($ownerKind, $ownerId, $routeType, $scope, $slug), $idempotencyKey);
     }
 
+    /** @param list<string> $meaningfulQualifiers */
+    public function allocateCanonical(string $ownerKind, string $ownerId, string $routeType, string $scope, string $publicName, array $meaningfulQualifiers, string $idempotencyKey): array
+    {
+        if ($ownerKind === '' || !UuidCodec::isValid($ownerId) || $routeType === '' || $scope === '' || $idempotencyKey === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
+        $policy = new CanonicalPublicSlugPolicy();
+        $slug = $policy->resolve($publicName, $meaningfulQualifiers, function (string $candidate) use ($routeType, $scope): bool {
+            if (($this->nativeRouteExists)($candidate)) return true;
+            return method_exists($this->repository, 'slugExists') && (bool) $this->repository->slugExists($routeType, $scope, $candidate, null);
+        });
+        return $this->repository->allocate($this->record($ownerKind, $ownerId, $routeType, $scope, $slug), $idempotencyKey);
+    }
+
     public function changeSlug(string $identityId, string $slug, int $expectedRevision, string $idempotencyKey): array
     {
         if ($identityId === '' || $expectedRevision < 1 || $idempotencyKey === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
@@ -28,6 +40,23 @@ final class PublicIdentityService
         $record = $current;
         $record['current_slug'] = $slug;
         $record['current_path'] = $this->path((string) $current['route_type'], $slug);
+        $record['route_policy_version'] = '2';
+        return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
+    }
+
+    /** Pre-public URL projection maintenance; semantic identity is unchanged. */
+    public function reproject(string $identityId, string $publicName, string $scope, int $expectedRevision, string $idempotencyKey): array
+    {
+        if (trim($scope) === '' || $identityId === '' || $expectedRevision < 1 || $idempotencyKey === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
+        $current = $this->repository->findCurrentById($identityId);
+        if ($current === null) throw new \RuntimeException('NOT_FOUND');
+        if ((int) ($current['revision'] ?? 0) !== $expectedRevision) throw new \RuntimeException('STALE_REVISION');
+        $slug = CanonicalPublicSlugPolicy::normalize($publicName);
+        if ($slug === '') throw new \InvalidArgumentException('PUBLIC_SLUG_INVALID');
+        if (($this->nativeRouteExists)($slug)) throw new \RuntimeException('NATIVE_ROUTE_CONFLICT');
+        $record = $current;
+        $record['current_slug'] = $slug;
+        $record['collision_scope'] = trim($scope);
         $record['route_policy_version'] = '2';
         return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
     }

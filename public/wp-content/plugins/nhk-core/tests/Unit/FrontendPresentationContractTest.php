@@ -40,6 +40,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_public_dictionary_terms_for_text', $source);
     }
 
+    public function test_brand_detail_prefers_dossier_structural_sections_and_uses_legacy_aggregation_only_as_fallback(): void
+    {
+        $source = $this->read('entity.php');
+
+        self::assertStringNotContainsString('if ($type === \'brand\') foreach ([\'brands\',\'models\',\'variants\',\'movements\',\'music\',\'components\',\'classifications\',\'specimens\',\'products\'] as $group) unset($relationSections[$group]);', $source);
+        self::assertStringContainsString('$dossier === null && $type === \'brand\' && is_array($entity[\'aggregation\'] ?? null)', $source);
+    }
+
     public function test_article_detail_uses_post_dossier_canonical_media_gallery_and_path_aware_relations(): void
     {
         $source = $this->read('single.php');

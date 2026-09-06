@@ -42,6 +42,24 @@ final class SeoDocumentationContractTest extends TestCase
         }
     }
 
+    public function test_router_and_index_route_entity_detail_projection_through_dossier_contract(): void
+    {
+        $root = dirname(__DIR__, 6);
+        $contract = $root . '/docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md';
+        self::assertFileExists($contract);
+        $contents = strtolower((string) file_get_contents($contract));
+        self::assertStringContainsString('read-only', $contents);
+        self::assertStringContainsString('subject-scoped', $contents);
+        self::assertStringContainsString('model_of', $contents);
+        self::assertStringContainsString('uses_movement', $contents);
+        self::assertStringContainsString('configured_with_music', $contents);
+        self::assertStringContainsString('supports_music', $contents);
+
+        foreach (['docs/constitution/READ_FIRST.md', 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md'] as $file) {
+            self::assertStringContainsString('PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md', (string) file_get_contents($root . '/' . $file));
+        }
+    }
+
     public function test_contract_set_does_not_create_an_seo_semantic_shortcut(): void
     {
         $root = dirname(__DIR__, 6);
