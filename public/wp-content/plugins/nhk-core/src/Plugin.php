@@ -357,6 +357,20 @@ final class Plugin {
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
+        add_action('admin_enqueue_scripts', static function (string $hookSuffix) use ($pluginFile): void {
+            $page = isset($_GET['page']) ? sanitize_key((string) $_GET['page']) : '';
+            if (!str_contains($hookSuffix, 'nhk-v3') && $page !== 'nhk-v3' && !str_starts_with($page, 'nhk-v3-')) return;
+
+            $version = defined('NHK_CORE_VERSION') ? (string) NHK_CORE_VERSION : '0.1.0';
+            wp_register_style('nhk-v3-admin-shell', plugins_url('assets/admin.css', $pluginFile), [], $version);
+            wp_enqueue_style('nhk-v3-admin-shell');
+            wp_register_script('nhk-v3-admin-shell', plugins_url('assets/admin.js', $pluginFile), [], $version, true);
+            wp_localize_script('nhk-v3-admin-shell', 'NHKAdminShell', [
+                'restUrl' => esc_url_raw(rest_url('nhk/v1/')),
+                'nonce' => wp_create_nonce('wp_rest'),
+            ]);
+            wp_enqueue_script('nhk-v3-admin-shell');
+        });
     }
     private static function runtimeMigrationsEnabled(): bool
     {

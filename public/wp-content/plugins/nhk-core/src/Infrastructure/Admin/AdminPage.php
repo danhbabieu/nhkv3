@@ -22,9 +22,16 @@ final class AdminPage
         if (!current_user_can('manage_options')) wp_die('You do not have permission to view this page.');
         $status = new MigrationStatus();
         $workspace = AdminWorkspaceViewModel::fromHealth((new HealthCheck($status))->read(), [], []);
-        echo '<div class="wrap"><h1>NHK V3</h1><p>Trung tâm vận hành domain canonical, Graph, Governance và dữ liệu semantic.</p>';
-        self::renderHealth($workspace['health']); self::renderMigrationLedgerSummary(); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
-        echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p></div>';
+        $workspaces = AdminShell::workspaceDefinitions([
+            'manage_options' => current_user_can('manage_options'),
+            'nhk_create_proposals' => current_user_can('nhk_create_proposals'),
+            'nhk_apply_proposals' => current_user_can('nhk_apply_proposals'),
+        ]);
+        AdminShell::render('governance', $workspaces, static function () use ($status, $workspace): void {
+            echo '<section id="nhk-workspace-governance" aria-labelledby="nhk-governance-content-heading"><h2 id="nhk-governance-content-heading">Bảng điều khiển hiện tại</h2><p>Trung tâm vận hành domain canonical, Graph, Governance và dữ liệu semantic.</p>';
+            self::renderHealth($workspace['health']); self::renderMigrationLedgerSummary(); self::renderEntityLookup($status); self::renderSemanticReadTools(); self::renderProposalComposer(); self::renderProposalLookup($status);
+            echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p></section>';
+        });
         self::scripts(); self::readScripts();
     }
 
