@@ -259,7 +259,7 @@ final class SemanticDossierQuery
             if (!is_string($url) || $url === '') return null;
             $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';
             if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
-            return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null, 'origin' => $origin];
+            return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null, 'deferred_embed' => true, 'origin' => $origin];
         }
 
         if ($type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {
