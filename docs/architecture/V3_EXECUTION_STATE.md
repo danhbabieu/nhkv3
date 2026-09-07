@@ -13,6 +13,20 @@ tests pass 9 tests / 13 assertions and the Unit suite passes 698 tests / 3,361
 assertions with 2 warnings and 5 PHPUnit deprecations. Demo deployment and
 runtime execution remain pending this commit.
 
+## Migration runtime closeout attempt — 2026-09-07
+
+Commit `c8d2847` passed the local migration-guard and Unit gates. The approved
+deployment runner found the external config at `/private/tmp/nhk-demo-deploy.ini`,
+but external publication was blocked by execution policy before any SSH
+transfer. A separately permitted read-only maintenance health call confirmed
+the demo runtime is still `plugin_version=0.1.0`, database reachable,
+`migration_current=13`, `migration_target=15`, and `MIGRATION_REQUIRED`.
+The deployed legacy inventory call returned no usable receipt. Therefore no
+014/015 UP, authorization write, canonical/Graph inventory, relation dry-run,
+Governance backfill, read-back or second-run was performed; all requested live
+counters remain `UNVERIFIED`, not zero. The named Cuckoo and Odo relation
+results likewise remain unverified.
+
 ## Demo publish and migration guard checkpoint — 2026-09-07
 
 Commit `37c6627` was deployed to `demo.1945.vn` and verified by remote Git
