@@ -1,120 +1,102 @@
 # NHK V3 Admin Media Input Guidance
 
-> **NON-NORMATIVE.** This is implementation guidance. If it conflicts with
+> **NON-NORMATIVE CURRENT GUIDANCE.** If it conflicts with
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
 ## Purpose
 
-Admin and other operator-facing inputs must preserve the Media, MediaAsset and
-MediaUsage boundaries while allowing an editor to describe image intent. The
-Admin surface is an input adapter; it is not a second semantic write path.
+Admin is a guided control-plane/input adapter over the canonical Media and
+Governance boundaries. It is not a second semantic writer.
 
-## Required flow
+Media, MediaAsset and MediaUsage remain separate. WordPress attachment is
+storage/projection only. Admin must not write semantic Media tables directly,
+infer an Authority identity from an upload, or turn OCR/recognition/filename/
+caption into Knowledge/Evidence/Graph truth.
 
-Admin composes a governed Media proposal and submits it through the existing
-Governance and Controlled Apply path. The proposal may carry asset metadata,
-contextual usage fields, the controlled usage role, SEO Blueprint context and
-batch context. The application layer then delegates Media persistence through
-`MediaIngestGateway` and `MediaService`.
+## Required create-or-reuse flow
 
-Admin must not write `nhk_media`, `nhk_media_assets` or `nhk_media_usages`
-directly, create a Graph edge from an upload, promote OCR/recognition to an
-Authority identity, or use keyword groups as meta keywords or Knowledge.
-Every file adoption/upload must validate actual image bytes before persistence;
-corrupt/fake/unreadable payloads fail closed and partial attachment/mapping or
-semantic records are cleaned up so no orphan remains. The source-original is
-retained PRIVATE and eligible optimized derivatives are PUBLIC under one
-canonical Media identity.
+Before creating Media, Admin/application code must search current canonical
+Media and reconcile the incoming asset/context. Reuse an existing suitable Media
+when canonical identity is already established. Checksum/filename/URL equality
+may flag a duplicate candidate but is not semantic merge proof.
 
-## Controlled input vocabulary
+For new bytes the shared flow is:
 
-Use `MediaUsageRoleRegistry` for roles, `MediaDetailTypeRegistry` for detail
-types and `SeoKeywordGroupRegistry` for bounded keyword groups. Use
-`MediaDiagnosticCodeRegistry` and `MediaSeoStateRegistry` when displaying
-missing, placeholder, low-resolution, metadata or rights diagnostics. Unknown
-values fail closed.
+`binary validation → canonical Media create-or-resolve → source-original
+PRIVATE/protected MediaAsset → eligible optimized derivative(s) → contextual
+MediaUsage → WordPress attachment/projection → canonical Media/Asset/Usage
+read-back → temporary/orphan cleanup → idempotency check`.
 
-For an Article, the input adapter may select one Media for
-`featured_primary`, one distinct Media for `inline_primary`, and zero or more
-supporting Media. The Article coordinator reuses suitable existing Media
-before creating a placeholder. WordPress remains the owner of editorial image
-selection and content ordering.
-Entity projection must expose the selected representative separately from
-evidence and `technical_detail`; evidence/detail never silently substitutes an
-existing representative. Selection follows deterministic precedence, never
-upload recency.
+Corrupt/fake/unreadable input fails closed. A partial attachment, mapping, asset,
+usage or temporary file must not remain after failure.
 
-## Dictionary lexical observation — 2026-09-05
+The current direct MCP image transport is multipart `nhk.media.ingest`; Admin
+must converge on the same governed application boundary. No base64/data URL or
+parallel semantic writer is authorized.
 
-When `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` is enabled, Media/Image input may
-feed the lexical detector only after the normal Media/attachment write boundary
-has completed, or through an explicitly read-only preview.
+## Controlled usage and view/detail context
 
-Allowed lexical observation inputs include editor-supplied caption/alt/context
-and weak signals such as filename, OCR, EXIF or visual recognition. The
-observation must preserve its source and strength. Weak signals never become an
-approved alias, semantic identity, Knowledge/Evidence or Graph relation by
-themselves.
+Use the executable Media usage/detail registries; unknown values fail closed.
+Operator-facing view/detail concepts can include `front`, `back`, `movement`,
+`dial`, `hands`, `pendulum`, `gong`, `hammer`, `plate`, `marking`, `logo`,
+`case_detail` where a corresponding current registry value exists.
 
-The Dictionary resolver must search approved labels and current canonical
-owners before creating a private Candidate. Ambiguous matches remain unlinked.
-A newly detected image term must never cause a new Media, Authority, Knowledge,
-Evidence or `depicts` relation automatically.
+Do not invent a runtime identifier because the English concept is useful in UI.
+Role/detail context is metadata/usage intent, not a Graph predicate or Knowledge
+claim.
 
-An approved Dictionary concept may reuse an existing eligible Media as an
-illustration through the existing MediaUsage/projection boundary. The binary is
-not copied into a Dictionary-specific store. Representative, evidence and
-technical-detail precedence remains governed by the Media contracts.
+For Article use, WordPress remains owner of featured/inline ordering. Current
+mandatory Article roles such as `featured_primary`, `inline_primary` and
+supporting usages are selected through the Media coordinator and must reuse
+canonical Media where possible. `representative`, `evidence` and
+`technical_detail` remain distinct presentation/usage intents; evidence/detail
+never silently replaces representative.
 
-## SEO and upload expectations
+## Canonical subject relation
 
-Alt text and caption are usage-context fields. Subject, view and filename
-intent belong to the Blueprint and asset metadata; they do not change Media
-identity. Camera-style filenames are normalized by the application boundary
-when enough context exists. Public preferred-image and sitemap projections
-exclude placeholders and non-public assets.
+An image usage may point at or be used near an Authority/Post/Product/Specimen,
+but placement does not prove a semantic relation. If the operation needs
+`depicts` or another relation, first resolve the canonical subject and use the
+registered Graph/Governance lifecycle. Do not derive the relation from file
+name, OCR, proximity, WP attachment parent or upload form selection alone.
 
-Every new NHK-managed image byte upload enters one governed Media identity
-boundary. The adapter validates and auto-orients the source, creates the
-contract-required public normalized derivative (currently WebP where supported),
-applies contextual naming only when trustworthy context exists, reads back the
-WordPress attachment/projection and cleans temporary workfiles. The uploaded
-source-original bytes are retained as a private/protected `MediaAsset` under the
-same canonical Media identity according to the Constitution; they are not the
-public filename/URL identity and are not discarded merely because a derivative
-was produced.
+## Dictionary / Living Knowledge observation
 
-Derivative WebP/thumbnail/responsive sizes never become a second semantic Media.
-A WordPress attachment is a storage/projection mapping for the same Media, not a
-semantic owner. Existing public URLs remain stable after publication; a later
-SEO filename preference does not authorize silent rename/rewrite of an existing
-public attachment.
+Media/Image input may feed read-only lexical/research observation or a
+post-write private Dictionary candidate when that contract is enabled. Weak
+signals include caption, alt, filename, OCR, EXIF and recognition. They must
+retain source/strength and never create Authority, Knowledge, Evidence or Graph
+truth automatically.
 
-A missing trustworthy naming context fails closed; the adapter must not invent
-a descriptive filename. Upload, OCR, recognition, EXIF or filename context does
-not infer Authority, Knowledge, Evidence, Graph, `about` or `depicts`.
+If a real fact is discovered, hand it to the normal semantic workflow:
+canonical subject resolution → reconcile existing Knowledge → Source/Evidence →
+Governance → canonical read-back. MediaUsage/`depicts` alone is not Evidence.
 
-The direct multipart MCP path and Admin path must reuse the same governed Media
-application boundary. If a suitable canonical Media already exists, downstream
-systems should reuse its UUID/stable key, eligible asset and contextual Usage
-rather than creating a duplicate Media solely because the same image is needed
-in another Article, Product, Specimen or projection.
+## SEO and public projection
 
-Existing legacy attachments are read-only unless a separately governed repair
-or migration task explicitly authorizes changes.
+Alt/caption are contextual usage/editorial fields. Public filename naming uses
+trustworthy context only and does not change canonical Media identity. Public
+asset URLs remain stable after publication unless a separately governed media
+operation authorizes a change.
 
-## Unified Workbench guidance — 2026-09-07
+Public preferred-image/sitemap projections exclude placeholders, private or
+ineligible assets. Source-original bytes remain private/protected while eligible
+derivatives may be public under the same Media.
 
-The standard Admin menu is: Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ
-thống and Nâng cao. Media has shared `Tất cả`, `Hình ảnh` and `Video` workspaces;
-Video and Hình ảnh use separate list/detail adapters over the shared Workbench
-architecture.
+## Unified Workbench guidance — current
 
-Normal guided workflows accept canonical selections and user-facing fields. They
-do not require proposal UUID, Evidence UUID, fingerprint, expected revision or
-raw JSON. Those belong only under Kỹ thuật/Nâng cao. Admin is a control plane
-over Governance and the existing application services, never a semantic writer.
+The standard Admin menu is Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ
+thống and Nâng cao. Media contains `Tất cả`, `Hình ảnh` and `Video` workspaces
+with domain-specific list/detail adapters.
 
-For Video, “Xem trên web” opens `/video/{slug}/` only when the canonical public
-projection is eligible; “Mở nguồn gốc” opens the external source. No external
-URL fallback is allowed for the first action.
+Normal guided workflows resolve canonical selections and user-facing fields.
+They do not ask operators for proposal UUID, Evidence UUID, fingerprint,
+expected revision or raw JSON; those belong under Kỹ thuật/Nâng cao.
+
+For Video, “Xem trên web” opens the canonical `/video/{slug}/` route only after
+public projection eligibility; “Mở nguồn gốc” opens the external source. The
+same principle applies to Media: storage/source actions are distinct from
+canonical semantic identity and public projection state.
+
+Existing legacy attachments remain read-only unless a separately governed
+repair/migration explicitly authorizes changes.
