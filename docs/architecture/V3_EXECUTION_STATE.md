@@ -4593,3 +4593,30 @@ performed. Therefore Cuckoo and Odo counters, canonical/inverse Graph reads,
 semantic neighborhood, MCP retrieval and second-run idempotency are
 `BLOCKED_BY_MISSING_CANONICAL_FIXTURES`, not PASS and not inferred. Legacy
 Odo audit/backfill was not run.
+
+## Video–Relation lifecycle ordering checkpoint — 2026-09-07
+
+The reproduced blocker was an ordering failure, not a canonical UUID failure:
+an independently applied relation proposal referenced a Video UUID before the
+Video owner existed, while the Video proposal had no approved attachment
+packet and correctly failed with `NO_SEMANTIC_ATTACHMENT`. The canonical
+workflow remains one approved Video ingest Proposal carrying its relation
+attachments; independent relation proposals continue to require both existing
+endpoints and fail closed otherwise.
+
+Controlled Apply now persists a newly ingested Video as an inactive canonical
+owner, validates the endpoint through the normal Video resolver, materializes
+approved Graph attachments through `GraphService`, and activates the Video
+only after relation creation succeeds. The transaction, evidence dependency
+validation, canonical identity, revision, fingerprint, idempotency and audit
+boundaries are unchanged. No public Video can be read as active before its
+semantic attachment is present.
+
+Focused Video/Governance/Graph tests pass 45 tests / 181 assertions. Full Unit
+passes 673 tests / 3,253 assertions with 2 warnings and 5 PHPUnit deprecations.
+PHP lint, Composer validation and `git diff --check` pass. Integration remains
+environment-blocked in this checkout: WordPress bootstrap is unavailable for
+the required `NHK_WP_TEST_PATH=public` acceptance runtime, with 2 Dictionary
+bootstrap errors and 12 mandatory-runtime failures; no runtime data was
+mutated. Named Video `01a07971-2fe3-77da-9424-998cf6f249e0` and existing
+relation proposals could not receive live read-back without that runtime.
