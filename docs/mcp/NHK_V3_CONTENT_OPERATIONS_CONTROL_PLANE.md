@@ -17,6 +17,14 @@ MCP and WordPress Admin must consume the same application services and
 capability source. Native WordPress editorial publishing remains independent;
 an MCP-managed V3 Article is complete only after the Article Ingest contract.
 
+The Governance Automation Policy is resolved in the shared application
+orchestration boundary used by MCP and Admin. Its only modes are
+`REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH`; absent configuration is
+`REVIEW_REQUIRED`. Human review is configurable; Governance gates are not.
+MCP responses distinguish submitted/manual review, approved/ready-to-apply,
+published/frontend-available and blocked outcomes. Apply success alone is
+never reported as frontend publication success.
+
 | Content kind | Owner | Current boundary | Mutation policy |
 |---|---|---|---|
 | Post/Article | WordPress `wp_posts` | Article Ingest + editorial boundary | Post writes are editorial; semantic changes use Governance |

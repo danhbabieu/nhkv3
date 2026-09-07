@@ -16,6 +16,17 @@ Proposal phải bind `subject_id`, operation, canonical payload fingerprint, exp
 
 State machine tối thiểu: `draft → approved → applied` hoặc `draft → rejected`. Approval chỉ hợp lệ khi cả content và dependency closure khớp. Apply chỉ hợp lệ khi binding khớp và actual revision bằng expected revision; stale proposal phải fail closed.
 
+## Governance Automation Policy — 2026-09-07
+
+Human review is configurable; Governance gates are not. The registered policy
+resolver supports only `REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH` and
+defaults every missing type to `REVIEW_REQUIRED`. Automation uses the same
+proposal, approval, eligibility, controlled-apply and canonical read-back
+boundaries; it is not a Governance bypass. `AUTO_APPROVE` stops before Apply,
+while `AUTO_PUBLISH` must also prove projection and frontend availability before
+reporting publication success. Automated actions use the existing system actor
+convention and are auditable separately from human actions.
+
 Media file adoption is not a parallel governance bypass: adapters submit to the
 canonical governed Media V3 boundary, where idempotency, payload validation,
 source-original PRIVATE retention, derivative visibility and cleanup of partial

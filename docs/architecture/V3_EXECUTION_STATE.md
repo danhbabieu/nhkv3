@@ -6,6 +6,22 @@ This snapshot records the implementation state after the Unified Admin Workbench
 and canonical Video frontend slices. It is evidence, not a replacement for the
 Constitution or current domain contracts.
 
+## Governance Automation Policy implementation — 2026-09-07
+
+The policy resolver, WordPress option adapter, common governed orchestrator,
+MCP ingest wiring and Admin configuration page are implemented. Supported modes
+are `REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH`; missing values default
+to `REVIEW_REQUIRED`. Automated approval/apply/publication emits system audit
+context and returns blockers without false success. Focused verification passed
+41 tests / 506 assertions; full Unit passed 754 tests / 3,662 assertions with
+2 warnings, 1 deprecation and 5 PHPUnit deprecations.
+
+Guarded Integration was attempted but remains environment-blocked because
+`NHK_WP_TEST_PATH=public` was not configured; two Dictionary integration tests
+also could not bootstrap WordPress (`update_option` unavailable). No shared,
+staging, production, V2 or semantic runtime data was mutated. Runtime Admin
+acceptance was not claimed without a safe governed fixture.
+
 | Area | Status | Current rule/evidence |
 |---|---|---|
 | Admin Workbench | **IMPLEMENTED** | Standard workspaces: Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ thống, Nâng cao; normal flows are guided and technical identifiers remain Advanced-only. |
