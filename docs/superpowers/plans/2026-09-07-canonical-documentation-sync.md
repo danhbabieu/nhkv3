@@ -26,9 +26,9 @@
 - Modify: `docs/constitution/NHK_V3_CONSTITUTION.md`
 - Modify: `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`
 
-- [ ] Add a dated amendment covering the Authority → Graph → canonical projection → frontend chain, Public Identity prerequisites, first-party Video route, Media/Video ownership, Admin control-plane rules, public-safe knowledge projection, and explicit frontend outcome states.
-- [ ] Align the relevant Constitution sections and acceptance invariants without inventing a new type, predicate, operation, field, or route.
-- [ ] Update the status index so downstream agents resolve the new current rules before dated evidence.
+- [x] Add a dated amendment covering the Authority → Graph → canonical projection → frontend chain, Public Identity prerequisites, first-party Video route, Media/Video ownership, Admin control-plane rules, public-safe knowledge projection, and explicit frontend outcome states.
+- [x] Align the relevant Constitution sections and acceptance invariants without inventing a new type, predicate, operation, field, or route.
+- [x] Update the status index so downstream agents resolve the new current rules before dated evidence.
 
 ### Task 2: Update domain contracts and public-route/frontend guidance
 
@@ -47,10 +47,10 @@
 - Modify: `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`
 - Modify: `docs/architecture/MEDIA_PUBLIC_ROUTE_DECISION_2026-09-03.md`
 
-- [ ] Add concise current-law sections for canonical first-party Video pages, Public Identity allocation/read-back, normalized `metadata.source` compatibility, Graph/public eligibility, privacy-safe knowledge projection, and frontend outcome semantics.
-- [ ] Add Admin Workbench menu/workspace and guided-form rules, keeping raw IDs/fingerprints/revisions/raw JSON in Advanced/Technical only.
-- [ ] State explicitly that WordPress attachments/posts are presentation/storage integrations and never semantic authority for Media/Video.
-- [ ] Reconcile image route wording so Admin Image management is implemented while standalone public Image/Media routing remains unapproved.
+- [x] Add concise current-law sections for canonical first-party Video pages, Public Identity allocation/read-back, normalized `metadata.source` compatibility, Graph/public eligibility, privacy-safe knowledge projection, and frontend outcome semantics.
+- [x] Add Admin Workbench menu/workspace and guided-form rules, keeping raw IDs/fingerprints/revisions/raw JSON in Advanced/Technical only.
+- [x] State explicitly that WordPress attachments/posts are presentation/storage integrations and never semantic authority for Media/Video.
+- [x] Reconcile image route wording so Admin Image management is implemented while standalone public Image/Media routing remains unapproved.
 
 ### Task 3: Update MCP/Admin control-plane guidance and execution state
 
@@ -59,17 +59,17 @@
 - Modify: `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`
 - Modify: `docs/architecture/V3_EXECUTION_STATE.md`
 
-- [ ] Record the current Admin menu, guided Video/Media workflow, separate “Xem trên web” and “Mở nguồn gốc” actions, and Governance-only mutation path.
-- [ ] Record the Video query contract from canonical record through Public Identity, projection, public relations, public-safe knowledge, provenance, and frontend.
-- [ ] Add the requested implementation status table: Admin Workbench, Admin Video, Admin Image, Video first-party route, Public Identity, public-safe knowledge fallback, private Source/Evidence protection, and Video relation rendering.
-- [ ] Preserve the existing historical checkpoint entries and label the new status as a current snapshot.
+- [x] Record the current Admin menu, guided Video/Media workflow, separate “Xem trên web” and “Mở nguồn gốc” actions, and Governance-only mutation path.
+- [x] Record the Video query contract from canonical record through Public Identity, projection, public relations, public-safe knowledge, provenance, and frontend.
+- [x] Add the requested implementation status table: Admin Workbench, Admin Video, Admin Image, Video first-party route, Public Identity, public-safe knowledge fallback, private Source/Evidence protection, and Video relation rendering.
+- [x] Preserve the existing historical checkpoint entries and label the new status as a current snapshot.
 
 ### Task 4: Verify documentation-only change
 
 **Files:**
 - Verify: all files modified in Tasks 1–3
 
-- [ ] Search for contradictory external-URL destination, WordPress-authority, standalone Image route, private-projection, or direct-writer wording.
-- [ ] Run `git diff --check`.
-- [ ] Run a secret scan over the diff and confirm no runtime data/code/migration changes are present.
-- [ ] Report exact modified files and verification results; do not claim live runtime acceptance beyond the evidence already recorded.
+- [x] Search for contradictory external-URL destination, WordPress-authority, standalone Image route, private-projection, or direct-writer wording.
+- [x] Run `git diff --check`.
+- [x] Run a secret scan over the diff and confirm no runtime data/code/migration changes are present.
+- [x] Report exact modified files and verification results; do not claim live runtime acceptance beyond the evidence already recorded.

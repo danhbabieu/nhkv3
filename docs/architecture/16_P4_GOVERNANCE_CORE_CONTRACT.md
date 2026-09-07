@@ -38,3 +38,15 @@ diagnostic using pinned-dial source UUID
 instead of that UUID. The diagnostic was rejected and no merge/apply or
 semantic data mutation occurred. Current blocker:
 `PINNED_DIAL_MERGE=BLOCKED` / `LIVE_MERGE_SUBJECT_BINDING_INVALID`.
+
+## Current cross-domain mutation law — 2026-09-07
+
+Video, Media, relation, Claim, Source and Evidence all use the same semantic
+mutation sequence: `Proposal → Submit → Review/Approve → Eligibility →
+Controlled Apply → canonical read-back`. Admin/MCP are control-plane adapters;
+they do not bypass Governance, write directly to semantic tables, create a
+duplicate writer or report Apply PASS as frontend success.
+
+Frontend state is reported separately as `Canonical Applied`, `Projection
+Available`, `Frontend Available` or `Frontend Blocked`. The last state becomes
+Available only after canonical route resolution and read-back succeed.

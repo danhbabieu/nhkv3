@@ -52,3 +52,17 @@ The media-integrity auditor and its CLI audit path are read-only by default and
 must run before and after basename-sensitive work. Semantic rekey must reject
 WordPress attachment/path fields so semantic identity changes cannot implicitly
 rename physical files.
+
+## Current canonical frontend/Admin boundary — 2026-09-07
+
+Media semantic records remain canonical V3 objects. WordPress attachments/posts
+may project storage or editorial placement, but are never Media authority,
+semantic identity or a replacement for Graph/Projection. Admin Hình ảnh is the
+canonical Media management workspace and has its own list/detail read surfaces;
+this does not authorize a standalone public Image/Media page. Any future
+standalone route requires separate architectural approval.
+
+Admin guided flows resolve/reuse canonical Media through the application
+boundary and Governance. Normal forms do not require proposal UUID, Evidence
+UUID, fingerprint, expected revision or raw JSON; technical identifiers belong
+under Kỹ thuật/Nâng cao.

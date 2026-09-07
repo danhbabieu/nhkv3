@@ -71,3 +71,17 @@ Evidence dependency validation is lifecycle-aware and visibility-independent:
 Claim, Source and Evidence must resolve to canonical records and be active.
 PRIVATE/HIDDEN Evidence is valid for governed internal verification and is not
 promoted to PUBLIC. Public readers continue to omit it.
+
+## Public-safe knowledge projection — current law 2026-09-07
+
+Raw Source/Evidence privacy is a boundary on raw payload serialization, not a
+blanket ban on public knowledge. When the canonical pipeline has produced an
+eligible public-safe projection, frontend queries may render that projection
+without reading private payloads at render time. The current allowlist is:
+`text`, `type`, `facet`, `scope` (or the exact registered field equivalents if
+the runtime serializer names them differently).
+
+The projection must not include raw Source, private Evidence excerpts/private
+metadata, canonical private IDs, or a reconstructed private payload. Public
+knowledge does not make a relation public: relation display independently
+requires Graph/public eligibility and must not leak private provenance.

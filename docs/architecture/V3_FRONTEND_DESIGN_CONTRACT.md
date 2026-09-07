@@ -136,3 +136,13 @@ archive/single, Movement, Music, Component, search, Video and 404 behavior.
 Visual QA covers wide desktop, laptop, tablet and mobile plus overflow,
 broken-image, no-image, empty-state, gallery and long-content cases. Fixture
 labels and hard-coded entity lists must never leak into public-facing output.
+
+## Current canonical frontend law — 2026-09-07
+
+Frontend pages consume canonical projections/read models only. The query chain
+for Video is `canonical Video → Public Identity → presentation/projection →
+public relations → public-safe knowledge → public-safe provenance → page`.
+Templates do not reconstruct facts from WordPress, external URLs, raw Source or
+private Evidence. `Frontend Available` requires route resolution and read-back;
+Apply PASS alone is not frontend success. “Xem trên web” resolves to the
+first-party Video route, while “Mở nguồn gốc” is the external source action.

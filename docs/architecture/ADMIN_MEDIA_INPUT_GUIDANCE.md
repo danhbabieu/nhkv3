@@ -102,3 +102,19 @@ in another Article, Product, Specimen or projection.
 
 Existing legacy attachments are read-only unless a separately governed repair
 or migration task explicitly authorizes changes.
+
+## Unified Workbench guidance — 2026-09-07
+
+The standard Admin menu is: Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ
+thống and Nâng cao. Media has shared `Tất cả`, `Hình ảnh` and `Video` workspaces;
+Video and Hình ảnh use separate list/detail adapters over the shared Workbench
+architecture.
+
+Normal guided workflows accept canonical selections and user-facing fields. They
+do not require proposal UUID, Evidence UUID, fingerprint, expected revision or
+raw JSON. Those belong only under Kỹ thuật/Nâng cao. Admin is a control plane
+over Governance and the existing application services, never a semantic writer.
+
+For Video, “Xem trên web” opens `/video/{slug}/` only when the canonical public
+projection is eligible; “Mở nguồn gốc” opens the external source. No external
+URL fallback is allowed for the first action.

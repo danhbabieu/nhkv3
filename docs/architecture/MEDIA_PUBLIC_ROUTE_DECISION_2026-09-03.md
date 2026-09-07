@@ -17,3 +17,10 @@ A future Media semantic/editorial page requires a registered Authority/entity
 type, Constitution allowance, public eligibility contract, projection contract
 and persisted Public Identity where applicable. No such entity is invented in
 Task 9.
+
+## Current Admin clarification — 2026-09-07
+
+Admin Hình ảnh is implemented as the canonical Media management workspace,
+including Media read-back, usage/role, provenance and frontend-state views. This
+does not change the Owner ruling: standalone public Image/Media detail remains
+unapproved and must not be inferred from an attachment page or Admin detail.

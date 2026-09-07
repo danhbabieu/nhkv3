@@ -403,6 +403,79 @@ retry/idempotency safety, mandatory read-back and MCP/Admin outcome parity.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-03.
 
+## Amendment record — 2026-09-07 — Canonical projection, Admin and Video frontend law
+
+**WHY:** The implemented Unified Admin Workbench and canonical Video frontend
+now provide enough verified structure to make the cross-surface rules explicit.
+Without one current statement, later agents could mistake an external source
+URL for a frontend destination, use raw governance identifiers in normal Admin
+flows, treat PRIVATE provenance as a total public-knowledge block, or create a
+second semantic writer.
+
+**WHAT LAW CHANGES:** The canonical public chain is:
+
+    Authority → Graph → canonical projection/read model → frontend
+
+WordPress is a presentation/runtime integration layer. It remains the sole
+owner of editorial Post fields and URLs, but WordPress Posts/attachments are
+not semantic authority for Authority, Graph, Knowledge, Source, Evidence, Media
+or Video. Every semantic mutation, including Video, Media and relation changes,
+uses `Proposal → Submit → Review/Approve → Eligibility → Controlled Apply →
+canonical read-back`. Direct database semantic mutation, duplicate writers,
+parallel semantic stores, fake success and frontend fact inference outside a
+canonical projection are prohibited.
+
+Every public-capable canonical resource requires Public Identity before a
+canonical frontend URL is emitted. Allocation/persistence uses the governed
+Public Identity service, is deterministic/idempotent under its contract,
+collision-checked and read back. WordPress post IDs, external platform IDs and
+frontend-generated identity are never canonical identity.
+
+Every eligible canonical Video has a first-party page at `/video/{slug}/`.
+External platform URLs are source, provenance, embed-provider or external
+reference data only. “Xem trên web” opens the first-party page; “Mở nguồn gốc”
+opens the external source. Video pages read canonical projection/read models,
+Graph/public eligibility and public-safe knowledge/provenance; they do not
+derive facts in templates.
+
+Source/Evidence `PRIVATE` does not prohibit a public-safe projection. A
+projection is public only after policy/eligibility and may contain only the
+allowlisted fields `text`, `type`, `facet`, `scope` (or the exact registered
+canonical equivalents). It must not expose raw Source, private Evidence
+excerpt/metadata, canonical private IDs, or reconstruct a private payload.
+Relations remain subject to Graph/public eligibility independently.
+
+Normal Admin workflows are guided and do not require proposal UUID, Evidence
+UUID, fingerprint, expected revision or raw JSON. Those values belong only in
+Kỹ thuật/Nâng cao. Admin is a control plane over the existing owners and
+Governance; it is not a writer or semantic store.
+
+Frontend completion is separately classified as `Canonical Applied`,
+`Projection Available`, `Frontend Available` or `Frontend Blocked`.
+`Frontend Available` requires canonical route resolution and successful
+read-back, not merely an Apply PASS. Video acceptance additionally requires
+HTTP 200, player, canonical metadata, eligible public relations, public-safe
+knowledge, no private Source/Evidence leak and correct Admin first-party link.
+
+Image/Media remains deliberately narrower: Admin Hình ảnh is the canonical
+Media management workspace and V3 manages Media read-back, relations and
+provenance there. A standalone public Image/Media page is not an approved
+invariant; any future route requires a separate architectural approval.
+
+**AFFECTED SUBSYSTEMS:** Public Identity, Graph, Projection, Frontend, Video,
+Media, Knowledge, Source/Evidence, Governance, MCP and Admin.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** Persisted Video source data may be
+normalized in the application/query layer across the current canonical
+`metadata.source` shape and supported backward-compatible shapes; this does
+not duplicate semantic data or make `source_snapshot` a second owner.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment changes documentation law
+only. It authorizes no migration, seed, backfill, runtime mutation, route
+allocation, Graph write or visibility change.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-07.
+
 ## 2. Ranh giới trách nhiệm tối cao
 
 Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:

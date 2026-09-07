@@ -119,3 +119,15 @@ Classification: `PINNED_DIAL_MERGE=BLOCKED`,
 `LIVE_MERGE_SUBJECT_BINDING_INVALID`. Diagnostic proposals were rejected; no
 semantic data was mutated. This replaces stale `MERGE_OPERATION_NOT_EXPOSED`
 wording while preserving the historical record.
+
+## Current Admin Workbench law — 2026-09-07
+
+The standard menu is Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ thống and
+Nâng cao. Media uses shared `Tất cả`, `Hình ảnh` and `Video` workspaces with
+separate domain list/detail adapters. Normal guided flows select canonical
+records and do not ask for proposal UUID, Evidence UUID, fingerprint, expected
+revision or raw JSON; those belong only to Kỹ thuật/Nâng cao.
+
+Admin remains a control plane over the same application services and Governance
+boundary. “Xem trên web” opens the canonical first-party Video route only when
+the projection is eligible; “Mở nguồn gốc” is the external source action.

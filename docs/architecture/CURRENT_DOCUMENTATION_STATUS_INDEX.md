@@ -1,6 +1,6 @@
 # NHK V3 Current Documentation Status Index
 
-> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-06.**
+> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-07.**
 > This file is not a second Constitution and does not create semantic vocabulary,
 > operations, predicates, storage, routes or data. Its purpose is to tell
 > downstream systems which sources are current law/contract, which sources are
@@ -35,6 +35,31 @@ registry/catalog merely because its wording is present tense.
 
 ## 2. Current boundary snapshot
 
+### Current cross-surface law — 2026-09-07
+
+The current canonical read path is `Authority → Graph → canonical
+projection/read model → frontend`. WordPress is the editorial
+presentation/runtime layer; it is not semantic authority for Media, Video,
+Knowledge, Source, Evidence or Graph. Semantic mutation always uses
+`Proposal → Submit → Review/Approve → Eligibility → Controlled Apply →
+canonical read-back`.
+
+Public-capable canonical resources require persisted Public Identity before a
+canonical frontend URL. Video uses `/video/{slug}/`; external URLs are only
+source/provenance/embed/external references. Admin “Xem trên web” and “Mở nguồn
+gốc” are separate actions.
+
+`PRIVATE` Source/Evidence blocks raw public serialization, not an already
+validated public-safe knowledge projection. The public projection allowlist is
+`text`, `type`, `facet`, `scope` using the exact registered field names. It must
+not expose private excerpts, metadata, IDs or reconstruct private payloads.
+Graph/public relation eligibility remains an independent gate.
+
+Normal Admin forms are guided and do not ask for proposal/Evidence UUIDs,
+fingerprints, expected revisions or raw JSON; those remain Kỹ thuật/Nâng cao.
+Frontend status is distinct from Apply: `Canonical Applied`, `Projection
+Available`, `Frontend Available`, `Frontend Blocked`.
+
 | Area | Current boundary | Current status / reuse rule |
 |---|---|---|
 | Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts |
@@ -53,6 +78,8 @@ registry/catalog merely because its wording is present tense.
 | MCP | transport/orchestration over existing owners | current catalog includes read-only canonical/Graph inventory and relation dry-run; use fresh runtime discovery when availability matters; no dedicated Dictionary MCP surface should be claimed unless current catalog/runtime exposes it |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; multipart Media ingest remains on its approved custom MCP boundary |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
+| Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
+| Video frontend | `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `VIDEO_RELATIONSHIP_CONTRACT.md`, `VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `VIDEO_SEO_PROJECTION_CONTRACT.md` | first-party `/video/{slug}/` route and separate source action; external URL is never the canonical frontend destination |
 
 ## 3. Current storage and writer rule
 

@@ -58,3 +58,12 @@ entity UUIDs and progresses only after Source, Claim, Evidence and Video owner
 read-backs pass. `EXPLICIT_USER_RELATION` `about` still requires non-empty
 `evidence_refs`; active PRIVATE/HIDDEN Evidence is verified internally and is
 never made PUBLIC for that verification.
+
+## Current frontend handoff — 2026-09-07
+
+After canonical Video read-back, the public frontend query resolves Public
+Identity and the canonical `/video/{slug}/` route. External YouTube URLs remain
+source/provenance/embed references only. Persisted source data under
+`metadata.source` is normalized in the query/application layer alongside any
+approved compatibility shape; no second source record or semantic writer is
+created. “Xem trên web” and “Mở nguồn gốc” remain separate Admin actions.

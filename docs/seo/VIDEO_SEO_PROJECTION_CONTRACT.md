@@ -28,3 +28,13 @@ deleted, non-embeddable, placeholder, incomplete or compliance-blocked public
 projection is excluded until the applicable publication gate is satisfied.
 Native WordPress editorial sitemaps remain independent; unrelated Posts do not
 receive Video sitemap entries.
+
+## Canonical frontend destination — 2026-09-07
+
+The Video watch page is always first-party `/video/{slug}/` after Public
+Identity and public projection eligibility. The external platform URL is only
+the source/provenance/embed reference and must not be used as the canonical
+frontend destination. SEO/readiness must distinguish `Canonical Applied`,
+`Projection Available`, `Frontend Available` and `Frontend Blocked`; a
+successful Apply without canonical route/read-back is not a publishable watch
+page.

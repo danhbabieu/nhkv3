@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+## Current documentation status snapshot — 2026-09-07
+
+This snapshot records the implementation state after the Unified Admin Workbench
+and canonical Video frontend slices. It is evidence, not a replacement for the
+Constitution or current domain contracts.
+
+| Area | Status | Current rule/evidence |
+|---|---|---|
+| Admin Workbench | **IMPLEMENTED** | Standard workspaces: Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ thống, Nâng cao; normal flows are guided and technical identifiers remain Advanced-only. |
+| Admin Video | **IMPLEMENTED** | Separate Video list/detail read adapter; guided relation reuses canonical provenance and Governance; “Xem trên web” is separate from “Mở nguồn gốc”. |
+| Admin Image | **IMPLEMENTED** | Hình ảnh is the canonical Media management workspace with read-back, usage/role, provenance and frontend-state views; no standalone public Image route is implied. |
+| Video first-party route | **IMPLEMENTED** | Eligible canonical Video resolves at `/video/{slug}/`; external URL is source/provenance/embed only. Acceptance read-back recorded below. |
+| Public Identity | **IMPLEMENTED** | Service/repository allocation, collision checks, idempotency and read-back are implemented; full target-environment activation/coverage remains separately runtime-gated. |
+| Public-safe knowledge fallback | **IMPLEMENTED** | Eligible public-safe projection may render despite PRIVATE raw Source/Evidence; allowlist is `text`, `type`, `facet`, `scope` using exact registered names. |
+| Private Source/Evidence protection | **IMPLEMENTED** | Raw private source/evidence excerpt, metadata and canonical private IDs are excluded; no private payload reconstruction at render. |
+| Video public relation rendering | **IMPLEMENTED** | Relations render only through Graph/public eligibility; public-safe knowledge does not bypass relation eligibility. |
+
+Canonical read chain: `Authority → Graph → canonical projection/read model →
+frontend`. All semantic mutation remains
+`Proposal → Submit → Review/Approve → Eligibility → Controlled Apply →
+canonical read-back`; no direct DB semantic mutation, duplicate writer,
+parallel semantic store or fake success is authorized. Frontend status is
+separate from Apply: `Canonical Applied`, `Projection Available`, `Frontend
+Available`, `Frontend Blocked`.
+
 ## Canonical Video frontend blocker closeout — 2026-09-07
 
 On `demo.1945.vn`, the canonical Video `truOChTNbwA` /

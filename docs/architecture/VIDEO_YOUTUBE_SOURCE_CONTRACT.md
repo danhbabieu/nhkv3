@@ -19,6 +19,11 @@ External text and collection sizes are bounded. Source thumbnails remain
 remote references unless the governed Media pipeline separately authorizes a
 local asset.
 
+The YouTube watch URL and external ID are source/provenance/embed references,
+not the NHK frontend destination. A public Video uses the first-party
+`/video/{slug}/` route after Public Identity and public projection eligibility;
+Admin keeps “Xem trên web” separate from “Mở nguồn gốc”.
+
 Caption availability does not imply transcript access. A transcript is stored
 only under `AUTHORIZED_YOUTUBE_TRANSCRIPT` or `USER_SUPPLIED_TRANSCRIPT`; the
 default is `NO_TRANSCRIPT`, with no fabricated timing or text.

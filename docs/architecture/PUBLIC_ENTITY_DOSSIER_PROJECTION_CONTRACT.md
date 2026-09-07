@@ -235,3 +235,11 @@ context while all of the following remain true:
 - legacy aggregation does not duplicate dossier structural rendering;
 - generic graph traversal remains bounded at two hops;
 - no canonical store is mutated by dossier assembly.
+
+## Current public-safe knowledge rule — 2026-09-07
+
+Dossier/projection assembly may consume an eligible public-safe Knowledge
+projection even when its raw Source/Evidence is PRIVATE. The projection must
+be allowlisted (`text`, `type`, `facet`, `scope`, or exact registered
+equivalents) and must not carry raw private excerpts, metadata or canonical
+private IDs. Graph/public relation eligibility is evaluated separately.

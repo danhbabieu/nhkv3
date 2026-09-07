@@ -504,3 +504,17 @@ proposal-create with pinned-dial source UUID
 The diagnostic was rejected and no merge/apply occurred. The required fix is
 to bind the canonical source UUID through both the local and remote governance
 transport paths and re-verify before any owner-approved merge.
+
+## Current public projection and frontend completion law — 2026-09-07
+
+MCP/Admin read orchestration follows `Authority → Graph → canonical
+projection/read model → frontend`. A successful semantic Apply is not a
+frontend success. Consumers distinguish `Canonical Applied`, `Projection
+Available`, `Frontend Available` and `Frontend Blocked`; the last requires
+canonical route resolution and read-back.
+
+For Video the route is `/video/{slug}/`. External platform URLs remain source,
+provenance and embed references only. Public-safe knowledge may be returned
+when its canonical projection passes policy and contains only the registered
+safe fields; raw PRIVATE Source/Evidence and private metadata/IDs remain
+excluded. Relations still require Graph/public eligibility independently.

@@ -136,3 +136,12 @@ Controlled Apply's `result_entity_uuid` is only a candidate result. Success and
 dependency progression require an internal canonical snapshot matching entity
 type, UUID, active state and revision. Read-back failure is non-success and
 fail-closed. Retries reuse idempotency, content and dependency fingerprints.
+
+## Canonical frontend handoff — 2026-09-07
+
+After canonical read-back, a public-capable Video must resolve Public Identity
+before the frontend emits its canonical route. The route is `/video/{slug}/`;
+the external YouTube URL is never a frontend destination. Query/projection code
+normalizes the current persisted source under `metadata.source` and approved
+compatibility shapes in one application layer. It does not duplicate source
+records or infer a second semantic identity.

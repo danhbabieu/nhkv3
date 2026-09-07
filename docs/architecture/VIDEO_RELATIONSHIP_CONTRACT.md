@@ -36,3 +36,12 @@ Public related sections reuse `RelatedContentQuery`, direct before derived,
 with derived traversal bounded at two hops. Derived output is never persisted
 as a shortcut. The current shared traversal engine remains a documented
 implementation gap until its direction policy/path result is fully converged.
+
+## Public relation and Admin boundary — 2026-09-07
+
+Public relation rendering is allowed only after Graph/public eligibility. A
+public-safe knowledge projection does not promote a relation, and PRIVATE
+Source/Evidence must not leak through relation payloads. Guided Admin relation
+flows resolve/reuse canonical provenance when the contract permits; normal
+users do not copy proposal or Evidence UUIDs. The existing Governance lifecycle
+remains the only relation writer.

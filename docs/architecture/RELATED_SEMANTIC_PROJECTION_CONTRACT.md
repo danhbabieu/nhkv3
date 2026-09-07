@@ -312,3 +312,11 @@ ranking/deduplication, reusable projection, page integration, MCP read review,
 performance/cache work and the full constitutional regression audit in the
 sequence recorded in
 `docs/superpowers/plans/2026-09-02-related-semantic-navigation.md`.
+
+## Current frontend/public-safe boundary — 2026-09-07
+
+Related projection is read-only and sits after canonical Authority/Graph truth.
+Frontend consumers must not infer relations from external URLs, WordPress
+attachments or private Source/Evidence. A public-safe Knowledge projection may
+be included only after its own policy/readiness gate and does not make a Graph
+relation public; relation eligibility remains independent.

@@ -103,3 +103,16 @@ Forward predicate query lọc `source_node_id`, `predicate_id`, `state` và orde
 `source_node_id`/`target_node_id`. `EXPLAIN` trên migration thực tế phải cho
 `possible_keys=source_lookup` hoặc `target_lookup`, không full table scan trên
 đường query chính; kiểm tra runtime được ghi trong P2 acceptance output.
+
+## Current public projection boundary — 2026-09-07
+
+Graph remains the single relation system. The public read chain is
+`Authority → Graph → canonical projection/read model → frontend`; Admin and
+frontend adapters must not create a parallel relation store or infer facts from
+WordPress post meta, attachment IDs, external URLs or fixture payloads.
+
+Relations render only after the existing Graph/public eligibility policy passes.
+An eligible public-safe knowledge projection does not make a relation public,
+and Source/Evidence PRIVATE data must not leak through relation payloads.
+Semantic relation changes still require the complete Governance lifecycle and
+canonical read-back.

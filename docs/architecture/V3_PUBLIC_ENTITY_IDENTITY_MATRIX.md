@@ -3,7 +3,7 @@
 > **NON-NORMATIVE.** This is an identity audit and gap record. If it conflicts
 > with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-Status: P0 read-only parity audit, synchronized 2026-09-04. This is an evidence record and
+Status: P0 read-only parity audit, synchronized 2026-09-07. This is an evidence record and
 contract matrix; it does not assign slugs, create aliases, alter redirects,
 write V2, import data, or repair Graph relations.
 
@@ -23,6 +23,12 @@ The remaining boundary is runtime activation/data/read-back parity: until the
 migration, allocation/current identity rows and consumers are verified in the
 actual environment, downstream systems must not claim durable public identity
 is live merely because the repository/service exists.
+
+The current implementation status is `IMPLEMENTED` for the Public Identity
+service/repository/allocator/read-back boundary, including the canonical Video
+route path. Runtime activation, full data coverage and every target-environment
+consumer remain separate evidence gates; compatibility name-derived routing is
+not a second durable identity writer.
 
 Current route compatibility may still derive paths from `canonical_name` where
 no persisted Public Identity has been allocated/consumed. That compatibility
