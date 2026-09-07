@@ -5011,3 +5011,25 @@ staging-marker blocker, not an ambiguity resolution or a data result.
   and 5 PHPUnit deprecations. Guarded Integration remains environment-blocked
   because NHK_WP_TEST_PATH=public is not configured and WordPress bootstrap
   functions are unavailable in the bare PHPUnit process.
+
+# Checkpoint — 2026-09-07 — Demo execution blocked at migration guard
+
+The exact `320863e` plugin snapshot was published to `demo.1945.vn` using the
+allowlisted SSH/rsync transport without remote deletion. Read-back SHA-256
+matched for `nhk-core.php`, the maintenance entrypoint, `Plugin.php`, the
+migration guard, and migrations 014/015. The official migration-up path was
+invoked, but returned `REMOTE_RUNTIME_BOOTSTRAP_FAILED`; read-only runtime
+markers required by the fail-closed guard (`WP_ENVIRONMENT_TYPE`,
+`NHK_AUTHORIZED_MIGRATION_DATABASE`, `NHK_MIGRATION_RUNTIME`) are unset. Health
+therefore remains `migration_current=13`, `migration_target=15`,
+`MIGRATION_REQUIRED`. No migration, semantic write, Graph write or governed
+apply was performed.
+
+Fresh remote relation dry-run was available read-only and returned 1,809
+records scanned, 249 existing relations, `MISSING_DETERMINISTIC=0`,
+`RELATION_PENDING=855`, `REGISTRY_GAP=175`, and zero for ambiguous,
+evidence-gap, orphan, duplicate-candidate and invalid-endpoint counters.
+Canonical/Graph inventory, deterministic resolution/apply, directional and
+neighborhood read-back, second-run idempotency, and live Odo/Cuckoo target
+verification could not proceed past the migration/runtime gate. These are
+recorded as blocked/unverified, not as zero. No code change was made.
