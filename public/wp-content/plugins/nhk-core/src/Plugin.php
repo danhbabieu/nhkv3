@@ -347,7 +347,8 @@ final class Plugin {
             );
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
-            (new VideoRelationAdminApi($governance, $proposalRepository, $videos, $authority, $types, $evidence))->register();
+            $videoRelationAdmin = new \NHK\Core\Application\Video\VideoRelationAdminService($governance, $proposalRepository, $videos, $authority, $knowledgeService, $claims, $sources, $evidence);
+            (new VideoRelationAdminApi($videoRelationAdmin))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();

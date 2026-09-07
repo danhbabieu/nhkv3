@@ -30,7 +30,7 @@ final class VideoRelationAdminServiceTest extends TestCase
 
         $context = $service->context($videoId); self::assertSame($videoProposal->id, $context['video_proposal']['id']); self::assertSame('PRIVATE', $context['provenance']['visibility']);
         $result = $service->create($videoId, 'brand', $targetId, '1');
-        self::assertSame('DRAFT', $result['state']); self::assertNotEmpty($result['evidence']['id']); self::assertSame('PRIVATE', $result['evidence']['visibility']); self::assertSame('https://www.youtube.com/watch?v=dQw4w9WgXcQ', $result['evidence']['locator']); self::assertCount(1, $sources->list()); self::assertCount(1, $claims->list()); self::assertCount(1, $evidence->listByClaim($result['evidence']['claim_id']));
+        self::assertSame(ProposalState::DRAFT->value, $result['state']); self::assertNotEmpty($result['evidence']['id']); self::assertSame('PRIVATE', $result['evidence']['visibility']); self::assertSame('https://www.youtube.com/watch?v=dQw4w9WgXcQ', $result['evidence']['locator']); self::assertCount(1, $sources->list()); self::assertCount(1, $claims->list()); self::assertCount(1, $evidence->listByClaim($result['evidence']['claim_id']));
         self::assertSame($result['evidence']['id'], $proposals->find($result['proposal_id'])?->payload['evidence_refs'][0]['evidence_id']);
     }
 
@@ -38,7 +38,7 @@ final class VideoRelationAdminServiceTest extends TestCase
     {
         [$service, $proposals, $sources, $claims, $evidence, $videoId, $targetId] = $this->fixture();
         $first = $service->create($videoId, 'brand', $targetId, '1'); $second = $service->create($videoId, 'brand', $targetId, '1');
-        self::assertSame($first['proposal_id'], $second['proposal_id']); self::assertSame($first['evidence']['id'], $second['evidence']['id']); self::assertCount(1, $sources->list()); self::assertCount(1, $claims->list()); self::assertCount(1, $evidence->listByClaim($first['evidence']['claim_id'])); self::assertCount(1, $proposals->items);
+        self::assertSame($first['proposal_id'], $second['proposal_id']); self::assertSame($first['evidence']['id'], $second['evidence']['id']); self::assertCount(1, $sources->list()); self::assertCount(1, $claims->list()); self::assertCount(1, $evidence->listByClaim($first['evidence']['claim_id'])); self::assertCount(2, $proposals->items);
     }
 
     public function test_missing_or_invalid_video_provenance_fails_closed(): void

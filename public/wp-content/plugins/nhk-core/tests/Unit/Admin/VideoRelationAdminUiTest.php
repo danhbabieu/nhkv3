@@ -13,9 +13,11 @@ final class VideoRelationAdminUiTest extends TestCase
         $script = (string) file_get_contents(dirname(__DIR__, 3) . '/assets/admin/admin-workbench.js');
         $contract = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Infrastructure/Admin/VideoRelationAdminContract.php');
 
-        foreach (['nhk-video-id', 'nhk-video-proposal-id', 'nhk-video-target-type', 'nhk-video-target-id', 'nhk-video-evidence-id', 'relation_create', 'EXPLICIT_USER_RELATION', 'EVIDENCE_REFS_REQUIRED', 'Controlled Apply'] as $needle) {
+        foreach (['nhk-video-id', 'nhk-video-target-type', 'nhk-video-target-id', 'relation_create', 'EXPLICIT_USER_RELATION', 'Controlled Apply', 'Evidence provenance', 'PRIVATE'] as $needle) {
             self::assertStringContainsString($needle, $page . $script . $contract);
         }
+        self::assertStringNotContainsString('nhk-video-proposal-id', $page . $script);
+        self::assertStringNotContainsString('nhk-video-evidence-id', $page . $script);
         self::assertStringContainsString('/admin/video-relation/context/', $script);
         self::assertStringContainsString('/admin/video-relation', $script);
         self::assertStringContainsString('Relation hiện có', $script);

@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+## Admin Video relation root-gap closeout — 2026-09-07
+
+The Admin Video relation workspace now accepts only canonical Video + selected
+Authority target. It automatically resolves the latest canonical Video ingest
+proposal, validates canonical YouTube provenance, and uses the existing
+KnowledgeService/repositories to create-or-reuse a deterministic private
+Source → provenance Claim → Evidence chain with locator and reconciliation
+fingerprint read-back. The relation proposal is created through Governance
+with canonical `evidence_refs`, stable idempotency and replay reuse; the UI
+shows the provenance that will be used and no longer asks for Video proposal or
+Evidence UUIDs. Existing relation/proposal replay remains non-duplicating and
+the existing Submit → Approve → Eligibility → Controlled Apply → canonical
+read-back lifecycle remains the writer path.
+
+Focused Admin/reconciliation verification passes 14 tests / 61 assertions and
+the complete Unit suite passes 709 tests / 3,400 assertions (2 warnings, 5
+PHPUnit deprecations). Guarded Integration bootstrapped exact `nhk_v3_test` and
+ran 110 tests / 742 assertions with 2 skips, 1 warning and 1 deprecation, but
+retains 1 pre-existing activation-hook error and 1 pre-existing relation-
+eligibility failure; it is not reported as a suite pass. PHP lint, Composer
+validation and diff-check remain the final commit gates. No production,
+staging, V2 or semantic runtime data was intentionally mutated.
+
 ## Migration guard and maintenance wiring checkpoint — 2026-09-07
 
 The guard now permits a non-canonical database only when all demo staging
