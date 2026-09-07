@@ -1,199 +1,187 @@
 # Governed Living Knowledge Design
 
-**Status:** owner-approved incremental design, updated 2026-09-05.
+**Status:** owner-approved incremental design, reconciled to current runtime on 2026-09-07.
 
 ## Ownership
 
-Authority owns canonical identity and lifecycle. Graph owns typed relations.
-Knowledge owns atomic claims. Source/Evidence owns provenance and support.
-WordPress native `wp_posts` owns Article title, body, author, dates, categories
-and editorial URLs. Media, MediaAsset, MediaUsage and Video keep their existing
-bounded contexts. Public Projection is a presentation/read model. Governance
-owns durable semantic mutation.
+Authority owns canonical identity/lifecycle. Graph owns typed semantic
+relations. Knowledge owns atomic claims. Source/Evidence owns canonical
+provenance and support. WordPress native `wp_posts` owns Article title/body,
+author, dates, categories and editorial URLs. Media/MediaAsset/MediaUsage and
+Video retain their separate domains. Public Projection is read-only
+presentation. Governance owns durable semantic mutation.
 
-Dictionary lexical state is a separate curation boundary governed by
-`DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`. Dictionary Concept, Label,
-Candidate and Mention records do not become Authority, Knowledge, Evidence or
-Graph records merely by existing.
+Dictionary lexical state is a separate curation boundary. Concept/Label/
+Candidate/Mention records never become Authority, Knowledge, Evidence or Graph
+truth merely by existing.
 
-No Article, FAQ, Cluster, Projection or KnowledgeCell Authority type is added.
-No new Graph predicate is added by this design.
+No Article, FAQ, Cluster, Projection, Note or KnowledgeCell Authority type is
+added by this design. No Graph predicate is added by this design.
+
+## Reconcile before create
+
+Before a new factual claim is proposed, current canonical Authority/Knowledge
+must be resolved and the candidate reconciled against existing subject/facet/
+scope truth.
+
+Required outcomes are:
+
+- exact existing claim → reuse or add valid Evidence;
+- merge/update/replacement candidate → governed lifecycle decision;
+- related but distinct claim → keep both with explicit scope/relation where
+  contract allows;
+- genuinely new claim → create only after subject and dependencies resolve;
+- uncertain → defer/research; do not mint a temporary claim.
+
+Exact normalized text is only an exact-match signal inside the same canonical
+subject/facet/scope. Fuzzy, lexical or AI similarity cannot decide identity.
+Dictionary labels may assist lookup but never establish semantic equivalence.
+
+## No orphan Knowledge
+
+The intended canonical subject/context must be resolved before Knowledge
+creation. If the correct subject is a genuinely missing Authority node, create,
+apply and read that Authority node back first. If subject resolution or node
+creation cannot complete safely, the Knowledge candidate is deferred.
+
+A detached claim created with the intention to “attach a node later” is not a
+valid completed ingest. A claim is also not complete merely because its Proposal
+is approved; canonical Knowledge plus intended Graph/evidence read-back must
+match the operation contract.
 
 ## Living Knowledge behavior
 
-Semantic meaning is never silently rewritten in an existing claim. Editorial
-typos that do not change meaning may use the existing correction contract;
-otherwise the system conservatively classifies structured input as one of:
+Semantic meaning is never silently rewritten. Existing truth is classified
+conservatively as same claim/new Evidence, compatible distinct claim,
+qualification, contradiction, replacement/lifecycle decision or retirement.
+Historical claims remain readable.
 
-- same claim with new Evidence;
-- new compatible claim;
-- qualifying Evidence/claim;
-- contradicting Evidence/claim;
-- semantic replacement requiring a lifecycle decision for the old claim;
-- retirement of obsolete claim through Governance.
+`supports`, `contradicts` and `qualifies` remain Evidence relations. Scope stays
+at the narrowest evidence-supported level: entity, Brand, Model, Variant,
+Movement or Specimen observation. Specimen observation never promotes
+automatically to Variant/Model/Brand.
 
-Historical claims remain readable. `supports`, `contradicts` and `qualifies`
-remain the only Evidence relations. Scope is bounded at the narrowest supported
-level: entity, brand, model, variant, movement or specimen observation. A
-specimen observation never promotes automatically to Variant, Model or Brand.
-Exact normalized text equality is only a deterministic exact-match signal for
-an active claim in the same subject/facet/scope. It is not broad semantic
-equivalence. Fuzzy or AI similarity cannot decide canonical identity. Explicit
-structured relation context is required for add-Evidence, qualification and
-contradiction; ambiguous or unsupported input fails closed.
+Commercial Product copy, Article prose, Video source/editorial text, Media
+caption/alt/OCR and generated synthesis are not canonical claims or Evidence by
+themselves.
 
-Dictionary labels may assist lexical lookup and disambiguation before Living
-Knowledge planning. They do not establish semantic equivalence by themselves.
-Before a new factual claim is proposed, Current Truth/Knowledge must be checked
-and an existing canonical claim reused or enriched when applicable. A
-Dictionary definition or repeated wording is never sufficient evidence to mint
-a duplicate Knowledge claim.
+## Required governed factual lifecycle
+
+For new semantic truth:
+
+`Source/Evidence research → canonical subject resolution → reconcile current
+canonical claims → create/update/merge Authority if genuinely needed → Authority
+read-back → Knowledge ingest → submit → review → approval binding → eligibility
+→ Controlled Apply → Knowledge read-back → governed Graph attachment →
+Source/Evidence attachment → Graph/Knowledge/Evidence read-back → idempotency
+verification`.
+
+Depending on operation composition, Source may be prepared earlier than the
+claim, but canonical Claim/Source/Evidence dependency rules must still hold.
+Second-run acceptance requires no duplicate claim, Source, Evidence, Authority
+node or active relation.
 
 ## Read model pipeline
 
 `Canonical Knowledge → Current Truth Resolver → Knowledge Cluster/Facet Read
-Model → AI Natural Synthesis port → SEO Stability Guard → Public Projection`.
+Model → synthesis port → SEO Stability Guard → Public Projection`.
 
-Facet/profile metadata is stored in the existing provenance/metadata JSON
-boundary, under validated namespaced keys. Unknown values fail closed. A
-cluster is an application/read concept and never a persisted semantic entity or
-Graph edge.
+Cluster/facet is a read concept, never a persisted semantic entity/Graph edge.
+Resolver output can include compatible claims, qualifiers, contradictions,
+unresolved conflicts, scope and evidence coverage; it never persists aggregate
+truth or lets synthesis choose a winner for an unresolved conflict.
 
-The resolver is read-only and returns compatible claims, qualifiers,
-contradictions, unresolved conflicts, scope, evidence coverage and internal
-trace references. It never persists aggregate truth and never lets AI choose a
-winner for an unresolved conflict.
+Projection fragments retain dependency fingerprints over the canonical subject,
+claim/evidence/source identities and revisions, policy/profile versions and
+projection contract. Unchanged fingerprints may reuse last-known-good output.
+Synthesis cannot introduce a fact absent from the current-truth packet.
 
-## Projection and provenance
+## Article and Note boundary
 
-Entity pages are living projections rebuilt per affected facet. Fragments are
-`overview`, `recognition`, `configuration`, `movement`, `music`, `history`,
-`domestic_cultural`, `evidence_media` and `related`. Every fragment carries a
-dependency fingerprint made from subject, facet/profile version, fragment key,
-claim IDs/revisions/lifecycle/public state, Evidence IDs/revisions/relation/
-state, eligible Source revisions, projection contract version and
-generator/policy version.
-Unchanged fingerprints are reused; unrelated fragments remain unchanged.
+Knowledge changes can create an Article enrichment/update suggestion only; they
+never directly write Article body. WordPress editorial notes, research notes and
+workspace annotations are planning context, not canonical semantic truth. A note
+fact is promoted only by re-entering canonical subject resolution,
+Source/Evidence/Knowledge and Governance.
 
-AI synthesis accepts a current-truth packet, presentation context, previous
-fragment and SEO constraints, and returns candidate copy plus diagnostics. It
-cannot introduce a fact absent from the packet. The default implementation is
-deterministic and Vietnamese-first. If synthesis is unavailable, the system
-retains last-known-good eligible content or deterministic reader-safe content;
-it never emits fabricated prose or turns unavailable into empty.
+Article research/preflight is therefore a reconciliation input. New semantic
+claims found during editorial research are not “completed” until the semantic
+owner lifecycle/read-back has finished.
 
-## Article, Video, Media and Dictionary boundaries
+## Video boundary — generic planner versus guided relation workflow
 
-Knowledge changes affecting an Article create an enrichment/update suggestion
-packet only. They never write an Article body or bypass the Article workflow.
-Video `user_hint` and bounded factual observations extracted from an authorized
-transcript enter the same read-only planner through an optional Video intake
-seam after canonical target resolution. One observation selects only the
-narrowest confidently supported subject (`specimen > variant > model >
-movement/brand`); equal subjects are ambiguous and no candidate is duplicated
-upward or sideways. The output is a complete `knowledge_enrichment` planning
-packet only. Transcript text itself is never a Knowledge claim, and an absent
-extractor produces `TRANSCRIPT_FACT_EXTRACTION_UNAVAILABLE` rather than a
-fabricated transcript claim. `USER_HINT`/transcript provenance is retained,
-YouTube metadata remains source input, and generated editorial text is never
-Evidence. At this phase Video does not resolve/create Source; no Source ID is
-invented, and `add_evidence` is proposal-ready only when canonical source ID
-and revision are supplied. Planner/extractor failure is diagnostic and
-fail-closed for enrichment without losing the Video intake result. The seam
-never submits, approves or applies a Knowledge proposal, writes
-Knowledge/Evidence directly, or creates a Graph predicate. Media annotations
-remain outside this Video slice; `MediaUsage`/`depicts` alone is not Evidence.
+Generic Video factual extraction remains a planning seam. `USER_HINT` and
+bounded observations from an authorized transcript preserve provenance and use
+the narrowest confidently supported subject. Equal candidates are ambiguous.
+Whole transcript text and generated editorial copy are never canonical Knowledge
+or Evidence.
 
-When Video intake receives an already-validated explicit `about` relation, that
-canonical target is preserved as the enrichment subject before text matching.
-The planner must not broaden an explicit Variant to Model/Brand merely because a
-title or hint also matches a broader name. This is a target-handoff invariant,
-not a new inference rule; absent an explicit target the normal narrowest,
-fail-closed resolution still applies.
+The older statement that Video cannot resolve/create any canonical Source is
+**historical for the isolated generic enrichment preview**. It must not be used
+to describe the current guided Video relation workflow.
 
-Dictionary detection may run alongside Article/Knowledge/Media/Video workflows,
-but it is lexical only. Research/preflight uses read-only Dictionary preview.
-After a canonical Knowledge or Video write, or after an actual WordPress
-Article/Media save, the Dictionary observer may idempotently store a lexical
-Mention or private Candidate. That post-write observation is non-blocking and
-never rolls the canonical write back merely because lexical curation is
-unavailable.
+Current guided relation orchestration, after canonical Video + canonical target
+resolution, can deterministically resolve/reuse or create and read back:
 
-For Media/Image, caption, alt, filename, OCR or recognition may produce only
-bounded lexical observations/candidates. For Video, title, description, tags
-and an authorized transcript may do the same. None of these signals becomes
-Knowledge/Evidence or a Graph relation through Dictionary. An explicit Video
-semantic target may be passed as context for disambiguation but must never be
-broadened by the lexical detector.
+`private YouTube Source → provenance-scoped Claim → private Evidence`.
 
-A Dictionary review that discovers a real new fact hands that fact to this
-Living Knowledge planner; Dictionary curation itself does not write the claim.
-Likewise, attaching a colloquial/technical/phonetic label to an existing
-Dictionary concept is not proof that a semantic entity relation exists.
+It then creates the governed `Video → about → target` proposal using canonical
+Evidence references and stable fingerprints/idempotency. Existing dependencies
+are reused only when their provenance binding matches; mismatches fail closed.
+Normal operators do not manually type Video proposal/Evidence UUIDs.
 
-Media → Living Knowledge and Article → Living Knowledge write integration are
-not implemented by the completed Video slice. Future adapters may emit planning
-or update-suggestion packets only until their own governed boundary is reviewed.
-Image OCR/recognition, MediaUsage, `depicts`, Article body text and generated copy
-remain candidate inputs at most; none is Evidence or canonical truth merely by
-existing in Media/WordPress storage.
+This path is bounded to relation provenance. It is not permission to auto-write
+arbitrary transcript facts or to make PRIVATE Source/Evidence public.
 
-Semantic apply remains `Proposal → Human Approval → Eligibility → Controlled
-Apply → canonical repository → audit → read-back`. Same-intent repeats are
-idempotent and produce no duplicate claim, Evidence or relation.
+## Media / Image boundary
+
+Media annotations, MediaUsage, `depicts`, OCR, recognition, filename, caption and
+alt remain candidate/research inputs at most. They are not Evidence merely by
+existing in storage. A future Media→Living Knowledge mutation must use the same
+canonical subject, reconcile, Source/Evidence and Governance boundaries.
+
+Dictionary observation can remain non-blocking lexical state after an owning
+content write; it never changes semantic truth.
 
 ## Governed apply boundary
 
-The effective operation vocabulary is read from the current runtime catalog
-(`McpToolCatalog::governedOperations()`); this slice does not introduce an
-operation registry or an adapter. Knowledge claim and Evidence creation use a
-registered `create`/`ingest` operation selected from that vocabulary. If no
-corresponding operation is registered, proposal translation returns typed
-`REGISTRY_GAP`; unsupported candidate classifications return `UNSUPPORTED`.
+Use only operations present in the current executable catalog/domain owner.
+Proposal translation fails closed with `REGISTRY_GAP`/`UNSUPPORTED` when the
+required operation or relation vocabulary does not exist.
 
-Evidence candidates are proposal-eligible only after canonical `claim_id` and
-`source_id` resolution. Their structured contract carries relation,
-excerpt/observation, optional locator, metadata and claim/source revision
-closure. Unresolved source input remains an `ambiguous` review candidate and
-cannot be translated into an Evidence proposal.
+Evidence candidates are proposal-eligible only after canonical Claim and Source
+resolution and revision closure. Existing-target lifecycle changes use the
+current owner revision. Canonical ordering binds content, dependency and
+idempotency fingerprints.
 
-Create proposals carry no existing-target revision (`expected_revision=null`).
-Existing-target lifecycle proposals must carry the repository revision read at
-the binding boundary; eligibility rejects a changed revision. Canonical
-structured ordering binds content, dependency and idempotency fingerprints.
-The factory is translation-only and performs no KnowledgeService or repository
+Semantic lifecycle is:
+
+`proposal/create-or-ingest → submit → review → approval with binding fingerprint
+→ eligibility → Controlled Apply → canonical owner read-back → idempotency
+verification`.
+
+The translation/planning layer itself performs no secret parallel repository
 write.
 
-## E2E acceptance boundary
+## Deferred and retry boundary
 
-The governed apply slice is accepted only when a focused in-memory test proves
-the complete sequence `candidate → factory → proposal → submit/review/binding →
-approve → eligibility → ControlledApplyService → AuthorityProposalExecutor →
-KnowledgeService → canonical repository read-back → audit`, including replay of
-the same idempotency binding. The same test must cover `new_claim` and Evidence
-relations `supports`, `qualifies` and `contradicts`, reject a changed dependency
-after approval, and prove failure atomicity (no semantic mutation or applied
-proposal after a controlled failure, with a durable failed attempt).
+Unresolved candidates preserve provenance, proposed subject/type/relation,
+evidence, canonical IDs already resolved, registry/runtime blocker, existing
+proposal ID and deterministic rerun instruction. Use states such as
+`PENDING_RESEARCH`, `EVIDENCE_GAP`, `REGISTRY_GAP`, `RELATION_GAP`,
+`LEXICAL_GAP`, `RUNTIME_BLOCKED`, `NEEDS_REVIEW` and final outcomes
+`COMPLETED`, `DEFERRED_WITH_REASON`, `BLOCKED_WITH_OWNER_ACTION`.
 
-The approval record binds the complete proposal binding fingerprint, which
-includes content and dependency fingerprints. Integration evidence is a
-separate gate and may only be reported when the exact guarded `nhk_v3_test`
-runtime is available. If unavailable, the result is `ENVIRONMENT_BLOCKED`, not
-PASS.
+A rate-limit/runtime interruption does not justify a new proposal. Reuse the
+existing proposal/idempotency binding when the intent is unchanged.
 
-## Acceptance and non-goals
+## E2E acceptance
 
-Reference corpora used in focused tests remain acceptance/reference data only
-and do not mutate production/demo semantic state.
+Acceptance for a governed semantic candidate requires the complete proposal →
+submit/review/binding → approve → eligibility → Controlled Apply → canonical
+owner read-back → audit chain, plus replay/idempotency. Tests/runtime evidence
+must cover dependency drift and failure atomicity. Exact integration/runtime
+proof is reported separately and cannot be inferred from unit coverage.
 
-The focused in-memory E2E acceptance closes the implementation code gap for the
-approved Living Knowledge slice. It does not claim database/runtime verification
-when the exact WordPress test runtime is unavailable.
-
-Dictionary lexical implementation has its own acceptance criteria in
-`DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`; it cannot be used to claim Living
-Knowledge semantic acceptance, and vice versa.
-
-Durable public identity remains a separately reported storage/runtime concern
-unless additive storage is verified in the target environment. No bulk slug
-migration is part of this feature.
+Reference corpora remain test/reference data only and do not authorize demo or
+production mutation.
