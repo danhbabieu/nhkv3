@@ -32,6 +32,10 @@ final class AdminAssets
             $version,
             true
         );
+        wp_localize_script('nhk-v3-admin-workbench', 'nhkV3Admin', [
+            'root' => esc_url_raw(rest_url()),
+            'nonce' => wp_create_nonce('wp_rest'),
+        ]);
     }
 
     private static function isNhkScreen(string $hookSuffix): bool

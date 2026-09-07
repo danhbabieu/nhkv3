@@ -11,10 +11,11 @@ final class MigrationDatabaseGuard
         ?string $runtime,
         ?string $environment
     ): bool {
-        if (in_array($environment, ['production', 'staging'], true)) return false;
+        if ($environment === 'production') return false;
         if (in_array($database, ['nhk_v3', 'nhk_v3_test'], true)) return true;
 
-        return $runtime === 'demo'
+        return $environment === 'staging'
+            && $runtime === 'demo'
             && $authorizedDatabase !== null
             && $authorizedDatabase !== ''
             && hash_equals($authorizedDatabase, $database);

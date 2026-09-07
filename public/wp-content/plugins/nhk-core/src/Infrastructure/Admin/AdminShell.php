@@ -59,9 +59,9 @@ final class AdminShell
                 'slug' => 'media-video',
                 'label' => 'Media & Video',
                 'description' => 'Media ingest, MediaAsset, MediaUsage và Video intake theo boundary hiện có.',
-                'read_capability' => 'upload_files',
+                'read_capability' => 'nhk_view_governance',
                 'write_capability' => ['nhk_create_proposals'],
-                'implemented' => false,
+                'implemented' => true,
             ],
             'operations' => [
                 'slug' => 'operations',

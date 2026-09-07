@@ -14,21 +14,29 @@ final class MigrationDatabaseGuardTest extends TestCase
         self::assertTrue(MigrationDatabaseGuard::isUpAllowed('nhk_v3_test', null, null, null));
     }
 
-    public function test_explicit_demo_database_authorization_allows_noncanonical_database(): void
+    public function test_authorized_demo_staging_database_is_allowed(): void
     {
-        self::assertTrue(MigrationDatabaseGuard::isUpAllowed('demo_actual', 'demo_actual', 'demo', 'development'));
+        self::assertTrue(MigrationDatabaseGuard::isUpAllowed('erourxcg_nhkv3', 'erourxcg_nhkv3', 'demo', 'staging'));
     }
 
-    public function test_noncanonical_database_without_matching_authorization_is_denied(): void
+    public function test_staging_without_authorization_is_denied(): void
     {
-        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('demo_actual', null, 'demo', 'development'));
-        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('demo_actual', 'other_database', 'demo', 'development'));
-        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('demo_actual', 'demo_actual', null, 'development'));
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('erourxcg_nhkv3', null, 'demo', 'staging'));
     }
 
-    public function test_explicit_authorization_cannot_open_production_runtime(): void
+    public function test_staging_with_wrong_database_is_denied(): void
     {
-        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('production_actual', 'production_actual', 'demo', 'production'));
-        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('production_actual', 'production_actual', 'production', 'production'));
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('other_db', 'erourxcg_nhkv3', 'demo', 'staging'));
+    }
+
+    public function test_staging_requires_demo_runtime_configuration(): void
+    {
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('erourxcg_nhkv3', 'erourxcg_nhkv3', null, 'staging'));
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('erourxcg_nhkv3', 'erourxcg_nhkv3', 'production', 'staging'));
+    }
+
+    public function test_production_is_denied_even_with_demo_authorization(): void
+    {
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed('erourxcg_nhkv3', 'erourxcg_nhkv3', 'demo', 'production'));
     }
 }

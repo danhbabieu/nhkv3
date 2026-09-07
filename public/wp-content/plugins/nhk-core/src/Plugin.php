@@ -17,6 +17,7 @@ use NHK\Core\Infrastructure\Migration\ArticleMediaMigration011;
 use NHK\Core\Infrastructure\Migration\MediaWordPressBridgeMigration012;
 use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
+use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
@@ -24,6 +25,7 @@ use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, M
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
+use NHK\Core\Infrastructure\Http\VideoRelationAdminApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
 use NHK\Core\Infrastructure\Http\EntityApi;
 use NHK\Core\Infrastructure\Http\GraphApi;
@@ -73,7 +75,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', PublicIdentityMigration014::VERSION, false);
+        update_option('nhk_core_migration_target', DictionaryMigration015::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
@@ -345,6 +347,7 @@ final class Plugin {
             );
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
             (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
+            (new VideoRelationAdminApi($governance, $proposalRepository, $videos, $authority, $types, $evidence))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
@@ -438,6 +441,7 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < OwnerPublicationDecisionMigration013::VERSION) (new OwnerPublicationDecisionMigration013())->up();
         global $wpdb;
         if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 use NHK\Core\Shared\Health\HealthCheck;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Infrastructure\Maintenance\MaintenanceCapabilityBridge;
+use NHK\Core\Infrastructure\Migration\{DictionaryMigration015, PublicIdentityMigration014};
 
 $operation = null;
 $json = false;
@@ -17,7 +19,7 @@ foreach (array_slice($argv, 1) as $argument) {
     if (str_starts_with($argument, '--source-revision=')) { $sourceRevision = substr($argument, 18); continue; }
     fwrite(STDERR, "UNKNOWN_ARGUMENT\n"); exit(64);
 }
-$allowed = ['health', 'inventory', 'dry-run', 'backup/snapshot', 'governance-plan', 'controlled-apply', 'read-back'];
+$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'migration-up', 'dry-run', 'backup/snapshot', 'governance-plan', 'controlled-apply', 'read-back'];
 if (!is_string($operation) || !in_array($operation, $allowed, true)) {
     $payload = ['status' => 'blocked', 'reason_code' => 'REMOTE_OPERATION_NOT_ALLOWLISTED'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL;
@@ -37,7 +39,32 @@ if (!is_readable($wpLoad)) {
 }
 try {
     require_once $wpLoad;
-    if ($operation === 'health') {
+    if ($operation === 'migration-up') {
+        global $wpdb;
+        if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
+        $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
+    } elseif (in_array($operation, ['canonical-inventory', 'graph-inventory', 'relation-dry-run'], true)) {
+        do_action('rest_api_init');
+        $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+        $request->set_header('Content-Type', 'application/json');
+        $arguments = $operation === 'relation-dry-run' ? ['records' => []] : ['filters' => [], 'limit' => 100, 'after' => null];
+        $result = MaintenanceCapabilityBridge::call($operation, $arguments, static function (string $tool, array $input): array {
+            $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
+            $request->set_header('Content-Type', 'application/json');
+            $request->set_body((string) wp_json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => $tool, 'arguments' => $input]]));
+            $response = rest_do_request($request);
+            if (is_wp_error($response)) throw new \RuntimeException('MAINTENANCE_MCP_REQUEST_FAILED');
+            $body = $response->get_data();
+            $result = is_array($body) ? ($body['result'] ?? null) : null;
+            if (!is_array($result) || ($result['isError'] ?? false) === true) throw new \RuntimeException('MAINTENANCE_MCP_CAPABILITY_FAILED');
+            $content = $result['structuredContent'] ?? null;
+            if (!is_array($content)) throw new \RuntimeException('MAINTENANCE_MCP_INVALID_RECEIPT');
+            return $content;
+        });
+        $payload = ['status' => ($result['status'] ?? null) === 'available' ? 'pass' : 'blocked', 'identifier' => 'remote-' . $operation, 'capability' => $result, 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
+        if ($payload['status'] !== 'pass') $payload['reason_code'] = 'MAINTENANCE_CAPABILITY_UNAVAILABLE';
+    } elseif ($operation === 'health') {
         $payload = (new HealthCheck(new MigrationStatus()))->read();
         $ok = ($payload['layers']['storage']['ok'] ?? false) && ($payload['layers']['application']['ok'] ?? false);
         $payload = ['status' => $ok ? 'pass' : 'blocked', 'identifier' => 'remote-health', 'health' => $payload];

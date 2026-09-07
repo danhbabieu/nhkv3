@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+## Migration guard and maintenance wiring checkpoint — 2026-09-07
+
+The guard now permits a non-canonical database only when all demo staging
+conditions hold: `WP_ENVIRONMENT_TYPE=staging`, an exact
+`NHK_AUTHORIZED_MIGRATION_DATABASE` match, and `NHK_MIGRATION_RUNTIME=demo`.
+Production remains denied and the canonical `nhk_v3` / `nhk_v3_test` paths are
+unchanged. TDD covers authorized staging, missing authorization, wrong DB,
+runtime mismatch, production denial and canonical test regression.
+
+Maintenance reads now bridge to the already-composed `McpReadHandler` through
+the registered MCP route for `nhk.canonical.inventory`, `nhk.graph.inventory`
+and `nhk.relation.backfill.dry_run`; no parallel implementation or fake receipt
+was added. Pending migration execution now includes 014 then 015 and reports
+the stored current/target versions.
+
+Local focused verification passed 16 tests / 61 assertions and PHP lint/diff
+checks passed. External SSH/rsync publication to `demo.1945.vn` was rejected
+by execution policy before transfer, so no remote migration or semantic data
+mutation occurred. Live migration and relation counters remain `UNVERIFIED`.
+
 ## Migration runtime authorization guard checkpoint — 2026-09-07
 
 The migration 014 blocker was fixed in code at the post-`39d3a60` checkpoint.

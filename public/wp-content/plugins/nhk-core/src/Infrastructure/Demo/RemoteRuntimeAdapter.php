@@ -11,7 +11,7 @@ use NHK\Core\Application\Demo\StageResult;
 final class RemoteRuntimeAdapter
 {
     private const OPERATIONS = [
-        'health', 'inventory', 'dry-run', 'backup/snapshot',
+        'health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'migration-up', 'dry-run', 'backup/snapshot',
         'governance-plan', 'controlled-apply', 'read-back',
     ];
 
