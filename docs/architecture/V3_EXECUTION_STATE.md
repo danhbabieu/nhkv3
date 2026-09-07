@@ -4572,3 +4572,24 @@ canonical data mutation or production/staging/V2 change is claimed in this
 checkout. The remaining owner action is to provide the development WordPress
 runtime/database, then run governed dry-run → approval/apply → canonical and
 inverse readback for the named fixtures.
+
+## Full Integration and named Graph fixture verification — 2026-09-07
+
+From commit `68b43be7a8a9d5f27fc1f3d5a5e0cbbdd4c8b706`, the guarded runtime
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` was revalidated and the
+full `NHK Integration` suite passed: 108 tests / 730 assertions, with 1 warning,
+1 deprecation and 2 skips, and no failures or errors. The initial unprivileged
+attempt stopped at WordPress database bootstrap; the successful rerun used the
+approved local MySQL runtime and did not change application code or data.
+
+The required Cuckoo Classification UUID
+`01a07614-832d-7f27-959c-74eb0cd63f3e`, Odo 36/8 Variant UUID
+`852da54d-457a-4397-a16d-52d9452ba766`, and all three requested Knowledge stable
+keys were absent from the guarded canonical repositories. The runtime had no
+Knowledge rows and only unrelated integration entities; no governed proposal,
+Controlled Apply, Graph edge, raw database write, new Knowledge, keyword
+relation inference, `classified_as` handling or Product–Specimen operation was
+performed. Therefore Cuckoo and Odo counters, canonical/inverse Graph reads,
+semantic neighborhood, MCP retrieval and second-run idempotency are
+`BLOCKED_BY_MISSING_CANONICAL_FIXTURES`, not PASS and not inferred. Legacy
+Odo audit/backfill was not run.
