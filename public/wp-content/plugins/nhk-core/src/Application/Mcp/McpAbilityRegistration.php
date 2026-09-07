@@ -58,6 +58,7 @@ final class McpAbilityRegistration
         'nhk.proposal.approve' => 'nhk-v3/proposal-approve',
         'nhk.proposal.reject' => 'nhk-v3/proposal-reject',
         'nhk.proposal.apply' => 'nhk-v3/proposal-apply',
+        'nhk.relation.backfill.apply' => 'nhk-v3/relation-backfill-apply',
     ];
 
     /** @var array<string,string> */
@@ -226,6 +227,7 @@ final class McpAbilityRegistration
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
             'nhk.proposal.apply' => 'nhk_apply_proposals',
+            'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
             default => 'nhk_create_proposals',
         };

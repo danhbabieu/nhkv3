@@ -106,6 +106,7 @@ final class McpTransport
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
             'nhk.proposal.apply' => 'nhk_apply_proposals',
+            'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
             default => null,
         };
@@ -118,6 +119,7 @@ final class McpTransport
             'nhk.canonical.inventory' => $this->read->canonicalInventory((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
             'nhk.graph.inventory' => $this->read->graphInventory((array) ($arguments['filters'] ?? []), (int) ($arguments['limit'] ?? 50), isset($arguments['after']) ? (string) $arguments['after'] : null),
             'nhk.relation.backfill.dry_run' => $this->read->relationBackfillDryRun((array) ($arguments['records'] ?? [])),
+            'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
             'nhk.semantic.resolve' => $this->read->semanticResolve((array) ($arguments['context'] ?? [])),
             'nhk.entity.neighborhood' => $this->read->entityNeighborhood((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? ''), (string) ($arguments['profile'] ?? ''), (int) ($arguments['max_hops'] ?? 2), (int) ($arguments['limit'] ?? 50)),
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),

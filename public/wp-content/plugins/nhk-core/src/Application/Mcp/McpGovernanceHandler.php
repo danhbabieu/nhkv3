@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
+use NHK\Core\Application\Graph\RelationBatchApplyOrchestrator;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -79,5 +80,17 @@ final class McpGovernanceHandler implements GovernedLifecycle
     {
         if (!$this->apply) throw new \RuntimeException('Controlled Apply service is not configured.');
         return $this->apply->apply($id);
+    }
+
+    /** @param list<array<string,mixed>> $candidates @return array<string,mixed> */
+    public function relationBatchApply(array $candidates, bool $approvalConfirmed): array
+    {
+        $actor = function_exists('get_current_user_id') ? (string) get_current_user_id() : '0';
+        return (new RelationBatchApplyOrchestrator(
+            $this,
+            fn (string $id): array => $this->apply($id),
+            static fn (array $review): bool => $approvalConfirmed && function_exists('current_user_can') && current_user_can('nhk_approve_proposals'),
+            $actor,
+        ))->run($candidates);
     }
 }

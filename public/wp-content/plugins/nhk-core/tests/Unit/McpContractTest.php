@@ -48,6 +48,7 @@ final class McpContractTest extends TestCase
             'nhk.canonical.inventory',
             'nhk.graph.inventory',
             'nhk.relation.backfill.dry_run',
+            'nhk.relation.backfill.apply',
             'nhk.semantic.resolve',
             'nhk.entity.neighborhood',
             'nhk.article.preflight',
@@ -297,6 +298,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/proposal-approve',
             'nhk-v3/proposal-reject',
             'nhk-v3/proposal-apply',
+            'nhk-v3/relation-backfill-apply',
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));

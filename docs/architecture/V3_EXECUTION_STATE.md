@@ -5104,3 +5104,21 @@ mutation, raw DB bypass, registry workaround, or guessed relation occurred.
 The live state therefore remains `existing=250`, `created=0`,
 `RELATION_PENDING=365`, `MISSING_DETERMINISTIC=492`; post-apply directional
 read-back and post-apply idempotency are not claimable.
+
+# Checkpoint — 2026-09-07 — Governed relation batch surface
+
+Added the minimal authenticated MCP surface
+`nhk.relation.backfill.apply`, backed by the existing Proposal/Governance
+lifecycle and Controlled Apply service. Each exact candidate is deduplicated
+by its stable source/predicate/target idempotency key, then follows
+create → submit → review → eligibility → approved apply → canonical read-back.
+Non-`STABLE_KEY_HIERARCHY` candidates are rejected before proposal creation;
+approval requires the authenticated request's explicit `approval_confirmed`
+flag and `nhk_approve_proposals` capability. The tool itself requires
+`nhk_apply_proposals`; unauthenticated DEMO verification returned HTTP 403.
+
+The surface is deployed with checksum read-back, but 492 candidates were not
+applied in this execution because no authenticated MCP credential/session was
+available to the agent and the only CLI alternative would impersonate
+`nhk_admin`, which is prohibited. DEMO data remains unchanged: 250 existing,
+0 created, 365 pending and 175 registry gaps.
