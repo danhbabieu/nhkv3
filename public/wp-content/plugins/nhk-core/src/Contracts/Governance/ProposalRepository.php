@@ -14,4 +14,5 @@ interface ProposalRepository
     public function findForUpdate(string $id): ?Proposal;
     public function recordApproval(Proposal $proposal, string $actor): void;
     public function latestApproval(string $proposalId): ?array;
+    public function findLatestVideoIngest(string $videoId): ?Proposal;
 }

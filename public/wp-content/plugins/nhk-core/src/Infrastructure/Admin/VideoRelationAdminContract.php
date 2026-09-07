@@ -15,6 +15,7 @@ final class VideoRelationAdminContract
     public function predicate(): string { return 'about'; }
     public function targetTypes(): array { return self::TARGET_TYPES; }
     public function evidenceOrigin(): string { return 'EXPLICIT_USER_RELATION'; }
+    public function evidenceVisibility(): string { return 'PRIVATE'; }
 
     /** @param list<array{evidence_id:string}> $evidenceRefs @return array<string,mixed> */
     public function payload(string $videoId, string $targetType, string $targetId, array $evidenceRefs, string $videoFingerprint): array

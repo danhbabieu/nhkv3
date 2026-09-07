@@ -99,6 +99,18 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
         return $db->get_row($db->prepare('SELECT * FROM '.$db->prefix.'nhk_proposal_approvals WHERE proposal_id=%d ORDER BY id DESC LIMIT 1', (int) $proposalDbId), ARRAY_A) ?: null;
     }
 
+    public function findLatestVideoIngest(string $videoId): ?Proposal
+    {
+        if (!UuidCodec::isValid($videoId)) return null;
+        $db = $this->db();
+        $rows = $db->get_results($db->prepare('SELECT * FROM '.$this->table().' WHERE entity_type=%s AND operation=%s ORDER BY id DESC', 'video', 'ingest'), ARRAY_A) ?: [];
+        foreach ($rows as $row) {
+            $proposal = $this->hydrate($row);
+            if ($proposal !== null && (string) ($proposal->payload['canonical_id'] ?? '') === $videoId) return $proposal;
+        }
+        return null;
+    }
+
     public function findApprovedFingerprintBoundRelations(string $sourceType, string $sourceUuid, string $sourceFingerprint): array
     {
         if ($sourceType !== 'video' || !UuidCodec::isValid($sourceUuid)) return [];

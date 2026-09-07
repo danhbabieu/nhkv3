@@ -17,4 +17,5 @@ final class InMemoryProposalRepository implements ProposalRepository
     public function findForUpdate(string $id): ?Proposal { return $this->find($id); }
     public function recordApproval(Proposal $proposal, string $actor): void {}
     public function latestApproval(string $proposalId): ?array { return null; }
+    public function findLatestVideoIngest(string $videoId): ?Proposal { foreach (array_reverse($this->items) as $proposal) if ($proposal->entityType === 'video' && $proposal->operation === 'ingest' && ($proposal->payload['canonical_id'] ?? '') === $videoId) return $proposal; return null; }
 }
