@@ -3,11 +3,11 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Governance;
 
-use NHK\Core\Contracts\Governance\ProposalRepository;
+use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,ProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbProposalRepository implements ProposalRepository
+final class WpdbProposalRepository implements ProposalRepository, ApprovedRelationProposalRepository
 {
     public function __construct(private ?object $database = null) {}
     private function db(): object { global $wpdb; return $this->database ?? $wpdb; }
@@ -97,5 +97,27 @@ final class WpdbProposalRepository implements ProposalRepository
         $proposalDbId = $db->get_var($db->prepare('SELECT id FROM '.$this->table().' WHERE proposal_uuid=%s', UuidCodec::toBinary($proposalId)));
         if (!$proposalDbId) return null;
         return $db->get_row($db->prepare('SELECT * FROM '.$db->prefix.'nhk_proposal_approvals WHERE proposal_id=%d ORDER BY id DESC LIMIT 1', (int) $proposalDbId), ARRAY_A) ?: null;
+    }
+
+    public function findApprovedFingerprintBoundRelations(string $sourceType, string $sourceUuid, string $sourceFingerprint): array
+    {
+        if ($sourceType !== 'video' || !UuidCodec::isValid($sourceUuid)) return [];
+        $db = $this->db();
+        $rows = $db->get_results($db->prepare(
+            'SELECT * FROM '.$this->table().' WHERE entity_type=%s AND operation=%s AND state=%d ORDER BY id ASC',
+            'relation', 'relation_create', $this->state(ProposalState::APPROVED)
+        ), ARRAY_A) ?: [];
+        $matches = [];
+        foreach ($rows as $row) {
+            $proposal = $this->hydrate($row);
+            if ($proposal === null || $proposal->state !== ProposalState::APPROVED) continue;
+            $payload = $proposal->payload;
+            if (($payload['source_type'] ?? '') !== $sourceType || ($payload['source_uuid'] ?? '') !== $sourceUuid) continue;
+            if (isset($payload['source_fingerprint']) && (string) $payload['source_fingerprint'] !== $sourceFingerprint) continue;
+            $approval = $this->latestApproval($proposal->id);
+            if ($approval === null || (int) ($approval['proposal_revision'] ?? 0) !== $proposal->revision || !hash_equals((string) ($approval['fingerprint'] ?? ''), $this->fingerprintBinary($proposal->bindingFingerprint()))) continue;
+            $matches[] = $proposal;
+        }
+        return $matches;
     }
 }

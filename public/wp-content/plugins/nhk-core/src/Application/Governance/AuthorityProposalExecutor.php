@@ -11,6 +11,7 @@ use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Contracts\Governance\ApprovedRelationProposalRepository;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Graph\GraphEdge;
@@ -21,7 +22,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
@@ -58,8 +59,8 @@ final class AuthorityProposalExecutor
                 isset($payload['canonical_id']) && (string) $payload['canonical_id'] !== '' ? (string) $payload['canonical_id'] : null,
                 false,
             );
-            $this->materializeVideoAttachments($proposal, $video);
-            $this->assertVideoCompleteness($video);
+            $attachments = $this->materializeVideoAttachments($proposal, $video);
+            $this->assertVideoCompleteness($video, $attachments);
             return $this->video->activateAfterSemanticAttachments($video);
         }
         if ($proposal->entityType === 'video' && in_array($proposal->operation, ['update', 'retire', 'reactivate'], true)) {
@@ -158,11 +159,25 @@ final class AuthorityProposalExecutor
             : $this->graph->reactivate($edgeId, $proposal->expectedRevision);
     }
 
-    private function materializeVideoAttachments(Proposal $proposal, Video $video): void
+    /** @return list<array<string,mixed>> */
+    private function materializeVideoAttachments(Proposal $proposal, Video $video): array
     {
         $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
-        if (!array_key_exists('intake_version', $metadata) && $proposal->operation !== 'ingest') return;
+        if (!array_key_exists('intake_version', $metadata) && $proposal->operation !== 'ingest') return [];
         $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
+        if ($attachments === [] && $this->relationProposals !== null) {
+            foreach ($this->relationProposals->findApprovedFingerprintBoundRelations('video', $video->canonicalId, $proposal->bindingFingerprint()) as $relationProposal) {
+                if ($relationProposal->state !== \NHK\Core\Domain\Governance\ProposalState::APPROVED || $relationProposal->operation !== 'relation_create' || $relationProposal->entityType !== 'relation') continue;
+                $relation = $relationProposal->payload;
+                if (($relation['source_type'] ?? '') !== 'video' || ($relation['source_uuid'] ?? '') !== $video->canonicalId) continue;
+                $attachments[] = [
+                    'target_type' => $relation['target_type'] ?? '',
+                    'target_uuid' => $relation['target_uuid'] ?? ($relation['target_key'] ?? ''),
+                    'predicate' => $relation['predicate'] ?? '',
+                    'evidence_refs' => $relation['evidence_refs'] ?? [],
+                ];
+            }
+        }
         if ($attachments === []) throw new \RuntimeException('NO_SEMANTIC_ATTACHMENT');
         if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
         foreach ($attachments as $attachment) {
@@ -180,11 +195,14 @@ final class AuthorityProposalExecutor
                 new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? '')),
             );
         }
+        return $attachments;
     }
 
-    private function assertVideoCompleteness(Video $video): void
+    private function assertVideoCompleteness(Video $video, array $attachments = []): void
     {
-        $result = ($this->completeness ?? new VideoCompletenessPolicy())->evaluate($video->metadata);
+        $metadata = $video->metadata;
+        if ($attachments !== []) $metadata['semantic_attachments'] = $attachments;
+        $result = ($this->completeness ?? new VideoCompletenessPolicy())->evaluate($metadata);
         if (!$result->publishable) throw new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:' . implode(',', $result->blockers));
     }
 }

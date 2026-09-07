@@ -10,6 +10,7 @@ use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Video\VideoCompletenessPolicy;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Governance\ApprovedRelationProposalRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
@@ -153,5 +154,80 @@ final class VideoRelationLifecycleTest extends TestCase
         self::assertFalse((bool) $endpointStateAtCreate);
         self::assertTrue($video->active);
         self::assertSame($videoId, $videos->findByCanonicalId($videoId)?->canonicalId);
+    }
+
+    public function test_historical_video_proposal_discovers_approved_bound_relation(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $targetId = '22222222-2222-4222-8222-222222222222';
+        $secondTargetId = '44444444-4444-4444-8444-444444444444';
+        $relations = new class($videoId, $targetId, $secondTargetId) implements ApprovedRelationProposalRepository {
+            public function __construct(private string $videoId, private string $targetId, private string $secondTargetId) {}
+            public function findApprovedFingerprintBoundRelations(string $sourceType, string $sourceUuid, string $sourceFingerprint): array
+            {
+                return [new Proposal('relation-a', 'relation', 'relation_create', [
+                    'source_type' => 'video', 'source_uuid' => $this->videoId,
+                    'target_type' => 'brand', 'target_uuid' => $this->targetId, 'predicate' => 'about',
+                    'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']],
+                ], 'relation-a-fingerprint', null, 'deps', ProposalState::APPROVED, decisionActor: 'reviewer', entityType: 'relation'), new Proposal('relation-b', 'relation', 'relation_create', [
+                    'source_type' => 'video', 'source_uuid' => $this->videoId,
+                    'target_type' => 'brand', 'target_uuid' => $this->secondTargetId, 'predicate' => 'about',
+                    'evidence_refs' => [['evidence_id' => '33333333-3333-4333-8333-333333333333']],
+                ], 'relation-b-fingerprint', null, 'deps', ProposalState::APPROVED, decisionActor: 'reviewer', entityType: 'relation')];
+            }
+        };
+        $videos = new class implements VideoRepository {
+            public array $items = [];
+            public function findByCanonicalId(string $id): ?Video { return $this->items[$id] ?? null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { foreach ($this->items as $video) if ($video->platform === $platform && $video->externalVideoId === $externalId) return $video; return null; }
+            public function create(Video $video): Video { return $this->items[$video->canonicalId] = $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $this->items[$video->canonicalId] = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata, $video->thumbnailMediaId, $video->active, $expectedRevision + 1); }
+            public function list(bool $includeRetired = false): array { return array_values($this->items); }
+        };
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('video', new class($videos) implements \NHK\Core\Contracts\Graph\EndpointResolver {
+            public function __construct(private VideoRepository $videos) {}
+            public function supports(string $endpoint_type): bool { return $endpoint_type === 'video'; }
+            public function exists(NodeReference $reference): bool { return $this->videos->findByCanonicalId($reference->endpoint_key) !== null; }
+            public function normalize(NodeReference $reference): NodeReference { return $reference; }
+        });
+        $endpoints->register('brand', new FakeEndpointResolver('brand', [$targetId, $secondTargetId]));
+        $graphRepo = new InMemoryGraphRepository();
+        $graph = new GraphService($graphRepo, $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $claims = new class implements KnowledgeRepository {
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return new KnowledgeClaim($id, 'claim', 'Claim', 'fact'); }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $sources = new class implements SourceRepository {
+            public function findByCanonicalId(string $id): ?Source { return new Source($id, 'source', 'Source', 'website'); }
+            public function findByStableKey(string $stableKey): ?Source { return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $evidence = new class implements EvidenceRepository {
+            public function findByCanonicalId(string $id): ?Evidence { return new Evidence($id, '22222222-2222-4222-8222-222222222222', '44444444-4444-4444-8444-444444444444', 'supports', 'Excerpt'); }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+        };
+        $executor = new AuthorityProposalExecutor(new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()), $graph, null, new VideoService($videos), null, null, null, null, new CanonicalDependencyValidator($claims, $sources, $evidence), null, $relations);
+
+        $video = $executor(new Proposal('video-historical', 'video', 'ingest', [
+            'canonical_id' => $videoId, 'url' => 'https://youtu.be/dQw4w9WgXcQ', 'title' => 'Historical video',
+            'metadata' => [
+                'intake_version' => 1, 'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+                'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE', 'editorial' => ['title' => 'Historical', 'summary' => 'Summary', 'body' => 'Body'],
+                'category' => ['primary' => ['key' => '01']], 'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+                'seo' => ['title' => 'Historical', 'description' => 'Summary'], 'semantic_attachments' => [],
+            ],
+        ], 'video-fingerprint', null, 'deps', ProposalState::APPROVED, entityType: 'video'));
+
+        self::assertTrue($video->active);
+        self::assertCount(2, $graphRepo->allEdges());
     }
 }

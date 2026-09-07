@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+## Video–Relation controlled apply binding — 2026-09-07
+
+Controlled Video Apply now accepts a historical Video proposal whose
+`metadata.semantic_attachments` is empty by discovering approved
+fingerprint-bound `relation_create` proposals through the canonical
+`source_type=video` and `source_uuid` binding. The WPDB reader requires the
+proposal to remain APPROVED, the latest approval revision/fingerprint to
+match, and rejects optional source-fingerprint mismatches; GraphService still
+validates endpoints, predicates, evidence and cardinality. Discovered
+relations are materialized before completeness is recomputed and activation,
+inside the existing Controlled Apply transaction. Independent relation apply
+is unchanged and remains fail-closed when the Video endpoint is absent.
+
+Focused lifecycle verification passed 6 tests / 14 assertions; Unit passed
+683 tests / 3,315 assertions. PHP lint and diff-check passed. Guarded
+integration could not bootstrap a usable WordPress database in this process
+(database connection failure); the unguarded full suite also exposed the
+pre-existing integration bootstrap failures and was not treated as passing.
+No deployment or semantic data mutation was performed.
+
 ## Read-only canonical/Graph inventory capability — 2026-09-07
 
 Added backend-only read capabilities nhk.canonical.inventory,
