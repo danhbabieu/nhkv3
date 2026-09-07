@@ -57,8 +57,14 @@ final class GovernanceApi
             $body = is_array($body) ? $body : [];
             $id = UuidCodec::newV7();
             $operation = (string) ($body['operation'] ?? ''); $entityType = (string) ($body['entity_type'] ?? ''); $subjectId = (string) ($body['subject_id'] ?? '');
-            if ($subjectId === '' && in_array($operation, ['create', 'ingest', 'relation_create'], true)) $subjectId = $entityType !== '' ? $entityType : 'relation';
             $payload = is_array($body['payload'] ?? null) ? $body['payload'] : [];
+            if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
+                $subjectId = trim((string) $payload['source_uuid']);
+            } elseif ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) {
+                $subjectId = $entityType !== '' ? $entityType : 'relation';
+            } elseif ($subjectId === '' && $operation === 'relation_create') {
+                $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
+            }
             $expectedRevision = max(1, (int) ($body['expected_revision'] ?? 1));
             $targetUuid = isset($body['target_uuid']) ? trim((string) $body['target_uuid']) : null;
             $targetUuid = $targetUuid !== '' ? $targetUuid : null;

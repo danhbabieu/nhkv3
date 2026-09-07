@@ -41,8 +41,14 @@ final class McpGovernanceHandler implements GovernedLifecycle
         $operation = (string) ($arguments['operation'] ?? '');
         $entityType = (string) ($arguments['entity_type'] ?? '');
         $subjectId = (string) ($arguments['subject_id'] ?? '');
-        if ($subjectId === '' && in_array($operation, ['create', 'ingest', 'relation_create'], true)) $subjectId = $entityType !== '' ? $entityType : 'relation';
         $payload = is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [];
+        if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
+            $subjectId = trim((string) $payload['source_uuid']);
+        } elseif ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) {
+            $subjectId = $entityType !== '' ? $entityType : 'relation';
+        } elseif ($subjectId === '' && $operation === 'relation_create') {
+            $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
+        }
         $targetUuid = isset($arguments['target_uuid']) ? trim((string) $arguments['target_uuid']) : null;
         $targetUuid = $targetUuid !== '' ? $targetUuid : null;
         $expectedRevision = array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null

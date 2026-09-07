@@ -14,9 +14,16 @@ final class CanonicalApplyReadBackVerifier
     public function verify(Proposal $proposal, string $resultId): array
     {
         if ($resultId === '') throw new \RuntimeException('CANONICAL_READBACK_MISSING_RESULT_UUID');
-        $readBack = ($this->reader)($proposal->entityType, $resultId);
+        // A relation proposal may be authored from an endpoint domain (for
+        // example entity_type=knowledge), but its canonical apply result is
+        // owned by Graph. Keep the check strict while resolving the correct
+        // canonical owner for the result.
+        $canonicalType = in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)
+            ? 'relation'
+            : $proposal->entityType;
+        $readBack = ($this->reader)($canonicalType, $resultId);
         if (!is_array($readBack)
-            || ($readBack['entity_type'] ?? null) !== $proposal->entityType
+            || ($readBack['entity_type'] ?? null) !== $canonicalType
             || ($readBack['canonical_id'] ?? null) !== $resultId
             || ($readBack['active'] ?? false) !== true
             || !is_int($readBack['revision'] ?? null)

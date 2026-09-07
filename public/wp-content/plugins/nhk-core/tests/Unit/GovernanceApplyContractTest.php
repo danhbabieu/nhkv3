@@ -39,6 +39,20 @@ final class GovernanceApplyContractTest extends TestCase
         $this->expectExceptionMessage('CANONICAL_READBACK_VERIFICATION_FAILED');
         (new CanonicalApplyReadBackVerifier(static fn (string $type, string $uuid): array => ['entity_type' => 'evidence', 'canonical_id' => $uuid, 'active' => true, 'revision' => 1, 'snapshot' => []]))->verify($proposal, UuidCodec::newV7());
     }
+
+    public function test_relation_readback_uses_graph_owner_even_when_proposal_entity_type_is_endpoint_domain(): void
+    {
+        $proposal = new Proposal(UuidCodec::newV7(), UuidCodec::newV7(), 'relation_create', [], 'content', null, 'deps', ProposalState::APPROVED, idempotencyKey: 'relation-readback-owner', entityType: 'knowledge');
+        $seenType = null;
+        $id = UuidCodec::newV7();
+        $readBack = (new CanonicalApplyReadBackVerifier(static function (string $type, string $uuid) use (&$seenType): array {
+            $seenType = $type;
+            return ['entity_type' => 'relation', 'canonical_id' => $uuid, 'active' => true, 'revision' => 1, 'snapshot' => ['id' => $uuid]];
+        }))->verify($proposal, $id);
+
+        self::assertSame('relation', $seenType);
+        self::assertSame($id, $readBack['canonical_id']);
+    }
     /** @dataProvider governedProductSpecimenDirections */
     public function test_governed_product_specimen_about_relation_fails_closed(string $source, string $target): void
     {

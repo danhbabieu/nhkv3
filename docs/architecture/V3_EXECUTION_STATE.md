@@ -5178,3 +5178,21 @@ applied in this execution because no authenticated MCP credential/session was
 available to the agent and the only CLI alternative would impersonate
 `nhk_admin`, which is prohibited. DEMO data remains unchanged: 250 existing,
 0 created, 365 pending and 175 registry gaps.
+
+# Checkpoint — 2026-09-07 — Relation proposal canonical subject preservation
+
+Reproduced the relation proposal hydration defect with a regression test:
+`entity_type=knowledge` plus `payload.source_uuid` previously read back
+`subject_id=knowledge` because `WpdbProposalRepository::hydrate()` used the
+persisted entity type as the subject. The fix hydrates `relation_create`
+subjects from explicit `source_uuid` (or legacy `source_key` fallback), and
+MCP/REST command construction treats `source_uuid` as the canonical subject.
+Relation apply read-back remains strict and resolves the Graph canonical owner
+for relation operations; it does not ignore type mismatches.
+
+Focused governance tests pass: 48 tests / 289 assertions. Full Unit passes:
+733 tests / 3,561 assertions, with 2 existing warnings and PHPUnit deprecation
+notices. Local WordPress integration and deployment preflight are blocked by
+unavailable database connectivity; DEMO cutover fails closed with
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`. No DEMO proposal, Graph mutation or
+batch continuation was performed.

@@ -52,7 +52,11 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             $expectedRevision = $isCreateWithoutTarget && ($row['expected_revision'] === null || $row['expected_revision'] === '' || (string) $row['expected_revision'] === '0')
                 ? null
                 : ($row['expected_revision'] === null || $row['expected_revision'] === '' ? null : (int) $row['expected_revision']);
-            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), (string) $row['entity_type'], (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $expectedRevision, !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
+            $subjectId = (string) $row['entity_type'];
+            if ((string) ($row['operation'] ?? '') === 'relation_create') {
+                $subjectId = trim((string) ($payload['source_uuid'] ?? $payload['source_key'] ?? $subjectId));
+            }
+            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), $subjectId, (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $expectedRevision, !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
         } catch (\InvalidArgumentException|\JsonException) {
             return null;
         }

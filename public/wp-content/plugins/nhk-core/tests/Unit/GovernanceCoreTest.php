@@ -12,6 +12,8 @@ use NHK\Core\Governance\Exception\GovernancePermissionDenied;
 use NHK\Core\Domain\Governance\DependencyGraph;
 use NHK\Core\Governance\Exception\DependencyCycle;
 use NHK\Tests\Support\{InMemoryDependencyRepository, InMemoryProposalRepository};
+use NHK\Core\Infrastructure\Governance\WpdbProposalRepository;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class GovernanceCoreTest extends TestCase
@@ -102,6 +104,55 @@ final class GovernanceCoreTest extends TestCase
         $handler = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
         $proposal = $handler->createFromArguments(['operation' => 'create', 'entity_type' => 'brand', 'target_uuid' => '', 'payload' => ['stable_key' => 'brand-empty-target', 'name' => 'Brand']]);
         self::assertNull($proposal->targetUuid);
+    }
+
+    public function test_persisted_knowledge_relation_hydration_preserves_source_uuid_as_subject_id(): void
+    {
+        $sourceUuid = UuidCodec::newV7();
+        $repository = new WpdbProposalRepository();
+        $hydrate = new \ReflectionMethod($repository, 'hydrate');
+        $hydrate->setAccessible(true);
+
+        $proposal = $hydrate->invoke($repository, [
+            'id' => 0,
+            'proposal_uuid' => UuidCodec::toBinary(UuidCodec::newV7()),
+            'entity_type' => 'knowledge',
+            'operation' => 'relation_create',
+            'target_uuid' => '',
+            'expected_revision' => null,
+            'command_json' => json_encode(['source_uuid' => $sourceUuid, 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about'], JSON_THROW_ON_ERROR),
+            'fingerprint' => hash('sha256', 'content', true),
+            'dependency_fingerprint' => hash('sha256', 'dependency', true),
+            'state' => 1,
+            'revision' => 1,
+            'created_by' => 0,
+            'idempotency_key' => 'relation-hydration',
+            'created_at' => null,
+            'updated_at' => null,
+            'submitted_at' => null,
+            'applied_at' => null,
+            'cancelled_at' => null,
+            'rejected_at' => null,
+            'superseded_at' => null,
+            'superseded_by_proposal_id' => null,
+        ]);
+
+        self::assertSame($sourceUuid, $proposal?->subjectId);
+    }
+
+    public function test_mcp_relation_subject_is_normalized_to_explicit_source_uuid(): void
+    {
+        $sourceUuid = UuidCodec::newV7();
+        $handler = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
+        $proposal = $handler->createFromArguments([
+            'operation' => 'relation_create',
+            'entity_type' => 'knowledge',
+            'subject_id' => 'knowledge',
+            'payload' => ['source_type' => 'knowledge', 'source_uuid' => $sourceUuid, 'target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about'],
+            'idempotency_key' => 'relation-source-authority',
+        ]);
+
+        self::assertSame($sourceUuid, $proposal->subjectId);
     }
 
     public function test_review_returns_binding_fingerprints_after_submit(): void

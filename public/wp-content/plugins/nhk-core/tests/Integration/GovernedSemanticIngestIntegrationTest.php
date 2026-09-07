@@ -7,6 +7,7 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\{CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceService, ProposalEligibilityService};
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
+use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Contracts\Governance\{ApplyExecutionHook, GovernanceAuthorizer};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -86,6 +87,55 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         self::assertNotNull($edge);
         self::assertNotSame($source['proposal_id'], $source['canonical_id']);
         self::assertTrue($video['canonical_readback']['active']);
+    }
+
+    public function test_knowledge_relation_preserves_source_uuid_through_governance_and_graph_readback(): void
+    {
+        [, $variant, $governance, $apply] = $this->fixture();
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', [
+            'stable_key' => $this->prefix . '-relation-source',
+            'text' => 'A governed relation source claim.',
+            'claim_type' => 'fact',
+        ]);
+        $sourceUuid = $claim['canonical_id'];
+        $handler = new McpGovernanceHandler($governance, new ProposalEligibilityService(
+            new WpdbProposalRepository($GLOBALS['wpdb']),
+            new DependencyGraph(new WpdbDependencyRepository($GLOBALS['wpdb'])),
+            new WpdbEligibilityReader(
+                new WpdbAuthorityRepository($GLOBALS['wpdb']),
+                new WpdbProposalRepository($GLOBALS['wpdb']),
+                new WpdbGraphRepository($GLOBALS['wpdb']),
+                null,
+                new WpdbVideoRepository($GLOBALS['wpdb']),
+                new WpdbKnowledgeRepository($GLOBALS['wpdb']),
+                new WpdbSourceRepository($GLOBALS['wpdb']),
+                new WpdbEvidenceRepository($GLOBALS['wpdb']),
+            ),
+        ), $apply);
+        $proposal = $handler->createFromArguments([
+            'operation' => 'relation_create',
+            'entity_type' => 'knowledge',
+            'subject_id' => $sourceUuid,
+            'payload' => [
+                'source_type' => 'knowledge',
+                'source_uuid' => $sourceUuid,
+                'predicate' => 'about',
+                'target_type' => 'variant',
+                'target_uuid' => $variant->canonicalId,
+            ],
+            'idempotency_key' => $this->prefix . '-knowledge-about-variant',
+        ]);
+
+        self::assertSame($sourceUuid, $proposal->subjectId);
+        self::assertSame($sourceUuid, $handler->review($proposal->id)['subject_id']);
+        $submitted = $handler->submit($proposal->id);
+        $approved = $handler->approve($submitted->id, $submitted->contentFingerprint, $submitted->dependencyFingerprint, 'test-policy');
+        self::assertSame($sourceUuid, $handler->review($approved->id)['subject_id']);
+        self::assertTrue($handler->eligibility($approved->id)['ready']);
+
+        $result = $handler->apply($approved->id);
+        self::assertNotNull($result['canonical_readback']);
+        self::assertNotNull((new WpdbGraphRepository($GLOBALS['wpdb']))->findByUuid((string) $result['canonical_id']));
     }
 
     public function test_fail_closed_rejects_proposal_uuid_as_canonical_dependency(): void
