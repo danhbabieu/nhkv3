@@ -4730,3 +4730,28 @@ warnings and 5 PHPUnit deprecations; PHP lint PASS; Composer validation PASS
 with the pre-existing missing-license warning; `git diff --check` PASS. The
 remaining owner action is to provide the approved development WordPress
 runtime/database, then rerun the full audit sequence from Phase A.
+
+## Demo SSH deployment checkpoint — 2026-09-07
+
+Read-only SSH discovery against `demo.1945.vn` resolved the WordPress root to
+`/home/erourxcg/apps/nhkv3/public` and the deployed plugin path to
+`/home/erourxcg/apps/nhkv3/public/wp-content/plugins/nhk-core`. The remote app
+and plugin Git HEAD were both `f7f8f15946368c1c2f2ad7a1e5bdaa8cf97a9f08`, and
+the plugin header reports version `0.1.0`. SSH used the existing host config
+and private key outside the repository; no credential was copied into the
+repository.
+
+The external deployment INI was materialized at `/private/tmp/` with mode
+`0600`, containing only `ssh_target` and the discovered `remote_path`. The
+repository already has the target-allowlisted rsync/SSH adapter and excludes
+tests, environment files and PEM files from the artifact; no additional
+deployment plumbing was required. Focused read-only/deployment tests passed
+31 tests / 269 assertions. Unit passed 683 tests / 3,317 assertions with 2
+warnings and 5 PHPUnit deprecations. Composer validation and diff-check passed;
+Composer retains the pre-existing missing-license warning.
+
+Guarded Integration ran against `nhk_v3_test` but currently reports 110 tests,
+742 assertions, 1 warning, 1 deprecation, 2 skips, 1 error and 1 failure in
+`GovernedSemanticIngestIntegrationTest` for Video rollback/eligibility. This
+failure remains explicit and was not hidden or downgraded. No semantic,
+WordPress, Graph or demo data mutation was performed in this checkpoint.
