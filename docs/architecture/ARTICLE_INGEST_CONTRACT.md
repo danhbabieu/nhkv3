@@ -4,185 +4,165 @@
 > Hiến pháp. Nếu mâu thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > Hiến pháp kiểm soát.
 
-> **APPROVED DOCUMENTATION CONTRACT — 2026-09-02.** This contract implements
-> the Article Ingest boundary approved by
-> `docs/constitution/NHK_V3_CONSTITUTION.md`. It does not create an Article
+> **APPROVED DOCUMENTATION CONTRACT — reconciled 2026-09-07.** This contract
+> implements the Article Ingest boundary. It does not create an Article
 > Authority entity, a second editorial body, a Graph `article` endpoint, a new
-> status enum or a new operation name.
+> status enum or a new semantic owner.
 
 ## Purpose and ownership
 
 This is an operation-level contract for a request that intends to create,
 update or publish a V3 knowledge Article with semantic claims or relations.
-WordPress native `wp_posts` remains the sole owner of the editorial title,
-body, metadata and public editorial URL. Authority owns registered canonical
-entities; Knowledge owns atomic claims; Source/Evidence owns provenance and
-support; Graph owns typed relations; Governance owns durable semantic mutation.
+WordPress native `wp_posts` remains the sole owner of editorial title, body,
+metadata and public editorial URL. Authority owns registered canonical entities;
+Knowledge owns atomic claims; Source/Evidence owns provenance/support; Graph owns
+typed relations; Governance owns durable semantic mutation.
 
-No body is copied into Knowledge or Graph. Article, FAQ, Search and hub surfaces
-reuse registered records and do not become semantic owners.
+No body is copied into Knowledge or Graph. Article, FAQ, Search, hub, editorial
+Note and workspace annotations do not become semantic owners by containing facts.
+A note/research annotation remains editorial context unless its fact is promoted
+through canonical subject resolution, reconcile, Source/Evidence/Knowledge and
+Governance.
 
 All public promotional/commercial Article copy is additionally subject to
-`docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md`. That policy
-applies to title, excerpt, body, generated summary, contextual image copy and
-SEO/meta projection where those surfaces make promotional claims. Compliance
-review does not transfer editorial ownership away from WordPress and does not
-turn generated copy into Evidence.
+`docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md`.
 
 ## Required stage order
 
-1. Resolve all semantic references through the runtime registries. Subject
-   identity precedence is canonical UUID, stable key, then exact canonical
-   name/alias. Ambiguous, unknown or unsupported type, endpoint, field,
-   predicate, target or identity fails closed; a valid explicit UUID is never
-   ignored.
-2. Run semantic preflight for required claims, sources/evidence, relation
-   direction, readiness, provenance, authorization and expected revisions.
-   Generic Article preflight resolves subjects only through the shared
-   canonical resolver; it never hard-codes a WordPress Post ID. A concrete
-   `wp_post` stable key may identify the editorial target only where the
-   operation contract explicitly requires an existing Post.
-3. Reconcile Article Media through the governed Media V3 flow. Every file
-   ingest/adoption validates the actual image payload, fails closed for
-   corrupt/fake/unreadable bytes, retains the source-original PRIVATE and
-   exposes only eligible optimized derivatives PUBLIC under the same canonical
-   Media identity. Attachment state is projection/storage only. The result
-   must expose representative/evidence according to the Media projection
-   contract and remain idempotent.
-4. Create or update the native WordPress Post as a draft. The Post identity is
-   the registered `wp_post` endpoint with stable key `<blog_id>:<post_id>`.
-5. Submit and apply semantic mutations through the existing
-   Proposal → Human Approval → Eligibility → Controlled Apply → repository →
-   audit boundary. Direct Graph or semantic repository writes are not a
-   substitute.
-6. Read back the semantic records, Graph relations, Media assets/usages,
-   representative/evidence projection and WordPress Post. Verify
-   canonical identity, revisions, visibility, relation direction, provenance
-   and public projection eligibility.
-7. Before publication of promotional/commercial copy, run the public-claim
-   compliance gate over the rendered Article and its public projections. An
-   unsupported objective or superiority/uniqueness/absolute claim must be
-   evidence-bound, genuinely narrowed by rewrite, or blocked for human review;
-   synonym substitution alone is not a compliant rewrite.
-8. Publish the WordPress Post only when all required stages have satisfied this
-   contract. Generic WordPress publication remains independently valid, but it
-   is not a completed V3 knowledge Article workflow without these stages.
+1. **Resolve semantic owners and subject.** Resolve by canonical UUID → stable
+   key → exact canonical name/alias. Unknown/ambiguous type, endpoint, predicate,
+   field or target fails closed. A valid explicit UUID is never ignored.
+2. **Reconcile before create.** Inventory current Authority, Knowledge,
+   Source/Evidence and relevant Graph relations. Classify each intended new
+   semantic object as exact existing, merge/update candidate, related-but-
+   distinct, genuinely new or uncertain. Fuzzy/keyword/prose similarity is not
+   identity proof. Uncertain candidates are deferred rather than created.
+3. **Enforce no-orphan Knowledge.** Resolve the canonical subject/context before
+   a new claim is created. If a genuinely missing Authority node is required,
+   create/apply/read it back first. If the subject cannot be resolved or safely
+   created, defer the claim; do not “create now, attach later”.
+4. **Run semantic preflight.** Verify required claims, sources/evidence,
+   registered relation direction, readiness, provenance, authorization,
+   revisions, idempotency and public/compliance planning. Generic preflight does
+   not hard-code a WordPress Post ID.
+5. **Reconcile Article Media.** Use the governed Media V3 flow: validate actual
+   bytes, reconcile/reuse canonical Media, retain source-original PRIVATE/
+   protected, create eligible derivatives under the same Media identity, create
+   contextual usages, and read Media/Asset/Usage/attachment projection back.
+6. **Create/update native WordPress draft.** The Post remains the editorial
+   owner. Registered `wp_post` endpoint stable key is `<blog_id>:<post_id>`.
+7. **Run semantic mutations through full Governance.** For Authority,
+   Knowledge, Source, Evidence and Graph mutations use `proposal create/ingest →
+   submit → review → approval with binding fingerprints → eligibility →
+   Controlled Apply → canonical owner read-back → idempotency verification`.
+   Direct Graph or semantic repository writes are not substitutes.
+8. **Verify cross-owner read-back.** Read Authority/Knowledge/Source/Evidence,
+   Graph, Media and WordPress through their canonical owners. Verify identities,
+   revisions, visibility, relation direction, provenance, Media usage and
+   projection eligibility. Proposal/apply state alone is not completion.
+9. **Run public-claim compliance** over rendered/public projections when
+   applicable. Unsupported objective or superiority/uniqueness/absolute claims
+   are evidence-bound, genuinely narrowed, or blocked for review.
+10. **Publish WordPress only after required gates.** Generic WordPress
+   publication remains independently valid, but it is not a completed V3
+   knowledge Article workflow without required semantic/read-back stages.
+
+## Semantic research and promotion
+
+Article research/body text can discover candidate facts, but the Article payload
+is never a semantic writer. A repeated fact resolves/reuses existing canonical
+Knowledge. A genuinely new fact must leave the editorial workspace and enter the
+normal Source/Evidence/Knowledge/Governance path before it can be called
+canonical.
+
+Dictionary lexical matches, keyword overlap, title/body similarity, AI synthesis
+and research notes may help discovery; they do not prove canonical identity.
+New relation candidates must use registered Graph vocabulary and canonical typed
+endpoints. Missing predicate remains `REGISTRY_GAP`; broad `about` is not a
+workaround for classification membership, structural/configuration relations or
+Product–Specimen ownership.
 
 ## Completion and failure
 
-A completion claim requires success of every required editorial, semantic,
-verification and applicable public-claim compliance stage. A required semantic,
-compliance or unavailable dependency failure must remain an explicit
-non-success, retryable, unavailable, conflict or equivalent outcome defined by
-the eventual approved runtime contract. This document does not reserve or
-invent a closed outcome vocabulary.
+A completed V3 Article operation requires every required editorial, semantic,
+media, verification and compliance stage. `DRAFT`, `SUBMITTED`, `APPROVED`,
+`ready=true`, HTTP success or Controlled Apply response is not enough. Each
+semantic mutation must be confirmed by canonical owner read-back.
 
-The runtime implementation must preserve canonical UUID/stable-key identity,
-optimistic revision, typed relation, provenance, readiness, idempotency, public
-identity and fail-closed invariants. Cross-boundary idempotency, WordPress
-revision binding, durable outcome recording, public-claim policy versioning and
-observability are follow-up implementation requirements, not claims of current
-runtime support.
+Second-run/idempotency acceptance requires no duplicate Authority node,
+Knowledge claim, Source, Evidence, Media, Video, active relation or publication
+side effect for unchanged durable intent.
+
+Required failure remains explicit: retryable, unavailable, identity/revision
+conflict, registry/evidence gap, review-required or another contract-defined
+non-success. Rate-limit/runtime interruption reuses an existing proposal/
+idempotency binding; it does not mint a replacement proposal for the same
+intent.
 
 ## Explicit exclusions
 
-- No Article Authority type, Article body projection, FAQ entity or `article`
-  Graph endpoint.
+- No Article Authority type, Article body projection, FAQ/Note semantic entity or
+  `article` Graph endpoint.
 - No identity derived from prose, title, body, URL, slug, checksum or display
   name.
-- No legacy article-body migration, import, parse or population.
+- No legacy article-body migration/import/parse/population.
 - No call from Article Ingest to `V2MigrationService.php`.
 - No direct `PostKnowledgeLinkService` Graph mutation outside
-  Governance/Controlled Apply; if such a reachable path exists, record
-  `CONSTITUTION_CONFLICT` and close it in a reviewed implementation slice.
-- No post-55 delete, replacement, slug/URL change, body-copy change or duplicate
-  semantic identity as part of this contract.
-- No generated ranking, award, uniqueness, market-leadership or other strong
-  promotional assertion may be treated as Evidence merely because it appears
-  in an Article draft or AI-generated copy.
+  Governance/Controlled Apply.
+- No Article payload/frontend/template mutation that creates semantic truth.
+- No generated ranking/award/uniqueness/market-leadership claim treated as
+  Evidence merely because it appears in draft/generated copy.
+- No automatic Article body rewrite from a later Knowledge change; use
+  suggestion/governed editorial flow.
 
 ## Current implementation status
 
-Phase 1 implements the reconcile-only coordinator, durable operation receipt,
-deterministic child proposal planning, read-only editorial fingerprinting,
-semantic/editorial verification, diagnostics and the coordinated MCP surface.
-The receipt is orchestration/recovery state and never stores the full Article
-body. Semantic writes remain behind Governance and Controlled Apply.
+`nhk.article.preflight` is read-only and includes reconciliation/research
+planning. `nhk.article.ingest` is the governed execute/resume coordinator for
+its supported Article reconciliation boundary. Native Article draft/create/
+update and publication operations remain WordPress editorial operations with
+state-token/CAS and publication gates; semantic child changes remain separate
+Governance operations.
 
-`nhk.article.preflight` is read-only; `nhk.article.ingest` remains the governed
-execute/resume surface for reconciliation. The separate typed draft gateway
-supports draft-only create/update with receipt idempotency and native
-state-token CAS; it does not publish, trash, apply semantic proposals, ingest
-Media/Video or copy body into semantic storage. Draft results remain blocked
-for publication until later semantic, media, compliance, rendered-public
-verification and read-back gates complete. Rendered verification preserves
-stored-state, rendered-state, public-route-state and unavailable-runtime
-evidence; a stored DTO pass is not a public pass. Publication receipts record
-body-free cross-boundary evidence, and uncertain native transitions are resolved
-by Post read-back before a retry may act.
-Production Post 55 execution remains outside this implementation and requires
-the separate human-reviewed reconciliation packet.
+Article receipts are orchestration/recovery state and never store the full body.
+Rendered public verification remains distinct from stored DTO verification;
+uncertain native publication transitions require WordPress read-back before a
+retry acts.
 
-The public-claim compliance law is documentation-approved, but automated claim
-classification/evidence validation across every output channel is not claimed
-implemented by this file. Until runtime support is verified, publication uses
-human review and the shared compliance contract rather than silently assuming a
-pass.
+Subject resolution is shared with current semantic resolver/inventory. Concrete
+Post IDs may be fixtures/operation targets but are never hard-coded semantic
+resolution exceptions.
 
-Subject resolution is shared by search/inventory and Article preflight. The
-generic preflight has no WordPress Post-ID exception; concrete Post IDs may
-appear only as test fixtures.
+## Media/Image reuse boundary
 
+Article media reuses canonical Media where available. A new upload enters the
+shared governed Media boundary, retains source-original as private/protected
+MediaAsset and keeps optimized/WordPress derivatives under the same Media.
+WordPress owns featured/inline ordering; MediaUsage stores contextual role/SEO
+metadata and does not itself create Graph or Knowledge/Evidence truth.
 
-## Media, image and Living Knowledge reuse boundary — 2026-09-04
+Media view/detail concepts and semantic relations remain separate. Alt/caption/
+OCR/filename/recognition may feed research only. If the Article asserts a Media
+semantic relation, canonical subject resolution and registered Graph/Governance
+are required.
 
-Article editorial storage and semantic storage remain deliberately separate.
-The WordPress Post owns title/body/excerpt, editorial image ordering and public
-editorial URL. Article Ingest receipts, Governance records and Knowledge
-repositories must not persist a duplicate copy of the Article body as semantic
-truth.
+## Video reuse boundary
 
-Article media must reuse canonical `Media` where available. A new upload enters
-the governed Media boundary, retains the source-original as a private/protected
-MediaAsset and projects normalized WebP/responsive/WordPress attachment outputs
-under the same Media identity. Featured/inline selection remains WordPress
-editorial state; `MediaUsage` records contextual role/SEO metadata and does not
-itself create a Graph edge or Knowledge/Evidence.
-
-An Article that repeats an existing fact should resolve and reuse the canonical
-Knowledge/Source/Evidence chain rather than minting a duplicate claim from its
-prose. New factual observations extracted from Article research/body context are
-planning inputs only until they pass the shared Living Knowledge planner and
-normal Governance lifecycle. A Knowledge update may produce an Article update
-suggestion, but it never rewrites a published WordPress body automatically.
-
-Video and Media references embedded in an Article retain their own bounded
-identity and storage. A Video `about` relation or Media `depicts` relation does
-not make the Article body Evidence. Likewise, alt/caption/OCR/generated copy is
-not Evidence merely because WordPress renders it publicly.
-
-Downstream systems must therefore reuse canonical IDs plus revisions and verify
-read-back across the owning boundary: WordPress for Article editorial state,
-Media/MediaAsset/MediaUsage for image state, Video for external-reference state,
-Knowledge/Source/Evidence for factual state, and Graph only for registered typed
-relations.
+Video referenced in Article retains its own canonical external identity and
+provenance. Article body text does not become Video Evidence. A guided Video
+relation may have its own canonical Source→Claim→Evidence provenance chain; the
+Article only projects/references that canonical truth and does not duplicate it.
 
 ## Runtime acceptance boundary
 
-Media and semantic identity operations remain separate inside this chain:
-Article subject resolution or semantic rekey must not mutate WordPress
-attachment metadata, physical filenames, derivatives or inline URLs. Any
-basename normalization requires the independent governed Media operation and
-its complete checksum/HTTP read-back evidence.
+Acceptance is a chain, not isolated unit passes:
 
-The acceptance path is one evidence chain, not a collection of isolated unit
-passes:
+`real image file → governed ingest/adoption → WP attachment projection → one
+canonical Media → source/derivatives/usages read-back → Article preflight →
+canonical subject/Knowledge/Source/Evidence reconciliation → governed semantic
+apply/read-back → rendered/publication verification`.
 
-`real image file → governed file ingest/adoption → WordPress attachment → one
-canonical Media identity → source-original PRIVATE + PUBLIC derivatives →
-MediaAsset/MediaUsage read-back → representative/evidence entity projection →
-Article preflight subject resolution`.
-
-The chain is accepted only when each boundary is proven with the real
-integration runtime. Focused unit tests may prove local behavior but cannot be
-reported as runtime acceptance or as completion of an unrun WordPress test.
+Runtime acceptance is claimed only for stages actually observed in the exact
+authorized environment. Historical environment blockers remain dated evidence,
+not timeless proof that current semantic writers or Graph read-back are
+unavailable.
