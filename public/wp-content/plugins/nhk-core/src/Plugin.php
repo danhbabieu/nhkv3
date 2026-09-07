@@ -410,7 +410,11 @@ final class Plugin {
 
     private static function relationBackfill(CanonicalInventoryService $canonicalInventory, GraphInventoryService $graphInventory): RelationBackfillService
     {
-        $planner = new LegacyRelationPlanner();
+        $canonicalByType = [];
+        foreach ($canonicalInventory->inventory([], 10000)->items as $record) {
+            if (($record['stable_key'] ?? '') !== '' && ($record['uuid'] ?? '') !== '') $canonicalByType[(string) $record['type']][(string) $record['stable_key']] = (string) $record['uuid'];
+        }
+        $planner = new LegacyRelationPlanner($canonicalByType);
         $edges = $graphInventory->inventory([], 10000)->items;
         $exists = static function (RelationBackfillCandidate $candidate) use ($edges): bool {
             foreach ($edges as $edge) {

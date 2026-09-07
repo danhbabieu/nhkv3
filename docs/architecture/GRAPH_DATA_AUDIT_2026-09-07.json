@@ -69,19 +69,19 @@
     "integration": "PASS_108_TESTS_730_ASSERTIONS_1_WARNING_1_DEPRECATION_2_SKIPS"
   },
   "live_demo_execution": {
-    "status": "PASS_WITH_DETERMINISTIC_DEBT_UNRESOLVED",
-    "source_commit": "d367df1-maintenance-null-cursor-fix",
+    "status": "PASS_WITH_GOVERNED_APPLY_BLOCKED",
+    "source_commit": "5f23b94",
     "deployment": "PASS_WITH_CHECKSUM_READBACK",
     "migration": {"status": "PASS", "current": 15, "target": 15, "runtime_markers": {"WP_ENVIRONMENT_TYPE": "staging", "NHK_AUTHORIZED_MIGRATION_DATABASE": "erourxcg_nhkv3", "NHK_MIGRATION_RUNTIME": "demo"}},
     "inventory": {"canonical": "PASS", "graph": "PASS"},
-    "relation_dry_run": {"status": "PASS_READ_ONLY", "scanned": 1809, "existing": 249, "missing_deterministic": 0, "ambiguous": 0, "relation_pending": 855, "registry_gap": 175, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0, "created": 0},
+    "relation_dry_run": {"status": "PASS_READ_ONLY", "scanned": 1814, "existing": 250, "missing_deterministic": 492, "ambiguous": 0, "relation_pending": 365, "registry_gap": 175, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0, "created": 0, "candidate_breakdown": {"model": 30, "variant": 39, "knowledge": 423, "video": 0}},
     "pending_classification": {
       "total": 855,
-      "reason": "MISSING_RELATION_METADATA",
+      "reason": "DETERMINISTIC_REMEDIATION_LIVE_DRY_RUN",
       "by_type": {"knowledge": 780, "model": 30, "variant": 42, "video": 3},
-      "resolved": 0,
+      "resolved": 492,
       "applied": 0,
-      "genuinely_unresolved": 855,
+      "genuinely_unresolved": 365,
       "manifest_files": [
         "GRAPH_RELATION_PENDING_KNOWLEDGE_01..08_2026-09-07.json",
         "GRAPH_RELATION_PENDING_MODEL_01_2026-09-07.json",
@@ -95,12 +95,13 @@
         "video": "Provide explicit target_type+target_uuid with evidence_refs through Video relation workflow"
       }
     },
-    "governed_apply": "NOT_RUN_NO_DETERMINISTIC_CANDIDATES; no safe candidate existed",
-    "second_run": {"status": "PASS_READ_ONLY_IDEMPOTENT", "created": 0, "missing_deterministic": 0},
+    "deterministic_remediation": {"before": 855, "counters": {"AUTO_RESOLVABLE_EXACT": 492, "AMBIGUOUS": 0, "NO_CANONICAL_TARGET": 360, "INSUFFICIENT_EVIDENCE": 3}, "resolved_by_type": {"model": 30, "variant": 39, "knowledge": 423, "video": 0}, "unresolved_by_type": {"model": 0, "variant": 3, "knowledge": 357, "video": 3}, "apply": "BLOCKED_GOVERNED_BATCH_SURFACE_UNAVAILABLE", "blocker": "Existing maintenance entrypoint returns CUTOVER_APPLICATION_WIRING_REQUIRED; automatic SSH wp_set_current_user impersonation was rejected by execution policy. No relation mutation was performed."},
+    "governed_apply": "NOT_RUN_GOVERNED_BATCH_SURFACE_UNAVAILABLE",
+    "second_run": {"status": "PASS_READ_ONLY", "created": 0, "missing_deterministic": 492, "relation_pending": 365},
     "odo": "READBACK_PASS; existing inbound about relations and bounded neighborhood; no pending deterministic candidate",
     "cuckoo": "READBACK_PASS; bounded neighborhood empty; no pending deterministic candidate",
-    "residual_debt": {"relation_pending": 855, "missing_deterministic": 0, "registry_gap": 175},
-    "policy_note": "No raw DB bypass, production/V2 access, or relation mutation was performed; no relation was guessed."
+    "residual_debt": {"relation_pending": 365, "missing_deterministic": 492, "registry_gap": 175},
+    "policy_note": "No raw DB bypass, production/V2 access, or relation mutation was performed; no relation was guessed. Governed apply requires an authenticated batch surface or explicit human approval per proposal."
   },
   "errors": [],
   "owner_actions": [

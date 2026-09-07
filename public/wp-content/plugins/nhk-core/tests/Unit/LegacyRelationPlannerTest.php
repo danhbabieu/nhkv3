@@ -60,4 +60,53 @@ final class LegacyRelationPlannerTest extends TestCase
             'type' => 'video', 'uuid' => 'video-1', 'provenance' => [],
         ])['expected_relation']['predicate']);
     }
+
+    public function test_exact_model_namespace_resolves_to_unique_canonical_brand(): void
+    {
+        $planner = new LegacyRelationPlanner([
+            'brand' => ['nhk:brand:odo' => 'brand-odo'],
+        ]);
+
+        $result = $planner->resolve([
+            'type' => 'model', 'uuid' => 'model-odo-36', 'stable_key' => 'nhk:model:odo.36', 'provenance' => [],
+        ]);
+
+        self::assertSame('MISSING_DETERMINISTIC', $result['status']);
+        self::assertSame('brand-odo', $result['candidate']['targetUuid']);
+        self::assertSame('STABLE_KEY_HIERARCHY', $result['reason']);
+    }
+
+    public function test_variant_uses_longest_exact_canonical_model_prefix(): void
+    {
+        $planner = new LegacyRelationPlanner([
+            'model' => [
+                'nhk:model:odo.36' => 'model-36',
+                'nhk:model:odo' => 'model-odo',
+            ],
+        ]);
+
+        $result = $planner->resolve([
+            'type' => 'variant', 'uuid' => 'variant-odo-36-8', 'stable_key' => 'nhk:variant:odo.36.8', 'provenance' => [],
+        ]);
+
+        self::assertSame('MISSING_DETERMINISTIC', $result['status']);
+        self::assertSame('model-36', $result['candidate']['targetUuid']);
+    }
+
+    public function test_knowledge_uses_most_specific_exact_canonical_namespace(): void
+    {
+        $planner = new LegacyRelationPlanner([
+            'brand' => ['nhk:brand:odo' => 'brand-odo'],
+            'model' => ['nhk:model:odo.36' => 'model-36'],
+            'variant' => ['nhk:variant:odo.36.8' => 'variant-36-8'],
+        ]);
+
+        $result = $planner->resolve([
+            'type' => 'knowledge', 'uuid' => 'knowledge-odo-36-8', 'stable_key' => 'nhk:knowledge:odo.36.8.gong', 'provenance' => [],
+        ]);
+
+        self::assertSame('MISSING_DETERMINISTIC', $result['status']);
+        self::assertSame('variant-36-8', $result['candidate']['targetUuid']);
+        self::assertSame('variant', $result['candidate']['targetType']);
+    }
 }

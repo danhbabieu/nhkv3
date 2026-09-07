@@ -5085,3 +5085,22 @@ and bounded neighborhood read-back remain intact. Cuckoo Classification UUID
 `01a07614-832d-7f27-959c-74eb0cd63f3e` has no bounded neighborhood relation
 to apply. No relation mutation occurred, so before/after remains 249 and
 created remains 0; the second read-only scan remains created=0.
+
+# Checkpoint — 2026-09-07 — Deterministic relation remediation dry-run
+
+The resolver was extended only for exact canonical stable-key hierarchy. A
+fresh DEMO dry-run scanned 1,814 records and produced 492 exact candidates:
+Model → Brand 30/30, Variant → Model 39/42, and Knowledge → specific Variant,
+Model or Brand 423/780. No ambiguous candidate was produced. The remaining
+365 are Variant 3 + Knowledge 357 with `NO_CANONICAL_TARGET`, and Video 3
+with `INSUFFICIENT_EVIDENCE`; Model unresolved is 0. The 175 `REGISTRY_GAP`
+records were not processed.
+
+Governed apply was not run. The existing maintenance entrypoint has no batch
+implementation and returns `CUTOVER_APPLICATION_WIRING_REQUIRED`; an
+automatic SSH invocation that impersonated `nhk_admin` for proposal
+create/submit/approve/apply was rejected by execution policy. No Graph
+mutation, raw DB bypass, registry workaround, or guessed relation occurred.
+The live state therefore remains `existing=250`, `created=0`,
+`RELATION_PENDING=365`, `MISSING_DETERMINISTIC=492`; post-apply directional
+read-back and post-apply idempotency are not claimable.
