@@ -14,6 +14,7 @@ final class AdminWorkbenchPage
     public static function register(): void
     {
         add_action('admin_menu', [self::class, 'registerMenu'], 11);
+        add_action('admin_post_nhk_governance_automation_policy', [self::class, 'saveAutomationPolicy']);
     }
 
     public static function registerMenu(): void
@@ -38,6 +39,7 @@ final class AdminWorkbenchPage
         add_submenu_page('nhk-v3', 'Tri thức', 'Tri thức', 'nhk_view_governance', 'nhk-v3-knowledge', [self::class, 'renderKnowledge']);
         add_submenu_page('nhk-v3', 'Duyệt', 'Duyệt', 'nhk_view_governance', 'nhk-v3-governance', [self::class, 'renderGovernance']);
         add_submenu_page('nhk-v3', 'Hệ thống', 'Hệ thống', 'manage_options', 'nhk-v3-system', [self::class, 'renderSystem']);
+        add_submenu_page('nhk-v3', 'Phê duyệt & xuất bản tự động', 'Phê duyệt & xuất bản tự động', 'manage_options', 'nhk-v3-automation-policy', [self::class, 'renderAutomationPolicy']);
         add_submenu_page('nhk-v3', 'Nâng cao', 'Nâng cao', 'manage_options', 'nhk-v3-advanced', [AdminPage::class, 'render']);
     }
 
@@ -70,6 +72,50 @@ final class AdminWorkbenchPage
     public static function renderKnowledge(): void { self::renderWorkspace('Tri thức', 'Entity, Claim, Source, Evidence và Relation trong một ô tìm kiếm.', 'knowledge'); }
     public static function renderGovernance(): void { self::renderWorkspace('Duyệt', 'Hàng đợi governed với diff dễ hiểu và read-back sau mỗi action.', 'governance'); }
     public static function renderSystem(): void { self::renderWorkspace('Hệ thống', 'Health, readiness và runtime diagnostics read-only.', 'system'); }
+
+    public static function renderAutomationPolicy(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Bạn không có quyền thay đổi chính sách tự động.');
+        $types = self::automationTypes();
+        $storage = new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage(array_keys($types));
+        $resolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver(array_keys($types), $storage);
+        echo '<div class="wrap nhk-admin-workbench"><header class="nhk-admin-hero"><div><p class="nhk-admin-eyebrow">NHK V3 · Hệ thống</p><h1>Phê duyệt &amp; xuất bản tự động</h1><p class="nhk-admin-lead">Cấu hình cách dữ liệu từ MCP đi qua Governance. Human review is configurable; Governance gates are not.</p></div></header>';
+        if (isset($_GET['saved'])) echo '<div class="notice notice-success is-dismissible"><p>Đã lưu chính sách tự động.</p></div>';
+        if (isset($_GET['error'])) echo '<div class="notice notice-error"><p>Không thể lưu chính sách tự động. Kiểm tra quyền và giá trị đã chọn.</p></div>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="nhk_governance_automation_policy">';
+        wp_nonce_field('nhk_governance_automation_policy_save');
+        echo '<table class="widefat striped"><thead><tr><th>Loại dữ liệu</th><th>Chế độ</th><th>Giải thích</th></tr></thead><tbody>';
+        foreach ($types as $type => $definition) {
+            $mode = $resolver->resolve($type)->value;
+            echo '<tr><th scope="row">' . esc_html($definition['label']) . '</th><td><select name="policies[' . esc_attr($type) . ']" aria-label="Chế độ ' . esc_attr($definition['label']) . '">';
+            foreach ([
+                'REVIEW_REQUIRED' => 'Cần phê duyệt',
+                'AUTO_APPROVE' => 'Tự động phê duyệt',
+                'AUTO_PUBLISH' => 'Tự động phê duyệt & xuất bản',
+            ] as $value => $label) echo '<option value="' . esc_attr($value) . '"' . selected($mode, $value, false) . '>' . esc_html($label) . '</option>';
+            echo '</select></td><td>' . esc_html($definition['description']);
+            if ($mode === 'AUTO_PUBLISH') echo '<br><strong>Cảnh báo:</strong> Dữ liệu hợp lệ từ MCP sẽ được tự động phê duyệt, Apply và xuất bản mà không cần thao tác thủ công.';
+            echo '</td></tr>';
+        }
+        echo '</tbody></table><p><button class="button button-primary" type="submit">Lưu</button></p></form></div>';
+    }
+
+    public static function saveAutomationPolicy(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Bạn không có quyền thay đổi chính sách tự động.', '', ['response' => 403]);
+        check_admin_referer('nhk_governance_automation_policy_save');
+        $types = self::automationTypes();
+        try {
+            $raw = isset($_POST['policies']) && is_array($_POST['policies']) ? wp_unslash($_POST['policies']) : [];
+            $policies = [];
+            foreach ($raw as $type => $mode) $policies[(string) $type] = (string) $mode;
+            (new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage(array_keys($types)))->write($policies);
+            wp_safe_redirect(add_query_arg(['page' => 'nhk-v3-automation-policy', 'saved' => '1'], admin_url('admin.php')));
+        } catch (\Throwable) {
+            wp_safe_redirect(add_query_arg(['page' => 'nhk-v3-automation-policy', 'error' => '1'], admin_url('admin.php')));
+        }
+        exit;
+    }
 
     private static function renderWorkspace(string $title, string $description, string $workspace): void
     {
@@ -130,7 +176,19 @@ final class AdminWorkbenchPage
         $workspace = AdminWorkspaceViewModel::fromHealth((new HealthCheck($status))->read(), [], []);
         echo '<section class="nhk-admin-panel"><h2>Runtime health</h2><p>Read-only. Runtime failure không được hiển thị thành empty success.</p><table class="widefat striped"><tbody>';
         foreach ($workspace['health'] as $item) echo '<tr><th>' . esc_html((string) ($item['label'] ?? '')) . '</th><td><strong>' . esc_html((string) ($item['state_label'] ?? 'Không khả dụng')) . '</strong> — ' . esc_html((string) ($item['display'] ?? 'Không khả dụng')) . '</td></tr>';
-        echo '</tbody></table></section><section class="nhk-admin-panel"><h2>Raw/technical tooling</h2><p>Các thao tác migration, proposal raw và diagnostics chi tiết vẫn ở <a href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced#system')) . '">Nâng cao</a>.</p></section>';
+        echo '</tbody></table></section><section class="nhk-admin-panel"><h2>Phê duyệt &amp; xuất bản tự động</h2><p>Cấu hình mode theo loại dữ liệu; các gate Governance vẫn bắt buộc.</p><p><a class="button" href="' . esc_url(admin_url('admin.php?page=nhk-v3-automation-policy')) . '">Mở cấu hình</a></p></section><section class="nhk-admin-panel"><h2>Raw/technical tooling</h2><p>Các thao tác migration, proposal raw và diagnostics chi tiết vẫn ở <a href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced#system')) . '">Nâng cao</a>.</p></section>';
+    }
+
+    /** @return array<string,array{label:string,description:string}> */
+    private static function automationTypes(): array
+    {
+        $registry = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
+        \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($registry);
+        $labels = ['wp_post' => 'Bài viết / Content', 'media' => 'Hình ảnh / Media', 'video' => 'Video', 'knowledge' => 'Tri thức / Knowledge', 'source' => 'Nguồn / Source', 'evidence' => 'Evidence'];
+        $types = [];
+        foreach ($registry->all() as $definition) $types[$definition->type] = ['label' => $labels[$definition->type] ?? $definition->type, 'description' => 'Dữ liệu canonical được xử lý qua Governance.'];
+        foreach ($labels as $type => $label) if (!isset($types[$type])) $types[$type] = ['label' => $label, 'description' => 'Dữ liệu được tiếp nhận qua boundary hiện hành.'];
+        return $types;
     }
 
     /** @param list<array<string,string>> $sections */
