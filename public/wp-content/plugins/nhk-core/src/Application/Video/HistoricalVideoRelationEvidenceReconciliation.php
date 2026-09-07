@@ -38,11 +38,11 @@ final class HistoricalVideoRelationEvidenceReconciliation
             $claim = $this->claimForRelation($relation, $videoId);
             if ($refs !== []) {
                 foreach ($refs as $ref) {
-                    $item = $this->evidence->findByCanonicalId($ref['evidence_id']);
-                    if ($item === null || $item->claimId !== $claim->canonicalId || ($item->metadata['origin'] ?? '') !== 'VIDEO_CANONICAL_PROVENANCE' || ($item->metadata['video_uuid'] ?? '') !== $videoId || strtoupper((string) ($item->metadata['visibility'] ?? '')) !== 'PRIVATE') throw new \RuntimeException('WRONG_EVIDENCE_PROVENANCE');
+                    $item = $this->canonicalEvidence($ref['evidence_id']);
+                    if ($item->claimId !== $claim->canonicalId || ($item->metadata['origin'] ?? '') !== 'VIDEO_CANONICAL_PROVENANCE' || ($item->metadata['video_uuid'] ?? '') !== $videoId || strtoupper((string) ($item->metadata['visibility'] ?? '')) !== 'PRIVATE') throw new \RuntimeException('WRONG_EVIDENCE_PROVENANCE');
                 }
             }
-            if ($refs === []) $refs = [$this->evidenceForRelation($relation, $videoId, $sourceRecord, $source, $claim)];
+            if ($refs === []) $refs = $this->evidenceForRelation($relation, $videoId, $sourceRecord, $source, $claim);
             if ($this->proposals->findByIdempotencyKey($this->idempotencyKey($relation, $refs)) !== null) {
                 $existing = $this->proposals->findByIdempotencyKey($this->idempotencyKey($relation, $refs));
                 $results[] = ['status' => 'replay', 'replacement_id' => $existing?->id, 'source_id' => $sourceRecord->canonicalId, 'evidence_refs' => $refs];
@@ -135,8 +135,17 @@ final class HistoricalVideoRelationEvidenceReconciliation
         }
         $excerpt = trim((string) ($provenance['source_description'] ?? $provenance['source_title'] ?? ''));
         if ($excerpt === '') $excerpt = 'Canonical YouTube source: ' . $source->locator;
-        $item = $this->knowledge->citeWithId($evidenceId, $claim->canonicalId, $source->canonicalId, $excerpt, 'supports', $source->locator, ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'video_uuid' => $videoId, 'reconciliation_fingerprint' => $fingerprint]);
+        $this->knowledge->citeWithId($evidenceId, $claim->canonicalId, $source->canonicalId, $excerpt, 'supports', $source->locator, ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'video_uuid' => $videoId, 'reconciliation_fingerprint' => $fingerprint]);
+        $item = $this->canonicalEvidence($evidenceId);
+        if ($item->claimId !== $claim->canonicalId || $item->sourceId !== $source->canonicalId || ($item->metadata['origin'] ?? '') !== 'VIDEO_CANONICAL_PROVENANCE' || ($item->metadata['video_uuid'] ?? '') !== $videoId || strtoupper((string) ($item->metadata['visibility'] ?? '')) !== 'PRIVATE' || ($item->metadata['reconciliation_fingerprint'] ?? '') !== $fingerprint) throw new \RuntimeException('WRONG_EVIDENCE_PROVENANCE');
         return [['evidence_id' => $item->canonicalId]];
+    }
+
+    private function canonicalEvidence(string $id): Evidence
+    {
+        $item = UuidCodec::isValid($id) ? $this->evidence->findByCanonicalId($id) : null;
+        if ($item === null || !$item->active) throw new \RuntimeException('CANONICAL_EVIDENCE_REQUIRED');
+        return $item;
     }
 
     /** @param list<array{evidence_id:string}> $refs */

@@ -35,6 +35,20 @@ final class HistoricalVideoRelationEvidenceReconciliationTest extends TestCase
         self::assertNotSame($relation->dependencyFingerprint, $repo->approved[0]->dependencyFingerprint);
         self::assertCount(1, $sources->items);
         self::assertCount(1, $evidence->items);
+        $createdEvidence = reset($evidence->items);
+        self::assertFalse($createdEvidence->isPublic());
+        self::assertSame('PRIVATE', $createdEvidence->metadata['visibility']);
+        self::assertSame('VIDEO_CANONICAL_PROVENANCE', $createdEvidence->metadata['origin']);
+        self::assertSame($videoId, $createdEvidence->metadata['video_uuid']);
+        self::assertSame([['evidence_id' => $createdEvidence->canonicalId]], $repo->approved[0]->payload['evidence_refs']);
+        self::assertSame($createdEvidence->metadata['reconciliation_fingerprint'], hash('sha256', \NHK\Core\Domain\Governance\CommandCanonicalizer::canonicalize([
+            'nhk:video-relation-claim:' . hash('sha256', \NHK\Core\Domain\Governance\CommandCanonicalizer::canonicalize([$videoId, 'brand', '22222222-2222-4222-8222-222222222222', 'about'])),
+            $sources->items[array_key_first($sources->items)]->stableKey,
+            $videoId,
+            'brand',
+            '22222222-2222-4222-8222-222222222222',
+            'about',
+        ])));
     }
 
     public function test_wrong_source_evidence_and_fingerprint_mismatch_fail_closed(): void
@@ -122,6 +136,20 @@ final class HistoricalVideoRelationEvidenceReconciliationTest extends TestCase
         $service->reconcile($videoId, 'video-binding', ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'], [$relation]);
     }
 
+    public function test_created_evidence_must_be_read_back_from_canonical_repository(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $relation = $this->relation('readback-required', $videoId);
+        $claims = new ReconciliationClaimRepository();
+        $sources = new ReconciliationSourceRepository();
+        $evidence = new ReconciliationEvidenceRepository();
+        $evidence->hideCreatedFromReadBack = true;
+
+        $this->expectExceptionMessage('CANONICAL_EVIDENCE_REQUIRED');
+        (new HistoricalVideoRelationEvidenceReconciliation(new KnowledgeService($claims, $sources, $evidence), $claims, $sources, $evidence, new ReconciliationProposalRepository($relation)))
+            ->reconcile($videoId, 'video-binding', ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'], [$relation]);
+    }
+
     private function relation(string $id, string $videoId, string $fingerprint = 'video-binding', array $evidenceRefs = []): Proposal
     {
         return new Proposal($id, 'relation', 'relation_create', ['source_type' => 'video', 'source_uuid' => $videoId, 'target_type' => 'brand', 'target_uuid' => '22222222-2222-4222-8222-222222222222', 'predicate' => 'about', 'evidence_refs' => $evidenceRefs, 'reason' => 'legacy reason', 'source_fingerprint' => $fingerprint], 'content', null, 'dependency', ProposalState::APPROVED, decisionActor: 'reviewer', idempotencyKey: 'legacy:' . $id, entityType: 'relation');
@@ -142,4 +170,4 @@ final class ReconciliationProposalRepository implements ProposalRepository
 }
 final class ReconciliationClaimRepository implements KnowledgeRepository { public array $items=[]; public function findByCanonicalId(string $id): ?KnowledgeClaim{return $this->items[$id]??null;} public function findByStableKey(string $key): ?KnowledgeClaim{foreach($this->items as $v)if($v->stableKey===$key)return $v;return null;} public function create(KnowledgeClaim $c):KnowledgeClaim{return $this->items[$c->canonicalId]=$c;} public function update(KnowledgeClaim $c,int $r):KnowledgeClaim{return $this->items[$c->canonicalId]=$c;} public function list(bool $includeRetired=false):array{return array_values($this->items);} }
 final class ReconciliationSourceRepository implements SourceRepository { public array $items=[]; public function findByCanonicalId(string $id): ?Source{return $this->items[$id]??null;} public function findByStableKey(string $key): ?Source{foreach($this->items as $v)if($v->stableKey===$key)return $v;return null;} public function create(Source $s):Source{return $this->items[$s->canonicalId]=$s;} public function update(Source $s,int $r):Source{return $this->items[$s->canonicalId]=$s;} public function list(bool $includeRetired=false):array{return array_values($this->items);} }
-final class ReconciliationEvidenceRepository implements EvidenceRepository { public array $items=[]; public function findByCanonicalId(string $id): ?Evidence{return $this->items[$id]??null;} public function create(Evidence $e):Evidence{return $this->items[$e->canonicalId]=$e;} public function update(Evidence $e,int $r):Evidence{return $this->items[$e->canonicalId]=$e;} public function listByClaim(string $id,bool $includeRetired=false):array{return array_values(array_filter($this->items,fn(Evidence $e)=>$e->claimId===$id));} public function listBySource(string $id,bool $includeRetired=false):array{return array_values(array_filter($this->items,fn(Evidence $e)=>$e->sourceId===$id));} }
+final class ReconciliationEvidenceRepository implements EvidenceRepository { public array $items=[]; public bool $hideCreatedFromReadBack=false; public function findByCanonicalId(string $id): ?Evidence{return $this->hideCreatedFromReadBack && isset($this->items[$id]) ? null : ($this->items[$id]??null);} public function create(Evidence $e):Evidence{return $this->items[$e->canonicalId]=$e;} public function update(Evidence $e,int $r):Evidence{return $this->items[$e->canonicalId]=$e;} public function listByClaim(string $id,bool $includeRetired=false):array{return array_values(array_filter($this->items,fn(Evidence $e)=>$e->claimId===$id));} public function listBySource(string $id,bool $includeRetired=false):array{return array_values(array_filter($this->items,fn(Evidence $e)=>$e->sourceId===$id));} }

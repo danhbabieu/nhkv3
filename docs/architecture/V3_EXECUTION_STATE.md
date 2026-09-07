@@ -4838,3 +4838,21 @@ source `58`, variant `42`, video `2`. Graph inventory returned `244` total,
 duplicate. Relation dry-run scanned `1,792` records with `EXISTING=244`,
 `NOT_APPLICABLE=1548`, and zero for every other reported debt/status counter;
 it reported `read_only=true` and created no candidate or relation.
+# Checkpoint — 2026-09-07 — Video Controlled Apply evidence blocker closed
+
+- Reproduced `CANONICAL_EVIDENCE_REQUIRED` in
+  `HistoricalVideoRelationEvidenceReconciliation`: the generated evidence
+  reference list was wrapped one level too deeply (`[[['evidence_id' => ...]]]`)
+  before the replacement relation proposal was approved. Controlled Apply then
+  inspected the outer array item, found no `evidence_id`, and failed closed.
+- Fixed the root cause by preserving the canonical `list<evidence_ref>` shape.
+  Reconciliation now also performs an internal Evidence repository read-back
+  immediately after create, validates active state, claim/source binding,
+  `VIDEO_CANONICAL_PROVENANCE`, PRIVATE visibility, video UUID and the
+  deterministic reconciliation fingerprint before proposal replacement.
+- Focused proof: 7 tests / 25 assertions. Full Unit: 694 tests / 3,353
+  assertions, pass with existing warnings/deprecations. Composer validation,
+  PHP lint and `git diff --check` pass. Guarded Integration was attempted with
+  exact `nhk_v3_test` settings but remains `ENVIRONMENT_BLOCKED` at WordPress
+  bootstrap (`Error establishing a database connection`); no integration
+  failure reached this fix.
