@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+## Canonical Video evidence create-or-resolve hardening — 2026-09-07
+
+Historical approved Video relation reconciliation now derives Source and
+scoped Claim stable keys from the canonical Video UUID, canonical YouTube
+platform/external ID/URL and typed relation binding. Existing Source and Claim
+records are reused only when their active provenance still matches the Video
+scope; mismatches fail closed. Evidence receives a deterministic name-based
+UUID from the stable-key relation fingerprint, is created through
+KnowledgeService with PRIVATE Video provenance, and is reused only when its
+Claim, Source, Video UUID, visibility and fingerprint all match. Missing
+Evidence therefore follows Source → Claim → Evidence creation before the
+replacement relation proposal is fingerprinted, approved, superseded and later
+materialized by the existing Controlled Apply transaction. No `reason` field,
+hardcoded UUID or raw database mutation is used.
+
+Focused reconciliation verification passed 6 tests / 16 assertions, and the
+complete Unit suite passed 689 tests / 3,333 assertions (3 warnings, 5
+PHPUnit deprecations). Guarded full Integration ran against exact `nhk_v3_test`
+and reached 110 tests / 742 assertions with 1 existing activation-hook error,
+1 existing relation-eligibility failure, 1 warning and 1 deprecation; the
+remaining rollback assertions are therefore not reported as a suite pass.
+PHP lint, Composer validation and diff-check remain required before commit.
+No semantic runtime data was intentionally retained or deployed.
+
 ## Historical Video relation evidence reconciliation — 2026-09-07
 
 Historical approved Video `relation_create` proposals with missing

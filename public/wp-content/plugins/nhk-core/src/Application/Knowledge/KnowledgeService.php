@@ -62,8 +62,14 @@ final class KnowledgeService
 
     public function cite(string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null, array $metadata = []): Evidence
     {
+        return $this->citeWithId(UuidCodec::newV7(), $claimId, $sourceId, $excerpt, $relation, $locator, $metadata);
+    }
+
+    public function citeWithId(string $evidenceId, string $claimId, string $sourceId, string $excerpt, string $relation = 'supports', ?string $locator = null, array $metadata = []): Evidence
+    {
+        if (!UuidCodec::isValid($evidenceId)) throw new KnowledgeException('Evidence identity is invalid.');
         if (!$this->claims->findByCanonicalId($claimId) || !$this->sources->findByCanonicalId($sourceId)) throw new KnowledgeException('Evidence endpoint does not exist.');
-        return $this->evidence->create(new Evidence(UuidCodec::newV7(), $claimId, $sourceId, $relation, $excerpt, $locator, true, 1, $metadata));
+        return $this->evidence->create(new Evidence($evidenceId, $claimId, $sourceId, $relation, $excerpt, $locator, true, 1, $metadata));
     }
 
     /** @return list<Evidence> */

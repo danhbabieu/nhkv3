@@ -35,7 +35,14 @@ final class HistoricalVideoRelationEvidenceReconciliation
             $declaredFingerprint = trim((string) ($payload['source_fingerprint'] ?? ''));
             if ($declaredFingerprint !== '' && !hash_equals($videoFingerprint, $declaredFingerprint)) throw new \RuntimeException('FINGERPRINT_MISMATCH');
             $refs = $this->references($payload['evidence_refs'] ?? [], $sourceRecord->canonicalId);
-            if ($refs === []) $refs = [$this->evidenceForRelation($relation, $videoId, $sourceRecord, $source)];
+            $claim = $this->claimForRelation($relation, $videoId);
+            if ($refs !== []) {
+                foreach ($refs as $ref) {
+                    $item = $this->evidence->findByCanonicalId($ref['evidence_id']);
+                    if ($item === null || $item->claimId !== $claim->canonicalId || ($item->metadata['origin'] ?? '') !== 'VIDEO_CANONICAL_PROVENANCE' || ($item->metadata['video_uuid'] ?? '') !== $videoId || strtoupper((string) ($item->metadata['visibility'] ?? '')) !== 'PRIVATE') throw new \RuntimeException('WRONG_EVIDENCE_PROVENANCE');
+                }
+            }
+            if ($refs === []) $refs = [$this->evidenceForRelation($relation, $videoId, $sourceRecord, $source, $claim)];
             if ($this->proposals->findByIdempotencyKey($this->idempotencyKey($relation, $refs)) !== null) {
                 $existing = $this->proposals->findByIdempotencyKey($this->idempotencyKey($relation, $refs));
                 $results[] = ['status' => 'replay', 'replacement_id' => $existing?->id, 'source_id' => $sourceRecord->canonicalId, 'evidence_refs' => $refs];
@@ -68,7 +75,11 @@ final class HistoricalVideoRelationEvidenceReconciliation
         if ($platform !== 'youtube' || $url === '' || filter_var($url, FILTER_VALIDATE_URL) === false || $externalId === '') throw new \RuntimeException('CANONICAL_VIDEO_PROVENANCE_REQUIRED');
         $stableKey = 'nhk:video-source:' . hash('sha256', CommandCanonicalizer::canonicalize([$platform, $externalId, $url]));
         $existing = $this->sources->findByStableKey($stableKey);
-        if ($existing !== null) return $existing;
+        if ($existing !== null) {
+            $metadata = $existing->metadata;
+            if (($metadata['origin'] ?? '') !== 'VIDEO_CANONICAL_PROVENANCE' || ($metadata['video_uuid'] ?? '') !== $videoId || ($metadata['platform'] ?? '') !== $platform || ($metadata['external_video_id'] ?? '') !== $externalId || $existing->locator !== $url || !$existing->active) throw new \RuntimeException('WRONG_SOURCE_PROVENANCE');
+            return $existing;
+        }
         return $this->knowledge->createSource($stableKey, trim((string) ($source['source_title'] ?? 'YouTube video source')) ?: 'YouTube video source', 'website', $url, ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'video_uuid' => $videoId, 'platform' => $platform, 'external_video_id' => $externalId]);
     }
 
@@ -89,7 +100,7 @@ final class HistoricalVideoRelationEvidenceReconciliation
     }
 
     /** @return list<array{evidence_id:string}> */
-    private function evidenceForRelation(Proposal $relation, string $videoId, Source $source, array $provenance): array
+    private function claimForRelation(Proposal $relation, string $videoId): KnowledgeClaim
     {
         $payload = $relation->payload;
         $targetType = trim((string) ($payload['target_type'] ?? ''));
@@ -99,11 +110,32 @@ final class HistoricalVideoRelationEvidenceReconciliation
         $key = 'nhk:video-relation-claim:' . hash('sha256', CommandCanonicalizer::canonicalize([$videoId, $targetType, $targetId, $predicate]));
         $claim = $this->claims->findByStableKey($key);
         if ($claim === null) $claim = $this->knowledge->createClaim($key, 'Video ' . $videoId . ' has a registered ' . $predicate . ' relation to ' . $targetType . ' ' . $targetId . '.', 'provenance', ['metadata' => ['origin' => 'VIDEO_RELATION_RECONCILIATION'], 'video_uuid' => $videoId, 'target_type' => $targetType, 'target_uuid' => $targetId, 'predicate' => $predicate]);
-        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize([$claim->canonicalId, $source->canonicalId, $videoId, $targetType, $targetId, $predicate]));
-        foreach ($this->evidence->listBySource($source->canonicalId) as $item) if (($item->metadata['reconciliation_fingerprint'] ?? '') === $fingerprint && $item->active) return [['evidence_id' => $item->canonicalId]];
+        else {
+            $claimProvenance = $claim->provenance;
+            $claimMetadata = is_array($claimProvenance['metadata'] ?? null) ? $claimProvenance['metadata'] : [];
+            if (($claimMetadata['origin'] ?? '') !== 'VIDEO_RELATION_RECONCILIATION' || ($claimProvenance['video_uuid'] ?? '') !== $videoId || ($claimProvenance['target_type'] ?? '') !== $targetType || ($claimProvenance['target_uuid'] ?? '') !== $targetId || ($claimProvenance['predicate'] ?? '') !== $predicate || !$claim->active) throw new \RuntimeException('WRONG_CLAIM_PROVENANCE');
+        }
+        return $claim;
+    }
+
+    /** @return list<array{evidence_id:string}> */
+    private function evidenceForRelation(Proposal $relation, string $videoId, Source $source, array $provenance, KnowledgeClaim $claim): array
+    {
+        $payload = $relation->payload;
+        $targetType = trim((string) ($payload['target_type'] ?? ''));
+        $targetId = trim((string) ($payload['target_uuid'] ?? $payload['target_key'] ?? ''));
+        $predicate = trim((string) ($payload['predicate'] ?? ''));
+        $key = 'nhk:video-relation-claim:' . hash('sha256', CommandCanonicalizer::canonicalize([$videoId, $targetType, $targetId, $predicate]));
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize([$key, $source->stableKey, $videoId, $targetType, $targetId, $predicate]));
+        $evidenceId = UuidCodec::v5('nhk:video-relation-evidence:' . $fingerprint);
+        $existing = $this->evidence->findByCanonicalId($evidenceId);
+        if ($existing !== null) {
+            if (!$existing->active || $existing->claimId !== $claim->canonicalId || $existing->sourceId !== $source->canonicalId || ($existing->metadata['reconciliation_fingerprint'] ?? '') !== $fingerprint || ($existing->metadata['origin'] ?? '') !== 'VIDEO_CANONICAL_PROVENANCE' || ($existing->metadata['video_uuid'] ?? '') !== $videoId || strtoupper((string) ($existing->metadata['visibility'] ?? '')) !== 'PRIVATE') throw new \RuntimeException('WRONG_EVIDENCE_PROVENANCE');
+            return [['evidence_id' => $existing->canonicalId]];
+        }
         $excerpt = trim((string) ($provenance['source_description'] ?? $provenance['source_title'] ?? ''));
         if ($excerpt === '') $excerpt = 'Canonical YouTube source: ' . $source->locator;
-        $item = $this->knowledge->cite($claim->canonicalId, $source->canonicalId, $excerpt, 'supports', $source->locator, ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'reconciliation_fingerprint' => $fingerprint]);
+        $item = $this->knowledge->citeWithId($evidenceId, $claim->canonicalId, $source->canonicalId, $excerpt, 'supports', $source->locator, ['visibility' => 'PRIVATE', 'origin' => 'VIDEO_CANONICAL_PROVENANCE', 'video_uuid' => $videoId, 'reconciliation_fingerprint' => $fingerprint]);
         return [['evidence_id' => $item->canonicalId]];
     }
 

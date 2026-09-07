@@ -31,6 +31,8 @@ final class HistoricalVideoRelationEvidenceReconciliationTest extends TestCase
         self::assertNotSame('legacy-relation', $repo->approved[0]->id);
         self::assertNotEmpty($repo->latestApproval($repo->approved[0]->id));
         self::assertNotEmpty($repo->approved[0]->payload['evidence_refs']);
+        self::assertNotSame($relation->contentFingerprint, $repo->approved[0]->contentFingerprint);
+        self::assertNotSame($relation->dependencyFingerprint, $repo->approved[0]->dependencyFingerprint);
         self::assertCount(1, $sources->items);
         self::assertCount(1, $evidence->items);
     }
@@ -91,6 +93,33 @@ final class HistoricalVideoRelationEvidenceReconciliationTest extends TestCase
         $second = $service->reconcile($videoId, 'video-binding', $source, [$relation]);
         self::assertSame($first[0]['replacement_id'], $second[0]['replacement_id']);
         self::assertCount(1, $sources->items); self::assertCount(1, $evidence->items);
+    }
+
+    public function test_evidence_identity_is_deterministic_across_reconciliation_replays(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $source = ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'];
+        $ids = [];
+        foreach ([1, 2] as $_) {
+            $relation = $this->relation('deterministic-' . count($ids), $videoId);
+            $claims = new ReconciliationClaimRepository(); $sources = new ReconciliationSourceRepository(); $evidence = new ReconciliationEvidenceRepository();
+            $repo = new ReconciliationProposalRepository($relation);
+            (new HistoricalVideoRelationEvidenceReconciliation(new KnowledgeService($claims, $sources, $evidence), $claims, $sources, $evidence, $repo))->reconcile($videoId, 'video-binding', $source, [$relation]);
+            $ids[] = array_key_first($evidence->items);
+        }
+        self::assertSame($ids[0], $ids[1]);
+    }
+
+    public function test_existing_source_with_wrong_video_provenance_fails_closed(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $relation = $this->relation('wrong-source-provenance', $videoId);
+        $claims = new ReconciliationClaimRepository(); $sources = new ReconciliationSourceRepository(); $evidence = new ReconciliationEvidenceRepository();
+        $sourceKey = 'nhk:video-source:' . hash('sha256', \NHK\Core\Domain\Governance\CommandCanonicalizer::canonicalize(['youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ']));
+        $sources->items['88888888-8888-4888-8888-888888888888'] = new Source('88888888-8888-4888-8888-888888888888', $sourceKey, 'Wrong', 'website', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', ['visibility' => 'PRIVATE', 'origin' => 'OTHER', 'video_uuid' => '99999999-9999-4999-8999-999999999999']);
+        $service = new HistoricalVideoRelationEvidenceReconciliation(new KnowledgeService($claims, $sources, $evidence), $claims, $sources, $evidence, new ReconciliationProposalRepository($relation));
+        $this->expectExceptionMessage('WRONG_SOURCE_PROVENANCE');
+        $service->reconcile($videoId, 'video-binding', ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'], [$relation]);
     }
 
     private function relation(string $id, string $videoId, string $fingerprint = 'video-binding', array $evidenceRefs = []): Proposal
