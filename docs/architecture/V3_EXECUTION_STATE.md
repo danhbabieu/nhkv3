@@ -4922,3 +4922,29 @@ it reported `read_only=true` and created no candidate or relation.
   exact `nhk_v3_test` settings but remains `ENVIRONMENT_BLOCKED` at WordPress
   bootstrap (`Error establishing a database connection`); no integration
   failure reached this fix.
+# Graph debt demo execution stop — 2026-09-07
+
+User-authorized target scope was `demo.1945.vn`, source HEAD
+`efd0961c7575c4fdf951e994df28c71989b8fbc7`, with no production/V2 access and
+no raw database bypass. The reviewed `NHK Core` artifact was published through
+the allowlisted SSH deployment adapter. An rsync `--checksum --dry-run` returned
+no file changes, and the remote plugin header read back `NHK Core 0.1.0`.
+
+The exact demo WordPress configuration read-only check reported
+`DB_NAME=erourxcg_nhkv3` and `WP_ENVIRONMENT_TYPE=staging`. The migration guard
+therefore correctly rejects the explicitly attempted official
+`PublicIdentityMigration014::up()` and `DictionaryMigration015::up()` even
+with `NHK_AUTHORIZED_MIGRATION_DATABASE=erourxcg_nhkv3` and
+`NHK_MIGRATION_RUNTIME=demo`; staging is denied by policy. No migration or
+semantic/Graph mutation was performed. Post-attempt health still reports
+`current=13`, `target=15`, `MIGRATION_REQUIRED`, with database, Graph,
+Authority and Governance storage reachable/ready.
+
+The official maintenance read path returned an empty inventory receipt in this
+session, and its relation `dry-run` returned
+`CUTOVER_APPLICATION_WIRING_REQUIRED`. Consequently canonical/Graph counts,
+relation dry-run counters, Odo/Cuckoo deterministic candidates, governed
+backfill, inbound/outbound/neighborhood read-back and second-run results are
+`UNVERIFIED`, not zero. Relations before/after/created are likewise
+`UNVERIFIED`; no residual-debt count is inferred. This is a constitutional
+staging-marker blocker, not an ambiguity resolution or a data result.
