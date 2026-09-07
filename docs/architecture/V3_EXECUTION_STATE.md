@@ -1,5 +1,62 @@
 # NHK V3 Execution State
 
+## Integration failure classification and remediation — 2026-09-07
+
+The guarded runtime was available for focused verification with
+`NHK_WP_TEST_PATH=public` and `NHK_WP_TEST_DB=nhk_v3_test`; MySQL connectivity
+was not re-investigated. The prior full run identified the following exact
+failures:
+
+- `NHK\Tests\Integration\McpTransportIntegrationTest::test_article_preflight_research_for_existing_post_reads_media_usage_inventory`
+  failed at `tests/Integration/McpTransportIntegrationTest.php:89` because
+  `get_post(71)` returned `null`. No canonical fixture loader or seed mechanism
+  for Post 71 was present; this was a stale development-data assumption, not a
+  Graph/runtime failure. The test now creates a disposable draft with
+  `wp_insert_post`, uses its actual endpoint key, authenticates an administrator
+  for the read capability, and deletes only that fixture in `finally`.
+  Assertions were also corrected to match the packet types (array blockers and
+  string reason). Focused result: 1 test / 11 assertions PASS.
+
+- `NHK\Tests\Integration\PublicSlugMigrationIntegrationTest` was an untracked
+  concurrent test when the earlier run reported second-run `changed=2` instead
+  of `0`. Its current focused run is 2 tests / 35 assertions PASS, and the file
+  is now tracked by the concurrent public-slug commit. No public-slug code or
+  test was changed in this remediation. The earlier observation remains a
+  `CONCURRENT_TEST_BLOCKER`/non-reproduced transient until a fresh full guarded
+  run confirms suite-wide isolation.
+
+- `NHK\Tests\Integration\WordPressMediaIngestIntegrationTest::test_real_file_ingest_retains_source_and_repeated_adoption_resolves_one_media`
+  errored at `WpdbMediaAssetRepository.php:57`, called by
+  `MediaService::completeIngest()` and
+  `WordPressMediaAttachmentBridge.php:189`. The derivative asset was already
+  `PUBLIC`; the unconditional update produced zero affected rows and was
+  incorrectly classified as an optimistic conflict. `MediaService` now updates
+  the asset only when visibility or metadata changes, retaining rollback when
+  an actual asset update occurs. Focused result: 1 test / 11 assertions PASS;
+  one PHP 8.5 `imagedestroy()` deprecation remains.
+
+- The MySQL 9.7 `id DEFAULT ''` message was warning-only from repeated
+  `dbDelta()` parsing in `MediaMigration004`, not the media failure. A read-only
+  schema check showed `wp_nhk_media_usages.id` is `BIGINT UNSIGNED NOT NULL
+  AUTO_INCREMENT DEFAULT NULL`. Migration 004 now calls `dbDelta()` only for a
+  missing table, preserving forward-safe/idempotent creation without direct
+  schema repair or destructive migration. The focused Media run no longer
+  emitted the MySQL schema warning.
+
+The red-green evidence exists for the Media regression: the new unit test first
+failed with `1` update instead of `0`, then passed after the service change.
+Focused Unit verification is 4 tests / 14 assertions (one existing warning),
+focused Article/MCP is 1 / 11, focused Media is 1 / 11 (one PHP deprecation),
+and focused public-slug is 2 / 35. A fresh full guarded rerun could not start
+because the execution environment rejected escalation after its usage limit
+was reached; this is `FULL_GUARDED_RERUN_BLOCKED_BY_USAGE_LIMIT`, not a PASS.
+
+The last full guarded evidence remains 108 tests / 698 assertions with 1 error,
+2 failures, 1 warning and 2 skips before these fixes. Therefore readiness for
+Graph backfill remains `RUNTIME_VERIFICATION_BLOCKED`: no Cuckoo/Odo mutation,
+Graph readback, outbound/inverse/neighborhood query, MCP retrieval or
+second-run backfill counters were run or inferred.
+
 ## Video relation endpoint identity fix — 2026-09-07
 
 The confirmed `relation_create` failure was traced from governed proposal
