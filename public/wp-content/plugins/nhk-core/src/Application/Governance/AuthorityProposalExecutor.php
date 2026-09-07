@@ -56,9 +56,10 @@ final class AuthorityProposalExecutor
                 is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                 isset($payload['thumbnail_media_id']) && (string) $payload['thumbnail_media_id'] !== '' ? (string) $payload['thumbnail_media_id'] : null,
                 isset($payload['canonical_id']) && (string) $payload['canonical_id'] !== '' ? (string) $payload['canonical_id'] : null,
+                false,
             );
             $this->applyVideoAttachments($proposal, $video);
-            return $video;
+            return $this->video->activateAfterSemanticAttachments($video);
         }
         if ($proposal->entityType === 'video' && in_array($proposal->operation, ['update', 'retire', 'reactivate'], true)) {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');

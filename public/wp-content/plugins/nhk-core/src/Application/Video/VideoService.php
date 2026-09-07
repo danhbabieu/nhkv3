@@ -11,9 +11,19 @@ final class VideoService
 {
     public function __construct(private VideoRepository $videos, private $dictionaryObserver = null) {}
 
-    public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null): Video
+    public function ingestUrl(string $url, string $title = '', array $metadata = [], ?string $thumbnailMediaId = null, ?string $canonicalId = null, bool $active = true): Video
     {
-        $candidate = Video::fromUrl($url, $title, $metadata, $thumbnailMediaId, $canonicalId);
+        $normalized = Video::fromUrl($url);
+        $candidate = new Video(
+            $canonicalId ?? \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
+            $normalized->platform,
+            $normalized->externalVideoId,
+            $normalized->canonicalUrl,
+            $title,
+            $metadata,
+            $thumbnailMediaId,
+            $active,
+        );
         $existing = $this->videos->findByExternalReference($candidate->platform, $candidate->externalVideoId);
         if ($existing) {
             if ($existing->canonicalUrl === $candidate->canonicalUrl) return $existing;
@@ -22,6 +32,22 @@ final class VideoService
         $video = $this->videos->create($candidate);
         $this->observe($video);
         return $video;
+    }
+
+    public function activateAfterSemanticAttachments(Video $video): Video
+    {
+        if ($video->active) return $video;
+        return $this->videos->update(new Video(
+            $video->canonicalId,
+            $video->platform,
+            $video->externalVideoId,
+            $video->canonicalUrl,
+            $video->title,
+            $video->metadata,
+            $video->thumbnailMediaId,
+            true,
+            $video->revision,
+        ), $video->revision);
     }
 
     public function update(string $id, string $title, array $metadata, ?string $thumbnailMediaId, int $revision): Video
