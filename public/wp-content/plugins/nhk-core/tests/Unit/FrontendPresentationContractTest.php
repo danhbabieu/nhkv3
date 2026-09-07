@@ -79,6 +79,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('source_thumbnail_url', $source);
     }
 
+    public function test_video_detail_has_first_party_sections_and_keeps_youtube_as_source_only(): void
+    {
+        $source = $this->read('video.php');
+        foreach (['video-frame', 'Tri thức liên quan', 'Nguồn và provenance', 'Bài viết liên quan', 'Hình ảnh liên quan', 'Liên kết nội bộ', 'Mở nguồn video'] as $needle) self::assertStringContainsString($needle, $source);
+        self::assertStringContainsString('embed_url', $source);
+        self::assertStringContainsString('video[\'url\']', $source);
+    }
+
     public function test_display_fallback_asset_exists_and_is_not_a_semantic_media_writer(): void
     {
         $fallback = $this->theme . '/assets/default-archive.svg';

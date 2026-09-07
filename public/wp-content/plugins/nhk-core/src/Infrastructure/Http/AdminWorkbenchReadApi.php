@@ -8,7 +8,7 @@ use NHK\Core\Contracts\Governance\ProposalRepository;
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Contracts\Knowledge\SourceRepository;
 use NHK\Core\Contracts\Knowledge\EvidenceRepository;
-use NHK\Core\Contracts\Media\MediaRepository;
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Application\Graph\GraphService;
@@ -32,12 +32,15 @@ final class AdminWorkbenchReadApi
         private ?GraphService $graph = null,
         private ?ProposalRepository $proposals = null,
         private ?ProposalEligibilityService $eligibility = null,
+        private ?MediaAssetRepository $assets = null,
+        private ?MediaUsageRepository $usages = null,
     ) {}
 
     public function register(): void
     {
         register_rest_route('nhk/v1', '/admin/workbench/search', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'args' => ['q' => ['required' => true], 'domain' => ['default' => 'all']], 'callback' => fn (\WP_REST_Request $request) => $this->search($request)]);
         register_rest_route('nhk/v1', '/admin/workbench/video/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->video((string) $request['id'])]);
+        register_rest_route('nhk/v1', '/admin/workbench/media/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->media((string) $request['id'])]);
     }
 
     private function search(\WP_REST_Request $request): array|\WP_Error
@@ -45,12 +48,19 @@ final class AdminWorkbenchReadApi
         $query = strtolower(trim((string) $request['q']));
         if (strlen($query) < 2 || strlen($query) > 120) return new \WP_Error('nhk_admin_search_term_invalid', 'Từ khóa phải có 2–120 ký tự.', ['status' => 400]);
         $domain = sanitize_key((string) $request['domain']); $groups = ['videos' => [], 'media' => [], 'knowledge' => [], 'entities' => []];
-        if ($domain === 'all' || $domain === 'video') foreach ($this->videos->list() as $item) if ($this->matches($query, $item->title, $item->externalVideoId, $item->canonicalId)) $groups['videos'][] = $this->videoRow($item);
-        if ($domain === 'all' || $domain === 'media') foreach ($this->media->list(true) as $item) if ($this->matches($query, $item->canonicalName, $item->stableKey, $item->canonicalId)) $groups['media'][] = array_merge(['type' => 'media'], (new AdminMediaAdapter([$item]))->find()[0] ?? []);
+        if ($domain === 'all' || $domain === 'video' || $domain === 'media') foreach ($this->videos->list() as $item) if ($this->matches($query, $item->title, $item->externalVideoId, $item->canonicalId)) $groups['videos'][] = $this->videoRow($item);
+        if ($domain === 'all' || $domain === 'media') foreach ($this->media->list(true) as $item) if ($this->matches($query, $item->canonicalName, $item->stableKey, $item->canonicalId)) $groups['media'][] = array_merge(['type' => 'media'], (new AdminMediaAdapter([$item], $this->assets?->listByMediaId($item->canonicalId) ?? [], $this->usages?->listByMediaId($item->canonicalId) ?? []))->find()[0] ?? []);
         if ($domain === 'all' || $domain === 'knowledge') foreach ($this->claims->list(true) as $item) if ($this->matches($query, $item->claimText, $item->stableKey, $item->canonicalId)) $groups['knowledge'][] = ['type' => 'knowledge', 'id' => $item->canonicalId, 'title' => $item->claimText, 'stable_key' => $item->stableKey, 'claim_type' => $item->claimType, 'active' => $item->active];
         if ($domain === 'all' || $domain === 'entity') { $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types); foreach ($types->all() as $definition) foreach ($this->authority->listByType($definition->type, true) as $item) if ($this->matches($query, $item->canonicalName, $item->stableKey, $item->canonicalId)) $groups['entities'][] = ['type' => $item->entityType, 'id' => $item->canonicalId, 'title' => $item->canonicalName, 'stable_key' => $item->stableKey, 'active' => $item->active()]; }
         foreach ($groups as $key => $items) $groups[$key] = array_slice($items, 0, 50);
         return ['query' => $query, 'groups' => $groups];
+    }
+
+    private function media(string $id): array|\WP_Error
+    {
+        $media = $this->media->findByCanonicalId($id);
+        if (!$media instanceof Media) return new \WP_Error('nhk_admin_media_not_found', 'Không tìm thấy Media canonical.', ['status' => 404]);
+        return (new AdminMediaAdapter([$media], $this->assets?->listByMediaId($id) ?? [], $this->usages?->listByMediaId($id) ?? []))->detail($media);
     }
 
     private function video(string $id): array|\WP_Error

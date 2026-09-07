@@ -173,7 +173,7 @@ final class Plugin {
             add_action('rest_after_insert_attachment', static function (\WP_Post $post, \WP_REST_Request $request, bool $creating) use ($adoptAttachment): void {
                 $adoptAttachment((int) $post->ID);
             }, 20, 3);
-            (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated), $historicPublicRouteService))->register();
+            (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated, null, $publicClaims, $publicEvidence, $publicSources), $historicPublicRouteService))->register();
             (new PublicVideoSitemapRoutes($publicVideos, $publicStatus))->register();
             $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
             if ($mediaRoot === '' && function_exists('wp_upload_dir')) { $upload = wp_upload_dir(); $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : ''; }
@@ -196,7 +196,7 @@ final class Plugin {
             $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($media, $assets, $usages));
             $proposalRepository = new WpdbProposalRepository($wpdb); $governanceAudit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb); $transactionManager = new WpdbTransactionManager($wpdb); $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
             $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
-            (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility))->register();
+            (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);

@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Media;
 use NHK\Core\Application\Entity\RelatedContentQuery;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
@@ -25,6 +26,9 @@ final class MediaVideoPageQuery
         private ?PublicMediaAssetDelivery $delivery = null,
         private ?RelatedContentQuery $related = null,
         ?PublicMediaGalleryQuery $gallery = null,
+        private ?KnowledgeRepository $claims = null,
+        private ?EvidenceRepository $evidence = null,
+        private ?SourceRepository $sources = null,
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
         $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery);
@@ -135,9 +139,55 @@ final class MediaVideoPageQuery
             'source_thumbnail_url' => $this->sourceThumbnail($source),
             'source_status' => (string) ($source['availability'] ?? 'unknown'),
             'seo_projection' => $seoProjection,
+            'provenance' => $this->publicProvenance($metadata, $source),
+            'knowledge' => $this->publicKnowledge($metadata),
+            'internal_links' => $this->publicLinks($metadata['internal_links'] ?? []),
         ];
         if ($this->related !== null) $result['related'] = $this->related->forEntity('video', $video->canonicalId);
         return $result;
+    }
+
+    /** @return array<string,mixed> */
+    private function publicProvenance(array $metadata, array $source): array
+    {
+        $provenance = is_array($metadata['provenance'] ?? null) ? $metadata['provenance'] : [];
+        $locator = $provenance['locator'] ?? ($source['canonical_source_url'] ?? null);
+        return array_filter(['kind' => $provenance['kind'] ?? null, 'origin' => $provenance['origin'] ?? null, 'locator' => $locator, 'platform' => $source['platform'] ?? 'youtube', 'external_id' => $source['external_video_id'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function publicKnowledge(array $metadata): array
+    {
+        if ($this->claims !== null && $this->evidence !== null && $this->sources !== null) {
+            $claims = [];
+            foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
+                if (!is_array($attachment)) continue;
+                foreach ((array) ($attachment['evidence_refs'] ?? []) as $reference) {
+                    $evidenceId = is_array($reference) ? (string) ($reference['evidence_id'] ?? '') : (string) $reference;
+                    if ($evidenceId === '') continue;
+                    $evidence = $this->evidence->findByCanonicalId($evidenceId);
+                    if ($evidence === null || !$evidence->active || !$evidence->isPublic()) continue;
+                    $claim = $this->claims->findByCanonicalId($evidence->claimId);
+                    $source = $this->sources->findByCanonicalId($evidence->sourceId);
+                    if ($claim === null || !$claim->active || !$claim->isPublic() || $source === null || !$source->active || !$source->isPublic()) continue;
+                    $claims[$claim->canonicalId] = ['id' => $claim->canonicalId, 'text' => $claim->claimText, 'type' => $claim->claimType, 'evidence' => ['excerpt' => $evidence->excerpt, 'relation' => $evidence->relation, 'source' => $source->title, 'locator' => $evidence->locator ?? $source->locator]];
+                }
+            }
+            return array_values($claims);
+        }
+        $items = is_array($metadata['public_knowledge'] ?? null) ? $metadata['public_knowledge'] : [];
+        return array_values(array_filter($items, static fn (mixed $item): bool => is_array($item) && trim((string) ($item['text'] ?? '')) !== ''));
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function publicLinks(mixed $links): array
+    {
+        if (!is_array($links)) return [];
+        return array_values(array_filter($links, static function (mixed $item): bool {
+            if (!is_array($item)) return false;
+            $url = trim((string) ($item['url'] ?? ''));
+            return filter_var($url, FILTER_VALIDATE_URL) !== false || str_starts_with($url, '/');
+        }));
     }
 
     private function sourceThumbnail(array $source): ?string

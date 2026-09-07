@@ -68,6 +68,22 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame('variant', $row['primary_entity']['type']);
     }
 
+    public function test_media_detail_is_a_usable_readback_projection_with_assets_roles_usage_and_provenance(): void
+    {
+        $media = new Media('01a07af5-3303-7a73-9f15-b7f675293dc6', 'media.example', 'Ảnh thử', 'ready', ['origin' => 'catalog']);
+        $asset = new MediaAsset('01a07af5-3303-7a73-9f15-b7f675293dc7', $media->canonicalId, 'derivative', 'image.webp', hash('sha256', 'image'), 'image/webp', 10, 640, 480, 'PUBLIC');
+        $usage = new MediaUsage('01a07af5-3303-7a73-9f15-b7f675293dc8', $media->canonicalId, 'variant', '01a07af5-3303-7a73-9f15-b7f675293dc9', 'representative', 0, 'Mặt trước', 'Ảnh đại diện');
+
+        $detail = (new AdminMediaAdapter([$media], [$asset], [$usage]))->detail($media);
+
+        self::assertSame($media->canonicalId, $detail['media']['id']);
+        self::assertSame(['origin' => 'catalog'], $detail['media']['provenance']);
+        self::assertSame('image/webp', $detail['assets'][0]['mime_type']);
+        self::assertSame('representative', $detail['usages'][0]['role']);
+        self::assertSame('variant', $detail['usages'][0]['endpoint_type']);
+        self::assertSame('available', $detail['frontend_state']);
+    }
+
     public function test_content_adapter_has_only_editorial_and_video_tabs(): void
     {
         self::assertSame(['article', 'video'], array_column((new AdminContentAdapter())->tabs(), 'id'));

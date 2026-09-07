@@ -5220,3 +5220,27 @@ tests / 224 assertions; the full Unit directory passes 735 tests / 3,591
 assertions with 2 warnings, 1 deprecation and 5 PHPUnit deprecations. The
 configured `Unit` suite name executes zero tests, so the directory invocation
 is the recorded full Unit baseline.
+
+# Checkpoint — 2026-09-07 — Admin Media and Video regression completion slice
+
+The Admin Media read path now returns separate `Tất cả`, `Hình ảnh` and
+`Video` result groups, including a canonical Media detail projection with
+asset visibility, semantic role, entity usage, provenance and frontend state.
+Video and image records have separate read-only detail endpoints and browser
+handlers; Admin Video keeps “Xem trên web” separate from “Mở nguồn gốc”.
+
+The public Video projection now includes canonical public Knowledge claims
+only when active public Claim, Evidence and Source read-backs all pass, plus
+provenance and validated internal links. The first-party template renders the
+player, editorial package, knowledge, provenance, related entities/articles/
+media/videos and internal links. YouTube remains embed/source only.
+
+TDD RED reproduced the missing Media detail method, missing Media detail API,
+Media search omitting Video, and missing public Video sections. Focused tests
+pass 27 tests / 245 assertions; the full Unit directory passes 740 tests /
+3,623 assertions with 2 warnings, 1 deprecation and 5 PHPUnit deprecations.
+PHP lint, JavaScript syntax, Composer validation and `git diff --check` pass.
+The available DEMO UI confirms the three Admin tabs, but its runtime search
+returns no `truOChTNbwA` record and the deployed runtime is not this checkout;
+local HTTP is unavailable, so end-to-end record/detail/page read-back remains
+runtime-blocked. No data, migration, seed, push or deployment was performed.

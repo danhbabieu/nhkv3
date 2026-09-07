@@ -112,7 +112,7 @@
 
     function renderSearchResults(output, workspace, groups) {
         output.textContent = '';
-        var keys = workspace === 'media' ? ['media'] : workspace === 'knowledge' ? ['entities', 'knowledge'] : ['posts', 'videos', 'entities', 'media', 'knowledge'];
+        var keys = workspace === 'media' ? ['media', 'videos'] : workspace === 'knowledge' ? ['entities', 'knowledge'] : ['posts', 'videos', 'entities', 'media', 'knowledge'];
         var count = 0;
         keys.forEach(function (key) {
             (groups[key] || []).forEach(function (item) {
@@ -127,6 +127,8 @@
                 card.appendChild(meta);
                 if (item.type === 'video' && item.id) {
                     var open = document.createElement('button'); open.type = 'button'; open.className = 'button button-secondary'; open.textContent = 'Mở chi tiết'; open.addEventListener('click', function () { loadVideoDetail(item.id); }); card.appendChild(open);
+                } else if (item.type === 'media' && item.id) {
+                    var mediaOpen = document.createElement('button'); mediaOpen.type = 'button'; mediaOpen.className = 'button button-secondary'; mediaOpen.textContent = 'Mở chi tiết'; mediaOpen.addEventListener('click', function () { loadMediaDetail(item.id); }); card.appendChild(mediaOpen);
                 } else if (item.url) { var link = document.createElement('a'); link.href = item.url; link.textContent = 'Xem trên web'; link.target = '_blank'; link.rel = 'noopener'; card.appendChild(link); }
                 output.appendChild(card);
             });
@@ -142,7 +144,7 @@
         fetch(base + 'nhk/v1/admin/workbench/video/' + encodeURIComponent(id), {headers: {'X-WP-Nonce': (window.nhkV3Admin && window.nhkV3Admin.nonce) || ''}})
             .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Không đọc được Video.'); return data; }); })
             .then(function (data) {
-                var video = data.video || {}, metadata = data.metadata || {}, iframe = document.createElement('iframe'); iframe.width = '560'; iframe.height = '315'; iframe.loading = 'lazy'; iframe.title = video.title || 'Video YouTube'; iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(video.external_id || ''); iframe.allowFullscreen = true;
+                var video = data.video || {}, metadata = data.metadata || {}, iframe = document.createElement('iframe'); iframe.width = '560'; iframe.height = '315'; iframe.loading = 'lazy'; iframe.title = video.title || 'Video YouTube'; iframe.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(video.external_id || ''); iframe.allowFullscreen = true;
                 output.textContent = ''; output.appendChild(iframe);
                 var title = document.createElement('h3'); title.textContent = video.title || 'Video'; output.appendChild(title);
                 var meta = document.createElement('p'); meta.textContent = [video.platform, video.external_id, video.id, 'revision ' + video.revision].join(' · '); output.appendChild(meta);
@@ -159,6 +161,24 @@
                 block('Frontend projection', projection.eligible ? 'Hợp lệ · ' + (projection.path || 'đã sẵn sàng') : 'Chưa hợp lệ · ' + ((projection.blockers || []).join(', ') || 'chưa đủ điều kiện'));
                 if (projection.eligible && projection.path) { var link = document.createElement('a'); link.className = 'button'; link.href = projection.path; link.textContent = 'Xem trên web'; output.appendChild(link); }
                 if (video.url) { var source = document.createElement('a'); source.className = 'button button-secondary'; source.href = video.url; source.textContent = 'Mở nguồn gốc'; source.target = '_blank'; source.rel = 'noopener noreferrer'; output.appendChild(source); }
+            }).catch(function (error) { output.textContent = error.message; });
+    }
+
+    function loadMediaDetail(id) {
+        var output = document.getElementById('nhk-image-detail');
+        if (!output) return;
+        output.textContent = 'Đang tải Media canonical...';
+        var base = (window.nhkV3Admin && window.nhkV3Admin.root) || (window.location.origin + '/wp-json/');
+        fetch(base + 'nhk/v1/admin/workbench/media/' + encodeURIComponent(id), {headers: {'X-WP-Nonce': (window.nhkV3Admin && window.nhkV3Admin.nonce) || ''}})
+            .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Không đọc được Media.'); return data; }); })
+            .then(function (data) {
+                var media = data.media || {};
+                output.textContent = '';
+                var title = document.createElement('h3'); title.textContent = media.title || 'Hình ảnh'; output.appendChild(title);
+                var facts = document.createElement('p'); facts.textContent = [media.stable_key, media.readiness, 'revision ' + media.revision].filter(Boolean).join(' · '); output.appendChild(facts);
+                var state = document.createElement('p'); state.textContent = 'Frontend: ' + (data.frontend_state || 'missing') + ' · Vai trò: ' + (data.semantic_role || 'chưa xác định') + ' · Sử dụng: ' + (data.usage_count || 0); output.appendChild(state);
+                var usage = document.createElement('p'); usage.textContent = (data.usages || []).map(function (item) { return [item.role, item.endpoint_type, item.endpoint_key, item.alt].filter(Boolean).join(' · '); }).join('\n') || 'Chưa có usage.'; output.appendChild(usage);
+                var provenance = document.createElement('p'); provenance.textContent = 'Provenance: ' + JSON.stringify(data.provenance || {}); output.appendChild(provenance);
             }).catch(function (error) { output.textContent = error.message; });
     }
 

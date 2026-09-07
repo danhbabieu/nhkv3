@@ -40,6 +40,25 @@ final class AdminMediaAdapter
         return $rows;
     }
 
+    /** @return array<string,mixed> */
+    public function detail(Media $media): array
+    {
+        $assets = $this->assets($media->canonicalId);
+        $usages = $this->usages($media->canonicalId);
+        $publicAssets = array_values(array_filter($assets, static fn (MediaAsset $asset): bool => $asset->visibility === 'PUBLIC'));
+
+        return [
+            'media' => ['id' => $media->canonicalId, 'title' => $media->canonicalName, 'stable_key' => $media->stableKey, 'readiness' => $media->readiness, 'active' => $media->active, 'provenance' => $media->provenance, 'revision' => $media->revision, 'placeholder' => $media->isSystemPlaceholder()],
+            'assets' => array_map(static fn (MediaAsset $asset): array => ['id' => $asset->assetId, 'kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'visibility' => $asset->visibility], $assets),
+            'usages' => array_map(static fn (MediaUsage $usage): array => ['usage_id' => $usage->usageId, 'role' => $usage->role, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption], $usages),
+            'semantic_role' => $usages[0]->role ?? null,
+            'relation_count' => count(array_filter($usages, static fn (MediaUsage $usage): bool => $usage->endpointType !== 'wp_post')),
+            'usage_count' => count($usages),
+            'provenance' => $media->provenance,
+            'frontend_state' => $media->active && $media->readiness === 'ready' && $publicAssets !== [] ? 'available' : 'missing',
+        ];
+    }
+
     /** @return list<MediaAsset> */
     private function assets(string $mediaId): array { return array_values(array_filter($this->assets, static fn (mixed $asset): bool => $asset instanceof MediaAsset && $asset->mediaId === $mediaId)); }
     /** @return list<MediaUsage> */

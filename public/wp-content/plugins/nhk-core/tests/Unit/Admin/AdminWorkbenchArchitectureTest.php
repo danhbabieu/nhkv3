@@ -67,6 +67,18 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         foreach (['metadata', 'Relation target', 'Source / Claim / Evidence', 'Governance', 'Frontend projection', 'projection.eligible && projection.path'] as $needle) self::assertStringContainsString($needle, $source);
     }
 
+    public function test_media_workspace_has_separate_video_and_image_readback_paths(): void
+    {
+        $page = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Infrastructure/Admin/AdminWorkbenchPage.php');
+        $api = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/src/Infrastructure/Http/AdminWorkbenchReadApi.php');
+        $js = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/assets/admin/admin-workbench.js');
+
+        foreach (['Tất cả', 'Hình ảnh', 'Video', 'nhk-image-detail', 'nhk-video-detail'] as $needle) self::assertStringContainsString($needle, $page);
+        self::assertStringContainsString("'/admin/workbench/media/", $api);
+        self::assertStringContainsString("domain === 'media'", $api);
+        foreach (['loadMediaDetail', 'Xem trên web', 'Mở nguồn gốc'] as $needle) self::assertStringContainsString($needle, $js);
+    }
+
     /** @return list<string> */
     private function productionFiles(): array
     {

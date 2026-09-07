@@ -53,6 +53,33 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertArrayNotHasKey('metadata', $query->videoDetail($video->canonicalId));
     }
 
+    public function test_video_detail_projects_public_knowledge_provenance_and_internal_links_without_raw_metadata(): void
+    {
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Reference', [
+            'public_identity' => ['current_slug' => 'reference'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true],
+            'editorial' => ['title' => 'Reference', 'summary' => 'Summary', 'body' => 'Body'],
+            'hub' => ['primary' => '06'],
+            'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'locator' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+            'semantic_attachments' => [[
+                'target_type' => 'variant',
+                'target_key' => '22222222-2222-4222-8222-222222222222',
+                'knowledge' => [['text' => 'Claim công khai']],
+                'provenance' => ['origin' => 'CANONICAL_SOURCE'],
+            ]],
+            'public_knowledge' => [['text' => 'Claim công khai']],
+            'internal_links' => [['label' => 'Hồ sơ liên quan', 'url' => '/variant/example/']],
+        ]);
+
+        $detail = $this->query([], [$video])->videoDetail($video->canonicalId);
+
+        self::assertSame('Claim công khai', $detail['knowledge'][0]['text']);
+        self::assertArrayNotHasKey('url', $detail['knowledge'][0]);
+        self::assertSame('YOUTUBE_SOURCE', $detail['provenance']['kind']);
+        self::assertSame('/variant/example/', $detail['internal_links'][0]['url']);
+        self::assertArrayNotHasKey('metadata', $detail);
+    }
+
     public function test_video_detail_and_archive_hide_invalid_persisted_external_references(): void
     {
         $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
