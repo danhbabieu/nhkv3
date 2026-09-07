@@ -4968,3 +4968,23 @@ backfill, inbound/outbound/neighborhood read-back and second-run results are
 `UNVERIFIED`, not zero. Relations before/after/created are likewise
 `UNVERIFIED`; no residual-debt count is inferred. This is a constitutional
 staging-marker blocker, not an ambiguity resolution or a data result.
+
+# Checkpoint — 2026-09-07 — Admin Video relation workflow
+
+- Admin audit found the existing Governance lifecycle and Controlled Apply
+  endpoints, but no Video-specific relation workspace, canonical endpoint
+  validation, existing-relation read-back or Evidence-ref guard.
+- Added the Admin Video relation adapter/workspace. It resolves a canonical
+  Video and matching ingest proposal, constrains target vocabulary and
+  about, validates active canonical Evidence, derives the source fingerprint
+  from the Video proposal, and creates an idempotent relation_create proposal
+  through Governance. Submit, approval fingerprints, eligibility, Controlled
+  Apply and read-back remain the existing governed actions.
+- Missing Evidence, wrong endpoint, proposal mismatch and stale binding fail
+  closed; no UUID is hardcoded and no direct semantic repository writer was
+  added. Existing relation display uses the administrator Graph read surface.
+- Focused Admin/Governance/Video verification passed 57 tests / 361
+  assertions; full Unit passed 706 tests / 3,382 assertions with 2 warnings
+  and 5 PHPUnit deprecations. Guarded Integration remains environment-blocked
+  because NHK_WP_TEST_PATH=public is not configured and WordPress bootstrap
+  functions are unavailable in the bare PHPUnit process.
