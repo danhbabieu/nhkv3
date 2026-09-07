@@ -4620,3 +4620,34 @@ the required `NHK_WP_TEST_PATH=public` acceptance runtime, with 2 Dictionary
 bootstrap errors and 12 mandatory-runtime failures; no runtime data was
 mutated. Named Video `01a07971-2fe3-77da-9424-998cf6f249e0` and existing
 relation proposals could not receive live read-back without that runtime.
+
+## Canonical data and Graph audit checkpoint — 2026-09-07
+
+The requested whole-data audit resumed from the current checkout HEAD
+`2de1c20`. The repository search found the named Cuckoo and Odo 36/8 identities
+only in documentation/manifest references and non-canonical test inputs; no
+approved fixture/export/snapshot was available to restore. This is recorded as
+`CANONICAL_FIXTURE_BLOCKED`.
+
+The guarded target was `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`, but this checkout has no `public/wp-config.php`.
+The WordPress probe and guarded Integration suite stop at `Error establishing a
+database connection`, so the live inventory, relation audit, dry-run,
+governed backfill, canonical/inverse readback, neighborhood/MCP retrieval,
+cleanup audit and second-run idempotency remain `RUNTIME_UNVERIFIED` /
+`NOT_RUN`. No fixture, Authority/Knowledge/Graph/WordPress/Media/Video record,
+proposal, relation edge, cleanup operation or production/staging/V2 data was
+mutated.
+
+Machine-readable evidence is recorded in
+`docs/architecture/GRAPH_DATA_AUDIT_2026-09-07.json`. The executable registry
+currently exposes `about`, `depicts`, `model_of`, `variant_of`,
+`uses_movement`, `supports_music`, `configured_with_music` and
+`observed_playing_music`; `classified_as` and Product–Specimen remain
+`REGISTRY_GAP` and were not replaced with a workaround.
+
+Fresh repository gates: Unit `673 tests / 3,253 assertions` PASS with 2
+warnings and 5 PHPUnit deprecations; PHP lint PASS; Composer validation PASS
+with the pre-existing missing-license warning; `git diff --check` PASS. The
+remaining owner action is to provide the approved development WordPress
+runtime/database, then rerun the full audit sequence from Phase A.

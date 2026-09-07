@@ -1,0 +1,70 @@
+{
+  "audit_type": "canonical_data_and_graph_relation_audit",
+  "as_of": "2026-09-07",
+  "repository_head": "2de1c20",
+  "environment": {
+    "target_database": "nhk_v3_test",
+    "wordpress_path": "public",
+    "status": "ENVIRONMENT_BLOCKED",
+    "reason": "public/wp-config.php is absent and WordPress bootstrap reports Error establishing a database connection",
+    "mutation_count": 0,
+    "production_or_staging_touched": false
+  },
+  "canonical_fixture_verification": {
+    "status": "CANONICAL_FIXTURE_BLOCKED",
+    "cuckoo": {
+      "classification_uuid": "01a07614-832d-7f27-959c-74eb0cd63f3e",
+      "stable_key": "nhk:classification:clock-type.cuckoo-clock",
+      "source_found": false
+    },
+    "odo_36_8": {
+      "variant_uuid": "852da54d-457a-4397-a16d-52d9452ba766",
+      "stable_key": "nhk:variant:odo.36.8",
+      "knowledge_stable_keys": [
+        "nhk:knowledge:odo-36-8.u-shaped-gong",
+        "nhk:knowledge:odo-36-8.early-black-gong-block",
+        "nhk:knowledge:odo-36-8.later-white-gong-block"
+      ],
+      "source_found": false
+    },
+    "repository_search": "Only documentation/manifest references and non-canonical unit-test inputs were found; no approved fixture/export/snapshot was found."
+  },
+  "inventory": {
+    "status": "RUNTIME_UNVERIFIED",
+    "entity_types": ["brand", "model", "variant", "movement", "component", "music", "classification", "specimen", "product"],
+    "non_authority_domains": ["knowledge", "source", "evidence", "article", "video", "media"],
+    "totals": null,
+    "relation_counts": null,
+    "orphan_duplicate_and_readiness_counts": null
+  },
+  "relation_audit": {
+    "status": "RUNTIME_UNVERIFIED",
+    "registered_predicates": ["about", "depicts", "model_of", "variant_of", "uses_movement", "supports_music", "configured_with_music", "observed_playing_music"],
+    "classified_as": "REGISTRY_GAP",
+    "product_specimen": "REGISTRY_GAP",
+    "candidates": null
+  },
+  "backfill": {
+    "dry_run": "NOT_RUN",
+    "apply": "NOT_RUN",
+    "second_run": "NOT_RUN",
+    "created": null,
+    "reason": "Canonical runtime data is unavailable; no mutation was inferred or attempted."
+  },
+  "retrieval_verification": {
+    "status": "NOT_RUN",
+    "mcp_entity_neighborhood": "RUNTIME_UNVERIFIED"
+  },
+  "quality_gates": {
+    "unit": {"status": "PASS", "tests": 673, "assertions": 3253, "warnings": 2, "deprecations": 5},
+    "php_lint": "PASS",
+    "composer_validate": "PASS_WITH_PREEXISTING_LICENSE_WARNING",
+    "git_diff_check": "PASS",
+    "integration": "ENVIRONMENT_BLOCKED"
+  },
+  "errors": [],
+  "owner_actions": [
+    "Provide an approved development WordPress runtime with public/wp-config.php and guarded nhk_v3_test access.",
+    "Re-run fixture verification, inventory, dry-run, governed batches, readback, second-run idempotency and retrieval verification."
+  ]
+}
