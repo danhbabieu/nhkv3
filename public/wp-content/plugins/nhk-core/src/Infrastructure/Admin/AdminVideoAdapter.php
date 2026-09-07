@@ -22,4 +22,17 @@ final class AdminVideoAdapter
         }
         return $rows;
     }
+
+    /** @param list<array<string,mixed>> $relations @param list<array<string,mixed>> $evidence */
+    public function detail(Video $video, array $relations, array $evidence, array $governance, array $frontendProjection): array
+    {
+        return [
+            'video' => $this->find($video->externalVideoId)[0] ?? [],
+            'metadata' => $video->metadata,
+            'relations' => array_values($relations),
+            'evidence' => array_values($evidence),
+            'governance' => $governance,
+            'frontend_projection' => $frontendProjection,
+        ];
+    }
 }

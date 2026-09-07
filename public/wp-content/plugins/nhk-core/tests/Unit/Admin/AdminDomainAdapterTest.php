@@ -19,6 +19,35 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame('01a07af5-3303-7a73-9f15-b7f675293dc5', $rows[0]['id']);
     }
 
+    public function test_video_detail_projection_exposes_readback_layers_and_gates_frontend_link(): void
+    {
+        $video = Video::fromUrl('https://youtu.be/truOChTNbwA', 'Video thử', [
+            'editorial' => ['title' => 'Tiêu đề đúng', 'summary' => 'Tóm tắt đúng'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_key' => 'variant-1']],
+        ], null, '01a07af5-3303-7a73-9f15-b7f675293dc5');
+
+        $detail = (new AdminVideoAdapter([$video]))->detail($video, [
+            ['target_type' => 'variant', 'target_key' => 'variant-1', 'predicate' => 'about'],
+        ], [[
+            'evidence_id' => 'evidence-1',
+            'claim_id' => 'claim-1',
+            'source_id' => 'source-1',
+            'relation' => 'supports',
+            'excerpt' => 'Excerpt',
+        ]], ['state' => 'approved', 'proposal_id' => 'proposal-1'], [
+            'eligible' => true,
+            'path' => '/video/tieu-de-dung/',
+        ]);
+
+        self::assertSame('Tóm tắt đúng', $detail['metadata']['editorial']['summary']);
+        self::assertSame('variant-1', $detail['relations'][0]['target_key']);
+        self::assertSame('evidence-1', $detail['evidence'][0]['evidence_id']);
+        self::assertSame('approved', $detail['governance']['state']);
+        self::assertTrue($detail['frontend_projection']['eligible']);
+        self::assertSame('/video/tieu-de-dung/', $detail['frontend_projection']['path']);
+    }
+
     public function test_media_adapter_exposes_readiness_without_mutation(): void
     {
         $media = new Media('01a07af5-3303-7a73-9f15-b7f675293dc6', 'media.example', 'Ảnh thử', 'ready');

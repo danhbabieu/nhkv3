@@ -142,12 +142,22 @@
         fetch(base + 'nhk/v1/admin/workbench/video/' + encodeURIComponent(id), {headers: {'X-WP-Nonce': (window.nhkV3Admin && window.nhkV3Admin.nonce) || ''}})
             .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Không đọc được Video.'); return data; }); })
             .then(function (data) {
-                var video = data.video || {}, iframe = document.createElement('iframe'); iframe.width = '560'; iframe.height = '315'; iframe.loading = 'lazy'; iframe.title = video.title || 'Video YouTube'; iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(video.external_id || ''); iframe.allowFullscreen = true;
+                var video = data.video || {}, metadata = data.metadata || {}, iframe = document.createElement('iframe'); iframe.width = '560'; iframe.height = '315'; iframe.loading = 'lazy'; iframe.title = video.title || 'Video YouTube'; iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(video.external_id || ''); iframe.allowFullscreen = true;
                 output.textContent = ''; output.appendChild(iframe);
                 var title = document.createElement('h3'); title.textContent = video.title || 'Video'; output.appendChild(title);
                 var meta = document.createElement('p'); meta.textContent = [video.platform, video.external_id, video.id, 'revision ' + video.revision].join(' · '); output.appendChild(meta);
-                var relation = document.createElement('p'); relation.textContent = 'Relation guided vẫn qua Governance; chọn target semantic từ kết quả Tri thức, không nhập Evidence UUID.'; output.appendChild(relation);
-                var link = document.createElement('a'); link.className = 'button'; link.href = video.url || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Xem trên web'; output.appendChild(link);
+                function block(label, value) { var section = document.createElement('section'); var heading = document.createElement('h4'); heading.textContent = label; section.appendChild(heading); var body = document.createElement('p'); body.textContent = value; section.appendChild(body); output.appendChild(section); }
+                var editorial = metadata.editorial || {};
+                block('Metadata', [editorial.title || video.title || '', editorial.summary || '', metadata.category && metadata.category.primary ? (metadata.category.primary.label || metadata.category.primary.key || '') : ''].filter(Boolean).join(' · ') || 'Chưa có metadata.');
+                var relations = data.relations || [];
+                block('Relation target', relations.length ? relations.map(function (item) { return [item.target_type, item.target_key, item.predicate].filter(Boolean).join(':'); }).join(', ') : 'Chưa có relation active được đọc từ Graph.');
+                var evidence = data.evidence || [];
+                block('Source / Claim / Evidence', evidence.length ? evidence.map(function (item) { return [item.source || item.source_id, item.claim || item.claim_id, item.evidence_id, item.relation].filter(Boolean).join(' · '); }).join('\n') : 'Chưa có Evidence chain được đọc lại.');
+                var governance = data.governance || {};
+                block('Governance', governance.state ? [governance.state, governance.eligible === true ? 'eligible' : governance.eligible === false ? 'blocked' : 'chưa kiểm tra', (governance.blockers || []).join(', ')].filter(Boolean).join(' · ') : 'Chưa có proposal Governance cho Video.');
+                var projection = data.frontend_projection || {};
+                block('Frontend projection', projection.eligible ? 'Hợp lệ · ' + (projection.path || 'đã sẵn sàng') : 'Chưa hợp lệ · ' + ((projection.blockers || []).join(', ') || 'chưa đủ điều kiện'));
+                if (projection.eligible && projection.path) { var link = document.createElement('a'); link.className = 'button'; link.href = projection.path; link.textContent = 'Xem trên web'; output.appendChild(link); }
             }).catch(function (error) { output.textContent = error.message; });
     }
 
