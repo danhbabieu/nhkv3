@@ -1,5 +1,24 @@
 # NHK V3 Execution State
 
+## Demo publish and migration guard checkpoint — 2026-09-07
+
+Commit `37c6627` was deployed to `demo.1945.vn` and verified by remote Git
+read-back. Remote health reported a reachable database and migration state
+`current=13`, `target=15`, with storage otherwise ready. The official
+`PublicIdentityMigration014::up()` was then invoked through WordPress
+bootstrap, but failed closed with `PUBLIC_IDENTITY_MIGRATION_UP_REQUIRES_NHK_V3_OR_TEST`;
+the target database is not an allowed `nhk_v3` or `nhk_v3_test` database. As a
+result migration 015, canonical/Graph inventory, relation dry-run, governed
+proposal/apply, relation read-back and second-run verification were not
+executed. No semantic or relation data was mutated.
+
+The raw database read probe was not used because this task restricts operation
+to approved maintenance/capability paths. The deployed maintenance entrypoint
+does not expose migration or governed relation operations beyond its current
+allowlist, and its inventory operation returned no usable receipt in this
+session. This is an external target/database configuration blocker, not a
+deterministic relation result; no debt counter is inferred.
+
 ## Demo relation closeout gate — 2026-09-07
 
 The requested demo closeout was not executed because the environment policy
