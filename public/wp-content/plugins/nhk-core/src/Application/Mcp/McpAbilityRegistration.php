@@ -10,6 +10,9 @@ final class McpAbilityRegistration
     /** @var array<string,string> */
     private const READ_TOOL_MAP = [
         'nhk.search' => 'nhk-v3/search',
+        'nhk.canonical.inventory' => 'nhk-v3/canonical-inventory',
+        'nhk.graph.inventory' => 'nhk-v3/graph-inventory',
+        'nhk.relation.backfill.dry_run' => 'nhk-v3/relation-backfill-dry-run',
         'nhk.semantic.resolve' => 'nhk-v3/semantic-resolve',
         'nhk.entity.neighborhood' => 'nhk-v3/entity-neighborhood',
         'nhk.article.preflight' => 'nhk-v3/article-preflight',
@@ -235,6 +238,9 @@ final class McpAbilityRegistration
         try {
             return match ($tool) {
                 'nhk.search' => $read->search((string) ($input['q'] ?? ''), (int) ($input['page'] ?? 1), (int) ($input['per_page'] ?? 20)),
+                'nhk.canonical.inventory' => $read->canonicalInventory((array) ($input['filters'] ?? []), (int) ($input['limit'] ?? 50), isset($input['after']) ? (string) $input['after'] : null),
+                'nhk.graph.inventory' => $read->graphInventory((array) ($input['filters'] ?? []), (int) ($input['limit'] ?? 50), isset($input['after']) ? (string) $input['after'] : null),
+                'nhk.relation.backfill.dry_run' => $read->relationBackfillDryRun((array) ($input['records'] ?? [])),
                 'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
                 'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
@@ -267,6 +273,9 @@ final class McpAbilityRegistration
             'nhk.public-url.audit' => 'NHK Public URL Audit',
             'nhk.public-url.reproject' => 'NHK Public URL Reproject',
             'nhk.search' => 'NHK Search',
+            'nhk.canonical.inventory' => 'NHK Canonical Inventory',
+            'nhk.graph.inventory' => 'NHK Graph Inventory',
+            'nhk.relation.backfill.dry_run' => 'NHK Relation Backfill Dry-Run',
             'nhk.semantic.resolve' => 'NHK Semantic Resolve',
             'nhk.entity.get' => 'NHK Entity Get',
             'nhk.media.get' => 'NHK Media Get',

@@ -136,7 +136,7 @@ preflight is read-gated.
 | Create/update entity | Ingest or generic governed proposal; no typed update tool | PARTIAL |
 | Read Source/Evidence | `nhk.source.get`, `nhk.evidence.get` | READY |
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
-| Read/create relation | Governed `relation_create`; raw Graph read is admin REST only; related semantic read has no MCP tool yet | PARTIAL / IMPLEMENTATION_GAP |
+| Read/create relation | Governed `relation_create`; raw Graph inventory and relation dry-run are read-only MCP tools; relation creation remains governed | PARTIAL / IMPLEMENTATION_GAP |
 | Create/update/publish Post | typed Article draft create/update plus gated publish/trash/restore boundary; exact live catalog/runtime still requires discovery/read-back | PARTIAL / RUNTIME-GATED |
 | Upload/find Media | governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
 | Attach MediaUsage | nested in Media ingest only | PARTIAL |
@@ -226,8 +226,11 @@ never Evidence merely because they are available to MCP.
 ## 7. Graph workflow and runtime matrix
 
 Graph is the only relation persistence. Relation create, retire and reactivate
-are governed operations through `GraphService`. There is no MCP Graph read
-tool; raw Graph REST is administrator-only.
+are governed operations through `GraphService`. The read-only
+`nhk.graph.inventory` tool enumerates stored edges with typed endpoints,
+direction, lifecycle and diagnostics; `nhk.relation.backfill.dry_run` scans the
+canonical/Graph snapshot without mutation. Raw Graph REST remains
+administrator-only.
 
 Full boot registers 15 endpoint types: `wp_post`; Authority `brand`, `model`,
 `variant`, `movement`, `music`, `component`, `classification`, `specimen`,
@@ -235,7 +238,7 @@ Full boot registers 15 endpoint types: `wp_post`; Authority `brand`, `model`,
 
 | SOURCE | PREDICATE | TARGET | CARDINALITY | DIRECT/DERIVED | EVIDENCE | GOVERNED OPERATION | MCP READ TOOL | MCP WRITE TOOL |
 |---|---|---|---|---|---|---|---|---|
-| all 15 endpoint types | `about` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
+| all 15 endpoint types | `about` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | `nhk.graph.inventory`, `nhk.relation.backfill.dry_run` | `nhk.proposal.create` + lifecycle |
 | `media` | `depicts` | all 15 endpoint types | outbound MANY / inbound MANY | DIRECT | none enforced in edge; provenance separate | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
 | `model` | `model_of` | `brand` | outbound ONE / inbound MANY | DIRECT | canonical endpoints; provenance where the relation operation requires it | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |
 | `variant` | `variant_of` | `model` | outbound ONE / inbound MANY | DIRECT | canonical endpoints; provenance where the relation operation requires it | `relation_create`, `relation_retire`, `relation_reactivate` | none; admin REST only | `nhk.proposal.create` + lifecycle |

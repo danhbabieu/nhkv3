@@ -144,6 +144,7 @@ final class P0ConstitutionIntegrityTest extends TestCase
             public function createEdge(\NHK\Core\Domain\Graph\GraphNode $source, \NHK\Core\Domain\Graph\PredicateDefinition $predicate, \NHK\Core\Domain\Graph\GraphNode $target): \NHK\Core\Domain\Graph\GraphEdge { throw new \RuntimeException('graph storage unavailable'); }
             public function findEdge(NodeReference $source, string $predicate, NodeReference $target): ?\NHK\Core\Domain\Graph\GraphEdge { throw new \RuntimeException('graph storage unavailable'); }
             public function findByUuid(string $uuid): ?\NHK\Core\Domain\Graph\GraphEdge { throw new \RuntimeException('graph storage unavailable'); }
+            public function allEdges(bool $include_retired = true): array { throw new \RuntimeException('graph storage unavailable'); }
             public function outgoing(\NHK\Core\Domain\Graph\GraphNode $source, ?string $predicate, int $after_id, int $limit, bool $include_retired, ?string $target_type = null): array { throw new \RuntimeException('graph storage unavailable'); }
             public function incoming(\NHK\Core\Domain\Graph\GraphNode $target, ?string $predicate, int $after_id, int $limit, bool $include_retired, ?string $source_type = null): array { throw new \RuntimeException('graph storage unavailable'); }
             public function retire(\NHK\Core\Domain\Graph\GraphEdge $edge, int $expected_revision): \NHK\Core\Domain\Graph\GraphEdge { throw new \RuntimeException('graph storage unavailable'); }

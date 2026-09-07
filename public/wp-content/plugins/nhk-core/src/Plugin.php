@@ -48,6 +48,8 @@ use NHK\Core\Contracts\Article\PublicationPrincipal;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery};
+use NHK\Core\Application\Graph\RelationBackfillService;
+use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Governance\{NoOpApplyExecutionHook, WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbEligibilityReader, WpdbProposalRepository};
@@ -95,7 +97,12 @@ final class Plugin {
             CoreEndpointResolverRegistrar::register($graphEndpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphRead = new GraphService(new WpdbGraphRepository($wpdb), $graphEndpoints, new PredicateRegistry(), new WpdbAuditSink());
             $neighborhood = new SemanticNeighborhoodQuery(new RelatedSemanticQuery($graphRead, new PredicateTraversalPolicy(new PredicateRegistry())));
-            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood));
+            $graphRepository = new WpdbGraphRepository($wpdb);
+            $predicates = new PredicateRegistry();
+            $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
+            $graphInventory = new GraphInventoryService($graphRepository, $graphEndpoints, $predicates);
+            $relationBackfill = new RelationBackfillService(static fn (array $record): mixed => isset($record['edge_uuid']) ? ['status' => 'EXISTING'] : ($record['resolution'] ?? ['status' => 'NOT_APPLICABLE']), static fn (): bool => false, static fn (): array => array_merge($canonicalInventory->inventory([], 10000)->items, $graphInventory->inventory([], 10000)->items));
+            McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
         });
@@ -341,7 +348,10 @@ final class Plugin {
             (new GraphApi($graphService, new MigrationStatus()))->register();
             $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
             $mcpNeighborhood = new SemanticNeighborhoodQuery(new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy(new PredicateRegistry())));
-            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood);
+            $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
+            $graphInventory = new GraphInventoryService($graphRepository, $endpoints, $predicates);
+            $relationBackfill = new RelationBackfillService(static fn (array $record): mixed => isset($record['edge_uuid']) ? ['status' => 'EXISTING'] : ($record['resolution'] ?? ['status' => 'NOT_APPLICABLE']), static fn (): bool => false, static fn (): array => array_merge($canonicalInventory->inventory([], 10000)->items, $graphInventory->inventory([], 10000)->items));
+            $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill);
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
@@ -373,6 +383,25 @@ final class Plugin {
             wp_enqueue_script('nhk-v3-admin-shell');
         });
     }
+    private static function canonicalInventory(EntityTypeRegistry $types, object $authority, object $media, object $videos, object $claims, object $sources, object $evidence): CanonicalInventoryService
+    {
+        $providers = [];
+        foreach ($types->all() as $definition) {
+            $type = $definition->type;
+            $providers[$type] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'stable_key' => $item->stableKey, 'revision' => $item->revision, 'state' => $item->active() ? 'ACTIVE' : 'RETIRED', 'provenance' => $item->payload], $authority->listByType($type, true));
+        }
+        $providers['knowledge'] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'stable_key' => $item->stableKey, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->provenance, 'visibility' => $item->isPublic() ? 'PUBLIC' : 'PRIVATE'], $claims->list(true));
+        $providers['source'] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'stable_key' => $item->stableKey, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->metadata, 'visibility' => $item->isPublic() ? 'PUBLIC' : 'PRIVATE'], $sources->list(true));
+        $providers['evidence'] = static function () use ($claims, $evidence): array {
+            $rows = [];
+            foreach ($claims->list(true) as $claim) foreach ($evidence->listByClaim($claim->canonicalId, true) as $item) $rows[$item->canonicalId] = ['uuid' => $item->canonicalId, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->metadata, 'visibility' => $item->isPublic() ? 'PUBLIC' : 'PRIVATE'];
+            return array_values($rows);
+        };
+        $providers['media'] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'stable_key' => $item->stableKey, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->provenance, 'visibility' => $item->active ? 'PUBLIC' : 'PRIVATE'], $media->list(true));
+        $providers['video'] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->metadata, 'visibility' => $item->active ? 'PUBLIC' : 'PRIVATE'], $videos->list(true));
+        return new CanonicalInventoryService($providers);
+    }
+
     private static function runtimeMigrationsEnabled(): bool
     {
         return defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true;

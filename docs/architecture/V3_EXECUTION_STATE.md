@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+## Read-only canonical/Graph inventory capability — 2026-09-07
+
+Added backend-only read capabilities nhk.canonical.inventory,
+nhk.graph.inventory and nhk.relation.backfill.dry_run. Canonical inventory
+uses registered types and canonical repositories with filter-before-pagination;
+Graph inventory uses a read-only allEdges repository primitive and reports
+direction, lifecycle, invalid/dangling endpoint and duplicate diagnostics.
+Relation dry-run has the required resolver-chain seam and machine-readable
+status counters, and when no explicit records are supplied scans both
+inventories. No new predicate/type was registered; classified_as and
+Model → uses_movement remain closed.
+
+Focused verification passed 10 tests / 58 assertions and Unit passed 682 tests
+/ 3,313 assertions (2 warnings, 5 PHPUnit deprecations). PHP lint, Composer
+validation and diff-check passed; Composer reports only the pre-existing
+missing-license warning. Guarded Integration could not bootstrap WordPress in
+this process and is recorded as ENVIRONMENT_BLOCKED; no demo deployment was
+attempted because NHK_DEMO_DEPLOY_CONFIG is unset. No demo or canonical data
+was mutated.
+
 ## Bootstrap/runtime reconciliation and live Graph audit — 2026-09-07
 
 The reported `ENVIRONMENT_BLOCKED` state was reconciled and must not be

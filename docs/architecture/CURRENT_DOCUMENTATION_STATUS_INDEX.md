@@ -50,7 +50,7 @@ registry/catalog merely because its wording is present tense.
 | Media | `Media` identity separate from `MediaAsset`, `MediaUsage` and WP attachment | source-original retained private/protected; derivatives remain under same Media; checksum does not auto-merge identity; caption/alt/filename observations may feed Dictionary candidates only |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | transport/orchestration over existing owners | fixed tool counts in historical docs are snapshots only; use current `McpToolCatalog` plus fresh runtime discovery when availability matters; no dedicated Dictionary MCP surface should be claimed unless current catalog/runtime exposes it |
+| MCP | transport/orchestration over existing owners | current catalog includes read-only canonical/Graph inventory and relation dry-run; use fresh runtime discovery when availability matters; no dedicated Dictionary MCP surface should be claimed unless current catalog/runtime exposes it |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; multipart Media ingest remains on its approved custom MCP boundary |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
 
@@ -115,7 +115,7 @@ Do not rewrite history merely to make old checkpoints look current.
 - dedicated Dictionary MCP tools are not current capability truth unless they
   are added to the executable catalog and confirmed by fresh runtime discovery;
 - dedicated Product–Specimen canonical relation;
-- approved Classification membership predicate (`classified_as`) and live Graph relation backfill runtime;
+- approved Classification membership predicate (`classified_as`) and governed Graph relation apply; read-only Graph inventory/relation dry-run capability is implemented;
 - full physical Graph completeness/backfill where not runtime-proven;
 - Media → Living Knowledge automatic enrichment adapter;
 - automatic Article body rewrite from Knowledge (prohibited by design; only

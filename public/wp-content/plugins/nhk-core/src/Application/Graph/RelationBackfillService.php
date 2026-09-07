@@ -5,26 +5,29 @@ namespace NHK\Core\Application\Graph;
 /** Generic dry-run/apply coordinator; resolution is injected so text matching cannot become canonical truth accidentally. */
 final class RelationBackfillService
 {
-    /** @param callable(array<string,mixed>): (RelationBackfillCandidate|array<string,mixed>|null) $resolver @param callable(RelationBackfillCandidate): bool $exists */
-    public function __construct(private $resolver, private $exists) {}
+    /** @param callable(array<string,mixed>): (RelationBackfillCandidate|array<string,mixed>|null) $resolver @param callable(RelationBackfillCandidate): bool $exists @param callable():list<array<string,mixed>>|null $recordProvider */
+    public function __construct(private $resolver, private $exists, private $recordProvider = null) {}
 
     /** @param list<array<string,mixed>> $records */
     public function dryRun(array $records): RelationBackfillReport
     {
+        if ($records === [] && is_callable($this->recordProvider)) $records = ($this->recordProvider)();
         $report = new RelationBackfillReport(scanned: count($records));
         foreach ($records as $record) {
             $resolved = ($this->resolver)($record);
             if ($resolved instanceof RelationBackfillCandidate) {
-                if (($this->exists)($resolved)) $report->existing++;
-                else $report->proposed[] = $resolved;
+                if (($this->exists)($resolved)) { $report->existing++; $report->counters['EXISTING']++; }
+                else { $report->proposed[] = $resolved; $report->candidates[] = $resolved->toArray(); $report->counters['MISSING_DETERMINISTIC']++; }
                 continue;
             }
             if (!is_array($resolved)) { $report->unsupported++; continue; }
-            $status = (string) ($resolved['status'] ?? 'unsupported');
-            if ($status === 'ambiguous') $report->ambiguous[] = $resolved;
-            elseif ($status === 'evidence_gap') $report->evidenceGap++;
-            elseif ($status === 'registry_gap') $report->registryGap++;
-            else $report->unsupported++;
+            $status = strtoupper((string) ($resolved['status'] ?? 'NOT_APPLICABLE'));
+            if (!array_key_exists($status, $report->counters)) { $report->unsupported++; continue; }
+            $report->counters[$status]++;
+            if ($status === 'AMBIGUOUS') $report->ambiguous[] = $resolved;
+            if (isset($resolved['candidate']) && is_array($resolved['candidate'])) $report->candidates[] = $resolved['candidate'];
+            if ($status === 'EVIDENCE_GAP') $report->evidenceGap++;
+            if ($status === 'REGISTRY_GAP') $report->registryGap++;
         }
         return $report;
     }

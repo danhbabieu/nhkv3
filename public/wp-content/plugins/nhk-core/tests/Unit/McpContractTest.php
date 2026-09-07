@@ -45,6 +45,9 @@ final class McpContractTest extends TestCase
     {
         self::assertSame([
             'nhk.search',
+            'nhk.canonical.inventory',
+            'nhk.graph.inventory',
+            'nhk.relation.backfill.dry_run',
             'nhk.semantic.resolve',
             'nhk.entity.neighborhood',
             'nhk.article.preflight',
@@ -253,6 +256,9 @@ final class McpContractTest extends TestCase
     {
         self::assertSame([
             'nhk-v3/search',
+            'nhk-v3/canonical-inventory',
+            'nhk-v3/graph-inventory',
+            'nhk-v3/relation-backfill-dry-run',
             'nhk-v3/semantic-resolve',
             'nhk-v3/entity-neighborhood',
             'nhk-v3/article-preflight',

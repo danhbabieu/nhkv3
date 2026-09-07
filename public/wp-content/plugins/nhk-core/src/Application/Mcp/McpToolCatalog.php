@@ -10,6 +10,9 @@ final class McpToolCatalog
     {
         return [
             self::tool('nhk.search', 'Search native editorial posts and active semantic records with bounded pagination.', ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['q']),
+            self::tool('nhk.canonical.inventory', 'Read-only inventory of canonical records with filtering before bounded pagination.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100], 'after' => ['type' => 'string']], []),
+            self::tool('nhk.graph.inventory', 'Read-only inventory of all Graph edges with endpoint diagnostics.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100], 'after' => ['type' => 'string']], []),
+            self::tool('nhk.relation.backfill.dry_run', 'Read-only relation backfill scan with fail-closed machine-readable statuses.', ['records' => ['type' => 'array']], ['records']),
             self::tool('nhk.semantic.resolve', 'Resolve read-only Authority context by UUID, stable key or exact name/alias; ambiguous matches remain candidates.', ['context' => ['type' => 'object']], ['context']),
             self::tool('nhk.entity.neighborhood', 'Read a bounded semantic neighborhood from canonical Graph relations.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'profile' => ['type' => 'string', 'enum' => ['brand', 'model', 'variant', 'classification', 'specimen']], 'max_hops' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['type', 'id', 'profile']),
             self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),

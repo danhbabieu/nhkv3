@@ -18,6 +18,8 @@ use NHK\Core\Application\Video\VideoSearchDocument;
 use NHK\Core\Application\Graph\SemanticNeighborhoodQuery;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
+use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
+use NHK\Core\Application\Graph\RelationBackfillService;
 
 final class McpReadHandler
 {
@@ -36,6 +38,9 @@ final class McpReadHandler
         private ?McpSemanticContextResolver $resolver = null,
         private ?WordPressMediaAttachmentIngestor $wordpressAttachments = null,
         private ?SemanticNeighborhoodQuery $neighborhood = null,
+        private ?CanonicalInventoryService $canonicalInventory = null,
+        private ?GraphInventoryService $graphInventory = null,
+        private ?RelationBackfillService $relationBackfill = null,
     ) { $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media); }
 
     public function entityGet(string $type, string $id): ?array
@@ -101,6 +106,24 @@ final class McpReadHandler
     {
         if ($this->resolver === null) throw new \InvalidArgumentException('Semantic context resolver is unavailable.');
         return $this->resolver->resolve($context);
+    }
+
+    public function canonicalInventory(array $filters, int $limit = 50, ?string $after = null): array
+    {
+        if ($this->canonicalInventory === null) return ['status' => 'unavailable', 'reason' => 'CANONICAL_INVENTORY_UNAVAILABLE'];
+        return ['status' => 'available'] + $this->canonicalInventory->inventory($filters, $limit, $after)->toArray();
+    }
+
+    public function graphInventory(array $filters, int $limit = 50, ?string $after = null): array
+    {
+        if ($this->graphInventory === null) return ['status' => 'unavailable', 'reason' => 'GRAPH_INVENTORY_UNAVAILABLE'];
+        return ['status' => 'available'] + $this->graphInventory->inventory($filters, $limit, $after)->toArray();
+    }
+
+    public function relationBackfillDryRun(array $records): array
+    {
+        if ($this->relationBackfill === null) return ['status' => 'unavailable', 'reason' => 'RELATION_DRY_RUN_UNAVAILABLE'];
+        return ['status' => 'available', 'read_only' => true] + $this->relationBackfill->dryRun($records)->toArray();
     }
 
     /** @return array{status:string,items:list<array<string,mixed>>,reason?:string} */
