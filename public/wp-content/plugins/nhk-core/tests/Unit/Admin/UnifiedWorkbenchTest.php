@@ -7,6 +7,12 @@ use PHPUnit\Framework\TestCase;
 
 final class UnifiedWorkbenchTest extends TestCase
 {
+    public function test_system_workspace_imports_shared_health_dependencies(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Infrastructure/Admin/AdminWorkbenchPage.php');
+        self::assertStringContainsString('use NHK\\Core\\Shared\\Health\\HealthCheck;', $source);
+        self::assertStringContainsString('use NHK\\Core\\Shared\\Migration\\MigrationStatus;', $source);
+    }
     public function test_primary_menu_registers_all_user_facing_workspaces_and_keeps_raw_tools_advanced(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Infrastructure/Admin/AdminWorkbenchPage.php');

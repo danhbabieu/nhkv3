@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Admin;
 
+use NHK\Core\Shared\Health\HealthCheck;
+use NHK\Core\Shared\Migration\MigrationStatus;
+
 /**
  * Task-first Admin shell. Existing domain/application writers remain unchanged.
  */
