@@ -229,5 +229,12 @@ final class VideoRelationLifecycleTest extends TestCase
 
         self::assertTrue($video->active);
         self::assertCount(2, $graphRepo->allEdges());
+
+        $replayed = $executor(new Proposal('video-historical-replay', 'video', 'ingest', [
+            'canonical_id' => $videoId, 'url' => 'https://youtu.be/dQw4w9WgXcQ', 'title' => 'Historical video',
+            'metadata' => ['intake_version' => 1, 'semantic_attachments' => []],
+        ], 'video-fingerprint', null, 'deps', ProposalState::APPROVED, entityType: 'video'));
+        self::assertTrue($replayed->active);
+        self::assertCount(2, $graphRepo->allEdges());
     }
 }
