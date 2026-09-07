@@ -21,6 +21,9 @@ final readonly class VideoRelationCandidate
     /** @return array<string,mixed> */
     public function toProposalPayload(): array
     {
-        return ['source_type' => $this->sourceType, 'source_key' => $this->sourceKey, 'target_type' => $this->targetType, 'target_key' => $this->targetId, 'predicate' => $this->predicate, 'origin' => $this->origin, 'evidence_refs' => $this->evidenceRefs, 'reason' => $this->reason, 'confidence' => $this->confidence];
+        // Relation endpoint identity is canonical UUID identity. Keep the
+        // older key names as read-compatible aliases for existing packets;
+        // new proposals must always carry the explicit UUID fields.
+        return ['source_type' => $this->sourceType, 'source_uuid' => $this->sourceKey, 'source_key' => $this->sourceKey, 'target_type' => $this->targetType, 'target_uuid' => $this->targetId, 'target_key' => $this->targetId, 'predicate' => $this->predicate, 'origin' => $this->origin, 'evidence_refs' => $this->evidenceRefs, 'reason' => $this->reason, 'confidence' => $this->confidence];
     }
 }

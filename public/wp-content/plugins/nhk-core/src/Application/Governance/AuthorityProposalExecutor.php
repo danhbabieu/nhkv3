@@ -178,7 +178,7 @@ final class AuthorityProposalExecutor
             $this->graph->create(
                 new NodeReference('video', $video->canonicalId),
                 (string) ($attachment['predicate'] ?? ''),
-                new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_key'] ?? '')),
+                new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? '')),
             );
         }
     }

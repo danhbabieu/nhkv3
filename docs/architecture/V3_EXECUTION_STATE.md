@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+## Video relation endpoint identity fix — 2026-09-07
+
+The confirmed `relation_create` failure was traced from governed proposal
+creation through persistence, approval fingerprint binding, eligibility and
+Controlled Apply to the relation handler. The canonical relation packet
+contract is explicit typed endpoint identity: `source_type/source_uuid` and
+`target_type/target_uuid`. `VideoRelationCandidate::toProposalPayload()` was
+emitting only the older `source_key/target_key` compatibility names, so Video
+relation proposals could lose the canonical endpoint fields at an adapter
+boundary and fail in the handler with `Relation endpoint identity is required.`
+
+New Video candidate packets now carry both canonical UUID fields and the
+existing compatibility aliases; Video attachment apply reads the canonical
+target UUID first. Endpoint validation, evidence requirements, approval
+fingerprints, eligibility, Controlled Apply and Graph idempotency are
+unchanged. Focused Unit verification is 41 tests / 172 assertions; complete
+Unit verification is 669 tests / 3,244 assertions; guarded Integration is 108
+tests / 730 assertions. PHP lint and `git diff --check` are required before
+commit.
+
+The guarded `nhk_v3_test` runtime is available, but it contains neither the
+reported Video UUID `01a077ef-ecd1-78fe-870c-6dd6b9bc676d` nor Variant UUID
+`852da54d-457a-4397-a16d-52d9452ba766`, and no matching Graph edge/proposal was
+found. No replay, new proposal, semantic write or public publication was
+performed; runtime completion of that specific Video is blocked on restoring
+the governed proposal/source/evidence and canonical records in the authorized
+integration runtime.
+
 ## Graph Relation runtime recovery recheck — 2026-09-06
 
 The repository runtime convention was re-verified without changing application

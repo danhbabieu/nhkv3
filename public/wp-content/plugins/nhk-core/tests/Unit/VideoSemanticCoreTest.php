@@ -377,6 +377,8 @@ final class VideoSemanticCoreTest extends TestCase
         $replayedProposal = $service->proposalArguments($preview, 'video-intake-test');
 
         self::assertSame('ingest', $preview->operation);
+        self::assertSame($preview->videoId, $preview->package['semantic_attachments'][0]['source_uuid']);
+        self::assertSame($brand->canonicalId, $preview->package['semantic_attachments'][0]['target_uuid']);
         self::assertSame($brand->canonicalId, $preview->package['semantic_attachments'][0]['target_key']);
         self::assertSame('EXPLICIT_USER_RELATION', $preview->package['semantic_attachments'][0]['origin']);
         self::assertSame('video', $proposal['entity_type']);
