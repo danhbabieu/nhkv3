@@ -68,6 +68,20 @@
     "git_diff_check": "PASS",
     "integration": "PASS_108_TESTS_730_ASSERTIONS_1_WARNING_1_DEPRECATION_2_SKIPS"
   },
+  "live_demo_execution": {
+    "status": "BLOCKED",
+    "source_commit": "320863e",
+    "deployment": "PASS_WITH_CHECKSUM_READBACK",
+    "migration": {"status": "BLOCKED", "current": 13, "target": 15, "reason_code": "REMOTE_RUNTIME_BOOTSTRAP_FAILED", "guard_markers": "UNSET"},
+    "inventory": {"canonical": "BLOCKED_MIGRATION_REQUIRED", "graph": "BLOCKED_MIGRATION_REQUIRED"},
+    "relation_dry_run": {"status": "PASS_READ_ONLY", "scanned": 1809, "existing": 249, "missing_deterministic": 0, "ambiguous": 0, "relation_pending": 855, "registry_gap": 175, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0, "created": 0},
+    "governed_apply": "NOT_RUN_MIGRATION_AND_RUNTIME_GATE_BLOCKED",
+    "second_run": "NOT_RUN",
+    "odo": "NO_LIVE_TARGET_READBACK; no deterministic candidate exposed",
+    "cuckoo": "NO_LIVE_TARGET_READBACK; no deterministic candidate exposed",
+    "residual_debt": {"deterministic_relation_pending": 855, "registry_gap": 175},
+    "policy_note": "No raw DB bypass, production/V2 access, or semantic/Graph mutation was performed."
+  },
   "errors": [],
   "owner_actions": [
     "Restore/authorize canonical Cuckoo and Odo 36/8 records plus governed source/evidence in nhk_v3_test before any batch backfill.",
