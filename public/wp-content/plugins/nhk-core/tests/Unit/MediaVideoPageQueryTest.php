@@ -80,6 +80,34 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertArrayNotHasKey('metadata', $detail);
     }
 
+    public function test_persisted_video_source_shape_projects_through_public_page_query_without_reingest(): void
+    {
+        $video = Video::fromUrl('https://www.youtube.com/watch?v=truOChTNbwA', 'Stored source title', [
+            'public_identity' => ['current_slug' => 'stored-video'],
+            'source' => [
+                'platform' => 'youtube',
+                'external_video_id' => 'truOChTNbwA',
+                'availability' => 'available',
+                'embeddable' => true,
+                'provenance' => ['kind' => 'YOUTUBE_SOURCE', 'origin' => 'YOUTUBE'],
+            ],
+            'provenance' => ['source_url' => 'https://www.youtube.com/watch?v=truOChTNbwA'],
+            'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'],
+            'category' => ['primary' => ['key' => '06']],
+            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+
+        $detail = $this->query([], [$video])->videoDetail($video->canonicalId);
+
+        self::assertNotNull($detail);
+        self::assertSame('/video/stored-video/', $detail['public_url']);
+        self::assertSame('https://www.youtube-nocookie.com/embed/truOChTNbwA', $detail['embed_url']);
+        self::assertSame('available', $detail['source_status']);
+        self::assertSame('YOUTUBE_SOURCE', $detail['provenance']['kind']);
+        self::assertSame('YOUTUBE', $detail['provenance']['origin']);
+        self::assertSame('truOChTNbwA', $detail['provenance']['external_id']);
+    }
+
     public function test_video_detail_and_archive_hide_invalid_persisted_external_references(): void
     {
         $invalid = new Video(UuidCodec::newV7(), 'vimeo', 'bad-reference', 'https://vimeo.com/bad-reference', 'Invalid');
