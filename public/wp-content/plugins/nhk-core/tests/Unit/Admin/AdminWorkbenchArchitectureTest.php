@@ -61,6 +61,12 @@ final class AdminWorkbenchArchitectureTest extends TestCase
         self::assertStringContainsString("'nhk-v3-advanced', [AdminPage::class, 'render']", $page);
     }
 
+    public function test_video_detail_renders_readback_layers_and_only_links_eligible_projection(): void
+    {
+        $source = (string) file_get_contents($this->repo() . '/public/wp-content/plugins/nhk-core/assets/admin/admin-workbench.js');
+        foreach (['metadata', 'Relation target', 'Source / Claim / Evidence', 'Governance', 'Frontend projection', 'projection.eligible && projection.path'] as $needle) self::assertStringContainsString($needle, $source);
+    }
+
     /** @return list<string> */
     private function productionFiles(): array
     {

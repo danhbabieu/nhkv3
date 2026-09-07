@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+## Unified Admin Workbench runtime acceptance closeout — 2026-09-07
+
+Fresh guarded runtime probe passed outside the sandbox: MySQL is alive on
+127.0.0.1:3306 and WordPress bootstraps against `nhk_v3`; the exact acceptance
+Video `truOChTNbwA` / `01a07af5-3303-7a73-9f15-b7f675293dc5` is absent from both
+local `nhk_v3` and `nhk_v3_test`, so local target read-back cannot be claimed.
+An already-authenticated read-only Admin session on `demo.1945.vn` confirmed
+the seven requested workspaces render, and confirmed the target appears in
+Video search, opens detail, renders the YouTube player, and shows external ID,
+canonical UUID and revision. The deployed session's detail projection was
+missing metadata, Graph target, Source/Claim/Evidence, Governance and
+frontend-projection state; this was classified as an Admin read-projection gap.
+
+The local fix keeps the existing Graph/Governance writers unchanged. The Admin
+Video read endpoint now composes Graph relation read-back, evidence-chain
+read-back, latest Video proposal/eligibility state and `VideoUrlPolicy` frontend
+projection, while the browser detail renders those layers and emits “Xem trên
+web” only for an eligible projection. No Graph JSON, migration, seed or
+semantic writer was changed. Regression coverage passes 63 Admin/relation tests
+and 514 assertions; local target/runtime acceptance remains unverified until
+the target data and updated code are available in the same authenticated
+runtime.
+
+Guarded Integration still runs 110 tests / 746 assertions with two precise
+pre-existing `GovernedSemanticIngestIntegrationTest` failures: the two rollback
+tests construct an APPROVED proposal without a matching approval-row binding,
+so eligibility returns `Proposal is not eligible for apply.` before the
+intended injected endpoint/activation failure. This is not reported as an
+environment failure and is left outside the Admin Workbench scope.
+
 ## Unified Admin Workbench implementation — 2026-09-07
 
 The Admin Workbench now exposes primary user-facing workspaces for Nội dung,
