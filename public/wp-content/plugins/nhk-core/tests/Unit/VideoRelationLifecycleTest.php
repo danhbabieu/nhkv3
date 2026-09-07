@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
-use NHK\Core\Application\Governance\AuthorityProposalExecutor;
+use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceService};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Video\VideoCompletenessPolicy;
@@ -18,7 +18,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Domain\Video\VideoRelationCandidate;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
-use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryGraphRepository};
+use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryGraphRepository, InMemoryProposalRepository};
 use PHPUnit\Framework\TestCase;
 
 final class VideoRelationLifecycleTest extends TestCase
@@ -47,6 +47,21 @@ final class VideoRelationLifecycleTest extends TestCase
         self::assertSame('01a07971-2fe3-77da-9424-998cf6f249e0', $packet['source_uuid']);
         self::assertSame('22222222-2222-4222-8222-222222222222', $packet['target_uuid']);
         self::assertSame('about', $packet['predicate']);
+    }
+
+    public function test_video_proposal_replay_is_idempotent_and_fingerprint_bound(): void
+    {
+        $governance = new GovernanceService(new InMemoryProposalRepository());
+        $payload = ['canonical_id' => '01a07971-2fe3-77da-9424-998cf6f249e0', 'url' => 'https://youtu.be/dQw4w9WgXcQ'];
+        $first = new Proposal('video-proposal-a', 'video', 'ingest', $payload, 'content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
+        $replay = new Proposal('video-proposal-b', 'video', 'ingest', $payload, 'content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
+
+        self::assertSame($first->id, $governance->create($first)->id);
+        self::assertSame($first->id, $governance->create($replay)->id);
+
+        $changedFingerprint = new Proposal('video-proposal-c', 'video', 'ingest', $payload, 'changed-content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
+        $this->expectExceptionMessage('Idempotency key is already bound to different content.');
+        $governance->create($changedFingerprint);
     }
 
     public function test_independent_relation_apply_keeps_endpoint_validation_for_unmaterialized_video(): void
@@ -119,7 +134,15 @@ final class VideoRelationLifecycleTest extends TestCase
             'title' => 'Video lifecycle',
             'metadata' => [
                 'intake_version' => 1,
-                'completeness' => ['blockers' => []],
+                // Intake completeness is evaluated before the relation exists;
+                // this stale blocker must not prevent relation materialization.
+                'completeness' => ['blockers' => ['NO_SEMANTIC_ATTACHMENT']],
+                'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+                'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+                'editorial' => ['title' => 'Video lifecycle', 'summary' => 'Summary', 'body' => 'Body'],
+                'category' => ['primary' => ['key' => '01']],
+                'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+                'seo' => ['title' => 'Video lifecycle', 'description' => 'Summary'],
                 'semantic_attachments' => [[
                     'target_type' => 'brand', 'target_uuid' => $targetId, 'predicate' => 'about',
                     'evidence_refs' => [['evidence_id' => $evidenceId]],

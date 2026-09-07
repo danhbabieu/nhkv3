@@ -8,7 +8,7 @@ use NHK\Core\Application\Governance\{CanonicalApplyReadBackVerifier, ControlledA
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Video\VideoService;
-use NHK\Core\Contracts\Governance\GovernanceAuthorizer;
+use NHK\Core\Contracts\Governance\{ApplyExecutionHook, GovernanceAuthorizer};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{DependencyGraph, Proposal, ProposalState};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
@@ -72,10 +72,10 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $video = $this->runGoverned($governance, $apply, 'video', [
             'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
             'title' => 'Governed test video',
-            'metadata' => ['intake_version' => 1, 'semantic_attachments' => [[
+            'metadata' => $this->videoMetadata([[
                 'target_type' => 'variant', 'target_key' => $variant->canonicalId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION',
                 'evidence_refs' => [['evidence_id' => $evidence['canonical_id']]],
-            ]]],
+            ]], true),
         ]);
 
         self::assertSame($source['canonical_id'], (new WpdbSourceRepository($GLOBALS['wpdb']))->findByCanonicalId($source['canonical_id'])?->canonicalId);
@@ -95,6 +95,59 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $validator = new CanonicalDependencyValidator(new WpdbKnowledgeRepository($GLOBALS['wpdb']), new WpdbSourceRepository($GLOBALS['wpdb']), new WpdbEvidenceRepository($GLOBALS['wpdb']));
         $this->expectExceptionMessage('Claim must resolve by canonical UUID.');
         $validator->claim($proposal->id);
+    }
+
+    public function test_video_relation_failure_rolls_back_inactive_video_and_relation(): void
+    {
+        [, $variant, $governance, $apply] = $this->fixture();
+        $source = $this->runGoverned($governance, $apply, 'source', ['stable_key' => $this->prefix . '-relation-failure-source', 'title' => 'Relation failure source', 'source_type' => 'catalog']);
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-relation-failure-claim', 'text' => 'Relation failure claim', 'claim_type' => 'fact']);
+        $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Relation failure evidence', 'relation' => 'supports']);
+        $videoId = UuidCodec::newV7();
+        $missingTarget = UuidCodec::newV7();
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'video', 'ingest', [
+            'canonical_id' => $videoId,
+            'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
+            'title' => 'Relation rollback video',
+            'metadata' => $this->videoMetadata([[
+                'target_type' => 'variant', 'target_uuid' => $missingTarget, 'predicate' => 'about',
+                'evidence_refs' => [['evidence_id' => $evidence['canonical_id']]],
+            ]]),
+        ], hash('sha256', $videoId), null, hash('sha256', 'video-relation-failure'), ProposalState::APPROVED, idempotencyKey: $this->prefix . '-video-relation-failure', entityType: 'video'));
+
+        try { $apply->apply($proposal->id); self::fail('Expected relation endpoint failure.'); }
+        catch (\Throwable $error) { self::assertSame('Endpoint does not exist: variant:' . $missingTarget, $error->getMessage()); }
+        self::assertNull((new WpdbVideoRepository($GLOBALS['wpdb']))->findByCanonicalId($videoId));
+        self::assertNull((new WpdbGraphRepository($GLOBALS['wpdb']))->findEdge(new NodeReference('video', $videoId), 'about', new NodeReference('variant', $missingTarget)));
+        self::assertNotNull($variant);
+    }
+
+    public function test_video_activation_phase_failure_rolls_back_video_and_relation(): void
+    {
+        $hook = new class implements ApplyExecutionHook {
+            public function afterAttemptStarted(): void {}
+            public function afterAuthorityMutation(): void { throw new \RuntimeException('VIDEO_ACTIVATION_PHASE_FAILED'); }
+            public function beforeProposalApplied(): void {}
+            public function beforeCommit(): void {}
+        };
+        [, $variant, $governance, $apply] = $this->fixture($hook);
+        $source = $this->runGoverned($governance, $apply, 'source', ['stable_key' => $this->prefix . '-activation-failure-source', 'title' => 'Activation failure source', 'source_type' => 'catalog']);
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-activation-failure-claim', 'text' => 'Activation failure claim', 'claim_type' => 'fact']);
+        $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Activation failure evidence', 'relation' => 'supports']);
+        $videoId = UuidCodec::newV7();
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'video', 'ingest', [
+            'canonical_id' => $videoId,
+            'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
+            'title' => 'Activation rollback video',
+            'metadata' => $this->videoMetadata([[
+                'target_type' => 'variant', 'target_uuid' => $variant->canonicalId, 'predicate' => 'about',
+                'evidence_refs' => [['evidence_id' => $evidence['canonical_id']]],
+            ]]),
+        ], hash('sha256', $videoId), null, hash('sha256', 'video-activation-failure'), ProposalState::APPROVED, idempotencyKey: $this->prefix . '-video-activation-failure', entityType: 'video'));
+
+        try { $apply->apply($proposal->id); self::fail('Expected activation phase failure.'); }
+        catch (\Throwable $error) { self::assertSame('VIDEO_ACTIVATION_PHASE_FAILED', $error->getMessage()); }
+        self::assertNull((new WpdbVideoRepository($GLOBALS['wpdb']))->findByCanonicalId($videoId));
     }
 
     public function test_fail_closed_rejects_proposal_uuid_as_source_dependency(): void
@@ -183,7 +236,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $verifier->verify($proposal, UuidCodec::newV7());
     }
 
-    private function fixture(): array
+    private function fixture(?ApplyExecutionHook $hook = null): array
     {
         global $wpdb;
         $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
@@ -200,7 +253,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $executor = new \NHK\Core\Application\Governance\AuthorityProposalExecutor($authority, $graph, null, new VideoService($videos), $knowledge, null, null, null, $dependencyValidator);
         $reader = new CanonicalApplyReadBackVerifier(static function (string $type, string $id) use ($authorityRepo, $claims, $sources, $evidence, $videos, $graph): ?array { $entity = match ($type) { 'source' => $sources->findByCanonicalId($id), 'knowledge' => $claims->findByCanonicalId($id), 'evidence' => $evidence->findByCanonicalId($id), 'video' => $videos->findByCanonicalId($id), 'relation' => $graph->findByUuid($id), default => $authorityRepo->findByCanonicalId($id) }; if ($entity === null) return null; return ['entity_type' => $type, 'canonical_id' => $id, 'active' => property_exists($entity, 'active') ? (bool) $entity->active : (method_exists($entity, 'isActive') ? $entity->isActive() : true), 'revision' => property_exists($entity, 'revision') ? (int) $entity->revision : 1, 'snapshot' => ['id' => $id]]; });
         $audit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb);
-        $apply = new ControlledApplyService($proposalRepo, new WpdbApplyAttemptRepository($wpdb), new WpdbTransactionManager($wpdb), $executor, $audit, $eligibility, null, new class implements GovernanceAuthorizer { public function require(string $capability): void {} }, $reader);
+        $apply = new ControlledApplyService($proposalRepo, new WpdbApplyAttemptRepository($wpdb), new WpdbTransactionManager($wpdb), $executor, $audit, $eligibility, $hook, new class implements GovernanceAuthorizer { public function require(string $capability): void {} }, $reader);
         return [$authority, $variant, new GovernanceService($proposalRepo, $audit, new WpdbTransactionManager($wpdb)), $apply];
     }
 
@@ -213,5 +266,10 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         self::assertTrue($apply->apply($proposal->id)['canonical_readback'] !== null);
         $result = $apply->apply($proposal->id); $id = (string) $result['canonical_id']; $this->owned[] = $id;
         return ['proposal_id' => $proposal->id, 'canonical_id' => $id, 'canonical_readback' => $result['canonical_readback']];
+    }
+
+    private function videoMetadata(array $attachments, bool $staleCompleteness = false): array
+    {
+        return ['intake_version' => 1, 'completeness' => ['blockers' => $staleCompleteness ? ['NO_SEMANTIC_ATTACHMENT'] : []], 'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true], 'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE', 'editorial' => ['title' => 'Governed video', 'summary' => 'Summary', 'body' => 'Body'], 'category' => ['primary' => ['key' => '01']], 'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'seo' => ['title' => 'Governed video', 'description' => 'Summary'], 'semantic_attachments' => $attachments];
     }
 }

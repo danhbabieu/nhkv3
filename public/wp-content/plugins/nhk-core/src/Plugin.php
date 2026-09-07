@@ -211,7 +211,7 @@ final class Plugin {
                 $canonicalId = (string) ($record->canonicalId ?? $record->edge_uuid ?? '');
                 return ['entity_type' => $actualType, 'canonical_id' => $canonicalId, 'active' => $active, 'revision' => $revision, 'snapshot' => get_object_vars($record)];
             });
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy()), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight(
                 $endpoints,
