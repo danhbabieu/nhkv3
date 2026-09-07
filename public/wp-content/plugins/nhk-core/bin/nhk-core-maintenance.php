@@ -48,7 +48,7 @@ try {
         do_action('rest_api_init');
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
         $request->set_header('Content-Type', 'application/json');
-        $arguments = $operation === 'relation-dry-run' ? ['records' => []] : ['filters' => [], 'limit' => 100, 'after' => null];
+        $arguments = $operation === 'relation-dry-run' ? ['records' => []] : ['filters' => [], 'limit' => 100];
         $result = MaintenanceCapabilityBridge::call($operation, $arguments, static function (string $tool, array $input): array {
             $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
             $request->set_header('Content-Type', 'application/json');

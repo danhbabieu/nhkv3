@@ -5033,3 +5033,28 @@ Canonical/Graph inventory, deterministic resolution/apply, directional and
 neighborhood read-back, second-run idempotency, and live Odo/Cuckoo target
 verification could not proceed past the migration/runtime gate. These are
 recorded as blocked/unverified, not as zero. No code change was made.
+
+# Checkpoint — 2026-09-07 — Demo migration and inventory regression closeout
+
+The guard source confirms the only authorized non-canonical DEMO combination:
+`WP_ENVIRONMENT_TYPE=staging`, `NHK_MIGRATION_RUNTIME=demo`, and
+`NHK_AUTHORIZED_MIGRATION_DATABASE=erourxcg_nhkv3`. These markers were passed
+to the official maintenance runtime without storing them in the repository.
+Migration 014 then 015 completed idempotently; health read-back is
+`migration_current=15`, `migration_target=15`.
+
+Fresh canonical and Graph inventories now pass. Graph read-back is 249 total,
+249 active, 0 retired, 0 dangling, 0 invalid endpoint and 0 duplicate. Fresh
+relation dry-run remains 1,809 scanned with 249 existing, 855
+`RELATION_PENDING`, 175 `REGISTRY_GAP`, and `MISSING_DETERMINISTIC=0`; all
+other debt counters remain zero. Therefore no deterministic relation existed
+to resolve or apply, and no governed mutation was attempted. The second
+read-only run returned `created=0` and `MISSING_DETERMINISTIC=0`.
+
+The inventory failure after migration was a live-proven maintenance payload
+regression: nullable `after => null` violated the MCP string schema. The
+minimal fix omits the cursor key, has a focused regression test, and was
+deployed. Odo read-back shows existing inbound `about` relations and a bounded
+neighborhood; Cuckoo read-back is an empty bounded neighborhood. Neither has a
+deterministic pending candidate. No registry gap was bypassed, and no raw DB,
+production or V2 path was used.

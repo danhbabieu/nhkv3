@@ -32,4 +32,11 @@ final class MaintenanceCapabilityBridgeTest extends TestCase
         self::expectExceptionMessage('MAINTENANCE_CAPABILITY_NOT_ALLOWLISTED');
         MaintenanceCapabilityBridge::call('inventory', [], static fn (): array => []);
     }
+
+    public function test_inventory_maintenance_payload_omits_nullable_cursor(): void
+    {
+        $entrypoint = (string) file_get_contents(dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php');
+
+        self::assertStringNotContainsString("'after' => null", $entrypoint);
+    }
 }
