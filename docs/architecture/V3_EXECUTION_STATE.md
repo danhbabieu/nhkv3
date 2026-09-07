@@ -5058,3 +5058,30 @@ deployed. Odo read-back shows existing inbound `about` relations and a bounded
 neighborhood; Cuckoo read-back is an empty bounded neighborhood. Neither has a
 deterministic pending candidate. No registry gap was bypassed, and no raw DB,
 production or V2 path was used.
+
+# Checkpoint — 2026-09-07 — Full RELATION_PENDING classification
+
+The complete live canonical inventory was paginated through the MCP read
+boundary: 1,560 canonical records plus 249 Graph records, yielding the known
+1,809 scan scope. All 855 `RELATION_PENDING` records were classified with
+stable identity: 780 Knowledge, 30 Model, 42 Variant and 3 Video. Every one
+has reason `MISSING_RELATION_METADATA`; the per-record UUID, stable key, type,
+reason and owner action are stored in the manifest files named in
+`GRAPH_DATA_AUDIT_2026-09-07.json`.
+
+The resolver precedence was checked against each record's available
+structured provenance. No record supplied a valid explicit target through the
+approved metadata fields; no stable-key or intended-relation mapping was
+authorized as a substitute, and no evidence/source binding yielded a target
+that the current registered relation contract could safely promote. Thus
+`resolved=0`, `applied=0`, `genuinely_unresolved=855`, while
+`MISSING_DETERMINISTIC=0` remains true. The 175 Classification registry gaps
+were excluded from this pass.
+
+Odo Variant `nhk:variant:odo.36.8` UUID
+`852da54d-457a-4397-a16d-52d9452ba766` remains unresolved only because its
+explicit relation metadata is absent; existing Odo inbound `about` relations
+and bounded neighborhood read-back remain intact. Cuckoo Classification UUID
+`01a07614-832d-7f27-959c-74eb0cd63f3e` has no bounded neighborhood relation
+to apply. No relation mutation occurred, so before/after remains 249 and
+created remains 0; the second read-only scan remains created=0.
