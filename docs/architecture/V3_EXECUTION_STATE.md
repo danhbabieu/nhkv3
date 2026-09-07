@@ -1,5 +1,16 @@
 # NHK V3 Execution State
 
+## Graph relation endpoint revision binding — 2026-09-08
+
+The governed relation proposal path now resolves and binds current revisions
+for both typed endpoints (`source_revision` and `target_revision`) through the
+registered revision-aware endpoint readers. Authority entity reads/search now
+expose canonical revision. Unknown endpoint revision is fail-closed; no
+relation path defaults to revision 1. Eligibility compares both bindings and
+retains `TARGET_REVISION_CHANGED` for post-proposal endpoint mutation. No
+Knowledge backfill or semantic data mutation was performed in this checkpoint;
+runtime/demo verification remains pending the authorized deployed artifact.
+
 ## Current documentation status snapshot — 2026-09-07
 
 This snapshot records the implementation state after the Unified Admin Workbench

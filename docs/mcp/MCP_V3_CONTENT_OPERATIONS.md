@@ -396,6 +396,15 @@ fingerprints, idempotency, audit and controlled transaction. The MCP proposal
 schema rejects unsupported operations before proposal persistence; this is an
 input boundary, not a new operation registry.
 
+For `relation_create`, the governed proposal binder resolves the current
+revision of both typed endpoints and stores `source_revision` and
+`target_revision` in the binding payload. Missing revision data fails closed;
+`expected_revision=1` is never used as an endpoint fallback. Eligibility
+continues to compare both bound revisions and blocks with
+`TARGET_REVISION_CHANGED` when either endpoint changes before apply. Authority
+`nhk.entity.get` and semantic search expose the canonical revision needed by
+this contract.
+
 ## 13. Error codes and fail-closed behavior
 
 `-32600` invalid JSON-RPC request; `-32601` unknown method/tool; `-32602`

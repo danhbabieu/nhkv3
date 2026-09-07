@@ -91,7 +91,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
 
     public function test_knowledge_relation_preserves_source_uuid_through_governance_and_graph_readback(): void
     {
-        [, $variant, $governance, $apply] = $this->fixture();
+        [, $variant, $governance, $apply, $endpoints] = $this->fixture();
         $claim = $this->runGoverned($governance, $apply, 'knowledge', [
             'stable_key' => $this->prefix . '-relation-source',
             'text' => 'A governed relation source claim.',
@@ -111,7 +111,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
                 new WpdbSourceRepository($GLOBALS['wpdb']),
                 new WpdbEvidenceRepository($GLOBALS['wpdb']),
             ),
-        ), $apply);
+        ), $apply, null, $endpoints);
         $proposal = $handler->createFromArguments([
             'operation' => 'relation_create',
             'entity_type' => 'knowledge',
@@ -304,7 +304,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $reader = new CanonicalApplyReadBackVerifier(static function (string $type, string $id) use ($authorityRepo, $claims, $sources, $evidence, $videos, $graph): ?array { $entity = match ($type) { 'source' => $sources->findByCanonicalId($id), 'knowledge' => $claims->findByCanonicalId($id), 'evidence' => $evidence->findByCanonicalId($id), 'video' => $videos->findByCanonicalId($id), 'relation' => $graph->findByUuid($id), default => $authorityRepo->findByCanonicalId($id) }; if ($entity === null) return null; return ['entity_type' => $type, 'canonical_id' => $id, 'active' => property_exists($entity, 'active') ? (bool) $entity->active : (method_exists($entity, 'isActive') ? $entity->isActive() : true), 'revision' => property_exists($entity, 'revision') ? (int) $entity->revision : 1, 'snapshot' => ['id' => $id]]; });
         $audit = new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb);
         $apply = new ControlledApplyService($proposalRepo, new WpdbApplyAttemptRepository($wpdb), new WpdbTransactionManager($wpdb), $executor, $audit, $eligibility, $hook, new class implements GovernanceAuthorizer { public function require(string $capability): void {} }, $reader);
-        return [$authority, $variant, new GovernanceService($proposalRepo, $audit, new WpdbTransactionManager($wpdb)), $apply];
+        return [$authority, $variant, new GovernanceService($proposalRepo, $audit, new WpdbTransactionManager($wpdb)), $apply, $endpoints];
     }
 
     private function runGoverned(GovernanceService $governance, ControlledApplyService $apply, string $type, array $payload): array

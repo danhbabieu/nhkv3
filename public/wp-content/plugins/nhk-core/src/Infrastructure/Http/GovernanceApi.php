@@ -12,12 +12,14 @@ use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Governance\{WpdbAuditSink, WpdbProposalRepository};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Graph\RelationRevisionBinder;
+use NHK\Core\Domain\Graph\EndpointTypeRegistry;
 
 final class GovernanceApi
 {
     private GovernanceService $governance;
 
-    public function __construct(?GovernanceService $governance = null, private ?ProposalEligibilityService $eligibility = null, private ?ControlledApplyService $apply = null)
+    public function __construct(?GovernanceService $governance = null, private ?ProposalEligibilityService $eligibility = null, private ?ControlledApplyService $apply = null, private ?EndpointTypeRegistry $endpoints = null)
     {
         $this->governance = $governance ?? new GovernanceService(new WpdbProposalRepository(), new WpdbAuditSink(), new WpdbTransactionManager(), new WordPressGovernanceAuthorizer());
     }
@@ -58,6 +60,10 @@ final class GovernanceApi
             $id = UuidCodec::newV7();
             $operation = (string) ($body['operation'] ?? ''); $entityType = (string) ($body['entity_type'] ?? ''); $subjectId = (string) ($body['subject_id'] ?? '');
             $payload = is_array($body['payload'] ?? null) ? $body['payload'] : [];
+            if ($operation === 'relation_create') {
+                if ($this->endpoints === null) throw new \RuntimeException('Relation endpoint revision resolver is unavailable.');
+                $payload = (new RelationRevisionBinder($this->endpoints))->bind($payload);
+            }
             if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
                 $subjectId = trim((string) $payload['source_uuid']);
             } elseif ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) {
@@ -65,7 +71,7 @@ final class GovernanceApi
             } elseif ($subjectId === '' && $operation === 'relation_create') {
                 $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
             }
-            $expectedRevision = max(1, (int) ($body['expected_revision'] ?? 1));
+            $expectedRevision = $operation === 'relation_create' ? null : max(1, (int) ($body['expected_revision'] ?? 1));
             $targetUuid = isset($body['target_uuid']) ? trim((string) $body['target_uuid']) : null;
             $targetUuid = $targetUuid !== '' ? $targetUuid : null;
             $dependencyIds = is_array($body['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $body['dependency_ids']))) : [];

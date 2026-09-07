@@ -348,7 +348,7 @@ final class Plugin {
                 [$articlePublicEligibility, 'evaluate'],
             );
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
-            (new GovernanceApi($governance, $eligibility, $controlledApply))->register();
+            (new GovernanceApi($governance, $eligibility, $controlledApply, $endpoints))->register();
             $videoRelationAdmin = new \NHK\Core\Application\Video\VideoRelationAdminService($governance, $proposalRepository, $videos, $authority, $knowledgeService, $claims, $sources, $evidence);
             (new VideoRelationAdminApi($videoRelationAdmin))->register();
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
@@ -362,7 +362,7 @@ final class Plugin {
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill);
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
-            $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver);
+            $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);

@@ -9,6 +9,8 @@ use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Governance\GovernedSemanticIngestOrchestrator;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Application\Graph\RelationBatchApplyOrchestrator;
+use NHK\Core\Application\Graph\RelationRevisionBinder;
+use NHK\Core\Domain\Graph\EndpointTypeRegistry;
 use NHK\Core\Domain\Governance\Proposal;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -23,6 +25,7 @@ final class McpGovernanceHandler implements GovernedLifecycle
         private ?ProposalEligibilityService $eligibility = null,
         private ?ControlledApplyService $apply = null,
         private ?GovernanceAutomationPolicyResolver $policyResolver = null,
+        private ?EndpointTypeRegistry $endpoints = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -69,6 +72,10 @@ final class McpGovernanceHandler implements GovernedLifecycle
         $entityType = (string) ($arguments['entity_type'] ?? '');
         $subjectId = (string) ($arguments['subject_id'] ?? '');
         $payload = is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [];
+        if ($operation === 'relation_create') {
+            if ($this->endpoints === null) throw new \RuntimeException('Relation endpoint revision resolver is unavailable.');
+            $payload = (new RelationRevisionBinder($this->endpoints))->bind($payload);
+        }
         if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
             $subjectId = trim((string) $payload['source_uuid']);
         } elseif ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) {
@@ -78,9 +85,9 @@ final class McpGovernanceHandler implements GovernedLifecycle
         }
         $targetUuid = isset($arguments['target_uuid']) ? trim((string) $arguments['target_uuid']) : null;
         $targetUuid = $targetUuid !== '' ? $targetUuid : null;
-        $expectedRevision = array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null
+        $expectedRevision = $operation === 'relation_create' ? null : (array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null
             ? max(1, (int) $arguments['expected_revision'])
-            : (in_array($operation, ['create', 'ingest', 'relation_create'], true) && $targetUuid === null ? null : 1);
+            : (in_array($operation, ['create', 'ingest'], true) && $targetUuid === null ? null : 1));
         $dependencyIds = is_array($arguments['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $arguments['dependency_ids']))) : [];
         $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencyIds];
         $contentFingerprint = trim((string) ($arguments['content_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($binding));

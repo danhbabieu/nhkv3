@@ -3,13 +3,13 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Graph;
 
-use NHK\Core\Contracts\Graph\EndpointResolver;
+use NHK\Core\Contracts\Graph\EndpointRevisionReader;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Graph\NodeReference;
 use NHK\Core\Graph\Exception\InvalidEndpointReference;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class VideoEndpointResolver implements EndpointResolver
+final class VideoEndpointResolver implements EndpointRevisionReader
 {
     public function __construct(private VideoRepository $repository)
     {
@@ -24,4 +24,5 @@ final class VideoEndpointResolver implements EndpointResolver
     }
 
     public function exists(NodeReference $reference): bool { return $this->repository->findByCanonicalId($reference->endpoint_key) !== null; }
+    public function revision(NodeReference $reference): ?int { return $this->repository->findByCanonicalId($reference->endpoint_key)?->revision; }
 }

@@ -465,7 +465,6 @@ final class FrontendContractTest extends TestCase
     {
         foreach ([
             dirname(__DIR__, 2) . '/src/Infrastructure/Http/ReadApi.php',
-            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
             dirname(__DIR__, 2) . '/src/Application/Media/MediaVideoPageQuery.php',
         ] as $path) {
             $contents = (string) file_get_contents($path);
@@ -541,7 +540,6 @@ final class FrontendContractTest extends TestCase
     {
         foreach ([
             dirname(__DIR__, 2) . '/src/Infrastructure/Http/EntityApi.php',
-            dirname(__DIR__, 2) . '/src/Application/Mcp/McpReadHandler.php',
             dirname(__DIR__, 2) . '/src/Application/Entity/EntityPageQuery.php',
         ] as $path) {
             $contents = (string) file_get_contents($path);

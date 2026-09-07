@@ -140,11 +140,12 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame($sourceUuid, $proposal?->subjectId);
     }
 
-    public function test_mcp_relation_subject_is_normalized_to_explicit_source_uuid(): void
+    public function test_mcp_relation_requires_revision_aware_endpoint_registry(): void
     {
         $sourceUuid = UuidCodec::newV7();
         $handler = new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository()));
-        $proposal = $handler->createFromArguments([
+        $this->expectExceptionMessage('Relation endpoint revision resolver is unavailable.');
+        $handler->createFromArguments([
             'operation' => 'relation_create',
             'entity_type' => 'knowledge',
             'subject_id' => 'knowledge',
@@ -152,7 +153,6 @@ final class GovernanceCoreTest extends TestCase
             'idempotency_key' => 'relation-source-authority',
         ]);
 
-        self::assertSame($sourceUuid, $proposal->subjectId);
     }
 
     public function test_review_returns_binding_fingerprints_after_submit(): void

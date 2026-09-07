@@ -24,7 +24,7 @@ final class ProposalEligibilityService
             return EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
         }
         $reasons = [];
-        $isCreation = in_array($proposal->operation, ['create', 'ingest', 'relation_create'], true) && $proposal->targetUuid === null;
+        $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
         if (!$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
         if ($proposal->operation === 'merge') {
             $sourceRevision = (int) ($proposal->payload['source_revision'] ?? $proposal->expectedRevision);
@@ -32,6 +32,12 @@ final class ProposalEligibilityService
             if ($sourceRevision < 1 || $targetRevision < 1) $reasons[] = 'MERGE_REVISIONS_REQUIRED';
             if ($proposal->subjectId !== '' && $this->reader->targetRevision($proposal->subjectId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
             if ($proposal->targetUuid !== null && $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        } elseif ($proposal->operation === 'relation_create') {
+            $sourceRevision = (int) ($proposal->payload['source_revision'] ?? 0);
+            $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);
+            $sourceId = (string) ($proposal->payload['source_uuid'] ?? $proposal->subjectId);
+            $targetId = (string) ($proposal->payload['target_uuid'] ?? '');
+            if ($sourceRevision < 1 || $targetRevision < 1 || $this->reader->targetRevision($sourceId) !== $sourceRevision || $this->reader->targetRevision($targetId) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         } elseif (!$isCreation && $proposal->subjectId !== '' && $proposal->expectedRevision > 0 && $this->reader->targetRevision($proposal->targetUuid ?: $proposal->subjectId) !== $proposal->expectedRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         $dependencyRevisions = $proposal->payload['dependency_revisions'] ?? [];
         if (is_array($dependencyRevisions)) {

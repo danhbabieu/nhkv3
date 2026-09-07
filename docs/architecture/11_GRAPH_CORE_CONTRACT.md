@@ -27,6 +27,11 @@ there is no `article` endpoint and no Article semantic identity or body in Graph
 resolver `wp_post`; key là `<blog_id>:<post_id>`, post draft vẫn tồn tại hợp lệ,
 trash không bị Graph tự xóa. Các type còn lại dùng contract/fake resolver.
 
+Các canonical resolver cần tham gia governed `relation_create` phải triển khai
+thêm `EndpointRevisionReader::revision()` để trả revision hiện tại; proposal
+binder đọc revision của cả source và target tại thời điểm tạo. Nếu revision
+không đọc được thì fail-closed, tuyệt đối không mặc định `1`.
+
 `PredicateRegistry` seed tối thiểu `about` và `depicts`. Predicate có source/target
 allow-list, outbound/inbound cardinality (`ONE`/`MANY`), self-relation và active.
 Không cho nhập predicate tùy ý và không lưu rule mutable JSON trong DB.
@@ -116,3 +121,7 @@ An eligible public-safe knowledge projection does not make a relation public,
 and Source/Evidence PRIVATE data must not leak through relation payloads.
 Semantic relation changes still require the complete Governance lifecycle and
 canonical read-back.
+
+`relation_create` bind `source_revision` và `target_revision` vào payload của
+proposal. Eligibility đối chiếu cả hai giá trị với canonical readers hiện tại
+và trả `TARGET_REVISION_CHANGED` nếu một endpoint đã đổi sau khi bind.
