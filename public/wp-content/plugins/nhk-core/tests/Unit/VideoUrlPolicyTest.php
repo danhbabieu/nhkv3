@@ -103,4 +103,21 @@ final class VideoUrlPolicyTest extends TestCase
         self::assertFalse($result['eligible']);
         self::assertContains('PUBLIC_IDENTITY_NOT_PERSISTED', $result['blockers']);
     }
+
+    public function test_persisted_video_source_shape_projects_without_reingest(): void
+    {
+        $video = new Video(self::VIDEO_ID, 'youtube', 'truOChTNbwA', 'https://www.youtube.com/watch?v=truOChTNbwA', 'Stored source title', [
+            'public_identity' => ['current_slug' => 'stored-video'],
+            'source' => ['availability' => 'available', 'embeddable' => true, 'provenance' => ['kind' => 'YOUTUBE_SOURCE']],
+            'provenance' => ['source_url' => 'https://www.youtube.com/watch?v=truOChTNbwA'],
+            'editorial' => ['title' => 'NHK editorial title', 'summary' => 'Summary'],
+            'category' => ['primary' => ['key' => '06']],
+            'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+
+        $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
+
+        self::assertTrue($result['eligible']);
+        self::assertSame('/video/stored-video/', $result['path']);
+    }
 }

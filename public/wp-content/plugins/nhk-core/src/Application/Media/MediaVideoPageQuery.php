@@ -114,7 +114,9 @@ final class MediaVideoPageQuery
     private function video(Video $video): array
     {
         $metadata = $video->metadata;
-        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+        $source = is_array($metadata['source_snapshot'] ?? null)
+            ? $metadata['source_snapshot']
+            : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
         $category = is_array($metadata['category'] ?? null) ? $metadata['category'] : [];
         $sourceAvailable = !isset($source['availability']) || $source['availability'] === 'available';
@@ -151,6 +153,9 @@ final class MediaVideoPageQuery
     private function publicProvenance(array $metadata, array $source): array
     {
         $provenance = is_array($metadata['provenance'] ?? null) ? $metadata['provenance'] : [];
+        if (trim((string) ($provenance['kind'] ?? '')) === '' && is_array($source['provenance'] ?? null)) {
+            $provenance = array_merge($source['provenance'], $provenance);
+        }
         $locator = $provenance['locator'] ?? ($source['canonical_source_url'] ?? null);
         return array_filter(['kind' => $provenance['kind'] ?? null, 'origin' => $provenance['origin'] ?? null, 'locator' => $locator, 'platform' => $source['platform'] ?? 'youtube', 'external_id' => $source['external_video_id'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '');
     }

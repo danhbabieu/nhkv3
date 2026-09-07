@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+## Canonical Video frontend blocker closeout — 2026-09-07
+
+On `demo.1945.vn`, the canonical Video `truOChTNbwA` /
+`01a07af5-3303-7a73-9f15-b7f675293dc5` had no persisted Public Identity. The
+canonical Video, active `about` relation to Variant
+`95873bfe-d978-4eda-a5a2-ce9ba79625df`, and Source → Claim → Evidence chain
+were read back before repair. Public Identity was allocated once through
+`PublicIdentityService` + `WpdbPublicIdentityRepository` with a native-route
+check, collision checks, idempotency and read-back; no Video ingest or duplicate
+canonical identity was created. Source and Evidence remain PRIVATE by the
+current Video provenance contract and therefore remain outside public
+knowledge readiness.
+
+The frontend root code gap was that the persisted Video shape stored source
+data under `metadata.source` and its `provenance` nested there, while
+`VideoUrlPolicy` and `MediaVideoPageQuery` only consumed `source_snapshot` and
+top-level provenance. A regression test was observed failing before the
+minimal fallback fix. The DEMO projection now returns eligible and the
+canonical `/video/{slug}/` route returns HTTP 200 with H1, YouTube embed,
+editorial presentation and provenance. Admin “Xem trên web” opens that route.
+Relations/knowledge remain fail-closed where public Source/Evidence readiness
+is not satisfied. No Image/Admin Workbench behavior was changed.
+
+Focused Video tests pass 11 tests / 37 assertions; full Unit passes 741 tests /
+3,626 assertions with existing warnings/deprecations. PHP lint, JS syntax,
+Composer validation and diff checks pass. No commit or push was made.
+
 ## Unified Admin Workbench runtime acceptance closeout — 2026-09-07
 
 Fresh guarded runtime probe passed outside the sandbox: MySQL is alive on

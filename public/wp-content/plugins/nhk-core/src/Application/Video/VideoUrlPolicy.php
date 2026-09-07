@@ -19,7 +19,9 @@ final class VideoUrlPolicy
         if ($slug === '' || !CanonicalPublicSlugPolicy::isCanonical($slug)) $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
         if ($video->platform !== 'youtube' || preg_match('/^[A-Za-z0-9_-]{11}$/', $video->externalVideoId) !== 1 || !$video->hasValidPublicReference()) $blockers[] = 'SOURCE_IDENTITY_INVALID';
 
-        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+        $source = is_array($metadata['source_snapshot'] ?? null)
+            ? $metadata['source_snapshot']
+            : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
         if (($source['availability'] ?? 'unknown') !== 'available') $blockers[] = 'SOURCE_UNAVAILABLE';
         if (($source['embeddable'] ?? null) !== true) $blockers[] = 'SOURCE_NOT_EMBEDDABLE';
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
@@ -27,7 +29,10 @@ final class VideoUrlPolicy
         $hub = is_array($metadata['hub'] ?? ($metadata['category'] ?? null)) ? ($metadata['hub'] ?? $metadata['category']) : [];
         $hubPrimary = is_array($hub['primary'] ?? null) ? ($hub['primary']['key'] ?? $hub['primary']['label'] ?? '') : ($hub['primary'] ?? '');
         if (trim((string) $hubPrimary) === '') $blockers[] = 'VIDEO_HUB_UNRESOLVED';
-        $provenance = is_array($metadata['provenance'] ?? ($source['provenance'] ?? null)) ? ($metadata['provenance'] ?? $source['provenance']) : [];
+        $provenance = is_array($metadata['provenance'] ?? null) ? $metadata['provenance'] : [];
+        if (trim((string) ($provenance['kind'] ?? '')) === '' && is_array($source['provenance'] ?? null)) {
+            $provenance = array_merge($source['provenance'], $provenance);
+        }
         if (trim((string) ($provenance['kind'] ?? '')) === '') $blockers[] = 'VIDEO_PROVENANCE_MISSING';
         if (!is_array($metadata['semantic_attachments'] ?? null) || $metadata['semantic_attachments'] === []) $blockers[] = 'NO_SEMANTIC_ATTACHMENT';
 
