@@ -17,6 +17,9 @@ final class AdminDomainAdapterTest extends TestCase
         $rows = (new AdminVideoAdapter([$video]))->find('truochtnbwa');
         self::assertCount(1, $rows);
         self::assertSame('01a07af5-3303-7a73-9f15-b7f675293dc5', $rows[0]['id']);
+        self::assertSame('01a07af5', $rows[0]['canonical_short_id']);
+        self::assertArrayHasKey('publication_state', $rows[0]);
+        self::assertArrayHasKey('frontend_state', $rows[0]);
     }
 
     public function test_video_detail_projection_exposes_readback_layers_and_gates_frontend_link(): void
@@ -46,6 +49,10 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame('approved', $detail['governance']['state']);
         self::assertTrue($detail['frontend_projection']['eligible']);
         self::assertSame('/video/tieu-de-dung/', $detail['frontend_projection']['path']);
+        self::assertSame('variant-1', $detail['primary_semantic_target']['key']);
+        self::assertSame(1, $detail['relation_count']);
+        self::assertSame(1, $detail['evidence_count']);
+        self::assertArrayHasKey('technical', $detail);
     }
 
     public function test_media_adapter_exposes_readiness_without_mutation(): void

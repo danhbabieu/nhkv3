@@ -90,7 +90,13 @@ final class AdminWorkbenchPage
 
     private static function renderMediaWorkspace(): void
     {
-        echo '<section class="nhk-admin-panel"><h2>Media workspace</h2><form class="nhk-admin-search" data-nhk-search="media"><label for="nhk-media-query">Tìm Media</label><input id="nhk-media-query" name="q" type="search" minlength="2" placeholder="Tên, stable key hoặc UUID"><button class="button button-primary">Tìm</button></form><div id="nhk-media-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa để tra cứu Media.</p></div></section><section class="nhk-admin-panel"><h2>Guided attachment</h2><p>Attachment/relation chỉ khả dụng khi writer Media V3 hiện có và đủ quyền. Không nhập UUID Evidence hoặc proposal trong workflow này.</p><div id="nhk-media-guided-state" class="nhk-admin-state nhk-admin-state--neutral">Chưa chọn Media.</div></section>';
+        echo '<section class="nhk-admin-panel"><nav class="nhk-admin-tabs" aria-label="Không gian Media"><a class="is-active" href="#nhk-media-all">Tất cả</a><a href="#nhk-media-images">Hình ảnh</a><a href="#nhk-media-videos">Video</a></nav><form class="nhk-admin-search" data-nhk-search="media"><label for="nhk-media-query">Tìm Media</label><input id="nhk-media-query" name="q" type="search" minlength="2" placeholder="Tên, stable key hoặc UUID"><button class="button button-primary">Tìm</button></form><div id="nhk-media-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa để tra cứu Media.</p></div></section>';
+        echo '<section id="nhk-media-all" class="nhk-admin-panel"><h2>Tất cả Media</h2><p>Ảnh và Video được đọc từ canonical owner và projection hiện có.</p></section>';
+        echo '<section id="nhk-media-images" class="nhk-admin-panel"><h2>Hình ảnh</h2><p>Chi tiết asset, semantic role, usage, readiness và provenance được hiển thị theo policy.</p><div id="nhk-image-detail" class="nhk-admin-detail" aria-live="polite"></div></section>';
+        echo '<section id="nhk-media-videos" class="nhk-admin-panel"><h2>Video</h2><p>Chọn Video để xem player, canonical identity, relation, evidence và frontend read-back.</p><nav class="nhk-admin-tabs" aria-label="Chi tiết Media/Video">';
+        foreach (['Tổng quan', 'Nội dung & SEO', 'Vai trò & Quan hệ', 'Tri thức', 'Nguồn & Evidence', 'Sử dụng', 'Governance', 'Kỹ thuật'] as $tab) echo '<a href="#nhk-media-video-' . esc_attr(sanitize_title($tab)) . '">' . esc_html($tab) . '</a>';
+        echo '</nav><div id="nhk-video-detail" class="nhk-admin-detail" aria-live="polite"></div></section>';
+        echo '<section class="nhk-admin-panel"><h2>Guided attachment</h2><p>Attachment/relation chỉ khả dụng khi writer Media V3 hiện có và đủ quyền. Không nhập UUID Evidence hoặc proposal trong workflow này.</p><div id="nhk-media-guided-state" class="nhk-admin-state nhk-admin-state--neutral">Chưa chọn Media.</div></section>';
     }
 
     private static function renderKnowledgeWorkspace(): void

@@ -5196,3 +5196,19 @@ notices. Local WordPress integration and deployment preflight are blocked by
 unavailable database connectivity; DEMO cutover fails closed with
 `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`. No DEMO proposal, Graph mutation or
 batch continuation was performed.
+
+# Checkpoint — 2026-09-07 — Canonical Media/Video publication Admin slice
+
+The Constitution-compliant publication slice is in progress after the Unified
+Admin Workbench. The Media shell now exposes shared `Tất cả`, `Hình ảnh` and
+`Video` tabs plus the eight read-only detail sections; the Video Admin adapter
+returns canonical short display ID, publication/frontend state, primary target
+and relation/evidence counts while retaining technical identifiers in a
+technical disclosure. “Xem trên web” and “Mở nguồn gốc” are separate actions.
+
+Focused Admin verification currently passes 14 tests / 186 assertions, PHP
+lint for the changed adapter, JavaScript syntax and `git diff --check` pass.
+No semantic writer, migration, seed, Graph JSON or runtime data was changed.
+Video continues to use persisted `/video/{slug}/`. Standalone indexable Media
+detail routing remains a `CONSTITUTION_CONFLICT` and is not enabled without an
+approved constitutional amendment.

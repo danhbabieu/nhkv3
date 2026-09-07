@@ -158,6 +158,7 @@
                 var projection = data.frontend_projection || {};
                 block('Frontend projection', projection.eligible ? 'Hợp lệ · ' + (projection.path || 'đã sẵn sàng') : 'Chưa hợp lệ · ' + ((projection.blockers || []).join(', ') || 'chưa đủ điều kiện'));
                 if (projection.eligible && projection.path) { var link = document.createElement('a'); link.className = 'button'; link.href = projection.path; link.textContent = 'Xem trên web'; output.appendChild(link); }
+                if (video.url) { var source = document.createElement('a'); source.className = 'button button-secondary'; source.href = video.url; source.textContent = 'Mở nguồn gốc'; source.target = '_blank'; source.rel = 'noopener noreferrer'; output.appendChild(source); }
             }).catch(function (error) { output.textContent = error.message; });
     }
 
