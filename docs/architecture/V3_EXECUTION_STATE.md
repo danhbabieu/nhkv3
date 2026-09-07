@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+## Demo relation closeout gate — 2026-09-07
+
+The requested demo closeout was not executed because the environment policy
+blocked external deployment/publication to `demo.1945.vn`, including an exact
+clean artifact for commit `34a14a7`. No SSH deploy, migration UP, governed
+relation apply, canonical/Graph mutation, or raw database operation was
+performed. Read-only remote health confirmed database reachability but reported
+plugin version `0.1.0`, migration current `13`, target `15`, and
+`MIGRATION_REQUIRED`; the remote inventory operation produced no usable receipt
+in this session, so no record or relation counts are inferred.
+
+The worktree received a concurrent commit `4c65b36` after the requested
+`34a14a7`; it was preserved unchanged. Local Unit verification passed 694
+tests / 3,353 assertions with 2 warnings and 5 PHPUnit deprecations. Composer
+validation, PHP lint and `git diff --check` passed; guarded Integration could
+not bootstrap the local WordPress database and is not a pass. Required
+relation counters, migration/schema/capability read-back, batch apply,
+directional/neighborhood verification and second-run counters remain
+UNVERIFIED, not zero.
+
 ## Legacy relation audit-gap correction — 2026-09-07
 
 Read-only demo evidence showed canonical inventory `1,548` rows and active
