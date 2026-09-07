@@ -20,7 +20,7 @@ final class PublicIdentityMigration014
     {
         global $wpdb;
         $database = (string) $wpdb->get_var('SELECT DATABASE()');
-        if (!in_array($database, ['nhk_v3', 'nhk_v3_test'], true)) throw new \RuntimeException('PUBLIC_IDENTITY_MIGRATION_UP_REQUIRES_NHK_V3_OR_TEST');
+        MigrationDatabaseGuard::assertUpAllowed($database, 'PUBLIC_IDENTITY_MIGRATION');
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $charset=$wpdb->get_charset_collate();
         dbDelta("CREATE TABLE {$wpdb->prefix}nhk_public_identities (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, identity_uuid BINARY(16) NOT NULL, owner_kind VARCHAR(64) NOT NULL, owner_uuid BINARY(16) NOT NULL, route_type VARCHAR(64) NOT NULL, current_slug VARCHAR(191) NOT NULL, collision_scope VARCHAR(191) NOT NULL, route_policy_version VARCHAR(64) NOT NULL, revision INT UNSIGNED NOT NULL DEFAULT 1, idempotency_key VARCHAR(191) NOT NULL, created_at DATETIME(6) NOT NULL, updated_at DATETIME(6) NOT NULL, PRIMARY KEY (id), UNIQUE KEY identity_unique (identity_uuid), UNIQUE KEY owner_unique (owner_kind,owner_uuid,route_type), UNIQUE KEY route_unique (route_type,collision_scope,current_slug), UNIQUE KEY idempotency_unique (idempotency_key)) {$charset}");

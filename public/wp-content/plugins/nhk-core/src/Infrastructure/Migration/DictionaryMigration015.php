@@ -20,7 +20,7 @@ final class DictionaryMigration015
     {
         global $wpdb;
         $database = (string) $wpdb->get_var('SELECT DATABASE()');
-        if (!in_array($database, ['nhk_v3', 'nhk_v3_test'], true)) throw new \RuntimeException('DICTIONARY_MIGRATION_UP_REQUIRES_NHK_V3_OR_TEST');
+        MigrationDatabaseGuard::assertUpAllowed($database, 'DICTIONARY_MIGRATION');
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $c = $wpdb->get_charset_collate();
         $p = $wpdb->prefix;

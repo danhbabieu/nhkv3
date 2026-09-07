@@ -1,5 +1,18 @@
 # NHK V3 Execution State
 
+## Migration runtime authorization guard checkpoint — 2026-09-07
+
+The migration 014 blocker was fixed in code at the post-`39d3a60` checkpoint.
+UP safety now remains fail-closed for non-canonical databases and accepts a
+non-canonical database only when the external runtime explicitly supplies a
+matching `NHK_AUTHORIZED_MIGRATION_DATABASE` and `NHK_MIGRATION_RUNTIME=demo`.
+Production and staging environment markers are denied even with a matching
+database authorization. Canonical `nhk_v3` and `nhk_v3_test` remain allowed;
+no credentials or raw database bypass were introduced. Focused guard/migration
+tests pass 9 tests / 13 assertions and the Unit suite passes 698 tests / 3,361
+assertions with 2 warnings and 5 PHPUnit deprecations. Demo deployment and
+runtime execution remain pending this commit.
+
 ## Demo publish and migration guard checkpoint — 2026-09-07
 
 Commit `37c6627` was deployed to `demo.1945.vn` and verified by remote Git
