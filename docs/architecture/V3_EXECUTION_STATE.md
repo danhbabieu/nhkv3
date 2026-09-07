@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+## Bootstrap/runtime reconciliation and live Graph audit — 2026-09-07
+
+The reported `ENVIRONMENT_BLOCKED` state was reconciled and must not be
+reused for this checkout. The active worktree is `/Users/imac24-2125d/Developer/nhk-v3`
+on `main` at `fb60c32370a74a6b8c100f6450ed41329503cb96`; the requested
+`e2919e1` is an existing backup branch commit, not the current HEAD.
+
+The supported WordPress bootstrap is `public/wp-load.php`. Because
+`public/wp-config.php` is absent, WordPress takes its documented parent-config
+branch and requires `/Users/imac24-2125d/Developer/nhk-v3/wp-config.php`, which
+then requires `public/wp-settings.php`. Root `wp-config.php` resolves
+`DB_NAME` from `NHK_WP_TEST_DB`, with `DB_USER=root`, empty development
+password, and `DB_HOST=127.0.0.1`; `NHK_WP_TEST_PATH=public` selects the loader.
+
+Sandbox TCP and socket probes returned MySQL error `(1)`, which was a sandbox
+policy denial. The narrowly escalated read-only probes both returned `mysqld is
+alive`. The exact WordPress probe loaded `public/wp-load.php`, returned
+`SELECT DATABASE() = nhk_v3_test`, and `$wpdb->last_error` was empty. The
+guarded full Integration suite then passed: 108 tests / 730 assertions, 1
+warning, 1 deprecation and 2 skips. Therefore the historical “missing
+`public/wp-config.php` / WordPress cannot connect” report conflated a valid
+parent-config layout with a sandbox-blocked database probe.
+
+Read-only live inventory against `nhk_v3_test` found Authority 8 (all `brand`),
+Knowledge 0, Source 0, Evidence 0, Article 14, Video 0, Media 0, MediaAsset 0
+and MediaUsage 0. Graph has 6 nodes and 4 edges (3 active), with 3 active
+`wp_post --about--> brand` edges; active Graph diagnostics are zero dangling,
+unknown, duplicate and endpoint-type violations. Cuckoo and Odo 36/8 canonical
+records are absent from the live target, so no governed relation candidate,
+backfill batch, canonical/inverse/neighborhood readback or MCP retrieval target
+exists. No mutation was performed.
+
+`GRAPH_DATA_AUDIT_2026-09-07.json` now records this live evidence and no longer
+claims `ENVIRONMENT_BLOCKED`. Backfill remains `PASS_NO_CANDIDATES`, not an
+inferred success: the generic `RelationBackfillService` has no approved live
+resolver/planner wiring, and the target contains no canonical semantic source
+records to resolve. No fixture, Knowledge record, Graph edge or raw database
+write was created.
+
 ## Integration failure classification and remediation — 2026-09-07
 
 The guarded runtime was available for focused verification with

@@ -1,21 +1,24 @@
 {
   "audit_type": "canonical_data_and_graph_relation_audit",
   "as_of": "2026-09-07",
-  "repository_head": "2de1c20",
+  "repository_head": "fb60c32370a74a6b8c100f6450ed41329503cb96",
   "environment": {
     "target_database": "nhk_v3_test",
     "wordpress_path": "public",
-    "status": "ENVIRONMENT_BLOCKED",
-    "reason": "public/wp-config.php is absent and WordPress bootstrap reports Error establishing a database connection",
+    "status": "PASS",
+    "reason": "public/wp-load.php requires the supported parent ../wp-config.php; guarded read-only probes and full Integration passed",
+    "bootstrap": "public/wp-load.php -> ../wp-config.php -> wp-settings.php",
+    "mysql": {"tcp_127_0_0_1_3306": "PASS", "socket_/tmp/mysql.sock": "PASS", "select_database": "nhk_v3_test", "wpdb_last_error": ""},
     "mutation_count": 0,
     "production_or_staging_touched": false
   },
   "canonical_fixture_verification": {
-    "status": "CANONICAL_FIXTURE_BLOCKED",
+    "status": "DATA_GAP",
     "cuckoo": {
       "classification_uuid": "01a07614-832d-7f27-959c-74eb0cd63f3e",
       "stable_key": "nhk:classification:clock-type.cuckoo-clock",
-      "source_found": false
+      "source_found": false,
+      "live_matches": 0
     },
     "odo_36_8": {
       "variant_uuid": "852da54d-457a-4397-a16d-52d9452ba766",
@@ -25,46 +28,49 @@
         "nhk:knowledge:odo-36-8.early-black-gong-block",
         "nhk:knowledge:odo-36-8.later-white-gong-block"
       ],
-      "source_found": false
+      "source_found": false,
+      "live_matches": 0
     },
-    "repository_search": "Only documentation/manifest references and non-canonical unit-test inputs were found; no approved fixture/export/snapshot was found."
+    "repository_search": "Only documentation/manifest references and non-canonical unit-test inputs were found; no approved fixture/export/snapshot was found. Live nhk_v3_test contains no matching Cuckoo or Odo 36/8 records."
   },
   "inventory": {
-    "status": "RUNTIME_UNVERIFIED",
+    "status": "PASS",
     "entity_types": ["brand", "model", "variant", "movement", "component", "music", "classification", "specimen", "product"],
     "non_authority_domains": ["knowledge", "source", "evidence", "article", "video", "media"],
-    "totals": null,
-    "relation_counts": null,
-    "orphan_duplicate_and_readiness_counts": null
+    "totals": {"authority": 8, "knowledge": 0, "source": 0, "evidence": 0, "article": 14, "video": 0, "media": 0, "media_asset": 0, "media_usage": 0},
+    "authority_by_type": {"brand": 8},
+    "relation_counts": {"graph_nodes": 6, "graph_edges_total": 4, "graph_edges_active": 3, "active_about_wp_post_to_brand": 3},
+    "orphan_duplicate_and_readiness_counts": {"orphan": 0, "duplicate_candidate": 0, "inconsistent": 0, "invalid_endpoint": 0}
   },
   "relation_audit": {
-    "status": "RUNTIME_UNVERIFIED",
+    "status": "PASS",
     "registered_predicates": ["about", "depicts", "model_of", "variant_of", "uses_movement", "supports_music", "configured_with_music", "observed_playing_music"],
     "classified_as": "REGISTRY_GAP",
     "product_specimen": "REGISTRY_GAP",
-    "candidates": null
+    "candidates": {"scanned": 4, "existing": 4, "missing_deterministic": 0, "ambiguous": 0, "relation_pending": 0, "registry_gap": 0, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0},
+    "dry_run_scope": "All live Graph edges; no canonical semantic backfill candidates exist because live Knowledge/Source/Evidence/Video/Media domains are empty."
   },
   "backfill": {
-    "dry_run": "NOT_RUN",
+    "dry_run": "PASS_NO_CANDIDATES",
     "apply": "NOT_RUN",
     "second_run": "NOT_RUN",
     "created": null,
-    "reason": "Canonical runtime data is unavailable; no mutation was inferred or attempted."
+    "reason": "Read-only live inventory and Graph audit completed. No deterministic semantic relation candidate was present; governed apply was not invoked."
   },
   "retrieval_verification": {
-    "status": "NOT_RUN",
-    "mcp_entity_neighborhood": "RUNTIME_UNVERIFIED"
+    "status": "NOT_RUN_NO_CANONICAL_TARGETS",
+    "mcp_entity_neighborhood": "NOT_RUN_NO_CANONICAL_TARGETS"
   },
   "quality_gates": {
     "unit": {"status": "PASS", "tests": 673, "assertions": 3253, "warnings": 2, "deprecations": 5},
     "php_lint": "PASS",
     "composer_validate": "PASS_WITH_PREEXISTING_LICENSE_WARNING",
     "git_diff_check": "PASS",
-    "integration": "ENVIRONMENT_BLOCKED"
+    "integration": "PASS_108_TESTS_730_ASSERTIONS_1_WARNING_1_DEPRECATION_2_SKIPS"
   },
   "errors": [],
   "owner_actions": [
-    "Provide an approved development WordPress runtime with public/wp-config.php and guarded nhk_v3_test access.",
-    "Re-run fixture verification, inventory, dry-run, governed batches, readback, second-run idempotency and retrieval verification."
+    "Restore/authorize canonical Cuckoo and Odo 36/8 records plus governed source/evidence in nhk_v3_test before any batch backfill.",
+    "Add or use an approved runtime planner wiring for whole-database relation dry-run/apply; current generic service has no live resolver/adapter."
   ]
 }
