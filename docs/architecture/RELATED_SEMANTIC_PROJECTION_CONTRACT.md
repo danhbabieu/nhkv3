@@ -1,322 +1,208 @@
 # NHK V3 Related Semantic Projection Contract
 
-> **NON-NORMATIVE.** Đây là architecture contract dưới Hiến pháp. Nếu mâu
-> thuẫn với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+> **NON-NORMATIVE CURRENT ARCHITECTURE CONTRACT.** If this document conflicts
+> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-Status: approved contract with initial shared read-engine implementation,
-2026-09-03. The engine is bounded to two hops, validates stored edge direction
-against the predicate registry, prevents cycles, deduplicates targets and
-retains direct/derived paths. Full page-level convergence remains pending.
-This document defines a reusable read/query boundary. It does not authorize
-new entity types, endpoints, predicates, fields, operations, Graph edges,
-taxonomy, post meta, migration or data repair.
+Status: approved bounded Graph read/projection contract, reconciled to the
+2026-09-07 executable runtime. This document authorizes no new type, endpoint,
+predicate, field, operation, Graph edge, taxonomy/postmeta fallback or data
+mutation.
 
-## 1. Purpose and boundaries
+## 1. Purpose and ownership
 
-Every registered canonical endpoint may be used as the source of a bounded
-related query. A public entity page is therefore a Graph entry point, but its
-projection is read-only:
+Every registered canonical Graph endpoint may be a source for bounded semantic
+navigation. Projection remains read-only:
 
 ```text
-registered endpoint
-    → Graph read boundary
-    → RelatedEntityQuery
-    → public eligibility/readiness and route policy
-    → RelatedSection projection
-    → frontend
+canonical endpoint
+→ active Graph read
+→ direct/incoming/outgoing path resolution
+→ bounded derived neighborhood (max two hops)
+→ public eligibility/readiness/route policy
+→ related/dossier projection
+→ frontend
 ```
 
-Authority owns identity/lifecycle, Graph owns typed relations, Knowledge owns
-atomic claims, Source/Evidence owns provenance, Media/MediaAsset/MediaUsage
-retain their separate boundaries, Video owns external references, and native
-WordPress owns editorial Post content and URL. Related projection owns none of
-those facts.
+Authority owns identity/lifecycle; Graph owns typed relations; Knowledge owns
+atomic claims; Source/Evidence owns provenance/support; Media/MediaAsset/
+MediaUsage retain their own boundaries; Video owns canonical external reference;
+WordPress owns editorial Post content/URL. Related projection owns no fact and
+never writes a shortcut edge.
 
-`Article` is not a canonical entity or Graph endpoint; a V3 Article is an
-operation-level WordPress workflow. `Album`/`Collection` has no registered V3
-entity type, endpoint, predicate, repository or public contract. It remains a
-`SEMANTIC_GAP`; a section label cannot create its identity.
+`Article` is an editorial workflow over WordPress, not an `article` Graph
+endpoint. Album/Collection remains `SEMANTIC_GAP` unless a future approved
+registry contract adds it.
 
-## 2. Runtime inventory
+## 2. Current executable Graph inventory
 
-### 2.1 Entity and endpoint types
+Current full boot has 15 endpoint types:
 
-The current working-tree runtime registers these nine Authority entity types:
+`wp_post`, `brand`, `model`, `variant`, `movement`, `music`, `component`,
+`classification`, `specimen`, `product`, `media`, `video`, `knowledge`,
+`source`, `evidence`.
 
-| Registry | Actual registered values |
+Current predicates are exactly:
+
+| Predicate | Registered source → target |
 |---|---|
-| Authority `EntityTypeRegistry` | `brand`, `model`, `variant`, `movement`, `music`, `component`, `classification`, `specimen`, `product` |
-| Graph `EndpointTypeRegistry` | `wp_post`, the nine Authority types above, `media`, `video`, `knowledge`, `source`, `evidence` |
+| `about` | registered endpoint → registered endpoint under current allowlist |
+| `depicts` | `media` → registered endpoint |
+| `model_of` | `model` → `brand` |
+| `variant_of` | `variant` → `model` |
+| `uses_movement` | `variant` → `movement` |
+| `supports_music` | `movement` → `music` |
+| `configured_with_music` | `variant` → `music` |
+| `observed_playing_music` | `specimen` → `music` |
 
-The Graph endpoint count is 15. `wp_post` uses the existing stable key
-`<blog_id>:<post_id>`; canonical semantic endpoints use their canonical UUID.
-The endpoint registry is the authority for which source and target types may
-be queried.
+`classified_as` is not registered. Product–Specimen has no dedicated approved
+persistence relation. Missing vocabulary remains `REGISTRY_GAP`; broad `about`
+may not impersonate membership, structural parentage, configuration,
+movement-use or Product–Specimen ownership.
 
-### 2.2 Predicate matrix from the runtime registry
+## 3. Current read engine
 
-The following is the current registry matrix, not a desired vocabulary. All
-rows are direct persisted Graph predicates. The runtime `PredicateDefinition`
-currently expresses source/target allow-lists and cardinality, but does not
-express a symmetric, inverse or traversable flag. Consequently, derived
-traversal is a contract/implementation gap until an approved traversal policy
-can be enforced without inventing registry data.
+The current application/runtime now has the shared bounded semantic read seam
+that older 2026-09-02 checkpoints lacked. It includes:
 
-| Source type(s) | Predicate | Target type(s) | Direction | Direct | Derived traversal allowed now |
-|---|---|---|---|---|---|
-| all 15 registered endpoints | `about` | all 15 registered endpoints | outbound source → target | Yes | `IMPLEMENTATION_GAP`: no central traversal/direction policy |
-| `media` | `depicts` | all 15 registered endpoints | outbound media → target | Yes | `IMPLEMENTATION_GAP`: no central traversal/direction policy |
-| `model` | `model_of` | `brand` | outbound model → brand | Yes | `IMPLEMENTATION_GAP`: structural reverse-read and path policy are not reusable |
-| `variant` | `variant_of` | `model` | outbound variant → model | Yes | `IMPLEMENTATION_GAP`: two-hop structural policy is not in a shared engine |
-| `variant` | `uses_movement` | `movement` | outbound variant → movement | Yes | `IMPLEMENTATION_GAP`: no shared two-hop traversal policy |
-| `movement` | `supports_music` | `music` | outbound movement → music | Yes | `IMPLEMENTATION_GAP`: no shared two-hop traversal policy |
-| `variant` | `configured_with_music` | `music` | outbound variant → music | Yes | `IMPLEMENTATION_GAP`: no shared traversal/ranking policy |
-| `specimen` | `observed_playing_music` | `music` | outbound specimen → music | Yes | `IMPLEMENTATION_GAP`: no shared traversal/ranking policy |
+- Graph outgoing and incoming reads over the same stored canonical edge;
+- bounded two-hop related/neighborhood traversal with registry validation;
+- cycle protection and canonical-target deduplication;
+- direct-versus-derived path information;
+- public/dossier consumers over canonical Graph state;
+- MCP `nhk.entity.neighborhood` for bounded semantic neighborhood reads;
+- operational `nhk.graph.inventory` for internal/admin diagnostics.
 
-The Graph service can read outgoing and incoming edges. An incoming read is a
-query operation over the stored child→parent direction; it is not an inverse
-predicate and must not be treated as permission to walk every edge backwards.
-`about` and `depicts` are broad registered direct relations, not permission to
-infer ownership, subject identity or a new relation between their endpoints.
+Therefore historical wording such as “no reusable two-hop engine”, “no MCP
+related read”, or “Graph neighborhood is unavailable” is superseded as a current
+capability statement. Those old checkpoints remain historical evidence in Git
+history/execution records only.
 
-The six technical predicates are registered in the current working tree, but
-no physical edges are created by this documentation checkpoint. Existing
-physical edge distribution remains a separate read-only/data-compatibility
-question.
+A specific frontend or dossier can still be incomplete. Missing consumption of
+an eligible path/profile is `PARTIAL_FRONTEND_GAP`, not Graph absence.
 
-## 3. RelatedEntityQuery contract
+## 4. Query contract
 
-`RelatedEntityQuery` is the single application/query concept for entity, Post,
-Media, Video, Knowledge and other registered endpoint pages. Page-specific
-assemblers may choose sections, but they must not implement independent Graph
-traversal algorithms.
-
-### 3.1 Input
+Input is bounded and registry-controlled:
 
 ```text
-source_entity_id   required; canonical UUID for semantic endpoints, the
-                    registered stable key for wp_post
-source_entity_type required registered endpoint type
-target_types[]     required bounded list of registered endpoint types
-mode               RELATED | FEATURED | LATEST
-max_hops           1 or 2; default 2; never greater than 2
-limit              positive bounded projection limit
-cursor             opaque pagination cursor, when pagination is supported
+source type + canonical identity
+profile / permitted target families
+max_hops = 1..2
+bounded limit/cursor where supported
 ```
 
-Input is validated against the endpoint and predicate registries. Unknown
-types, malformed identities, unsupported mode, `max_hops > 2`, unbounded
-limits, invalid cursors and unavailable dependencies fail closed. A query must
-not load the whole Graph for a page request.
+Rules:
 
-### 3.2 Candidate and traversal rules
+1. resolve the source through the registered canonical endpoint resolver;
+2. read only active Graph edges through Graph/application boundaries;
+3. preserve actual stored direction; incoming read is not reverse persistence;
+4. direct result is one registered hop;
+5. derived result is at most two registered/allowed hops;
+6. prevent cycles and graph explosion;
+7. deduplicate by canonical target identity;
+8. direct wins an equivalent derived result while alternative explainable paths
+   may be retained by reader/admin contracts;
+9. apply public eligibility/readiness/route policy before public emission;
+10. dependency failure, ambiguity or unsupported path is explicit unavailable/
+    conflict/gap, not an honest empty set.
 
-1. Resolve the source through the registered endpoint resolver.
-2. Read active Graph edges through `GraphService`/the governed repository
-   boundary; the query must not use direct semantic SQL.
-3. Accept a direct candidate only for one valid registered hop.
-4. Accept a derived candidate only when every hop is active, registered,
-   directionally permitted, endpoint-resolvable and within `MAX_HOPS = 2`.
-5. Prevent cycles by canonical endpoint identity and bound target types,
-   predicates, page size and hop count.
-6. Resolve public active/readiness/visibility/eligibility and routeability
-   before emitting a public item. An active row that is not publicly eligible
-   is not a public related result.
-7. Deduplicate by target canonical identity. Preserve the best path and,
-   where the reader/admin contract allows it, alternative paths.
+No query may infer a relation from display name, stable key wording, URL, Article
+text, Dictionary label, WordPress taxonomy/postmeta, MediaUsage placement,
+checksum, visual similarity or keyword search.
 
-No traversal rule may be inferred from a display name, slug, URL, payload
-field, WordPress taxonomy, post meta, checksum, visual similarity or an
-unregistered inverse. No derived result is persisted.
+## 5. Result and explainability
 
-### 3.3 Query-layer result
+Application/read-model results distinguish at least:
 
-The application result retains the following fields for explainability and
-ranking. These are query-result fields, not new canonical entity fields:
+- source canonical identity/type internally;
+- target canonical identity/type internally;
+- `DIRECT` or `DERIVED`;
+- `hop_count`;
+- direction and registered predicate for each hop;
+- best path and bounded alternatives when supported;
+- public eligibility/route result;
+- unavailable/conflict/gap diagnostics.
+
+Public serialization replaces internal IDs with reader-safe labels/routes and
+must not expose raw Graph storage, private Source/Evidence payloads, internal
+lifecycle/revision or stable keys. Enough path explanation should remain for the
+frontend to explain why an item is related where that surface exposes relation
+context.
+
+## 6. Ranking and projection
+
+Pipeline:
 
 ```text
-target_entity_id
-target_entity_type
-relationship_class   DIRECT | DERIVED
-hop_count            1 or 2
-best_path             ordered registered endpoint/predicate hops
-alternative_paths    zero or more ordered paths
-ranking_reason       structured reason, not opaque recommendation text
-rank_facts           optional facts from an existing approved signal
+registered Graph candidate set
+→ direct/derived classification
+→ canonical deduplication / best path
+→ permitted editorial/quality/freshness ranking
+→ diversity/limit/pagination
+→ projection
 ```
 
-`best_path` contains the source/target identity and predicate for each hop;
-provenance is retained when the underlying relation contract provides it. A
-reader-safe serializer may replace internal IDs with display labels and
-canonical public routes, but it must preserve enough path explanation to show
-why the item appears. Internal UUIDs, stable keys, lifecycle, raw Graph rows
-and provenance internals must not leak into public HTML or public APIs.
+Relation filtering always happens before `LATEST`, `FEATURED` or other
+presentation ranking. Ranking may order an already-authorized candidate set; it
+cannot create semantic relationship truth.
 
-### 3.4 Empty, unavailable and conflict outcomes
+Frontend owns section layout/title/card/grid/limit. Graph/Authority must not
+store UI concerns. Derived paths are never materialized merely to enrich a page.
 
-| Condition | Result |
-|---|---|
-| Valid Graph query with no eligible candidates | Successful empty result |
-| Graph/runtime/database dependency unavailable | Explicit unavailable/runtime failure; never successful empty |
-| Unknown registry member or unsupported traversal | Typed gap/unsupported result; never taxonomy fallback |
-| Ambiguous identity, endpoint, direction or public eligibility | Explicit conflict/blocked result; never guessed relation |
+## 7. Cuckoo and Classification distinction
 
-## 4. RelatedSection projection contract
+Canonical Cuckoo Classification
+`01a07614-832d-7f27-959c-74eb0cd63f3e` currently has 10 core Knowledge claims
+successfully connected by `Knowledge → about → Classification Cuckoo` through
+the full governed mutation lifecycle and canonical Graph read-back.
 
-`RelatedSection` is presentation configuration, not semantic storage:
+Those direct `about` relations are valid Graph truth and may participate in
+bounded neighborhood projection subject to public/readiness policy.
 
-```text
-key
-title
-target_entity_types[]
-mode
-max_hops
-limit
-items[]
-empty_state / unavailable_state
-next_cursor (optional)
-```
+This does not mean Model/Variant membership exists. `classified_as` remains a
+registry gap and may not be synthesized from `about`, lexical similarity or
+frontend grouping.
 
-The section assembler may request visitor-facing groups such as direct
-relations, Models, Movements, Variants, Knowledge, Articles, Media, Videos,
-Specimens or Products. Each item must carry a valid query origin/path. A
-Collection/Album section is unavailable until that boundary is registered.
+## 8. Video/public-safe Knowledge boundary
 
-The same query engine serves Brand, Model, Movement, Variant, Knowledge,
-WordPress Post/Article workflow, Media, Video, Specimen, Product and every
-other page with a registered endpoint. Brand is not granted a special
-ownership shortcut. For example, a Brand page may display a Model discovered
-through the incoming `model_of` read, or a Variant through the two registered
-structural hops, only after the traversal policy and public eligibility gates
-are implemented. A Movement or Music shown on Brand is still shared/derived
-context, not Brand ownership.
+Guided Video relation orchestration may establish a canonical Video `about`
+relation with its verified Source→Claim→Evidence provenance chain. Related
+projection consumes the canonical Graph edge after eligibility; it does not
+infer the edge from YouTube title/URL/user hint.
 
-Projection responsibilities include layout location, title, card/grid,
-pagination, load-more, item limit and visitor-facing labels. Authority/Graph
-must never receive these concerns. No section may source candidates from
-global latest posts before semantic relation filtering.
+Public-safe Knowledge can be projected after its own policy while PRIVATE raw
+Source/Evidence remains hidden. Public Knowledge eligibility does not
+automatically make a Graph relation public; relation eligibility is independent.
 
-## 5. Ranking contract
+## 9. Current remaining frontend/read-model gaps
 
-The ranking pipeline is:
+Current gaps are surface-specific rather than “Graph unavailable”:
 
-```text
-registered Graph relation filter
-    → direct/derived classification
-    → deduplication and best-path selection
-    → mode-specific ranking
-    → diversity policy
-    → limit/pagination
-```
+- some entity dossier types do not yet have the same depth/type-specific path
+  recipes as the complete Brand dossier;
+- ranking/diversity/cache/telemetry policies may remain partial on individual
+  consumers;
+- public route/readiness coverage remains target-runtime dependent;
+- missing registered relation vocabulary remains a registry gap rather than a
+  frontend workaround opportunity.
 
-Minimum precedence:
+Record these as `PARTIAL_FRONTEND_GAP`, `REGISTRY_GAP` or the exact runtime
+reason. Do not fall back to taxonomy/keyword similarity.
 
-1. `DIRECT` relation;
-2. `DERIVED` relation with at most two hops;
-3. quality/editorial significance only when an existing approved signal is
-   available;
-4. freshness only for `LATEST`, and only inside the related candidate set;
-5. diversity to avoid repeating one Graph branch when a valid policy exists.
+## 10. Acceptance invariants
 
-`RELATED` ranks semantic strength first. `FEATURED` may not invent candidates
-and remains unavailable or falls back to an explicitly documented semantic
-mode when no quality signal contract exists. `LATEST` applies time ordering
-only after relation filtering. Direct and derived paths to the same target
-produce one item; direct wins and derived paths remain alternatives.
+A conforming implementation proves:
 
-No opaque AI recommendation is part of this contract. If a future ranker is
-introduced, it may order only the already-authorized Graph candidate set and
-must not create relationship truth.
-
-## 6. Cache and performance policy
-
-Related results may be cached only in the query/projection layer. Cache keys
-must include source identity/type, target type set, mode, hop bound, projection
-contract version and relevant public eligibility/revision inputs. Invalidation
-must cover relation changes, source/target revisions that affect projection,
-eligibility/readiness changes and projection-contract changes.
-
-The current repository has no verified related-result cache or invalidation
-contract. This is an `IMPLEMENTATION_GAP`; this document does not add Redis,
-plugin infrastructure or a cache table. Until bounded caching is implemented,
-use the existing repository boundaries and conservative limits, with no
-unrestricted recursive traversal or N+1 page-wide Graph load.
-
-## 7. Runtime gap report
-
-This report is based on the current working-tree code and registry, not on
-invented rows or fixtures.
-
-### P0 — conformance or semantic-truth risk
-
-| Gap | Evidence | Required treatment |
-|---|---|---|
-| Predicate direction/inverse/traversal policy is not represented by the runtime definition; `RelatedContentQuery` reads both outgoing and incoming edges without a central policy | `PredicateDefinition.php`, `GraphService.php`, `RelatedContentQuery.php` | Record `CONSTITUTION_CONFLICT` risk if treated as complete; define and test a registry-backed read policy before relying on derived navigation; do not invent inverse predicates |
-| Public related readers gate active/readiness but do not share the complete public eligibility/route decision used by the collection boundary | `RelatedContentQuery.php`, `BrandAggregationQuery.php`, `PublicEntityCollectionQuery.php` | Route every public related result through the existing eligibility/identity/route policy; no public item when routeability or eligibility is unresolved |
-| Brand aggregation deduplicates by target but does not replace a previously collected `DERIVED` item with a later equivalent `DIRECT` item | `BrandAggregationQuery.php` (`appendUnique`) | Add a failing direct-beats-derived regression before changing the read model; retain alternative paths without duplicate presentation |
-
-### P1 — missing required traversal/query/projection capability
-
-| Gap | Evidence | Required treatment |
-|---|---|---|
-| No reusable bounded 2-hop traversal engine; current `RelatedContentQuery` is one-hop and `BrandAggregationQuery` is a Brand-specific manual traversal | `Application/Entity/RelatedContentQuery.php`, `Application/Graph/BrandAggregationQuery.php` | Implement one registry-driven engine with max-hop, target filtering, cycle prevention and path objects |
-| Current related output has no standardized relationship class, hop count, best/alternative paths, ranking facts or opaque cursor | `RelatedContentQuery.php`, `BrandAggregationQuery.php` | Introduce the query contract in a TDD slice without changing canonical storage |
-| Related pagination, dedupe/ranking and diversity are not a shared contract; current reads use fixed Graph page sizes and page-specific arrays | Same query classes; `EntityPageQuery.php` and theme `entity.php` | Add bounded pagination and projection assemblers after traversal behavior is proven |
-| Entity pages have hard-coded generic related groups and a separate Brand aggregation path rather than one reusable section assembler | `EntityPageQuery.php`, `public/wp-content/themes/nhk-v3/entity.php` | Converge Brand and all registered endpoint pages on the shared query/projection boundary |
-| MCP exposes no related/Graph read; raw Graph REST remains administrator-only | `MCP_V3_CONTENT_OPERATIONS.md`, `GraphApi.php` | Add only a future read contract review; no MCP tool or WordPress Ability is authorized by this documentation task |
-| Product–Specimen relation mechanism is not registered, and Album/Collection has no semantic boundary | Constitution §11; MCP content-operations audit | Keep Product linkage fail-closed and Album/Collection as `SEMANTIC_GAP`; do not use `about` or a section name as a workaround |
-
-### P2 — ranking, cache and operational enhancement
-
-| Gap | Evidence | Required treatment |
-|---|---|---|
-| No verified quality/editorial significance signal or diversity policy for `FEATURED`/large related sections | Current query services and frontend contracts | Keep ranking limited to relation strength/freshness where contracted; add signals only through a later contract |
-| No verified query/projection cache or invalidation mechanism | Repository-wide architecture audit | Implement only after correctness and invalidation dependencies are tested; no new cache infrastructure in this task |
-| No dedicated related-query performance budget/telemetry contract | Current query services and execution state | Add bounded query metrics and N+1 regression coverage after the shared engine exists |
-
-## 8. Acceptance test contract
-
-The implementation plan must write failing tests first and eventually prove:
-
-1. A valid direct relation appears once.
-2. A valid two-hop derived relation appears with `DERIVED`, `hop_count=2` and
-   an explicit path.
-3. A three-hop candidate never appears.
-4. Direct plus derived paths to the same target produce one item, with direct
-   as best path and derived retained only as an alternative when allowed.
-5. Traversal honors registered source/target direction and does not assume an
-   inverse.
-6. Cycles terminate without recursion or duplicate output.
-7. A wrong target type is excluded.
-8. No relation returns an honest empty result and never falls back to taxonomy.
-9. `LATEST` sorts only inside the semantic candidate set.
-10. `FEATURED` cannot invent a candidate outside the Graph set.
-11. Brand receives only sections backed by valid paths and does not create
-    Brand ownership shortcuts.
-12. Model uses the same query engine as Brand and other entity pages.
-13. Knowledge, Post/Article workflow, Media and Video remain navigable without
-    becoming new entity types or body owners.
-14. Every derived result contains a traceable path and predicate sequence.
-15. WordPress taxonomy/post meta/direct semantic SQL cannot substitute for the
-    governed Graph query boundary.
-
-## 9. Non-goals and rollout gates
-
-This checkpoint does not implement PHP, JavaScript, SQL, MCP, WordPress,
-frontend or cache changes. It does not create relation data, repair missing
-parents, migrate article bodies, seed entities, assign slugs, publish content,
-modify V2/live data or claim parity.
-
-Future phases must complete registry/contract audit, TDD traversal,
-ranking/deduplication, reusable projection, page integration, MCP read review,
-performance/cache work and the full constitutional regression audit in the
-sequence recorded in
-`docs/superpowers/plans/2026-09-02-related-semantic-navigation.md`.
-
-## Current frontend/public-safe boundary — 2026-09-07
-
-Related projection is read-only and sits after canonical Authority/Graph truth.
-Frontend consumers must not infer relations from external URLs, WordPress
-attachments or private Source/Evidence. A public-safe Knowledge projection may
-be included only after its own policy/readiness gate and does not make a Graph
-relation public; relation eligibility remains independent.
+1. one valid direct relation appears once;
+2. a permitted two-hop result remains `DERIVED` and explainable;
+3. three-hop/unbounded traversal is excluded;
+4. direct beats equivalent derived after deduplication;
+5. incoming/outgoing direction is preserved without inverse persistence;
+6. cycles terminate;
+7. wrong target/profile is excluded;
+8. no relation yields honest empty, not keyword/taxonomy fallback;
+9. runtime/registry failure remains unavailable/gap, not empty;
+10. frontend does not mutate Graph truth;
+11. Cuckoo Knowledge `about` relations are not misrepresented as
+    `classified_as` membership;
+12. replay/read-only projection never creates a Graph edge.
