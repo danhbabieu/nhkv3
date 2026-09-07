@@ -8,7 +8,7 @@ use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
-use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoService};
+use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Contracts\Governance\ApprovedRelationProposalRepository;
@@ -22,7 +22,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
@@ -166,6 +166,15 @@ final class AuthorityProposalExecutor
         if (!array_key_exists('intake_version', $metadata) && $proposal->operation !== 'ingest') return [];
         $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
         if ($attachments === [] && $this->relationProposals !== null) {
+            if ($this->historicalEvidence !== null) {
+                $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : [];
+                $this->historicalEvidence->reconcile(
+                    $video->canonicalId,
+                    $proposal->bindingFingerprint(),
+                    ['platform' => $video->platform, 'external_video_id' => $video->externalVideoId, 'canonical_source_url' => $video->canonicalUrl] + $source,
+                    $this->relationProposals->findApprovedFingerprintBoundRelations('video', $video->canonicalId, '')
+                );
+            }
             foreach ($this->relationProposals->findApprovedFingerprintBoundRelations('video', $video->canonicalId, $proposal->bindingFingerprint()) as $relationProposal) {
                 if ($relationProposal->state !== \NHK\Core\Domain\Governance\ProposalState::APPROVED || $relationProposal->operation !== 'relation_create' || $relationProposal->entityType !== 'relation') continue;
                 $relation = $relationProposal->payload;

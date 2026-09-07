@@ -218,7 +218,9 @@ final class Plugin {
                 $canonicalId = (string) ($record->canonicalId ?? $record->edge_uuid ?? '');
                 return ['entity_type' => $actualType, 'canonical_id' => $canonicalId, 'active' => $active, 'revision' => $revision, 'snapshot' => get_object_vars($record)];
             });
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), new KnowledgeService($claims, $sources, $evidence), new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
+            $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
+            $historicalEvidence = new \NHK\Core\Application\Video\HistoricalVideoRelationEvidenceReconciliation($knowledgeService, $claims, $sources, $evidence, $proposalRepository);
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight(
                 $endpoints,

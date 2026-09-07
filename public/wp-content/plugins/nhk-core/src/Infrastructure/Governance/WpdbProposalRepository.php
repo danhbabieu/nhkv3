@@ -113,7 +113,7 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             if ($proposal === null || $proposal->state !== ProposalState::APPROVED) continue;
             $payload = $proposal->payload;
             if (($payload['source_type'] ?? '') !== $sourceType || ($payload['source_uuid'] ?? '') !== $sourceUuid) continue;
-            if (isset($payload['source_fingerprint']) && (string) $payload['source_fingerprint'] !== $sourceFingerprint) continue;
+            if ($sourceFingerprint !== '' && isset($payload['source_fingerprint']) && (string) $payload['source_fingerprint'] !== $sourceFingerprint) continue;
             $approval = $this->latestApproval($proposal->id);
             if ($approval === null || (int) ($approval['proposal_revision'] ?? 0) !== $proposal->revision || !hash_equals((string) ($approval['fingerprint'] ?? ''), $this->fingerprintBinary($proposal->bindingFingerprint()))) continue;
             $matches[] = $proposal;

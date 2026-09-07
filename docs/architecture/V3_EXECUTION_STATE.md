@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+## Historical Video relation evidence reconciliation — 2026-09-07
+
+Historical approved Video `relation_create` proposals with missing
+`evidence_refs` now have a governed compatibility reconciliation path inside
+Controlled Apply. Discovery is source-bound and fingerprint-aware; the
+reconciler reuses or deterministically creates a canonical YouTube Source,
+scoped Knowledge claim and private Evidence from canonical Video provenance.
+The explanatory `reason` field is never treated as Evidence. A changed or
+wrong-source binding fails closed. Evidence dependency changes create a new
+proposal with a new content/dependency fingerprint, approve it through
+Governance, and supersede the historical proposal; the old approval is not
+rewritten or reused. Deterministic stable keys, evidence metadata fingerprints
+and idempotency keys make replay safe. The existing Controlled Apply
+transaction provides atomic rollback, while GraphService and its
+`EVIDENCE_REFS_REQUIRED` policy remain unchanged.
+
+Focused reconciliation verification passed 4 tests / 14 assertions; complete
+Unit verification passed 687 tests / 3,331 assertions (3 warnings, 5 PHPUnit
+deprecations). PHP lint, Composer validation and diff-check passed; Composer
+reports the pre-existing missing-license warning. Guarded Integration could
+not run because WordPress bootstrap returned a database connection error and
+the narrowly escalated test-database request was rejected by the execution
+policy. No semantic or raw database mutation was performed. Runtime next step
+is a human-approved/available guarded run against exact `nhk_v3_test`, followed
+by read-back of the reported Video and its proposal set.
+
 ## Video–Relation controlled apply binding — 2026-09-07
 
 Controlled Video Apply now accepts a historical Video proposal whose
