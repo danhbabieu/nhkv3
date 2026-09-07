@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+## Legacy relation audit-gap correction — 2026-09-07
+
+Read-only demo evidence showed canonical inventory `1,548` rows and active
+Graph `244` rows, while relation dry-run returned `NOT_APPLICABLE=1,548` and
+all debt counters zero. Root cause was the Plugin wiring: canonical rows were
+passed through `record['resolution'] ?? NOT_APPLICABLE`; only Graph rows were
+explicitly marked `EXISTING`. Thus legacy canonical records without
+`intended_relations` or structured relation metadata were scanned but not
+audited. Added `LegacyRelationPlanner` and wired both read registrations to
+classify registered Model/Variant parent formulas, Knowledge/Video subject
+absence as `RELATION_PENDING`, and Classification as `REGISTRY_GAP`, without
+inferring targets from names or stable keys. Brand, Media, Source, Evidence
+and other types without a registered required relation remain
+`NOT_APPLICABLE`. Focused planner tests pass 4 tests/11 assertions and the
+Unit suite passes 693 tests/3,346 assertions (3 warnings, 5 PHPUnit
+deprecations).
+Demo remains untouched; the prior demo zero-debt result is `FALSE_NEGATIVE`.
+
 ## Canonical Video evidence create-or-resolve hardening — 2026-09-07
 
 Historical approved Video relation reconciliation now derives Source and

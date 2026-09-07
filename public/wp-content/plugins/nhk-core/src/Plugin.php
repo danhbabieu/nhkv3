@@ -48,7 +48,7 @@ use NHK\Core\Contracts\Article\PublicationPrincipal;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery};
-use NHK\Core\Application\Graph\RelationBackfillService;
+use NHK\Core\Application\Graph\{LegacyRelationPlanner, RelationBackfillCandidate, RelationBackfillService};
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, SemanticMergeGraphAdapter, WpdbAuditSink, WpdbGraphRepository};
@@ -101,7 +101,7 @@ final class Plugin {
             $predicates = new PredicateRegistry();
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $graphEndpoints, $predicates);
-            $relationBackfill = new RelationBackfillService(static fn (array $record): mixed => isset($record['edge_uuid']) ? ['status' => 'EXISTING'] : ($record['resolution'] ?? ['status' => 'NOT_APPLICABLE']), static fn (): bool => false, static fn (): array => array_merge($canonicalInventory->inventory([], 10000)->items, $graphInventory->inventory([], 10000)->items));
+            $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
             McpAbilityRegistration::registerReadAbilities(new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), null, $neighborhood, $canonicalInventory, $graphInventory, $relationBackfill));
             McpAbilityRegistration::registerCapabilityGatedReadAbilities();
             McpAbilityRegistration::registerGovernedAbilities();
@@ -352,7 +352,7 @@ final class Plugin {
             $mcpNeighborhood = new SemanticNeighborhoodQuery(new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy(new PredicateRegistry())));
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
             $graphInventory = new GraphInventoryService($graphRepository, $endpoints, $predicates);
-            $relationBackfill = new RelationBackfillService(static fn (array $record): mixed => isset($record['edge_uuid']) ? ['status' => 'EXISTING'] : ($record['resolution'] ?? ['status' => 'NOT_APPLICABLE']), static fn (): bool => false, static fn (): array => array_merge($canonicalInventory->inventory([], 10000)->items, $graphInventory->inventory([], 10000)->items));
+            $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill);
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
@@ -402,6 +402,28 @@ final class Plugin {
         $providers['media'] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'stable_key' => $item->stableKey, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->provenance, 'visibility' => $item->active ? 'PUBLIC' : 'PRIVATE'], $media->list(true));
         $providers['video'] = static fn (): array => array_map(static fn (object $item): array => ['uuid' => $item->canonicalId, 'revision' => $item->revision, 'active' => $item->active, 'provenance' => $item->metadata, 'visibility' => $item->active ? 'PUBLIC' : 'PRIVATE'], $videos->list(true));
         return new CanonicalInventoryService($providers);
+    }
+
+    private static function relationBackfill(CanonicalInventoryService $canonicalInventory, GraphInventoryService $graphInventory): RelationBackfillService
+    {
+        $planner = new LegacyRelationPlanner();
+        $edges = $graphInventory->inventory([], 10000)->items;
+        $exists = static function (RelationBackfillCandidate $candidate) use ($edges): bool {
+            foreach ($edges as $edge) {
+                if (($edge['source']['type'] ?? '') === $candidate->sourceType
+                    && ($edge['source']['uuid'] ?? '') === $candidate->sourceUuid
+                    && ($edge['predicate'] ?? '') === $candidate->predicate
+                    && ($edge['target']['type'] ?? '') === $candidate->targetType
+                    && ($edge['target']['uuid'] ?? '') === $candidate->targetUuid
+                    && ($edge['state'] ?? '') === 'ACTIVE') return true;
+            }
+            return false;
+        };
+        return new RelationBackfillService(
+            static fn (array $record): mixed => isset($record['edge_uuid']) ? ['status' => 'EXISTING'] : $planner->resolve($record),
+            $exists,
+            static fn (): array => array_merge($canonicalInventory->inventory([], 10000)->items, $graphInventory->inventory([], 10000)->items)
+        );
     }
 
     private static function runtimeMigrationsEnabled(): bool
