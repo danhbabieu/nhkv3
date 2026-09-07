@@ -4755,3 +4755,18 @@ Guarded Integration ran against `nhk_v3_test` but currently reports 110 tests,
 `GovernedSemanticIngestIntegrationTest` for Video rollback/eligibility. This
 failure remains explicit and was not hidden or downgraded. No semantic,
 WordPress, Graph or demo data mutation was performed in this checkpoint.
+
+The release artifact transferred successfully and remote checksums for
+`McpToolCatalog.php` and `bin/nhk-core-maintenance.php` matched the local
+checkout. The deploy runner's health gate returned `REMOTE_HEALTH_NOT_READY`
+because the demo reports migration current `13` and target `15`; migrations
+were not run because that would be a live mutation and owner-gated operation.
+Despite the health gate, fresh read-only MCP discovery exposed all three
+requested capabilities. Canonical inventory returned `1,548` records;
+per-type totals were brand `4`, classification `175`, component `91`, evidence
+`93`, knowledge `775`, media `249`, model `30`, movement `18`, music `11`,
+source `58`, variant `42`, video `2`. Graph inventory returned `244` total,
+`244` active, `0` retired, `0` dangling, `0` invalid endpoint and `0`
+duplicate. Relation dry-run scanned `1,792` records with `EXISTING=244`,
+`NOT_APPLICABLE=1548`, and zero for every other reported debt/status counter;
+it reported `read_only=true` and created no candidate or relation.
