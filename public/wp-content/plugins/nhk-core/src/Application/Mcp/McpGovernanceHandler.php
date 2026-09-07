@@ -5,6 +5,8 @@ namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Governance\ControlledApplyService;
+use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
+use NHK\Core\Application\Governance\GovernedSemanticIngestOrchestrator;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Application\Graph\RelationBatchApplyOrchestrator;
 use NHK\Core\Domain\Governance\Proposal;
@@ -14,7 +16,32 @@ use NHK\Core\Contracts\Governance\GovernedLifecycle;
 
 final class McpGovernanceHandler implements GovernedLifecycle
 {
-    public function __construct(private GovernanceService $governance, private ?ProposalEligibilityService $eligibility = null, private ?ControlledApplyService $apply = null) {}
+    private ?GovernedSemanticIngestOrchestrator $ingestOrchestrator = null;
+
+    public function __construct(
+        private GovernanceService $governance,
+        private ?ProposalEligibilityService $eligibility = null,
+        private ?ControlledApplyService $apply = null,
+        private ?GovernanceAutomationPolicyResolver $policyResolver = null,
+    ) {}
+
+    /** @return array<string,mixed> */
+    public function ingestFromArguments(array $arguments): array
+    {
+        if ($this->policyResolver === null) return $this->proposal($this->createFromArguments($arguments));
+        $this->ingestOrchestrator ??= new GovernedSemanticIngestOrchestrator(
+            $this,
+            static fn (array $review): bool => true,
+            fn (string $id): array => $this->apply($id),
+            $this->policyResolver,
+        );
+        return $this->ingestOrchestrator->run([$arguments])[0];
+    }
+
+    public function automationEnabled(): bool
+    {
+        return $this->policyResolver !== null;
+    }
 
     public function create(Proposal $proposal): Proposal { return $this->governance->create($proposal); }
     public function review(string $id): array
@@ -98,5 +125,22 @@ final class McpGovernanceHandler implements GovernedLifecycle
             static fn (array $review): bool => $approvalConfirmed && function_exists('current_user_can') && current_user_can('nhk_approve_proposals'),
             $actor,
         ))->run($candidates);
+    }
+
+    /** @return array<string,mixed> */
+    private function proposal(Proposal $proposal): array
+    {
+        return [
+            'proposal_id' => $proposal->id,
+            'proposal_state' => $proposal->state->value,
+            'target_uuid' => $proposal->targetUuid,
+            'canonical_id' => $proposal->targetUuid,
+            'entity_type' => $proposal->entityType,
+            'operation' => $proposal->operation,
+            'payload' => $proposal->payload,
+            'expected_revision' => $proposal->expectedRevision,
+            'revision' => $proposal->revision,
+            'idempotency_key' => $proposal->idempotencyKey,
+        ];
     }
 }

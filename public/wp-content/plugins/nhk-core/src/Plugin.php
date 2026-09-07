@@ -360,7 +360,9 @@ final class Plugin {
             $graphInventory = new GraphInventoryService($graphRepository, $endpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill);
-            $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply);
+            $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
+            $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
+            $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver);
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);

@@ -398,6 +398,19 @@ final class McpTransport
     /** @return array<string,mixed> */
     private function ingestProposal(\NHK\Core\Domain\Governance\Proposal $proposal): array
     {
+        if (method_exists($this->governance, 'automationEnabled') && $this->governance->automationEnabled()) {
+            return $this->governance->ingestFromArguments([
+                'operation' => $proposal->operation,
+                'entity_type' => $proposal->entityType,
+                'subject_id' => $proposal->subjectId,
+                'target_uuid' => $proposal->targetUuid,
+                'expected_revision' => $proposal->expectedRevision,
+                'payload' => $proposal->payload,
+                'content_fingerprint' => $proposal->contentFingerprint,
+                'dependency_fingerprint' => $proposal->dependencyFingerprint,
+                'idempotency_key' => $proposal->idempotencyKey,
+            ]);
+        }
         return [
             'proposal_id' => $proposal->id,
             'proposal_state' => $proposal->state->value,
