@@ -70,6 +70,16 @@ final class AdminWorkbenchArchitectureTest extends TestCase
             $base . 'AdminWorkbenchState.php',
             $base . 'AdminAssets.php',
             $base . 'AdminWorkbenchPage.php',
+            $base . 'AdminListTable.php',
+            $base . 'AdminStatusBadge.php',
+            $base . 'AdminReadBackPanel.php',
+            $base . 'AdminTechnicalDetails.php',
+            $base . 'AdminDetailShell.php',
+            $base . 'AdminContentAdapter.php',
+            $base . 'AdminVideoAdapter.php',
+            $base . 'AdminMediaAdapter.php',
+            $base . 'AdminKnowledgeAdapter.php',
+            $base . 'AdminGovernanceAdapter.php',
         ];
     }
 

@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+## Unified Admin Workbench implementation — 2026-09-07
+
+The Admin Workbench now exposes primary user-facing workspaces for Nội dung,
+Media, Tri thức, Duyệt and Hệ thống, with raw proposal/composer tooling kept
+under Nâng cao. Shared presentation primitives cover list tables, status badges,
+detail shells, technical disclosure and canonical/relation/projection/frontend
+read-back labels. Domain adapters cover Content tabs, Video search projection,
+Media readiness, Knowledge tabs and Vietnamese Governance summaries. Video
+guided relation continues to use the existing `VideoRelationAdminService` and
+Governance REST boundary; no parallel writer, semantic registry entry,
+predicate, migration or seed was added. The Governance repository now provides
+a read-only recent proposal query for the user-facing queue. A separate
+capability-gated `nhk.admin.workbench` read route supplies canonical IDs for
+Video/Media/Knowledge/Entity selection without exposing them through public
+search or creating a second semantic writer.
+
+Focused Admin verification passed 28 tests / 332 assertions. Admin + relation
+regression passed 62 tests / 508 assertions. The full Unit suite passed 728
+tests / 3,545 assertions with 2 existing warnings and 5 PHPUnit deprecations.
+Composer validation, PHP lint and `git diff --check` passed; Composer retains
+the pre-existing missing-license warning. The unfiltered suite is not a pass:
+it encountered 2 integration bootstrap errors and 12 P4 environment-gate
+failures because `NHK_WP_TEST_PATH=public`/WordPress runtime was not enabled
+in that invocation. No production, staging, V2 or semantic runtime data was
+mutated.
+
 ## Admin Video relation root-gap closeout — 2026-09-07
 
 The Admin Video relation workspace now accepts only canonical Video + selected

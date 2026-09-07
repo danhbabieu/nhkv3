@@ -87,4 +87,70 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', videoRelationWorkspace);
     else videoRelationWorkspace();
+
+    function workspaceSearch() {
+        var forms = document.querySelectorAll('[data-nhk-search]');
+        if (!forms.length) return;
+        var base = (window.nhkV3Admin && window.nhkV3Admin.root) || (window.location.origin + '/wp-json/');
+        forms.forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                var query = String(new FormData(form).get('q') || '').trim();
+                var workspace = form.getAttribute('data-nhk-search');
+                var output = document.getElementById('nhk-' + workspace + '-results') || document.getElementById('nhk-content-results');
+                if (!output) return;
+                if (query.length < 2) { output.textContent = 'Nhập ít nhất 2 ký tự để tìm kiếm.'; return; }
+                output.textContent = 'Đang tìm...';
+                var domain = workspace === 'media' ? 'media' : workspace === 'knowledge' ? 'all' : 'all';
+                fetch(base + 'nhk/v1/admin/workbench/search?q=' + encodeURIComponent(query) + '&domain=' + domain, {headers: {'X-WP-Nonce': (window.nhkV3Admin && window.nhkV3Admin.nonce) || ''}})
+                    .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || data.code || 'Không thể tìm kiếm.'); return data; }); })
+                    .then(function (data) { renderSearchResults(output, workspace, data.groups || {}); })
+                    .catch(function (error) { output.textContent = error.message; });
+            });
+        });
+    }
+
+    function renderSearchResults(output, workspace, groups) {
+        output.textContent = '';
+        var keys = workspace === 'media' ? ['media'] : workspace === 'knowledge' ? ['entities', 'knowledge'] : ['posts', 'videos', 'entities', 'media', 'knowledge'];
+        var count = 0;
+        keys.forEach(function (key) {
+            (groups[key] || []).forEach(function (item) {
+                count++;
+                var card = document.createElement('article');
+                card.className = 'nhk-admin-result-card';
+                var title = document.createElement('h3');
+                title.textContent = item.title || item.name || 'Không có tiêu đề';
+                card.appendChild(title);
+                var meta = document.createElement('p');
+                meta.textContent = [item.type || key, item.platform || '', item.external_id || ''].filter(Boolean).join(' · ');
+                card.appendChild(meta);
+                if (item.type === 'video' && item.id) {
+                    var open = document.createElement('button'); open.type = 'button'; open.className = 'button button-secondary'; open.textContent = 'Mở chi tiết'; open.addEventListener('click', function () { loadVideoDetail(item.id); }); card.appendChild(open);
+                } else if (item.url) { var link = document.createElement('a'); link.href = item.url; link.textContent = 'Xem trên web'; link.target = '_blank'; link.rel = 'noopener'; card.appendChild(link); }
+                output.appendChild(card);
+            });
+        });
+        if (!count) { var empty = document.createElement('p'); empty.className = 'nhk-admin-empty'; empty.textContent = 'Không tìm thấy dữ liệu phù hợp hoặc runtime chưa khả dụng.'; output.appendChild(empty); }
+    }
+
+    function loadVideoDetail(id) {
+        var output = document.getElementById('nhk-video-detail');
+        if (!output) return;
+        output.textContent = 'Đang tải Video canonical...';
+        var base = (window.nhkV3Admin && window.nhkV3Admin.root) || (window.location.origin + '/wp-json/');
+        fetch(base + 'nhk/v1/admin/workbench/video/' + encodeURIComponent(id), {headers: {'X-WP-Nonce': (window.nhkV3Admin && window.nhkV3Admin.nonce) || ''}})
+            .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.message || 'Không đọc được Video.'); return data; }); })
+            .then(function (data) {
+                var video = data.video || {}, iframe = document.createElement('iframe'); iframe.width = '560'; iframe.height = '315'; iframe.loading = 'lazy'; iframe.title = video.title || 'Video YouTube'; iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(video.external_id || ''); iframe.allowFullscreen = true;
+                output.textContent = ''; output.appendChild(iframe);
+                var title = document.createElement('h3'); title.textContent = video.title || 'Video'; output.appendChild(title);
+                var meta = document.createElement('p'); meta.textContent = [video.platform, video.external_id, video.id, 'revision ' + video.revision].join(' · '); output.appendChild(meta);
+                var relation = document.createElement('p'); relation.textContent = 'Relation guided vẫn qua Governance; chọn target semantic từ kết quả Tri thức, không nhập Evidence UUID.'; output.appendChild(relation);
+                var link = document.createElement('a'); link.className = 'button'; link.href = video.url || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Xem trên web'; output.appendChild(link);
+            }).catch(function (error) { output.textContent = error.message; });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', workspaceSearch);
+    else workspaceSearch();
 }());

@@ -30,6 +30,11 @@ final class AdminWorkbenchPage
             26
         );
         add_submenu_page('nhk-v3', 'Tổng quan', 'Tổng quan', 'manage_options', 'nhk-v3', [self::class, 'render']);
+        add_submenu_page('nhk-v3', 'Nội dung', 'Nội dung', 'edit_posts', 'nhk-v3-content', [self::class, 'renderContent']);
+        add_submenu_page('nhk-v3', 'Media', 'Media', 'upload_files', 'nhk-v3-media', [self::class, 'renderMedia']);
+        add_submenu_page('nhk-v3', 'Tri thức', 'Tri thức', 'nhk_view_governance', 'nhk-v3-knowledge', [self::class, 'renderKnowledge']);
+        add_submenu_page('nhk-v3', 'Duyệt', 'Duyệt', 'nhk_view_governance', 'nhk-v3-governance', [self::class, 'renderGovernance']);
+        add_submenu_page('nhk-v3', 'Hệ thống', 'Hệ thống', 'manage_options', 'nhk-v3-system', [self::class, 'renderSystem']);
         add_submenu_page('nhk-v3', 'Nâng cao', 'Nâng cao', 'manage_options', 'nhk-v3-advanced', [AdminPage::class, 'render']);
     }
 
@@ -57,12 +62,74 @@ final class AdminWorkbenchPage
         echo '</div>';
     }
 
+    public static function renderContent(): void { self::renderWorkspace('Nội dung', 'Bài viết và Video trong một workbench chung.', 'content'); }
+    public static function renderMedia(): void { self::renderWorkspace('Media', 'Media identity, assets, usage và projection theo contract.', 'media'); }
+    public static function renderKnowledge(): void { self::renderWorkspace('Tri thức', 'Entity, Claim, Source, Evidence và Relation trong một ô tìm kiếm.', 'knowledge'); }
+    public static function renderGovernance(): void { self::renderWorkspace('Duyệt', 'Hàng đợi governed với diff dễ hiểu và read-back sau mỗi action.', 'governance'); }
+    public static function renderSystem(): void { self::renderWorkspace('Hệ thống', 'Health, readiness và runtime diagnostics read-only.', 'system'); }
+
+    private static function renderWorkspace(string $title, string $description, string $workspace): void
+    {
+        if (!current_user_can('manage_options') && !current_user_can('nhk_view_governance') && !current_user_can('edit_posts') && !current_user_can('upload_files')) wp_die('Bạn không có quyền xem khu vực này.');
+        echo '<div class="wrap nhk-admin-workbench" data-nhk-workspace="' . esc_attr($workspace) . '">';
+        echo '<header class="nhk-admin-hero"><div><p class="nhk-admin-eyebrow">NHK V3 · Admin Workbench</p><h1>' . esc_html($title) . '</h1><p class="nhk-admin-lead">' . esc_html($description) . '</p></div><div class="nhk-admin-hero__boundary"><strong>Luật vận hành</strong><span>Admin là adapter; semantic mutation vẫn đi qua Governance và canonical read-back.</span></div></header>';
+        self::renderNavigation((new AdminWorkbenchRegistry())->sections());
+        if ($workspace === 'content') self::renderContentWorkspace();
+        elseif ($workspace === 'media') self::renderMediaWorkspace();
+        elseif ($workspace === 'knowledge') self::renderKnowledgeWorkspace();
+        elseif ($workspace === 'governance') self::renderGovernanceWorkspace();
+        else self::renderSystemWorkspace();
+        echo '</div>';
+    }
+
+    private static function renderContentWorkspace(): void
+    {
+        echo '<section class="nhk-admin-panel"><nav class="nhk-admin-tabs" aria-label="Loại nội dung"><a class="is-active" href="#nhk-content-articles">Bài viết</a><a href="#nhk-content-videos">Video</a></nav><form class="nhk-admin-search" data-nhk-search="content"><label for="nhk-content-query">Tìm kiếm</label><input id="nhk-content-query" name="q" type="search" minlength="2" placeholder="Tiêu đề, YouTube ID hoặc canonical UUID"><button class="button button-primary">Tìm</button></form><div id="nhk-content-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa để tra cứu Nội dung.</p></div></section>';
+        echo '<section id="nhk-content-videos" class="nhk-admin-panel"><h2>Video workspace</h2><p>Chọn Video từ kết quả tìm kiếm để mở detail, player, provenance, relation và read-back.</p><div id="nhk-video-detail" class="nhk-admin-detail" aria-live="polite"></div></section>';
+    }
+
+    private static function renderMediaWorkspace(): void
+    {
+        echo '<section class="nhk-admin-panel"><h2>Media workspace</h2><form class="nhk-admin-search" data-nhk-search="media"><label for="nhk-media-query">Tìm Media</label><input id="nhk-media-query" name="q" type="search" minlength="2" placeholder="Tên, stable key hoặc UUID"><button class="button button-primary">Tìm</button></form><div id="nhk-media-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa để tra cứu Media.</p></div></section><section class="nhk-admin-panel"><h2>Guided attachment</h2><p>Attachment/relation chỉ khả dụng khi writer Media V3 hiện có và đủ quyền. Không nhập UUID Evidence hoặc proposal trong workflow này.</p><div id="nhk-media-guided-state" class="nhk-admin-state nhk-admin-state--neutral">Chưa chọn Media.</div></section>';
+    }
+
+    private static function renderKnowledgeWorkspace(): void
+    {
+        echo '<section class="nhk-admin-panel"><h2>Tri thức</h2><form class="nhk-admin-search" data-nhk-search="knowledge"><label for="nhk-knowledge-query">Tìm semantic</label><input id="nhk-knowledge-query" name="q" type="search" minlength="2" placeholder="Tên entity, claim, source hoặc evidence"><select name="tab" aria-label="Loại tri thức"><option value="entity">Thực thể</option><option value="claim">Claim</option><option value="source">Nguồn</option><option value="evidence">Evidence</option><option value="relation">Quan hệ</option></select><button class="button button-primary">Tìm</button></form><div id="nhk-knowledge-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa semantic để bắt đầu.</p></div></section>';
+    }
+
+    private static function renderGovernanceWorkspace(): void
+    {
+        echo '<section class="nhk-admin-panel"><h2>Hàng đợi Governance</h2><p>Hàng đợi hiển thị thay đổi bằng tiếng Việt. Proposal UUID, fingerprint, dependency và payload chỉ có trong Chi tiết kỹ thuật.</p><div class="nhk-admin-state-list"><div class="nhk-admin-state"><strong>Chờ duyệt</strong><span>Proposal cần Submit/Approve.</span></div><div class="nhk-admin-state"><strong>Sẵn sàng Apply</strong><span>Đã duyệt và qua Eligibility.</span></div><div class="nhk-admin-state"><strong>Đã Apply</strong><span>Đã apply, đang xác minh read-back.</span></div><div class="nhk-admin-state nhk-admin-state--blocked"><strong>Bị chặn</strong><span>Không tự bypass blocker.</span></div></div><div id="nhk-governance-queue" aria-live="polite"><p class="nhk-admin-empty">Chưa có queue reader khả dụng trong runtime hiện tại. Mở Nâng cao để tra cứu proposal kỹ thuật.</p></div><p><a class="button" href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced#governance')) . '">Mở công cụ nâng cao</a></p></section>';
+        global $wpdb;
+        if (!isset($wpdb) || !is_object($wpdb)) return;
+        $proposals = (new \NHK\Core\Infrastructure\Governance\WpdbProposalRepository($wpdb))->listRecent(50);
+        $adapter = new AdminGovernanceAdapter();
+        $rows = [];
+        foreach ($proposals as $proposal) {
+            $row = $adapter->humanize($proposal);
+            $rows[] = ['summary' => $row['summary'], 'operation' => $row['operation'], 'state' => $row['state_label'], 'subject' => $row['subject']];
+        }
+        echo '<section class="nhk-admin-panel"><h2>Thay đổi gần đây</h2>';
+        AdminListTable::render('Governance queue', ['summary' => 'Thay đổi', 'operation' => 'Operation', 'state' => 'Trạng thái', 'subject' => 'Đối tượng'], $rows, ['label' => 'Chưa có proposal trong hàng đợi.']);
+        echo '</section>';
+    }
+
+    private static function renderSystemWorkspace(): void
+    {
+        $status = new MigrationStatus();
+        $workspace = AdminWorkspaceViewModel::fromHealth((new HealthCheck($status))->read(), [], []);
+        echo '<section class="nhk-admin-panel"><h2>Runtime health</h2><p>Read-only. Runtime failure không được hiển thị thành empty success.</p><table class="widefat striped"><tbody>';
+        foreach ($workspace['health'] as $item) echo '<tr><th>' . esc_html((string) ($item['label'] ?? '')) . '</th><td><strong>' . esc_html((string) ($item['state_label'] ?? 'Không khả dụng')) . '</strong> — ' . esc_html((string) ($item['display'] ?? 'Không khả dụng')) . '</td></tr>';
+        echo '</tbody></table></section><section class="nhk-admin-panel"><h2>Raw/technical tooling</h2><p>Các thao tác migration, proposal raw và diagnostics chi tiết vẫn ở <a href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced#system')) . '">Nâng cao</a>.</p></section>';
+    }
+
     /** @param list<array<string,string>> $sections */
     private static function renderNavigation(array $sections): void
     {
         echo '<nav class="nhk-admin-nav" aria-label="Khu vực quản trị NHK V3"><ul>';
         foreach ($sections as $section) {
-            if ($section['id'] === 'overview') continue;
+            if (!self::isPrimarySection((string) $section['id'])) continue;
             echo '<li><a href="' . esc_url(self::adminHref($section['href'])) . '">' . esc_html($section['label']) . '</a></li>';
         }
         echo '</ul></nav>';
@@ -75,7 +142,7 @@ final class AdminWorkbenchPage
         echo '<div><h2 id="nhk-admin-work-heading">Công việc</h2><p>Đi theo tác vụ hằng ngày; công cụ kỹ thuật được tách xuống khu vực Nâng cao.</p></div></div>';
         echo '<div class="nhk-admin-grid">';
         foreach ($sections as $section) {
-            if ($section['id'] === 'overview') continue;
+            if (!self::isPrimarySection((string) $section['id'])) continue;
             $mode = match ($section['kind']) {
                 'native' => 'WordPress gốc',
                 'advanced' => 'Nâng cao',
@@ -90,6 +157,11 @@ final class AdminWorkbenchPage
             echo '</article>';
         }
         echo '</div></section>';
+    }
+
+    private static function isPrimarySection(string $id): bool
+    {
+        return in_array($id, ['content', 'media', 'knowledge', 'governance', 'system', 'advanced'], true);
     }
 
     private static function renderStateGuide(): void

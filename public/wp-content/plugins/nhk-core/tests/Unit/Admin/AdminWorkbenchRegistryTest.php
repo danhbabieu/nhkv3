@@ -26,13 +26,13 @@ final class AdminWorkbenchRegistryTest extends TestCase
         $registry = new AdminWorkbenchRegistry();
 
         self::assertSame('WordPress', $registry->section('content')['owner']);
-        self::assertSame('edit.php', $registry->section('content')['href']);
-        self::assertSame('native', $registry->section('content')['kind']);
+        self::assertSame('admin.php?page=nhk-v3-content', $registry->section('content')['href']);
+        self::assertSame('workbench', $registry->section('content')['kind']);
         self::assertSame('edit_posts', $registry->section('content')['capability']);
 
         self::assertSame('Media + WordPress', $registry->section('media')['owner']);
-        self::assertSame('upload.php', $registry->section('media')['href']);
-        self::assertSame('native', $registry->section('media')['kind']);
+        self::assertSame('admin.php?page=nhk-v3-media', $registry->section('media')['href']);
+        self::assertSame('workbench', $registry->section('media')['kind']);
         self::assertSame('upload_files', $registry->section('media')['capability']);
     }
 

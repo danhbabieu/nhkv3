@@ -78,6 +78,15 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
         return $this->find($proposal->id) ?? $proposal;
     }
     public function find(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1',UuidCodec::toBinary($id)),ARRAY_A)); }
+    /** @return list<Proposal> */
+    public function listRecent(int $limit = 50, ?ProposalState $state = null): array
+    {
+        $db = $this->db();
+        $limit = min(100, max(1, $limit));
+        $where = $state === null ? '' : $db->prepare(' WHERE state=%d', $this->state($state));
+        $rows = $db->get_results('SELECT * FROM ' . $this->table() . $where . ' ORDER BY id DESC LIMIT ' . $limit, ARRAY_A) ?: [];
+        return array_values(array_filter(array_map(fn (array $row): ?Proposal => $this->hydrate($row), $rows), static fn (?Proposal $proposal): bool => $proposal !== null));
+    }
     public function findByIdempotencyKey(string $key): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE idempotency_key=%s LIMIT 1',$key),ARRAY_A)); }
     public function save(Proposal $proposal): Proposal { $db=$this->db(); $replacementDbId=$proposal->supersededByProposalId ? $db->get_var($db->prepare('SELECT id FROM '.$this->table().' WHERE proposal_uuid=%s',UuidCodec::toBinary($proposal->supersededByProposalId))) : null; $ok=$db->query($db->prepare('UPDATE '.$this->table().' SET state=%d,revision=%d,updated_at=%s,submitted_at=%s,applied_at=%s,cancelled_at=%s,rejected_at=%s,superseded_at=%s,superseded_by_proposal_id=%s WHERE proposal_uuid=%s AND revision=%d',$this->state($proposal->state),$proposal->revision,gmdate('Y-m-d H:i:s.u'),$proposal->submittedAt,$proposal->appliedAt,$proposal->cancelledAt,$proposal->rejectedAt,$proposal->supersededAt,$replacementDbId,UuidCodec::toBinary($proposal->id),$proposal->revision-1)); if($ok!==1)throw new \RuntimeException('PROPOSAL_REVISION_CONFLICT'); return $this->find($proposal->id)??$proposal; }
     public function findForUpdate(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1 FOR UPDATE',UuidCodec::toBinary($id)),ARRAY_A)); }

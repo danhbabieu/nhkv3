@@ -24,6 +24,7 @@ use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
+use NHK\Core\Infrastructure\Http\AdminWorkbenchReadApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\VideoRelationAdminApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
@@ -185,6 +186,7 @@ final class Plugin {
             if (!isset($wpdb) || !is_object($wpdb)) return;
             $media = new WpdbMediaRepository($wpdb); $assets = new WpdbMediaAssetRepository($wpdb); $usages = new WpdbMediaUsageRepository($wpdb); $videos = new WpdbVideoRepository($wpdb); $claims = new WpdbKnowledgeRepository($wpdb); $sources = new WpdbSourceRepository($wpdb); $evidence = new WpdbEvidenceRepository($wpdb); $authority = new WpdbAuthorityRepository($wpdb);
             (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus()))->register();
+            (new AdminWorkbenchReadApi($media, $videos, $claims, $authority))->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
             $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink());
