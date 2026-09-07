@@ -23,6 +23,97 @@ viết cũ; không cho phép seed, sửa, backfill, merge hoặc xóa semantic r
 không cho phép ghi Graph edge; và không cho phép thay đổi V2, staging hoặc
 production. Những hành động đó cần contract, governance và gate riêng.
 
+## Amendment record — 2026-09-07 — Reconcile Before Create, No-Orphan and Canonical Completion Law
+
+**WHY:** Runtime hiện đã expose và sử dụng các semantic writer cho Authority,
+Knowledge, Source, Evidence, Media, Video, Graph relation và Governance. Khi
+writer tồn tại, rủi ro lớn không còn là “không ghi được” mà là tạo duplicate,
+claim rời subject, dùng proposal state như canonical success hoặc retry bằng một
+proposal mới. Runtime cũng đã xác minh relation source binding sau bug hydration
+cũ và đã chạy relation thật tới canonical Graph read-back. Vì vậy luật tối cao
+phải buộc mọi workflow reconcile canonical state trước create, cấm orphan semantic
+data và định nghĩa completion bằng owner read-back thay vì proposal/apply state.
+
+**WHAT LAW CHANGES:** Trước khi tạo bất kỳ canonical semantic node hoặc Knowledge
+claim mới, caller phải resolve/research dữ liệu canonical hiện có và phân loại
+intent thành đúng một trong năm outcome:
+
+- `EXACT_EXISTING` → reuse/update/enrich record canonical hiện có;
+- `MERGE_CANDIDATE` → governed merge/rekey/update theo owner contract;
+- `RELATED_BUT_DISTINCT` → giữ identity riêng và chỉ tạo relation đã registered;
+- `NO_EXISTING_CANONICAL_RECORD` → mới được phép create canonical record mới;
+- `UNCERTAIN` → fail closed vào deferred/research ledger.
+
+Lexical similarity, fuzzy match, keyword search, display-name similarity,
+filename/checksum/URL hoặc AI memory không phải canonical identity proof.
+
+Một Knowledge claim mới không được chủ động tạo detached rồi “gắn node sau”.
+Canonical subject/context phải resolve trước. Nếu subject đúng chưa tồn tại và
+việc tạo node mới đã được chứng minh là cần thiết, Authority node phải đi qua
+Governance, Controlled Apply và canonical read-back trước khi Knowledge claim
+được tạo. Nếu subject không resolve hoặc không tạo an toàn được, candidate phải
+DEFERRED; orphan claim không thể là `COMPLETED`.
+
+Mọi semantic durable mutation hiện dùng lifecycle chuẩn:
+
+    Proposal create / ingest
+    → Submit
+    → Review
+    → Approval bound to content/dependency fingerprints
+    → Eligibility
+    → Controlled Apply
+    → canonical owner read-back
+    → idempotency verification
+
+`DRAFT`, `SUBMITTED`, `APPROVED`, `ready=true`, HTTP success hoặc Apply response
+không tự là canonical success. `COMPLETED` chỉ khi canonical owner đọc lại đúng
+identity/state/revision/relation và second-run không tạo duplicate side effect.
+Các shorthand lifecycle trong amendment cũ được hiểu là historical abbreviation
+và bị supersede bởi lifecycle đầy đủ này.
+
+`relation_create` phải giữ real typed endpoints:
+`source_type/source_uuid`, registered `predicate`,
+`target_type/target_uuid`. Không dùng entity-type string thay cho source UUID.
+Historical proposal hydration defect từng biến relation subject thành type string
+đã được sửa ở repository/runtime và không còn là global Graph blocker. Create
+Proposal cho một Authority node chưa tồn tại là trường hợp khác: node mới chưa có
+canonical UUID trước Controlled Apply.
+
+Current executable predicates gồm `about`, `depicts`, `model_of`, `variant_of`,
+`uses_movement`, `supports_music`, `configured_with_music`,
+`observed_playing_music`. `classified_as` chưa registered; Product–Specimen cũng
+chưa có dedicated approved persistence relation. Không dùng broad `about` để giả
+classification membership, structural parentage, configuration, movement-use,
+Product–Specimen ownership hoặc bất kỳ relation chưa registered nào.
+
+**AFFECTED SUBSYSTEMS:** Authority, Knowledge, Source/Evidence, Graph,
+Governance, Media, Video, Article/Note research, MCP/Admin, deferred ledgers,
+projection/frontend và idempotent retry.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** Amendment này không tạo entity type,
+predicate, field, route hoặc parallel store mới. Frontend chỉ project canonical
+truth đã read-back. Editorial/research Note vẫn chỉ là workspace context nếu
+không có explicit semantic promotion contract. Bounded Graph neighborhood là
+read-model infrastructure; frontend thiếu consumer được ghi
+`PARTIAL_FRONTEND_GAP`, không được suy thành Graph unavailable.
+
+**DATA, MIGRATION AND ROLLOUT:** Amendment này không tự tạo/sửa/backfill data.
+Runtime evidence hiện có: relation source binding defect đã resolved; Graph
+relation đã chạy full Governance + canonical read-back; 10 core Cuckoo Knowledge
+claims đã hoàn tất `Knowledge → about → Classification Cuckoo`. Authority-create
+probe Classification đã PASS create/submit/review/approval/eligibility nhưng cố
+ý không Apply để tránh tạo node rác; actual new-node Apply/generated UUID/
+resolver read-back chỉ được claim khi một node thật sự cần tạo.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Retry sau rate-limit/runtime interruption
+phải reuse proposal/idempotency binding hiện có khi intent không đổi. Không mint
+proposal mới chỉ để retry. Validation phải kiểm tra duplicate Authority,
+Knowledge, Source, Evidence, Media, Video, active relation, dangling relation và
+orphan claim. Không deploy production chỉ vì documentation amendment này.
+
+**DECISION OWNER / DATE:** NHK V3 owner-approved runtime/documentation
+reconciliation, 2026-09-07.
+
 ## Amendment record — 2026-09-06 — Canonical Public URL Identity
 
 **WHY:** Public URLs must project persisted public identity rather than re-encode
@@ -80,10 +171,11 @@ URL, WordPress post, Graph edge or production/staging data is changed. Runtime
 implementation, idempotency, WordPress revision binding, outcome vocabulary,
 read-back and observability remain follow-up work under the approved contract.
 
-**GOVERNANCE, TEST AND DEPLOYMENT:** Semantic mutation remains Proposal → Human
-Approval → Eligibility → Controlled Apply → repository → audit. The Article
-workflow must fail closed on registry, contract, governance, verification or
-infrastructure failure and must be tested before implementation is accepted.
+**GOVERNANCE, TEST AND DEPLOYMENT:** Semantic mutation remains governed; the
+2026-09-07 Reconcile/Completion amendment defines the current full lifecycle.
+The Article workflow must fail closed on registry, contract, governance,
+verification or infrastructure failure and must be tested before implementation
+is accepted.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
@@ -156,12 +248,12 @@ audited read-only. Public asset URLs remain stable after publication and
 derivatives never become new semantic Media identities.
 
 **GOVERNANCE, TEST AND DEPLOYMENT:** All Media semantic writes converge on the
-existing Media application service and, where the operation is semantic,
-Proposal → Human Approval → Eligibility → Controlled Apply → repository →
-audit. Recognition/OCR is only a candidate for Evidence. Tests must prove
-two distinct mandatory slots, placeholder incompleteness, reuse, contextual
-alt, filename normalization, idempotent reconciliation, sitemap/structured
-data exclusion and channel parity. Unknown registry values fail closed.
+existing Media application service and use the current full Governance lifecycle
+where semantic. Recognition/OCR is only a candidate for Evidence. Tests must
+prove two distinct mandatory slots, placeholder incompleteness, reuse,
+contextual alt, filename normalization, idempotent reconciliation,
+sitemap/structured data exclusion and channel parity. Unknown registry values
+fail closed.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
@@ -200,9 +292,12 @@ in source or audit output.
 
 **GOVERNANCE, TEST AND DEPLOYMENT:** Intake creates or reconciles a governed
 Proposal only. A reviewed intake with semantic attachments applies Video and
-its approved Graph relations atomically through Controlled Apply; no generic
-WordPress write is a Video writer. Transcript absence is a warning, not a
-blocker; fabricated transcript or unsupported source metadata is forbidden.
+its approved Graph relations through Controlled Apply; no generic WordPress
+write is a Video writer. Transcript absence is a warning, not a blocker;
+fabricated transcript or unsupported source metadata is forbidden. Current
+guided relation orchestration may resolve/reuse/create canonical private
+Source→provenance Claim→Evidence dependencies through their existing owners;
+that does not auto-promote arbitrary transcript/editorial text to Knowledge.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
@@ -242,12 +337,11 @@ contract are separately reviewed. Until then, physical linkage remains an
 explicit REGISTRY_GAP/CODE_GAP and all current data remains untouched.
 
 **GOVERNANCE, TEST AND DEPLOYMENT:** Physical identity, Specimen
-identification/observation/provenance and Product–Specimen semantic linkage
-use Proposal → Human Approval → Eligibility → Controlled Apply → repository →
-audit. Commerce-only Product edits remain ordinary commerce writes unless they
-also mutate semantic truth. Tests must prove identity separation, lifecycle
-survival, at-most-one linkage, completeness diagnostics, claim non-promotion
-and no implicit repair.
+identification/observation/provenance and Product–Specimen semantic linkage use
+the current full Governance lifecycle. Commerce-only Product edits remain
+ordinary commerce writes unless they also mutate semantic truth. Tests must
+prove identity separation, lifecycle survival, at-most-one linkage,
+completeness diagnostics, claim non-promotion and no implicit repair.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-02.
 
@@ -420,10 +514,10 @@ WordPress is a presentation/runtime integration layer. It remains the sole
 owner of editorial Post fields and URLs, but WordPress Posts/attachments are
 not semantic authority for Authority, Graph, Knowledge, Source, Evidence, Media
 or Video. Every semantic mutation, including Video, Media and relation changes,
-uses `Proposal → Submit → Review/Approve → Eligibility → Controlled Apply →
-canonical read-back`. Direct database semantic mutation, duplicate writers,
-parallel semantic stores, fake success and frontend fact inference outside a
-canonical projection are prohibited.
+uses the current full Governance lifecycle and canonical read-back. Direct
+database semantic mutation, duplicate writers, parallel semantic stores, fake
+success and frontend fact inference outside a canonical projection are
+prohibited.
 
 Every public-capable canonical resource requires Public Identity before a
 canonical frontend URL is emitted. Allocation/persistence uses the governed
@@ -497,7 +591,9 @@ Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:
 | Public Projection | Read model, route, SEO và presentation của sự thật đã được phép hiển thị |
 
 Không subsystem nào được âm thầm thay thế hoặc nhân bản trách nhiệm của
-subsystem khác.
+subsystem khác. Editorial/research Note không có canonical semantic owner riêng
+trong registry hiện tại; Note chỉ là workspace context cho tới khi fact của nó
+được promote qua các owner canonical ở trên.
 
 ## 3. Từ vựng canonical
 
@@ -619,6 +715,17 @@ Không tạo thêm Authority type chỉ vì V2, UI hoặc một field cũ có t�
 Knowledge, Source, Evidence, Media và Video có domain identity riêng; chúng
 không tự động trở thành Authority type.
 
+### 5.2 Reconcile-before-create
+
+Create không bắt đầu từ “tên có vẻ mới”. Trước mọi canonical Authority create,
+resolver/research phải kiểm tra UUID, stable key, exact canonical name/alias và
+current related context, rồi trả một trong năm outcome của amendment 2026-09-07.
+`NO_EXISTING_CANONICAL_RECORD` là outcome duy nhất cho phép mint node mới.
+
+`MERGE_CANDIDATE` không tự merge; nó đi vào high-impact Governance review.
+`RELATED_BUT_DISTINCT` giữ hai identity. `UNCERTAIN` không được tạo placeholder
+semantic node. Fuzzy/lexical/keyword similarity chỉ giúp tìm candidate.
+
 ## 6. Brand Backbone — luật cấu trúc tối cao
 
 Brand là semantic backbone của product/technical lineage. Backbone bảo toàn
@@ -705,8 +812,21 @@ trong runtime được phân loại ở Appendix B, không được tự invent 
 | configured_with_music | Variant → Music | MANY / MANY | Variant configuration/offering |
 | observed_playing_music | Specimen → Music | MANY / MANY | One physical-object observation |
 
+Runtime current cũng có broad `about` và Media `depicts` theo executable
+PredicateRegistry. `classified_as` không tồn tại trong current registry.
+Product–Specimen không có dedicated relation hiện hành. Không dùng `about` để
+fake các nghĩa này hoặc bất kỳ relation chưa registered nào.
+
 Evidence phải phù hợp đúng scope. Không suy ra các predicate này từ tên, binary,
 rod count, hammer count, case style, visual similarity hoặc Brand.
+
+### 8.2 Relation endpoint binding
+
+Một `relation_create` phải preserve real canonical source/target UUID và type.
+Entity-type string không được dùng thay UUID. Historical `subject_id` hydration
+bug đã resolved; current repository lấy relation subject từ canonical
+`source_uuid` (legacy source-key fallback chỉ là compatibility). Runtime đã có
+relation full-lifecycle và Graph canonical read-back PASS sau fix.
 
 ## 9. Direct, derived và explainability
 
@@ -775,6 +895,10 @@ Brand, Model, Movement, Variant, Knowledge, WordPress Post/Article workflow,
 Media, Video, Specimen, Product và mọi endpoint canonical khác chịu cùng luật
 này. Album/Collection chỉ xuất hiện khi một entity/endpoint/predicate contract
 được đăng ký riêng; tên section hoặc field `music.album` không tạo identity.
+
+Current application/MCP có bounded semantic neighborhood. Một frontend surface
+chưa tiêu thụ đầy đủ path/profile là `PARTIAL_FRONTEND_GAP`, không phải bằng
+chứng rằng Graph infrastructure không tồn tại.
 
 ## 10. Fact-scope law
 
@@ -866,8 +990,8 @@ thống giữ nguyên Specimen và tạo diagnostic/proposal theo Governance.
 Product copy không phải Knowledge Claim. Commercial description không tự động
 trở thành Knowledge, Source/Evidence hoặc semantic relation. Claim về Brand,
 Model, Variant, Movement, Music, Component, condition, provenance, production
-date hoặc technical configuration chỉ được promotion qua evidence → Proposal →
-Human Approval → Eligibility → Controlled Apply → canonical semantic state.
+date hoặc technical configuration chỉ được promotion qua evidence và current
+full Governance lifecycle tới canonical semantic read-back.
 
 Media vẫn thuộc Media/MediaAsset/MediaUsage law hiện hành. Media dùng trên
 Specimen page, Product listing hoặc editorial Post không tự chứng minh semantic
@@ -890,6 +1014,30 @@ Evidence là đơn vị cụ thể gắn Claim với Source, có thể supports,
 hoặc qualifies theo contract. Source tồn tại không chứng minh mọi claim của
 entity đó. Evidence phải hỗ trợ assertion/relation cụ thể.
 
+### 12.1 No-orphan và factual ingest
+
+Trước Knowledge creation phải resolve canonical subject/context và reconcile
+current claims. Nếu target hiện có, reuse target. Nếu target chưa có nhưng
+`NO_EXISTING_CANONICAL_RECORD` đã được xác nhận và node thật sự cần thiết,
+Authority node phải create/apply/read-back trước claim. Nếu không resolve/create
+được target đúng, claim phải deferred; không tạo orphan.
+
+Factual lifecycle chuẩn là:
+
+    Source / Evidence research
+    → canonical subject / target resolution
+    → reconcile existing canonical data / claims
+    → create / update / merge Authority if genuinely needed
+    → Authority canonical read-back
+    → Knowledge ingest + canonical read-back
+    → governed Graph attachment
+    → Source / Evidence attachment
+    → Graph + Knowledge + Evidence read-back
+    → idempotency verification
+
+Second run không được tạo duplicate Authority, Knowledge, Source, Evidence,
+active relation, dangling relation hoặc orphan claim.
+
 Commercial Product copy remains outside Knowledge. A listing statement is not
 an atomic canonical fact merely because it names a Brand, Model, Variant,
 condition, provenance or technical attribute. Promotion from Product copy into
@@ -901,6 +1049,8 @@ Public claim/source/evidence phải qua active/public/verification policy và
 reader-safe serialization. Raw metadata/provenance internals và lifecycle fields
 không tự động trở thành public copy. Source/Evidence không mặc định có standalone
 SEO page; chúng xuất hiện như provenance trong projection đã đủ điều kiện.
+Active PRIVATE/HIDDEN Source/Evidence có thể được governed internal verification
+đọc khi contract cho phép mà không cần đổi thành PUBLIC.
 
 ## 13. Media và Video
 
@@ -1018,8 +1168,8 @@ làm Evidence, Graph relation, image-sitemap member hoặc preferred structured-
 data image; nó luôn phát ra incomplete warning. `SERIAL`, `LOGO`, `MODEL_MARK`,
 `STAMP`, `LABEL`, `ENGRAVING` và các detail type tương đương chỉ làm Evidence
 candidate. OCR/recognition/visual matching không được đổi canonical
-Specimen/Model/Variant/Movement; promotion vẫn là Evidence → Proposal → Human
-Approval → Eligibility → Controlled Apply.
+Specimen/Model/Variant/Movement; promotion vẫn phải dùng full Governance + owner
+read-back.
 
 Ảnh của một physical object anchor semantically ở Specimen khi có contract và
 Governance-approved fact. Product dùng cùng Media qua MediaUsage; Product
@@ -1104,6 +1254,11 @@ yêu cầu; derived Brand visibility dùng Graph traversal, không dùng fake ow
     không được nhúng bắt buộc vào canonical public route. Audit URL là read-only;
     reprojection phải explicit, governed, collision-safe, idempotent và không
     đổi semantic UUID, Knowledge, Evidence hoặc Graph truth.
+12. Guided relation workflow có thể resolve/reuse/create canonical private
+    YouTube Source, provenance-scoped Claim và Evidence sau khi canonical Video
+    và target đã resolve. Normal operator không phải nhập Proposal/Evidence UUID
+    thủ công. Generic transcript extraction vẫn planning-first và không auto-write
+    arbitrary Knowledge.
 
 ## 14. WordPress editorial law
 
@@ -1121,6 +1276,11 @@ WordPress editorial create/update/publish hoạt động độc lập với Sema
 Controlled Apply. Governance kiểm soát semantic mutation; nó không biến việc
 biên tập và xuất bản một native Post thành semantic apply bắt buộc.
 
+Editorial/research Note, annotation hoặc draft workspace context không tự trở
+thành semantic owner. Fact phát hiện từ Note/Article chỉ canonical sau khi đi
+qua canonical subject resolution, reconcile, Source/Evidence/Knowledge,
+Governance và owner read-back.
+
 ### 14.1 Coordinated Article Ingest Boundary
 
 V3 knowledge Article là một workflow ở cấp operation, không phải một Authority
@@ -1130,9 +1290,9 @@ Graph `article` endpoint hoặc semantic identity cho bài viết. WordPress nat
 
 Khi request có intent tạo/cập nhật/xuất bản V3 knowledge Article hoặc Post kèm
 semantic claims/relations, completion chỉ hợp lệ sau khi Article Ingest Contract
-đã hoàn tất, theo thứ tự: semantic registry resolution và preflight; ghi Post ở
-trạng thái draft; semantic Proposal/Governance/Controlled Apply; read-back
-verification; rồi mới đủ điều kiện publish WordPress. Generic WordPress
+đã hoàn tất, theo thứ tự: semantic registry resolution và canonical reconcile;
+ghi Post ở trạng thái draft; full semantic Governance lifecycle; canonical
+owner read-back; rồi mới đủ điều kiện publish WordPress. Generic WordPress
 create/update/publish không tự trở thành Article Ingest và không được báo là
 workflow V3 knowledge hoàn tất.
 
@@ -1187,8 +1347,8 @@ approval never overrides authentication, authorization, security, system
 integrity, identity ambiguity, route collision, CAS/state safety or reliable
 execution. It never marks failed rules as `PASS`, suppresses diagnostics,
 fabricates Evidence/Knowledge, mutates Authority/Graph outside Governance or
-authorizes a forbidden semantic mutation. Semantic Proposal → Human Approval
-→ Eligibility → Controlled Apply remains unchanged.
+authorizes a forbidden semantic mutation. Semantic mutation still follows the
+current full Governance lifecycle.
 
 An approval is valid only for the exact WordPress Post, editorial state token,
 publication policy version and deterministic blocker fingerprint evaluated for
@@ -1421,22 +1581,28 @@ lookup/runtime failure không được biến thành compliance pass.
 
 Mọi semantic durable mutation đi theo:
 
-    Proposal
-    → Human Approval
+    Proposal create / ingest
+    → Submit
+    → Review
+    → Approval bound to content/dependency fingerprints
     → Eligibility
     → Controlled Apply
-    → Authority/Graph/domain repository
-    → durable audit
+    → canonical owner repository/query read-back
+    → idempotency verification
+    → durable audit / completion outcome
 
 Proposal phải bind subject, operation, canonical payload/content fingerprint,
 expected revision, dependency-closure fingerprint và idempotency key. Approval
-chỉ có giá trị khi binding còn khớp. Apply phải kiểm tra target existence, revision,
-dependencies, capability, endpoint/predicate/field contract và transaction.
+chỉ có giá trị khi binding còn khớp. Apply phải kiểm tra target existence,
+revision, dependencies, capability, endpoint/predicate/field contract và
+transaction.
 
-Apply thành công là một atomic semantic transaction cùng attempt/success audit.
-Failure rollback semantic mutation và proposal transition; FAILED attempt được
-ghi bounded trong transaction riêng. Retry re-evaluates eligibility. Apply lại
-proposal APPLIED phải idempotent và không mutate lần hai.
+Apply thành công là một atomic semantic transaction cùng attempt/success audit,
+nhưng Apply response chưa đủ để báo `COMPLETED`. Canonical owner phải đọc lại
+đúng mutation; second run phải không tạo duplicate side effect. Failure rollback
+semantic mutation và proposal transition; FAILED attempt được ghi bounded trong
+transaction riêng. Retry re-evaluates eligibility. Apply lại proposal APPLIED
+phải idempotent và không mutate lần hai.
 
 Không có admin shortcut, direct SQL, MCP shortcut hoặc compatibility adapter nào
 được bypass registry, revision, provenance, idempotency, permission, audit hay
@@ -1444,6 +1610,10 @@ Graph boundary. Semantic merge, reassignment, retirement và structural parent
 change là high-impact mutation; phải đánh giá identity, alias, Graph, Knowledge,
 Media, Source/Evidence, Specimen/Product, slug, redirect, SEO và MCP trước khi
 apply. Canonical entity không bị hard-delete tùy tiện.
+
+Retry sau rate-limit/runtime interruption phải reuse existing proposal ID và
+idempotency binding nếu durable intent không đổi. Tạo proposal mới cho cùng
+intent chỉ vì transport/runtime bị gián đoạn là duplicate-risk và bị cấm.
 
 Native WordPress editorial publish là ngoại lệ có chủ đích: vẫn thuộc Post
 boundary và không cần semantic Governance apply.
@@ -1463,17 +1633,21 @@ mới, không tạo persistence path thứ hai và không bypass capability.
 
 Read surface phải dùng reader-safe serializers, canonical UUID validation, active/
 public/readiness policy và ambiguity diagnostics. Mutation tools phải capability-
-gated và dùng đúng Proposal → Approval → Eligibility → Controlled Apply.
+gated và dùng đúng full Governance lifecycle ở §19.
 
 Admin phải hiển thị, khi contract có, identity, state, revision, blockers,
 warnings, relation path, compatibility gaps, proposal binding, apply status và
 reason codes. Diagnostic visibility khác public visibility: Admin không được che
 record invalid/ineligible bằng cách biến chúng thành “không tồn tại”.
 
+Normal guided workflow không bắt user nhập proposal UUID/Evidence UUID khi
+application orchestration có thể resolve canonical dependencies. Technical IDs,
+fingerprint, expected revision và raw JSON thuộc Kỹ thuật/Nâng cao.
+
 Raw Graph REST có thể là administrator-only operational read; public API không
 được leak endpoint keys, edge state/revisions hoặc storage identifiers nếu không
 được contract cho phép. WordPress Abilities chỉ là discoverability bridge của
-existing read contracts, không phải persistence hoặc write bypass.
+existing read/contracts, không phải persistence hoặc write bypass.
 
 ## 21. Health, hydration và deployment
 
@@ -1564,6 +1738,8 @@ Các trường hợp biên sau đây có kết quả kiến trúc cố định:
 | Variant cấu hình Music nhưng Specimen quan sát khác Music | Cả hai fact cùng tồn tại ở scope riêng; không promotion, overwrite hoặc suy ngược |
 | Specimen có observation riêng | Giữ ở Specimen Observation với evidence; không biến thành Variant/Model/Brand fact |
 | Knowledge Claim có Source nhưng Evidence không đủ | Không đủ điều kiện public/verified hoặc apply theo contract; giữ diagnostic/provenance gap, không nâng claim thành sự thật |
+| New Knowledge candidate chưa resolve canonical subject | DEFERRED/RESEARCH; không create orphan claim để attach sau |
+| Candidate name/fuzzy match gần record hiện có | Chỉ là discovery signal; phải reconcile canonical identity, không auto-create hoặc auto-merge |
 | Model thiếu, mơ hồ hoặc conflicting parent | Fail-closed với STRUCTURAL_PARENT_MISSING hoặc STRUCTURAL_PARENT_AMBIGUOUS; không đoán, không dùng payload shortcut làm Graph truth |
 | Brand đổi tên hoặc public slug đổi | Giữ Canonical ID và Stable Key; rename không tự đổi slug; slug change là operation explicit, giữ Historic Slug và redirect một hop |
 | Alias collision hoặc Historic Slug collision | Fail-closed với IDENTITY_CONFLICT; alias không được dùng như historic redirect |
@@ -1574,13 +1750,16 @@ Các trường hợp biên sau đây có kết quả kiến trúc cố định:
 | Product price/availability/title thay đổi | Commerce-only nếu không đổi semantic truth; không tạo, đổi hoặc xóa Specimen |
 | Product copy mâu thuẫn Specimen evidence | Giữ nguyên Specimen; tạo diagnostic/proposal theo Governance, không silently overwrite |
 | Product–Specimen link dùng field hoặc broad `about` chưa được chọn owner | REGISTRY_GAP/CODE_GAP; fail closed, không persist hoặc đồng bộ hai bản truth |
+| Model/Variant cần classification membership nhưng `classified_as` chưa registered | REGISTRY_GAP; không dùng `about` để giả membership |
 | Database hợp lệ nhưng runtime dependency thiếu | Health là RUNTIME/BOOTSTRAP failure; surface failure, không trả empty semantic data |
 | Homepage và hub cho membership khác nhau | PUBLIC_ELIGIBILITY_FAILURE; dùng cùng policy, identity, route và blocker/warning, không sửa bằng template |
 | Derived Music xuất hiện trên Brand page | Chỉ được hiển thị như DERIVED với relation path; không tạo Brand→Music shortcut |
 | Shortcut trùng với derived path | Không persist shortcut; giữ một direct path và giải thích derived traversal |
 | Legacy V2 field không có V3 contract | REGISTRY_GAP hoặc DATA_COMPATIBILITY_GAP; không phát minh type/field/relation và không migrate tự động |
 | Generic WordPress Post publish | Hợp lệ độc lập ở Post boundary; không được báo là V3 knowledge Article hoàn tất nếu thiếu Article Ingest contract |
-| Semantic MCP/Admin mutation | Chỉ Proposal → Human Approval → Eligibility → Controlled Apply → repository → audit; bypass là CONSTITUTION_CONFLICT |
+| Semantic MCP/Admin mutation | Full lifecycle ở §19; bypass hoặc completion trước owner read-back là CONSTITUTION_CONFLICT |
+| Apply response PASS nhưng owner read-back không khớp | Chưa COMPLETED; surface blocker/conflict và không fake success |
+| Retry cùng durable intent sau runtime interruption | Reuse proposal/idempotency binding; không tạo duplicate proposal/semantic record |
 | Public promotional claim khẳng định dẫn đầu/độc bản/tuyệt đối nhưng thiếu legally valid supporting evidence | Không publish claim đó; phải evidence-bind đúng scope, rewrite thực sự hẹp hơn hoặc block human review. Đổi synonym nhưng giữ nguyên meaning không làm claim hợp lệ |
 | Claim evidence chỉ support một Specimen/category/period nhưng public copy mở rộng ra Variant/Brand/market/all-time | Scope violation; giữ evidence ở scope thật, không publish claim mở rộng |
 | Compliance/legal-policy dependency unavailable | Surface unavailable/review-required state; không coi là compliance pass |
@@ -1724,6 +1903,16 @@ editorial, semantic and verification stages.
 78. Representative candidate selection là deterministic và không dùng upload recency làm precedence.
 79. Explicit canonical UUID được resolve trước stable key rồi exact canonical name/alias; ambiguity fail closed.
 80. Generic Article preflight không special-case WordPress Post ID; concrete IDs chỉ được dùng trong test fixtures.
+81. Trước mọi semantic node/Knowledge create phải reconcile canonical state thành một trong năm outcome chuẩn; chỉ `NO_EXISTING_CANONICAL_RECORD` cho phép new canonical create.
+82. Lexical/fuzzy/keyword/display-name/checksum/URL similarity không phải canonical identity proof.
+83. Không tạo orphan Knowledge claim để attach subject sau; subject phải resolve, hoặc Authority node phải create/apply/read-back trước claim, hoặc candidate phải deferred.
+84. Semantic lifecycle chuẩn luôn có Submit, Review, binding-bound Approval, Eligibility, Controlled Apply, canonical owner read-back và idempotency verification.
+85. Proposal/draft/submitted/approved/eligible/apply-response không tự là `COMPLETED`; owner read-back phải khớp và second run không được duplicate.
+86. `relation_create` phải preserve real source/target UUID+type và registered predicate; entity-type string không thay UUID. Historical subject hydration bug đã resolved và không phải global blocker.
+87. `classified_as` thiếu registry không được giả bằng `about`; Product–Specimen và mọi missing relation meaning cũng fail closed tương tự.
+88. Retry cùng durable intent phải reuse existing proposal/idempotency binding khi có; runtime/rate-limit interruption không cho phép duplicate proposal.
+89. Editorial/research Note không tự là semantic truth; promotion phải quay lại canonical subject/reconcile/Source/Evidence/Knowledge/Governance chain.
+90. Frontend không được keyword-search giả relation; thiếu consumer của bounded Graph neighborhood là frontend gap, không phải Graph absence.
 
 ---
 
@@ -1735,11 +1924,15 @@ khác không được dùng như decision authority song song.
 | Decision | Rationale | Consequence |
 |---|---|---|
 | Structure first / relationships first / data later | Sai cấu trúc và quan hệ gây duplicate identity, không thể sửa an toàn bằng population | Chốt registry, cardinality và scope trước mọi data operation |
+| Reconcile before create | Writer tồn tại không đồng nghĩa record mới là cần thiết; duplicate identity/claim là semantic corruption | Resolve current canonical state first; only genuinely-new canonical identity may be created; fuzzy/lexical similarity never decides identity |
+| No orphan semantic data | Detached claim loses intended semantic context and creates later repair debt | Resolve/create/read-back canonical subject before Knowledge create; otherwise defer |
+| Canonical completion | Proposal/apply state is control-plane evidence, not canonical truth | Full submit/review/approval/eligibility/apply lifecycle plus owner read-back and idempotency verification before `COMPLETED` |
 | Authority owns canonical entities | Cần một owner duy nhất cho identity/lifecycle | UI, Post, Graph và MCP không được làm entity owner thứ hai |
 | Brand backbone | Model/Variant cần lineage rõ nhưng shared domains không phải Brand asset | Model→Brand và Variant→Model là structural direct edges; Variant→Brand derived |
 | Child→parent storage | Một hướng canonical tránh reverse duplication | Query incoming để điều hướng; không lưu reverse edges |
 | Direct vs Derived | Presence trong projection không đồng nghĩa ownership | Read models trả origin/path; không materialize shortcut |
 | Semantic relationship navigation | Mọi canonical endpoint là điểm vào của mạng tri thức, nhưng Graph truth và presentation có boundary khác nhau | Related query dùng Graph governed, tối đa 2 hop, direct thắng derived, path phải giải thích được và không tạo fake edge |
+| Graph registry honesty | Semantic plausibility does not register a predicate | Never use `about` as a substitute for `classified_as`, Product–Specimen or another missing relation |
 | Music has three scopes | Capability, configuration và physical observation là ba sự thật khác nhau | Không promotion hoặc infer từ count/visual/Brand |
 | Specimen is physical identity | Một object có nhiều observation/listing theo thời gian | Product không thay thế Specimen |
 | Product is offer identity | Commerce context thay đổi và relist được | Product–Specimen chỉ dùng khi contract chọn owner/semantics rõ |
@@ -1756,52 +1949,47 @@ khác không được dùng như decision authority song song.
 | Media detail/view vocabulary | Image view classifications support review without becoming entities | One controlled registry; detail types such as SERIAL or MOVEMENT_FRONT are metadata/candidate signals only |
 | Batch is workflow context | Bulk intake needs traceability without creating semantic relations | Batch stores workflow metadata and suggestions; each Media is independently reviewable and no edge is inferred |
 | Knowledge vs Post | Claim atomic khác narrative editorial body | Post giữ body/URL; Knowledge giữ claim; Graph chỉ liên hệ |
-| Coordinated Article Ingest | V3 knowledge Article completion crosses editorial and semantic boundaries | Approved operation-level contract: semantic preflight → WordPress draft → governed semantic apply → read-back → WordPress publish; no Article entity/body/endpoint |
-| No Article semantic entity | Article is an editorial workflow, not a canonical semantic owner | Reuse registered Authority, Knowledge, Source/Evidence and Graph records; do not invent Article/FAQ types |
+| Coordinated Article Ingest | V3 knowledge Article completion crosses editorial and semantic boundaries | semantic preflight/reconcile → WordPress draft → governed semantic apply → owner read-back → WordPress publish; no Article entity/body/endpoint |
+| No Article/Note semantic entity | Article/Note is editorial workflow/context, not a canonical semantic owner | Reuse registered Authority, Knowledge, Source/Evidence and Graph records; do not invent Article/FAQ/Note types |
 | Public identity distinctions | Rename không được thay semantic identity hoặc URL ngoài ý muốn | Slug durable, history và redirect là governed contract |
 | Vietnamese hubs | Public IA dành cho người đọc, không leak registry | Technical roots chỉ là compatibility inputs |
 | Eligibility parity | Một entity không được có membership khác nhau giữa surface | Một underlying policy và blocker/warning rõ ràng |
-| Governance | Semantic mutation cần approval, revision, idempotency và audit | Controlled Apply là write boundary; Post publish vẫn độc lập |
+| Governance | Semantic mutation cần approval, revision, idempotency và audit | Full Controlled Apply lifecycle + canonical owner read-back is the write/completion boundary; Post publish vẫn độc lập |
 | Product/Specimen boundary | Physical object identity và commercial offer identity có lifecycle/cardinality khác nhau | Specimen 1 → 0..N Product; Product → 0..1 Specimen; no implicit physical identity, claim promotion or repair |
 | Public claim & advertising compliance | Promotional wording can create unsupported legal/objective claims even when semantic records are otherwise correct | Meaning-based cross-channel publication gate; objective claims stay within evidence scope; leadership/uniqueness/absolute claims require valid support; unsupported meaning is rewritten narrowly or blocked |
 | Owner publication override | Eligible publication-quality incompleteness must be distinguishable from unsafe identity, security and execution failure | Exactly `PASS`, `OWNER_REVIEW_REQUIRED` and `SYSTEM_BLOCKED`; explicit authenticated owner approval may accept only eligible failures, bound to Post/state/policy/blocker fingerprint for 30 minutes, with append-only decision audit and mandatory WordPress read-back |
 | Deployment health | Runtime failure không được bị che thành empty data | Preflight, layered health và dependency completeness là release gate |
 
-# Appendix B — CURRENT IMPLEMENTATION STATUS (NON-NORMATIVE STATUS SNAPSHOT)
+# Appendix B — HISTORICAL IMPLEMENTATION STATUS SNAPSHOT (NON-NORMATIVE)
 
-Snapshot này là evidence tại 2026-09-02. Nó không sửa hoặc hạ bất kỳ luật nào
-ở trên. Khi runtime thay đổi, cập nhật snapshot và evidence; nếu luật thay đổi,
-phải dùng Change Control.
+Bảng dưới đây là evidence lịch sử tại 2026-09-02 và được giữ vì audit trail.
+Nó **không phải current runtime status**. Current status phải đọc
+`docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`, executable
+registries/catalogs và fresh runtime read-back. Bất kỳ statement fixed-count,
+CODE_GAP/BLOCKED/READY nào bên dưới bị later runtime supersede phải được hiểu là
+historical only.
 
-| Law / concern | Current status | Classification | Evidence |
-|---|---|---|---|
-| Authority type registry | Chín type brand, model, variant, movement, music, component, classification, specimen, product đã load qua CanonicalEntityTypeCatalog | COMPLIANT | public/wp-content/plugins/nhk-core/src/Domain/Authority/CanonicalEntityTypeCatalog.php |
-| Graph endpoint registry | Full boot đăng ký wp_post, chín Authority type, media, video, knowledge, source, evidence — 15 endpoint types | COMPLIANT | CoreEndpointResolverRegistrar.php; MCP_V3_CONTENT_OPERATIONS.md |
-| Graph predicates | Runtime hiện có about, depicts và sáu predicate kỹ thuật: model_of, variant_of, uses_movement, supports_music, configured_with_music, observed_playing_music | COMPLIANT vocabulary; DATA GAP physical rows | PredicateRegistry.php; Brand relationship evidence; không có physical backfill trong checkpoint này |
-| Semantic relationship navigation | Canonical endpoints may be navigation entry points; direct/derived, path, ranking, projection và bounded traversal law đã được phê duyệt | PARTIAL / CODE_GAP; directionality and traversal policy gaps remain | RELATED_SEMANTIC_PROJECTION_CONTRACT.md; RelatedContentQuery.php; BrandAggregationQuery.php |
-| Brand structural storage | Registry/cardinality đã có; payload brand_uuid/model_uuid vẫn được PublicRouteResolver dùng; physical structural rows chưa được backfill | CODE_GAP, CONSTITUTION_CONFLICT nếu payload bị coi là canonical, DATA_COMPATIBILITY_GAP cho rows | PublicRouteResolver.php, StructuralContextQuery.php, BRAND_BACKBONE_STRUCTURAL_CONTRACT_EVIDENCE_2026-09-02.md |
-| Direct/derived Brand aggregation | Read-only Brand aggregation trả DIRECT/DERIVED và path; không tạo shortcut edge | IMPLEMENTED | BrandAggregationQuery.php; current execution state |
-| Public identity | Slug vẫn derive từ canonical_name lúc đọc; chưa có persisted public-slug/history contract | PUBLIC_IDENTITY_STORAGE_GAP, CODE_GAP | PublicIdentityContract.php, PublicRouteResolver.php, V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md |
-| Public eligibility | Production composition wires PublicEntityCollectionQuery into home, search, entity routes và REST; legacy/fallback query branches vẫn tồn tại và cần convergence proof | CODE_GAP / PUBLIC_ELIGIBILITY_FAILURE candidate | Plugin.php, PublicEntityCollectionQuery.php, EntityPageQuery.php, EntityApi.php |
-| Transitional parent handling | Clear active payload parent can remain eligible with DATA_COMPATIBILITY_GAP; missing/conflicting parent blocks; no edge mutation | PARTIAL but contract-visible | PublicEntityEligibilityPolicy.php, StructuralContextQuery.php |
-| Technical public routes | Vietnamese hubs/detail routes and one-hop archive redirects are implemented in code; live stored-menu and some runtime evidence remain gated | PARTIAL runtime evidence | PublicEntityRoutes.php, V3_PUBLIC_HUB_MATRIX.md, V3_MENU_ROUTE_AUDIT_2026-09-02.md |
-| Knowledge/Source/Evidence | Separate domain records, active/public reader-safe gates, governed ingest and evidence chain exist; final public provenance policy remains open | IMPLEMENTED with publication gate | KnowledgeClaim.php, Source.php, Evidence.php, MCP_V3_CONTENT_OPERATIONS.md |
-| Media/Asset/Usage | Separate domain/persistence objects, contextual usage SEO, guarded delivery, Article slots, placeholders and Blueprint storage are implemented; byte upload and final publication policy remain limited/open | IMPLEMENTED with policy gap | Media.php, MediaAsset.php, MediaUsage.php, MediaUsageRoleRegistry.php, ArticleMediaCoordinator.php, PublicMediaAssetDelivery.php |
-| Video | Validated YouTube external-reference identity, canonical watch URL and optional thumbnail reference; no local MP4 behavior | IMPLEMENTED for current contract | Video.php, VideoService.php, MCP_V3_CONTENT_OPERATIONS.md |
-| Product/Specimen ownership | Human-approved law separates physical identity and commerce identity; lifecycle, cardinality, completeness, condition and claim boundaries are explicit | PARTIAL / REGISTRY_GAP | This amendment; Product/Specimen tests; no dedicated approved Product–Specimen relation mechanism yet; existing `specimen_uuid`/broad `about` path is not canonical |
-| Public claim & advertising compliance | Constitution and shared contract approved; READ_FIRST, Article Ingest and Video SEO documentation point to the same cross-channel policy; automated claim classification/evidence/legal-policy enforcement across all surfaces is not yet runtime-proven | CODE_GAP / HUMAN_REVIEW_REQUIRED | PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md; ARTICLE_INGEST_CONTRACT.md; VIDEO_SEO_PROJECTION_CONTRACT.md; READ_FIRST.md |
-| Album | No Authority type, endpoint, predicate, repository, service or public contract | SEMANTIC_GAP | MCP content-operations audit |
-| WordPress Post boundary | Native Post remains editorial title/body/author/date/category/URL truth; no Article Authority body path is approved | COMPLIANT | 01_EDITORIAL_CONTENT_BOUNDARY.md historical evidence; Plugin.php and public route contracts |
-| Article Ingest boundary | Constitutionally approved operation-level workflow; reconcile coordinator, receipt diagnostics and MCP preflight/ingest media policy are implemented, while create/update cross-boundary idempotency, WordPress revision binding and final outcome contract remain open | PARTIAL / CODE_GAP | ArticleIngestCoordinator.php, ArticleMediaCoordinator.php, ArticleOperationReceipt.php, MCP_V3_CONTENT_OPERATIONS.md |
-| Governance | Proposal binding, approval, eligibility, Controlled Apply, capability checks, revision, idempotency and durable audit are implemented for current operations | COMPLIANT for registered operations | ControlledApplyService.php, ProposalEligibilityService.php, MCP catalog |
-| MCP catalog | Exactly 36 tools; governed writes remain capability-gated; the registered read and mutation abilities are exposed on supported WordPress versions | IMPLEMENTED for current catalog | McpToolCatalog.php, McpAbilityRegistration.php, MCP_V3_CONTENT_OPERATIONS.md |
-| Hydration/health | Bounded malformed-row omission and layered health/preflight exist; runtime/DB evidence varies by environment | IMPLEMENTED with environment gates | AuthorityRowHydrator.php, HealthCheck.php, tools/deployment-preflight.php |
-| Deployment | Root Composer lock/autoload and read-only preflight are release requirements; staging/server verification remains externally gated | PARTIAL evidence | P0_DEPLOYMENT_PREFLIGHT.md, V3_EXECUTION_STATE.md |
-| Frontend law | Vietnamese-first theme tokens, responsive/accessibility/SEO constraints and route/read-model boundaries are implemented or contract-tested; visual/runtime gates remain recorded | IMPLEMENTED with open QA gates | V3_FRONTEND_DESIGN_CONTRACT.md, frontend route evidence |
+| Law / concern | Historical status at snapshot | Classification / evidence then |
+|---|---|---|
+| Authority type registry | Chín type brand, model, variant, movement, music, component, classification, specimen, product đã load qua CanonicalEntityTypeCatalog | COMPLIANT at snapshot |
+| Graph endpoint registry | wp_post, chín Authority type, media, video, knowledge, source, evidence | COMPLIANT at snapshot |
+| Graph predicates | about, depicts, model_of, variant_of, uses_movement, supports_music, configured_with_music, observed_playing_music | Registry vocabulary remains current unless executable registry changes; physical data coverage is separate |
+| Semantic relationship navigation | approved direct/derived/path/bounded law | Historical PARTIAL/CODE_GAP statements are superseded where current bounded neighborhood/read seams now exist; frontend consumer gaps remain surface-specific |
+| Public identity | snapshot described slug derivation/storage gap | Historical; consult current Public Identity implementation/runtime evidence |
+| Knowledge/Source/Evidence | separate domain records and governed ingest existed | Current writer/read-back status is routed through status index/MCP catalog |
+| Media/Asset/Usage | separate domain/persistence objects | Current Media ingest/read-back status is routed through status index/current Media contracts |
+| Video | validated YouTube external identity | Current guided provenance/relation orchestration is newer than this snapshot |
+| Product/Specimen ownership | separate law; no dedicated relation | Dedicated Product–Specimen relation remains REGISTRY_GAP unless executable registry changes |
+| Album | no canonical contract | SEMANTIC_GAP unless later amendment registers it |
+| WordPress Post boundary | native editorial owner | Remains canonical editorial law |
+| Article Ingest boundary | approved operation-level workflow | Current reconcile/read-back lifecycle is defined by 2026-09-07 amendment |
+| Governance | proposal/approval/eligibility/apply existed | Current full lifecycle includes Submit, Review, binding-bound Approval, canonical owner read-back and idempotency verification |
+| MCP catalog fixed count | snapshot once recorded an exact tool count | HISTORICAL ONLY; never use a fixed count as current capability truth |
+| Deployment/runtime | environment-specific evidence | Always re-verify target environment |
 
 Known current counts and environment results are maintained in
-docs/architecture/V3_EXECUTION_STATE.md; that file is non-normative evidence
-and must not redefine this snapshot's law.
+`docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md` and the latest entries
+of `docs/architecture/V3_EXECUTION_STATE.md`; neither may redefine normative law.
 
 # Appendix C — V2 RETIREMENT NOTES (NON-NORMATIVE)
 
