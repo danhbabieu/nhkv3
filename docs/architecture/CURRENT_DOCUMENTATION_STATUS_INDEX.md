@@ -1,13 +1,10 @@
 # NHK V3 Current Documentation Status Index
 
-> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-07.**
-> This file is not a second Constitution and does not create semantic vocabulary,
-> operations, predicates, storage, routes or data. Its purpose is to tell
-> downstream systems which sources are current law/contract, which sources are
-> executable/runtime truth, and which documents are historical evidence.
->
-> If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
-> the Constitution controls.
+> **NON-NORMATIVE ROUTER / CURRENT STATUS — 2026-09-07.**
+> This file is not a second Constitution. It routes later agents to current law,
+> executable boundaries and the latest verified runtime state. If anything here
+> conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution
+> controls.
 
 ## 1. Authority and read order
 
@@ -15,166 +12,317 @@ Use this precedence when deciding current behavior:
 
 1. `docs/constitution/NHK_V3_CONSTITUTION.md` — sole supreme normative authority.
 2. Current approved contracts referenced by `docs/constitution/READ_FIRST.md`.
-3. Executable registries/catalogs and application boundaries for the vocabulary
-   and capabilities actually present in the checked-out runtime.
-4. Fresh runtime discovery/read-back when the question is whether a tool,
-   Ability, route, record or integration is actually available in that
-   environment.
-5. `docs/architecture/V3_EXECUTION_STATE.md` — dated execution ledger. Newer
-   checkpoints may supersede older entries; fixed historical counts are not
-   timeless contracts.
-6. Numbered P-phase documents, parity matrices, audits and dated implementation
-   checkpoints — implementation/historical evidence unless a current contract
-   explicitly incorporates them.
-7. Plans/specs under `docs/superpowers/` and legacy/V2 material — plan/reference
-   or migration evidence only.
+3. Executable registries/catalogs and application boundaries for vocabulary and
+   capabilities actually present in the checked-out runtime.
+4. Fresh runtime discovery and canonical owner read-back when the question is
+   whether a capability or mutation actually works in that environment.
+5. This index — compact current-status router.
+6. `docs/architecture/V3_EXECUTION_STATE.md` and current machine-readable audit
+   ledgers — dated execution evidence; later entries/overrides supersede older
+   checkpoints where they conflict.
+7. Numbered phase docs, plans/specs, old audits, V2 material and fixed
+   test/tool-count statements — historical/reference evidence only unless a
+   current contract explicitly incorporates them.
 
-A newer timestamp alone never overrides the Constitution or an approved
-contract. Conversely, an old checkpoint must not override a later executable
-registry/catalog merely because its wording is present tense.
+A newer timestamp alone never overrides the Constitution. An older present-tense
+checkpoint never overrides a later executable registry or verified canonical
+read-back.
 
-## 2. Current boundary snapshot
+## 2. Current semantic write and completion law
 
-### Current cross-surface law — 2026-09-07
+Semantic writes are exposed and in use for the registered Authority operations,
+Knowledge, Source, Evidence, Media, Video, Graph relations and Governance
+proposal lifecycle. The executable MCP catalog is the source of truth for the
+exact currently registered tools; do not reuse a historical fixed tool count.
 
-The current canonical read path is `Authority → Graph → canonical
-projection/read model → frontend`. WordPress is the editorial
-presentation/runtime layer; it is not semantic authority for Media, Video,
-Knowledge, Source, Evidence or Graph. Semantic mutation always uses
-`Proposal → Submit → Review/Approve → Eligibility → Controlled Apply →
-canonical read-back`.
+A create/ingest request may create only a governed Proposal/Draft. It is not a
+canonical entity merely because the request returned successfully.
 
-Public-capable canonical resources require persisted Public Identity before a
-canonical frontend URL. Video uses `/video/{slug}/`; external URLs are only
-source/provenance/embed/external references. Admin “Xem trên web” and “Mở nguồn
-gốc” are separate actions.
+The canonical lifecycle is:
 
-`PRIVATE` Source/Evidence blocks raw public serialization, not an already
-validated public-safe knowledge projection. The public projection allowlist is
-`text`, `type`, `facet`, `scope` using the exact registered field names. It must
-not expose private excerpts, metadata, IDs or reconstruct private payloads.
-Graph/public relation eligibility remains an independent gate.
+`proposal_create / ingest → submit → review → approval with binding fingerprints
+→ eligibility → Controlled Apply → canonical owner read-back → idempotency
+verification`.
 
-Normal Admin forms are guided and do not ask for proposal/Evidence UUIDs,
-fingerprints, expected revisions or raw JSON; those remain Kỹ thuật/Nâng cao.
-Frontend status is distinct from Apply: `Canonical Applied`, `Projection
-Available`, `Frontend Available`, `Frontend Blocked`.
+`DRAFT`, `SUBMITTED`, `APPROVED`, `ready=true`, an apply response or HTTP 2xx is
+not by itself `COMPLETED`. Completion requires the canonical owner to return the
+expected identity, state/revision and mutation. Repeating the same durable intent
+must not duplicate the canonical record, active relation or proposal.
 
-| Area | Current boundary | Current status / reuse rule |
+### Reconcile before create
+
+Before any new Authority node or Knowledge claim, read current canonical state
+and classify the intent:
+
+- `EXACT_EXISTING` → reuse/update/enrich the existing canonical record;
+- `MERGE_CANDIDATE` → governed merge/rekey/update after identity review;
+- `RELATED_BUT_DISTINCT` → preserve separate identities and use only a
+  registered relation when justified;
+- `NO_EXISTING_CANONICAL_RECORD` → only then may creation proceed;
+- `UNCERTAIN` → defer with evidence/reason/owner action.
+
+Lexical/fuzzy/keyword/name similarity is not canonical identity proof.
+
+### No orphan semantic data
+
+A new Knowledge claim must have its intended canonical subject/context resolved
+before creation. If a genuinely missing Authority node is required, create it
+through Governance, apply it, and read it back before creating the claim. If the
+subject cannot be resolved or safely created, defer the claim. A detached claim
+that is intended to be attached later is not a completed semantic ingest.
+
+## 3. Canonical owner and current capability snapshot
+
+| Area | Canonical owner / current boundary | Current status |
 |---|---|---|
-| Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts |
-| Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
-| Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
-| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; governed relation commands now preserve explicit endpoint UUIDs, bounded direct/inverse reads and a read-only semantic-neighborhood MCP seam exist; `classified_as` remains a documented `REGISTRY_GAP` pending approved Authority vocabulary, and physical row completeness/backfill is a separate runtime/data question |
-| Public Entity Dossier | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`; detail-only read model over existing canonical owners | shared dossier seam is wired through `nhk_v3_entity_detail_projection`; Brand is the first complete typed path-recipe projection; direct subject Knowledge remains subject-scoped, deep Brand context keeps origin path, archives stay outside the heavy dossier path, and no display shortcut relation is persisted |
-| Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
-| Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates, while guarded migration/data allocation/current-route durable consumer parity and live re-projection remain runtime-unverified |
-| Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
-| Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |
-| Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; Dictionary observation after canonical write is lexical/non-blocking and does not broaden the target |
-| Media | `Media` identity separate from `MediaAsset`, `MediaUsage` and WP attachment | source-original retained private/protected; derivatives remain under same Media; checksum does not auto-merge identity; caption/alt/filename observations may feed Dictionary candidates only |
-| Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
-| Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | transport/orchestration over existing owners | current catalog includes read-only canonical/Graph inventory and relation dry-run; use fresh runtime discovery when availability matters; no dedicated Dictionary MCP surface should be claimed unless current catalog/runtime exposes it |
-| WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; multipart Media ingest remains on its approved custom MCP boundary |
-| SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
-| Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
-| Video frontend | `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `VIDEO_RELATIONSHIP_CONTRACT.md`, `VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `VIDEO_SEO_PROJECTION_CONTRACT.md` | first-party `/video/{slug}/` route and separate source action; external URL is never the canonical frontend destination |
+| WordPress Article/Post | native `wp_posts` owns editorial title/body/excerpt/category/order/public editorial URL | implemented editorial boundary; Article workflow references canonical semantic owners and never turns body/prose into semantic truth automatically |
+| Editorial/research Note | no separate canonical semantic Note owner registered | workspace/editorial context only unless explicitly promoted through canonical resolution, Source/Evidence/Knowledge and Governance |
+| Authority | nine registered types: brand, model, variant, movement, music, component, classification, specimen, product | governed reads/writes implemented; create probe for Classification is verified through approval + eligibility, actual new-node apply intentionally untested |
+| Knowledge | atomic canonical claims | writer exposed/used; reconcile existing claims first; no orphan claims; canonical read-back required |
+| Source | canonical provenance source + locator | writer exposed/used; separate from Authority and Knowledge; canonical read-back required |
+| Evidence | canonical Claim↔Source support link using supports/contradicts/qualifies | writer exposed/used; requires existing canonical Claim+Source; visibility/public-read policy separate from governed internal verification |
+| Graph | only semantic relation persistence | governed create/retire/reactivate implemented; canonical relation read-back and bounded neighborhood available; relation source binding defect resolved |
+| Media | canonical Media identity | separate from MediaAsset/MediaUsage/WP attachment; governed `nhk.media.ingest` current boundary; source-original private/protected and eligible derivatives remain under same Media |
+| Video | canonical external Video reference | governed YouTube ingest/read implemented; same external ID reuses canonical Video; guided relation workflow can resolve/reuse/create provenance chain and does not require manual proposal/Evidence UUID entry |
+| Specimen | one physical object | separate canonical Authority family; physical truth owner |
+| Product | one listing/offer/context | separate canonical Authority family; not Specimen identity |
+| Governance | proposal, review/approval binding, eligibility, Controlled Apply, audit | implemented for registered operations; completion remains owner read-back dependent |
+| Public Projection / Frontend | read model/presentation only | never creates canonical truth; Graph/owner data is projected after eligibility |
 
-## 3. Current storage and writer rule
+## 4. Authority create runtime status
 
-Every domain has one canonical owner and authorized writer boundary:
+Authority creation is not a generic blocker. Runtime probe proposal
+`01a07c4e-14b2-734e-8264-3f04b37e5fe4` for
+`operation=create, entity_type=classification` verified:
 
-- Article editorial state → WordPress editorial gateways/read-back.
-- Dictionary lexical state → dedicated Concept/Label/Candidate/Mention repository;
-  automatic content detection may persist only lexical observations/candidates
-  after the owning content write, while curation uses its dedicated authorized
-  boundary. Dictionary persistence is not a semantic writer.
-- Authority → Authority service/repository through Governance where semantic.
-- Public Identity → dedicated Public Identity service/repository/history boundary;
-  compatibility route derivation is not a second durable identity writer.
-- Knowledge/Source/Evidence → their canonical services/repositories through
-  Governance/Controlled Apply.
-- Graph relations → `GraphService` through governed relation lifecycle.
-- Media/MediaAsset/MediaUsage → governed Media application boundary; WordPress
-  attachment is storage/public projection, not semantic owner.
-- Video → governed Video intake/apply boundary.
-- Public Entity Dossier → read-only composition only; never a canonical writer.
-- MCP/Admin/WordPress adapters → orchestration/input adapters only; never a
-  second semantic store or writer.
+- proposal create: PASS;
+- submit: PASS;
+- review/fingerprint binding: PASS;
+- approval: PASS;
+- eligibility: PASS (`ready=true`, `reasons=[]`).
 
-Downstream systems should resolve/reuse canonical UUID/stable key/revision and
-read back from the owning store instead of cloning semantic data into a new
-context. Dictionary owner delegation must be revalidated at read time; a stale
-stored destination is not permission to publish/link an invalid canonical URL.
+The probe was intentionally **not applied** to avoid creating a junk canonical
+Classification. Therefore current evidence does **not** yet claim the complete
+new-node sequence `Controlled Apply → generated canonical UUID → entity_get /
+resolver read-back → immediate relation use`. That remaining runtime proof is
+performed only when a real needed Authority node must be created.
 
-## 4. Historical-document interpretation
+A create Proposal may use an entity-type subject marker before a new canonical
+UUID exists. That is not the old `relation_create` source-binding defect.
 
-The following kinds of statements are snapshots unless explicitly reaffirmed by
-current contracts/runtime:
+## 5. Graph relation and registry status
 
-- exact MCP tool or Ability counts;
-- fixed test/assertion counts;
-- environment-specific connector exposure counts;
-- migration/runtime probe outcomes tied to a date;
-- statements such as “not implemented”, “no Article Ability”, “registry gap”,
-  “READY” or “BLOCKED” inside an older checkpoint;
-- route/data counts captured before later implementation slices.
+Current executable predicates are exactly the current registry entries:
 
-Preserve such text as historical evidence when useful, but label it historical
-or route current downstream readers through this index/current contracts.
-Do not rewrite history merely to make old checkpoints look current.
+- `about`;
+- `depicts`;
+- `model_of`;
+- `variant_of`;
+- `uses_movement` (Variant → Movement);
+- `supports_music`;
+- `configured_with_music`;
+- `observed_playing_music`.
 
-## 5. Known current gaps that remain intentional
+`relation_create` preserves typed canonical endpoints:
+`source_type/source_uuid`, registered `predicate`,
+`target_type/target_uuid`. The historical repository-hydration defect that could
+hydrate `subject_id` as an entity-type string instead of the relation source UUID
+is **RESOLVED**. Current `WpdbProposalRepository` hydrates relation subjects from
+`payload.source_uuid` (legacy source-key fallback only for compatibility), and
+runtime relation flows have completed through canonical Graph read-back.
 
-- Public Identity runtime activation/data coverage/current-route durable consumer
-  parity and target-runtime re-projection are not proven. The current canary
-  projection is intentionally read-only; no bulk persisted-identity rewrite or
-  governed re-projection executor is claimed by code presence alone;
-- Brand is the first complete explicit deep-path Public Entity Dossier recipe;
-  equivalent type-specific completeness recipes for Model, Movement, Variant
-  and the remaining Entity types must be added deliberately rather than by
-  increasing the generic graph traversal bound;
-- Dictionary migration 015/runtime activation, initial curated data, dry-run
-  legacy backfill and target-environment public-route/read-back are not proven
-  until executed in the target WordPress runtime; code presence alone is not
-  live acceptance;
-- dedicated Dictionary MCP tools are not current capability truth unless they
-  are added to the executable catalog and confirmed by fresh runtime discovery;
-- dedicated Product–Specimen canonical relation;
-- approved Classification membership predicate (`classified_as`) and governed Graph relation apply; read-only Graph inventory/relation dry-run capability is implemented;
-- full physical Graph completeness/backfill where not runtime-proven;
-- Media → Living Knowledge automatic enrichment adapter;
-- automatic Article body rewrite from Knowledge (prohibited by design; only
-  suggestion/governed editorial flow is allowed);
-- exact integration/runtime gates wherever current execution evidence reports
-  `ENVIRONMENT_BLOCKED` or unavailable infrastructure;
-- any capability whose availability has not been confirmed by current runtime
-  discovery/read-back in the target environment.
+Do not retain “Graph relation source binding is a global blocker”, “all Graph
+mutation must stop”, or “Graph canonical read-back is unavailable” as current
+status. Those are historical descriptions where dated evidence requires them.
 
-A gap is not permission to invent a shortcut.
+Current registry gaps remain fail-closed:
 
-## 6. Downstream operating rule
+- `classified_as` — **REGISTRY_GAP**. Do not use `about` to fake
+  Model/Variant→Classification membership.
+- dedicated Product↔Specimen persistence relation — **REGISTRY_GAP**.
+- Model→Movement is not separately authorized when the registry only permits
+  Variant→`uses_movement`→Movement; do not invent or substitute a predicate.
 
-Before implementing or mutating data:
+Broad `about` must not impersonate classification membership, structural
+parentage, configuration, movement use, Product–Specimen ownership or another
+unregistered semantic meaning.
+
+## 6. Cuckoo current runtime correction
+
+Canonical Classification:
+
+- UUID: `01a07614-832d-7f27-959c-74eb0cd63f3e`
+- stable key: `nhk:classification:clock-type.cuckoo-clock`
+- canonical name: `Đồng hồ chim cúc cu`
+
+The 10 core Cuckoo Knowledge claims have completed the real governed relation
+flow `Knowledge → about → Classification Cuckoo`, including create/submit/review/
+approval/eligibility/Controlled Apply and canonical Graph read-back. For this
+specific group the former Knowledge→Classification `RELATION_GAP` is
+**COMPLETED / RESOLVED**.
+
+This does **not** prove or authorize
+`Model/Variant → classified_as → Classification`; `classified_as` remains a
+registry gap. Do not confuse Knowledge `about` with classification membership.
+
+The exact individual claim/proposal/edge IDs are not invented in this router;
+consult fresh canonical inventory/runtime receipts when item-level identity is
+required.
+
+## 7. Knowledge / Source / Evidence ingest lifecycle
+
+The required current sequence for new factual semantic material is:
+
+`Source/Evidence research → canonical subject/target resolution → reconcile
+existing canonical entities/claims → create/update/merge Authority if genuinely
+needed → Authority canonical read-back → Knowledge ingest → Knowledge canonical
+read-back → governed Graph attachment → Source/Evidence attachment → Graph +
+Knowledge + Evidence canonical read-back → idempotency check`.
+
+Source is the canonical provenance source, not an Authority shortcut. Evidence
+links an existing Claim to an existing Source with `supports`, `contradicts` or
+`qualifies`. Do not stuff arbitrary provenance into Knowledge as a substitute
+for a Source/Evidence chain where the contract requires those owners.
+
+Public visibility and internal validity are separate. Active PRIVATE/HIDDEN
+Source/Evidence may be used by governed internal verification according to the
+current policy without exposing their raw payload publicly. Public-safe
+Knowledge projection remains independently policy-gated.
+
+## 8. Video workflow status
+
+Video canonical identity is separate from Media, thumbnail, Knowledge, Source,
+Evidence and Article. YouTube intake retains normalized canonical source URL,
+platform/external ID, provenance/source state, user hint, editorial instruction,
+optional thumbnail Media binding and resolved intended relations.
+
+Current guided relation workflow:
+
+`canonical Video → resolve canonical target → resolve/reuse/create deterministic
+private YouTube Source → resolve/reuse provenance Claim → resolve/reuse Evidence
+→ relation proposal → submit/review/approval/eligibility → Controlled Apply →
+canonical Graph/Video read-back → projection/frontend`.
+
+Normal operators are not required to type a Video proposal UUID or Evidence UUID;
+the orchestration resolves them. Generic transcript/Knowledge extraction remains
+a separate planning seam until a candidate is actually governed and applied.
+
+Replay of the same YouTube external identity must reuse the canonical Video and
+stable intent; it must not create a duplicate Video merely because title,
+Shorts/watch URL form or tracking query differs.
+
+## 9. Media / Image workflow status
+
+`Media`, `MediaAsset`, `MediaUsage` and WordPress attachment are distinct.
+Current intake uses the governed Media application boundary and must reconcile a
+reusable canonical Media before creating another semantic identity. Checksum,
+filename, URL and upload time are duplicate/presentation signals, not canonical
+merge proof.
+
+Conceptual view/detail context may include values such as `front`, `back`,
+`movement`, `dial`, `hands`, `pendulum`, `gong`, `hammer`, `plate`, `marking`,
+`logo` and `case_detail`, but only the executable role/detail registry decides
+which identifiers are valid. Unknown values fail closed; a view/detail label is
+not itself Knowledge or a Graph relation.
+
+The flow is binary/storage validation → one canonical Media → MediaAsset
+source/derivatives → contextual MediaUsage/role → resolved canonical subject →
+registered Graph/projection only when that separate contract requires it.
+WordPress attachment is storage/projection, not semantic authority.
+
+## 10. Article and Note status
+
+WordPress remains the owner of Article editorial content and URLs. Article
+research must resolve/reuse canonical Authority, Knowledge, Source/Evidence,
+Media and Video. New facts discovered while drafting remain research input until
+they independently pass reconcile-before-create and the governed semantic
+lifecycle. Frontend templates and Article payloads cannot mint semantic truth.
+
+No separate canonical Note domain was found in the current registered owner
+map. Editorial notes and research notes therefore remain context/workspace data
+unless explicitly promoted through the existing semantic owners.
+
+## 11. MCP / Admin and frontend/read-model status
+
+MCP/Admin are orchestration/control-plane adapters, not canonical owners. Current
+executable capabilities include canonical/Graph inventory, relation dry-run,
+authenticated deterministic relation batch apply, semantic resolver, bounded
+`nhk.entity.neighborhood`, and the currently registered semantic ingest/proposal
+writers. Fresh runtime discovery still determines environment availability.
+
+Frontend uses canonical Graph/read models and must not keyword-search a fake
+relationship. Related reads distinguish direct, inbound/outbound direction and
+derived bounded neighborhood. The Graph bounded neighborhood infrastructure is
+implemented. Where a specific frontend dossier/section does not yet consume the
+full eligible neighborhood/path policy, classify that as a
+`PARTIAL_FRONTEND_GAP`, not “Graph unavailable”.
+
+## 12. Deferred / unfinished ledger law
+
+Current work may use intermediate states such as `PENDING_RESEARCH`,
+`EVIDENCE_GAP`, `REGISTRY_GAP`, `RELATION_GAP`, `LEXICAL_GAP`, `FRONTEND_GAP`,
+`RUNTIME_BLOCKED` and `NEEDS_REVIEW`. Final outcomes are:
+
+- `COMPLETED`;
+- `DEFERRED_WITH_REASON`;
+- `BLOCKED_WITH_OWNER_ACTION`.
+
+A deferred entry should retain the source/provenance, proposed canonical
+subject and entity type, proposed relation, evidence, reason, registry blocker,
+existing proposal ID, canonical IDs already resolved, and deterministic rerun
+instructions. After a rate limit/runtime interruption, reuse the existing
+proposal/idempotency binding whenever the durable intent is unchanged; do not
+mint a duplicate proposal just to retry.
+
+## 13. Historical-document interpretation
+
+Historical statements must remain available when audit history matters, but they
+must not be read as current blockers. Explicitly treat as dated/resolved when a
+later executable/runtime source proves otherwise:
+
+- “WRITE semantic is not exposed”;
+- “Source/Evidence/Knowledge writer does not exist”;
+- “relation `subject_id` is still globally broken”;
+- “all Graph mutation is blocked”;
+- “Cuckoo core Knowledge is not related to Classification”;
+- “Graph canonical read-back has never run”;
+- fixed MCP/Ability counts from older checkpoints.
+
+Do not rewrite historical events to pretend they never happened; mark them
+`HISTORICAL`, `RESOLVED`, or superseded by this index/current runtime.
+
+## 14. Intentional remaining gaps
+
+- `classified_as` Classification membership predicate is not registered.
+- dedicated Product–Specimen canonical persistence relation is not registered.
+- actual creation/apply/read-back of a genuinely new Authority node remains to
+  be runtime-proven when a real node is needed; the proposal lifecycle through
+  eligibility is already verified.
+- full physical Graph completeness/backfill remains data/runtime-specific even
+  though governed relation creation/apply is implemented.
+- Media→Living Knowledge automatic enrichment is not authorized merely from
+  MediaUsage/OCR/recognition.
+- automatic Article body rewrite from Knowledge remains prohibited; use
+  suggestion/governed editorial flow.
+- Public Identity and individual frontend dossiers still have target-environment
+  activation/coverage gates described in their current contracts/ledger.
+- capability availability in a specific target environment still requires fresh
+  discovery/read-back even when code exists.
+
+A gap is never permission to invent a shortcut or overload `about`.
+
+## 15. Downstream operating rule
+
+Before implementation or data mutation:
 
 1. follow `READ_FIRST.md`;
-2. resolve the responsible bounded context and canonical owner;
-3. inspect current executable registry/catalog when vocabulary/capability is in
-   question;
-4. distinguish historical evidence from current contract;
-5. fail closed on ambiguity or a missing approved writer/relation;
-6. use Governance for semantic mutation;
-7. read back from the canonical owner before claiming completion.
+2. resolve the canonical owner and executable registry/capability;
+3. research and reconcile existing canonical data before any create;
+4. resolve subject/context before creating Knowledge;
+5. fail closed on ambiguity or missing relation/owner;
+6. use the full Governance lifecycle for semantic mutation;
+7. read back from the canonical owner;
+8. verify second-run idempotency before claiming completion.
 
-For public Entity display work, also resolve the applicable dossier recipe. A
-reachable graph node is not automatically approved public inherited truth; use
-only current registered/contracted paths and preserve direct-versus-derived
-scope in the emitted dossier.
-
-For Dictionary work specifically, detection is not semantic identity: resolve
-approved labels/current canonical owners first, create a private candidate only
-when unresolved, and keep ambiguous terms unlinked until human curation.
-
-This index should remain compact. Detailed law belongs in the Constitution or
-approved domain contracts, not duplicated here.
+This index remains a compact router. Detailed normative law belongs in the
+Constitution and approved contracts.
