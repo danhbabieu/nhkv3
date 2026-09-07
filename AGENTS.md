@@ -8,7 +8,8 @@ read the following chain directly and in order:
 AGENTS.md
 → docs/constitution/READ_FIRST.md
 → docs/constitution/NHK_V3_CONSTITUTION.md
-→ relevant normative contracts
+→ docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md
+→ relevant approved contracts and current executable/runtime boundaries
 
 The session MUST also read the canonical Constitution directly:
 
@@ -49,6 +50,30 @@ after the Constitution.
 - Preserve canonical UUID/stable-key, optimistic revision, typed relation,
   provenance, readiness, idempotency, public identity and fail-closed
   invariants.
+- Before creating any canonical semantic node or Knowledge claim, resolve and
+  reconcile current canonical state. Classify the input as `EXACT_EXISTING`,
+  `MERGE_CANDIDATE`, `RELATED_BUT_DISTINCT`, `NO_EXISTING_CANONICAL_RECORD` or
+  `UNCERTAIN`. Lexical/fuzzy/keyword similarity is discovery evidence only and
+  never canonical identity proof.
+- Do not create an orphan Knowledge claim with the intention to attach its
+  semantic subject later. Resolve the canonical subject/context first; if a new
+  Authority node is genuinely required, create/apply/read it back before the
+  claim is created. Unresolved cases go to the deferred/research ledger.
+- The semantic mutation lifecycle is `Proposal/Create-or-Ingest → Submit →
+  Review → Approval with binding fingerprints → Eligibility → Controlled Apply
+  → canonical owner read-back → idempotency verification`. Draft, submitted or
+  approved state is not canonical success. `COMPLETED` requires matching owner
+  read-back.
+- A `relation_create` command carries real typed endpoints:
+  `source_type/source_uuid`, registered `predicate`, and
+  `target_type/target_uuid`. Never substitute an entity-type string for the
+  source UUID. The historical relation `subject_id` hydration defect is
+  resolved; do not treat it as a current global Graph blocker.
+- Current registered Graph predicates include `about`, `depicts`, `model_of`,
+  `variant_of`, `uses_movement`, `supports_music`, `configured_with_music` and
+  `observed_playing_music`. `classified_as` and a dedicated Product–Specimen
+  relation remain registry gaps unless the executable registry changes. Never
+  use `about` to fake a missing structural/membership/configuration predicate.
 
 ## Data and database safety
 
@@ -84,14 +109,21 @@ after the Constitution.
   Vietnamese-first public copy, controlled typography/tokens, accessible
   semantic HTML, responsive layouts, real query services and honest empty/error
   states.
+- After any mutation, read back from the canonical owner: Authority/entity
+  resolver, Knowledge, Source, Evidence, Graph/neighborhood, Video, Media or
+  native WordPress as appropriate. HTTP success or proposal state alone is not
+  completion evidence.
+- Retry after interruption/rate limit with the same durable intent and existing
+  proposal/idempotency binding when available. Never mint a replacement proposal
+  or duplicate canonical record solely because execution was interrupted.
 
 ## Stop conditions
 
 Stop and ask the user before irreversible real-data deletion, destructive
-production migration, modifying V2 production, changing a locked architectural
-invariant, resolving severe identity ambiguity, merging identities, proceeding
-through unresolved CONSTITUTION_CONFLICT, or continuing without required
-external credentials/infrastructure.
+production migration, modifying a locked architectural invariant, resolving
+severe identity ambiguity, merging identities, proceeding through unresolved
+CONSTITUTION_CONFLICT, or continuing without required external
+credentials/infrastructure.
 
 Never perform final production cutover autonomously; produce a Cutover Readiness
 Report first. Pushes and merges remain subject to platform policy and quality
@@ -117,3 +149,7 @@ editorial truth while Authority, Knowledge, Graph, Media and Video are queried
 through application services. Public UI must not expose internal terms, fixtures,
 unavailable modules or invented metrics/content. Projection work must not create
 semantic types, relations or fields outside the runtime registry/contract.
+
+Editorial notes, research notes and workspace annotations are editorial/context
+inputs only unless an explicit promotion contract resolves them into canonical
+Source/Evidence/Knowledge through the normal reconcile and Governance lifecycle.

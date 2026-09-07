@@ -1,63 +1,127 @@
-# NHK V3 P4 Governance Core Contract
+# NHK V3 Governance Core Contract
 
-> **NON-NORMATIVE.** This is implementation contract evidence. If it conflicts
-> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+> **NON-NORMATIVE IMPLEMENTATION CONTRACT.** The current Constitution and
+> executable Governance boundaries control. Early P4 migration/surface notes are
+> historical implementation evidence and must not be used as current capability
+> truth.
 
-## Status
+## Current Governance boundary — 2026-09-07
 
-P4 implementation and test gates are `ACCEPTED` on `nhk_v3_test`; the final
-close still requires the non-destructive Migration003 UP on `nhk_v3`, health
-3/3, and release diff/secret review. Evidence is recorded in
-`17_P4_ACCEPTANCE_MATRIX.md`.
+Governance is the durable semantic mutation control plane. MCP/Admin are adapters
+into the same application boundary; they are not alternate writers.
 
-P4 giữ governance ở application/domain boundary, không public mutation endpoint và không phụ thuộc UI.
+The current lifecycle is:
 
-Proposal phải bind `subject_id`, operation, canonical payload fingerprint, expected revision và dependency-closure fingerprint. Replay cùng binding là idempotent; cùng proposal id với binding khác bị từ chối.
+`proposal create/ingest → submit → review → approval with content/dependency
+binding fingerprints → eligibility → Controlled Apply → canonical owner
+read-back → idempotency verification`.
 
-State machine tối thiểu: `draft → approved → applied` hoặc `draft → rejected`. Approval chỉ hợp lệ khi cả content và dependency closure khớp. Apply chỉ hợp lệ khi binding khớp và actual revision bằng expected revision; stale proposal phải fail closed.
+A Proposal binds subject/operation, canonical command payload/content
+fingerprint, expected revision where applicable, dependency-closure fingerprint
+and idempotency key. Review returns the exact bindings required for a valid
+approval. Approval is valid only while those bindings match. Eligibility checks
+proposal state, target/dependency existence/revisions and operation-specific
+requirements. Controlled Apply performs the owning mutation transaction and
+audit.
 
-## Governance Automation Policy — 2026-09-07
+Proposal state is not canonical success. `DRAFT`, `SUBMITTED`, `APPROVED`,
+`ready=true` and an Apply response are intermediate control-plane states.
+`COMPLETED` requires the canonical owner to read back the intended mutation and
+a replay/idempotency check to prove no duplicate side effect.
 
-Human review is configurable; Governance gates are not. The registered policy
-resolver supports only `REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH` and
-defaults every missing type to `REVIEW_REQUIRED`. Automation uses the same
-proposal, approval, eligibility, controlled-apply and canonical read-back
-boundaries; it is not a Governance bypass. `AUTO_APPROVE` stops before Apply,
-while `AUTO_PUBLISH` must also prove projection and frontend availability before
-reporting publication success. Automated actions use the existing system actor
-convention and are auditable separately from human actions.
+## Current semantic write coverage
 
-Media file adoption is not a parallel governance bypass: adapters submit to the
-canonical governed Media V3 boundary, where idempotency, payload validation,
-source-original PRIVATE retention, derivative visibility and cleanup of partial
-artifacts are enforced. Attachment creation is an infrastructure projection;
-semantic Media identity remains the single governed identity.
+Registered Governance paths cover current Authority operations, Knowledge,
+Source, Evidence, Media, Video and Graph relation operations exposed by the
+runtime catalog. A historical statement that semantic writers or Graph mutation
+are generally unavailable is superseded by the current executable boundary and
+verified relation runtime evidence.
 
-Audit là port bắt buộc tùy chọn ở core boundary. Persistence adapter dùng một
-append-only shared event store cho Graph, Authority và Governance; public
-transport vẫn chưa được expose ở P4.
+Graph `relation_create` must carry canonical typed endpoints:
+`source_type/source_uuid`, registered predicate,
+`target_type/target_uuid`. The historical relation proposal hydration bug that
+could expose an entity-type string as `subject_id` is resolved at the proposal
+repository boundary. Do not treat it as a current global Graph blocker.
 
-Migration 003 tạo normalized proposal, dependency, approval, apply-attempt và append-only audit tables. `READY`/`BLOCKED` không được lưu; `ProposalEligibilityService` trả reason codes máy đọc được và kiểm tra approval state, target revision, target existence và dependency closure.
+## Authority create status
 
-## Current Odo merge runtime evidence — 2026-09-04
+Authority-create runtime probe proposal
+`01a07c4e-14b2-734e-8264-3f04b37e5fe4` for a Classification passed create,
+submit, review/fingerprint binding, approval and eligibility with
+`ready=true`, `reasons=[]`. It was intentionally not Applied to avoid creating a
+junk canonical node.
 
-The governed operation vocabulary now exposes `rekey` and same-type `merge`,
-and the merge executor is wired locally. This supersedes historical
-capability-gap wording; it does not claim a live apply. A live proposal-create
-diagnostic using pinned-dial source UUID
-`32f43d4b-d6c8-4223-a89b-cc47f30cda77` persisted `subject_id="component"`
-instead of that UUID. The diagnostic was rejected and no merge/apply or
-semantic data mutation occurred. Current blocker:
-`PINNED_DIAL_MERGE=BLOCKED` / `LIVE_MERGE_SUBJECT_BINDING_INVALID`.
+Therefore current evidence proves Authority create through eligibility only.
+The actual new-node chain `Controlled Apply → generated canonical UUID →
+Authority/entity resolver read-back → immediate relation use` remains intentionally
+unproven until a genuine node is required.
 
-## Current cross-domain mutation law — 2026-09-07
+A pre-create entity-type subject marker is not the same as the old relation
+source-binding defect because the new node has no canonical UUID yet.
 
-Video, Media, relation, Claim, Source and Evidence all use the same semantic
-mutation sequence: `Proposal → Submit → Review/Approve → Eligibility →
-Controlled Apply → canonical read-back`. Admin/MCP are control-plane adapters;
-they do not bypass Governance, write directly to semantic tables, create a
-duplicate writer or report Apply PASS as frontend success.
+## Reconcile-before-create and no-orphan boundary
 
-Frontend state is reported separately as `Canonical Applied`, `Projection
-Available`, `Frontend Available` or `Frontend Blocked`. The last state becomes
-Available only after canonical route resolution and read-back succeed.
+Governance does not turn a create command into permission to skip canonical
+research. Before a new Authority node or Knowledge claim is proposed, the
+caller/orchestrator must resolve current canonical data and reconcile the intent
+as exact-existing, merge-candidate, related-but-distinct, genuinely-new or
+uncertain.
+
+Uncertain identity is not converted into a create Proposal. A Knowledge claim
+must have its intended canonical subject/context resolved before creation. If a
+new Authority node is required, it must be applied and read back first. Detached
+“attach later” claims are non-compliant and must be deferred.
+
+## Automation policy
+
+Human review is configurable; Governance gates are not. Supported automation
+modes are `REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH`; missing policy
+defaults to `REVIEW_REQUIRED`.
+
+Automation uses the same proposal, review/binding, approval, eligibility,
+Controlled Apply and canonical read-back boundaries. `AUTO_APPROVE` stops before
+Apply. `AUTO_PUBLISH` must additionally prove applicable projection/frontend
+availability before publication success is reported. Automated actions use the
+system actor/audit convention and do not bypass capability, registry or owner
+checks.
+
+## Retry, failure and idempotency
+
+Controlled Apply locks/reloads the proposal and re-evaluates eligibility.
+Deterministic failure rolls back the semantic mutation/proposal transition;
+bounded failed-attempt audit is recorded according to the retry contract.
+Revision/dependency drift blocks retry fail-closed.
+
+An APPLIED proposal replay returns/reuses its durable result and creates no
+second mutation. When execution is interrupted by rate limit/runtime failure
+after a proposal exists, the same proposal/idempotency binding is reused if the
+intent is unchanged; retry must not mint a duplicate proposal just to continue.
+
+## Historical merge incident clarification
+
+The September 4 pinned-dial merge diagnostic that persisted
+`subject_id="component"` instead of the supplied source UUID is retained as
+**HISTORICAL, SCOPE-SPECIFIC EVIDENCE**. The diagnostic was rejected and no merge
+occurred. It is not evidence that current `relation_create` source binding or all
+Graph mutation remains blocked.
+
+Identity-risking merge/rekey remains a separately governed high-impact
+operation and still requires current source/target revision and canonical
+read-back proof before use.
+
+## Canonical owner read-back map
+
+After mutation, verify the owning boundary:
+
+- Authority → entity/resolver read-back;
+- Knowledge → canonical Knowledge read;
+- Source → canonical Source read;
+- Evidence → canonical Evidence/internal evidence-chain read;
+- Graph → edge/outbound/inbound/neighborhood read-back as appropriate;
+- Video → canonical Video read;
+- Media → canonical Media/asset/usage read;
+- WordPress Article → native WordPress read/rendered verification for editorial
+  state.
+
+Apply success alone does not prove frontend/publication success. Projection and
+frontend availability remain separate post-canonical gates.

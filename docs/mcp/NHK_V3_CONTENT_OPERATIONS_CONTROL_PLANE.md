@@ -1,141 +1,201 @@
 # NHK V3 Content Operations Control Plane
 
-> **NON-NORMATIVE.** The Constitution and registered runtime contracts remain
-> authoritative. This document maps adapters to existing application owners;
-> it does not authorize generic writes or new semantic vocabulary.
+> **NON-NORMATIVE CURRENT CONTROL-PLANE GUIDE.** The Constitution, current
+> domain contracts, executable MCP catalog/registries and fresh runtime read-back
+> control. MCP/Admin are adapters, never semantic owners.
 
 ## Shared boundary
 
 ```text
-user intent → content kind → registered owner/endpoint
-→ application service → governed operation (when semantic)
-→ relation/media/SEO policy → read-back → publication gate
-→ MCP and Admin adapters
+user/editor intent
+→ content kind + canonical owner
+→ current canonical research / reconcile
+→ application service
+→ governed operation where semantic
+→ canonical owner read-back
+→ idempotency verification
+→ projection/publication gate
+→ MCP/Admin response
 ```
 
-MCP and WordPress Admin must consume the same application services and
-capability source. Native WordPress editorial publishing remains independent;
-an MCP-managed V3 Article is complete only after the Article Ingest contract.
+Native WordPress editorial publication remains independent. A V3 knowledge
+Article is complete only after its coordinated Article contract, including any
+required semantic owner read-back.
 
-The Governance Automation Policy is resolved in the shared application
-orchestration boundary used by MCP and Admin. Its only modes are
-`REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH`; absent configuration is
-`REVIEW_REQUIRED`. Human review is configurable; Governance gates are not.
-MCP responses distinguish submitted/manual review, approved/ready-to-apply,
-published/frontend-available and blocked outcomes. Apply success alone is
-never reported as frontend publication success.
+## Reconcile-before-create control-plane rule
 
-| Content kind | Owner | Current boundary | Mutation policy |
-|---|---|---|---|
-| Post/Article | WordPress `wp_posts` | Article Ingest + editorial boundary | Post writes are editorial; semantic changes use Governance |
-| Category/hub | WordPress taxonomy | typed `CategoryGateway` + native WordPress adapter | deterministic resolve/create, parent validation, fingerprint CAS, guarded delete and read-back |
-| Authority | Authority registry | entity application services | governed revision/lifecycle |
-| Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
-| Graph relation | Graph | GraphService | governed relation lifecycle only |
+No guided form or MCP orchestration should jump from user text directly to a
+semantic create. First resolve canonical UUID → stable key → exact name/alias and
+classify the intent as exact-existing, merge-candidate, related-but-distinct,
+genuinely-new or uncertain. Fuzzy/keyword matching is discovery only.
 
-| Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is PRIVATE/protected, eligible derivatives are PUBLIC under that Media, representative/evidence/detail roles are distinct, and attachment mapping is idempotent |
-| Video | Video | Video intake/sync services | governed canonical external reference; optional Living Knowledge output is planning-only |
-| Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
-| Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |
+Knowledge additionally requires its intended canonical subject/context before
+create. If a missing Authority node is genuinely required, create/apply/read it
+back first. If resolution remains uncertain, produce a deferred/research packet;
+do not create an orphan claim/node.
 
-## Capability manifest
+## Canonical owner map
 
-The machine-readable manifest is a projection of the actual registered MCP
-catalog. It reports supported reads/writes, governance, idempotency,
-revision, relation/media/SEO support, read-back and an explicit unsupported
-reason. It must not advertise an operation merely because a future contract
-mentions it. Admin and MCP must use this one source.
-
-The canonical binary transport for a new image is the existing direct
-multipart `nhk.media.ingest` adapter. It validates, orients, resizes and names
-from supplied editorial context, then enters the governed Media V3 boundary.
-The source-original is retained as a MediaAsset; WebP/responsive outputs are
-derivatives under the same Media identity. It does not use base64/data URLs or
-infer semantic relations from image content. No `nhk-v3/media-ingest` Ability
-is authorized or required.
-Actual image bytes must validate before persistence. Corrupt/fake/unreadable
-payloads fail closed and partial attachment, mapping or semantic artifacts must
-be cleaned up. WordPress attachment is never semantic authority. Entity
-projection exposes representative and evidence separately; evidence and
-`technical_detail` never replace a representative, whose precedence is
-deterministic.
-
-## Storage and reuse map — 2026-09-04
-
-| Data | Canonical owner/storage | Reuse rule | Never infer/duplicate |
-|---|---|---|---|
-| Article title/body/excerpt/editorial order | WordPress `wp_posts` | reuse native Post identity/state token | do not copy body into Knowledge, receipt or Graph storage |
-| Media identity | `Media` | reuse canonical UUID/stable key/revision | checksum/filename/URL does not mint or merge identity |
-| Uploaded source bytes | source-original `MediaAsset` | retain privately/protected under same Media | do not discard because WebP exists |
-| WebP/thumbnail/responsive image | derivative asset / WordPress attachment projection | reuse under same Media identity | derivative is not a new Media |
-| Image placement/alt/caption | `MediaUsage` + WordPress editorial placement | reuse same Media with contextual usage | usage is not Knowledge/Evidence/Graph truth |
-| Video | canonical Video external reference | reuse platform + external ID and canonical target attachments | no local MP4 or Post identity implied |
-| Video-derived fact candidate | Living Knowledge planning packet | resolve narrowest canonical subject; explicit valid `about` target wins | no automatic Knowledge/Evidence/Graph mutation |
-| Knowledge claim | `Knowledge` | reuse UUID/stable key/revision | repeated prose does not create a duplicate claim |
-| Provenance/support | `Source` + `Evidence` | reuse canonical source/evidence chain | generated text, transcript, OCR or caption is not Evidence by itself |
-| Typed semantic relation | Graph | reuse registered endpoint IDs and predicate | no relation from placement, upload or prose alone |
-
-All downstream adapters must read back from the owning store after a write. MCP
-is orchestration/transport, not a canonical data store; Admin is an input
-adapter, not a second writer.
-
-## Required Article sequence
-
-`nhk.article.preflight` must complete semantic inventory, overlap analysis,
-relation plan, internal-link plan, SEO blueprint, media/video plan and claim
-compliance before an Article draft or publication orchestration proceeds.
-Subject resolution is canonical UUID → stable key → exact canonical name/alias;
-ambiguity fails closed and generic preflight never hard-codes a WordPress Post
-ID. Runtime acceptance must prove real file → attachment → one Media identity
-→ assets/usages → representative/evidence projection → Article preflight.
-`nhk.article.ingest` remains the governed coordinator and must preserve
-idempotency, revision binding, read-back and fail-closed outcomes. The
-operation-level `ArticlePublicationGate` consumes those verified results and
-requires the exact current draft state token, canonical public identity,
-semantic read-back, MediaUsage completion, SEO/public-route verification and
-claim-compliance acceptance. It returns explicit blocker codes and does not
-publish or replace any bounded-context policy.
-
-Video intake may expose `knowledge_enrichment`, but that packet is read-only
-planning output. An explicitly validated Video `about` target is handed through
-to enrichment as the canonical subject before broader text research. No MCP
-preview packet is evidence that Knowledge/Evidence was applied; those records
-require their own governed proposal and read-back.
-
-## Current gap classification
-
-| Area | Status | Classification |
+| Content kind | Owner | Current write/read boundary |
 |---|---|---|
-| Existing Article reconcile preflight | partial | CODE_GAP for full research packet |
-| SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
-| Shared capability source | partial catalog | CODE_GAP for manifest consumers |
-| WordPress editorial gateway | draft create/update boundary | runtime-unverified pending exact integration DB | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |
-| Taxonomy gateway | typed category facade exposed in MCP | runtime-unverified pending exact integration DB | no fuzzy-create, no Graph/semantic mutation, guarded delete |
-| Related semantic query | existing bounded query, policy gaps remain | CODE_GAP/REGISTRY_GAP where traversal policy is absent |
-| Video → Living Knowledge | planning seam implemented; target-handoff smoke verified | apply remains separate Governance boundary; guarded integration still ENVIRONMENT_BLOCKED |
-| Media → Living Knowledge | not implemented | CODE_GAP; MediaUsage/depicts/OCR must not be promoted implicitly |
-| Article → Living Knowledge automatic body update | not implemented by design | suggestion-only until separately governed |
-| Product–Specimen persistence | unavailable | REGISTRY_GAP/CONTRACT_EXTENSION_REQUIRED |
-| Live data application | prohibited in this slice | HUMAN GATE |
+| Post/Article | WordPress `wp_posts` | typed editorial gateways/read-back; semantic child changes stay separate |
+| Category | WordPress taxonomy | typed Category gateway + native read-back |
+| Authority | Authority registry/services | governed revision/lifecycle; resolver/entity read-back |
+| Knowledge | Knowledge owner | governed ingest/update + canonical read-back |
+| Source | Source owner | governed ingest + locator/provenance read-back |
+| Evidence | Evidence owner | existing Claim+Source binding + canonical read-back |
+| Graph relation | Graph | registered predicate/endpoints, Governance, Graph read-back |
+| Media/MediaAsset/MediaUsage | Media contexts + binary/WP projection | shared governed Media application boundary; attachment is not semantic owner |
+| Video | Video | governed external-reference intake; guided relation provenance orchestration + Video/Graph read-back |
+| Specimen | Authority `specimen` | physical identity owner |
+| Product | Authority `product` | listing/offer owner; no implicit Specimen ownership |
+| Projection/frontend | application/read model | read-only; never semantic mutation |
+| Editorial/research Note | no separate semantic owner currently registered | workspace/editorial context unless explicitly promoted through canonical semantic owners |
 
-## Current semantic merge blocker
+## Governance lifecycle and automation
 
-`rekey` and `merge` are present in the governed operation schema. They are not
-currently safe for the pinned-dial apply because the live proposal binding
-maps the supplied source UUID to `subject_id="component"`.
-Classification: `PINNED_DIAL_MERGE=BLOCKED`,
-`LIVE_MERGE_SUBJECT_BINDING_INVALID`. Diagnostic proposals were rejected; no
-semantic data was mutated. This replaces stale `MERGE_OPERATION_NOT_EXPOSED`
-wording while preserving the historical record.
+Semantic lifecycle is:
 
-## Current Admin Workbench law — 2026-09-07
+`proposal create/ingest → submit → review → approval with content/dependency
+binding fingerprints → eligibility → Controlled Apply → canonical owner
+read-back → idempotency verification`.
 
-The standard menu is Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ thống and
-Nâng cao. Media uses shared `Tất cả`, `Hình ảnh` and `Video` workspaces with
-separate domain list/detail adapters. Normal guided flows select canonical
-records and do not ask for proposal UUID, Evidence UUID, fingerprint, expected
-revision or raw JSON; those belong only to Kỹ thuật/Nâng cao.
+Proposal/approved/eligible/apply-response state is not canonical completion.
+`COMPLETED` requires owner read-back; frontend/publication success is an
+additional projection gate.
 
-Admin remains a control plane over the same application services and Governance
-boundary. “Xem trên web” opens the canonical first-party Video route only when
-the projection is eligible; “Mở nguồn gốc” is the external source action.
+Governance Automation Policy modes remain `REVIEW_REQUIRED`, `AUTO_APPROVE`,
+`AUTO_PUBLISH`; missing policy defaults to `REVIEW_REQUIRED`. Automation never
+removes review/binding/eligibility/owner-readback semantics. `AUTO_APPROVE` stops
+before Apply. `AUTO_PUBLISH` must prove applicable canonical and
+projection/frontend results before reporting publication success.
+
+## Current semantic capability status
+
+The current executable catalog exposes semantic writers for the registered
+Knowledge, Source, Evidence, Media, Video, Proposal/Governance and relation
+operations, plus current Authority operations. It also exposes read-only
+canonical/Graph inventory, semantic resolver, relation dry-run and bounded
+`nhk.entity.neighborhood`, and an authenticated deterministic relation batch
+apply surface.
+
+Historical statements that WRITE semantic is unavailable, Source/Evidence/
+Knowledge writers are missing, Graph has no read seam, or governed relation
+apply is generally unavailable are superseded. Target-environment availability
+still requires fresh runtime discovery.
+
+## Relation identity and registry
+
+`relation_create` keeps real typed canonical endpoints:
+`source_type/source_uuid`, registered `predicate`,
+`target_type/target_uuid`, plus canonical Evidence refs when required.
+
+The old relation-proposal hydration defect that could use an entity type instead
+of the real source UUID is **RESOLVED**. It is not the same as a create Proposal
+for a new Authority node, which has no canonical UUID before creation.
+
+Current executable predicates:
+`about`, `depicts`, `model_of`, `variant_of`, `uses_movement`,
+`supports_music`, `configured_with_music`, `observed_playing_music`.
+
+`classified_as` and a dedicated Product–Specimen relation remain registry gaps.
+Never use broad `about` to fake a missing relation meaning.
+
+## Authority create evidence
+
+Classification create probe proposal
+`01a07c4e-14b2-734e-8264-3f04b37e5fe4` passed create, submit, review, approval
+and eligibility (`ready=true`, no reasons) and was deliberately not Applied to
+avoid a junk node. Current status is therefore **verified through eligibility**,
+not yet actual new-node Apply/generated UUID/entity-readback/relation reuse.
+
+## Article sequence
+
+`nhk.article.preflight` performs read-only canonical research/reconciliation,
+including subject resolution, existing claim/evidence/Graph inventory, overlap,
+Media/Video/SEO/compliance planning. It must identify reuse/merge/related/new/
+uncertain outcomes before any semantic child create.
+
+WordPress draft/create/update remains editorial. Required semantic children use
+the full Governance lifecycle and owner read-back. Publication uses native
+WordPress state/read-rendered verification and applicable claim/media/SEO gates.
+Article body/Note/prose is never automatically Knowledge or Evidence.
+
+## Media / Image sequence
+
+Current canonical binary transport is multipart `nhk.media.ingest`. It validates
+actual bytes, reconciles/reuses canonical Media, creates one Media when genuinely
+new, retains source-original PRIVATE/protected, creates eligible derivatives
+under that Media, reconciles MediaUsage, maps WordPress attachment projection and
+reads canonical Media/asset/usage back.
+
+Media, MediaAsset, MediaUsage and attachment remain separate. Detail/view
+concepts such as front/back/movement/dial/hands/pendulum/gong/hammer/plate/
+marking/logo/case detail are controlled inputs only where the executable Media
+registry has a matching value. They are not Knowledge or Graph truth.
+
+MediaUsage/placement/OCR/recognition does not create `depicts`, `about`,
+Knowledge, Evidence or Authority automatically.
+
+## Video sequence
+
+Generic Video-derived Knowledge extraction remains planning-first. The current
+guided Video relation workflow, however, can after canonical Video + target
+resolution deterministically resolve/reuse or create and read back the private
+YouTube Source, provenance Claim and Evidence needed by the explicit `about`
+relation, then create the governed relation proposal.
+
+Normal guided Admin forms do not ask for Video proposal UUID or Evidence UUID;
+those dependencies are resolved by orchestration. Replay of the same YouTube ID
+reuses the canonical Video and matching provenance/relation intent.
+
+## Cuckoo current status
+
+Classification `01a07614-832d-7f27-959c-74eb0cd63f3e` /
+`nhk:classification:clock-type.cuckoo-clock` (`Đồng hồ chim cúc cu`) now has the
+10 core Knowledge `about` relations completed through full Governance and
+canonical Graph read-back. Older current-status wording that this specific
+Knowledge→Classification group is a `RELATION_GAP` is resolved.
+
+`Model/Variant → classified_as → Classification` is a different semantic
+relationship and remains a registry gap.
+
+## Admin Workbench
+
+Standard workspaces remain Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ
+thống, Nâng cao. Normal flows are guided; raw proposal UUID, Evidence UUID,
+fingerprint, expected revision and raw JSON remain Kỹ thuật/Nâng cao.
+
+Admin is a control plane over existing owners/Governance. For Video, “Xem trên
+web” is the eligible first-party `/video/{slug}/` action; “Mở nguồn gốc” is the
+external source action.
+
+## Frontend/retrieval
+
+Frontend projects canonical owners/Graph. Related content distinguishes direct,
+incoming/outgoing and derived bounded neighborhood. Keyword search, taxonomy or
+postmeta never substitutes for a missing semantic relation.
+
+Graph bounded neighborhood exists in the current application/MCP boundary. A
+missing consumer/path in a specific frontend is `PARTIAL_FRONTEND_GAP`, not
+Graph unavailability.
+
+## Deferred/retry packet
+
+Use explicit intermediate states such as `PENDING_RESEARCH`, `EVIDENCE_GAP`,
+`REGISTRY_GAP`, `RELATION_GAP`, `LEXICAL_GAP`, `FRONTEND_GAP`,
+`RUNTIME_BLOCKED`, `NEEDS_REVIEW`, and final outcomes `COMPLETED`,
+`DEFERRED_WITH_REASON`, `BLOCKED_WITH_OWNER_ACTION`.
+
+Preserve source/provenance, proposed subject/type/relation, evidence, blocker,
+canonical IDs, existing proposal ID and deterministic rerun instructions. If
+intent is unchanged after rate-limit/runtime interruption, reuse the existing
+proposal/idempotency binding rather than creating a duplicate.
+
+## Historical merge incident
+
+The pinned-dial/Odo merge incident that persisted a type-like `subject_id` is
+historical, identity-specific merge evidence. It is not current proof that
+ordinary `relation_create` source binding is broken. Merge/rekey remains a
+separately high-impact governed identity operation and must be verified on its
+own source/target revisions/read-back.

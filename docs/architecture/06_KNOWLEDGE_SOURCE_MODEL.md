@@ -1,87 +1,162 @@
-# Knowledge và Source
+# Knowledge, Source và Evidence
 
-> **NON-NORMATIVE.** Đây là evidence mô hình và runtime. Nếu mâu thuẫn với
+> **NON-NORMATIVE CURRENT MODEL / RUNTIME GUIDE.** Nếu mâu thuẫn với
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
 
-Knowledge là claim/fact/research statement có thể được nhiều Post sử dụng.
-Source là thực thể authority để truy nguyên claim và quan hệ nghiên cứu. Một
-Post có thể liên hệ nhiều Knowledge; một Knowledge có thể liên hệ nhiều Post.
+Knowledge, Source và Evidence là ba canonical domain boundary riêng, không phải
+WordPress body và không phải Authority type.
 
-P7 persists claims, sources and evidence as separate canonical records with
-UUID identity, stable keys, state, optimistic revision and provenance/metadata.
-Evidence requires existing claim and source endpoints and records whether the
-source supports, contradicts or qualifies the claim. `PostKnowledgeLinkService`
-connects a WordPress Post to a Knowledge claim through the single Graph using
-the `about` predicate; it does not copy claim text into the Post body and does
-not create an Article Authority.
+- **Knowledge** là atomic claim/fact/research statement có canonical identity,
+  lifecycle và revision.
+- **Source** là canonical nguồn có source type, durable locator và provenance/
+  metadata theo contract.
+- **Evidence** là canonical link giữa một existing Claim và một existing Source,
+  với relation `supports`, `contradicts` hoặc `qualifies`, excerpt/locator và
+  metadata/visibility theo policy.
 
-Article Ingest may reuse these records, but completion is coordinated at the
-operation boundary: semantic preflight, WordPress draft, governed semantic
-mutation, read-back verification and WordPress publish. A direct link write
-outside Governance/Controlled Apply is a `CONSTITUTION_CONFLICT`; future Article
-implementation must route the link through the approved governed boundary.
+Một Source tồn tại không chứng minh mọi claim của subject. Provenance nhét trong
+Knowledge payload không thay thế Source/Evidence khi fact/relation contract yêu
+cầu chain riêng.
 
-Public read boundaries require active records and fail closed when persisted
-Source or Evidence metadata explicitly declares a non-`PUBLIC` visibility
-(including `PRIVATE` and `HIDDEN`). Public serializers omit the persisted
-Source/Evidence metadata blobs and Knowledge claim provenance blob. A missing
-visibility value preserves the existing V3-compatible default, but does not
-constitute approval of imported V2 provenance; the final publication policy
-remains a cutover gate.
+## Current writer and identity boundary
 
-## Current enrichment and reuse boundary — 2026-09-04
+Governed Knowledge, Source and Evidence ingest/write surfaces are exposed in the
+current runtime/MCP catalog. An ingest response may represent only a Proposal;
+`proposal_id` is never a canonical Claim/Source/Evidence ID and must not be
+copied into `claim_id`, `source_id` or `evidence_id`.
 
-Knowledge remains atomic and canonical. Article body text, Video transcript,
-Video editorial copy, Media alt/caption, OCR output and generated AI prose are
-not themselves Knowledge or Evidence. They may only act as bounded input to a
-read-only enrichment/extraction planner. Any resulting semantic mutation still
-uses `Proposal → Human Approval → Eligibility → Controlled Apply → repository →
-audit → read-back`.
+Current lifecycle is:
 
-Video `USER_HINT` and approved transcript observations may create scoped
-Knowledge candidates only after canonical subject resolution. The explicit
-validated Video `about` target, when supplied, is preserved as the enrichment
-subject; text matching must not silently broaden a Variant observation to Model
-or Brand. Transcript text is never promoted wholesale into one claim. At the
-current Video phase no canonical Source is created implicitly; `add_evidence`
-requires resolved `source_id` plus `source_revision` and otherwise remains
-review-only/diagnostic.
+`create/ingest proposal → submit → review → approval with binding fingerprints →
+eligibility → Controlled Apply → canonical owner read-back → idempotency
+verification`.
 
-Article enrichment is suggestion-only until it re-enters the approved Article
-workflow. Knowledge changes do not rewrite an existing WordPress body directly.
-MediaUsage, `depicts`, image recognition and technical annotations do not become
-Evidence by themselves. A future Media → Living Knowledge adapter must preserve
-this same separation and must not create a second writer.
+Create/ingest does not become canonical success until the owning repository/query
+returns the expected record. Evidence creation validates that Claim and Source
+already exist canonically and are active; their revisions/dependencies remain
+part of the eligibility/apply boundary.
 
-Downstream reuse must resolve canonical Knowledge/Source/Evidence UUIDs and
-revisions and attach/refer to those records; it must not copy canonical claim
-text into a parallel semantic store or create duplicate claims merely because a
-new Post, Video or Media item repeats the same observation.
+Visibility is separate from canonical validity. Active PRIVATE/HIDDEN
+Source/Evidence may be used by governed internal verification under the current
+policy without being exposed by public reads. Public serializers remain
+reader-safe and policy-gated.
 
-## Proposal identity versus canonical identity
+## Reconcile before Knowledge create
 
-Governance `proposal_id` identifies a draft/review/apply command only. It is
-never a Source, Knowledge Claim or Evidence `canonical_id`, and must never be
-copied into `claim_id`, `source_id`, `evidence_id` or another entity reference.
-Create/ingest responses expose `proposal_id`, `proposal_state`, `target_uuid`
-and `canonical_id` separately; `canonical_id` remains null until controlled
-apply has produced and verified the canonical record.
+Before creating any Knowledge claim:
 
-Evidence dependency validation is lifecycle-aware and visibility-independent:
-Claim, Source and Evidence must resolve to canonical records and be active.
-PRIVATE/HIDDEN Evidence is valid for governed internal verification and is not
-promoted to PUBLIC. Public readers continue to omit it.
+1. resolve the intended canonical semantic subject/context;
+2. inventory current Knowledge at the same subject/facet/scope;
+3. reconcile the proposed observation against existing claims and evidence;
+4. classify it as exact existing, merge/update candidate, related-but-distinct,
+   genuinely new, or uncertain;
+5. only a genuinely new atomic claim may enter create/ingest.
 
-## Public-safe knowledge projection — current law 2026-09-07
+Exact normalized text can be one deterministic signal inside the same canonical
+subject/facet/scope, but lexical/fuzzy/AI similarity is never broad identity
+proof. A new Post, Video, Media item or differently worded sentence does not
+justify a duplicate claim if canonical truth already exists.
+
+`same_claim` means reuse/enrich the current claim. `add_evidence` requires an
+existing Claim and Source. Qualification/contradiction remains a distinct
+structured decision; it is not silent overwrite of the earlier claim.
+
+## No orphan semantic data
+
+A Knowledge claim must not be deliberately created detached from the semantic
+subject it is intended to describe. The canonical target must be resolved first.
+If the correct target does not exist and a new Authority node is genuinely
+needed, the node is created through its Authority/Governance lifecycle and read
+back before the Knowledge claim is created.
+
+If the target cannot be resolved, safely created or related with current
+registry vocabulary, the candidate is deferred with provenance/reason/owner
+action. “Create claim now, attach node later” is prohibited and cannot produce a
+`COMPLETED` result.
+
+## Required factual semantic ingest lifecycle
+
+For new researched truth, use:
+
+`Source/Evidence research → canonical subject/target resolution → reconcile
+existing canonical data/claims → create/update/merge Authority node if genuinely
+needed → canonical Authority read-back → Knowledge ingest → Knowledge canonical
+read-back → governed Graph attachment → Source/Evidence attachment → Graph +
+Knowledge + Evidence canonical read-back → idempotency check`.
+
+Second-run acceptance requires no duplicate Authority node, Knowledge claim,
+Source, Evidence, active relation, dangling relation or orphan claim.
+
+## Article / WordPress boundary
+
+WordPress Post is editorial truth. An Article may reference many Knowledge
+claims and one Knowledge claim may be reused by many Posts. Article body text,
+title, excerpt, research notes and generated copy are not canonical Knowledge
+merely because WordPress stores or renders them.
+
+Article Ingest may create planning candidates, but new semantic truth must leave
+the editorial workspace and enter the canonical Source/Evidence/Knowledge and
+Governance flow before being called canonical. Knowledge updates may create an
+Article update suggestion; they never rewrite a published WordPress body
+automatically.
+
+A direct Post→Knowledge Graph write outside Governance/Controlled Apply is a
+`CONSTITUTION_CONFLICT`; relation state remains Graph-owned.
+
+## Video boundary — current reconciliation
+
+Generic Video factual extraction remains planning-first: `USER_HINT`, authorized
+transcript observations and source metadata are candidate inputs, not Evidence or
+canonical Knowledge by themselves. Generated Video editorial copy is never
+Evidence.
+
+The older statement that Video workflows cannot resolve/create any canonical
+Source is **historical for the generic enrichment-preview seam** and must not be
+used to describe the current guided Video relation workflow. The current
+`VideoRelationAdminService` can, after canonical Video + canonical target
+resolution, deterministically resolve/reuse or create and read back:
+
+`private YouTube Source → provenance-scoped Claim → private Evidence`.
+
+That provenance chain is then referenced by the governed Video `about` relation
+proposal. Normal operators are not asked to manually supply Video Proposal UUID
+or Evidence UUID. Existing matching Source/Claim/Evidence is reused only when
+its canonical provenance binding still matches; a mismatch fails closed.
+
+This does not turn Video metadata into Knowledge automatically and does not make
+Source/Evidence public. It is one bounded orchestration path using the existing
+canonical owners; arbitrary transcript facts still require the normal
+reconcile/Governance flow.
+
+## Media / Image boundary
+
+MediaUsage, `depicts`, filename, alt, caption, OCR, EXIF and visual recognition
+are not Evidence or Knowledge by themselves. They may feed read-only research or
+lexical candidate planning. A future Media→Living Knowledge write adapter must
+still resolve canonical subject, reconcile current claims, and use the same
+Source/Evidence/Knowledge/Governance boundaries.
+
+## Public-safe knowledge projection
 
 Raw Source/Evidence privacy is a boundary on raw payload serialization, not a
-blanket ban on public knowledge. When the canonical pipeline has produced an
-eligible public-safe projection, frontend queries may render that projection
-without reading private payloads at render time. The current allowlist is:
-`text`, `type`, `facet`, `scope` (or the exact registered field equivalents if
-the runtime serializer names them differently).
+blanket ban on public Knowledge. When the canonical pipeline has produced an
+eligible public-safe projection, frontend queries may render only the registered
+safe fields such as `text`, `type`, `facet`, `scope` (using exact runtime names).
 
-The projection must not include raw Source, private Evidence excerpts/private
-metadata, canonical private IDs, or a reconstructed private payload. Public
-knowledge does not make a relation public: relation display independently
-requires Graph/public eligibility and must not leak private provenance.
+The projection must not expose raw Source, private Evidence excerpt/metadata,
+canonical private IDs, or reconstruct private payloads. A public-safe Knowledge
+projection also does not make a Graph relation public; relation eligibility is
+independent.
+
+## Deferred and retry boundary
+
+Unresolved factual candidates use explicit states such as `PENDING_RESEARCH`,
+`EVIDENCE_GAP`, `REGISTRY_GAP`, `RELATION_GAP`, `LEXICAL_GAP`,
+`RUNTIME_BLOCKED` or `NEEDS_REVIEW`, and end as `COMPLETED`,
+`DEFERRED_WITH_REASON` or `BLOCKED_WITH_OWNER_ACTION`.
+
+A deferred record should retain source/provenance, proposed subject/type/relation,
+evidence, resolved canonical IDs, registry/runtime blocker, existing proposal ID
+and rerun instruction. When a rate limit/runtime interruption occurs after a
+proposal already exists, reuse that proposal/idempotency binding if the intent is
+unchanged; do not mint a duplicate proposal just to retry.

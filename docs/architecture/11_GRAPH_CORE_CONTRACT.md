@@ -1,118 +1,167 @@
-# Graph Core V1 Contract
+# Graph Core Contract
 
-> **NON-NORMATIVE.** This is implementation contract evidence. If it conflicts
-> with `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+> **NON-NORMATIVE IMPLEMENTATION CONTRACT.** If this document conflicts with
+> `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
+> Statements below about the old P2 surface are retained only as history where
+> explicitly labelled; current executable registry/runtime status controls.
 
 ## Boundary
 
-Graph Core là Semantic Graph duy nhất dùng chung cho Post và các endpoint tương
-lai. Domain không phụ thuộc WordPress hoặc `$wpdb`; Infrastructure chứa WPDB
-adapter. P2 không expose REST/MCP mutation và không tạo Media/Video/Authority/
-Knowledge/Proposal tables.
+Graph is the single semantic relation persistence system for registered NHK V3
+endpoints. Domain code is WordPress-independent; infrastructure owns WPDB
+adapters. Article remains an operation over the registered `wp_post` endpoint,
+not an `article` Graph entity.
 
-Raw Graph REST reads are an administrator-only operational surface because they
-return endpoint keys, edge state and revisions. Public post/entity surfaces use
-`RelatedContentQuery`, which resolves active records into reader-facing titles and
-URLs and omits unavailable groups. This keeps the single Graph relation system
-without exposing its storage identifiers as public content API.
+Frontend, Admin, MCP, WordPress taxonomy/postmeta, MediaUsage and payload fields
+must not create a parallel relation store. A relation exists canonically only
+when it is represented by a valid registered Graph edge and read back from the
+Graph boundary.
 
-Article Ingest is an operation-level coordination boundary, not a Graph endpoint.
-It may reference a registered `wp_post` and registered semantic endpoints only;
-there is no `article` endpoint and no Article semantic identity or body in Graph.
+## Current endpoint and predicate registries — 2026-09-07
 
-## Types and registries
+Current full boot registers 15 endpoint types:
 
-`NodeReference` gồm `endpoint_type` và `endpoint_key`. `EndpointTypeRegistry`
-đăng ký resolver với `supports()`, `exists()` và `normalize()`. Production P2 có
-resolver `wp_post`; key là `<blog_id>:<post_id>`, post draft vẫn tồn tại hợp lệ,
-trash không bị Graph tự xóa. Các type còn lại dùng contract/fake resolver.
+`wp_post`, Authority `brand`, `model`, `variant`, `movement`, `music`,
+`component`, `classification`, `specimen`, `product`, plus `knowledge`,
+`source`, `media`, `video`, `evidence`.
 
-`PredicateRegistry` seed tối thiểu `about` và `depicts`. Predicate có source/target
-allow-list, outbound/inbound cardinality (`ONE`/`MANY`), self-relation và active.
-Không cho nhập predicate tùy ý và không lưu rule mutable JSON trong DB.
+Current executable predicates are:
 
-Post-to-Knowledge links remain Graph relations and must be applied through
-Governance/Controlled Apply when part of Article Ingest. A direct mutation path
-outside that boundary is a `CONSTITUTION_CONFLICT` to be audited and closed.
+| Predicate | Current source → target contract |
+|---|---|
+| `about` | registered endpoint → registered endpoint under the broad current allowlist |
+| `depicts` | `media` → registered endpoint |
+| `model_of` | `model` → `brand`, outbound ONE / inbound MANY |
+| `variant_of` | `variant` → `model`, outbound ONE / inbound MANY |
+| `uses_movement` | `variant` → `movement` |
+| `supports_music` | `movement` → `music` |
+| `configured_with_music` | `variant` → `music` |
+| `observed_playing_music` | `specimen` → `music` |
 
-## Storage migration 001
+`classified_as` is **not registered**. A dedicated Product↔Specimen relation is
+also not registered. Missing vocabulary is `REGISTRY_GAP`; do not use `about`
+to fake classification membership, structural parentage, configuration,
+movement use, Product–Specimen ownership or another missing predicate.
 
-### `{$wpdb->prefix}nhk_graph_nodes`
+If the registry permits `variant → uses_movement → movement`, that is not
+permission to mint a Model→Movement edge. Endpoint/type allowlists are semantic
+law, not suggestions.
 
-`id BIGINT UNSIGNED AUTO_INCREMENT`, `endpoint_type VARCHAR(64)`,
-`endpoint_key VARCHAR(191)`, `created_at DATETIME(6)`. Unique
-`(endpoint_type, endpoint_key)` và index `(endpoint_type,id)`.
+## Canonical relation command identity
 
-### `{$wpdb->prefix}nhk_graph_predicates`
+A `relation_create` packet preserves real typed endpoints:
 
-`id SMALLINT UNSIGNED AUTO_INCREMENT`, `predicate_key VARCHAR(64) UNIQUE`,
-`created_at DATETIME(6)`. Đây chỉ là numeric dictionary; rules nằm trong code.
+- `source_type` = actual semantic endpoint type;
+- `source_uuid` = actual existing canonical source UUID;
+- `predicate` = registered predicate;
+- `target_type` = actual canonical target type;
+- `target_uuid` = actual existing canonical target UUID.
 
-### `{$wpdb->prefix}nhk_graph_edges`
+The historical proposal-hydration defect that could return `subject_id` as an
+entity-type string (for example `knowledge`) instead of the relation source UUID
+is **RESOLVED**. Current `WpdbProposalRepository::hydrate()` derives relation
+subject identity from `payload.source_uuid`, with legacy `source_key` only as a
+compatibility fallback. Runtime relation flows have completed through Graph
+canonical read-back after this fix.
 
-`id BIGINT UNSIGNED AUTO_INCREMENT`, `edge_uuid BINARY(16) UNIQUE`,
-`source_node_id`, `predicate_id`, `target_node_id`, `state` (1 ACTIVE/0 RETIRED),
-`revision`, timestamps và `retired_at`. Unique triple
-`(source_node_id,predicate_id,target_node_id)`. Composite indexes:
+Do not treat that old defect as a global Graph blocker. It is also distinct from
+a create Proposal for a new Authority entity: a new node has no canonical UUID
+before creation, while a relation source must already exist canonically.
 
-- `(source_node_id,predicate_id,state,target_node_id)`
-- `(target_node_id,predicate_id,state,source_node_id)`
+## Governed mutation contract
 
-Không có foreign-key cascade; không lưu UUID/string endpoint, JSON lớn, body,
-Media metadata hoặc Evidence payload trong edge table. Graph node không được hard
-delete khi còn edge.
+Graph create/retire/reactivate are governed semantic mutations. Current
+lifecycle is:
 
-## Mutation contract
+`proposal/relation_create|relation_retire|relation_reactivate → submit → review →
+approval with binding fingerprints → eligibility → Controlled Apply → canonical
+Graph read-back → idempotency verification`.
 
-Create normalize/validate endpoint, xác nhận existence, validate predicate/type/
-cardinality rồi resolve node và insert edge. Exact ACTIVE triple trả edge cũ,
-không tăng revision. Triple RETIRED không tự resurrect; chỉ explicit reactivate.
-Cardinality violation fail rõ ràng, không auto-retire edge cũ.
+GraphService normalizes and validates source/target existence, predicate,
+allowlists, self-relation/cardinality, state and revision. Exact active triple
+creation is idempotent and returns/reuses the existing edge. A retired triple is
+not silently resurrected; reactivate is explicit. Cardinality conflict does not
+auto-retire another edge. Revision mismatch fails closed.
 
-Retire giữ row, set state/retired_at và tăng revision. Reactivate validate lại,
-xóa retired_at và tăng revision. expected revision mismatch ném typed
-`RelationRevisionConflict`.
+`COMPLETED` is not inferred from proposal state or an apply response. Canonical
+Graph read-back must show the expected typed active/retired edge. A second run
+of the same intent must not create another active edge.
 
-Các mutation transaction-safe. InnoDB dùng unique constraints làm safety net;
-transaction kết hợp `FOR UPDATE` trên exact edge và các active range theo
-source/target/predicate để serialize cardinality check + insert. Không dùng
-distributed lock.
+Post→Knowledge or any other relation created by Article/Video/Media workflows
+uses this same governed boundary. Direct relation mutation outside Governance is
+a `CONSTITUTION_CONFLICT`.
 
-## Query and pagination
+## Storage contract
 
-Repository có `findOutgoing`, `findIncoming`, `findEdge`, `findByEdgeUuid`.
-Mặc định chỉ ACTIVE; include RETIRED phải explicit. Cursor là `id > last_id`,
-sort `id ASC`, limit mặc định 50 và hard maximum 200; query lấy thêm một dòng để
-trả `next_cursor`. Forward/reverse query dùng đúng composite indexes ở trên,
-không OFFSET làm contract duy nhất.
+`nhk_graph_nodes` stores normalized endpoint references with a unique
+`(endpoint_type, endpoint_key)` identity. `nhk_graph_predicates` is the compact
+predicate dictionary; executable predicate rules remain in code. Graph edges
+hold edge UUID, source/target node IDs, predicate, lifecycle state, revision and
+timestamps. Exact source/predicate/target triple is unique.
 
-## UUID and audit/evidence
+Edges do not store Article body, Knowledge payload, Media metadata or Evidence
+blob. Graph nodes are not hard-deleted while edges depend on them.
 
-Edge UUID dùng UUIDv7, domain/API là canonical string, DB là BINARY(16). Codec
-duy nhất nằm ở `Shared/Uuid/UuidCodec`, hỗ trợ cả UUIDv7 mới và UUIDv4 legacy
-round-trip. Relation mutation phụ thuộc `AuditSink` và phát event
-`RelationCreated`, `RelationRetired`, `RelationReactivated`; P2 chỉ có
-`InMemoryAuditSink`, chưa giả vờ có durable audit. Evidence/provenance là boundary
-riêng tương lai, không nhét JSON vào edge.
+Mutation is transaction-safe. Unique constraints are the final duplicate safety
+net; cardinality checks and exact-edge operations are serialized at the storage
+boundary according to the repository contract.
 
-## Query-plan reasoning
+## Query, direction and semantic neighborhood
 
-Forward predicate query lọc `source_node_id`, `predicate_id`, `state` và order/id
-được cover bởi `source_lookup`; reverse query tương ứng được cover bởi
-`target_lookup`. Predicate không truyền vào vẫn dùng leftmost prefix
-`source_node_id`/`target_node_id`. `EXPLAIN` trên migration thực tế phải cho
-`possible_keys=source_lookup` hoặc `target_lookup`, không full table scan trên
-đường query chính; kiểm tra runtime được ghi trong P2 acceptance output.
+Canonical Graph reads support outgoing and incoming direction. Reverse query is
+not reverse persistence. Default query returns active edges; retired state is
+explicit. Cursor pagination remains bounded and storage-oriented reads are
+administrator/internal where they expose technical identifiers.
 
-## Current public projection boundary — 2026-09-07
+The current executable MCP/read boundary includes:
 
-Graph remains the single relation system. The public read chain is
-`Authority → Graph → canonical projection/read model → frontend`; Admin and
-frontend adapters must not create a parallel relation store or infer facts from
-WordPress post meta, attachment IDs, external URLs or fixture payloads.
+- `nhk.graph.inventory` for bounded operational edge inventory/diagnostics;
+- `nhk.relation.backfill.dry_run` for read-only relation audit;
+- `nhk.entity.neighborhood` for a bounded semantic neighborhood with maximum two
+  hops and registered profiles;
+- application/frontend related/dossier queries over canonical Graph data.
 
-Relations render only after the existing Graph/public eligibility policy passes.
-An eligible public-safe knowledge projection does not make a relation public,
-and Source/Evidence PRIVATE data must not leak through relation payloads.
-Semantic relation changes still require the complete Governance lifecycle and
-canonical read-back.
+Therefore “Graph neighborhood does not exist” or “Graph has no read seam” is
+stale. Individual frontend surfaces may still consume only part of the eligible
+neighborhood/path policy; classify that as `PARTIAL_FRONTEND_GAP`, not as Graph
+unavailability.
+
+Direct, incoming/outgoing and derived results remain distinct. Derived paths are
+read-time bounded associations and are never persisted merely to enrich UI.
+Frontend must not use keyword search, taxonomy, postmeta or display-name matches
+as a relation substitute.
+
+## Evidence and provenance
+
+Graph does not embed provenance blobs. Evidence requirements are enforced by the
+owning relation/orchestration contract. Video `about` relation flows can require
+canonical Evidence references and verify PRIVATE/HIDDEN Source/Evidence through
+governed internal read-back without making those payloads public.
+
+A public-safe Knowledge projection does not make a Graph relation public.
+Relation projection applies its own eligibility, endpoint and privacy rules.
+
+## Cuckoo runtime correction — 2026-09-07
+
+Canonical Cuckoo Classification:
+
+- UUID `01a07614-832d-7f27-959c-74eb0cd63f3e`;
+- stable key `nhk:classification:clock-type.cuckoo-clock`;
+- name `Đồng hồ chim cúc cu`.
+
+Ten core Cuckoo Knowledge claims have completed the real governed
+`Knowledge → about → Classification` relation lifecycle and canonical Graph
+read-back. For those 10 claims, older `RELATION_GAP`/“Cuckoo neighborhood
+empty” wording is superseded by `COMPLETED` current runtime evidence.
+
+This does not close Classification membership. A Model/Variant classification
+membership would require `classified_as`, which remains a registry gap. Do not
+confuse Knowledge `about` with entity membership.
+
+## Historical P2 wording
+
+Early P2 documents correctly recorded that the initial phase did not expose
+REST/MCP mutation and used limited/fake endpoint support during foundation work.
+That is historical implementation evidence only. Current Governance, MCP and
+GraphService relation surfaces described above supersede it; the old absence of
+a mutation adapter must not be carried forward as a current blocker.

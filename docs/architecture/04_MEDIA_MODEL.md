@@ -1,68 +1,116 @@
 # Media model
 
-> **NON-NORMATIVE.** Đây là evidence mô hình lịch sử. Nếu mâu thuẫn với
+> **NON-NORMATIVE CURRENT MODEL / RUNTIME GUIDE.** Nếu mâu thuẫn với
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
 
+Media là canonical semantic identity độc lập. `Media`, `MediaAsset` và
+`MediaUsage` không được gộp:
 
-Media là semantic entity độc lập. Media identity tách khỏi MediaAsset và
-MediaUsage: cùng một binary có thể dùng cho nhiều Post, entity, gallery Model,
-Component hoặc Product/Specimen context mà không nhân bản Media. WordPress
-attachment chỉ là storage/projection record, không phải semantic authority.
-Checksum chỉ phát hiện duplicate candidate/binary, không tự merge semantic
-identity. Nguyên tắc: asset một lần, relation nhiều lần, usage nhiều lần.
+- `Media` = canonical semantic media identity;
+- `MediaAsset` = source-original/derivative binary + technical/storage metadata;
+- `MediaUsage` = contextual placement, role, alt/caption/SEO intent.
 
-## Current reusable storage boundary — 2026-09-04
+WordPress attachment chỉ là storage/projection mapping. Nó không phải semantic
+Media authority. Checksum, filename, attachment URL và upload timestamp chỉ là
+binary/duplicate/presentation signals; chúng không tự merge hoặc mint canonical
+Media identity.
 
-Một upload ảnh mới phải create-or-resolve đúng một canonical `Media`.
-Source-original được giữ dưới cùng Media đó như một `MediaAsset` ở trạng thái
-`PRIVATE`/protected; WebP, thumbnail và responsive outputs là derivative
-`MediaAsset` hoặc WordPress projection và có thể `PUBLIC` khi đủ điều kiện.
-Derivative không được tạo Media identity mới.
+## Reconcile before Media create
 
-Image payload phải được validate thực sự trước persistence. Corrupt, fake hoặc
-unreadable input fail-closed và không được để lại orphan artifact.
+Mọi ingest/adoption trước tiên phải resolve/reconcile reusable canonical Media.
+Nếu một Media phù hợp đã tồn tại, reuse canonical UUID/stable key/revision,
+asset đủ điều kiện và contextual Usage thay vì tạo Media mới vì cùng binary được
+cần ở Post/Product/Specimen/Entity khác.
 
-`MediaUsage` chỉ mô tả placement, role và contextual SEO của một Media đã có.
-Usage không tự tạo `depicts`, `about`, Knowledge, Source hoặc Evidence. Role
-`representative` tách khỏi `evidence`/`technical_detail`; ảnh evidence không tự
-thay ảnh đại diện. Checksum, tên file, URL attachment và thời điểm upload không
-được dùng để merge hoặc thay canonical Media identity.
+Checksum equality có thể tạo duplicate candidate nhưng không chứng minh semantic
+identity. Ambiguous identity phải review/defer; không auto-merge.
 
-Các adapter MCP/Admin/WordPress phải đi qua cùng application boundary của Media;
-không adapter nào được ghi trực tiếp bảng Media/Asset/Usage như một writer thứ
-hai. Downstream reuse phải ưu tiên canonical Media UUID/stable key + revision,
-sau đó dùng asset/usage phù hợp thay vì upload hoặc nhân bản lại cùng semantic
-identity.
+## Current governed ingest boundary
 
-## Ô Đô media integrity incident — current operational rule
+New image bytes enter the shared governed Media application boundary:
 
-The September 2026 incident proved that semantic namespace normalization and
-physical Media basename normalization are separate operations. A prior semantic
-namespace normalization changed attachment metadata without renaming physical
-files, affecting attachments `#83` (Ô Đô 62/6/10) and `#86` (Ô Đô 36/8), with
-two originals and three derivatives in the initial broken set.
+`validate actual binary → normalize/orient/resize/encode as required →
+create-or-resolve one canonical Media → retain source-original PRIVATE/protected
+MediaAsset → create eligible optimized/public derivatives under the same Media
+→ create/reconcile contextual MediaUsage → WordPress attachment/projection
+read-back → canonical Media/Asset/Usage read-back → cleanup temporary artifacts →
+idempotency check`.
 
-The safe repair retained canonical DB metadata, renamed originals and derivatives
-together, matched checksums, and verified canonical HTTP `200 image/webp`
-responses. Post-repair legacy physical files, broken originals/derivatives and
-inline legacy URLs were zero. This is historical evidence, not permission to
-repair other data.
+Corrupt, fake, unreadable, out-of-root or incomplete bytes fail closed. Failure
+must not leave orphan Media, Asset, Usage, attachment mapping or temporary file.
+Derivative WebP/thumbnail/responsive representations never create a second
+semantic Media.
 
-The media-integrity auditor and its CLI audit path are read-only by default and
-must run before and after basename-sensitive work. Semantic rekey must reject
-WordPress attachment/path fields so semantic identity changes cannot implicitly
-rename physical files.
+The current MCP binary/metadata entry remains `nhk.media.ingest`; direct file
+transport is multipart, not base64/data URL. Admin/Article/WordPress adapters
+reuse the same application boundary and do not write semantic Media tables as a
+second writer.
 
-## Current canonical frontend/Admin boundary — 2026-09-07
+## Semantic role, view/detail and subject context
 
-Media semantic records remain canonical V3 objects. WordPress attachments/posts
-may project storage or editorial placement, but are never Media authority,
-semantic identity or a replacement for Graph/Projection. Admin Hình ảnh is the
-canonical Media management workspace and has its own list/detail read surfaces;
-this does not authorize a standalone public Image/Media page. Any future
-standalone route requires separate architectural approval.
+`MediaUsage` describes placement/context. View/detail intent describes what part
+or view of the subject the image represents. Typical operator concepts may
+include:
 
-Admin guided flows resolve/reuse canonical Media through the application
-boundary and Governance. Normal forms do not require proposal UUID, Evidence
-UUID, fingerprint, expected revision or raw JSON; technical identifiers belong
-under Kỹ thuật/Nâng cao.
+`front`, `back`, `movement`, `dial`, `hands`, `pendulum`, `gong`, `hammer`,
+`plate`, `marking`, `logo`, `case_detail`.
+
+These examples are not permission to invent registry values. The executable
+Media usage/detail registries decide the accepted identifiers; unknown values
+fail closed. A view/detail label is not an Authority type, Knowledge claim,
+Evidence relation or Graph predicate.
+
+The semantic chain is:
+
+`binary/storage → canonical Media → MediaAsset(s) → MediaUsage / controlled
+role/detail context → resolved canonical subject → registered Graph/projection
+only when that separate relation contract requires it`.
+
+Usage does not automatically create `depicts`, `about`, Knowledge, Source or
+Evidence. If a semantic subject relation is required, resolve canonical target
+first and use the registered Graph/Governance boundary.
+
+## Representative versus evidence/detail
+
+`representative`, `evidence` and `technical_detail` are distinct intent classes.
+Evidence/detail imagery does not silently replace an existing representative.
+Representative selection follows deterministic contract precedence, not upload
+recency. Evidence imagery is not automatically canonical Evidence; Source/
+Evidence remains its own factual provenance model.
+
+Contextual alt/caption belongs to usage/editorial projection and may differ by
+surface. OCR/recognition/EXIF/filename/caption/alt may feed lexical/research
+candidates only; none is semantic truth by itself.
+
+## Article and Product/Specimen reuse
+
+WordPress owns featured/inline editorial ordering. MediaUsage indexes the
+context; it does not copy Article body truth. Product and Specimen may reuse one
+Media through separate usages; deleting a Product must not delete shared Media
+or Specimen Media use.
+
+An image appearing in a listing does not prove it depicts a canonical Specimen.
+Such a fact needs the applicable registered relation/evidence contract.
+
+## Public/Admin boundary
+
+Admin Hình ảnh is the current canonical Media management workspace. It can show
+Media identity, assets, usages/roles, provenance and frontend state without
+making WordPress attachment the owner. Normal guided forms use canonical
+selection/user-facing fields and do not require proposal UUID, Evidence UUID,
+fingerprint, expected revision or raw JSON.
+
+This does not authorize a standalone indexable Image/Media detail page. Public
+asset delivery/projection remains governed by Media visibility/readiness/route
+policy. A future standalone route needs explicit architectural approval.
+
+## Physical filename integrity
+
+Semantic rekey/namespace changes are separate from physical attachment filename
+normalization. A semantic identity operation must not silently rename
+`_wp_attached_file`, derivatives or inline URLs. Basename-sensitive work requires
+a separately governed Media operation with pre/post inventory, collision/checksum
+and HTTP/read-back verification.
+
+The September 2026 Odo media incident remains historical evidence for this
+separation; it is not permission to run unsolicited repair/backfill.

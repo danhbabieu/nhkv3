@@ -1,111 +1,191 @@
 {
   "audit_type": "canonical_data_and_graph_relation_audit",
   "as_of": "2026-09-07",
-  "repository_head": "fb60c32370a74a6b8c100f6450ed41329503cb96",
-  "environment": {
-    "target_database": "nhk_v3_test",
-    "wordpress_path": "public",
-    "status": "PASS",
-    "reason": "public/wp-load.php requires the supported parent ../wp-config.php; guarded read-only probes and full Integration passed",
-    "bootstrap": "public/wp-load.php -> ../wp-config.php -> wp-settings.php",
-    "mysql": {"tcp_127_0_0_1_3306": "PASS", "socket_/tmp/mysql.sock": "PASS", "select_database": "nhk_v3_test", "wpdb_last_error": ""},
-    "mutation_count": 0,
-    "production_or_staging_touched": false
-  },
-  "canonical_fixture_verification": {
-    "status": "DATA_GAP",
+  "status": "CURRENT_RUNTIME_RECONCILED_WITH_HISTORICAL_EVIDENCE",
+  "current_documentation_branch_head_at_reconcile": "6341388484a9a84be66f637c778d3ed311540781",
+  "current_runtime_override": {
+    "semantic_write": {
+      "status": "AVAILABLE_AND_USED_FOR_REGISTERED_BOUNDARIES",
+      "domains": [
+        "authority_operations",
+        "knowledge",
+        "source",
+        "evidence",
+        "media",
+        "video",
+        "graph_relation",
+        "governance_proposals"
+      ],
+      "rule": "create/ingest may return a governed proposal; proposal state is not canonical completion"
+    },
+    "governance_lifecycle": [
+      "proposal_create_or_ingest",
+      "submit",
+      "review",
+      "approval_with_binding_fingerprints",
+      "eligibility",
+      "controlled_apply",
+      "canonical_owner_read_back",
+      "idempotency_verification"
+    ],
+    "completion_rule": "COMPLETED only after canonical owner read-back matches the intended mutation and replay creates no duplicate side effect",
+    "relation_source_binding": {
+      "status": "RESOLVED",
+      "historical_bug": "relation proposal hydration could expose subject_id as an entity-type string rather than the real source UUID",
+      "current_rule": "relation_create preserves source_type/source_uuid, registered predicate, target_type/target_uuid",
+      "code_evidence": "WpdbProposalRepository::hydrate reads relation subject identity from payload.source_uuid with legacy source_key compatibility fallback",
+      "runtime_evidence": "multiple governed relations completed through Controlled Apply and canonical Graph read-back after the fix",
+      "global_graph_blocker": false
+    },
+    "authority_create_probe": {
+      "proposal_id": "01a07c4e-14b2-734e-8264-3f04b37e5fe4",
+      "operation": "create",
+      "entity_type": "classification",
+      "proposal_create": "PASS",
+      "submit": "PASS",
+      "review_fingerprint_binding": "PASS",
+      "approval": "PASS",
+      "eligibility": {"status": "PASS", "ready": true, "reasons": []},
+      "controlled_apply": "INTENTIONALLY_NOT_RUN",
+      "reason": "Avoid creating a junk canonical Classification node",
+      "not_yet_claimed": [
+        "generated canonical UUID for a newly created Authority node",
+        "entity_get/resolver read-back of that new node",
+        "immediate relation use of that new node"
+      ],
+      "subject_id_note": "A pre-create entity-type subject marker is not the historical relation_create source-UUID hydration defect because the new node does not yet have a canonical UUID."
+    },
     "cuckoo": {
       "classification_uuid": "01a07614-832d-7f27-959c-74eb0cd63f3e",
       "stable_key": "nhk:classification:clock-type.cuckoo-clock",
-      "source_found": false,
-      "live_matches": 0
-    },
-    "odo_36_8": {
-      "variant_uuid": "852da54d-457a-4397-a16d-52d9452ba766",
-      "stable_key": "nhk:variant:odo.36.8",
-      "knowledge_stable_keys": [
-        "nhk:knowledge:odo-36-8.u-shaped-gong",
-        "nhk:knowledge:odo-36-8.early-black-gong-block",
-        "nhk:knowledge:odo-36-8.later-white-gong-block"
-      ],
-      "source_found": false,
-      "live_matches": 0
-    },
-    "repository_search": "Only documentation/manifest references and non-canonical unit-test inputs were found; no approved fixture/export/snapshot was found. Live nhk_v3_test contains no matching Cuckoo or Odo 36/8 records."
-  },
-  "inventory": {
-    "status": "PASS",
-    "entity_types": ["brand", "model", "variant", "movement", "component", "music", "classification", "specimen", "product"],
-    "non_authority_domains": ["knowledge", "source", "evidence", "article", "video", "media"],
-    "totals": {"authority": 8, "knowledge": 0, "source": 0, "evidence": 0, "article": 14, "video": 0, "media": 0, "media_asset": 0, "media_usage": 0},
-    "authority_by_type": {"brand": 8},
-    "relation_counts": {"graph_nodes": 6, "graph_edges_total": 4, "graph_edges_active": 3, "active_about_wp_post_to_brand": 3},
-    "orphan_duplicate_and_readiness_counts": {"orphan": 0, "duplicate_candidate": 0, "inconsistent": 0, "invalid_endpoint": 0}
-  },
-  "relation_audit": {
-    "status": "PASS",
-    "registered_predicates": ["about", "depicts", "model_of", "variant_of", "uses_movement", "supports_music", "configured_with_music", "observed_playing_music"],
-    "classified_as": "REGISTRY_GAP",
-    "product_specimen": "REGISTRY_GAP",
-    "candidates": {"scanned": 4, "existing": 4, "missing_deterministic": 0, "ambiguous": 0, "relation_pending": 0, "registry_gap": 0, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0},
-    "dry_run_scope": "All live Graph edges; no canonical semantic backfill candidates exist because live Knowledge/Source/Evidence/Video/Media domains are empty."
-  },
-  "backfill": {
-    "dry_run": "PASS_NO_CANDIDATES",
-    "apply": "NOT_RUN",
-    "second_run": "NOT_RUN",
-    "created": null,
-    "reason": "Read-only live inventory and Graph audit completed. No deterministic semantic relation candidate was present; governed apply was not invoked."
-  },
-  "retrieval_verification": {
-    "status": "NOT_RUN_NO_CANONICAL_TARGETS",
-    "mcp_entity_neighborhood": "NOT_RUN_NO_CANONICAL_TARGETS"
-  },
-  "quality_gates": {
-    "unit": {"status": "PASS", "tests": 673, "assertions": 3253, "warnings": 2, "deprecations": 5},
-    "php_lint": "PASS",
-    "composer_validate": "PASS_WITH_PREEXISTING_LICENSE_WARNING",
-    "git_diff_check": "PASS",
-    "integration": "PASS_108_TESTS_730_ASSERTIONS_1_WARNING_1_DEPRECATION_2_SKIPS"
-  },
-  "live_demo_execution": {
-    "status": "PASS_WITH_GOVERNED_APPLY_BLOCKED",
-    "source_commit": "5f23b94",
-    "deployment": "PASS_WITH_CHECKSUM_READBACK",
-    "migration": {"status": "PASS", "current": 15, "target": 15, "runtime_markers": {"WP_ENVIRONMENT_TYPE": "staging", "NHK_AUTHORIZED_MIGRATION_DATABASE": "erourxcg_nhkv3", "NHK_MIGRATION_RUNTIME": "demo"}},
-    "inventory": {"canonical": "PASS", "graph": "PASS"},
-    "relation_dry_run": {"status": "PASS_READ_ONLY", "scanned": 1814, "existing": 250, "missing_deterministic": 492, "ambiguous": 0, "relation_pending": 365, "registry_gap": 175, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0, "created": 0, "candidate_breakdown": {"model": 30, "variant": 39, "knowledge": 423, "video": 0}},
-    "pending_classification": {
-      "total": 855,
-      "reason": "DETERMINISTIC_REMEDIATION_LIVE_DRY_RUN",
-      "by_type": {"knowledge": 780, "model": 30, "variant": 42, "video": 3},
-      "resolved": 492,
-      "applied": 0,
-      "genuinely_unresolved": 365,
-      "manifest_files": [
-        "GRAPH_RELATION_PENDING_KNOWLEDGE_01..08_2026-09-07.json",
-        "GRAPH_RELATION_PENDING_MODEL_01_2026-09-07.json",
-        "GRAPH_RELATION_PENDING_VARIANT_01_2026-09-07.json",
-        "GRAPH_RELATION_PENDING_VIDEO_01_2026-09-07.json"
-      ],
-      "owner_actions_by_type": {
-        "knowledge": "Provide explicit subject_type+subject_uuid or governed evidence/source binding",
-        "model": "Provide explicit brand_uuid or governed relation evidence",
-        "variant": "Provide explicit model_uuid or governed relation evidence",
-        "video": "Provide explicit target_type+target_uuid with evidence_refs through Video relation workflow"
+      "name": "Đồng hồ chim cúc cu",
+      "core_knowledge_relation": {
+        "count": 10,
+        "source_type": "knowledge",
+        "predicate": "about",
+        "target_type": "classification",
+        "target_uuid": "01a07614-832d-7f27-959c-74eb0cd63f3e",
+        "status": "COMPLETED",
+        "governance": "FULL_LIFECYCLE_PASS",
+        "canonical_graph_read_back": "PASS"
+      },
+      "historical_relation_gap_for_these_10_claims": "RESOLVED",
+      "classification_membership": {
+        "predicate": "classified_as",
+        "status": "REGISTRY_GAP",
+        "note": "Knowledge about Classification is not Model/Variant classification membership."
       }
     },
-    "deterministic_remediation": {"before": 855, "counters": {"AUTO_RESOLVABLE_EXACT": 492, "AMBIGUOUS": 0, "NO_CANONICAL_TARGET": 360, "INSUFFICIENT_EVIDENCE": 3}, "resolved_by_type": {"model": 30, "variant": 39, "knowledge": 423, "video": 0}, "unresolved_by_type": {"model": 0, "variant": 3, "knowledge": 357, "video": 3}, "apply": "BLOCKED_GOVERNED_BATCH_SURFACE_UNAVAILABLE", "blocker": "Existing maintenance entrypoint returns CUTOVER_APPLICATION_WIRING_REQUIRED; automatic SSH wp_set_current_user impersonation was rejected by execution policy. No relation mutation was performed."},
-    "governed_apply": "NOT_RUN_GOVERNED_BATCH_SURFACE_UNAVAILABLE",
-    "second_run": {"status": "PASS_READ_ONLY", "created": 0, "missing_deterministic": 492, "relation_pending": 365},
-    "odo": "READBACK_PASS; existing inbound about relations and bounded neighborhood; no pending deterministic candidate",
-    "cuckoo": "READBACK_PASS; bounded neighborhood empty; no pending deterministic candidate",
-    "residual_debt": {"relation_pending": 365, "missing_deterministic": 492, "registry_gap": 175},
-    "policy_note": "No raw DB bypass, production/V2 access, or relation mutation was performed; no relation was guessed. Governed apply requires an authenticated batch surface or explicit human approval per proposal."
+    "registered_predicates": [
+      "about",
+      "depicts",
+      "model_of",
+      "variant_of",
+      "uses_movement",
+      "supports_music",
+      "configured_with_music",
+      "observed_playing_music"
+    ],
+    "known_registry_gaps": {
+      "classified_as": "REGISTRY_GAP",
+      "product_specimen_relation": "REGISTRY_GAP"
+    },
+    "reconcile_before_create": {
+      "required": true,
+      "outcomes": [
+        "EXACT_EXISTING",
+        "MERGE_CANDIDATE",
+        "RELATED_BUT_DISTINCT",
+        "NO_EXISTING_CANONICAL_RECORD",
+        "UNCERTAIN"
+      ],
+      "new_create_allowed_only_for": "NO_EXISTING_CANONICAL_RECORD",
+      "fuzzy_or_lexical_similarity_is_identity_proof": false
+    },
+    "no_orphan_semantic_data": {
+      "required": true,
+      "rule": "Resolve canonical subject before Knowledge creation; create/apply/read-back a genuinely required Authority node first, otherwise defer the claim."
+    },
+    "frontend_graph": {
+      "bounded_neighborhood_infrastructure": "AVAILABLE",
+      "mcp_read_seam": "nhk.entity.neighborhood",
+      "missing_surface_consumer_classification": "PARTIAL_FRONTEND_GAP",
+      "keyword_search_as_relation_fallback": "PROHIBITED"
+    }
   },
-  "errors": [],
-  "owner_actions": [
-    "Restore/authorize canonical Cuckoo and Odo 36/8 records plus governed source/evidence in nhk_v3_test before any batch backfill.",
-    "Add or use an approved runtime planner wiring for whole-database relation dry-run/apply; current generic service has no live resolver/adapter."
-  ]
+  "historical_snapshot": {
+    "repository_head": "fb60c32370a74a6b8c100f6450ed41329503cb96",
+    "note": "The fields in this historical snapshot record earlier 2026-09-07 probes. They are retained for audit history and must not override current_runtime_override when later runtime has resolved a blocker.",
+    "environment": {
+      "target_database": "nhk_v3_test",
+      "wordpress_path": "public",
+      "status": "PASS",
+      "reason": "public/wp-load.php requires the supported parent ../wp-config.php; guarded read-only probes and full Integration passed",
+      "bootstrap": "public/wp-load.php -> ../wp-config.php -> wp-settings.php",
+      "mysql": {"tcp_127_0_0_1_3306": "PASS", "socket_/tmp/mysql.sock": "PASS", "select_database": "nhk_v3_test", "wpdb_last_error": ""},
+      "mutation_count": 0,
+      "production_or_staging_touched": false
+    },
+    "canonical_fixture_verification": {
+      "status": "DATA_GAP_AT_THAT_PROBE",
+      "cuckoo": {
+        "classification_uuid": "01a07614-832d-7f27-959c-74eb0cd63f3e",
+        "stable_key": "nhk:classification:clock-type.cuckoo-clock",
+        "source_found": false,
+        "live_matches": 0,
+        "superseded_for_current_demo_runtime": true
+      },
+      "odo_36_8": {
+        "variant_uuid": "852da54d-457a-4397-a16d-52d9452ba766",
+        "stable_key": "nhk:variant:odo.36.8",
+        "knowledge_stable_keys": [
+          "nhk:knowledge:odo-36-8.u-shaped-gong",
+          "nhk:knowledge:odo-36-8.early-black-gong-block",
+          "nhk:knowledge:odo-36-8.later-white-gong-block"
+        ],
+        "source_found": false,
+        "live_matches": 0
+      }
+    },
+    "inventory": {
+      "status": "PASS_AT_THAT_PROBE",
+      "entity_types": ["brand", "model", "variant", "movement", "component", "music", "classification", "specimen", "product"],
+      "non_authority_domains": ["knowledge", "source", "evidence", "article", "video", "media"],
+      "totals": {"authority": 8, "knowledge": 0, "source": 0, "evidence": 0, "article": 14, "video": 0, "media": 0, "media_asset": 0, "media_usage": 0},
+      "authority_by_type": {"brand": 8},
+      "relation_counts": {"graph_nodes": 6, "graph_edges_total": 4, "graph_edges_active": 3, "active_about_wp_post_to_brand": 3},
+      "orphan_duplicate_and_readiness_counts": {"orphan": 0, "duplicate_candidate": 0, "inconsistent": 0, "invalid_endpoint": 0}
+    },
+    "relation_audit": {
+      "status": "PASS_AT_THAT_PROBE",
+      "registered_predicates": ["about", "depicts", "model_of", "variant_of", "uses_movement", "supports_music", "configured_with_music", "observed_playing_music"],
+      "classified_as": "REGISTRY_GAP",
+      "product_specimen": "REGISTRY_GAP",
+      "candidates": {"scanned": 4, "existing": 4, "missing_deterministic": 0, "ambiguous": 0, "relation_pending": 0, "registry_gap": 0, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0}
+    },
+    "live_demo_execution": {
+      "status": "HISTORICAL_PRE_FIX_AND_PRE_BATCH_SURFACE_EVIDENCE",
+      "source_commit": "5f23b94",
+      "deployment": "PASS_WITH_CHECKSUM_READBACK",
+      "migration": {"status": "PASS", "current": 15, "target": 15},
+      "relation_dry_run": {"status": "PASS_READ_ONLY", "scanned": 1814, "existing": 250, "missing_deterministic": 492, "ambiguous": 0, "relation_pending": 365, "registry_gap": 175, "evidence_gap": 0, "orphan": 0, "duplicate_candidate": 0, "invalid_endpoint": 0, "created": 0, "candidate_breakdown": {"model": 30, "variant": 39, "knowledge": 423, "video": 0}},
+      "deterministic_remediation": {
+        "before": 855,
+        "counters": {"AUTO_RESOLVABLE_EXACT": 492, "AMBIGUOUS": 0, "NO_CANONICAL_TARGET": 360, "INSUFFICIENT_EVIDENCE": 3},
+        "resolved_by_type": {"model": 30, "variant": 39, "knowledge": 423, "video": 0},
+        "unresolved_by_type": {"model": 0, "variant": 3, "knowledge": 357, "video": 3},
+        "apply": "HISTORICAL_BLOCKED_GOVERNED_BATCH_SURFACE_UNAVAILABLE",
+        "current_interpretation": "Superseded as a global capability blocker. Governed relation apply/batch surfaces and successful canonical relation read-back exist in later runtime."
+      },
+      "cuckoo": "HISTORICAL_READBACK_EMPTY_AT_THAT_CHECKPOINT; superseded for the 10 current core Knowledge about relations",
+      "policy_note": "Historical counts remain evidence for that checkpoint only and are not current completion counters."
+    }
+  },
+  "current_deferred_owner_actions": [
+    "Register/review classified_as semantics before Model/Variant classification membership; do not substitute about.",
+    "Define/register Product–Specimen canonical persistence relation before linking those identities semantically.",
+    "When a genuinely new Authority node is needed, run the first real create Controlled Apply → generated UUID → entity/resolver read-back → immediate relation-use proof.",
+    "Continue target-specific frontend/dossier consumption of the bounded Graph neighborhood as PARTIAL_FRONTEND_GAP work where needed."
+  ],
+  "validation_rule": "Historical blocker text may remain only when clearly marked historical/superseded. Current agents must follow CURRENT_DOCUMENTATION_STATUS_INDEX, executable registries/catalogs and fresh canonical read-back."
 }

@@ -1,147 +1,136 @@
 # Video Semantic Ingest Contract
 
-> Non-normative implementation contract under the sole Constitution. The
-> Constitution controls if any text conflicts.
+> **NON-NORMATIVE CURRENT IMPLEMENTATION CONTRACT** under the sole
+> Constitution. The Constitution controls if any text conflicts.
 
-Workflow: `YouTube URL + user hint → source resolution → snapshot → transcript
-policy → NHK lookup → relation candidates → optional Knowledge enrichment
-planning → optional Dictionary lexical preview → Hub classification → editorial
-package → SEO projection → completeness → governed Video Proposal`.
+## Identity and ownership
 
-Canonical public URL policy is `/video/{semantic-slug}/`; the external video ID
-remains internal identity metadata and is not a default public slug suffix.
-Semantic slug fallback order is explicit governed NHK semantic/editorial
-context; confirmed attached Brand/Model/Variant/Movement/Music context;
-governed editorial title; governed user hint when allowed; and source-platform
-title only as a controlled last resort. A source-platform marketing title must
-not replace confirmed NHK context. URL changes are explicit Public Identity
-operations; source synchronization never changes UUID or creates a duplicate
-Video.
+Video is a canonical external Video reference, not a MediaAsset, WordPress Post,
+Knowledge claim or Source. Current YouTube identity uses platform + external
+video ID; watch/Shorts/embed/`youtu.be` forms and tracking parameters normalize
+to the same external identity. Replay must reuse the existing canonical Video.
 
-The public MCP entry point is the existing governed `nhk.video.ingest`. It may
-return a single preview packet with source, editorial, Hub, relation, SEO,
-warning and ambiguity information. It never approves, applies or publishes.
-Dictionary-specific MCP tools are not implied by this contract and must not be
-claimed unless present in the current executable catalog and fresh runtime
-discovery.
+Canonical public Video URL is `/video/{slug}/` through the Public Identity
+boundary. External YouTube URL remains source/provenance/embed data. Thumbnail
+Media is a separate typed Media reference and does not change Video identity.
 
-Input is intentionally small: `url`, optional `user_hint`, optional
-`intended_category`, optional already-resolved `intended_relations`, optional
-`editorial_instruction` and optional `idempotency_key`. User hints are retained
-as `USER_HINT`; they are high-value context, not Authority truth.
+## Intake input and source policy
 
-The source adapter is the only boundary allowed to call the external video
-platform. The preferred client is its official data API with an
-environment-provided key. A missing key is an explicit
-configuration/unavailable warning. No HTML scraping, SSRF, arbitrary host or
-transcript workaround is permitted.
+`nhk.video.ingest` remains the governed YouTube intake adapter. It accepts the
+validated URL plus bounded user/editorial context such as `user_hint`,
+`editorial_instruction`, optional thumbnail Media and already-resolved intended
+relations. It preserves normalized canonical source URL, external ID, source
+provenance/state and NHK editorial intent.
 
-The Proposal payload reuses the dedicated Video metadata boundary for the
-normalized source snapshot, transcript policy, editorial package, Hub result,
-relation candidates, SEO package, provenance and source-rights state. It is not
-WordPress post meta and does not create a second semantic store.
+The official platform adapter is the only external source lookup boundary.
+Unavailable API configuration/remote metadata remains explicit; no HTML scraping,
+fabricated transcript or guessed platform fact is permitted. `USER_HINT` is
+valuable context but is not Evidence by itself.
 
-When configured, `VideoIntakeService` invokes an optional read-only Knowledge
-enrichment seam after canonical semantic target resolution. The seam selects
-one narrowest confidently supported subject per observation in the order
-`specimen > variant > model > movement/brand`; it never copies an observation
-upward or sideways. Equal candidates are ambiguous and produce no
-proposal-ready candidate. Brand-only context does not infer a Variant.
+Same external identity plus same durable intent is idempotent. Source changes
+produce reconciliation/review state; they never silently overwrite NHK editorial
+content, canonical Video identity or Graph truth.
 
-If `intended_relations` contains an already-validated explicit `about` target,
-that canonical target is authoritative for both the Video attachment candidate
-and the enrichment subject. The planner must preserve its canonical UUID/type
-before any broader title/description/user-hint matching. This is preservation of
-an explicit resolved target, not permission to infer a Variant from Model-only
-text. Multiple conflicting explicit targets remain ambiguous and fail closed.
+## Resolve and reconcile before mutation
 
-Its output is the bounded `knowledge_enrichment` packet with `status`,
-`subject`, `candidates`, `diagnostics`, `proposal_ready` and
-`unresolved_reasons`. Each candidate exposes `classification`, `subject_id`,
-`facet`, `scope`, `observation`, provenance summary and `proposal_ready`.
-`same_claim` and ambiguous/unresolved candidates are never proposal-ready.
-`new_claim` is proposal-ready only after the shared planner has resolved its
-dependencies; `add_evidence` additionally requires canonical `source_id` and
-`source_revision`.
+Before a new semantic attachment or Video-derived fact is created:
 
-Transcript text is source material, not an atomic Knowledge claim. An approved
-read-only factual-observation extractor must return bounded observations with
-provenance/locator. If no extractor is configured, the packet emits
-`TRANSCRIPT_FACT_EXTRACTION_UNAVAILABLE` and creates no transcript candidate;
-extractor failure is diagnostic and does not fail Video intake. Generated
-editorial text is never passed to the Knowledge planner or represented as
-Evidence.
+1. resolve the canonical Video/external identity;
+2. resolve the canonical intended target/subject;
+3. reconcile current canonical relations and Knowledge claims;
+4. reuse exact existing records and provenance chains when valid;
+5. create only a genuinely missing canonical record through its owning boundary;
+6. defer ambiguity instead of minting a temporary identity/claim.
 
-At this phase Video does not resolve or create a canonical NHK Source entity.
-The intake therefore passes no invented Source ID. If a future caller supplies
-canonical `source_id` plus `source_revision`, the shared planner may produce a
-proposal-ready `add_evidence` candidate. Without that canonical binding,
-existing-claim evidence remains `same_claim`/review-only and the packet records
-`SOURCE_RESOLUTION_NEEDED`; Video intake does not create Source or Evidence.
+A validated explicit user `about` target is authoritative for that relation and
+for its semantic context. Text/title/user-hint matching must not broaden an
+explicit Variant target into Model/Brand. Multiple conflicting explicit targets
+fail closed.
 
-The seam is planning-only: it does not call Knowledge/Evidence repositories,
-submit or approve proposals, apply mutations, or create Graph predicates. A
-planner failure is diagnostic and fail-closed for enrichment while preserving
-the complete Video intake preview and its existing `about` relation/proposal
-flow. Same-claim and add-Evidence idempotency remain governed by the shared
-Knowledge planner/factory; Video intake does not apply either result.
+## Generic Video → Living Knowledge planning
 
-## Dictionary lexical integration — 2026-09-05
+Authorized transcript text and user hints may feed a bounded factual observation
+planner after canonical target resolution. Whole transcript text is source
+material, not one canonical claim. Generated editorial copy is never Evidence.
 
-Dictionary behavior follows
-`docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md`.
+Generic enrichment output remains planning-first: `same_claim`, new-claim,
+qualification/contradiction or add-Evidence candidates must still pass canonical
+Knowledge/Source/Evidence reconciliation and the normal governed mutation
+boundary before becoming truth.
 
-- Video title, source description, tags, user-supplied lexical hints and only an
-  authorized transcript may be inspected for lexical terms.
-- Dictionary preview is read-only. It may report resolved labels, ambiguity and
-  review candidates but must not write Candidate/Mention rows during Video
-  intake preview.
-- After the governed Video canonical create/update succeeds, a non-blocking
-  Dictionary observer may persist idempotent Mention/Candidate rows from the
-  stored Video metadata/text. Lexical observation failure never turns a
-  successful canonical Video write into semantic failure.
-- An explicit validated `about` target may be supplied as context to
-  disambiguate a term, but Dictionary must not broaden, replace or manufacture
-  that target.
-- Video metadata, transcript text and generated editorial copy are never
-  Evidence merely because Dictionary recognized a term.
-- An existing approved lexical label/current canonical owner is reused. An
-  unresolved term becomes a private review candidate, never a public concept
-  automatically.
+The historical wording “Video cannot resolve/create any canonical Source” is
+**not current for the guided relation workflow below**. It remains relevant only
+to an isolated generic preview seam that does not itself mutate Knowledge.
 
-Same external identity plus same intent is idempotent. Existing identity means
-reconcile/update candidate, never duplicate Video. Source changes require a
-new governed review packet; NHK fields are not overwritten by source metadata.
+## Current guided Video relation provenance workflow — 2026-09-07
 
-## Verified target-handoff checkpoint — 2026-09-04
+After canonical Video and canonical Authority target resolution, the guided
+Video relation application service can deterministically resolve/reuse or create
+and read back the provenance chain needed by the relation:
 
-Focused/unit implementation and the runtime smoke path distinguish target
-resolution from textual research. A validated explicit Variant UUID is retained
-as both `about` target and `knowledge_enrichment.subject`; the candidate scope
-remains `variant` and no Model/Brand fallback is emitted. This checkpoint
-changes no semantic data and does not relax the separate Source/Evidence or
-Governance gates.
+`canonical YouTube Source → provenance-scoped Knowledge Claim → Evidence`.
 
-## Governed dependency lifecycle
+The current implementation:
 
-The coordinated ingest path is `Source → Knowledge Claim → Evidence → Video →
-about target`. Every node uses `create/ingest → submit → review/approve under
-the current approval policy → eligibility → Controlled Apply → canonical owner
-read-back`. Orchestration never approves on behalf of a required human/manual
-policy and never writes a domain repository directly. `proposal_id` remains
-separate from `target_uuid` and `canonical_id`; a create/ingest response has
-`canonical_id: null` until apply and verification complete.
+- derives a deterministic Source stable key from YouTube platform/external ID/
+  canonical URL;
+- reuses an existing Source only when active provenance/locator still matches;
+- resolves/reuses a target-scoped provenance Claim for the Video relation;
+- derives deterministic Evidence identity/fingerprint and reuses it only when
+  Claim, Source, Video UUID, visibility, locator and reconciliation fingerprint
+  still match;
+- keeps Source/Evidence PRIVATE under current Video provenance policy;
+- reads each canonical owner back before the relation proposal is created;
+- fails closed on wrong-source/wrong-claim/wrong-evidence provenance.
 
-Controlled Apply's `result_entity_uuid` is only a candidate result. Success and
-dependency progression require an internal canonical snapshot matching entity
-type, UUID, active state and revision. Read-back failure is non-success and
-fail-closed. Retries reuse idempotency, content and dependency fingerprints.
+Normal Admin operators therefore select canonical Video + target and do **not**
+manually enter a Video proposal UUID or Evidence UUID. The orchestration resolves
+those dependencies and creates the relation proposal with canonical
+`evidence_refs` and stable idempotency.
 
-## Canonical frontend handoff — 2026-09-07
+This bounded provenance orchestration is not permission to turn arbitrary Video
+metadata/transcript into Knowledge. It exists to support the explicit governed
+relation and still uses the canonical Knowledge/Source/Evidence owners rather
+than a Video-private provenance store.
 
-After canonical read-back, a public-capable Video must resolve Public Identity
-before the frontend emits its canonical route. The route is `/video/{slug}/`;
-the external YouTube URL is never a frontend destination. Query/projection code
-normalizes the current persisted source under `metadata.source` and approved
-compatibility shapes in one application layer. It does not duplicate source
-records or infer a second semantic identity.
+## Relation and Governance lifecycle
+
+Video relation candidates use registered Graph vocabulary only. The current
+Video outbound relation is `about`; do not invent a Hub/thumbnail/category
+predicate. Relation endpoint packet preserves:
+
+`source_type=video`, real `source_uuid`, registered predicate,
+real `target_type`, real `target_uuid`, canonical Evidence references.
+
+The lifecycle is:
+
+`Video/provenance reconciliation → relation proposal create → submit → review →
+approval with binding fingerprints → eligibility → Controlled Apply → canonical
+Video/Graph read-back → idempotency verification`.
+
+A Video Proposal UUID is not a canonical Video UUID. Approved/eligible state is
+not relation completion. Graph read-back must show the active typed edge. Replay
+must reuse existing canonical Video/provenance/relation rather than duplicate.
+
+## Canonical frontend handoff
+
+After canonical owner read-back and Public Identity eligibility, Video projects
+to `/video/{slug}/`. Query/application code normalizes current persisted source
+shape such as `metadata.source` and supported compatibility shapes without
+creating a second source owner.
+
+Frontend reads canonical projection, eligible Graph relations, public-safe
+Knowledge and reader-safe provenance. It must not infer facts/relations from
+keywords or external title text. External URL is never a fallback canonical
+frontend destination.
+
+Admin “Xem trên web” and “Mở nguồn gốc” are separate actions.
+
+## Deferred/retry behavior
+
+Ambiguous target, missing evidence, missing predicate, runtime interruption or
+unavailable dependency uses explicit deferred/blocker state. Preserve existing
+proposal ID and canonical IDs already resolved. Re-run the same proposal/
+idempotency binding when the intent is unchanged; do not duplicate Video,
+Source, Evidence, Knowledge or relation merely because execution was
+interrupted.
