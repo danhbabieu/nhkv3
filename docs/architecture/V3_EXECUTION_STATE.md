@@ -5212,3 +5212,11 @@ No semantic writer, migration, seed, Graph JSON or runtime data was changed.
 Video continues to use persisted `/video/{slug}/`. Standalone indexable Media
 detail routing remains a `CONSTITUTION_CONFLICT` and is not enabled without an
 approved constitutional amendment.
+
+The Admin read boundary now reuses the Video/Media adapters for workbench
+search rows, preserving canonical IDs, external source identity and read-only
+state composition. Focused Media/Video/Admin/SEO/route verification passes 26
+tests / 224 assertions; the full Unit directory passes 735 tests / 3,591
+assertions with 2 warnings, 1 deprecation and 5 PHPUnit deprecations. The
+configured `Unit` suite name executes zero tests, so the directory invocation
+is the recorded full Unit baseline.

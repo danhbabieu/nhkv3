@@ -14,7 +14,7 @@ use NHK\Core\Application\Governance\ProposalEligibilityService;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Domain\Graph\NodeReference;
-use NHK\Core\Infrastructure\Admin\AdminVideoAdapter;
+use NHK\Core\Infrastructure\Admin\{AdminMediaAdapter, AdminVideoAdapter};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Domain\Media\Media;
@@ -46,7 +46,7 @@ final class AdminWorkbenchReadApi
         if (strlen($query) < 2 || strlen($query) > 120) return new \WP_Error('nhk_admin_search_term_invalid', 'Từ khóa phải có 2–120 ký tự.', ['status' => 400]);
         $domain = sanitize_key((string) $request['domain']); $groups = ['videos' => [], 'media' => [], 'knowledge' => [], 'entities' => []];
         if ($domain === 'all' || $domain === 'video') foreach ($this->videos->list() as $item) if ($this->matches($query, $item->title, $item->externalVideoId, $item->canonicalId)) $groups['videos'][] = $this->videoRow($item);
-        if ($domain === 'all' || $domain === 'media') foreach ($this->media->list(true) as $item) if ($this->matches($query, $item->canonicalName, $item->stableKey, $item->canonicalId)) $groups['media'][] = ['type' => 'media', 'id' => $item->canonicalId, 'title' => $item->canonicalName, 'stable_key' => $item->stableKey, 'readiness' => $item->readiness, 'active' => $item->active];
+        if ($domain === 'all' || $domain === 'media') foreach ($this->media->list(true) as $item) if ($this->matches($query, $item->canonicalName, $item->stableKey, $item->canonicalId)) $groups['media'][] = array_merge(['type' => 'media'], (new AdminMediaAdapter([$item]))->find()[0] ?? []);
         if ($domain === 'all' || $domain === 'knowledge') foreach ($this->claims->list(true) as $item) if ($this->matches($query, $item->claimText, $item->stableKey, $item->canonicalId)) $groups['knowledge'][] = ['type' => 'knowledge', 'id' => $item->canonicalId, 'title' => $item->claimText, 'stable_key' => $item->stableKey, 'claim_type' => $item->claimType, 'active' => $item->active];
         if ($domain === 'all' || $domain === 'entity') { $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types); foreach ($types->all() as $definition) foreach ($this->authority->listByType($definition->type, true) as $item) if ($this->matches($query, $item->canonicalName, $item->stableKey, $item->canonicalId)) $groups['entities'][] = ['type' => $item->entityType, 'id' => $item->canonicalId, 'title' => $item->canonicalName, 'stable_key' => $item->stableKey, 'active' => $item->active()]; }
         foreach ($groups as $key => $items) $groups[$key] = array_slice($items, 0, 50);
@@ -99,6 +99,6 @@ final class AdminWorkbenchReadApi
     }
 
     /** @return array<string,mixed> */
-    private function videoRow(Video $item): array { return ['type' => 'video', 'id' => $item->canonicalId, 'title' => $item->title !== '' ? $item->title : 'Video chưa có tiêu đề', 'platform' => $item->platform, 'external_id' => $item->externalVideoId, 'url' => $item->canonicalUrl, 'thumbnail_media_id' => $item->thumbnailMediaId, 'active' => $item->active, 'revision' => $item->revision]; }
+    private function videoRow(Video $item): array { return array_merge(['type' => 'video'], (new AdminVideoAdapter([$item]))->find($item->externalVideoId)[0] ?? []); }
     private function matches(string $query, string ...$values): bool { foreach ($values as $value) if (str_contains(strtolower($value), $query)) return true; return false; }
 }

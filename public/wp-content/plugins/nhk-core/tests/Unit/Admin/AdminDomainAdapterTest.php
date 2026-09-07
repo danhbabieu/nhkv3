@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit\Admin;
 
-use NHK\Core\Domain\Media\Media;
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Infrastructure\Admin\{AdminContentAdapter, AdminGovernanceAdapter, AdminMediaAdapter, AdminVideoAdapter};
@@ -58,7 +58,14 @@ final class AdminDomainAdapterTest extends TestCase
     public function test_media_adapter_exposes_readiness_without_mutation(): void
     {
         $media = new Media('01a07af5-3303-7a73-9f15-b7f675293dc6', 'media.example', 'Ảnh thử', 'ready');
-        self::assertSame('ready', (new AdminMediaAdapter([$media]))->find()[0]['readiness']);
+        $asset = new MediaAsset('01a07af5-3303-7a73-9f15-b7f675293dc7', $media->canonicalId, 'derivative', 'image.webp', hash('sha256', 'image'), 'image/webp', 10, 640, 480, 'PUBLIC');
+        $usage = new MediaUsage('01a07af5-3303-7a73-9f15-b7f675293dc8', $media->canonicalId, 'variant', '01a07af5-3303-7a73-9f15-b7f675293dc9', 'representative');
+        $row = (new AdminMediaAdapter([$media], [$asset], [$usage]))->find()[0];
+        self::assertSame('ready', $row['readiness']);
+        self::assertSame('640 × 480', $row['dimensions']);
+        self::assertSame('representative', $row['semantic_role']);
+        self::assertSame(1, $row['usage_count']);
+        self::assertSame('variant', $row['primary_entity']['type']);
     }
 
     public function test_content_adapter_has_only_editorial_and_video_tabs(): void
