@@ -196,11 +196,12 @@ become new semantic identities. WordPress attachment and derivatives are
 storage/projection records only.
 
 Media usage roles must distinguish `representative` from `evidence` and
-`technical_detail`. Evidence/technical usage may be related to a canonical
-target through the registered Graph/evidence contract, but never replaces an
-existing representative Media automatically. Multiple representative
-candidates use deterministic contract precedence; upload recency is not a
-precedence rule. WordPress featured image remains editorial projection state.
+`technical_detail`. Evidence/technical usage must not replace an existing
+representative solely by role, recency or size; after the required suitability
+comparison, a more suitable candidate may be promoted and the old one demoted
+when still suitable. Multiple representative candidates use deterministic
+contract precedence; upload recency is not a precedence rule. WordPress
+featured image remains editorial projection state.
 
 Article subject resolution is deterministic in this order: canonical UUID,
 stable key, exact canonical name/alias. A valid explicit UUID must be honored;
@@ -995,6 +996,28 @@ reader-safe serialization. Raw metadata/provenance internals và lifecycle field
 không tự động trở thành public copy. Source/Evidence không mặc định có standalone
 SEO page; chúng xuất hiện như provenance trong projection đã đủ điều kiện.
 
+### 12.1 Provenance source classes and post-ingest reconciliation
+
+Mọi observation, claim, candidate relation và representative decision phải giữ
+provenance ở scope thực tế của nó. Các source class được kiểm soát là
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` và `SYSTEM_INFERENCE`. Đây là provenance classification
+trong contract hiện hành, không phải Source type, Knowledge type hoặc Graph
+predicate mới.
+
+`OBSERVED_FROM_MEDIA` mô tả điều quan sát được từ Media; nó không tự chứng minh
+identity hay fact phổ quát. `EXPLICIT_USER_KNOWLEDGE` giữ nguyên statement của
+user; nó không tự trở thành universal fact. `CATALOG_SUPPORTED` và
+`EXTERNAL_RESEARCH` phải trỏ tới Source/Evidence phù hợp khi contract yêu cầu.
+`SYSTEM_INFERENCE` chỉ mô tả suy luận có thể giải thích từ các canonical fact;
+không đủ một mình để tạo fact hoặc Graph edge mới. Mọi promotion scope phải
+giữ chủ thể, facet, thời gian, phạm vi và độ tin cậy evidence đúng như nguồn.
+
+Sau mọi MCP ingest, hệ thống phải reconcile với canonical Knowledge, Source,
+Evidence và Graph lân cận theo §20.1. Không được nâng user statement hoặc image
+observation thành Brand/Model/Variant/Movement/Component/Classification fact
+hay universal claim nếu evidence không hỗ trợ.
+
 ## 13. Media và Video
 
 ### 13.1 Media
@@ -1120,6 +1143,29 @@ không sở hữu physical image truth và xóa Product không xóa Specimen/Med
 Commercial composite có binary/semantic identity riêng khi contract yêu cầu,
 không overwrite original và không mạnh hơn original Evidence. Nếu chưa có
 predicate `derived-from`, ghi gap, không invent predicate.
+
+#### Media semantic enrichment and representative reconciliation
+
+Sau mỗi Media ingest đã đọc lại được, hệ thống phải chạy semantic enrichment
+bounded và inspection các node trực tiếp liên quan qua Graph/canonical
+neighborhood. Một Media có thể có nhiều MediaUsage và relation tới nhiều node
+khi từng relation/usage có căn cứ riêng; không tạo edge chỉ vì cùng ảnh có thể
+dùng tiện lợi ở nhiều trang.
+
+Mọi node trực tiếp liên quan đang thiếu ảnh phải được đưa vào representative
+review. Ảnh tốt nhất hiện có chỉ được dùng làm representative tạm thời khi
+vẫn đạt representative relevance; đây là lựa chọn `BEST CURRENTLY AVAILABLE`,
+không phải immutable relation. Khi có ảnh phù hợp hơn, hệ thống phải compare
+suitability, promote ảnh mới và demote ảnh cũ về gallery,
+`technical_detail` hoặc evidence nếu ảnh cũ còn phù hợp. Không xóa Media cũ,
+MediaAsset cũ hay provenance.
+
+Thứ tự chọn representative là: **exact subject specificity → visual coverage
+→ technical relevance → image quality/resolution → provenance confidence →
+current representative quality**. Ảnh cấp Variant không được làm
+representative cho Brand/Model rộng hơn chỉ để lấp khoảng trống khi
+representative relevance không đủ. Evidence/technical detail vẫn không tự
+trở thành semantic identity hoặc relation.
 
 #### Image SEO and public asset law
 
@@ -1578,6 +1624,56 @@ Raw Graph REST có thể là administrator-only operational read; public API kh�
 được contract cho phép. WordPress Abilities chỉ là discoverability bridge của
 existing read contracts, không phải persistence hoặc write bypass.
 
+### 20.1 Universal MCP post-ingest reconciliation law
+
+Mọi dữ liệu đi qua MCP ingest, gồm Media, Video, Knowledge, Source, Evidence
+và mọi Authority entity, đều phải chạy một bounded deep semantic reconciliation
+sau ingest. Bounded nghĩa là dùng đúng runtime registry, endpoint/predicate
+allow-list, canonical search limits, neighborhood/Graph traversal limits,
+dependency closure, evidence lookup budget và Governance policy hiện hành;
+không recursive crawl, không graph explosion và không suy đoán ngoài contract.
+
+Trình tự bắt buộc, không được bỏ qua hoặc đổi chỗ, là:
+
+    ingest
+    → read-back
+    → canonical search
+    → neighborhood/Graph inspection
+    → duplicate/reuse analysis
+    → relation candidate discovery
+    → evidence/provenance validation
+    → apply mọi relation hợp lý đã registered và justified
+    → final read-back
+
+`apply mọi relation hợp lý` nghĩa là apply toàn bộ relation hữu ích **có căn
+cứ**, khi target canonical đã resolve duy nhất, predicate/endpoint được đăng
+ký, scope phù hợp, evidence/provenance đủ, revision/idempotency còn hợp lệ và
+Governance cho phép. “Maximize relations” không có nghĩa maximize relation
+count. Weak, speculative, duplicate, convenience-only, visual-similarity-only
+hoặc unsupported Graph edge phải bị loại và giữ diagnostic/candidate nếu cần.
+
+Canonical search phải tìm record có thể reuse trước khi tạo identity hoặc
+claim mới. Neighborhood/Graph inspection phải kiểm tra direct relation, các
+đường derived được contract cho phép, target readiness/public policy và các
+relation lân cận có thể bị ảnh hưởng. Duplicate/reuse analysis áp dụng cho
+identity, claim, source/evidence, Video, Media và representative candidate;
+checksum, tên, URL hoặc prose lặp lại chỉ là tín hiệu, không phải bằng chứng
+merge.
+
+Với Knowledge hoặc user input, reconciliation phải xem xét các target đã đăng
+ký gồm Brand, Model, Variant, Movement, Component, Classification, Media,
+Source, Evidence và Knowledge liên quan. Với Media, phải chạy semantic
+enrichment và representative-media reconciliation theo §13.1.1. Với Video,
+Knowledge enrichment planning vẫn phải giữ scope/provenance và chỉ apply qua
+Governance riêng; preview không phải canonical completion.
+
+Một MCP operation không được báo `COMPLETE` chỉ vì ingest thành công. Chỉ được
+`COMPLETE` khi canonical read-back, duplicate check, semantic research,
+relation reconciliation, representative-media reconciliation (khi áp dụng),
+final verification và các gate của owner đã pass. Ingest bị pending review,
+partial, unavailable, conflict hoặc chỉ là attachment transport là outcome
+trung gian, không phải `COMPLETE`.
+
 ## 21. Health, hydration và deployment
 
 Một database hợp lệ không được xuất hiện như empty chỉ vì runtime dependency,
@@ -1827,6 +1923,16 @@ editorial, semantic and verification stages.
 78. Representative candidate selection là deterministic và không dùng upload recency làm precedence.
 79. Explicit canonical UUID được resolve trước stable key rồi exact canonical name/alias; ambiguity fail closed.
 80. Generic Article preflight không special-case WordPress Post ID; concrete IDs chỉ được dùng trong test fixtures.
+81. Mọi MCP ingest phải chạy bounded post-ingest semantic reconciliation theo đúng thứ tự ingest → read-back → canonical search → neighborhood/Graph inspection → duplicate/reuse analysis → relation candidate discovery → evidence/provenance validation → apply mọi relation hữu ích có căn cứ → final read-back.
+82. “Maximize relations” chỉ là maximize justified useful relations; weak/speculative/convenience-only edges không được tạo.
+83. MCP ingest không được báo `COMPLETE` nếu chỉ ingest thành công; completion cần canonical read-back, duplicate check, semantic research, relation reconciliation, representative-media reconciliation khi áp dụng và final verification.
+84. Media ingest phải semantic-enrich; một Media có thể có nhiều usage/relation tới nhiều node khi từng quan hệ được chứng minh hợp lý.
+85. Sau Media ingest, node trực tiếp liên quan thiếu ảnh phải được representative-reconcile; ảnh tốt nhất hiện có có thể làm representative tạm thời khi đủ relevance.
+86. Representative là `BEST CURRENTLY AVAILABLE`, không immutable; ảnh phù hợp hơn có thể promote và ảnh cũ có thể demote nếu còn phù hợp, không xóa Media hoặc provenance.
+87. Representative selection ưu tiên exact subject specificity → visual coverage → technical relevance → image quality/resolution → provenance confidence → current representative quality; Variant image không lấp Brand/Model rộng hơn nếu thiếu representative relevance.
+88. Knowledge và user input phải relation-reconcile với các target canonical liên quan đã registered, gồm Authority types, Media, Source, Evidence và Knowledge.
+89. Provenance source class phải được giữ rõ: `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH`, `SYSTEM_INFERENCE`.
+90. User statement và image observation không được nâng thành universal fact nếu evidence không hỗ trợ đúng subject và scope.
 
 ---
 
@@ -1868,6 +1974,7 @@ khác không được dùng như decision authority song song.
 | Product/Specimen boundary | Physical object identity và commercial offer identity có lifecycle/cardinality khác nhau | Specimen 1 → 0..N Product; Product → 0..1 Specimen; no implicit physical identity, claim promotion or repair |
 | Public claim & advertising compliance | Promotional wording can create unsupported legal/objective claims even when semantic records are otherwise correct | Meaning-based cross-channel publication gate; objective claims stay within evidence scope; leadership/uniqueness/absolute claims require valid support; unsupported meaning is rewritten narrowly or blocked |
 | Owner publication override | Eligible publication-quality incompleteness must be distinguishable from unsafe identity, security and execution failure | Exactly `PASS`, `OWNER_REVIEW_REQUIRED` and `SYSTEM_BLOCKED`; explicit authenticated owner approval may accept only eligible failures, bound to Post/state/policy/blocker fingerprint for 30 minutes, with append-only decision audit and mandatory WordPress read-back |
+| Universal MCP post-ingest reconciliation | Ingest success alone cannot prove identity reuse, semantic neighborhood, justified relations, provenance or representative suitability | Every MCP ingest follows the bounded nine-stage reconciliation sequence; completion requires final verification; relation maximization is justified-useful, not edge-count maximization |
 | Deployment health | Runtime failure không được bị che thành empty data | Preflight, layered health và dependency completeness là release gate |
 
 # Appendix B — CURRENT IMPLEMENTATION STATUS (NON-NORMATIVE STATUS SNAPSHOT)
@@ -1896,6 +2003,7 @@ phải dùng Change Control.
 | Album | No Authority type, endpoint, predicate, repository, service or public contract | SEMANTIC_GAP | MCP content-operations audit |
 | WordPress Post boundary | Native Post remains editorial title/body/author/date/category/URL truth; no Article Authority body path is approved | COMPLIANT | 01_EDITORIAL_CONTENT_BOUNDARY.md historical evidence; Plugin.php and public route contracts |
 | Article Ingest boundary | Constitutionally approved operation-level workflow; reconcile coordinator, receipt diagnostics and MCP preflight/ingest media policy are implemented, while create/update cross-boundary idempotency, WordPress revision binding and final outcome contract remain open | PARTIAL / CODE_GAP | ArticleIngestCoordinator.php, ArticleMediaCoordinator.php, ArticleOperationReceipt.php, MCP_V3_CONTENT_OPERATIONS.md |
+| Universal MCP post-ingest reconciliation | Constitutional sequence and completion gate approved; per-domain runtime orchestration, relation candidate coverage, representative promotion/demotion and final completion evidence remain to be verified | CODE_GAP / RUNTIME-GATED | Constitution §20.1; MCP_V3_CONTENT_OPERATIONS.md; current domain contracts |
 | Governance | Proposal binding, approval, eligibility, Controlled Apply, capability checks, revision, idempotency and durable audit are implemented for current operations | COMPLIANT for registered operations | ControlledApplyService.php, ProposalEligibilityService.php, MCP catalog |
 | MCP catalog | Exactly 36 tools; governed writes remain capability-gated; the registered read and mutation abilities are exposed on supported WordPress versions | IMPLEMENTED for current catalog | McpToolCatalog.php, McpAbilityRegistration.php, MCP_V3_CONTENT_OPERATIONS.md |
 | Hydration/health | Bounded malformed-row omission and layered health/preflight exist; runtime/DB evidence varies by environment | IMPLEMENTED with environment gates | AuthorityRowHydrator.php, HealthCheck.php, tools/deployment-preflight.php |

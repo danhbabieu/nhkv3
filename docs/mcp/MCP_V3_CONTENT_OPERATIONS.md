@@ -3,7 +3,7 @@
 > **NON-NORMATIVE.** This is a runtime contract audit. If it conflicts with
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
-Status: runtime audit and contract-safe implementation checkpoint, 2026-09-04.
+Status: runtime audit and contract-safe implementation checkpoint, 2026-09-09.
 
 Governed Source/Knowledge/Evidence/Video ingest responses use an explicit
 identity envelope: `proposal_id`, `proposal_state`, `target_uuid` and
@@ -47,6 +47,39 @@ Modern requests use protocol `2026-07-28`; `Accept` must include both
 `application/json` and `text/event-stream`. Malformed arguments fail before
 dispatch. Governed tools require their capability. Initialized notifications
 return HTTP 202 with no body.
+
+### Universal post-ingest reconciliation and completion
+
+Every MCP ingest operation, including Media, Video, Knowledge, Source, Evidence
+and Authority entity ingest, must continue through the Constitution's bounded
+post-ingest reconciliation. The canonical order is:
+
+```text
+ingest
+→ read-back
+→ canonical search
+→ neighborhood/Graph inspection
+→ duplicate/reuse analysis
+→ relation candidate discovery
+→ evidence/provenance validation
+→ apply every justified useful registered relation
+→ final read-back
+```
+
+The reconciliation is bounded by the active registries, endpoint/predicate
+allow-lists, traversal/result budgets, dependency closure and Governance. It
+maximizes justified useful relations, not relation count; weak, speculative,
+duplicate or convenience-only candidates remain unapplied with diagnostics.
+Canonical search must happen before minting a new identity, claim, Source,
+Evidence, Video or Media. A transport-only attachment upload is an intermediate
+storage result; it must hand off to governed Media semantic ingest before the
+overall operation can be complete.
+
+`COMPLETE` is reserved for a result with canonical read-back, duplicate check,
+semantic research, relation reconciliation, representative-media
+reconciliation where applicable and final verification. Ingest success,
+proposal creation, preview, partial success, pending review or attachment
+creation alone is never `COMPLETE`.
 
 ### Documentation bootstrap surface
 
@@ -102,6 +135,12 @@ writers.
    writers as semantic fallback.
 4. If no registered owner or operation exists, return the applicable
    `REGISTRY_GAP`, `CODE_GAP` or `SEMANTIC_GAP`; never invent a writer.
+
+After the owner write, every ingest adapter invokes the universal reconciliation
+sequence above. The adapter must carry forward its canonical read-back,
+candidate set, duplicate/reuse findings, provenance/evidence checks, relation
+apply results and final read-back status. It must not report `COMPLETE` while a
+required stage is pending, unavailable, ambiguous or only proposed.
 
 ## 2. Tool catalog thực tế
 
@@ -242,6 +281,16 @@ claim. `add_evidence` requires an existing canonical Claim and Source plus their
 revision closure. Generated text, OCR, caption, alt and transcript text are
 never Evidence merely because they are available to MCP.
 
+After a Knowledge, Source or Evidence ingest read-back, the adapter must run
+canonical search, neighborhood/Graph inspection, duplicate/reuse analysis and
+relation candidate discovery against the registered Authority, Media,
+Source/Evidence and related Knowledge context. Each candidate keeps its
+provenance class (`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`,
+`CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`) and must pass
+subject/scope evidence validation before a governed relation apply. User input
+and Media observation remain scoped evidence/input; they are not universal
+facts without supporting Source/Evidence.
+
 ## 7. Graph workflow and runtime matrix
 
 Graph is the only relation persistence. Relation create, retire and reactivate
@@ -269,6 +318,8 @@ Full boot registers 15 endpoint types: `wp_post`; Authority `brand`, `model`,
 Only predicates currently registered by runtime may be used. Documentation or
 historical fixture text never authorizes an additional relation. No derived
 relation, Album relation or predicate-specific evidence rule may be invented.
+Post-ingest reconciliation applies every registered relation candidate that is
+useful and justified, and deliberately rejects weak/speculative edges.
 
 ### 7.1 Related semantic navigation read gap
 
@@ -320,10 +371,11 @@ The canonical lifecycle is multipart batch → native WordPress attachment
 creation → `wp_generate_attachment_metadata()` and derivatives → canonical
 attachment read-back / `nhk.media.attachment.get` → governed
 `nhk-v3/media-ingest` attachment adoption/binding → MediaAsset → Media →
-MediaUsage. Upload transport does not create Knowledge, Source, Evidence,
-Graph relations or inferred Model/Variant truth. The source-original remains a
-private/protected MediaAsset and WordPress derivatives remain derivatives under
-the same Media identity.
+MediaUsage. The upload transport phase does not infer or apply Knowledge,
+Source, Evidence, Graph relations or Model/Variant truth; after canonical Media
+ingest read-back, the universal post-ingest reconciliation is mandatory. The
+source-original remains a private/protected MediaAsset and WordPress
+derivatives remain derivatives under the same Media identity.
 
 The path classification is fixed: `nhk.media.upload-batch` is
 PRIMARY/RECOMMENDED multipart transport; `wp_upload_media_from_url` is
@@ -357,6 +409,28 @@ Media detail types, SEO keyword groups, state values and diagnostic reason codes
 are controlled registries owned by NHK Core. This MCP document does not define
 their semantics; the sole source of law is the Constitution and runtime
 registries.
+
+### 8.1 Media semantic enrichment and representative reconciliation
+
+After every governed Media ingest/read-back, inspect the canonical semantic
+neighborhood and run bounded enrichment. A single Media may be reused through
+multiple contextual usages and justified relations to multiple canonical nodes;
+each usage/relation must have its own supported subject/context and must not be
+created merely to increase Graph count.
+
+Inspect every directly related node that lacks an image. The best currently
+available image may become a temporary representative only when its
+representative relevance is sufficient. Selection is deterministic in this
+order: exact subject specificity → visual coverage → technical relevance →
+image quality/resolution → provenance confidence → current representative
+quality. A Variant-level image must not fill a broader Brand/Model slot when
+representative relevance is insufficient.
+
+When a more suitable candidate appears, compare suitability, promote the new
+representative and demote the old one to gallery, `technical_detail` or
+evidence when still suitable. Never delete the old Media, MediaAsset or
+provenance. Representative status is `BEST CURRENTLY AVAILABLE`, a mutable
+presentation choice rather than an immutable relation.
 
 ## 9. Product / Specimen
 
@@ -409,6 +483,14 @@ At the current Video boundary no NHK Source is created implicitly. A repeated
 observation may resolve `same_claim`; `add_evidence` is proposal-ready only with
 canonical `source_id` + `source_revision`. The planning packet never submits,
 approves or applies Knowledge/Evidence and never creates Graph predicates.
+
+After a governed Video ingest has produced a canonical owner read-back, the
+universal post-ingest reconciliation still runs: canonical search,
+neighborhood/Graph inspection, duplicate/reuse analysis, relation candidate
+discovery, evidence/provenance validation, governed application of every useful
+registered relation and final Video/Graph read-back. The optional Knowledge
+enrichment packet remains planning-only unless its own governed operation is
+applied; a preview or source snapshot is never `COMPLETE`.
 
 The runtime smoke for `SaLpWgitdSE` / Odo 36/10 verifies the target handoff:
 explicit `about → variant 95873bfe-d978-4eda-a5a2-ce9ba79625df` remains the
@@ -463,7 +545,9 @@ must use `nhk.media.attachment.get` with the returned `attachment_id` for
 WordPress projection read-back. Graph requires administrator-only Graph REST.
 Post requires native WordPress read/browser verification. Verify canonical
 identity, active state, visibility, revision result, relation direction and
-public projection; apply success alone does not prove public availability.
+public projection; then perform the final read-back after all justified relation
+and representative changes. Apply or ingest success alone does not prove
+public availability or permit `COMPLETE`.
 
 ## 15. End-to-end example
 

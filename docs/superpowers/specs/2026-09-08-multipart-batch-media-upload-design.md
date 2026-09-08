@@ -29,7 +29,10 @@ multipart request
 The batch context stores only workflow provenance, uploader, source/context,
 count and status. It is not an Authority entity, Graph endpoint, Knowledge,
 Source, Evidence or Media identity. Filename, OCR, EXIF, intended role and
-subject hints never infer semantic relations or create MediaUsage.
+subject hints do not infer or apply semantic relations or create MediaUsage
+during the transport phase. After governed Media ingest/read-back,
+Constitution §20.1 requires bounded reconciliation of justified usages and
+registered relations.
 
 ## Request and response
 
@@ -73,9 +76,11 @@ semantic identities. Storage containment and public delivery policy are
 verified. No raw DB write or arbitrary client filesystem path is accepted.
 
 The transport enters the existing Media application boundary for exactly one
-Media create-or-resolve per uploaded item. It does not create MediaUsage,
-Knowledge, Source, Evidence or Graph edges. Semantic role/target resolution
-continues later through the registered `nhk-v3/media-ingest` contract.
+Media create-or-resolve per uploaded item. It does not infer or apply
+MediaUsage, Knowledge, Source, Evidence or Graph edges during transport.
+Semantic role/target resolution continues through the registered
+`nhk-v3/media-ingest` contract and its mandatory bounded post-ingest
+reconciliation; weak/speculative relations remain unapplied.
 
 ## MCP and security
 
@@ -96,4 +101,3 @@ and preserve the transport/semantic boundary. Tests cover valid single/batch,
 ordering, partial failure/retry, idempotency/conflict, security, WordPress
 attachment metadata/derivatives/read-back, Media ingest integration, no
 semantic inference, existing tool regression and actual MCP discovery.
-

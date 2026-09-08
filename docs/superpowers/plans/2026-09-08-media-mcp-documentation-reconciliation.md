@@ -4,7 +4,7 @@
 
 **Goal:** Reconcile all current NHK V3 Media/MCP documentation around the implemented multipart batch transport and the separate governed semantic Media ingest boundary.
 
-**Architecture:** Keep `nhk.media.upload-batch` as the canonical multipart binary transport and route its ordered file results through native WordPress attachment creation, metadata/derivative generation and canonical read-back. Keep `nhk-v3/media-ingest` as the governed semantic Media boundary that may adopt an attachment, without allowing upload transport to create Knowledge, Source, Evidence or Graph truth.
+**Architecture:** Keep `nhk.media.upload-batch` as the canonical multipart binary transport and route its ordered file results through native WordPress attachment creation, metadata/derivative generation and canonical read-back. Keep `nhk-v3/media-ingest` as the governed semantic Media boundary that may adopt an attachment. Upload transport must not infer or apply Knowledge, Source, Evidence or Graph truth during transport; after canonical Media ingest/read-back, Constitution §20.1 requires bounded reconciliation of every justified useful registered relation.
 
 **Tech Stack:** Markdown contracts/status ledgers, PHP MCP catalog/transport/service code, PHPUnit tests, PHP lint and repository search.
 
@@ -18,7 +18,7 @@
 - WordPress attachment lifecycle uses native APIs and canonical read-back; no raw DB or manual uploads copying.
 - SHA-256 is computed from actual bytes; same idempotency key plus different payload fails with `IDEMPOTENCY_CONFLICT`.
 - Batch results are per-item and may be `partial_success`; successful items are retained for retry of failed items.
-- No upload-only semantic Knowledge, Source, Evidence or Graph mutation is documented or introduced.
+- No upload-only semantic Knowledge, Source, Evidence or Graph mutation is documented or introduced during transport; post-ingest reconciliation is mandatory after the governed Media boundary and must reject weak/speculative edges.
 - Runtime acceptance is not claimed unless fresh target discovery/read-back proves it.
 
 ### Task 1: Inventory and classify current documentation

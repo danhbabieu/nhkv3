@@ -95,3 +95,25 @@ Projection filtering preserves subject, scope, provenance eligibility and
 claim lifecycle; generated prose is never Evidence. Published SEO prose stays
 on its prior revision until the separate candidate passes validation and an
 explicit publish transition.
+
+## Universal MCP post-ingest reconciliation — 2026-09-09
+
+Knowledge, Source and Evidence MCP ingest is not complete at proposal/apply or
+single-owner read-back. After ingest, the bounded sequence is mandatory:
+canonical read-back → canonical search → neighborhood/Graph inspection →
+duplicate/reuse analysis → relation candidate discovery → evidence/provenance
+validation → governed application of every useful registered relation → final
+read-back. The full operation sequence begins with ingest as defined by
+Constitution §20.1.
+
+Relation candidates must be reconciled with registered Brand, Model, Variant,
+Movement, Component, Classification, Media, Source, Evidence and related
+Knowledge nodes where evidence supports the association. “Maximize relations”
+means maximize justified useful relations, not edge count; weak or speculative
+edges remain unapplied.
+
+Every claim, observation and relation candidate retains one controlled
+provenance class: `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`,
+`CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`. User input and
+image observation stay scoped to their subject/facet and cannot become a
+universal fact without supporting Source/Evidence of the same scope.

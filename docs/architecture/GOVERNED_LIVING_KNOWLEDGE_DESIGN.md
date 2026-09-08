@@ -131,8 +131,11 @@ Living Knowledge planner; Dictionary curation itself does not write the claim.
 Likewise, attaching a colloquial/technical/phonetic label to an existing
 Dictionary concept is not proof that a semantic entity relation exists.
 
-Media → Living Knowledge and Article → Living Knowledge write integration are
-not implemented by the completed Video slice. Future adapters may emit planning
+Media → Living Knowledge automatic claim-writing and Article → Living Knowledge
+body update are not implemented by the completed Video slice. This does not
+waive the universal MCP post-ingest reconciliation: Media must still run bounded
+semantic enrichment, duplicate/reuse analysis, neighborhood inspection and
+justified registered relation reconciliation. Future adapters may emit planning
 or update-suggestion packets only until their own governed boundary is reviewed.
 Image OCR/recognition, MediaUsage, `depicts`, Article body text and generated copy
 remain candidate inputs at most; none is Evidence or canonical truth merely by
@@ -141,6 +144,23 @@ existing in Media/WordPress storage.
 Semantic apply remains `Proposal → Human Approval → Eligibility → Controlled
 Apply → canonical repository → audit → read-back`. Same-intent repeats are
 idempotent and produce no duplicate claim, Evidence or relation.
+
+## Universal MCP post-ingest reconciliation — 2026-09-09
+
+When Living Knowledge is reached through MCP ingest, completion requires the
+bounded sequence in Constitution §20.1 after the canonical owner write:
+canonical read-back, canonical search, neighborhood/Graph inspection,
+duplicate/reuse analysis, relation candidate discovery,
+evidence/provenance validation, governed application of every justified useful
+registered relation and final read-back. “Maximize relations” is not a license
+to create weak or speculative edges.
+
+Knowledge and user input are reconciled against registered Brand, Model,
+Variant, Movement, Component, Classification, Media, Source, Evidence and
+related Knowledge nodes when the evidence supports them. Provenance remains
+explicit as `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`,
+`CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`; user statements
+and image observations do not become universal facts without matching support.
 
 ## Governed apply boundary
 

@@ -1,5 +1,50 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Persisted Odo36 Claim Projection acceptance
+
+The local integration root cause was isolated. `public/wp-config.php` already
+resolves `NHK_WP_TEST_DB`; MySQL 9.7.1 was running on `127.0.0.1:3306`, and
+both `nhk_v3` and `nhk_v3_test` existed. The earlier WordPress error was the
+sandbox refusing local TCP access, not a bad database name, credential,
+bootstrap path or `TestDatabaseGuard` failure. The approved local runtime path
+was used to run the guarded tests against the exact `nhk_v3_test` database.
+
+The integration acceptance now includes a controlled test-only Odo fixture. It
+uses the approved Model UUID `c01c109c-5d39-401e-a16e-6d61a0a52f50`, Variant
+UUID `95873bfe-d978-4eda-a5a2-ce9ba79625df`, the two supplied direct Claim
+UUIDs/stable keys and the approved Odo stable-key namespace. The fixture is
+created through the persisted repository boundary only inside `nhk_v3_test`
+and is removed in teardown; it is not production/demo semantic data.
+
+Real WPDB acceptance passed `3 tests / 152 assertions`. It proves persisted
+Odo36 direct claims, Odo36/10 propagated context with original subject UUID,
+revision and SEO read-back, source/evidence/relation dependency persistence,
+deterministic second read, explicit candidate publication, and invalidation →
+rebuild while retaining the previous published revision. The existing
+governed synthetic acceptance remains green and continues to cover private,
+disputed, XSS, unrelated-node, idempotency and frontend HTML behavior.
+
+Focused Claim Projection/search/frontend/migration verification passed `87
+tests / 776 assertions`; the complete Unit suite passed `823 tests / 3,915
+assertions` with existing warnings/deprecations. Maintenance/search integration
+smoke passed `4 tests / 34 assertions` with one existing warning. PHP lint, JS
+syntax, diff check and secret review pass. Local HTTP homepage returned 200,
+but the test database has no persisted Public Identity for an Odo entity, so a
+canonical entity HTTP route returned 404; renderer/integration HTML acceptance
+is green, while Odo HTTP runtime acceptance is not claimed.
+
+No canonical backfill operator exposure was required by runtime acceptance;
+the existing backfill service remains callable only in application/test code,
+so `BACKFILL_OPERATOR_PATH=NOT_EXPOSED`. No V2, staging, production or demo
+data was accessed or mutated, no migration reset/down was run, and no push was
+performed.
+
+`CLAIM_PROJECTION_INTEGRATION=PASS`
+`ODO36_PERSISTED_ACCEPTANCE=PASS`
+`ODO36_HTTP_RUNTIME_VERIFY=BLOCKED_NO_PUBLIC_IDENTITY`
+`BACKFILL_OPERATOR_PATH=NOT_EXPOSED`
+`READY_FOR_DEPLOY=NO`
+
 ## Checkpoint — 2026-09-09 — Semantic Claim Display acceptance continuation
 
 The Semantic Claim Display path is now code-complete for the governed
@@ -5911,11 +5956,12 @@ Public URL audit items now retain the identity action/status separately from
 reports an explicit blocked/unverified state. No Media, MediaAsset, MediaUsage,
 attachment, slug or canonical URL was created or changed.
 
-Focused route/delivery/audit tests pass 15 tests / 64 assertions; the complete
-Unit suite passes 823 tests / 3,914 assertions with 7 warnings, 1 deprecation
+Focused route/delivery/audit tests pass 15 tests / 65 assertions; the complete
+Unit suite passes 823 tests / 3,915 assertions with 7 warnings, 1 deprecation
 and 6 PHPUnit deprecations. Changed PHP files lint clean and `git diff --check`
 passes. Local HTTP route smoke is `ENVIRONMENT_BLOCKED` because no server is
-listening on `localhost:80`; the demo runtime was not deployed or mutated, so
+listening on `localhost:80`. The guarded WordPress integration bootstrap also
+hit the local database-connection error before tests could run. The demo runtime was not deployed or mutated, so
 the required real #86 curl and `/thu-vien/` browser read-back remain pending
 authorized deployment/runtime access. Attachment #86 remains 240×320; no
 upscale or gallery repair was performed.

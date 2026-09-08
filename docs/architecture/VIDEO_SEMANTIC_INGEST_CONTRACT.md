@@ -8,6 +8,15 @@ policy → NHK lookup → relation candidates → optional Knowledge enrichment
 planning → optional Dictionary lexical preview → Hub classification → editorial
 package → SEO projection → completeness → governed Video Proposal`.
 
+After the governed Video ingest is applied and the canonical Video is read back,
+the universal MCP reconciliation is mandatory: canonical search →
+neighborhood/Graph inspection → duplicate/reuse analysis → relation candidate
+discovery → evidence/provenance validation → apply every justified useful
+registered relation → final read-back. A preview, proposal or source snapshot
+is not `COMPLETE`; completion also requires duplicate check, semantic research,
+relation reconciliation and final verification. Weak/speculative relations are
+not created merely to maximize edge count.
+
 Canonical public URL policy is `/video/{semantic-slug}/`; the external video ID
 remains internal identity metadata and is not a default public slug suffix.
 Semantic slug fallback order is explicit governed NHK semantic/editorial
@@ -29,6 +38,12 @@ Input is intentionally small: `url`, optional `user_hint`, optional
 `intended_category`, optional already-resolved `intended_relations`, optional
 `editorial_instruction` and optional `idempotency_key`. User hints are retained
 as `USER_HINT`; they are high-value context, not Authority truth.
+
+The reconciliation preserves provenance classes
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` and `SYSTEM_INFERENCE`. User hints, source metadata and
+observations remain scoped; they are not universal facts without supporting
+evidence.
 
 The source adapter is the only boundary allowed to call the external video
 platform. The preferred client is its official data API with an

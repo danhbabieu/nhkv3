@@ -44,6 +44,31 @@ Usage không tự tạo `depicts`, `about`, Knowledge, Source hoặc Evidence. R
 thay ảnh đại diện. Checksum, tên file, URL attachment và thời điểm upload không
 được dùng để merge hoặc thay canonical Media identity.
 
+## Universal MCP post-ingest reconciliation — 2026-09-09
+
+Sau mỗi MCP Media ingest đã đọc lại được, Media phải chạy bounded semantic
+enrichment theo chuỗi canonical: `ingest → read-back → canonical search →
+neighborhood/Graph inspection → duplicate/reuse analysis → relation candidate
+discovery → evidence/provenance validation → apply mọi relation hữu ích có căn
+cứ → final read-back`. Đây là một phần của completion contract, không phải
+optional enrichment. Bounded theo runtime registry, Graph traversal/result
+limits, dependency closure và Governance; không tạo weak/speculative edge.
+
+Một Media có thể được reuse bởi nhiều MediaUsage hoặc quan hệ tới nhiều node
+khi từng context có căn cứ. Sau ingest phải tìm các node trực tiếp liên quan
+đang thiếu ảnh và đánh giá ảnh tốt nhất hiện có làm representative tạm thời.
+Representative là `BEST CURRENTLY AVAILABLE`, không immutable. Suitability
+được ưu tiên theo exact subject specificity → visual coverage → technical
+relevance → image quality/resolution → provenance confidence → current
+representative quality. Ảnh cấp Variant không đại diện Brand/Model rộng hơn
+nếu thiếu representative relevance.
+
+Khi có ảnh phù hợp hơn, compare suitability, promote ảnh mới và demote ảnh cũ
+về gallery, `technical_detail` hoặc evidence nếu còn phù hợp. Không xóa Media,
+MediaAsset hay provenance cũ. Role/usage reconciliation không tự tạo
+`depicts`; mọi semantic relation vẫn phải là predicate đã đăng ký, evidence-
+supported và Governed.
+
 Các adapter MCP/Admin/WordPress phải đi qua cùng application boundary của Media;
 không adapter nào được ghi trực tiếp bảng Media/Asset/Usage như một writer thứ
 hai. Downstream reuse phải ưu tiên canonical Media UUID/stable key + revision,
@@ -84,11 +109,13 @@ không tự tạo global semantic dedup. Nếu concurrency chưa có runtime pro
 trạng thái phải ghi `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING`.
 
 Upload transport chỉ tạo/adopt attachment và đi qua governed Media boundary;
-nó không tạo Knowledge, Source, Evidence, Graph relation, Model/Variant suy
-diễn hay semantic truth. Source/Evidence chỉ được tạo/reconcile bởi workflow
-semantic có provenance và governance; locator canonical của attachment được
-ưu tiên khi lifecycle đã đọc lại thành công, không duplicate Source/Evidence
-chỉ để thay `chatgpt-upload:*`.
+trong transport phase nó không infer/apply Knowledge, Source, Evidence, Graph
+relation, Model/Variant suy diễn hay semantic truth. Sau Media semantic ingest
+và canonical read-back, universal post-ingest reconciliation bắt buộc phải
+chạy; Source/Evidence và Graph chỉ được tạo/reconcile khi có provenance,
+evidence, registered relation và Governance phù hợp. Locator canonical của
+attachment được ưu tiên khi lifecycle đã đọc lại thành công, không duplicate
+Source/Evidence chỉ để thay `chatgpt-upload:*`.
 
 Media workflow có thể chuẩn bị cho `batch images → attachments → Media →
 MediaUsage → Specimen → Product`, nhưng Specimen vẫn là một hiện vật vật lý,

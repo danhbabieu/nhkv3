@@ -10,10 +10,14 @@ MediaAsset delivery URLs are delivery identities, not standalone SEO pages.
 WordPress attachment and editorial placement are storage/projection state.
 
 SEO respects representative, evidence and `technical_detail` usage roles.
-Representative selection follows deterministic existing precedence; evidence or
-technical imagery never replaces it because it is newer, larger or uploaded
-later. Private, placeholder and technical-only assets are excluded where the
-target surface requires a public representative.
+Representative selection follows the post-ingest deterministic precedence:
+exact subject specificity → visual coverage → technical relevance → image
+quality/resolution → provenance confidence → current representative quality.
+Evidence or technical imagery never replaces a representative solely because it
+is newer or larger, but a fully compared and more suitable candidate may be
+promoted while the prior representative is demoted if still suitable. Private,
+placeholder and technical-only assets are excluded where the target surface
+requires a public representative.
 
 Alt text is contextual, concise and accessibility-first. Caption is editorial
 context. Neither may assert an unseen fact or create Knowledge, Evidence or a
@@ -33,3 +37,8 @@ separate thumbnail/srcset candidate, but clicking the gallery image must open
 the large canonical `/anh/<slug>.webp` asset. Missing source-derived output is
 an unavailable/incomplete projection, not permission to fall back to a
 thumbnail.
+
+After every MCP Media ingest, the Media semantic enrichment and representative
+reconciliation required by Constitution §20.1 must complete before the Media
+operation is `COMPLETE`; SEO projection consumes the final read-back and does
+not create relations or select an image from upload recency alone.

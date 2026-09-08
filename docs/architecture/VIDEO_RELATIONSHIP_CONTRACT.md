@@ -45,3 +45,19 @@ Source/Evidence must not leak through relation payloads. Guided Admin relation
 flows resolve/reuse canonical provenance when the contract permits; normal
 users do not copy proposal or Evidence UUIDs. The existing Governance lifecycle
 remains the only relation writer.
+
+## Post-ingest reconciliation — 2026-09-09
+
+After Video canonical owner read-back, MCP completion continues through
+canonical search, bounded neighborhood/Graph inspection, duplicate/reuse
+analysis, relation candidate discovery, evidence/provenance validation,
+Governed application of every useful registered relation and final read-back.
+“Maximize relations” means maximize justified useful relations, not edge count;
+weak or speculative candidates remain unapplied.
+
+The relation candidate retains one explicit provenance class:
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`. The class does not replace
+`evidence_refs`; it records how the candidate was sourced. User input, source
+metadata and visual observation do not become universal facts or relation
+evidence without support at the exact subject and scope.

@@ -9,13 +9,26 @@
 ```text
 user intent → content kind → registered owner/endpoint
 → application service → governed operation (when semantic)
-→ relation/media/SEO policy → read-back → publication gate
+→ ingest → canonical read-back → canonical search
+→ neighborhood/Graph inspection → duplicate/reuse analysis
+→ relation candidate discovery → evidence/provenance validation
+→ apply every justified useful registered relation → final read-back
+→ publication gate when applicable
 → MCP and Admin adapters
 ```
 
 MCP and WordPress Admin must consume the same application services and
 capability source. Native WordPress editorial publishing remains independent;
 an MCP-managed V3 Article is complete only after the Article Ingest contract.
+
+Every MCP ingest domain uses this bounded deep reconciliation, including
+Media, Video, Knowledge, Source, Evidence and Authority entities. “Maximize
+relations” means maximize justified useful relations, not edge count; weak or
+speculative candidates remain diagnostics/review items. `COMPLETE` requires the
+canonical read-back, duplicate check, semantic research, relation
+reconciliation, representative-media reconciliation where applicable and final
+verification. Attachment-only transport, preview, partial, pending or
+unavailable outcomes are intermediate and cannot be reported as complete.
 
 The Governance Automation Policy is resolved in the shared application
 orchestration boundary used by MCP and Admin. Its only modes are
@@ -69,9 +82,11 @@ semantic Media boundary for attachment adoption/binding through
 
 The canonical flow is `multipart batch → WordPress attachment lifecycle →
 attachment read-back / media-attachment-get → media-ingest → MediaAsset →
-Media → MediaUsage`. Upload transport does not create Knowledge, Source,
-Evidence, Graph relations or inferred Model/Variant truth. Source/Evidence is
-reconciled only by a later governed semantic workflow, and a durable
+Media → MediaUsage`. Upload transport does not infer or apply Knowledge,
+Source, Evidence, Graph relations or inferred Model/Variant truth during its
+transport phase; the mandatory post-ingest reconciliation runs after canonical
+Media read-back. Source/Evidence is reconciled only by a later governed
+semantic workflow, and a durable
 WordPress locator is preferred after canonical read-back without duplicating a
 Source/Evidence record solely to change its locator.
 
@@ -86,8 +101,9 @@ Actual image bytes must validate before persistence. Corrupt/fake/unreadable
 payloads fail closed and partial attachment, mapping or semantic artifacts must
 be cleaned up. WordPress attachment is never semantic authority. Entity
 projection exposes representative and evidence separately; evidence and
-`technical_detail` never replace a representative, whose precedence is
-deterministic.
+`technical_detail` do not replace a representative solely by role, recency or
+size. A fully compared more suitable candidate may be promoted, with the old
+one demoted when still suitable, under the deterministic precedence.
 
 ## Storage and reuse map — 2026-09-04
 
@@ -107,6 +123,12 @@ deterministic.
 All downstream adapters must read back from the owning store after a write. MCP
 is orchestration/transport, not a canonical data store; Admin is an input
 adapter, not a second writer.
+
+The reconciliation preserves provenance classes
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` and `SYSTEM_INFERENCE`. User statements and image
+observations stay scoped and are not promoted to universal facts without
+supporting evidence.
 
 ## Required Article sequence
 

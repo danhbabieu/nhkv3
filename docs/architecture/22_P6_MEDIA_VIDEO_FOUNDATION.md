@@ -11,6 +11,26 @@ when `NHK_WP_TEST_PATH` is unavailable; therefore runtime acceptance remains
 required and this document does not claim the full ingest-to-preflight chain
 complete. Legacy mapping/repair remains read-only and unauthorized.
 
+## Universal MCP post-ingest reconciliation — 2026-09-09
+
+The Media and Video foundation is subject to the Constitution's mandatory
+bounded post-ingest sequence: ingest → canonical read-back → canonical search
+→ neighborhood/Graph inspection → duplicate/reuse analysis → relation
+candidate discovery → evidence/provenance validation → governed application of
+every justified useful registered relation → final read-back. Upload transport,
+preview, partial success or proposal creation is not `COMPLETE`.
+
+Media additionally runs semantic enrichment and representative reconciliation.
+Every directly related node missing an image is inspected; the best currently
+available suitable image may be a temporary representative. Selection is
+ordered by exact subject specificity, visual coverage, technical relevance,
+image quality/resolution, provenance confidence and current representative
+quality. A better image is promoted and the old one demoted to gallery,
+`technical_detail` or evidence when suitable; no Media or provenance is deleted.
+Weak/speculative Graph edges are rejected. Provenance classes remain
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` and `SYSTEM_INFERENCE`.
+
 ## Current reusable boundary — 2026-09-04
 
 Downstream systems must read the current Constitution before interpreting older
@@ -28,8 +48,9 @@ P6 checkpoints below. The active storage/reuse boundary is:
 - checksum, filename, attachment URL and upload recency are duplicate/
   presentation signals only and never canonical merge rules;
 - representative and evidence/technical-detail presentation roles remain
-  distinct; evidence imagery never replaces representative imagery merely
-  because it was uploaded later;
+  distinct; evidence imagery does not replace a representative merely because
+  it was uploaded later, but a fully compared more suitable candidate may be
+  promoted under the post-ingest representative policy;
 - MCP/Admin/WordPress adapters all converge on the same Media application
   boundary and must read back from the canonical Media + attachment mapping;
 - upload/EXIF/OCR/recognition/alt/caption do not automatically create Authority,
@@ -63,8 +84,10 @@ lifecycle (`wp_handle_sideload`/attachment creation, metadata generation and
 derivatives) → canonical attachment read-back / `nhk.media.attachment.get` →
 `nhk-v3/media-ingest` attachment adoption/binding → MediaAsset → Media →
 MediaUsage. It uses the same governed Media boundary and attachment read-back
-as the existing single-file path; it does not create semantic roles,
-Knowledge, Source, Evidence or Graph relations.
+as the existing single-file path; the transport/adoption phase does not infer
+or apply semantic roles, Knowledge, Source, Evidence or Graph relations. After
+canonical Media ingest read-back, the universal post-ingest reconciliation is
+mandatory and may apply only justified registered relations through Governance.
 The `nhk-v3/media-ingest` Ability remains metadata/attachment-binding
 semantics. The connector-facing `nhk-v3/media-upload-batch` Ability exposes
 the top-level `files[]` binary parameter and forwards the request's native
@@ -120,9 +143,12 @@ dimensions, filesize and WordPress derivatives. `nhk.media.attachment.get`
 provides the same reader-safe read-back shape.
 
 This path is an adapter into the governed Media/MediaAsset/MediaUsage workflow;
-it does not infer semantic relations from image content. The attachment is
-created or adopted idempotently after Media identity resolution. Metadata-only
-`nhk.media.ingest` remains the governed proposal workflow.
+the adapter itself does not infer or apply semantic relations from image
+content. After canonical Media ingest/read-back, the universal reconciliation
+may evaluate image observations and other evidence but applies only justified
+registered relations through Governance. The attachment is created or adopted
+idempotently after Media identity resolution. Metadata-only `nhk.media.ingest`
+remains the governed proposal workflow.
 
 ## Video contract
 

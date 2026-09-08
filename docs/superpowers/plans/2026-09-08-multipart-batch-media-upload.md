@@ -4,7 +4,7 @@
 
 **Goal:** Deliver the canonical multipart single/batch upload transport from real file bytes through WordPress attachment read-back and governed Media adoption, with safe replay, partial failure, MCP discovery, tests and reconciled documentation.
 
-**Architecture:** Add one transport capability, `nhk.media.upload-batch` / `nhk-v3/media-upload-batch`, whose single-file case is batch size one. Reuse the existing WordPress image adapter and governed Media boundary, adding a durable transport binding for idempotency and a per-item artifact cleanup journal; never create semantic relations from upload hints.
+**Architecture:** Add one transport capability, `nhk.media.upload-batch` / `nhk-v3/media-upload-batch`, whose single-file case is batch size one. Reuse the existing WordPress image adapter and governed Media boundary, adding a durable transport binding for idempotency and a per-item artifact cleanup journal; never infer or apply semantic relations from upload hints during the transport phase. After canonical Media ingest/read-back, Constitution §20.1 requires bounded reconciliation of justified relations.
 
 **Tech Stack:** PHP 8.x, WordPress native media APIs, existing NHK Core application/domain/repository layers, PHPUnit, WordPress REST/MCP Ability bridge, additive UP-only migration where required.
 
@@ -19,7 +19,7 @@
 - SHA-256 is calculated from actual bytes; checksum never performs unsafe global semantic deduplication.
 - Same idempotency key and different payload is a deterministic conflict.
 - Batch items are independently successful or failed; successful items are not rolled back because another item failed.
-- Upload transport creates no Knowledge, Source, Evidence, Graph edge or final semantic role.
+- Upload transport creates no Knowledge, Source, Evidence, Graph edge or final semantic role during the transport phase; it hands off to governed Media ingest and the mandatory post-ingest reconciliation.
 - No production/V2/staging mutation, push, deploy, raw DB semantic write, or legacy repair.
 
 ---
@@ -125,7 +125,7 @@
 - Test: focused Media integration tests and `McpTransportIntegrationTest.php`
 
 - [ ] Step 1: Add a test that consumes returned attachment IDs through attachment read-back and then the existing `nhk-v3/media-ingest` binding path.
-- [ ] Step 2: Add assertions that upload-only creates no MediaUsage, Knowledge, Source, Evidence or Graph relation beyond the governed Media/Asset attachment mapping required by the current Media law.
+- [ ] Step 2: Add assertions that the transport phase creates no Knowledge, Source, Evidence or Graph relation beyond the governed Media/Asset attachment mapping, and that canonical Media ingest then enters the mandatory post-ingest reconciliation without weak/speculative edges.
 - [ ] Step 3: Verify replay yields one attachment/Media binding and no duplicate semantic record.
 - [ ] Step 4: Run focused Media/MCP tests and record unavailable runtime distinctly from empty data.
 - [ ] Step 5: Commit `test: prove batch upload media boundary integration`.
@@ -145,4 +145,3 @@
 - [ ] Step 3: Update execution state with exact test counts and blockers; do not claim live/deployed acceptance if WordPress/Easy MCP runtime is unavailable.
 - [ ] Step 4: Review changed files and status for credentials, dumps, tokens or unrelated changes.
 - [ ] Step 5: Commit `feat: add multipart batch media upload transport`.
-

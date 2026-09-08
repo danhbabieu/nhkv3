@@ -1,6 +1,6 @@
 # NHK V3 Current Documentation Status Index
 
-> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-07.**
+> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-09.**
 > This file is not a second Constitution and does not create semantic vocabulary,
 > operations, predicates, storage, routes or data. Its purpose is to tell
 > downstream systems which sources are current law/contract, which sources are
@@ -39,6 +39,34 @@ Use this precedence when deciding current behavior:
    explicitly incorporates them.
 7. Plans/specs under `docs/superpowers/` and legacy/V2 material — plan/reference
    or migration evidence only.
+
+## 1.1 Universal MCP ingest reconciliation — current canonical route
+
+The sole normative rule is Constitution §20.1. Every MCP ingest of Media,
+Video, Knowledge, Source, Evidence or Authority entity must follow the bounded
+sequence:
+
+`ingest → read-back → canonical search → neighborhood/Graph inspection →
+duplicate/reuse analysis → relation candidate discovery → evidence/provenance
+validation → apply every justified useful registered relation → final
+read-back`.
+
+The operational details are distributed only through the existing owning
+contracts: `MCP_V3_CONTENT_OPERATIONS.md` and
+`NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` for orchestration/completion,
+`04_MEDIA_MODEL.md`, `22_P6_MEDIA_VIDEO_FOUNDATION.md` and
+`ADMIN_MEDIA_INPUT_GUIDANCE.md` for Media enrichment and representative
+selection, `06_KNOWLEDGE_SOURCE_MODEL.md` and
+`GOVERNED_LIVING_KNOWLEDGE_DESIGN.md` for claims/provenance, and
+`VIDEO_SEMANTIC_INGEST_CONTRACT.md` plus `VIDEO_RELATIONSHIP_CONTRACT.md` for
+Video. No separate reconciliation policy or vocabulary is created here.
+
+`COMPLETE` requires canonical read-back, duplicate check, semantic research,
+relation reconciliation, representative-media reconciliation when applicable
+and final verification. “Maximize relations” means maximize justified useful
+relations, not relation count. The controlled provenance classes are
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` and `SYSTEM_INFERENCE`.
 
 A newer timestamp alone never overrides the Constitution or an approved
 contract. Conversely, an old checkpoint must not override a later executable
@@ -112,7 +140,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
 | Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |
 | Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; Dictionary observation after canonical write is lexical/non-blocking and does not broaden the target |
-| Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | `nhk.media.upload-batch` is PRIMARY multipart transport; native WordPress attachment lifecycle and canonical read-back precede separate governed `nhk-v3/media-ingest`; URL import is SECONDARY/IMPORT; base64 is FALLBACK/COMPATIBILITY; code-side batch/idempotency exists, while target multipart acceptance remains `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING` |
+| Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | `nhk.media.upload-batch` is PRIMARY multipart transport; native WordPress attachment lifecycle and canonical read-back precede separate governed `nhk-v3/media-ingest`; URL import is SECONDARY/IMPORT; base64 is FALLBACK/COMPATIBILITY; post-ingest semantic enrichment, relation reconciliation and representative reconciliation are mandatory; target acceptance remains runtime-gated |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
 | MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.media.upload-batch` is the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; the Ability bridge preserves connector multipart parts while delegating to the same transport; `nhk-v3/media-ingest` remains the governed semantic metadata/attachment-binding Ability; discovery existence is not live callability, and authenticated `upload_files` read-back is still required |
@@ -121,7 +149,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
 | Video frontend | `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `VIDEO_RELATIONSHIP_CONTRACT.md`, `VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `VIDEO_SEO_PROJECTION_CONTRACT.md` | first-party `/video/{slug}/` route and separate source action; external URL is never the canonical frontend destination |
 
-### 2.1 Canonical Media/MCP document map — 2026-09-08
+### 2.1 Canonical Media/MCP document map — 2026-09-09
 
 | Classification | Documents | Use |
 |---|---|---|
@@ -133,8 +161,10 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 
 The current canonical Media flow is `multipart batch → WordPress attachment →
 canonical read-back / media-attachment-get → media-ingest → MediaAsset → Media
-→ MediaUsage`. Upload-only does not create Knowledge, Source, Evidence or Graph
-truth. Product/Specimen future sequencing is allowed as a workflow shape only;
+→ MediaUsage`. Upload-only does not infer or apply Knowledge, Source, Evidence
+or Graph truth during the transport phase; after canonical Media ingest
+read-back, universal post-ingest reconciliation is mandatory.
+Product/Specimen future sequencing is allowed as a workflow shape only;
 the entities remain distinct and Product–Specimen remains `REGISTRY_GAP` until
 an approved relation is registered.
 
@@ -201,7 +231,10 @@ Do not rewrite history merely to make old checkpoints look current.
 - dedicated Product–Specimen canonical relation;
 - approved Classification membership predicate (`classified_as`) and governed Graph relation apply; read-only Graph inventory/relation dry-run capability is implemented;
 - full physical Graph completeness/backfill where not runtime-proven;
-- Media → Living Knowledge automatic enrichment adapter;
+- Media → Living Knowledge automatic claim-writing adapter (Media semantic
+  enrichment/relation reconciliation remains mandatory);
+- universal per-domain MCP post-ingest reconciliation orchestration and final
+  `COMPLETE` read-back evidence across all target runtimes;
 - automatic Article body rewrite from Knowledge (prohibited by design; only
   suggestion/governed editorial flow is allowed);
 - exact integration/runtime gates wherever current execution evidence reports
@@ -222,7 +255,9 @@ Before implementing or mutating data:
 4. distinguish historical evidence from current contract;
 5. fail closed on ambiguity or a missing approved writer/relation;
 6. use Governance for semantic mutation;
-7. read back from the canonical owner before claiming completion.
+7. run the bounded post-ingest reconciliation required by Constitution §20.1;
+8. read back from the canonical owner after reconciliation before claiming
+   completion.
 
 For public Entity display work, also resolve the applicable dossier recipe. A
 reachable graph node is not automatically approved public inherited truth; use

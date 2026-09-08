@@ -103,6 +103,29 @@ in another Article, Product, Specimen or projection.
 Existing legacy attachments are read-only unless a separately governed repair
 or migration task explicitly authorizes changes.
 
+## Post-ingest semantic reconciliation — 2026-09-09
+
+Sau khi Media ingest đã canonical read-back, Admin phải dùng cùng bounded
+reconciliation với MCP: canonical search → neighborhood/Graph inspection →
+duplicate/reuse analysis → relation candidate discovery →
+evidence/provenance validation → apply mọi relation hữu ích có căn cứ qua
+Governance → final read-back. Admin không được dừng ở attachment/Media ingest
+success hoặc báo `COMPLETE` khi các stage này còn pending.
+
+Media semantic enrichment phải kiểm tra mọi node trực tiếp liên quan đang thiếu
+ảnh. Ảnh tốt nhất hiện có có thể làm representative tạm thời nếu đủ
+representative relevance. Representative là `BEST CURRENTLY AVAILABLE`, không
+immutable; ảnh phù hợp hơn được compare/promote và ảnh cũ được demote về
+gallery, `technical_detail` hoặc evidence nếu còn phù hợp. Thứ tự suitability
+là exact subject specificity → visual coverage → technical relevance → image
+quality/resolution → provenance confidence → current representative quality.
+Ảnh Variant không lấp Brand/Model rộng hơn khi thiếu relevance.
+
+Provenance phải giữ rõ một trong các class
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH`, `SYSTEM_INFERENCE`; observation ảnh và user statement
+không được nâng thành universal fact nếu thiếu evidence.
+
 ## Unified Workbench guidance — 2026-09-07
 
 The standard Admin menu is: Tổng quan, Nội dung, Media, Tri thức, Duyệt, Hệ

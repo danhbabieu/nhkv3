@@ -23,9 +23,13 @@ Native WordPress attachment creation, metadata/derivative generation and
 canonical read-back precede the separate governed `nhk-v3/media-ingest`
 attachment-adoption boundary. `wp_upload_media_from_url` is secondary/import;
 base64 `wp_upload_media` is fallback/compatibility, not the primary path.
-Upload does not infer semantic relations or Knowledge/Source/Evidence truth.
-Code-side batch/idempotency implementation exists; live multipart acceptance
-and target runtime read-back remain pending.
+Upload transport does not infer or apply semantic relations or
+Knowledge/Source/Evidence truth during its storage phase. After governed Media
+ingest and canonical read-back, Constitution §20.1 requires bounded semantic
+reconciliation and application of every justified useful registered relation;
+weak/speculative edges remain rejected. Code-side batch/idempotency
+implementation exists; live multipart acceptance and target runtime read-back
+remain pending.
 
 | Phase | Status | Evidence / next gate |
 |---|---|---|

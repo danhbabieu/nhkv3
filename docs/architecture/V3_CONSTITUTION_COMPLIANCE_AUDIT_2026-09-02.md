@@ -450,7 +450,7 @@ the earlier runtime findings.
 | Placeholder / semantic safety | PASS | Placeholders are system Media only; tests prove they are excluded from preferred-image and image-sitemap eligibility and do not create Evidence, Knowledge or Graph records. |
 | Reuse / idempotency | PASS in unit evidence | Suitable active, ready Media with assets is reused before placeholder creation; repeated reconciliation preserves one usage per mandatory role. |
 | SEO vocabulary / projection | PASS for policy slice | Role, detail, keyword, state and diagnostic registries fail closed; filename normalization and contextual Usage metadata are covered. Full WordPress attachment, structured-data and live sitemap integration remain unverified. |
-| Bulk / batch boundary | PASS for metadata packets | `MediaBatchIngestService` carries workflow context only and does not create semantic relations. Real upload transport remains a separate gate. |
+| Bulk / batch boundary | PASS for metadata packets | `MediaBatchIngestService` carries workflow context only and does not infer/apply semantic relations during transport. Under the later universal MCP rule, canonical Media ingest must enter bounded post-ingest reconciliation; real upload transport remains a separate gate. |
 | Legacy read-only audit | PASS | The dedicated legacy report records `UNVERIFIED` runtime counts and no-repair status. No Post 55 or legacy article body was mutated. |
 | Live runtime verification | FAIL / BLOCKED | WordPress/MySQL bootstrap is unavailable in this shell; no fresh integration, migration or HTTP evidence can be claimed. |
 

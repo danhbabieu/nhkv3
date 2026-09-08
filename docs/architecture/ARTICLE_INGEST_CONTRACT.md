@@ -59,20 +59,27 @@ turn generated copy into Evidence.
    representative/evidence projection and WordPress Post. Verify
    canonical identity, revisions, visibility, relation direction, provenance
    and public projection eligibility.
-7. Before publication of promotional/commercial copy, run the public-claim
+7. Run the bounded post-ingest semantic reconciliation: canonical search,
+   neighborhood/Graph inspection, duplicate/reuse analysis, relation candidate
+   discovery, evidence/provenance validation, governed application of every
+   justified useful registered relation and final read-back. This stage must
+   not maximize edge count or create weak/speculative relations.
+8. Before publication of promotional/commercial copy, run the public-claim
    compliance gate over the rendered Article and its public projections. An
    unsupported objective or superiority/uniqueness/absolute claim must be
    evidence-bound, genuinely narrowed by rewrite, or blocked for human review;
    synonym substitution alone is not a compliant rewrite.
-8. Publish the WordPress Post only when all required stages have satisfied this
+9. Publish the WordPress Post only when all required stages have satisfied this
    contract. Generic WordPress publication remains independently valid, but it
    is not a completed V3 knowledge Article workflow without these stages.
 
 ## Completion and failure
 
 A completion claim requires success of every required editorial, semantic,
-verification and applicable public-claim compliance stage. A required semantic,
-compliance or unavailable dependency failure must remain an explicit
+post-ingest reconciliation, representative-media reconciliation and
+verification/public-claim compliance stage. Ingest success, draft creation,
+proposal creation or one owner read-back alone never authorizes `COMPLETE`. A
+required semantic, compliance or unavailable dependency failure must remain an explicit
 non-success, retryable, unavailable, conflict or equivalent outcome defined by
 the eventual approved runtime contract. This document does not reserve or
 invent a closed outcome vocabulary.
