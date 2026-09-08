@@ -11,6 +11,8 @@ final class InMemoryProjectionRevisionStore implements ProjectionRevisionStore
     /** @var array<string,list<ProjectionRevision>> */
     private array $items = [];
 
+    public function status(): array { return ['status' => 'available', 'reason' => null, 'missing_tables' => []]; }
+
     public function saveCandidate(ProjectionRevision $revision): ProjectionRevision
     {
         $items = $this->items[$revision->nodeUuid] ?? [];

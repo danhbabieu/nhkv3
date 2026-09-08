@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Contracts\Projection;
 
-interface ProjectionDependencyIndex
+interface ProjectionDependencyIndex extends ProjectionStorageStatus
 {
     /** @param array<string,mixed> $dependency */
     public function add(array $dependency): void;

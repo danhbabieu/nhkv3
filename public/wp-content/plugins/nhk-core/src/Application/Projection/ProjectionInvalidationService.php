@@ -13,6 +13,12 @@ final class ProjectionInvalidationService
     /** @return array{status:string,impacted:list<array<string,mixed>>} */
     public function invalidate(string $kind, string $id, ?int $revision = null): array
     {
+        try {
+            $storage = $this->dependencies->status();
+            if (($storage['status'] ?? 'unavailable') !== 'available') return ['status' => 'unavailable', 'reason' => $storage['reason'] ?? 'PROJECTION_STORAGE_UNAVAILABLE', 'impacted' => [], 'failures' => []];
+            $storage = $this->store->status();
+            if (($storage['status'] ?? 'unavailable') !== 'available') return ['status' => 'unavailable', 'reason' => $storage['reason'] ?? 'PROJECTION_STORAGE_UNAVAILABLE', 'impacted' => [], 'failures' => []];
+        } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'PROJECTION_STORAGE_UNAVAILABLE', 'impacted' => [], 'failures' => []]; }
         $impacted = $this->dependencies->findByDependency($kind, $id);
         $nodes = [];
         $failures = [];

@@ -1,5 +1,46 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-08 — Semantic Claim Projection missing-schema fail-soft
+
+The pre-migration failure was reproduced with a WPDB test double representing
+the runtime before migration 016: the entity projection read returned
+`status=unavailable`, `reason=MIGRATION_016_SCHEMA_UNAVAILABLE`, the published
+SEO projection returned `null`, and no data query was issued against either
+projection table. The canonical entity path remains independent of this
+optional derived read model, so its identity/summary can render while the
+Ledger section reports an honest update/unavailable state. The missing-table
+probe is read-only (`SHOW TABLES`), cached for the request, and does not invoke
+the migration system.
+
+The exact call path was `entity.php` → `EntityPageQuery::withRelated()` →
+`nhk_v3_entity_detail_projection` → `FrontendSemanticBootstrap` →
+`ClaimProjectionService::getLedger()` / `getPublishedSeoProjection()` →
+`WpdbProjectionRevisionStore::findCandidate()` / `findPublished()`. Before
+this fix the store queried unconditionally; WordPress returned `null` while
+also recording/printing the missing-table DB error. `Plugin::boot()` only calls
+`runPendingMigrations()` when `NHK_RUN_MIGRATIONS === true`; migration 016
+remains an additive migration-system responsibility, never a frontend action.
+
+`WpdbProjectionSchema` now guards both revision and dependency stores, and the
+application service, invalidation boundary and projection REST write actions
+fail soft/deterministically when the schema is unavailable. Admin status
+returns the unavailable reason and missing table list instead of reporting
+zero claims. The normal existing-schema WPDB read path remains covered, as do
+candidate-table absence, dependency-table absence and no-query-storm behavior.
+
+Focused projection/frontend/migration verification passed `30 tests / 126
+assertions`; the complete Unit suite passed `796 tests / 3,809 assertions`
+with existing warnings/deprecations. The guarded local integration command
+using `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` was attempted but
+WordPress could not establish its database connection in this run, so current
+local migration read-back and frontend HTML runtime acceptance remain
+`ENVIRONMENT_BLOCKED`. No target/demo/production runtime was accessed, no
+table was created manually, and no semantic data was changed.
+
+`MIGRATION_016_STATUS=CODE_PRESENT_TARGET_RUNTIME_UNVERIFIED`.
+`READY_FOR_DEPLOY=NO` pending the separate documented migration execution and
+read-back by an authorized deployment/runtime operator.
+
 ## Checkpoint — 2026-09-08 — Semantic Claim Projection runtime acceptance continuation
 
 Baseline resumed at `6237e33` with a clean working tree. Focused projection

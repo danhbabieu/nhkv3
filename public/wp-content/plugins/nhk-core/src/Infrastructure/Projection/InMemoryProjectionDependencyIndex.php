@@ -10,6 +10,8 @@ final class InMemoryProjectionDependencyIndex implements ProjectionDependencyInd
     /** @var list<array<string,mixed>> */
     private array $items = [];
 
+    public function status(): array { return ['status' => 'available', 'reason' => null, 'missing_tables' => []]; }
+
     public function add(array $dependency): void
     {
         $key = implode('|', [(string) ($dependency['kind'] ?? ''), (string) ($dependency['id'] ?? ''), (string) ($dependency['node_uuid'] ?? ''), (string) ($dependency['section_key'] ?? '')]);

@@ -2,8 +2,9 @@
 declare(strict_types=1);
 namespace NHK\Core\Shared\Migration;
 final class MigrationStatus {
+    private ?bool $projectionReady = null;
     public function status(): array {
-        return ['current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 10)];
+        return ['current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 16)];
     }
     public function graphStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $prefix=$wpdb->prefix; foreach (["nhk_graph_nodes","nhk_graph_predicates","nhk_graph_edges"] as $table) if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s",$prefix.$table)) !== $prefix.$table) return false; return true; }
     public function authorityStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $name=$wpdb->prefix."nhk_entities"; return $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s",$name)) === $name; }
@@ -13,5 +14,5 @@ final class MigrationStatus {
     public function knowledgeStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; foreach (['nhk_knowledge_claims','nhk_sources','nhk_evidence'] as $table) if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$wpdb->prefix.$table)) !== $wpdb->prefix.$table) return false; return true; }
     public function articleStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $table=$wpdb->prefix.'nhk_article_operations'; return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table)) === $table; }
     public function articleMediaStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $table=$wpdb->prefix.'nhk_article_media_blueprints'; return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$table)) === $table; }
-    public function projectionStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; foreach (['nhk_claim_projection_revisions','nhk_claim_projection_dependencies'] as $table) if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$wpdb->prefix.$table)) !== $wpdb->prefix.$table) return false; return true; }
+    public function projectionStorageReady(): bool { if ($this->projectionReady !== null) return $this->projectionReady; global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return $this->projectionReady = false; foreach (['nhk_claim_projection_revisions','nhk_claim_projection_dependencies'] as $table) if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$wpdb->prefix.$table)) !== $wpdb->prefix.$table) return $this->projectionReady = false; return $this->projectionReady = true; }
 }

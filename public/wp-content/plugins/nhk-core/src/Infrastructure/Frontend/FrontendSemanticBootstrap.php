@@ -16,7 +16,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink,
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
-use NHK\Core\Infrastructure\Projection\{WpdbProjectionDependencyIndex, WpdbProjectionRevisionStore};
+use NHK\Core\Infrastructure\Projection\{WpdbProjectionDependencyIndex, WpdbProjectionRevisionStore, WpdbProjectionSchema};
 use NHK\Core\Infrastructure\Http\ProjectionAdminApi;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
@@ -62,10 +62,11 @@ final class FrontendSemanticBootstrap
                 return $entity?->canonicalName;
             },
         );
-        $projectionStore = new WpdbProjectionRevisionStore($wpdb);
-        $projectionDependencies = new WpdbProjectionDependencyIndex($wpdb);
-        $claimProjection = new ClaimProjectionService(new LiveLedgerProjectionBuilder($claimResolver), $projectionStore, dependencies: $projectionDependencies);
-        (new ProjectionEventSubscriber(new ProjectionInvalidationService($projectionDependencies, $projectionStore, $claimProjection)))->register();
+        $projectionSchema = new WpdbProjectionSchema($wpdb);
+        $projectionStore = new WpdbProjectionRevisionStore($wpdb, $projectionSchema);
+        $projectionDependencies = new WpdbProjectionDependencyIndex($wpdb, $projectionSchema);
+        $claimProjection = new ClaimProjectionService(new LiveLedgerProjectionBuilder($claimResolver, evidence: $evidence, sources: $sources), $projectionStore, dependencies: $projectionDependencies);
+        (new ProjectionEventSubscriber(new ProjectionInvalidationService($projectionDependencies, $projectionStore, $claimProjection, static fn (string $claimId): array => $claimResolver->impactNodesForClaim($claimId), static fn (string $edgeUuid): array => $claimResolver->impactNodesForRelation($edgeUuid))))->register();
         $projectionAdmin = new ProjectionAdminApi($claimProjection);
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 

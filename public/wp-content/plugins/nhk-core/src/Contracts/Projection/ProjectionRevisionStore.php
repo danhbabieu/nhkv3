@@ -5,7 +5,7 @@ namespace NHK\Core\Contracts\Projection;
 
 use NHK\Core\Domain\Projection\ProjectionRevision;
 
-interface ProjectionRevisionStore
+interface ProjectionRevisionStore extends ProjectionStorageStatus
 {
     public function saveCandidate(ProjectionRevision $revision): ProjectionRevision;
     public function findLatest(string $nodeUuid): ?ProjectionRevision;
