@@ -53,6 +53,16 @@ final class GovernanceApplyContractTest extends TestCase
         self::assertSame('relation', $seenType);
         self::assertSame($id, $readBack['canonical_id']);
     }
+
+    public function test_retire_readback_accepts_inactive_canonical_state(): void
+    {
+        $id = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $id, 'relation_retire', [], 'content', 1, 'deps', ProposalState::APPROVED, idempotencyKey: 'relation-retire-readback', targetUuid: $id, entityType: 'relation');
+        $readBack = (new CanonicalApplyReadBackVerifier(static fn (string $type, string $uuid): array => ['entity_type' => 'relation', 'canonical_id' => $uuid, 'active' => false, 'revision' => 2, 'snapshot' => ['id' => $uuid]]))->verify($proposal, $id);
+
+        self::assertFalse($readBack['active']);
+        self::assertSame(2, $readBack['revision']);
+    }
     /** @dataProvider governedProductSpecimenDirections */
     public function test_governed_product_specimen_about_relation_fails_closed(string $source, string $target): void
     {

@@ -38,6 +38,18 @@ final class SemanticClaimProjectionRevisionTest extends TestCase
         self::assertSame($published->revision, $store->findLatest('node-replay')->revision);
     }
 
+    public function test_same_ledger_hash_with_changed_seo_creates_a_new_candidate(): void
+    {
+        $store = new InMemoryProjectionRevisionStore();
+        $hash = str_repeat('a', 64);
+        $first = $store->saveCandidate(new ProjectionRevision('node-seo', 1, ProjectionStatus::CANDIDATE, $hash, str_repeat('b', 64), str_repeat('c', 64), payload: ['ledger' => ['generated_at' => '2026-01-01T00:00:00Z'], 'seo' => ['canonical_url' => '/old/', 'h1' => 'Old']]));
+        $second = $store->saveCandidate(new ProjectionRevision('node-seo', 1, ProjectionStatus::CANDIDATE, $hash, str_repeat('b', 64), str_repeat('c', 64), payload: ['ledger' => ['generated_at' => '2026-01-01T00:00:01Z'], 'seo' => ['canonical_url' => '/new/', 'h1' => 'New']]));
+
+        self::assertSame(1, $first->revision);
+        self::assertSame(2, $second->revision);
+        self::assertSame(2, $store->findCandidate('node-seo')->revision);
+    }
+
     public function test_invalidation_marks_only_dependent_sections_dirty(): void
     {
         $store = new InMemoryProjectionRevisionStore();

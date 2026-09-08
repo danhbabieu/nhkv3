@@ -16,10 +16,13 @@ final class InMemoryProjectionRevisionStore implements ProjectionRevisionStore
     public function saveCandidate(ProjectionRevision $revision): ProjectionRevision
     {
         $items = $this->items[$revision->nodeUuid] ?? [];
-        foreach ($items as $item) if ($item->inputHash === $revision->inputHash) return $item;
+        foreach ($items as $item) if ($item->inputHash === $revision->inputHash && $this->samePayload($item->payload, $revision->payload)) return $item;
         $next = 1; foreach ($items as $item) $next = max($next, $item->revision + 1);
+        foreach ($items as $i => $item) if (in_array($item->status, [ProjectionStatus::CANDIDATE, ProjectionStatus::VALIDATING, ProjectionStatus::READY], true)) {
+            $items[$i] = new ProjectionRevision($item->nodeUuid, $item->revision, ProjectionStatus::SUPERSEDED, $item->inputHash, $item->claimSetHash, $item->graphHash, $item->policyRevision, $item->templateRevision, $item->payload, $item->dirtySections, $item->generatedAt, $item->publishedAt);
+        }
         $saved = new ProjectionRevision($revision->nodeUuid, $next, ProjectionStatus::CANDIDATE, $revision->inputHash, $revision->claimSetHash, $revision->graphHash, $revision->policyRevision, $revision->templateRevision, $revision->payload, $revision->dirtySections, $revision->generatedAt ?: gmdate('c'), $revision->publishedAt);
-        $this->items[$revision->nodeUuid][] = $saved;
+        $this->items[$revision->nodeUuid] = array_merge($items, [$saved]);
         return $saved;
     }
 
@@ -63,6 +66,15 @@ final class InMemoryProjectionRevisionStore implements ProjectionRevisionStore
         $this->items[$nodeUuid] = array_values(array_filter($this->items[$nodeUuid] ?? [], static fn (ProjectionRevision $item): bool => $item->revision !== $revision));
     }
 
+    public function markFailed(string $nodeUuid, int $revision): ProjectionRevision
+    {
+        foreach ($this->items[$nodeUuid] ?? [] as $i => $item) {
+            if ($item->revision !== $revision || !in_array($item->status, [ProjectionStatus::CANDIDATE, ProjectionStatus::VALIDATING, ProjectionStatus::READY], true)) continue;
+            return $this->items[$nodeUuid][$i] = new ProjectionRevision($item->nodeUuid, $item->revision, ProjectionStatus::FAILED, $item->inputHash, $item->claimSetHash, $item->graphHash, $item->policyRevision, $item->templateRevision, $item->payload, $item->dirtySections, $item->generatedAt, null);
+        }
+        throw new \RuntimeException('PROJECTION_CANDIDATE_NOT_FOUND');
+    }
+
     public function markDirty(string $nodeUuid, array $sections): void
     {
         $candidate = $this->findCandidate($nodeUuid);
@@ -78,5 +90,11 @@ final class InMemoryProjectionRevisionStore implements ProjectionRevisionStore
             return $this->items[$nodeUuid][$i] = $ready;
         }
         throw new \RuntimeException('PROJECTION_CANDIDATE_NOT_FOUND');
+    }
+
+    private function samePayload(array $left, array $right): bool
+    {
+        unset($left['ledger']['generated_at'], $right['ledger']['generated_at']);
+        return $left == $right;
     }
 }

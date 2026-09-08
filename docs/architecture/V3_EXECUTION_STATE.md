@@ -5731,3 +5731,24 @@ code-side only in this checkpoint; no migration, semantic data mutation,
 backfill, publication, V2/staging/production action or external deployment was
 run. Focused projection tests pass. Full suite remains affected by the
 pre-existing WordPress integration/runtime blockers recorded by the baseline.
+
+# Checkpoint — 2026-09-08 — Semantic Claim Projection acceptance closure
+
+Closed the acceptance gaps for the governed projection layer. The guarded
+integration fixture now creates Brand A → Model A → Variant A plus Component M,
+public/private Source and Evidence, governed claims, real Graph edges and real
+projection dependencies in `nhk_v3_test`. It verifies subject preservation,
+explicit one/two-hop policy, Component user-experience classification, privacy,
+idempotency, claim/relation add-update-retire-reactivate invalidation,
+unrelated-mutation isolation, stable SEO candidate failure safety, and the
+WordPress entity HTML path including escaping, Vietnamese copy, ARIA state and
+bounded initial ledger output.
+
+Runtime fixes included claim/relation endpoint impact discovery, component
+`user_experience` profile support, correct retire read-back expectations,
+revision candidate supersession, SEO-sensitive candidate deduplication and
+public stripping of internal projection identifiers. Guarded acceptance passes
+with 1 test / 113 assertions; the existing guarded projection integration
+passes with 1 test / 9 assertions; the Unit suite passes with 799 tests / 3819
+assertions. PHP lint and `git diff --check` pass. No V2, production or staging
+data, deployment, push or destructive migration was performed.

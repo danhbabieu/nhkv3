@@ -86,6 +86,64 @@ final class ClaimScopeResolver
         return ['status' => 'available', 'node' => ['type' => $node->endpoint_type, 'uuid' => $node->endpoint_key], 'direct' => $direct, 'related' => $related, 'items' => array_values($dedup)];
     }
 
+    /** @return list<array{node_uuid:string,node_type:string,section_key:string,scope:string,graph_distance:int}> */
+    public function impactNodesForClaim(string $claimUuid): array
+    {
+        try { $claim = $this->claims->findByCanonicalId($claimUuid); } catch (\Throwable) { return []; }
+        if (!$claim instanceof KnowledgeClaim || !ClaimProjectionVisibility::eligible($claim)) return [];
+        [$subjectUuid, $subjectType] = $this->subject($claim);
+        if ($subjectUuid === '' || $subjectType === null) return [];
+        $category = ($this->classifier ??= new ClaimClassifier())->classify($claim);
+        if (!($this->profiles ??= new NodeProjectionProfileRegistry())->allows($subjectType, $category)) return [];
+        $impacts = [['node_uuid' => $subjectUuid, 'node_type' => $subjectType, 'section_key' => $category, 'scope' => 'direct', 'graph_distance' => 0]];
+        $queue = [[new NodeReference($subjectType, $subjectUuid), 0, []]];
+        $visited = [$subjectType . ':' . $subjectUuid => true];
+        while ($queue !== []) {
+            [$current, $depth, $path] = array_shift($queue);
+            if ($depth >= self::MAX_DISTANCE) continue;
+            try { $page = $this->graph->findIncoming($current, null, 0, 200); } catch (\Throwable) { return $impacts; }
+            foreach ((array) ($page['items'] ?? []) as $edge) {
+                if (!$edge instanceof GraphEdge || !$edge->isActive()) continue;
+                $other = $edge->source->reference;
+                if (!$this->policy->allowsTraversal($current, 'incoming', $other, $edge->predicate)) continue;
+                $hop = ['source_type' => $other->endpoint_type, 'source_uuid' => $other->endpoint_key, 'predicate' => $edge->predicate, 'target_type' => $current->endpoint_type, 'target_uuid' => $current->endpoint_key, 'direction' => 'incoming', 'edge_uuid' => $edge->edge_uuid, 'edge_revision' => $edge->revision];
+                $semanticPath = array_merge([$hop], $path);
+                $distance = $depth + 1;
+                if ($this->policy->allowsPath($subjectType, $other->endpoint_type, $semanticPath, $category, ClaimProjectionVisibility::status($claim), $this->hasEligibleEvidence($claim)) && ($this->profiles ??= new NodeProjectionProfileRegistry())->allows($other->endpoint_type, $category)) {
+                    $impacts[] = ['node_uuid' => $other->endpoint_key, 'node_type' => $other->endpoint_type, 'section_key' => $category, 'scope' => 'related', 'graph_distance' => $distance];
+                }
+                if (!isset($visited[$other->key()])) { $visited[$other->key()] = true; $queue[] = [$other, $distance, $semanticPath]; }
+            }
+        }
+        return $impacts;
+    }
+
+    /** @return list<array{node_uuid:string,node_type:string,section_key:string,scope:string,graph_distance:int}> */
+    public function impactNodesForRelation(string $edgeUuid): array
+    {
+        try { $edge = $this->graph->findByUuid($edgeUuid); } catch (\Throwable) { return []; }
+        if (!$edge instanceof GraphEdge) return [];
+        $profiles = $this->profiles ??= new NodeProjectionProfileRegistry();
+        $impacts = [];
+        $queue = [[$edge->target->reference, 0]];
+        $visited = [$edge->target->reference->key() => true];
+        while ($queue !== []) {
+            [$current, $depth] = array_shift($queue);
+            foreach ($profiles->categoriesFor($current->endpoint_type) as $category) {
+                $impacts[] = ['node_uuid' => $current->endpoint_key, 'node_type' => $current->endpoint_type, 'section_key' => $category, 'scope' => $depth === 0 ? 'direct' : 'related', 'graph_distance' => $depth];
+            }
+            if ($depth >= self::MAX_DISTANCE) continue;
+            try { $page = $this->graph->findIncoming($current, null, 0, 200); } catch (\Throwable) { break; }
+            foreach ((array) ($page['items'] ?? []) as $incoming) {
+                if (!$incoming instanceof GraphEdge || !$incoming->isActive()) continue;
+                $other = $incoming->source->reference;
+                if (!$this->policy->allowsTraversal($current, 'incoming', $other, $incoming->predicate)) continue;
+                if (!isset($visited[$other->key()])) { $visited[$other->key()] = true; $queue[] = [$other, $depth + 1]; }
+            }
+        }
+        return $impacts;
+    }
+
     /** @return array{0:string,1:?string} */
     private function subject(KnowledgeClaim $claim): array
     {

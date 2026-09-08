@@ -13,7 +13,7 @@ final class NodeProjectionProfileRegistry
         'model' => ['identity', 'history', 'mechanism', 'configuration', 'dial_and_hands', 'case_and_decoration', 'music_and_strike', 'sound', 'identification_rule'],
         'variant' => ['identity', 'mechanism', 'configuration', 'component', 'dial_and_hands', 'music_and_strike', 'sound', 'user_experience', 'operation', 'identification_rule', 'exception'],
         'movement' => ['identity', 'mechanism', 'component', 'configuration', 'music_and_strike', 'operation', 'identification_rule'],
-        'component' => ['identity', 'mechanism', 'configuration', 'material', 'sound', 'operation', 'identification_rule'],
+        'component' => ['identity', 'mechanism', 'configuration', 'material', 'sound', 'user_experience', 'operation', 'identification_rule'],
         'classification' => ['identity', 'classification', 'history', 'identification_rule', 'comparison'],
         'specimen' => ['identity', 'provenance', 'identification_rule', 'exception', 'other'],
         'product' => ['identity', 'provenance', 'comparison', 'other'],

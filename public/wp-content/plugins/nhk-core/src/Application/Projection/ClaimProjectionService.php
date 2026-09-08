@@ -77,6 +77,7 @@ final class ClaimProjectionService
     }
 
     public function publish(string $nodeUuid, int $revision): ProjectionRevision { return $this->store->publish($nodeUuid, $revision); }
+    public function fail(string $nodeUuid, int $revision): ProjectionRevision { return $this->store->markFailed($nodeUuid, $revision); }
     public function discard(string $nodeUuid, int $revision): void { $this->store->discard($nodeUuid, $revision); }
 
     /** @param array<string,mixed> $ledger @return array<string,mixed> */

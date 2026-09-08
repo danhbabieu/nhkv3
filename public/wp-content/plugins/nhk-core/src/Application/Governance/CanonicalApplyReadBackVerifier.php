@@ -22,10 +22,11 @@ final class CanonicalApplyReadBackVerifier
             ? 'relation'
             : $proposal->entityType;
         $readBack = ($this->reader)($canonicalType, $resultId);
+        $expectedActive = !in_array($proposal->operation, ['retire', 'relation_retire'], true);
         if (!is_array($readBack)
             || ($readBack['entity_type'] ?? null) !== $canonicalType
             || ($readBack['canonical_id'] ?? null) !== $resultId
-            || ($readBack['active'] ?? false) !== true
+            || ($readBack['active'] ?? null) !== $expectedActive
             || !is_int($readBack['revision'] ?? null)
             || $readBack['revision'] < 1
             || !is_array($readBack['snapshot'] ?? null)) {

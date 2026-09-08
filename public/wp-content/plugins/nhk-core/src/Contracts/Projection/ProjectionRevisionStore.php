@@ -14,6 +14,7 @@ interface ProjectionRevisionStore extends ProjectionStorageStatus
     public function markReady(string $nodeUuid, int $revision): ProjectionRevision;
     public function publish(string $nodeUuid, int $revision): ProjectionRevision;
     public function discard(string $nodeUuid, int $revision): void;
+    public function markFailed(string $nodeUuid, int $revision): ProjectionRevision;
     /** @param list<string> $sections */
     public function markDirty(string $nodeUuid, array $sections): void;
 }
