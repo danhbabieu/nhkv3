@@ -166,7 +166,7 @@ final class McpAbilityRegistration
      */
     public static function registerGovernedAbilities(): void
     {
-        if (!function_exists('wp_register_ability') || !function_exists('rest_do_request')) return;
+        if (!function_exists('wp_register_ability')) return;
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
         foreach (self::GOVERNED_TOOL_MAP as $toolName => $abilityName) {
             $tool = $tools[$toolName] ?? null;
@@ -175,7 +175,10 @@ final class McpAbilityRegistration
                 'label' => self::label($toolName),
                 'description' => (string) $tool['description'],
                 'category' => self::CATEGORY,
-                'input_schema' => (array) $tool['inputSchema'],
+                // WordPress Abilities/MCP is the attachment-binding bridge. The
+                // canonical direct-file path remains on the custom multipart
+                // transport, so do not export its binary pseudo-schema here.
+                'input_schema' => self::abilityInputSchema($toolName, (array) $tool['inputSchema']),
                 'output_schema' => ['type' => ['object', 'null']],
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
                 'permission_callback' => static fn (): bool => self::canGoverned($toolName),
@@ -190,6 +193,18 @@ final class McpAbilityRegistration
                 ],
             ]);
         }
+    }
+
+    /** @return array<string,mixed> */
+    private static function abilityInputSchema(string $tool, array $schema): array
+    {
+        if ($tool !== 'nhk.media.ingest') return $schema;
+
+        foreach (['file', 'filename', 'max_width', 'max_height', 'quality'] as $property) {
+            unset($schema['properties'][$property]);
+        }
+
+        return $schema;
     }
 
     private static function executeMcp(string $tool, mixed $input): mixed

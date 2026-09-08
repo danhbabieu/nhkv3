@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Mcp\McpAbilityRegistration;
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpToolCatalog};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository};
 use NHK\Core\Domain\Media\Media;
@@ -49,7 +49,7 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['resolved' => [], 'candidates' => [], 'ambiguities' => [], 'missing' => [], 'conflicts' => [], 'relations' => []], $response->get_data()['result']['structuredContent']);
     }
 
-    public function test_wordpress_abilities_register_public_read_and_governed_video_allowlist(): void
+    public function test_wordpress_abilities_register_public_media_ingest_and_export_its_contract(): void
     {
         $abilities = wp_get_abilities(['namespace' => 'nhk-v3']);
         self::assertSame(McpAbilityRegistration::abilityNames(), array_values(array_map(static fn (\WP_Ability $ability): string => $ability->get_name(), $abilities)));
@@ -59,7 +59,22 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertTrue($read->get_meta_item('public'));
         self::assertTrue($read->get_meta_item('show_in_rest'));
         self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $read->get_meta_item('annotations'));
-        self::assertNull(wp_get_ability('nhk-v3/media-ingest'));
+        $media = wp_get_ability('nhk-v3/media-ingest');
+        self::assertNotNull($media);
+        self::assertSame('NHK Image Intake / Upload Normalization', $media->get_label());
+        self::assertTrue($media->get_meta_item('public'));
+        self::assertTrue($media->get_meta_item('show_in_rest'));
+        $mediaSchema = $media->get_input_schema();
+        self::assertArrayHasKey('assets', $mediaSchema['properties']);
+        self::assertArrayHasKey('wordpress_attachment_id', $mediaSchema['properties']['assets']['items']['properties']);
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertArrayHasKey('attachment_id', $tools['nhk.media.attachment.get']['inputSchema']['properties']);
+
+        $export = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-ingest'));
+        self::assertSame(200, $export->get_status(), (string) wp_json_encode($export->get_data()));
+        self::assertSame('nhk-v3/media-ingest', $export->get_data()['name']);
+        self::assertArrayHasKey('wordpress_attachment_id', $export->get_data()['input_schema']['properties']['assets']['items']['properties']);
+        self::assertArrayNotHasKey('file', $export->get_data()['input_schema']['properties']);
         foreach (McpAbilityRegistration::governedAbilityNames() as $abilityName) {
             $ability = wp_get_ability($abilityName);
             self::assertNotNull($ability, $abilityName);

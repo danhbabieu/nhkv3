@@ -5424,3 +5424,24 @@ The available DEMO UI confirms the three Admin tabs, but its runtime search
 returns no `truOChTNbwA` record and the deployed runtime is not this checkout;
 local HTTP is unavailable, so end-to-end record/detail/page read-back remains
 runtime-blocked. No data, migration, seed, push or deployment was performed.
+
+# Checkpoint — 2026-09-08 — Media Ability MCP discovery exposure
+
+The remaining Media V3 writer exposure gap was traced through the current
+`McpAbilityRegistration` → WordPress Abilities registry → Ability REST
+serializer boundary. The governed registration had a lifecycle guard on
+`rest_do_request`, which could silently skip registration during lazy Ability
+initialization even though the catalog mapping and Unit contract passed. The
+guard was removed from registration; the callback still uses the custom MCP
+transport at execution time. The governed Media Ability now uses an
+attachment-binding schema without the custom multipart binary pseudo-field,
+while retaining the nested `wordpress_attachment_id` contract; direct file
+ingest remains on `nhk.media.ingest` custom MCP transport.
+
+The integration regression now enumerates the actual `nhk-v3` Ability registry,
+asserts `nhk-v3/media-ingest`, checks its public/REST metadata and schema, and
+reads `/wp-abilities/v1/abilities/nhk-v3/media-ingest` to verify serialized
+discovery output. The guarded test was attempted with `NHK_WP_TEST_PATH=public`
+and `NHK_WP_TEST_DB=nhk_v3_test` but WordPress bootstrap remained blocked by
+database connectivity; no runtime data was mutated and live deploy/reconnect
+has not been claimed.
