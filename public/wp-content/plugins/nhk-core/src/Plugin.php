@@ -87,6 +87,13 @@ final class Plugin {
         // Initialize the WordPress ability registry before that snapshot so
         // newly-added NHK abilities are present in the bridge's tool list.
         add_action('init', [McpAbilityRegistration::class, 'bootstrapRegistry'], 1);
+        // Easy MCP builds its Tool_Registry from the first REST request. Keep
+        // this boundary explicit as well: a REST request may reach
+        // rest_api_init without a prior request having initialized Abilities.
+        // Priority 0 guarantees the registry exists before Easy MCP registers
+        // its Dynamic_Tool_Registrar.
+        add_action('rest_api_init', [McpAbilityRegistration::class, 'bootstrapRegistry'], 0);
+        add_action('rest_api_init', [McpAbilityRegistration::class, 'logEasyMcpExportDiagnostics'], PHP_INT_MAX);
         add_action('wp_abilities_api_init', static function (): void {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;

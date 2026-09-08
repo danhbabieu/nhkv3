@@ -5458,3 +5458,21 @@ before an Easy MCP dynamic snapshot can run. No MediaService code, production
 data, deployment or push was changed. The local WordPress runtime remains
 blocked by unavailable database connectivity; the Easy MCP integration test is
 therefore guarded and skips when that external plugin is not installed locally.
+
+# Checkpoint — 2026-09-08 — Easy MCP export diagnostics and REST timing
+
+The actual Easy MCP `Dynamic_Tool_Registrar` path was traced in the runtime
+package. Dynamic export reads the enabled-ability option, enumerates
+`wp_get_abilities()`, normalizes the ability name, builds a `Dynamic_Tool`,
+and materializes the schema through the real `Tool_Registry`; there is no
+separate Media-specific eligibility rule or persistent snapshot in this path.
+The live admin state confirms Media is enabled and has full token access.
+
+The NHK adapter now bootstraps the Ability registry at `rest_api_init`
+priority 0, before Easy MCP registers its REST discovery routes, while
+retaining the earlier init bootstrap. A guarded diagnostic invokes the real
+Easy MCP registrar and records ability id, skip reason, schema reason, and
+bounded serializer exception details without payloads or secrets. Integration
+coverage asserts Media and Video export names, schema, callback resolution and
+clean diagnostics when the real runtime is available. No MediaService,
+semantic workflow, public API, production data, deployment or push changed.

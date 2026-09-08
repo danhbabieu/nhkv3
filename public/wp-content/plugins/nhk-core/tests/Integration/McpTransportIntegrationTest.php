@@ -118,6 +118,25 @@ final class McpTransportIntegrationTest extends TestCase
         );
     }
 
+    public function test_easy_mcp_export_diagnostic_is_clean_for_media_and_video(): void
+    {
+        if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {
+            self::markTestSkipped('Easy MCP AI is required for the bridge diagnostic assertion.');
+        }
+
+        $diagnostics = McpAbilityRegistration::easyMcpExportDiagnostics();
+        $diagnosticIds = array_column($diagnostics, 'ability_id');
+
+        self::assertNotContains('nhk-v3/media-ingest', $diagnosticIds, (string) wp_json_encode($diagnostics));
+        self::assertNotContains('nhk-v3/video-ingest', $diagnosticIds, (string) wp_json_encode($diagnostics));
+        self::assertNotContains('nhk-v3/*', $diagnosticIds, (string) wp_json_encode($diagnostics));
+
+        $media = wp_get_ability('nhk-v3/media-ingest');
+        self::assertNotNull($media);
+        self::assertTrue(method_exists($media, 'execute'));
+        self::assertTrue(method_exists($media, 'check_permissions'));
+    }
+
     public function test_article_preflight_research_for_existing_post_reads_media_usage_inventory(): void
     {
         $postId = wp_insert_post([

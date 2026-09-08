@@ -14,6 +14,96 @@ final class McpAbilityRegistration
         }
     }
 
+    /**
+     * Inspect the real Easy MCP bridge without changing its registry.
+     *
+     * This is intentionally a diagnostic boundary, not a second tool
+     * registration path. It makes a bridge-side omission observable while
+     * keeping the ability and the custom MCP transport as the owners.
+     *
+     * @return list<array<string,string>>
+     */
+    public static function easyMcpExportDiagnostics(): array
+    {
+        if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {
+            return [];
+        }
+
+        $diagnostics = [];
+        $enabled = function_exists('get_option') ? (array) get_option('easy_mcp_ai_enabled_abilities', []) : [];
+        $definitions = [];
+
+        try {
+            $registry = new \Easy_MCP_AI\Tools\Tool_Registry();
+            (new \Easy_MCP_AI\Tools\Dynamic_Tool_Registrar())->register_to($registry);
+            $definitions = array_column($registry->get_all_definitions(), null, 'name');
+        } catch (\Throwable $error) {
+            $diagnostics[] = [
+                'ability_id' => 'nhk-v3/*',
+                'skip_reason' => 'MCP_SERIALIZER_EXCEPTION',
+                'schema_validation_reason' => 'UNAVAILABLE_AFTER_SERIALIZER_EXCEPTION',
+                'serializer_exception_class' => get_class($error),
+                'serializer_exception_message' => self::diagnosticMessage($error->getMessage()),
+            ];
+            return $diagnostics;
+        }
+
+        foreach (self::abilityNames() as $abilityName) {
+            $ability = function_exists('wp_get_ability') ? wp_get_ability($abilityName) : null;
+            if ($ability === null) {
+                $diagnostics[] = self::diagnostic($abilityName, 'ABILITY_NOT_REGISTERED', 'ABILITY_SCHEMA_UNAVAILABLE');
+                continue;
+            }
+            if (!in_array($abilityName, $enabled, true)) {
+                $diagnostics[] = self::diagnostic($abilityName, 'ABILITY_NOT_ENABLED', self::schemaValidationReason($ability));
+                continue;
+            }
+
+            $toolName = 'wp_ability_' . strtolower((string) preg_replace('/[^a-z0-9]+/', '_', $abilityName));
+            if (!isset($definitions[$toolName])) {
+                $diagnostics[] = self::diagnostic($abilityName, 'MCP_TOOL_NOT_REGISTERED', self::schemaValidationReason($ability));
+            }
+        }
+
+        return $diagnostics;
+    }
+
+    public static function logEasyMcpExportDiagnostics(): void
+    {
+        foreach (self::easyMcpExportDiagnostics() as $diagnostic) {
+            if (function_exists('error_log')) {
+                error_log('NHK V3 Easy MCP ability export diagnostic: ' . wp_json_encode($diagnostic)); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- intentional bridge diagnostic without payloads
+            }
+        }
+    }
+
+    /** @return array<string,string> */
+    private static function diagnostic(string $abilityName, string $skipReason, string $schemaReason): array
+    {
+        return [
+            'ability_id' => $abilityName,
+            'skip_reason' => $skipReason,
+            'schema_validation_reason' => $schemaReason,
+            'serializer_exception_class' => '',
+            'serializer_exception_message' => '',
+        ];
+    }
+
+    private static function schemaValidationReason(object $ability): string
+    {
+        $schema = method_exists($ability, 'get_input_schema') ? $ability->get_input_schema() : null;
+        if (!is_array($schema) || (($schema['type'] ?? null) !== 'object' && !in_array('object', (array) ($schema['type'] ?? []), true))) {
+            return 'INPUT_SCHEMA_NOT_OBJECT';
+        }
+        return 'NOT_SCHEMA_VALIDATION_FAILURE';
+    }
+
+    private static function diagnosticMessage(string $message): string
+    {
+        $message = preg_replace('/\s+/', ' ', trim($message)) ?? '';
+        return function_exists('mb_substr') ? mb_substr($message, 0, 240) : substr($message, 0, 240);
+    }
+
     /** @var array<string,string> */
     private const READ_TOOL_MAP = [
         'nhk.search' => 'nhk-v3/search',

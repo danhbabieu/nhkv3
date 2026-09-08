@@ -47,4 +47,17 @@ final class PluginBootWiringTest extends TestCase
             substr($plugin, strpos($plugin, 'public static function activate(): void'))
         );
     }
+
+    public function test_ability_registry_bootstrap_runs_before_easy_mcp_rest_registration(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        $bootstrap = "add_action('rest_api_init', [McpAbilityRegistration::class, 'bootstrapRegistry'], 0);";
+
+        self::assertStringContainsString($bootstrap, $plugin);
+        self::assertLessThan(
+            strpos($plugin, "add_action('rest_api_init', static function ()"),
+            strpos($plugin, $bootstrap)
+        );
+    }
 }
