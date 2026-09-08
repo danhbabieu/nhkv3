@@ -260,6 +260,63 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame('relation-immediate-readback', $created->idempotencyKey);
     }
 
+    #[RunInSeparateProcess]
+    public function test_hydrates_relation_create_with_database_default_zero_expected_revision(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        if (!function_exists('wp_json_encode')) {
+            eval('function wp_json_encode($value, $flags = 0) { return json_encode($value, $flags); }');
+        }
+        $proposalUuid = UuidCodec::newV7();
+        $sourceUuid = UuidCodec::newV7();
+        $targetUuid = UuidCodec::newV7();
+        $row = [
+            'id' => '498',
+            'proposal_uuid' => UuidCodec::toBinary($proposalUuid),
+            'idempotency_key' => 'relation-hydration-default-zero',
+            'operation' => 'relation_create',
+            'entity_type' => 'relation',
+            'target_uuid' => UuidCodec::toBinary($targetUuid),
+            'expected_revision' => '0',
+            'command_json' => json_encode([
+                'predicate' => 'about',
+                'source_uuid' => $sourceUuid,
+                'source_type' => 'knowledge',
+                'target_uuid' => $targetUuid,
+                'target_type' => 'classification',
+                'source_revision' => 1,
+                'target_revision' => 1,
+            ], JSON_THROW_ON_ERROR),
+            'fingerprint' => str_repeat('a', 32),
+            'dependency_fingerprint' => str_repeat('b', 32),
+            'state' => '1',
+            'revision' => '1',
+            'created_by' => '1',
+            'created_at' => '2026-09-08 01:23:52.000000',
+            'updated_at' => '2026-09-08 01:23:52.000000',
+        ];
+        $repository = new WpdbProposalRepository(new class($row) {
+            public string $prefix = 'wp_';
+            public string $last_error = '';
+
+            public function __construct(private array $row) {}
+            public function prepare(string $query, mixed ...$arguments): string { return $query; }
+            public function get_row(string $query, mixed $output): ?array
+            {
+                return str_contains($query, 'SELECT * FROM wp_nhk_proposals') ? $this->row : null;
+            }
+            public function get_var(string $query): ?string { return null; }
+        });
+
+        $proposal = $repository->find($proposalUuid);
+
+        self::assertNotNull($proposal);
+        self::assertSame($proposalUuid, $proposal->id);
+        self::assertSame($sourceUuid, $proposal->subjectId);
+        self::assertSame($targetUuid, $proposal->targetUuid);
+        self::assertNull($proposal->expectedRevision);
+    }
+
     public function test_rekey_proposal_idempotency_key_replays_identical_binding_and_rejects_changed_payload(): void
     {
         $service = new GovernanceService(new InMemoryProposalRepository());

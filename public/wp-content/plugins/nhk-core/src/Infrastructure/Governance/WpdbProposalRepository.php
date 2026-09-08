@@ -48,8 +48,9 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             }
             $payload = json_decode((string) ($row['command_json'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
             if (!is_array($payload)) return null;
-            $isCreateWithoutTarget = in_array((string) ($row['operation'] ?? ''), ['create', 'ingest', 'relation_create'], true) && !$hasTargetUuid;
-            $expectedRevision = $isCreateWithoutTarget && ($row['expected_revision'] === null || $row['expected_revision'] === '' || (string) $row['expected_revision'] === '0')
+            $isRelationCreate = (string) ($row['operation'] ?? '') === 'relation_create';
+            $isCreateWithoutTarget = in_array((string) ($row['operation'] ?? ''), ['create', 'ingest'], true) && !$hasTargetUuid;
+            $expectedRevision = ($isRelationCreate || ($isCreateWithoutTarget && ($row['expected_revision'] === null || $row['expected_revision'] === '' || (string) $row['expected_revision'] === '0')))
                 ? null
                 : ($row['expected_revision'] === null || $row['expected_revision'] === '' ? null : (int) $row['expected_revision']);
             $subjectId = (string) $row['entity_type'];
