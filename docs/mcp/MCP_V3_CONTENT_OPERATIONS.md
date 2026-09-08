@@ -48,6 +48,25 @@ Modern requests use protocol `2026-07-28`; `Accept` must include both
 dispatch. Governed tools require their capability. Initialized notifications
 return HTTP 202 with no body.
 
+### Documentation bootstrap surface
+
+The normal read-only MCP catalog exposes `nhk.docs.bootstrap` and
+`nhk.docs.get`. `nhk.docs.bootstrap` is the entry point for a new client: it
+returns the current documentation content hash/source revision when available,
+Constitution identity, required reading, current contract keys, executable
+runtime status and documented registry gaps. It deliberately does not inline
+the canonical documents. `nhk.docs.get` accepts only a registry allowlisted
+document key and returns bounded UTF-8 content with its document hash; it never
+accepts a filesystem path or reads arbitrary source/config/secrets.
+
+Documentation truth and runtime truth remain separate: the bootstrap's
+`canonical_contract` describes what the Constitution/contracts require, while
+`runtime_status` describes what the current MCP catalog registers. A capability
+is not `LIVE` without fresh target discovery/read-back. When a deployment
+artifact does not contain repo-level `/docs`, the release build must generate
+the plugin documentation snapshot from canonical repo docs; the snapshot is
+not a separately edited source of truth.
+
 
 ### Storage & Reuse Map — 2026-09-04
 

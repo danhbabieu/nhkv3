@@ -9,6 +9,17 @@
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
 
+## 0. MCP documentation bootstrap — 2026-09-08
+
+The normal read-only MCP surface now exposes `nhk.docs.bootstrap` and
+`nhk.docs.get`. They resolve only registry allowlisted canonical documents by
+key, with bounded UTF-8 reads and a content-hash documentation revision;
+callers do not need a GitHub connector. The bootstrap distinguishes
+`canonical_contract` from `runtime_status` and uses the executable MCP catalog
+and `McpCapabilityManifest` for runtime summaries. Code-side discovery is
+covered; target-runtime connector discovery/read-back remains an environment
+gate until freshly verified.
+
 ## 1. Authority and read order
 
 Use this precedence when deciding current behavior:

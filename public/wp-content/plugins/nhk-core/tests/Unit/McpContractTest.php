@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\McpToolCatalog;
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
-use NHK\Core\Application\Mcp\{McpGovernanceHandler, McpReadHandler, McpTransport};
+use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
@@ -44,6 +44,8 @@ final class McpContractTest extends TestCase
     public function test_catalog_has_exact_current_ordered_tool_contract(): void
     {
         self::assertSame([
+            'nhk.docs.bootstrap',
+            'nhk.docs.get',
             'nhk.search',
             'nhk.canonical.inventory',
             'nhk.graph.inventory',
@@ -85,6 +87,36 @@ final class McpContractTest extends TestCase
             'nhk.proposal.eligibility',
             'nhk.proposal.apply',
         ], array_column(McpToolCatalog::tools(), 'name'));
+    }
+
+    public function test_documentation_tools_are_read_only_and_allowlisted(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertFalse($tools['nhk.docs.bootstrap']['governed']);
+        self::assertFalse($tools['nhk.docs.get']['governed']);
+        self::assertSame(McpDocumentationRegistry::documentKeys(), $tools['nhk.docs.get']['inputSchema']['properties']['document_key']['enum']);
+        self::assertSame([], $tools['nhk.docs.bootstrap']['inputSchema']['required']);
+    }
+
+    public function test_documentation_tools_dispatch_through_the_read_capability(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'read');
+        $bootstrap = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.docs.bootstrap', 'arguments' => []]]);
+        self::assertSame(200, $bootstrap['status']);
+        self::assertSame('constitution', $bootstrap['body']['result']['structuredContent']['constitution']['document_key']);
+        $document = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.docs.get', 'arguments' => ['document_key' => 'read-first']]]);
+        self::assertSame(200, $document['status']);
+        self::assertStringContainsString('Mandatory Read-First Router', $document['body']['result']['structuredContent']['content']);
+    }
+
+    private function readHandler(): McpReadHandler
+    {
+        return new McpReadHandler(
+            $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+            $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+            $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+            $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+        );
     }
 
     public function test_generic_proposal_declares_only_existing_governed_operations(): void

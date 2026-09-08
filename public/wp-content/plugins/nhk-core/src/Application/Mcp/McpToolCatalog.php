@@ -9,6 +9,8 @@ final class McpToolCatalog
     public static function tools(): array
     {
         return [
+            self::tool('nhk.docs.bootstrap', 'Read the compact canonical NHK V3 documentation bootstrap and current MCP runtime status.', [], []),
+            self::tool('nhk.docs.get', 'Read one allowlisted canonical NHK V3 document by document key.', ['document_key' => ['type' => 'string', 'enum' => McpDocumentationRegistry::documentKeys()]], ['document_key']),
             self::tool('nhk.search', 'Search native editorial posts and active semantic records with bounded pagination.', ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['q']),
             self::tool('nhk.canonical.inventory', 'Read-only inventory of canonical records with filtering before bounded pagination.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100], 'after' => ['type' => 'string']], []),
             self::tool('nhk.graph.inventory', 'Read-only inventory of all Graph edges with endpoint diagnostics.', ['filters' => ['type' => 'object'], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100], 'after' => ['type' => 'string']], []),

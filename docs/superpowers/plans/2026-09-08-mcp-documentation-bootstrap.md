@@ -29,28 +29,28 @@
 - Produces `documentKeys(): list<string>`, `get(string $key): array`, and `bootstrap(): array`.
 - `get()` returns `key`, `path`, `content`, `documentation_revision`, `source_revision`, `generated_at` and `classification` without exposing an arbitrary client path.
 
-- [ ] Write tests for allowlisted key resolution, traversal-like key rejection, size/UTF-8 fail-closed behavior, stable hash and bootstrap sections.
-- [ ] Run the focused PHPUnit test and observe failure before implementation.
-- [ ] Implement fixed key-to-relative-path metadata, fixed candidate roots, bounded reads, UTF-8 validation, content hash and git revision discovery without hardcoded commit values.
-- [ ] Implement bootstrap required reading, current contracts, registry gaps and runtime status from `McpCapabilityManifest::all()`.
-- [ ] Run the focused test until it passes.
+- [x] Write tests for allowlisted key resolution, traversal-like key rejection, size/UTF-8 fail-closed behavior, stable hash and bootstrap sections.
+- [x] Run the focused PHPUnit test and observe failure before implementation.
+- [x] Implement fixed key-to-relative-path metadata, fixed candidate roots, bounded reads, UTF-8 validation, content hash and git revision discovery without hardcoded commit values.
+- [x] Implement bootstrap required reading, current contracts, registry gaps and runtime status from `McpCapabilityManifest::all()`.
+- [x] Run the focused test until it passes.
 
 ### Task 2: MCP catalog and transport exposure
 
 **Files:**
 - Modify: `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpToolCatalog.php`
-- Modify: `public/wp-content/plugins/nhk-v3/src/Application/Mcp/McpTransport.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpTransport.php`
 - Test: `public/wp-content/plugins/nhk-core/tests/Unit/McpContractTest.php`
 
 **Interfaces:**
 - Adds read tools `nhk.docs.bootstrap` and `nhk.docs.get` with the registry key enum.
 - `McpTransport` dispatches the tools using the existing `read` capability and `McpDocumentationRegistry`.
 
-- [ ] Add catalog/schema and dispatch contract tests.
-- [ ] Run focused tests to verify the new assertions fail.
-- [ ] Add tools and an optional last constructor dependency so existing callers remain source-compatible.
-- [ ] Dispatch bootstrap/get and wrap results in the existing MCP structured-content envelope.
-- [ ] Run the focused test suite.
+- [x] Add catalog/schema and dispatch contract tests.
+- [x] Run focused tests to verify the new assertions fail.
+- [x] Add tools and an optional last constructor dependency so existing callers remain source-compatible.
+- [x] Dispatch bootstrap/get and wrap results in the existing MCP structured-content envelope.
+- [x] Run the focused test suite.
 
 ### Task 3: MCP surface integration and documentation status
 
@@ -59,6 +59,6 @@
 - Modify: `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`
 - Modify: `docs/architecture/V3_EXECUTION_STATE.md`
 
-- [ ] Assert both tools are present in `tools/list` and document keys are bounded.
-- [ ] Run PHP lint, focused/full Unit tests, integration attempt if environment permits, `git diff --check`, and a secret scan.
-- [ ] Record the checkpoint as code-side MCP exposure with live discovery explicitly pending unless freshly verified.
+- [x] Assert both tools are present in `tools/list` and document keys are bounded.
+- [x] Run PHP lint, focused/full Unit tests, integration attempt if environment permits, `git diff --check`, and a secret scan.
+- [x] Record the checkpoint as code-side MCP exposure with live discovery explicitly pending unless freshly verified.

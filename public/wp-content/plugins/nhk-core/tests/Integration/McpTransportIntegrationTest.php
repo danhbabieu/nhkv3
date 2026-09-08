@@ -32,6 +32,9 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame('2.0', $data['jsonrpc']);
         self::assertCount(count(\NHK\Core\Application\Mcp\McpToolCatalog::tools()), $data['result']['tools']);
         self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
+        $names = array_column($data['result']['tools'], 'name');
+        self::assertContains('nhk.docs.bootstrap', $names);
+        self::assertContains('nhk.docs.get', $names);
     }
 
     public function test_mcp_registration_initializes_semantic_context_resolver_and_serves_read_tool(): void

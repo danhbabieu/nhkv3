@@ -170,7 +170,10 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [];
+    private const EXPLICIT_EXCLUSION_REASONS = [
+        'nhk.docs.bootstrap' => 'Canonical documentation bootstrap is exposed on the normal read-only MCP surface; no separate WordPress Ability is required.',
+        'nhk.docs.get' => 'Canonical documentation reader is exposed on the normal read-only MCP surface; no separate WordPress Ability is required.',
+    ];
 
     /** @return list<string> */
     public static function readAbilityNames(): array

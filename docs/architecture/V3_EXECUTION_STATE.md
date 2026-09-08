@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+## Multipart runtime acceptance — 2026-09-08
+
+The documented local runtime was restored without code bypass: MySQL is alive
+on `127.0.0.1:3306`, WordPress bootstraps through `NHK_WP_TEST_PATH=public`,
+and the exact guarded database is `nhk_v3_test` with no `$wpdb->last_error`.
+The existing administrator fixture lacked `upload_files`; the capability was
+temporarily granted for the exact acceptance probe and then reverted. The
+Ability `nhk-v3/media-upload-batch` was present and its permission check passed.
+Easy MCP classes were absent, so connector discovery was not available in this
+runtime. A real GD-generated JPEG multipart call returned one created item with
+verified attachment read-back via `nhk.media.attachment.get`; the unauthenticated
+call failed closed with `-32003`. Attachment and semantic fixture rows plus the
+idempotency option were removed after the probe. The broader focused Integration
+selection ran 23 tests / 173 assertions but retained four unrelated/pre-existing
+failures (tools-list schema expectation, Ability REST auth state, and two
+governed media/video fixture-state assertions); it is not a suite pass.
+
+## MCP documentation bootstrap — 2026-09-08
+
+The normal read-only MCP surface now exports `nhk.docs.bootstrap` and
+`nhk.docs.get`. A fixed documentation registry reads the canonical repo docs in
+checkout and supports a generated plugin-resource snapshot when the deployed
+artifact does not contain repo-level `/docs`; client-supplied filesystem paths
+are never accepted. Bootstrap returns the content-hash documentation revision,
+actual source/build revision when available, Constitution identity, required
+reading, current contract keys, registry-gap summary, and a runtime status
+derived from the executable catalog/`McpCapabilityManifest`. Document reads are
+allowlisted, bounded to 512 KiB, UTF-8 checked and read-only. Focused unit
+verification passes 24 tests / 242 assertions; live target MCP discovery and
+connector read-back remain pending and no semantic or WordPress data was
+mutated.
+
 ## Documentation reconciliation — 2026-09-08
 
 Canonical Media/MCP documentation is reconciled around the implemented

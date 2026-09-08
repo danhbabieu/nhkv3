@@ -32,6 +32,7 @@ final class McpTransport
         private ?CanonicalDependencyValidator $dependencies = null,
         private ?PublicUrlMaintenanceService $publicUrls = null,
         private ?MediaBatchUploadService $mediaBatchUpload = null,
+        private ?McpDocumentationRegistry $documentation = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -96,6 +97,7 @@ final class McpTransport
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
         $capability = match ($name) {
+            'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
             'nhk.article.preflight' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
@@ -116,6 +118,8 @@ final class McpTransport
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
         $this->validateArguments($definition['inputSchema'], $arguments);
         $result = match ($name) {
+            'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
+            'nhk.docs.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['document_key'] ?? '')),
             'nhk.public-url.audit' => $this->publicUrls?->audit() ?? throw new \RuntimeException('PUBLIC_URL_MAINTENANCE_UNAVAILABLE'),
             'nhk.public-url.reproject' => $this->publicUrls?->reproject((string) ($arguments['idempotency_key'] ?? ''), (bool) ($arguments['pre_public_confirmed'] ?? false)) ?? throw new \RuntimeException('PUBLIC_URL_MAINTENANCE_UNAVAILABLE'),
             'nhk.search' => $this->read->search((string) ($arguments['q'] ?? ''), (int) ($arguments['page'] ?? 1), (int) ($arguments['per_page'] ?? 20)),
