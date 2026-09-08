@@ -14,7 +14,7 @@ final class InMemoryProjectionRevisionStore implements ProjectionRevisionStore
     public function saveCandidate(ProjectionRevision $revision): ProjectionRevision
     {
         $items = $this->items[$revision->nodeUuid] ?? [];
-        foreach ($items as $item) if (in_array($item->status, [ProjectionStatus::CANDIDATE, ProjectionStatus::VALIDATING, ProjectionStatus::READY], true) && $item->inputHash === $revision->inputHash) return $item;
+        foreach ($items as $item) if ($item->inputHash === $revision->inputHash) return $item;
         $next = 1; foreach ($items as $item) $next = max($next, $item->revision + 1);
         $saved = new ProjectionRevision($revision->nodeUuid, $next, ProjectionStatus::CANDIDATE, $revision->inputHash, $revision->claimSetHash, $revision->graphHash, $revision->policyRevision, $revision->templateRevision, $revision->payload, $revision->dirtySections, $revision->generatedAt ?: gmdate('c'), $revision->publishedAt);
         $this->items[$revision->nodeUuid][] = $saved;

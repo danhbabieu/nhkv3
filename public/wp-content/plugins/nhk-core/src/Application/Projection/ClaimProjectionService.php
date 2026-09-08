@@ -21,12 +21,13 @@ final class ClaimProjectionService
     public function getLedger(string $nodeUuid, array $options = []): array
     {
         if (trim((string) ($options['node_type'] ?? '')) !== 'wp_post' && !UuidCodec::isValid($nodeUuid)) return ['status' => 'blocked', 'reason' => 'INVALID_NODE_UUID', 'sections' => []];
-        try { $candidate = $this->store->findCandidate($nodeUuid); } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'PROJECTION_STORAGE_UNAVAILABLE', 'sections' => []]; }
-        if ($candidate !== null && !isset($options['force_rebuild'])) {
-            $ledger = $candidate->payload['ledger'] ?? ['status' => 'unavailable', 'reason' => 'PROJECTION_PAYLOAD_MISSING', 'sections' => []];
+        try { $candidate = $this->store->findCandidate($nodeUuid); $published = $candidate === null ? $this->store->findPublished($nodeUuid) : null; } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'PROJECTION_STORAGE_UNAVAILABLE', 'sections' => []]; }
+        $revision = $candidate ?? $published;
+        if ($revision !== null && !isset($options['force_rebuild'])) {
+            $ledger = $revision->payload['ledger'] ?? ['status' => 'unavailable', 'reason' => 'PROJECTION_PAYLOAD_MISSING', 'sections' => []];
             return ((int) ($options['page'] ?? 1) > 1 && is_array($ledger)) ? $this->pageLedger($ledger, (int) $options['page'], (int) ($options['per_section'] ?? 50)) : $ledger;
         }
-        return ['status' => 'unavailable', 'reason' => $candidate === null ? 'PROJECTION_NOT_BUILT' : 'PROJECTION_PAGE_REQUIRES_REBUILD', 'sections' => []];
+        return ['status' => 'unavailable', 'reason' => $revision === null ? 'PROJECTION_NOT_BUILT' : 'PROJECTION_PAGE_REQUIRES_REBUILD', 'sections' => []];
     }
 
     /** @return array<string,mixed>|null */

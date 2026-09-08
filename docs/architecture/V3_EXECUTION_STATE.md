@@ -1,5 +1,65 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-08 — Semantic Claim Projection runtime acceptance continuation
+
+Baseline resumed at `6237e33` with a clean working tree. Focused projection
+Unit baseline passed `15 tests / 42 assertions`. The documented host runtime
+path `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` then bootstrapped
+WordPress and connected to the exact guarded `nhk_v3_test` database; the
+plugin was inactive in that test database, so it was activated through the
+normal WordPress activation path. The runtime now reports
+`WORDPRESS_BOOTSTRAP=PASS`, `DB_CONNECTIVITY=PASS`, `DB_NAME=nhk_v3_test`,
+`nhk-core=active/load PASS`, `CURRENT_SCHEMA_VERSION=16` and
+`TARGET_SCHEMA_VERSION=16`.
+
+Migration 016 was accepted on the test database through the existing additive
+activation/up path from the observed pre-migration state `8/15`. A second
+016 UP was a no-op; both projection tables, unique node/revision and
+dependency indexes were read back. Canonical counts were unchanged across the
+second run: Authority 8, Graph nodes 6, Graph edges 4, Knowledge claims 1,
+Sources 1 and Evidence 1. No Knowledge/Graph/Source/Evidence row was created
+or changed by the projection acceptance probes.
+
+Real WPDB repository acceptance passed `1 test / 9 assertions`: candidate
+create/read, published CAS with one active published revision, candidate
+non-replacement, same-input replay, dependency add/read/remove and cleanup.
+The first real roundtrip exposed two minimal runtime bugs: a published input
+hash was not treated as an idempotent replay, and a published Ledger was not
+read after candidate publication. Regression tests were added before the
+minimal fixes; the focused projection suite then passed `17 tests / 46
+assertions`, and the full Unit suite passed `793 tests / 3,794 assertions`
+with existing warnings/deprecations. In-memory and WPDB stores now return the
+existing revision for every same-input replay, including a published one;
+public Ledger reads fall back to the published revision when no candidate is
+present.
+
+The public projection smoke used an existing active Brand fixture only:
+rebuild → validate → publish → read-back returned `projection_status=published`
+and `ledger_status=available`, with canonical URL `/integration-brand-renamed/`
+and H1 `Integration Brand Renamed` unchanged. Projection REST status returned
+401 unauthenticated and 200 with the administrator capability/nonce; the
+authenticated rebuild handler returned 200. Odo/Odo36/Odo36/10 nodes are not
+present in the test database, so no production-semantic Odo acceptance is
+claimed and no fake Odo canonical fixture was created.
+
+The synthetic performance probe measured 1,000 claims (500 direct and 500
+related during build) at `12.021 ms` build, `4.086 ms` persisted materialized
+read, `4.143 ms` page-2 read, 100 visible page items and `55,050,240` peak
+process bytes in the WordPress runtime. This is an observed measurement, not
+a new threshold. The full guarded Integration suite ran `115 tests / 647
+assertions` but retained 4 errors, 5 failures and 4 skips in pre-existing
+Governance/MCP fixture/API areas; those are not called PASS and were not
+modified for this scope.
+
+PHP lint, JS syntax, `git diff --check` and secret review pass. Composer
+validation is structurally valid with the existing warning that no license is
+specified. No deployment, push, production/staging/V2 mutation or semantic
+backfill occurred. Remaining blockers for runtime acceptance are governed
+canonical Knowledge → Graph → projection E2E (including Odo or an explicitly
+approved synthetic fixture), event/invalidation lifecycle, SEO candidate
+publication, frontend HTML/search/backfill acceptance, many-claim N+1/query
+proof and unrelated Integration regressions. `READY_FOR_DEPLOY=NO`.
+
 ## Checkpoint — 2026-09-08 — MCP documentation Ability registration
 
 The production root cause was the WordPress Ability bridge's explicit

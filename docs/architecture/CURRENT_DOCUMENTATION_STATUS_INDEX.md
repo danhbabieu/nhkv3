@@ -66,8 +66,11 @@ Entity frontend detail consumes the shared service and renders a bounded
 Vietnamese Ledger with honest unavailable state. Event subscribers listen only
 to canonical application events, and the projection admin REST surface is
 capability/nonce protected. Initial backfill is dry-run/resumable and never
-publishes candidates automatically. Target-runtime migration/read-back and
-full public acceptance remain environment gates until freshly verified.
+publishes candidates automatically. On 2026-09-08, guarded local
+`nhk_v3_test` migration 016, WPDB repository roundtrip, published-Ledger
+read-back and projection REST auth/rebuild smoke were verified. Governed
+canonical E2E, event/invalidation lifecycle, full frontend/search/SEO/backfill
+acceptance and deploy readiness remain open until separately evidenced.
 
 ### Current cross-surface law — 2026-09-07
 

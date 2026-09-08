@@ -24,6 +24,20 @@ final class SemanticClaimProjectionRevisionTest extends TestCase
         self::assertSame($published->revision, $store->findPublished($input['node'])->revision);
     }
 
+    public function test_same_input_hash_after_publish_is_a_noop(): void
+    {
+        $store = new InMemoryProjectionRevisionStore();
+        $hash = str_repeat('a', 64);
+        $revision = new ProjectionRevision('node-replay', 1, ProjectionStatus::CANDIDATE, $hash, str_repeat('b', 64), str_repeat('c', 64), payload: ['seo' => ['canonical_url' => '/replay/', 'h1' => 'Replay']]);
+
+        $published = $store->publish('node-replay', $store->markReady('node-replay', $store->saveCandidate($revision)->revision)->revision);
+        $replay = $store->saveCandidate($revision);
+
+        self::assertSame(ProjectionStatus::PUBLISHED, $replay->status);
+        self::assertSame($published->revision, $replay->revision);
+        self::assertSame($published->revision, $store->findLatest('node-replay')->revision);
+    }
+
     public function test_invalidation_marks_only_dependent_sections_dirty(): void
     {
         $store = new InMemoryProjectionRevisionStore();

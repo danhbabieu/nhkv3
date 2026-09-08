@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Projection\{ClaimClusterer, ClaimProjectionService, ClaimRanker, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder};
+use NHK\Core\Domain\Projection\{ProjectionRevision, ProjectionStatus};
 use NHK\Core\Contracts\Graph\EndpointResolver;
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Domain\Graph\NodeReference;
@@ -62,6 +63,20 @@ final class SemanticClaimProjectionPipelineTest extends TestCase
         $clusters = $clusterer->cluster($resolved['items']);
         self::assertCount(2, $clusters);
         self::assertNotSame([], $clusters[0]->supportingClaimIds);
+    }
+
+    public function test_published_ledger_remains_public_after_candidate_is_published(): void
+    {
+        $node = UuidCodec::newV7();
+        $graph = $this->graph(new InMemoryGraphRepository(), [$node]);
+        $resolver = new ClaimScopeResolver($this->claims([]), $graph, new GraphProjectionPolicy());
+        $store = new InMemoryProjectionRevisionStore();
+        $service = new ClaimProjectionService(new LiveLedgerProjectionBuilder($resolver), $store);
+        $candidate = $store->saveCandidate(new ProjectionRevision($node, 1, ProjectionStatus::CANDIDATE, str_repeat('a', 64), str_repeat('b', 64), str_repeat('c', 64), payload: ['ledger' => ['status' => 'available', 'claim_count' => 0, 'sections' => []]]));
+        $ready = $store->markReady($node, $candidate->revision);
+        $store->publish($node, $ready->revision);
+
+        self::assertSame('available', $service->getLedger($node)['status']);
     }
 
     private function claim(string $text, string $subject, string $type, string $category, array $extra = []): KnowledgeClaim

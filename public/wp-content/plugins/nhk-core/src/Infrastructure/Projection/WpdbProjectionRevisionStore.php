@@ -14,7 +14,7 @@ final class WpdbProjectionRevisionStore implements ProjectionRevisionStore
 
     public function saveCandidate(ProjectionRevision $revision): ProjectionRevision
     {
-        $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE node_uuid=%s AND input_hash=%s AND status IN ('candidate','validating','ready') ORDER BY projection_revision DESC LIMIT 1", $revision->nodeUuid, $revision->inputHash), ARRAY_A);
+        $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE node_uuid=%s AND input_hash=%s ORDER BY projection_revision DESC LIMIT 1", $revision->nodeUuid, $revision->inputHash), ARRAY_A);
         if (is_array($existing)) return $this->hydrate($existing);
         $next = (int) $this->database->get_var($this->database->prepare("SELECT COALESCE(MAX(projection_revision),0)+1 FROM {$this->table} WHERE node_uuid=%s", $revision->nodeUuid));
         $now = gmdate('Y-m-d H:i:s.u');
