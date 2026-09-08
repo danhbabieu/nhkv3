@@ -125,6 +125,26 @@ final class P4GovernanceAcceptanceIntegrationTest extends TestCase
         self::assertNull($repository->findByIdempotencyKey($proposal->idempotencyKey));
     }
 
+    public function test_create_is_readable_immediately_and_from_an_independent_repository_request(): void
+    {
+        global $wpdb;
+        $proposal = (new GovernanceService(new WpdbProposalRepository($wpdb), new WpdbAuditSink($wpdb), new WpdbTransactionManager()))->create($this->proposal('independent-readback'));
+
+        $sameRequest = (new WpdbProposalRepository($wpdb))->find($proposal->id);
+        $independentRequest = (new WpdbProposalRepository())->find($proposal->id);
+        $row = $wpdb->get_row($wpdb->prepare(
+            'SELECT id, proposal_uuid, idempotency_key FROM ' . $wpdb->prefix . 'nhk_proposals WHERE proposal_uuid=%s',
+            UuidCodec::toBinary($proposal->id)
+        ), ARRAY_A);
+
+        self::assertNotNull($sameRequest);
+        self::assertNotNull($independentRequest);
+        self::assertSame($proposal->id, $sameRequest->id);
+        self::assertSame($proposal->id, $independentRequest->id);
+        self::assertSame($proposal->idempotencyKey, $row['idempotency_key'] ?? null);
+        self::assertSame(16, strlen((string) ($row['proposal_uuid'] ?? '')));
+    }
+
     public function test_eligibility_reports_dependency_and_revision_reason_codes(): void
     {
         $service = $this->service();

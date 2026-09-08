@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+## Proposal persistence runtime diagnosis — 2026-09-08
+
+Direct WordPress/DB inspection on `demo.1945.vn` confirmed `$wpdb->prefix=wp_`,
+database `erourxcg_nhkv3`, canonical table `wp_nhk_proposals`, migration state
+15/15, the migration-003 columns and indexes, `autocommit=1`, and no active
+transaction. The deployed proposal repository checksum matched the local
+checkout. Governance-authorized create probes for both `create` and
+`relation_create` returned `query=1`, `last_error=''`, one affected row, and
+the same UUID from immediate repository read, direct binary-UUID SQL read and
+an independent `wpdb` connection with the correct WordPress prefix. A
+30-row hydration audit found no unreadable persisted proposal. The prior
+generic read-back error therefore had no reproducible DB/prefix/schema cause
+in the current remote artifact; it was made diagnosable instead of hiding
+insert/read/hydration state.
+
+`WpdbProposalRepository::create()` now snapshots INSERT result, DB error,
+query, affected rows and insert id immediately, rejects any result other than
+exactly one affected row, and on read-back failure performs the same canonical
+UUID lookup and reports whether the row exists. Regression coverage adds a
+real integration test for immediate and independent repository reads and
+retains fail-closed read-back coverage. No migration or semantic backfill was
+performed. Remote lifecycle verification after deployment remains pending.
+
 ## Proposal persistence remote runtime closeout — 2026-09-08
 
 Commit `6d9a91c` was deployed to `demo.1945.vn` through the allowlisted

@@ -5,6 +5,7 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,ProposalRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Governance\Exception\ProposalIdempotencyStaleBinding;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class WpdbProposalRepository implements ProposalRepository, ApprovedRelationProposalRepository
@@ -70,17 +71,43 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             throw new \NHK\Core\Governance\Exception\ProposalIdempotencyConflict('Idempotency key is already bound to different content.');
         }
         $now = gmdate('Y-m-d H:i:s.u');
-        $ok = $db->query($db->prepare('INSERT INTO '.$this->table().' (proposal_uuid,idempotency_key,operation,entity_type,target_uuid,expected_revision,command_json,fingerprint,dependency_fingerprint,state,revision,created_by,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s)', UuidCodec::toBinary($proposal->id), $proposal->idempotencyKey, $proposal->operation, $proposal->entityType ?: $proposal->subjectId, $proposal->targetUuid ? UuidCodec::toBinary($proposal->targetUuid) : null, $proposal->expectedRevision, wp_json_encode($proposal->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $this->fingerprintBinary($proposal->contentFingerprint), $this->fingerprintBinary($proposal->dependencyFingerprint), $this->state($proposal->state), $proposal->revision, (int) ($proposal->actor ?? 0), $now, $now));
-        if ($ok === false) {
+        $insertQuery = $db->prepare('INSERT INTO '.$this->table().' (proposal_uuid,idempotency_key,operation,entity_type,target_uuid,expected_revision,command_json,fingerprint,dependency_fingerprint,state,revision,created_by,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s)', UuidCodec::toBinary($proposal->id), $proposal->idempotencyKey, $proposal->operation, $proposal->entityType ?: $proposal->subjectId, $proposal->targetUuid ? UuidCodec::toBinary($proposal->targetUuid) : null, $proposal->expectedRevision, wp_json_encode($proposal->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $this->fingerprintBinary($proposal->contentFingerprint), $this->fingerprintBinary($proposal->dependencyFingerprint), $this->state($proposal->state), $proposal->revision, (int) ($proposal->actor ?? 0), $now, $now);
+        $ok = $db->query($insertQuery);
+        $insertLastError = (string) $db->last_error;
+        $insertLastQuery = (string) ($db->last_query ?? $insertQuery);
+        $insertAffectedRows = (string) ($db->rows_affected ?? 'unknown');
+        $insertId = (string) ($db->insert_id ?? 'unknown');
+        if ($ok === false || $ok !== 1) {
             // The unique idempotency index is the race-safe serialization point.
             $existing = $this->findByIdempotencyKey($proposal->idempotencyKey);
             if ($existing) {
                 if ($this->sameIdempotentContent($existing, $proposal)) return $existing;
                 throw new \NHK\Core\Governance\Exception\ProposalIdempotencyConflict('Idempotency key is already bound to different content.');
             }
-            throw new \RuntimeException('PROPOSAL_INSERT_FAILED: '.(string) $db->last_error);
+            throw new \RuntimeException(sprintf(
+                'PROPOSAL_INSERT_FAILED: table=%s; insert_result=%s; affected_rows=%s; insert_id=%s; last_error=%s; last_query=%s',
+                $this->table(),
+                var_export($ok, true),
+                $insertAffectedRows,
+                $insertId,
+                $insertLastError,
+                $insertLastQuery,
+            ));
         }
-        return $this->find($proposal->id) ?? throw new \RuntimeException('PROPOSAL_READBACK_FAILED: inserted proposal is not readable from the canonical store.');
+        $readback = $this->find($proposal->id);
+        if ($readback !== null) return $readback;
+        $readbackQuery = $db->prepare('SELECT proposal_uuid FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1', UuidCodec::toBinary($proposal->id));
+        $canonicalRow = $db->get_row($readbackQuery, ARRAY_A);
+        throw new \RuntimeException(sprintf(
+            'PROPOSAL_READBACK_FAILED: table=%s; insert_result=%s; affected_rows=%s; insert_id=%s; canonical_row_present=%s; canonical_query=%s; last_error=%s',
+            $this->table(),
+            var_export($ok, true),
+            $insertAffectedRows,
+            $insertId,
+            $canonicalRow === null ? '0' : '1',
+            $readbackQuery,
+            (string) $db->last_error,
+        ));
     }
     public function find(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1',UuidCodec::toBinary($id)),ARRAY_A)); }
     /** @return list<Proposal> */
@@ -92,7 +119,17 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
         $rows = $db->get_results('SELECT * FROM ' . $this->table() . $where . ' ORDER BY id DESC LIMIT ' . $limit, ARRAY_A) ?: [];
         return array_values(array_filter(array_map(fn (array $row): ?Proposal => $this->hydrate($row), $rows), static fn (?Proposal $proposal): bool => $proposal !== null));
     }
-    public function findByIdempotencyKey(string $key): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE idempotency_key=%s LIMIT 1',$key),ARRAY_A)); }
+    public function findByIdempotencyKey(string $key): ?Proposal
+    {
+        $db = $this->db();
+        $row = $db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE idempotency_key=%s LIMIT 1', $key), ARRAY_A);
+        if (!$row) return null;
+        $proposal = $this->hydrate($row);
+        if ($proposal === null) {
+            throw new ProposalIdempotencyStaleBinding('IDEMPOTENCY_STALE_BINDING: existing idempotency binding is not readable from the canonical proposal store.');
+        }
+        return $proposal;
+    }
     public function save(Proposal $proposal): Proposal { $db=$this->db(); $replacementDbId=$proposal->supersededByProposalId ? $db->get_var($db->prepare('SELECT id FROM '.$this->table().' WHERE proposal_uuid=%s',UuidCodec::toBinary($proposal->supersededByProposalId))) : null; $ok=$db->query($db->prepare('UPDATE '.$this->table().' SET state=%d,revision=%d,updated_at=%s,submitted_at=%s,applied_at=%s,cancelled_at=%s,rejected_at=%s,superseded_at=%s,superseded_by_proposal_id=%s WHERE proposal_uuid=%s AND revision=%d',$this->state($proposal->state),$proposal->revision,gmdate('Y-m-d H:i:s.u'),$proposal->submittedAt,$proposal->appliedAt,$proposal->cancelledAt,$proposal->rejectedAt,$proposal->supersededAt,$replacementDbId,UuidCodec::toBinary($proposal->id),$proposal->revision-1)); if($ok!==1)throw new \RuntimeException('PROPOSAL_REVISION_CONFLICT'); return $this->find($proposal->id)??$proposal; }
     public function findForUpdate(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1 FOR UPDATE',UuidCodec::toBinary($id)),ARRAY_A)); }
 

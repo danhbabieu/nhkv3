@@ -188,6 +188,9 @@ final class GovernanceCoreTest extends TestCase
         $repository = new WpdbProposalRepository(new class {
             public string $prefix = 'wp_';
             public string $last_error = '';
+            public string $last_query = '';
+            public int $rows_affected = 0;
+            public int $insert_id = 0;
 
             public function prepare(string $query, mixed ...$arguments): string
             {
@@ -206,7 +209,7 @@ final class GovernanceCoreTest extends TestCase
         });
         $service = new GovernanceService($repository);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('PROPOSAL_READBACK_FAILED');
+        $this->expectExceptionMessage('PROPOSAL_READBACK_FAILED: table=wp_nhk_proposals; insert_result=1; affected_rows=0; insert_id=0; canonical_row_present=0');
 
         $service->create(new Proposal(
             UuidCodec::newV7(),
@@ -225,6 +228,56 @@ final class GovernanceCoreTest extends TestCase
             idempotencyKey: 'relation-immediate-readback',
             targetUuid: $targetUuid,
             entityType: 'knowledge',
+        ));
+    }
+
+    #[RunInSeparateProcess]
+    public function test_stale_idempotency_binding_fails_fast_instead_of_being_treated_as_missing(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        $row = [
+            'id' => '501',
+            'proposal_uuid' => UuidCodec::toBinary(UuidCodec::newV7()),
+            'idempotency_key' => 'stale-idempotency-key',
+            'operation' => 'relation_create',
+            'entity_type' => 'relation',
+            'target_uuid' => '',
+            'expected_revision' => null,
+            'command_json' => '{not-canonical-json}',
+            'fingerprint' => str_repeat('a', 32),
+            'dependency_fingerprint' => str_repeat('b', 32),
+            'state' => '1',
+            'revision' => '1',
+            'created_by' => '1',
+            'created_at' => '2026-09-08 01:23:52.000000',
+            'updated_at' => '2026-09-08 01:23:52.000000',
+        ];
+        $repository = new WpdbProposalRepository(new class($row) {
+            public string $prefix = 'wp_';
+            public string $last_error = '';
+
+            public function __construct(private array $row) {}
+            public function prepare(string $query, mixed ...$arguments): string { return $query; }
+            public function get_row(string $query, mixed $output): ?array
+            {
+                return str_contains($query, 'WHERE idempotency_key=') ? $this->row : null;
+            }
+            public function get_var(string $query): ?string { return null; }
+        });
+
+        $service = new GovernanceService($repository);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('IDEMPOTENCY_STALE_BINDING');
+        $service->create(new Proposal(
+            UuidCodec::newV7(),
+            'source',
+            'relation_create',
+            ['source_uuid' => UuidCodec::newV7(), 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about'],
+            'stale-content',
+            null,
+            'stale-dependency',
+            idempotencyKey: 'stale-idempotency-key',
+            entityType: 'relation',
         ));
     }
 
