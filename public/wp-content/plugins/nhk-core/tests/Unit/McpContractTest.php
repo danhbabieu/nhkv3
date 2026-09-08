@@ -290,6 +290,8 @@ final class McpContractTest extends TestCase
     public function test_wordpress_ability_allowlist_covers_the_catalog(): void
     {
         self::assertSame([
+            'nhk-v3/docs-bootstrap',
+            'nhk-v3/docs-get',
             'nhk-v3/search',
             'nhk-v3/canonical-inventory',
             'nhk-v3/graph-inventory',
@@ -307,6 +309,12 @@ final class McpContractTest extends TestCase
             'nhk-v3/evidence-get',
         ], McpAbilityRegistration::readAbilityNames());
         self::assertSame('nhk-v3/entity-get', McpAbilityRegistration::abilityNameForTool('nhk.entity.get'));
+        self::assertSame('nhk-v3/docs-bootstrap', McpAbilityRegistration::abilityNameForTool('nhk.docs.bootstrap'));
+        self::assertSame('nhk-v3/docs-get', McpAbilityRegistration::abilityNameForTool('nhk.docs.get'));
+        self::assertContains('nhk-v3/docs-bootstrap', McpAbilityRegistration::readAbilityNames());
+        self::assertContains('nhk-v3/docs-get', McpAbilityRegistration::readAbilityNames());
+        self::assertArrayNotHasKey('nhk.docs.bootstrap', McpAbilityRegistration::explicitExclusionReasons());
+        self::assertArrayNotHasKey('nhk.docs.get', McpAbilityRegistration::explicitExclusionReasons());
         self::assertSame('nhk-v3/video-ingest', McpAbilityRegistration::abilityNameForTool('nhk.video.ingest'));
         self::assertSame([
             'nhk-v3/public-url-reproject',
@@ -389,7 +397,7 @@ final class McpContractTest extends TestCase
     public function test_multipart_batch_upload_is_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch'],
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }
@@ -397,8 +405,28 @@ final class McpContractTest extends TestCase
     public function test_media_ingest_is_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch'],
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
+    }
+
+    public function test_documentation_abilities_are_added_to_the_easy_mcp_enabled_ability_list(): void
+    {
+        self::assertSame(
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
+        );
+    }
+
+    public function test_documentation_abilities_use_the_read_capability_and_read_only_annotations(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+
+        self::assertSame('read', $tools['nhk.docs.bootstrap']['kind'] === 'read' ? 'read' : null);
+        self::assertSame('read', $tools['nhk.docs.get']['kind'] === 'read' ? 'read' : null);
+        self::assertFalse($tools['nhk.docs.bootstrap']['governed']);
+        self::assertFalse($tools['nhk.docs.get']['governed']);
+        self::assertSame([], $tools['nhk.docs.bootstrap']['inputSchema']['required']);
+        self::assertSame(McpDocumentationRegistry::documentKeys(), $tools['nhk.docs.get']['inputSchema']['properties']['document_key']['enum']);
     }
 }

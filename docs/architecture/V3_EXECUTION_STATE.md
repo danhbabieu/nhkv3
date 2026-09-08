@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-08 — MCP documentation Ability registration
+
+The production root cause was the WordPress Ability bridge's explicit
+exclusion of the already-implemented `nhk.docs.bootstrap` and `nhk.docs.get`
+catalog tools. The exclusion is removed: both now map to
+`nhk-v3/docs-bootstrap` and `nhk-v3/docs-get` in the read-only Ability map,
+use the `read` permission boundary and delegate execution through the existing
+MCP transport/documentation registry. Both are appended by the existing Easy
+MCP enabled-abilities filter. Their schemas remain the catalog contracts:
+bootstrap has no path input, while get accepts only the registry enum key.
+Unit coverage passes 26 tests / 253 assertions; integration coverage was added
+for Ability registration, canonical registry read-back and traversal rejection
+but is environment-skipped without `NHK_WP_TEST_PATH`. No documentation
+architecture, semantic data, production/staging/V2 data, deployment or push
+was changed.
+
 ## Multipart runtime acceptance — 2026-09-08
 
 The documented local runtime was restored without code bypass: MySQL is alive

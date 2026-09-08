@@ -20,6 +20,8 @@ final class McpAbilityRegistration
         if (!is_array($enabled) || $enabled === []) return [];
         if (!in_array('nhk-v3/media-ingest', $enabled, true)) $enabled[] = 'nhk-v3/media-ingest';
         if (!in_array('nhk-v3/media-upload-batch', $enabled, true)) $enabled[] = 'nhk-v3/media-upload-batch';
+        if (!in_array('nhk-v3/docs-bootstrap', $enabled, true)) $enabled[] = 'nhk-v3/docs-bootstrap';
+        if (!in_array('nhk-v3/docs-get', $enabled, true)) $enabled[] = 'nhk-v3/docs-get';
         return array_values($enabled);
     }
 
@@ -115,6 +117,8 @@ final class McpAbilityRegistration
 
     /** @var array<string,string> */
     private const READ_TOOL_MAP = [
+        'nhk.docs.bootstrap' => 'nhk-v3/docs-bootstrap',
+        'nhk.docs.get' => 'nhk-v3/docs-get',
         'nhk.search' => 'nhk-v3/search',
         'nhk.canonical.inventory' => 'nhk-v3/canonical-inventory',
         'nhk.graph.inventory' => 'nhk-v3/graph-inventory',
@@ -170,10 +174,7 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [
-        'nhk.docs.bootstrap' => 'Canonical documentation bootstrap is exposed on the normal read-only MCP surface; no separate WordPress Ability is required.',
-        'nhk.docs.get' => 'Canonical documentation reader is exposed on the normal read-only MCP surface; no separate WordPress Ability is required.',
-    ];
+    private const EXPLICIT_EXCLUSION_REASONS = [];
 
     /** @return list<string> */
     public static function readAbilityNames(): array
@@ -371,6 +372,7 @@ final class McpAbilityRegistration
                 'nhk.graph.inventory' => $read->graphInventory((array) ($input['filters'] ?? []), (int) ($input['limit'] ?? 50), isset($input['after']) ? (string) $input['after'] : null),
                 'nhk.relation.backfill.dry_run' => $read->relationBackfillDryRun((array) ($input['records'] ?? [])),
                 'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
+                'nhk.docs.bootstrap', 'nhk.docs.get' => self::executeMcp($tool, $input),
                 'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
                 'nhk.category.resolve' => self::executeMcp($tool, $input),
@@ -399,6 +401,8 @@ final class McpAbilityRegistration
     private static function label(string $tool): string
     {
         return [
+            'nhk.docs.bootstrap' => 'NHK Documentation Bootstrap',
+            'nhk.docs.get' => 'NHK Documentation Get',
             'nhk.public-url.audit' => 'NHK Public URL Audit',
             'nhk.public-url.reproject' => 'NHK Public URL Reproject',
             'nhk.search' => 'NHK Search',

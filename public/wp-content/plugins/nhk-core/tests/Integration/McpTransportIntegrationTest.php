@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Governance\GovernanceCapabilities;
-use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpToolCatalog};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpDocumentationRegistry, McpToolCatalog};
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository};
 use NHK\Core\Domain\Media\Media;
@@ -96,6 +96,14 @@ final class McpTransportIntegrationTest extends TestCase
         }
         self::assertNotNull(wp_get_ability('nhk-v3/article-preflight'));
         self::assertNotNull(wp_get_ability('nhk-v3/article-ingest'));
+        $docsBootstrap = wp_get_ability('nhk-v3/docs-bootstrap');
+        $docsGet = wp_get_ability('nhk-v3/docs-get');
+        self::assertNotNull($docsBootstrap);
+        self::assertNotNull($docsGet);
+        self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $docsBootstrap->get_meta_item('annotations'));
+        self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $docsGet->get_meta_item('annotations'));
+        self::assertSame('object', $docsBootstrap->get_input_schema()['type']);
+        self::assertSame(McpDocumentationRegistry::documentKeys(), $docsGet->get_input_schema()['properties']['document_key']['enum']);
         $administrator = get_role('administrator');
         self::assertNotNull($administrator);
         $administrator->add_cap('read');
@@ -105,6 +113,14 @@ final class McpTransportIntegrationTest extends TestCase
         wp_set_current_user((int) $users[0]->ID);
         try {
             self::assertSame(['resolved' => [], 'candidates' => [], 'ambiguities' => [], 'missing' => [], 'conflicts' => [], 'relations' => []], $read->execute(['context' => []]));
+            $bootstrap = $docsBootstrap->execute([]);
+            self::assertIsArray($bootstrap);
+            self::assertSame('constitution', $bootstrap['constitution']['document_key']);
+            $document = $docsGet->execute(['document_key' => 'read-first']);
+            self::assertIsArray($document);
+            self::assertStringContainsString('Mandatory Read-First Router', $document['content']);
+            $unknown = $docsGet->execute(['document_key' => '../wp-config.php']);
+            self::assertInstanceOf(\WP_Error::class, $unknown);
         } finally {
             wp_set_current_user($previousUser);
         }
