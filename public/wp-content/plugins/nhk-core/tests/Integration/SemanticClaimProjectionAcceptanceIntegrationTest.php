@@ -11,8 +11,9 @@ use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Contracts\Governance\GovernanceAuthorizer;
-use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Projection\{ProjectionRevision, ProjectionStatus};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
@@ -231,6 +232,105 @@ final class SemanticClaimProjectionAcceptanceIntegrationTest extends TestCase
         self::assertLessThan(1000, substr_count($frontend, 'class="claim-card"'));
         self::assertStringNotContainsString('rebuild(', $frontend);
         self::assertSame('PASS', 'PASS', 'FRONTEND_HTML');
+    }
+
+    public function test_canonical_odo36_fixture_is_persisted_and_rebuilds_propagated_context(): void
+    {
+        global $wpdb;
+
+        $fixture = $this->fixture();
+        $authority = new WpdbAuthorityRepository($wpdb);
+        $claims = $fixture['claims'];
+        $sources = $fixture['sources'];
+        $evidence = $fixture['evidence'];
+        $graph = $fixture['graph'];
+        $projection = $fixture['projection'];
+        $store = $fixture['store'];
+        $dependencies = $fixture['dependencies'];
+
+        $brandId = 'd2af7739-3d1b-4666-ad0a-aeda0758f4d8';
+        $modelId = 'c01c109c-5d39-401e-a16e-6d61a0a52f50';
+        $variantId = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
+        $directClaimIds = [
+            '01a07e84-a8d9-7707-8f0d-ddd98f1b064f',
+            '01a07f5d-e0ce-7cb7-ac7a-fc853e6deb47',
+        ];
+        $propagatedClaimId = '01a07f91-e0ce-7cb7-ac7a-fc853e6deb47';
+        $sourceId = UuidCodec::newV7();
+        $evidenceIds = [UuidCodec::newV7(), UuidCodec::newV7(), UuidCodec::newV7()];
+
+        // This is a controlled fixture loader for nhk_v3_test only. It preserves
+        // the approved Odo UUIDs/stable keys without touching a target runtime.
+        $authority->create(new AuthorityEntity($brandId, 'brand', 'nhk:brand:odo', 'Odo', 1, [
+            'aliases' => [], 'description' => 'Controlled Odo acceptance fixture', 'country' => 'France', 'founded_year' => 1,
+        ], AuthorityState::ACTIVE));
+        $authority->create(new AuthorityEntity($modelId, 'model', 'nhk:model:odo.36', 'Odo 36', 1, [
+            'brand_uuid' => $brandId, 'aliases' => [], 'description' => 'Controlled Odo36 acceptance fixture', 'launch_year' => 0,
+        ], AuthorityState::ACTIVE));
+        $authority->create(new AuthorityEntity($variantId, 'variant', 'nhk:variant:odo.36.10', 'Odo36/10', 1, [
+            'model_uuid' => $modelId, 'aliases' => [], 'description' => 'Controlled Odo36/10 acceptance fixture', 'reference' => '36/10',
+        ], AuthorityState::ACTIVE));
+        $this->owned = [$brandId, $modelId, $variantId];
+
+        $edge = $graph->create(new NodeReference('variant', $variantId), 'variant_of', new NodeReference('model', $modelId));
+        self::assertNotNull($edge->edge_uuid);
+
+        $sources->create(new Source($sourceId, 'nhk:source:odo36.acceptance', 'Controlled Odo36 acceptance source', 'catalog', 'https://example.test/odo36', ['visibility' => 'PUBLIC']));
+        $claims->create(new KnowledgeClaim($directClaimIds[0], 'nhk:knowledge:odo36.dial.ellipse-logo', 'Odo36 và Odo30 mặt xoáy thường gặp logo elip trên mặt số.', 'fact', ['metadata' => ['subject_id' => $modelId, 'subject_type' => 'model', 'projection_category' => 'identification_rule', 'knowledge_status' => 'APPROVED']]));
+        $claims->create(new KnowledgeClaim($directClaimIds[1], 'nhk:knowledge:odo36.dial.20x20', 'Mặt số in 20x20 là loại phổ biến trên Odo36, gặp ở 36/8 và 36/10; thường đi kèm kim tháp, kim bút hoặc kim số 8.', 'fact', ['metadata' => ['subject_id' => $modelId, 'subject_type' => 'model', 'projection_category' => 'dial_and_hands', 'knowledge_status' => 'APPROVED']]));
+        $claims->create(new KnowledgeClaim($propagatedClaimId, 'nhk:knowledge:odo36.10.configuration', 'Odo36/10 thường sử dụng côn chữ M.', 'technical', ['metadata' => ['subject_id' => $variantId, 'subject_type' => 'variant', 'projection_category' => 'configuration', 'knowledge_status' => 'APPROVED']]));
+        $this->owned = array_merge($this->owned, $directClaimIds, [$propagatedClaimId, $sourceId], $evidenceIds);
+
+        foreach (array_merge($directClaimIds, [$propagatedClaimId]) as $index => $claimId) {
+            $evidence->create(new Evidence($evidenceIds[$index], $claimId, $sourceId, 'supports', 'Controlled acceptance excerpt', 'https://example.test/odo36#' . $index, true, 1, ['visibility' => 'PUBLIC']));
+        }
+
+        $first = $projection->rebuild(new NodeReference('model', $modelId), '/dong-ho/odo-36/', 'Odo 36');
+        $candidate = $store->findCandidate($modelId);
+        self::assertNotNull($candidate);
+        self::assertSame($first->revision, $candidate->revision);
+        self::assertSame(3, $candidate->payload['ledger']['claim_count']);
+        self::assertSame(2, $candidate->payload['ledger']['direct_count']);
+        self::assertSame(1, $candidate->payload['ledger']['related_count']);
+        self::assertSame($modelId, $candidate->payload['ledger']['node_uuid']);
+
+        $rawItems = array_merge(...array_map(static fn (array $section): array => (array) ($section['claims'] ?? []), $candidate->payload['ledger']['sections']));
+        $directItems = array_values(array_filter($rawItems, static fn (array $item): bool => in_array($item['claim_uuid'] ?? '', $directClaimIds, true)));
+        $propagatedItems = array_values(array_filter($rawItems, static fn (array $item): bool => ($item['claim_uuid'] ?? '') === $propagatedClaimId));
+        self::assertCount(2, $directItems);
+        self::assertSame($modelId, $directItems[0]['canonical_subject_uuid']);
+        self::assertCount(1, $propagatedItems);
+        self::assertSame($variantId, $propagatedItems[0]['canonical_subject_uuid']);
+        self::assertStringContainsString('Ở biến thể Odo36/10', $propagatedItems[0]['display_text']);
+
+        $ready = $projection->validate($modelId, $candidate->revision);
+        $published = $projection->publish($modelId, $ready->revision);
+        $persisted = $store->findPublished($modelId);
+        self::assertNotNull($persisted);
+        self::assertSame($published->revision, $persisted->revision);
+        self::assertSame('/dong-ho/odo-36/', $persisted->payload['seo']['canonical_url']);
+        self::assertSame('Odo 36', $persisted->payload['seo']['h1']);
+        self::assertNotEmpty($dependencies->findByDependency('claim', $directClaimIds[0]));
+        self::assertNotEmpty($dependencies->findByDependency('claim', $propagatedClaimId));
+        self::assertNotEmpty($dependencies->findByDependency('source', $sourceId));
+        self::assertNotEmpty($dependencies->findByDependency('evidence', $evidenceIds[2]));
+        self::assertNotEmpty($dependencies->findByDependency('relation', $edge->edge_uuid));
+
+        $publicRead = $projection->getLedger($modelId);
+        self::assertStringContainsString('Ở biến thể Odo36/10', json_encode($publicRead, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        self::assertArrayNotHasKey('claim_uuid', $publicRead['sections'][0]['claims'][0]);
+        self::assertSame($publicRead, $projection->getLedger($modelId), 'Second persisted read must be deterministic.');
+        self::assertSame($persisted->revision, $store->findPublished($modelId)->revision);
+
+        $current = $claims->findByCanonicalId($propagatedClaimId);
+        self::assertNotNull($current);
+        $claims->update(new KnowledgeClaim($current->canonicalId, $current->stableKey, 'Odo36/10 được ghi nhận với côn chữ M.', $current->claimType, $current->provenance, true, $current->revision), $current->revision);
+        do_action('nhk_knowledge_revised', $propagatedClaimId);
+        $invalidated = $store->findCandidate($modelId);
+        self::assertNotNull($invalidated);
+        self::assertGreaterThan($persisted->revision, $invalidated->revision);
+        self::assertStringContainsString('Ở biến thể Odo36/10, được ghi nhận', json_encode($invalidated->payload['ledger'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        self::assertSame($persisted->revision, $store->findPublished($modelId)->revision, 'Invalidation must not auto-publish SEO.');
     }
 
     /** @return array<string,mixed> */
