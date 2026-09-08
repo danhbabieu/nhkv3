@@ -283,25 +283,6 @@ role, order and contextual SEO fields. Article roles are `featured_primary`,
 remain in the same registry. `nhk.media.get` returns active ready Media, public
 deliverable assets and reader-safe usage.
 
-The same `nhk.media.ingest` tool also accepts one direct multipart `file`
-parameter. The MCP envelope carries JSON-RPC arguments separately from the
-multipart file part; the file is never represented as base64 or a data URL.
-`filename`, `max_width`, `max_height` and `quality` control the binary adapter.
-Before public WordPress projection, the adapter works on a temporary copy,
-validates image MIME, applies EXIF orientation, resizes without cropping to the
-maximum dimensions, applies requested encoding quality and sanitizes the public
-filename. The processed derivative is inserted/adopted in the WordPress Media
-Library. The source-original bytes are retained as a private/protected
-MediaAsset under the same canonical Media identity; temporary workfiles are not
-retained. WordPress/generated responsive representations remain derivatives.
-
-The direct file path is a binary/storage adapter inside the governed Media
-
-flow. It creates or resolves exactly one NHK semantic Media identity; the
-source-original remains a private/protected MediaAsset and eligible optimized
-outputs remain derivatives under that same Media. It does not create Knowledge,
-Source, Evidence or Graph edges from image content.
-
 `nhk.media.upload-batch` is the primary multipart transport for one or more
 images. It accepts `files[]`, an idempotency key, optional batch metadata and
 per-file hints, then returns an ordered manifest with attachment/Media IDs,
@@ -312,6 +293,31 @@ different payload under the same key is a deterministic conflict. The custom
 `/nhk/v1/mcp` endpoint carries the binary parts. The tool is explicitly not
 exported as a JSON-only WordPress Ability because that transport cannot carry
 the required file parts; its custom MCP discovery entry is canonical.
+
+The canonical lifecycle is multipart batch → native WordPress attachment
+creation → `wp_generate_attachment_metadata()` and derivatives → canonical
+attachment read-back / `nhk.media.attachment.get` → governed
+`nhk-v3/media-ingest` attachment adoption/binding → MediaAsset → Media →
+MediaUsage. Upload transport does not create Knowledge, Source, Evidence,
+Graph relations or inferred Model/Variant truth. The source-original remains a
+private/protected MediaAsset and WordPress derivatives remain derivatives under
+the same Media identity.
+
+The path classification is fixed: `nhk.media.upload-batch` is
+PRIMARY/RECOMMENDED multipart transport; `wp_upload_media_from_url` is
+SECONDARY/IMPORT for already-public HTTPS files; `wp_upload_media` base64 is
+FALLBACK/COMPATIBILITY only and is not the production-primary path for many
+images. Any legacy direct multipart branch on `nhk.media.ingest` is a bounded
+compatibility adapter; it does not replace the batch transport or merge the
+transport and semantic boundaries.
+
+Same idempotency key plus the same binary payload reuses the canonical result;
+same key with a different payload returns `IDEMPOTENCY_CONFLICT`. Filename
+equality is not identity and checksum is not global semantic dedup. A batch is
+not all-or-nothing: successful items remain, failed items carry their own
+errors, `partial_success` is explicit and failed items may be retried. If
+runtime acceptance is not freshly proven, status is
+`IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING`.
 
 `nhk.media.attachment.get` reads back attachment projection state including the
 attachment ID, canonical URL, sanitized filename, MIME, dimensions, filesize and

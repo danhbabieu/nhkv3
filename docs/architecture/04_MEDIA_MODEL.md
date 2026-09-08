@@ -1,7 +1,9 @@
 # Media model
 
-> **NON-NORMATIVE.** Đây là evidence mô hình lịch sử. Nếu mâu thuẫn với
-> `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát.
+> **NON-NORMATIVE.** Đây là domain-model evidence hiện hành. Nếu mâu thuẫn
+> với `docs/constitution/NHK_V3_CONSTITUTION.md`, Hiến pháp kiểm soát. MCP
+> transport và runtime capability được chốt ở các contract hiện hành được
+> router trong `READ_FIRST.md` dẫn tới.
 
 
 Media là semantic entity độc lập. Media identity tách khỏi MediaAsset và
@@ -33,6 +35,46 @@ không adapter nào được ghi trực tiếp bảng Media/Asset/Usage như m�
 hai. Downstream reuse phải ưu tiên canonical Media UUID/stable key + revision,
 sau đó dùng asset/usage phù hợp thay vì upload hoặc nhân bản lại cùng semantic
 identity.
+
+## Canonical file-to-Media workflow — 2026-09-08
+
+Đường upload file canonical là:
+
+`nhk.media.upload-batch` (multipart `files[]`)
+→ WordPress native attachment lifecycle
+→ canonical attachment read-back / `nhk.media.attachment.get`
+→ `nhk-v3/media-ingest` attachment adoption/binding
+→ `MediaAsset` → `Media` → `MediaUsage`.
+
+Một file là batch có một item; batch hỗ trợ 1..N file trong giới hạn runtime.
+Manifest phải giữ thứ tự và trả về per-item `attachment_id`, `source_url`,
+filename, MIME, byte size, dimensions, SHA-256, `created`/`reused`, read-back
+status và typed error. Batch là per-item, không all-or-nothing: item thành công
+được giữ lại khi item khác lỗi và `partial_success` được trả về.
+
+`nhk.media.upload-batch` là PRIMARY multipart transport. URL đã có public
+HTTPS dùng `wp_upload_media_from_url` là SECONDARY/IMPORT. `wp_upload_media`
+base64 chỉ là FALLBACK/COMPATIBILITY cho payload nhỏ, không phải đường mặc định
+cho workflow nhiều ảnh. Hai transport và semantic `media-ingest` không được
+nhập thành một boundary.
+
+SHA-256 được tính trên binary thật. Cùng idempotency key và cùng payload được
+replay/reuse; cùng key nhưng payload khác phải fail deterministic
+`IDEMPOTENCY_CONFLICT`. Filename trùng không chứng minh cùng file và checksum
+không tự tạo global semantic dedup. Nếu concurrency chưa có runtime proof,
+trạng thái phải ghi `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING`.
+
+Upload transport chỉ tạo/adopt attachment và đi qua governed Media boundary;
+nó không tạo Knowledge, Source, Evidence, Graph relation, Model/Variant suy
+diễn hay semantic truth. Source/Evidence chỉ được tạo/reconcile bởi workflow
+semantic có provenance và governance; locator canonical của attachment được
+ưu tiên khi lifecycle đã đọc lại thành công, không duplicate Source/Evidence
+chỉ để thay `chatgpt-upload:*`.
+
+Media workflow có thể chuẩn bị cho `batch images → attachments → Media →
+MediaUsage → Specimen → Product`, nhưng Specimen vẫn là một hiện vật vật lý,
+Product là listing/offer. Product–Specimen vẫn là `REGISTRY_GAP` nếu chưa có
+predicate/contract được đăng ký; không dùng `about` làm workaround.
 
 ## Ô Đô media integrity incident — current operational rule
 

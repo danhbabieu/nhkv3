@@ -46,15 +46,40 @@ revision, relation/media/SEO support, read-back and an explicit unsupported
 reason. It must not advertise an operation merely because a future contract
 mentions it. Admin and MCP must use this one source.
 
-The canonical binary transport for a new image is the existing direct
-multipart `nhk.media.ingest` adapter. It validates, orients, resizes and names
-from supplied editorial context, then enters the governed Media V3 boundary.
-The source-original is retained as a MediaAsset; WebP/responsive outputs are
-derivatives under the same Media identity. It does not use base64/data URLs or
-infer semantic relations from image content. The same governed contract is
-also exposed as `nhk-v3/media-ingest` for binding an already-uploaded
-`wordpress_attachment_id`; direct multipart file input remains on the custom
-MCP transport.
+The canonical binary transport for a new image is `nhk.media.upload-batch` on
+the custom `/nhk/v1/mcp` multipart boundary. It accepts `files[]` (one file is
+a batch of one), validates bytes, creates/adopts native WordPress attachments,
+generates metadata/derivatives and returns an ordered per-item manifest with
+canonical read-back. The source-original is retained as a MediaAsset;
+WebP/responsive outputs are derivatives under the same Media identity. It does
+not use base64 as the default transport or infer semantic relations from image
+content.
+
+The transport classification is PRIMARY/RECOMMENDED for
+`nhk.media.upload-batch`, SECONDARY/IMPORT for `wp_upload_media_from_url` when
+the source is already a public HTTPS URL, and FALLBACK/COMPATIBILITY for
+base64 `wp_upload_media`. The JSON-only Ability layer cannot carry multipart
+bytes, so the batch transport is not advertised as a JSON Ability.
+
+After attachment read-back, `nhk-v3/media-ingest` remains the separate governed
+semantic Media boundary for attachment adoption/binding through
+`wordpress_attachment_id`; it is not the binary batch uploader.
+
+The canonical flow is `multipart batch → WordPress attachment lifecycle →
+attachment read-back / media-attachment-get → media-ingest → MediaAsset →
+Media → MediaUsage`. Upload transport does not create Knowledge, Source,
+Evidence, Graph relations or inferred Model/Variant truth. Source/Evidence is
+reconciled only by a later governed semantic workflow, and a durable
+WordPress locator is preferred after canonical read-back without duplicating a
+Source/Evidence record solely to change its locator.
+
+Batch results are per-item rather than all-or-nothing: successful attachments
+remain when another item fails, the batch returns `partial_success`, and failed
+items can be retried. SHA-256 is computed from real bytes; same key and same
+payload reuses, while same key and different payload returns
+`IDEMPOTENCY_CONFLICT`. Code-side implementation exists; live multipart
+acceptance remains `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING` until
+fresh target discovery/read-back proves it.
 Actual image bytes must validate before persistence. Corrupt/fake/unreadable
 payloads fail closed and partial attachment, mapping or semantic artifacts must
 be cleaned up. WordPress attachment is never semantic authority. Entity

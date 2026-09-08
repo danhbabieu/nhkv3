@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+## Documentation reconciliation — 2026-09-08
+
+Canonical Media/MCP documentation is reconciled around the implemented
+workflow `nhk.media.upload-batch` multipart → native WordPress attachment
+lifecycle → canonical attachment read-back / `nhk.media.attachment.get` →
+separate governed `nhk-v3/media-ingest` attachment adoption/binding →
+MediaAsset → Media → MediaUsage. The current docs classify multipart as
+PRIMARY/RECOMMENDED, `wp_upload_media_from_url` as SECONDARY/IMPORT and
+base64 `wp_upload_media` as FALLBACK/COMPATIBILITY; no compatibility runtime
+path was removed.
+
+The reconciliation covers `READ_FIRST.md`, the Media model/P6/Admin guidance,
+current MCP Content Operations and Control Plane contracts, the current-status
+index and the master-plan checkpoint. Design/plan documents remain history and
+are no longer the only place where the workflow is defined. Code-side
+registration, dispatch, per-item manifest, SHA-256, idempotency conflict and
+partial-success behavior are documented; live multipart target acceptance,
+authenticated capability read-back and full cleanup/concurrency runtime proof
+remain `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING`. No semantic data,
+WordPress data, deployment or production/staging/V2 state was changed.
+
 ## Multipart batch media transport — 2026-09-08
 
 The primary multipart transport `nhk.media.upload-batch` is now registered in

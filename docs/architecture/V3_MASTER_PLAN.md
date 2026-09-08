@@ -17,13 +17,15 @@ plane mapping and catalog-derived `McpCapabilityManifest` are present. This is
 documentation plus a read-only capability boundary only; the full research
 inventory/planner, editorial/taxonomy gateways and Admin parity remain open.
 
-Media ingest policy checkpoint (2026-09-03): the existing direct multipart
-`nhk.media.ingest` adapter is the single canonical binary transport. New
-managed image bytes are validated, oriented, resized, contextually named and
-encoded to WebP before persistence; the scoped path stores one verified
-primary and bypasses global WordPress intermediate-size generation. Source
-binary/name retention, semantic inference and a new Ability facade remain
-forbidden. Runtime byte-level integration evidence remains pending.
+Media ingest policy checkpoint (2026-09-08): `nhk.media.upload-batch` is the
+canonical multipart binary transport; its one-file case is batch size one.
+Native WordPress attachment creation, metadata/derivative generation and
+canonical read-back precede the separate governed `nhk-v3/media-ingest`
+attachment-adoption boundary. `wp_upload_media_from_url` is secondary/import;
+base64 `wp_upload_media` is fallback/compatibility, not the primary path.
+Upload does not infer semantic relations or Knowledge/Source/Evidence truth.
+Code-side batch/idempotency implementation exists; live multipart acceptance
+and target runtime read-back remain pending.
 
 | Phase | Status | Evidence / next gate |
 |---|---|---|

@@ -51,12 +51,29 @@ foundation.
 Multipart batch upload is the primary file transport. URL import remains a
 secondary/import path and base64 remains a small-file compatibility fallback.
 `nhk.media.upload-batch` accepts one or more native multipart file parts and
-returns a reader-safe ordered manifest. It uses the same governed Media
-boundary and attachment read-back as the existing single-file path; it does
-not create semantic roles, Knowledge, Source, Evidence or Graph relations.
+returns a reader-safe ordered manifest. Its one-file case is a batch of one;
+the runtime limit is 1..20 files and 50 MB total bytes. The manifest includes
+per-item attachment/Media IDs, source URL, filename, MIME, byte size,
+dimensions, SHA-256, created/reused state, canonical read-back status and
+typed errors. Partial success retains successful items and marks
+`partial_success`; it is not an all-or-nothing transaction.
+
+The canonical sequence is multipart batch → native WordPress attachment
+lifecycle (`wp_handle_sideload`/attachment creation, metadata generation and
+derivatives) → canonical attachment read-back / `nhk.media.attachment.get` →
+`nhk-v3/media-ingest` attachment adoption/binding → MediaAsset → Media →
+MediaUsage. It uses the same governed Media boundary and attachment read-back
+as the existing single-file path; it does not create semantic roles,
+Knowledge, Source, Evidence or Graph relations.
 The `nhk-v3/media-ingest` Ability remains metadata/attachment-binding
 semantics, while binary batch transport is exposed through custom MCP because
 the JSON-only Ability layer cannot carry multipart bytes.
+
+The upload path classification is fixed: `nhk.media.upload-batch` is
+PRIMARY/RECOMMENDED multipart transport; `wp_upload_media_from_url` is
+SECONDARY/IMPORT for an already-public HTTPS file; `wp_upload_media` base64 is
+FALLBACK/COMPATIBILITY only and is not the production-primary path for many
+images. The two boundaries must not be merged.
 
 `Media` is semantic identity. `MediaAsset` owns a binary storage key, checksum,
 MIME and technical dimensions. `MediaUsage` owns placement and role. A checksum
@@ -77,6 +94,13 @@ checksum and storage-path validation before durable persistence. Corrupt or
 fake images fail closed and the flow cleans up any partial attachment, mapping,
 semantic asset/usage or temporary file so no orphan is left behind.
 Re-adoption of the same attachment is idempotent.
+
+Same idempotency key plus same payload reuses the ordered result; the same key
+with a different payload fails as `IDEMPOTENCY_CONFLICT`. Filename equality is
+not file identity and checksum is not an unapproved global semantic dedup
+policy. Code-side atomic reservation exists, but live concurrency/target
+acceptance remains `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING` until
+fresh runtime discovery and read-back pass.
 
 ### MCP direct image attachment checkpoint — 2026-09-03
 

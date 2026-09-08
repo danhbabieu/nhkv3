@@ -29,6 +29,14 @@ the operation:
 | MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; current tool/Ability availability must be checked against executable catalog/registration and fresh runtime discovery. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only |
 | Storage / schema / execution | current boundaries from the relevant domain contracts plus `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`; `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md` and `docs/architecture/V2_V3_PARITY_MATRIX.md` contain implementation/history evidence and must be interpreted by date/context |
 
+For Media upload specifically, read the Media model, P6 foundation, Admin Media
+guidance and the Media section of the current MCP Content Operations contract
+together. The current file flow is `nhk.media.upload-batch` multipart → native
+WordPress attachment lifecycle → canonical read-back / `media-attachment-get`
+→ separate governed `media-ingest` → MediaAsset → Media → MediaUsage. Do not
+use the historical Ability exposure document or a JSON-only Ability as the
+multipart binary contract.
+
 ## Current versus historical evidence
 
 The Constitution is the only normative authority. Current approved contracts

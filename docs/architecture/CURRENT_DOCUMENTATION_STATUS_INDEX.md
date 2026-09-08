@@ -72,14 +72,31 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
 | Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |
 | Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; Dictionary observation after canonical write is lexical/non-blocking and does not broaden the target |
-| Media | `Media` identity separate from `MediaAsset`, `MediaUsage` and WP attachment; multipart batch is the primary byte transport | WordPress native single-file integration now boots on local `nhk_v3_test` and passes metadata/derivative/source-original/read-back proof; atomic per-key reservation is implemented; batch/partial-failure/cleanup and full Media replay acceptance remain runtime-gated until dedicated acceptance cases run |
+| Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | `nhk.media.upload-batch` is PRIMARY multipart transport; native WordPress attachment lifecycle and canonical read-back precede separate governed `nhk-v3/media-ingest`; URL import is SECONDARY/IMPORT; base64 is FALLBACK/COMPATIBILITY; code-side batch/idempotency exists, while target multipart acceptance remains `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING` |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | transport/orchestration over existing owners | local runtime discovery exposes `nhk.media.upload-batch`; `/nhk/v1/mcp` accepts multipart and dispatches to capability checking; privileged upload call requires `upload_files`, so client usability is not claimed without authenticated capability read-back |
+| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.media.upload-batch` is the canonical multipart/file transport on `/nhk/v1/mcp`; JSON-only Ability export cannot carry file parts; `nhk-v3/media-ingest` remains the governed semantic metadata/attachment-binding Ability; discovery existence is not live callability, and authenticated `upload_files` read-back is still required |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; binary multipart batch remains on the approved custom MCP boundary while metadata Media ingest remains the Ability bridge |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
 | Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
 | Video frontend | `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `VIDEO_RELATIONSHIP_CONTRACT.md`, `VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `VIDEO_SEO_PROJECTION_CONTRACT.md` | first-party `/video/{slug}/` route and separate source action; external URL is never the canonical frontend destination |
+
+### 2.1 Canonical Media/MCP document map — 2026-09-08
+
+| Classification | Documents | Use |
+|---|---|---|
+| Canonical operational | `04_MEDIA_MODEL.md`, `22_P6_MEDIA_VIDEO_FOUNDATION.md`, `ADMIN_MEDIA_INPUT_GUIDANCE.md`, `MCP_V3_CONTENT_OPERATIONS.md`, `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` | Current Media ownership, upload paths, attachment lifecycle, MCP boundary, semantic ingest and read-back rules. |
+| Bootstrap/router | `READ_FIRST.md`, this index | Direct new agents to the canonical set and distinguish code/runtime truth from dated evidence. |
+| Executable truth | `MediaBatchUploadService`, `McpTransport`, `McpToolCatalog`, `McpAbilityRegistration`, attachment bridge/ingestor, `MediaIngestGateway`, idempotency repository | Actual registered vocabulary, dispatch, schemas, limits and implementation status; docs must not invent capabilities. |
+| Design/plan history | `docs/superpowers/specs/2026-09-08-multipart-batch-media-upload-design.md`, `docs/superpowers/plans/2026-09-08-multipart-batch-media-upload.md`, and this reconciliation plan | Rationale and implementation history; not canonical law or the only source of current workflow. |
+| Historical/superseded | `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md`, older dated P-phase/checkpoint sections and legacy/V2 audits | Preserve evidence where useful, but do not use them for current capability or upload-path decisions. |
+
+The current canonical Media flow is `multipart batch → WordPress attachment →
+canonical read-back / media-attachment-get → media-ingest → MediaAsset → Media
+→ MediaUsage`. Upload-only does not create Knowledge, Source, Evidence or Graph
+truth. Product/Specimen future sequencing is allowed as a workflow shape only;
+the entities remain distinct and Product–Specimen remains `REGISTRY_GAP` until
+an approved relation is registered.
 
 ## 3. Current storage and writer rule
 
