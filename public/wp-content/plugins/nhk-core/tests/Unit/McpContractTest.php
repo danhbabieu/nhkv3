@@ -339,4 +339,12 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/media-ingest', McpAbilityRegistration::governedAbilityNames());
         self::assertArrayNotHasKey('nhk.media.ingest', McpAbilityRegistration::explicitExclusionReasons());
     }
+
+    public function test_media_ingest_is_added_to_the_easy_mcp_enabled_ability_list(): void
+    {
+        self::assertSame(
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest'],
+            McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
+        );
+    }
 }

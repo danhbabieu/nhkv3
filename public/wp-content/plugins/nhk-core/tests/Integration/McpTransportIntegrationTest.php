@@ -109,6 +109,7 @@ final class McpTransportIntegrationTest extends TestCase
         $tools = $registry->get_all_definitions();
         $byName = array_column($tools, null, 'name');
 
+        self::assertArrayHasKey('wp_ability_nhk_v3_video_ingest', $byName);
         self::assertArrayHasKey('wp_ability_nhk_v3_media_ingest', $byName);
         self::assertSame('object', $byName['wp_ability_nhk_v3_media_ingest']['inputSchema']['type']);
         self::assertArrayHasKey('assets', $byName['wp_ability_nhk_v3_media_ingest']['inputSchema']['properties']);

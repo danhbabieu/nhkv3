@@ -14,6 +14,14 @@ final class McpAbilityRegistration
         }
     }
 
+    /** @param mixed $enabled @return list<string> */
+    public static function ensureEasyMcpEnabledAbilities(mixed $enabled): array
+    {
+        if (!is_array($enabled) || $enabled === []) return [];
+        if (!in_array('nhk-v3/media-ingest', $enabled, true)) $enabled[] = 'nhk-v3/media-ingest';
+        return array_values($enabled);
+    }
+
     /**
      * Inspect the real Easy MCP bridge without changing its registry.
      *

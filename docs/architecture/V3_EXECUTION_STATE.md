@@ -5476,3 +5476,14 @@ bounded serializer exception details without payloads or secrets. Integration
 coverage asserts Media and Video export names, schema, callback resolution and
 clean diagnostics when the real runtime is available. No MediaService,
 semantic workflow, public API, production data, deployment or push changed.
+
+# Checkpoint — 2026-09-08 — Media Ability enabled-list bridge
+
+Easy MCP dynamic discovery reads only `easy_mcp_ai_enabled_abilities` before
+materializing `wp_ability_*` tools. NHK now appends only
+`nhk-v3/media-ingest` at that option boundary when the existing list is
+non-empty, preserving the existing Video export and avoiding activation when
+the Easy MCP list is intentionally empty. Unit coverage locks the list
+transformation; the integration export assertion requires
+`wp_ability_nhk_v3_media_ingest`. No MediaService, workflow, data, deployment
+or push changed.
