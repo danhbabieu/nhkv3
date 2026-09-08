@@ -1,5 +1,28 @@
 # NHK V3 Execution State
 
+## Proposal persistence remote runtime closeout — 2026-09-08
+
+Commit `6d9a91c` was deployed to `demo.1945.vn` through the allowlisted
+deployment path. Remote read-only evidence confirmed `erourxcg_nhkv3`, prefix
+`wp_`, blog `1`, table `wp_nhk_proposals`, schema `15/15`, and a persisted test
+row. The row had `operation=relation_create`, a valid target UUID, and database
+default `expected_revision=0`; `WpdbProposalRepository::hydrate()` converted
+that to integer zero, the `Proposal` constructor rejected it, and hydration
+returned null. This was the remaining remote-specific cause after the
+read-back guard.
+
+Commit `7203192` now treats `relation_create` expected revision as null during
+hydration because endpoint revisions are bound independently in the payload.
+The red regression test reproduces the remote row shape; focused verification
+passed 20 tests / 38 assertions and Unit passed 760 tests / 3,674 assertions.
+The updated repository file hash matched on remote after deployment. Remote
+MCP lifecycle then passed canonical proposal replay/read, submit, approve,
+eligibility, apply, Graph read-back and idempotent re-apply with one edge and
+no duplicate. A true remote stale-revision probe was not claimed: the runtime
+canonicalized fabricated revisions, while the existing Classification
+read-model exposed no safely restorable mutable field; the temporary relation
+proposal was rejected and no Authority or Graph data was changed.
+
 ## Proposal persistence read-back guard — 2026-09-08
 
 Governance proposal creation previously returned the in-memory `Proposal` when
