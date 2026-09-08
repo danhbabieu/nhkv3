@@ -70,7 +70,7 @@ final class FrontendSemanticBootstrap
         $projectionAdmin = new ProjectionAdminApi($claimProjection);
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 
-        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media));
+        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages);
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status);
         $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status);

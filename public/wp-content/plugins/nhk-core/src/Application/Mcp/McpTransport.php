@@ -267,7 +267,7 @@ final class McpTransport
                 (string) ($arguments['name'] ?? ''),
                 (int) ($arguments['max_width'] ?? 2048),
                 (int) ($arguments['max_height'] ?? 2048),
-                (int) ($arguments['quality'] ?? 82),
+                (int) ($arguments['quality'] ?? \NHK\Core\Application\Media\PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY),
             );
         }
         if (array_key_exists('file', $arguments)) throw new \InvalidArgumentException('file must be a direct multipart attachment.');

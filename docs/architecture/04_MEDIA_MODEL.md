@@ -21,6 +21,20 @@ Source-original được giữ dưới cùng Media đó như một `MediaAsset` 
 `MediaAsset` hoặc WordPress projection và có thể `PUBLIC` khi đủ điều kiện.
 Derivative không được tạo Media identity mới.
 
+## Public canonical image resolution — 2026-09-09
+
+Public projection phải chọn source-derived image lớn nhất đủ điều kiện làm
+canonical `/anh/<slug>.webp`. Khi source-original rộng từ 900px trở lên,
+derivative public canonical cũng phải rộng tối thiểu 900px; derivative 240×340
+hoặc thumbnail tương tự không được dùng làm full-size asset. Derivative phải
+được tạo trực tiếp từ source/original, không upscale từ derivative nhỏ hơn,
+giữ nguyên aspect ratio nguồn và không sharpen quá mức hay đổi màu ảnh gốc.
+
+WebP dùng quality mục tiêu 82–88 (default hiện hành 86). Listing có thể dùng
+thumbnail riêng, nhưng link click từ `/thu-vien/` luôn mở canonical
+`/anh/<slug>.webp` độ phân giải lớn. Nếu source đủ lớn nhưng chưa có public
+derivative đạt chuẩn, projection fail-closed thay vì trả về thumbnail.
+
 Image payload phải được validate thực sự trước persistence. Corrupt, fake hoặc
 unreadable input fail-closed và không được để lại orphan artifact.
 

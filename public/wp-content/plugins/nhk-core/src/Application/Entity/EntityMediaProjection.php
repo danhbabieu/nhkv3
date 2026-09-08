@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Media\PublicMediaAssetUrlResolver;
+use NHK\Core\Application\Media\PublicMediaAssetSelector;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, MediaUsageRoleRegistry};
 
@@ -35,13 +36,11 @@ final class EntityMediaProjection
     {
         $media = $this->media->findByCanonicalId($usage->mediaId);
         if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
-        foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
-            if (!$asset instanceof MediaAsset || $asset->visibility !== 'PUBLIC' || !str_starts_with(strtolower($asset->mimeType), 'image/')) continue;
-            $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== '' ? (string) $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));
-            if ($filename === '') continue;
-            $path = (new PublicMediaAssetUrlResolver())->path($filename);
-            return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'alt' => $usage->altText, 'role' => $usage->role, 'sort_order' => $usage->sortOrder];
-        }
-        return null;
+        $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
+        if (!$asset instanceof MediaAsset) return null;
+        $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== '' ? (string) $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));
+        if ($filename === '') return null;
+        $path = (new PublicMediaAssetUrlResolver())->path($filename);
+        return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'alt' => $usage->altText, 'role' => $usage->role, 'sort_order' => $usage->sortOrder];
     }
 }

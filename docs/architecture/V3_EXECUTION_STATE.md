@@ -1,5 +1,72 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Public media library real-asset projection and card UX
+
+Fresh source/runtime probing confirmed that `/thu-vien/` was rendering three
+`default-archive.svg` placeholders in the current demo runtime, with no image
+or title links. The local query/template path showed two independent causes:
+the gallery query discarded a PUBLIC image asset when the request-time binary
+delivery checksum/path gate could not reconstruct the file, even though the
+governed public asset projection had a canonical `/anh/{slug}.webp` path; the
+theme archive template then rendered an unlinked figure without a summary.
+
+The read-only `PublicMediaGalleryQuery` now projects eligible PUBLIC image
+assets directly through `PublicMediaAssetUrlResolver` and leaves binary
+delivery validation fail-closed at the `/anh/` delivery boundary. It also
+reads the existing `MediaUsage.caption` as the card summary, trims it for
+display, and uses the bounded Vietnamese fallback `Ảnh tư liệu trong kho hình
+ảnh NHK.` when no caption exists. No Media, MediaAsset, MediaUsage or semantic
+record was created or changed.
+
+The archive template now renders real image cards with lazy loading, intrinsic
+dimensions when available, canonical image hrefs, title hrefs to the same
+canonical image path, summaries and an explicit `Xem ảnh` action. Placeholder
+art is emitted only when the query did not provide a usable public image. The
+CSS changes the archive from masonry to a compact 3/2/1 responsive grid with
+fixed aspect ratio, `object-fit: contain` and visible keyboard focus states.
+
+The new `MediaLibraryFrontendContractTest` was RED before production changes
+(missing summary, links and responsive grid contract) and is GREEN afterward.
+Focused media/frontend tests pass `28 tests / 127 assertions`; the full NHK
+Unit suite passes `806 tests / 3,840 assertions` with existing warnings and
+deprecations. Changed PHP files lint clean and `git diff --check` passes.
+The local route smoke is `ENVIRONMENT_BLOCKED` because no server is listening
+on `localhost:80`. A fresh read-only browser probe of `https://demo.1945.vn`
+still shows the pre-change placeholders and `/anh/*.webp` currently returns
+HTML rather than image binary; no deployment or push was performed.
+
+`MEDIA_LIBRARY_CODE_STATUS=GREEN`
+`LOCAL_RUNTIME_VERIFY=ENVIRONMENT_BLOCKED`
+`DEMO_RUNTIME_VERIFY=NOT_DEPLOYED_AND_CANONICAL_IMAGE_DELIVERY_BLOCKED`
+`READY_FOR_DEPLOY=NO`
+
+## Checkpoint — 2026-09-09 — Public MediaAsset full-size projection standard
+
+Public image projection now uses the shared `PublicMediaAssetSelector` instead
+of selecting the first PUBLIC image asset. It chooses the largest eligible
+public image, excludes thumbnail-marked derivatives, and fails closed when a
+source-original is at least 900px wide but no public canonical derivative
+reaches that width. This prevents a 240×340 derivative from becoming the
+canonical `/anh/<slug>.webp` asset and does not perform any upscale. Gallery,
+entity-media, Article SEO and public filename delivery/legacy redirect paths
+share the same selection boundary. The existing gallery template links the
+image to its projected `/anh/<slug>.webp` URL, so the click target follows the
+full-size projection.
+
+The managed WebP default is aligned to quality 86 (within the approved 82–88
+range); source processing remains aspect-preserving with a 2048px long-edge
+cap and no sharpening step. The Constitution, Media model and Media/Image SEO
+projection contract now record the source-original, minimum-width, no-upscale,
+quality and thumbnail rules. New regression coverage passes 4 tests / 11
+assertions for source-only downscaling, large-asset selection, high-source
+fail-closed behavior and gallery URL/dimension read-back. Impacted
+Media/Article/frontend suites pass 62 tests / 380 assertions.
+
+The requested `mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp` file is not
+present in the local upload tree, and no target/production data was accessed or
+mutated; its live dimension read-back remains pending an authorized runtime
+asset. No migration, backfill, file rename or public URL rewrite was run.
+
 ## Checkpoint — 2026-09-09 — Canonical operator migration-up includes 016
 
 The versioned `nhk-core/bin/nhk-core-maintenance.php --operation=migration-up`

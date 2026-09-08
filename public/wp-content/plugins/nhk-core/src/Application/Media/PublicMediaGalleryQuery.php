@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
 
 /**
@@ -18,6 +18,7 @@ final class PublicMediaGalleryQuery
         private MediaRepository $media,
         private MediaAssetRepository $assets,
         private ?PublicMediaAssetDelivery $delivery = null,
+        private ?MediaUsageRepository $usages = null,
     ) {}
 
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */
@@ -54,6 +55,7 @@ final class PublicMediaGalleryQuery
             'title' => $media->canonicalName,
             'image_url' => $image['image_url'] ?? null,
             'alt' => $media->canonicalName,
+            'summary' => $this->summary($media),
             'width' => $image['width'] ?? null,
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
@@ -63,20 +65,38 @@ final class PublicMediaGalleryQuery
     /** @return array{image_url:string,width:?int,height:?int}|null */
     private function firstImage(Media $media): ?array
     {
-        foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
-            if (!$asset instanceof MediaAsset || $asset->visibility !== 'PUBLIC' || !str_starts_with(strtolower($asset->mimeType), 'image/')) continue;
-            if ($this->delivery !== null && $this->delivery->resolve($asset->assetId) === null) continue;
-            $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== ''
-                ? (string) $asset->metadata['canonical_filename']
-                : basename(str_replace('\\', '/', $asset->storageKey));
-            if ($filename === '') continue;
-            $path = (new PublicMediaAssetUrlResolver())->path($filename);
-            return [
-                'image_url' => function_exists('home_url') ? (string) home_url($path) : $path,
-                'width' => $asset->width,
-                'height' => $asset->height,
-            ];
+        $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
+        // The read model may expose a governed public projection even when a
+        // request-time binary check is temporarily unavailable. The /anh/
+        // delivery route remains the fail-closed binary boundary.
+        if (!$asset instanceof MediaAsset) return null;
+        $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== ''
+            ? (string) $asset->metadata['canonical_filename']
+            : basename(str_replace('\\', '/', $asset->storageKey));
+        if ($filename === '') return null;
+        $path = (new PublicMediaAssetUrlResolver())->path($filename);
+        return [
+            'image_url' => function_exists('home_url') ? (string) home_url($path) : $path,
+            'width' => $asset->width,
+            'height' => $asset->height,
+        ];
+    }
+
+    private function summary(Media $media): string
+    {
+        if ($this->usages !== null) {
+            foreach ($this->usages->listByMediaId($media->canonicalId) as $usage) {
+                $caption = trim(preg_replace('/\s+/u', ' ', $usage->caption) ?? '');
+                if ($caption !== '') return $this->shorten($caption);
+            }
         }
-        return null;
+        return 'Ảnh tư liệu trong kho hình ảnh NHK.';
+    }
+
+    private function shorten(string $value): string
+    {
+        if (function_exists('wp_trim_words')) return trim((string) wp_trim_words($value, 24));
+        $words = preg_split('/\s+/u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        return count($words) > 24 ? implode(' ', array_slice($words, 0, 24)) . '…' : $value;
     }
 }

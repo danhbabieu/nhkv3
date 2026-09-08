@@ -69,7 +69,8 @@ final class PublicMediaAssetRoutes
     {
         $resolved = $this->delivery->resolve($assetKey);
         if ($resolved === null) return null;
-        $asset = $resolved['asset'];
+        $asset = $this->delivery->canonicalAsset($resolved['asset']);
+        if ($asset === null) return null;
         $filename = trim((string) ($asset->metadata['canonical_filename'] ?? ''));
         if ($filename === '') return null;
         $target = (new PublicMediaAssetUrlResolver())->path($filename);

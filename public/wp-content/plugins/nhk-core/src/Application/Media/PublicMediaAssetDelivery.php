@@ -56,14 +56,20 @@ final class PublicMediaAssetDelivery
         $resolver = new PublicMediaAssetUrlResolver();
         foreach ($this->media->list() as $media) {
             if (!$media->active || $media->readiness !== 'ready') continue;
-            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
-                $candidate = is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey);
-                if ($resolver->path($candidate) !== '/anh/' . rawurlencode($wanted)) continue;
-                $resolved = $this->resolve($asset->assetId);
-                if ($resolved !== null) return $resolved;
-            }
+            $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
+            if (!$asset instanceof MediaAsset) continue;
+            $candidate = is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey);
+            if ($resolver->path($candidate) !== '/anh/' . rawurlencode($wanted)) continue;
+            $resolved = $this->resolve($asset->assetId);
+            if ($resolved !== null) return $resolved;
         }
         return null;
+    }
+
+    public function canonicalAsset(MediaAsset $asset): ?MediaAsset
+    {
+        $selected = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($asset->mediaId));
+        return $selected !== null && $this->resolve($selected->assetId) !== null ? $selected : null;
     }
 
     private function isAbsolute(string $path): bool

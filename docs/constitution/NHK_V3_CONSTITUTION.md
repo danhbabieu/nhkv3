@@ -51,6 +51,30 @@ projection must remain one-owner and one-hop under the SEO/public route law.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-06.
 
+## Amendment record — 2026-09-09 — Public MediaAsset Resolution Standard
+
+**WHY:** A public image projection must remain useful for the `/thu-vien/`
+gallery and standalone image viewing; selecting a small derivative such as
+240×340 when a high-resolution source exists loses detail and creates a blurry
+canonical asset.
+
+**WHAT:** The canonical public `/anh/<slug>.webp` projection must be generated
+from the retained source-original, with aspect ratio preserved and no upscale
+from an existing derivative. A source-derived public image should be at least
+900px wide where the source permits it; approximately 960×1360 is the target
+for the stated portrait example. Smaller thumbnails may remain separate for
+listing performance, but they are never the canonical full-size asset. WebP
+encoding targets quality 82–88, with the current default at 86, without
+sharpening or color changes beyond the active encoder's normal conversion.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no bulk repair,
+backfill, file rename, attachment-path change or existing public URL rewrite.
+Projection selection fails closed when a large source exists but no eligible
+source-derived public asset is available; an operator must run the governed
+projection workflow and read back the resulting dimensions before publication.
+
+**DECISION OWNER / DATE:** NHK V3 Owner decision, 2026-09-09.
+
 ## Amendment record — 2026-09-02 — Article Ingest Boundary
 
 **WHY:** A V3 knowledge Article request may cross the editorial and semantic
@@ -1056,6 +1080,16 @@ Real public Media mới đủ điều kiện image sitemap; UUID/stable key khô
 public URL hoặc sitemap. SEO-critical imagery dùng semantic `img`/`picture`
 với `srcset`, `sizes`, width, height và meaningful contextual alt; loading policy
 phù hợp vị trí editorial.
+
+Public canonical image resolution is a separate projection invariant. When a
+source-original has width ≥ 900px, `/anh/<slug>.webp` must resolve to a public
+source-derived asset with width ≥ 900px; a 240×340 or other thumbnail derivative
+must never be selected as the full-size canonical asset. The derivative must be
+created from the source-original, never upscaled from a smaller derivative, and
+must preserve source aspect ratio. The current WebP quality target is 82–88
+(default 86); no extra sharpening or intentional color alteration is allowed.
+Listing thumbnails may be exposed separately, while the gallery image click
+must open the canonical full-size `/anh/<slug>.webp` URL.
 
 Article media state tối thiểu phải phân biệt `MEDIA_COMPLETE`,
 `MEDIA_INCOMPLETE_FEATURED`, `MEDIA_INCOMPLETE_INLINE`, `MEDIA_PLACEHOLDER`,

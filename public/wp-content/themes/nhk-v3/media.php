@@ -24,9 +24,25 @@ get_header();
 <?php elseif (is_array($context) && is_array($archive)): ?>
   <header class="archive-intro media-library-header"><p class="eyebrow">Thư viện hình ảnh</p><h1>Hiện vật qua hình ảnh</h1><p class="archive-summary">Ảnh công khai được lấy từ kho hình ảnh đã đủ điều kiện. Mỗi ảnh hỗ trợ đối chiếu hình dáng, chi tiết và dấu nhận diện mà không tạo thêm một địa chỉ nội dung giả.</p></header>
   <?php if (!empty($archive['items'])): ?>
-    <div class="media-masonry library-grid">
-      <?php foreach ($archive['items'] as $item): $image = trim((string) ($item['image_url'] ?? '')) ?: $fallback; ?>
-        <figure class="library-item"><div class="library-image"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['alt'] ?? $item['title'] ?? '')); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></div><figcaption><span class="eyebrow">Hình ảnh</span><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? 'Hình ảnh hiện vật'))); ?></strong></figcaption></figure>
+    <div class="media-library-grid">
+      <?php foreach ($archive['items'] as $item):
+        $image = trim((string) ($item['image_url'] ?? ''));
+        $hasRealImage = !empty($item['has_real_image']) && $image !== '';
+        $title = nhk_v3_public_brand_text((string) ($item['title'] ?? 'Hình ảnh hiện vật'));
+        $alt = (string) ($item['alt'] ?? $title);
+        $summary = trim((string) ($item['summary'] ?? '')) ?: 'Ảnh tư liệu trong kho hình ảnh NHK.';
+      ?>
+        <article class="library-item">
+          <div class="library-image">
+            <?php if ($hasRealImage): ?><a class="library-image-link" href="<?php echo esc_url($image); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></a><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
+          </div>
+          <div class="library-item-body">
+            <span class="eyebrow">Hình ảnh</span>
+            <h2><?php if ($hasRealImage): ?><a class="library-title-link" href="<?php echo esc_url($image); ?>"><?php echo esc_html($title); ?></a><?php else: ?><?php echo esc_html($title); ?><?php endif; ?></h2>
+            <p class="library-summary"><?php echo esc_html($summary); ?></p>
+            <?php if ($hasRealImage): ?><a class="library-cta" href="<?php echo esc_url($image); ?>">Xem ảnh <span aria-hidden="true">→</span></a><?php endif; ?>
+          </div>
+        </article>
       <?php endforeach; ?>
     </div>
   <?php else: ?><div class="empty media-empty"><h2>Chưa có hình ảnh công khai</h2><p>Thư viện sẽ hiện ảnh thật ngay khi tài nguyên đủ điều kiện. Các bố cục khác vẫn dùng ảnh minh họa mặc định khi chưa có ảnh đại diện.</p></div><?php endif; ?>
