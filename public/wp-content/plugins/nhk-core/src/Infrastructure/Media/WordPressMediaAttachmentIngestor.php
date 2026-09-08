@@ -107,12 +107,9 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             if (is_wp_error($attachmentId) || (int) $attachmentId < 1) throw new \RuntimeException('WORDPRESS_ATTACHMENT_CREATE_FAILED');
             WordPressMediaAttachmentWriteGuard::enter();
             try {
-                // Do not invoke wp_generate_attachment_metadata here: its
-                // global intermediate-size policy can create an unbounded
-                // number of physical files. This scoped ingest stores one
-                // verified primary; derivatives are opt-in future contracts.
-                $metadata = ['width' => $width, 'height' => $height, 'file' => $this->relativeUploadPath($uploadedPath), 'sizes' => []];
-                if (!function_exists('wp_update_attachment_metadata') || wp_update_attachment_metadata((int) $attachmentId, $metadata) === false) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
+                if (!function_exists('wp_generate_attachment_metadata') || !function_exists('wp_update_attachment_metadata')) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_UNAVAILABLE');
+                $metadata = wp_generate_attachment_metadata((int) $attachmentId, $uploadedPath);
+                if (!is_array($metadata) || (int) ($metadata['width'] ?? 0) < 1 || (int) ($metadata['height'] ?? 0) < 1 || wp_update_attachment_metadata((int) $attachmentId, $metadata) === false) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
             } finally {
                 WordPressMediaAttachmentWriteGuard::leave();
             }
