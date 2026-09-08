@@ -49,7 +49,10 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $processed = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         if (!is_string($work) || $work === '' || !is_string($processed) || $processed === '') throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_UNAVAILABLE');
         $uploadedPath = null;
+        $sourceUploadedPath = null;
         $processedPath = null;
+        $attachmentId = 0;
+        $completed = false;
         try {
             if (!copy($source, $work)) throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_COPY_FAILED');
             $sourceInfo = @getimagesize($work);
@@ -109,7 +112,10 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             try {
                 if (!function_exists('wp_generate_attachment_metadata') || !function_exists('wp_update_attachment_metadata')) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_UNAVAILABLE');
                 $metadata = wp_generate_attachment_metadata((int) $attachmentId, $uploadedPath);
-                if (!is_array($metadata) || (int) ($metadata['width'] ?? 0) < 1 || (int) ($metadata['height'] ?? 0) < 1 || wp_update_attachment_metadata((int) $attachmentId, $metadata) === false) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
+                if (!is_array($metadata) || (int) ($metadata['width'] ?? 0) < 1 || (int) ($metadata['height'] ?? 0) < 1) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
+                wp_update_attachment_metadata((int) $attachmentId, $metadata);
+                $storedMetadata = wp_get_attachment_metadata((int) $attachmentId);
+                if (!is_array($storedMetadata) || (int) ($storedMetadata['width'] ?? 0) < 1 || (int) ($storedMetadata['height'] ?? 0) < 1) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
             } finally {
                 WordPressMediaAttachmentWriteGuard::leave();
             }
@@ -118,21 +124,25 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             $sourceFilename = $this->sourceFilename($safeFilename, (string) ($sourceInfo['mime'] ?? 'image/jpeg'));
             $sourceUpload = wp_upload_bits($sourceFilename, null, $sourceContents);
             if (!is_array($sourceUpload) || !empty($sourceUpload['error']) || !is_string($sourceUpload['file'] ?? null)) throw new \RuntimeException('WORDPRESS_MEDIA_SOURCE_PERSIST_FAILED');
-            $sourceRelative = $this->relativeUploadPath((string) $sourceUpload['file']);
+            $sourceUploadedPath = (string) $sourceUpload['file'];
+            $sourceRelative = $this->relativeUploadPath($sourceUploadedPath);
             if (function_exists('update_post_meta')) update_post_meta((int) $attachmentId, '_nhk_source_original_file', $sourceRelative);
             $mediaId = null;
             if ($this->semanticMedia !== null) $mediaId = $this->semanticMedia->adoptAttachment((int) $attachmentId);
             $result = $this->read((int) $attachmentId);
             if ($result === null) throw new \RuntimeException('WORDPRESS_ATTACHMENT_READBACK_FAILED');
             if ($mediaId !== null) $result['media_id'] = $mediaId;
+            $completed = true;
             return $result;
         } finally {
             if (is_string($work) && is_file($work)) @unlink($work);
             if (is_string($processed) && is_file($processed)) @unlink($processed);
             if (is_string($processedPath) && $processedPath !== $processed && is_file($processedPath)) @unlink($processedPath);
-            // The original ChatGPT upload is never moved into uploads. Only
-            // the sanitized processed file may remain in WordPress storage.
-            if ($uploadedPath !== null && !isset($attachmentId) && is_file($uploadedPath)) @unlink($uploadedPath);
+            if (!$completed) {
+                if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
+                if ($sourceUploadedPath !== null && is_file($sourceUploadedPath)) @unlink($sourceUploadedPath);
+                if ($uploadedPath !== null && is_file($uploadedPath)) @unlink($uploadedPath);
+            }
         }
     }
 

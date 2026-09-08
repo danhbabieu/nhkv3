@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\MediaBatchUploadService;
-use NHK\Core\Contracts\Media\{MediaBatchUploadRepository, WordPressMediaAttachmentIngestor};
+use NHK\Core\Contracts\Media\{AtomicMediaBatchUploadRepository, MediaBatchUploadRepository, WordPressMediaAttachmentIngestor};
 use PHPUnit\Framework\TestCase;
 
 final class MediaBatchUploadServiceTest extends TestCase
@@ -58,6 +58,37 @@ final class MediaBatchUploadServiceTest extends TestCase
         $this->expectExceptionMessage('IDEMPOTENCY_CONFLICT');
         $service->upload('same-key', [], ['files' => [$file]], [['client_file_id' => 'one']]);
         @unlink($file['tmp_name']);
+    }
+
+    public function test_atomic_reservation_rejects_a_concurrent_same_key_before_upload(): void
+    {
+        $file = $this->file('one.jpg', 'one');
+        $ingestCalls = 0;
+        $ingestor = new class($ingestCalls) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private int &$calls) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { $this->calls++; return ['attachment_id' => 1, 'canonical_url' => '/image.webp', 'filename' => 'image.webp', 'mime' => 'image/webp', 'filesize' => 3, 'width' => 1, 'height' => 1]; }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository, AtomicMediaBatchUploadRepository {
+            public bool $claimed = true;
+            public function claim(string $idempotencyKey, string $fingerprint): ?array
+            {
+                if ($this->claimed) return ['fingerprint' => $fingerprint, 'state' => 'in_progress'];
+                $this->claimed = true;
+                return null;
+            }
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+        try {
+            (new MediaBatchUploadService($ingestor, $repository))->upload('race-key', [], ['files' => [$file]], [['client_file_id' => 'one']]);
+            self::fail('Expected the concurrent reservation to fail closed.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('MEDIA_BATCH_IN_PROGRESS', $error->getMessage());
+        } finally {
+            @unlink($file['tmp_name']);
+        }
+        self::assertSame(0, $ingestCalls);
     }
 
     /** @return array<string,mixed> */

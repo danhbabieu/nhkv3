@@ -5500,3 +5500,31 @@ the Easy MCP list is intentionally empty. Unit coverage locks the list
 transformation; the integration export assertion requires
 `wp_ability_nhk_v3_media_ingest`. No MediaService, workflow, data, deployment
 or push changed.
+
+# Checkpoint — 2026-09-08 — Multipart batch media runtime acceptance
+
+The local WordPress integration runtime was restored by using the existing
+`public/wp-config.php` with `NHK_WP_TEST_PATH=public` and the guarded
+`nhk_v3_test` database. The original bootstrap error was sandbox DB
+connectivity: MySQL was listening on `127.0.0.1:3306`, but the sandbox client
+could not connect; the same read-only connection succeeds in the permitted
+local runtime. The single real-file Media integration now passes native
+attachment metadata generation, derivative/source-original retention and
+canonical read-back (1 test, 11 assertions).
+
+The native metadata path also exposed a code-side no-op return issue: a valid
+metadata read-back could follow a false update return. The adapter now uses
+canonical metadata read-back and compensates incomplete attempts by deleting
+the created attachment/derivatives and source-original. WordPress Options
+idempotency now reserves an option-per-key atomically with `add_option()`;
+same-key concurrent work fails closed before upload, while the aggregate
+option remains a compatibility fallback.
+
+Fresh local MCP discovery exposes 44 tools including `nhk.media.upload-batch`.
+An actual multipart request reaches `/nhk/v1/mcp` and dispatches to the
+`upload_files` capability gate; privileged end-to-end route execution remains
+unclaimed because this runtime request had no authenticated user with that
+capability. The full Integration suite remains non-green on four unrelated
+pre-existing subsystem/fixture failures (4 errors, 4 failures, 4 skips); the
+focused multipart integration is green. No production/V2/staging data,
+deployment or push was performed.

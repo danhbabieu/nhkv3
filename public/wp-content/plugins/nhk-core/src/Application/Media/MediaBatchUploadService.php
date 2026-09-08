@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
-use NHK\Core\Contracts\Media\{MediaBatchUploadRepository, WordPressMediaAttachmentIngestor};
+use NHK\Core\Contracts\Media\{AtomicMediaBatchUploadRepository, MediaBatchUploadRepository, WordPressMediaAttachmentIngestor};
 use NHK\Core\Infrastructure\Media\WpOptionMediaBatchUploadRepository;
 
 final class MediaBatchUploadService
@@ -27,9 +27,12 @@ final class MediaBatchUploadService
         $normalizedItems = $this->normalizeItems($items, count($files));
         $fingerprint = hash('sha256', json_encode([$metadata, array_map([$this, 'fileFingerprint'], $files), $normalizedItems], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         $repository = $this->repository ?? new WpOptionMediaBatchUploadRepository();
-        $existing = $repository->find($idempotencyKey);
+        $existing = $repository instanceof AtomicMediaBatchUploadRepository
+            ? $repository->claim($idempotencyKey, $fingerprint)
+            : $repository->find($idempotencyKey);
         if ($existing !== null) {
             if (($existing['fingerprint'] ?? '') !== $fingerprint) throw new \RuntimeException('IDEMPOTENCY_CONFLICT');
+            if (($existing['state'] ?? '') === 'in_progress') throw new \RuntimeException('MEDIA_BATCH_IN_PROGRESS');
             return is_array($existing['manifest'] ?? null) ? $existing['manifest'] : throw new \RuntimeException('MEDIA_BATCH_IDEMPOTENCY_STALE_BINDING');
         }
 
