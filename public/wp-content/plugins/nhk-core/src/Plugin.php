@@ -128,6 +128,7 @@ final class Plugin {
         LegacyUrlRedirects::register();
         global $wpdb;
         $sharedAttachmentBridge = null;
+        $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;
         if (isset($wpdb) && is_object($wpdb)) {
             $publicTypes = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($publicTypes);
@@ -201,7 +202,7 @@ final class Plugin {
             if ($publicMediaDelivery !== null) (new PublicMediaAssetRoutes($publicMediaDelivery))->register();
             (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register();
         }
-        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge): void {
+        add_action('rest_api_init', static function () use (&$sharedAttachmentBridge, $claimOwnerUrl): void {
             (new HealthCheck(new MigrationStatus()))->register_routes();
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
