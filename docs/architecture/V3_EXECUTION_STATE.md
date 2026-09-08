@@ -1,5 +1,24 @@
 # NHK V3 Execution State
 
+## Proposal persistence read-back guard — 2026-09-08
+
+Governance proposal creation previously returned the in-memory `Proposal` when
+the canonical `WpdbProposalRepository::find()` after a successful INSERT
+returned `null`. That converted a persistence/hydration/context failure into a
+false create success, so the immediate `review`/`submit` read path reported
+`Proposal not found`. The repository now fails closed with
+`PROPOSAL_READBACK_FAILED` instead of returning an unreadable object.
+
+Regression coverage proves the missing-read-back case fails at create and that
+a governed `relation_create` is immediately readable with the same proposal
+UUID, Knowledge subject UUID, target UUID and idempotency key. Governance and
+Graph-related Unit verification passed 44 tests / 130 assertions; the complete
+Unit suite passed 759 tests / 3,669 assertions with existing warnings and
+deprecations. Guarded WordPress integration was attempted with the documented
+`NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public` path but remained
+`ENVIRONMENT_BLOCKED` at WordPress bootstrap (`Error establishing a database
+connection`); no runtime data, Odo relation or Graph edge was mutated.
+
 ## Graph relation endpoint revision binding — 2026-09-08
 
 The governed relation proposal path now resolves and binds current revisions

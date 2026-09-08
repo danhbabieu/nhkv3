@@ -79,7 +79,7 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             }
             throw new \RuntimeException('PROPOSAL_INSERT_FAILED: '.(string) $db->last_error);
         }
-        return $this->find($proposal->id) ?? $proposal;
+        return $this->find($proposal->id) ?? throw new \RuntimeException('PROPOSAL_READBACK_FAILED: inserted proposal is not readable from the canonical store.');
     }
     public function find(string $id): ?Proposal { $db=$this->db(); return $this->hydrate($db->get_row($db->prepare('SELECT * FROM '.$this->table().' WHERE proposal_uuid=%s LIMIT 1',UuidCodec::toBinary($id)),ARRAY_A)); }
     /** @return list<Proposal> */

@@ -14,6 +14,7 @@ use NHK\Core\Governance\Exception\DependencyCycle;
 use NHK\Tests\Support\{InMemoryDependencyRepository, InMemoryProposalRepository};
 use NHK\Core\Infrastructure\Governance\WpdbProposalRepository;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 final class GovernanceCoreTest extends TestCase
@@ -173,6 +174,90 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame('content-review', $review['content_fingerprint']);
         self::assertSame('dependency-review', $review['dependency_fingerprint']);
         self::assertSame('submitted', $review['state']);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_relation_create_does_not_return_an_unreadable_in_memory_proposal(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        if (!function_exists('wp_json_encode')) {
+            eval('function wp_json_encode($value, $flags = 0) { return json_encode($value, $flags); }');
+        }
+        $sourceUuid = UuidCodec::newV7();
+        $targetUuid = UuidCodec::newV7();
+        $repository = new WpdbProposalRepository(new class {
+            public string $prefix = 'wp_';
+            public string $last_error = '';
+
+            public function prepare(string $query, mixed ...$arguments): string
+            {
+                return $query;
+            }
+
+            public function get_row(string $query, mixed $output): ?array
+            {
+                return null;
+            }
+
+            public function query(string $query): int
+            {
+                return 1;
+            }
+        });
+        $service = new GovernanceService($repository);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('PROPOSAL_READBACK_FAILED');
+
+        $service->create(new Proposal(
+            UuidCodec::newV7(),
+            $sourceUuid,
+            'relation_create',
+            [
+                'source_type' => 'knowledge',
+                'source_uuid' => $sourceUuid,
+                'target_type' => 'model',
+                'target_uuid' => $targetUuid,
+                'predicate' => 'about',
+            ],
+            'relation-content',
+            null,
+            'relation-dependency',
+            idempotencyKey: 'relation-immediate-readback',
+            targetUuid: $targetUuid,
+            entityType: 'knowledge',
+        ));
+    }
+
+    public function test_relation_create_is_immediately_readable_with_subject_target_and_idempotency_binding(): void
+    {
+        $sourceUuid = UuidCodec::newV7();
+        $targetUuid = UuidCodec::newV7();
+        $service = new GovernanceService(new InMemoryProposalRepository());
+        $created = $service->create(new Proposal(
+            UuidCodec::newV7(),
+            $sourceUuid,
+            'relation_create',
+            [
+                'source_type' => 'knowledge',
+                'source_uuid' => $sourceUuid,
+                'target_type' => 'model',
+                'target_uuid' => $targetUuid,
+                'predicate' => 'about',
+            ],
+            'relation-content',
+            null,
+            'relation-dependency',
+            idempotencyKey: 'relation-immediate-readback',
+            targetUuid: $targetUuid,
+            entityType: 'knowledge',
+        ));
+
+        $review = $service->review($created->id);
+
+        self::assertSame($created->id, $review->id);
+        self::assertSame($sourceUuid, $review->subjectId);
+        self::assertSame($targetUuid, $review->targetUuid);
+        self::assertSame('relation-immediate-readback', $created->idempotencyKey);
     }
 
     public function test_rekey_proposal_idempotency_key_replays_identical_binding_and_rejects_changed_payload(): void
