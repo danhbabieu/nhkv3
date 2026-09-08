@@ -290,9 +290,12 @@ checksum, dimensions, MIME, byte size, read-back status and typed per-item
 errors. One file uses the same implementation with batch size one. Partial
 failure is retained per item and replay uses the same idempotency binding;
 different payload under the same key is a deterministic conflict. The custom
-`/nhk/v1/mcp` endpoint carries the binary parts. The tool is explicitly not
-exported as a JSON-only WordPress Ability because that transport cannot carry
-the required file parts; its custom MCP discovery entry is canonical.
+`/nhk/v1/mcp` endpoint carries the binary parts. The same contract is exported
+as the `nhk-v3/media-upload-batch` WordPress Ability with a top-level `files[]`
+binary parameter so connector discovery can expose it. The Ability adapter
+preserves native multipart parts from the connector request and delegates to
+`/nhk/v1/mcp`; file bytes are never serialized into Ability JSON, base64 or
+client filesystem paths.
 
 The canonical lifecycle is multipart batch → native WordPress attachment
 creation → `wp_generate_attachment_metadata()` and derivatives → canonical

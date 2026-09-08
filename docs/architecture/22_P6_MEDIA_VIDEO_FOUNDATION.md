@@ -66,8 +66,9 @@ MediaUsage. It uses the same governed Media boundary and attachment read-back
 as the existing single-file path; it does not create semantic roles,
 Knowledge, Source, Evidence or Graph relations.
 The `nhk-v3/media-ingest` Ability remains metadata/attachment-binding
-semantics, while binary batch transport is exposed through custom MCP because
-the JSON-only Ability layer cannot carry multipart bytes.
+semantics. The connector-facing `nhk-v3/media-upload-batch` Ability exposes
+the top-level `files[]` binary parameter and forwards the request's native
+multipart parts to the custom MCP transport; bytes do not enter Ability JSON.
 
 The upload path classification is fixed: `nhk.media.upload-batch` is
 PRIMARY/RECOMMENDED multipart transport; `wp_upload_media_from_url` is

@@ -5549,3 +5549,21 @@ capability. The full Integration suite remains non-green on four unrelated
 pre-existing subsystem/fixture failures (4 errors, 4 failures, 4 skips); the
 focused multipart integration is green. No production/V2/staging data,
 deployment or push was performed.
+
+# Checkpoint — 2026-09-08 — Multipart batch connector exposure bridge
+
+Root cause of the connector omission was the explicit
+`McpAbilityRegistration` exclusion: `nhk.media.upload-batch` existed in the
+custom catalog but was not mapped to a WordPress Ability, so Easy MCP could
+not export it. The exclusion was removed and the tool is now registered as
+`nhk-v3/media-upload-batch`, enabled at the Easy MCP option boundary, and
+serialized with a top-level `files[]` binary schema. Its Ability adapter copies
+the request's native `$_FILES` into the internal `/nhk/v1/mcp` request while
+keeping bytes out of JSON and preserving the `upload_files` capability gate.
+
+Focused MCP contract tests pass: 22 tests / 216 assertions including catalog,
+Ability mapping, enabled-list transformation and binary schema. PHP lint and
+`git diff --check` pass. The real Easy MCP export and authenticated JPEG
+multipart call remain runtime acceptance work because the local integration
+environment does not have the connector plugin/authenticated caller; no
+production/V2/staging data, deployment or push was performed.

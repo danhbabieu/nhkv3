@@ -293,6 +293,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/article-restore',
             'nhk-v3/video-ingest',
             'nhk-v3/media-ingest',
+            'nhk-v3/media-upload-batch',
             'nhk-v3/knowledge-ingest',
             'nhk-v3/source-ingest',
             'nhk-v3/evidence-ingest',
@@ -341,10 +342,30 @@ final class McpContractTest extends TestCase
         self::assertArrayNotHasKey('nhk.media.ingest', McpAbilityRegistration::explicitExclusionReasons());
     }
 
+    public function test_multipart_batch_upload_is_exposed_as_a_file_capable_ability(): void
+    {
+        self::assertSame('nhk-v3/media-upload-batch', McpAbilityRegistration::abilityNameForTool('nhk.media.upload-batch'));
+        self::assertContains('nhk-v3/media-upload-batch', McpAbilityRegistration::governedAbilityNames());
+        self::assertArrayNotHasKey('nhk.media.upload-batch', McpAbilityRegistration::explicitExclusionReasons());
+
+        $tool = array_column(McpToolCatalog::tools(), null, 'name')['nhk.media.upload-batch'];
+        self::assertArrayHasKey('files', $tool['inputSchema']['properties']);
+        self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
+        self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
+    }
+
+    public function test_multipart_batch_upload_is_added_to_the_easy_mcp_enabled_ability_list(): void
+    {
+        self::assertSame(
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch'],
+            McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
+        );
+    }
+
     public function test_media_ingest_is_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest'],
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }

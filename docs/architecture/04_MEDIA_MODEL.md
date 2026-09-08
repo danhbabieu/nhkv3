@@ -58,6 +58,11 @@ base64 chỉ là FALLBACK/COMPATIBILITY cho payload nhỏ, không phải đườ
 cho workflow nhiều ảnh. Hai transport và semantic `media-ingest` không được
 nhập thành một boundary.
 
+Connector discovery cũng nhận capability này qua Ability
+`nhk-v3/media-upload-batch` với top-level `files[]` binary parameter. Adapter
+giữ native multipart parts và chuyển tiếp chúng tới custom MCP transport;
+binary không đi qua Ability JSON, base64 hoặc client filesystem path.
+
 SHA-256 được tính trên binary thật. Cùng idempotency key và cùng payload được
 replay/reuse; cùng key nhưng payload khác phải fail deterministic
 `IDEMPOTENCY_CONFLICT`. Filename trùng không chứng minh cùng file và checksum

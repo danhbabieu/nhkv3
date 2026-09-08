@@ -35,7 +35,11 @@ final class McpToolCatalog
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.media.upload-batch', 'Upload one or more image files through the canonical multipart WordPress attachment and governed Media boundary.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
-                'files' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
+                    'type' => 'object',
+                    'format' => 'binary',
+                    'description' => 'Native multipart file part. Binary bytes are transported out-of-band; base64 and paths are not accepted.',
+                ]],
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
             ], ['idempotency_key', 'files'], true),

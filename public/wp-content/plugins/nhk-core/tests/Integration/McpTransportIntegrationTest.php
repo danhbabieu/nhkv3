@@ -75,6 +75,15 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame('nhk-v3/media-ingest', $export->get_data()['name']);
         self::assertArrayHasKey('wordpress_attachment_id', $export->get_data()['input_schema']['properties']['assets']['items']['properties']);
         self::assertArrayNotHasKey('file', $export->get_data()['input_schema']['properties']);
+        $batch = wp_get_ability('nhk-v3/media-upload-batch');
+        self::assertNotNull($batch);
+        self::assertTrue($batch->check_permissions());
+        $batchSchema = $batch->get_input_schema();
+        self::assertSame('array', $batchSchema['properties']['files']['type']);
+        self::assertSame('binary', $batchSchema['properties']['files']['items']['format']);
+        $batchExport = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-upload-batch'));
+        self::assertSame(200, $batchExport->get_status(), (string) wp_json_encode($batchExport->get_data()));
+        self::assertSame('binary', $batchExport->get_data()['input_schema']['properties']['files']['items']['format']);
         foreach (McpAbilityRegistration::governedAbilityNames() as $abilityName) {
             $ability = wp_get_ability($abilityName);
             self::assertNotNull($ability, $abilityName);

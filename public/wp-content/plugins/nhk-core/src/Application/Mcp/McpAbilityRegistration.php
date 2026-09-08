@@ -19,6 +19,7 @@ final class McpAbilityRegistration
     {
         if (!is_array($enabled) || $enabled === []) return [];
         if (!in_array('nhk-v3/media-ingest', $enabled, true)) $enabled[] = 'nhk-v3/media-ingest';
+        if (!in_array('nhk-v3/media-upload-batch', $enabled, true)) $enabled[] = 'nhk-v3/media-upload-batch';
         return array_values($enabled);
     }
 
@@ -156,6 +157,7 @@ final class McpAbilityRegistration
         'nhk.article.restore' => 'nhk-v3/article-restore',
         'nhk.video.ingest' => 'nhk-v3/video-ingest',
         'nhk.media.ingest' => 'nhk-v3/media-ingest',
+        'nhk.media.upload-batch' => 'nhk-v3/media-upload-batch',
         'nhk.knowledge.ingest' => 'nhk-v3/knowledge-ingest',
         'nhk.source.ingest' => 'nhk-v3/source-ingest',
         'nhk.evidence.ingest' => 'nhk-v3/evidence-ingest',
@@ -168,9 +170,7 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [
-        'nhk.media.upload-batch' => 'Requires multipart file parts on the custom /nhk/v1/mcp transport; WordPress Ability JSON calls cannot carry the binary payload.',
-    ];
+    private const EXPLICIT_EXCLUSION_REASONS = [];
 
     /** @return list<string> */
     public static function readAbilityNames(): array
@@ -282,9 +282,6 @@ final class McpAbilityRegistration
                 'label' => self::label($toolName),
                 'description' => (string) $tool['description'],
                 'category' => self::CATEGORY,
-                // WordPress Abilities/MCP is the attachment-binding bridge. The
-                // canonical direct-file path remains on the custom multipart
-                // transport, so do not export its binary pseudo-schema here.
                 'input_schema' => self::abilityInputSchema($toolName, (array) $tool['inputSchema']),
                 'output_schema' => ['type' => ['object', 'null']],
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
@@ -318,6 +315,11 @@ final class McpAbilityRegistration
     {
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
         $request->set_header('Content-Type', 'application/json');
+        if ($tool === 'nhk.media.upload-batch' && isset($_FILES) && is_array($_FILES)) {
+            // Preserve connector multipart parts while delegating to the
+            // canonical custom transport; bytes never enter Ability JSON.
+            $request->set_file_params($_FILES);
+        }
         $request->set_body((string) wp_json_encode([
             'jsonrpc' => '2.0',
             'id' => 1,
@@ -350,6 +352,7 @@ final class McpAbilityRegistration
             'nhk.proposal.apply' => 'nhk_apply_proposals',
             'nhk.relation.backfill.apply' => 'nhk_apply_proposals',
             'nhk.public-url.audit', 'nhk.public-url.reproject' => 'nhk_manage_public_urls',
+            'nhk.media.upload-batch' => 'upload_files',
             default => 'nhk_create_proposals',
         };
         return !function_exists('current_user_can') || current_user_can($capability);

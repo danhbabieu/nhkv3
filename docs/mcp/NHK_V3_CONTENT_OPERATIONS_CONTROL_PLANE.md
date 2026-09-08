@@ -58,8 +58,10 @@ content.
 The transport classification is PRIMARY/RECOMMENDED for
 `nhk.media.upload-batch`, SECONDARY/IMPORT for `wp_upload_media_from_url` when
 the source is already a public HTTPS URL, and FALLBACK/COMPATIBILITY for
-base64 `wp_upload_media`. The JSON-only Ability layer cannot carry multipart
-bytes, so the batch transport is not advertised as a JSON Ability.
+base64 `wp_upload_media`. Connector discovery also exposes the transport as
+`nhk-v3/media-upload-batch` with a top-level `files[]` binary parameter. Its
+thin Ability adapter preserves native multipart parts and delegates to the
+custom boundary; bytes are not serialized into Ability JSON, base64 or paths.
 
 After attachment read-back, `nhk-v3/media-ingest` remains the separate governed
 semantic Media boundary for attachment adoption/binding through
