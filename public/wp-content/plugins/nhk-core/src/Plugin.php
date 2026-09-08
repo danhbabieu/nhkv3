@@ -83,6 +83,10 @@ final class Plugin {
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
         add_action('wp_abilities_api_categories_init', [McpAbilityRegistration::class, 'registerCategory']);
+        // Easy MCP AI registers dynamic ability tools from its own bootstrap.
+        // Initialize the WordPress ability registry before that snapshot so
+        // newly-added NHK abilities are present in the bridge's tool list.
+        add_action('init', [McpAbilityRegistration::class, 'bootstrapRegistry'], 1);
         add_action('wp_abilities_api_init', static function (): void {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;

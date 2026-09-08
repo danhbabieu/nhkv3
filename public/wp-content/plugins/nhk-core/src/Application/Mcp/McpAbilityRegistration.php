@@ -7,6 +7,13 @@ final class McpAbilityRegistration
 {
     private const CATEGORY = 'nhk-v3-content-operations';
 
+    public static function bootstrapRegistry(): void
+    {
+        if (function_exists('wp_get_abilities')) {
+            wp_get_abilities();
+        }
+    }
+
     /** @var array<string,string> */
     private const READ_TOOL_MAP = [
         'nhk.search' => 'nhk-v3/search',

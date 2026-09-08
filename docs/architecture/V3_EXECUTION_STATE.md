@@ -5445,3 +5445,16 @@ discovery output. The guarded test was attempted with `NHK_WP_TEST_PATH=public`
 and `NHK_WP_TEST_DB=nhk_v3_test` but WordPress bootstrap remained blocked by
 database connectivity; no runtime data was mutated and live deploy/reconnect
 has not been claimed.
+
+# Checkpoint — 2026-09-08 — Easy MCP dynamic ability bootstrap ordering
+
+LIVE Easy MCP admin discovery confirms `nhk-v3/media-ingest` is registered,
+public, REST-visible and enabled; global disabled-tool and whitelist settings
+do not exclude it. The bridge-side regression now exercises Easy MCP's dynamic
+ability registrar and asserts the serialized tool name
+`wp_ability_nhk_v3_media_ingest`, including the attachment-binding schema. NHK
+also eagerly initializes the WordPress Ability registry at `init` priority 1,
+before an Easy MCP dynamic snapshot can run. No MediaService code, production
+data, deployment or push was changed. The local WordPress runtime remains
+blocked by unavailable database connectivity; the Easy MCP integration test is
+therefore guarded and skips when that external plugin is not installed locally.

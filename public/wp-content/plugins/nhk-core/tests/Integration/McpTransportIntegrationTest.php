@@ -98,6 +98,26 @@ final class McpTransportIntegrationTest extends TestCase
         }
     }
 
+    public function test_easy_mcp_tools_list_serializes_media_ingest_ability(): void
+    {
+        if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {
+            self::markTestSkipped('Easy MCP AI is required for the bridge serialization assertion.');
+        }
+
+        $registry = new \Easy_MCP_AI\Tools\Tool_Registry();
+        (new \Easy_MCP_AI\Tools\Dynamic_Tool_Registrar())->register_to($registry);
+        $tools = $registry->get_all_definitions();
+        $byName = array_column($tools, null, 'name');
+
+        self::assertArrayHasKey('wp_ability_nhk_v3_media_ingest', $byName);
+        self::assertSame('object', $byName['wp_ability_nhk_v3_media_ingest']['inputSchema']['type']);
+        self::assertArrayHasKey('assets', $byName['wp_ability_nhk_v3_media_ingest']['inputSchema']['properties']);
+        self::assertArrayHasKey(
+            'wordpress_attachment_id',
+            $byName['wp_ability_nhk_v3_media_ingest']['inputSchema']['properties']['assets']['items']['properties']
+        );
+    }
+
     public function test_article_preflight_research_for_existing_post_reads_media_usage_inventory(): void
     {
         $postId = wp_insert_post([
