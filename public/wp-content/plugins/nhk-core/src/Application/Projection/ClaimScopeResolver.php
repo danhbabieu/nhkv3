@@ -101,13 +101,13 @@ final class ClaimScopeResolver
         while ($queue !== []) {
             [$current, $depth, $path] = array_shift($queue);
             if ($depth >= self::MAX_DISTANCE) continue;
-            try { $page = $this->graph->findIncoming($current, null, 0, 200); } catch (\Throwable) { return $impacts; }
+            try { $page = $this->graph->findOutgoing($current, null, 0, 200); } catch (\Throwable) { return $impacts; }
             foreach ((array) ($page['items'] ?? []) as $edge) {
                 if (!$edge instanceof GraphEdge || !$edge->isActive()) continue;
-                $other = $edge->source->reference;
-                if (!$this->policy->allowsTraversal($current, 'incoming', $other, $edge->predicate)) continue;
-                $hop = ['source_type' => $other->endpoint_type, 'source_uuid' => $other->endpoint_key, 'predicate' => $edge->predicate, 'target_type' => $current->endpoint_type, 'target_uuid' => $current->endpoint_key, 'direction' => 'incoming', 'edge_uuid' => $edge->edge_uuid, 'edge_revision' => $edge->revision];
-                $semanticPath = array_merge([$hop], $path);
+                $other = $edge->target->reference;
+                if (!$this->policy->allowsTraversal($current, 'outgoing', $other, $edge->predicate)) continue;
+                $hop = ['source_type' => $current->endpoint_type, 'source_uuid' => $current->endpoint_key, 'predicate' => $edge->predicate, 'target_type' => $other->endpoint_type, 'target_uuid' => $other->endpoint_key, 'direction' => 'outgoing', 'edge_uuid' => $edge->edge_uuid, 'edge_revision' => $edge->revision];
+                $semanticPath = array_merge($path, [$hop]);
                 $distance = $depth + 1;
                 if ($this->policy->allowsPath($subjectType, $other->endpoint_type, $semanticPath, $category, ClaimProjectionVisibility::status($claim), $this->hasEligibleEvidence($claim)) && ($this->profiles ??= new NodeProjectionProfileRegistry())->allows($other->endpoint_type, $category)) {
                     $impacts[] = ['node_uuid' => $other->endpoint_key, 'node_type' => $other->endpoint_type, 'section_key' => $category, 'scope' => 'related', 'graph_distance' => $distance];
@@ -133,11 +133,11 @@ final class ClaimScopeResolver
                 $impacts[] = ['node_uuid' => $current->endpoint_key, 'node_type' => $current->endpoint_type, 'section_key' => $category, 'scope' => $depth === 0 ? 'direct' : 'related', 'graph_distance' => $depth];
             }
             if ($depth >= self::MAX_DISTANCE) continue;
-            try { $page = $this->graph->findIncoming($current, null, 0, 200); } catch (\Throwable) { break; }
+            try { $page = $this->graph->findOutgoing($current, null, 0, 200); } catch (\Throwable) { break; }
             foreach ((array) ($page['items'] ?? []) as $incoming) {
                 if (!$incoming instanceof GraphEdge || !$incoming->isActive()) continue;
-                $other = $incoming->source->reference;
-                if (!$this->policy->allowsTraversal($current, 'incoming', $other, $incoming->predicate)) continue;
+                $other = $incoming->target->reference;
+                if (!$this->policy->allowsTraversal($current, 'outgoing', $other, $incoming->predicate)) continue;
                 if (!isset($visited[$other->key()])) { $visited[$other->key()] = true; $queue[] = [$other, $depth + 1]; }
             }
         }
@@ -163,7 +163,7 @@ final class ClaimScopeResolver
             $label = trim($context->nodeLabel);
             $rest = preg_replace('/^' . preg_quote($label, '/') . '\s*[:\-–—,]?\s*/iu', '', $text);
             $rest = is_string($rest) && trim($rest) !== '' ? trim($rest) : $text;
-            $prefix = match ($context->nodeType) { 'variant' => 'Ở biến thể ', 'model' => 'Ở model ', 'brand' => 'Trong dòng ', default => 'Theo ' };
+            $prefix = match ($context->nodeType) { 'variant' => 'Ở biến thể ', 'model' => 'Ở mẫu ', 'brand' => 'Trong dòng ', default => 'Theo ' };
             $text = $prefix . $label . ', ' . $rest;
         }
         return new ProjectedClaim($claim, $category, $scope, ClaimProjectionVisibility::status($claim), $context, $text);

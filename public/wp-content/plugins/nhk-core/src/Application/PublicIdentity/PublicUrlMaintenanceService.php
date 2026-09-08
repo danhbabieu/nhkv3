@@ -11,12 +11,14 @@ final class PublicUrlMaintenanceService
      * @param \Closure():array<int,array<string,mixed>> $inventory
      * @param \Closure(array<string,mixed>,string):bool $externallyOccupied
      * @param \Closure(array<string,mixed>,string):void $apply
+     * @param \Closure(array<string,mixed>):array<string,mixed> $deliveryVerifier
      */
     public function __construct(
         private \Closure $inventory,
         private \Closure $externallyOccupied,
         private \Closure $apply,
         ?PublicUrlReprojectionPlanner $planner = null,
+        private ?\Closure $deliveryVerifier = null,
     ) {
         $this->planner = $planner ?? new PublicUrlReprojectionPlanner();
     }
@@ -27,7 +29,21 @@ final class PublicUrlMaintenanceService
         try {
             $inventory = ($this->inventory)();
             if (!is_array($inventory)) return ['status'=>'UNAVAILABLE','reason_code'=>'PUBLIC_URL_INVENTORY_UNAVAILABLE','items'=>[],'counts'=>['total'=>0,'change'=>0,'keep'=>0,'blocked'=>0]];
-            return $this->planner->plan(array_values($inventory), $this->externallyOccupied);
+            $plan = $this->planner->plan(array_values($inventory), $this->externallyOccupied);
+            foreach ($plan['items'] as $index => $item) {
+                if (($item['kind'] ?? '') !== 'media_asset') continue;
+                $action = (string) ($item['action'] ?? 'BLOCKED');
+                $plan['items'][$index]['url_identity_status'] = match ($action) {
+                    'KEEP' => 'URL_IDENTITY_KEEP',
+                    'ALLOCATE' => 'URL_IDENTITY_ALLOCATE',
+                    'CHANGE' => 'URL_IDENTITY_CHANGE',
+                    default => 'URL_IDENTITY_BLOCKED',
+                };
+                $plan['items'][$index]['binary_delivery'] = $this->deliveryVerifier === null
+                    ? ['status' => 'UNVERIFIED', 'reason_code' => 'BINARY_DELIVERY_VERIFIER_UNAVAILABLE']
+                    : ($this->deliveryVerifier)($item);
+            }
+            return $plan;
         } catch (\Throwable) {
             return ['status'=>'UNAVAILABLE','reason_code'=>'PUBLIC_URL_INVENTORY_UNAVAILABLE','items'=>[],'counts'=>['total'=>0,'change'=>0,'keep'=>0,'blocked'=>0]];
         }

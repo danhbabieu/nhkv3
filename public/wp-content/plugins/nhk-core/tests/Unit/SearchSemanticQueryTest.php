@@ -145,4 +145,67 @@ final class SearchSemanticQueryTest extends TestCase
         self::assertSame([], $result['entities']);
         self::assertSame(0, $result['_totals']['entities']);
     }
+
+    public function test_claim_search_resolves_one_canonical_owner_and_never_creates_claim_urls(): void
+    {
+        $subject = UuidCodec::newV7();
+        $claims = [
+            new KnowledgeClaim(UuidCodec::newV7(), 'search.odo36.configuration', 'Odo36 có cấu hình côn chữ M.', 'technical', ['metadata' => ['subject_id' => $subject, 'subject_type' => 'model', 'knowledge_status' => 'APPROVED']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'search.odo36.sound', 'Odo36 có âm sắc trầm.', 'fact', ['metadata' => ['subject_id' => $subject, 'subject_type' => 'model', 'knowledge_status' => 'APPROVED']]),
+            new KnowledgeClaim(UuidCodec::newV7(), 'search.orphan', 'Odo36 claim không có owner.', 'fact', ['metadata' => ['subject_type' => 'model', 'knowledge_status' => 'APPROVED']]),
+        ];
+        $query = new SearchSemanticQuery(
+            new InMemoryAuthorityRepository(),
+            $this->emptyMediaRepository(),
+            $this->emptyVideoRepository(),
+            $this->knowledgeRepository($claims),
+            new EntityTypeRegistry(),
+            null,
+            null,
+            null,
+            static function (KnowledgeClaim $claim) use ($subject): ?string {
+                return (($claim->provenance['metadata']['subject_id'] ?? '') === $subject) ? '/mau/odo36/' : null;
+            },
+        );
+
+        $result = $query->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Odo36');
+
+        self::assertSame(1, $result['_totals']['knowledge']);
+        self::assertSame('/mau/odo36/', $result['knowledge'][0]['url']);
+        self::assertStringNotContainsString('/knowledge/', $result['knowledge'][0]['url']);
+    }
+
+    private function emptyMediaRepository(): MediaRepository
+    {
+        return new class implements MediaRepository {
+            public function findByCanonicalId(string $id): ?Media { return null; }
+            public function findByStableKey(string $key): ?Media { return null; }
+            public function create(Media $item): Media { return $item; }
+            public function update(Media $item, int $expectedRevision): Media { return $item; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+    }
+
+    private function emptyVideoRepository(): VideoRepository
+    {
+        return new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $id): ?Video { return null; }
+            public function create(Video $item): Video { return $item; }
+            public function update(Video $item, int $expectedRevision): Video { return $item; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+    }
+
+    private function knowledgeRepository(array $items): KnowledgeRepository
+    {
+        return new class($items) implements KnowledgeRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; }
+            public function findByStableKey(string $key): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $item): KnowledgeClaim { return $item; }
+            public function update(KnowledgeClaim $item, int $expectedRevision): KnowledgeClaim { return $item; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+    }
 }

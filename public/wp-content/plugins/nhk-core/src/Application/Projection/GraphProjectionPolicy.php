@@ -46,11 +46,17 @@ final class GraphProjectionPolicy
         $rulePath = $this->rulesForPath($sourceType, $targetType, $path, $category, $state);
         if ($rulePath === null) return false;
         foreach ($path as $index => $hop) {
+            // Projection rules describe the public read as an incoming
+            // child-to-parent traversal. Invalidation walks the same
+            // structural path from the claim subject outward, so its
+            // physical outgoing edge direction is the inverse operation.
+            $direction = (string) ($hop['direction'] ?? 'incoming');
+            $ruleDirection = $direction === 'outgoing' ? 'incoming' : $direction;
             if (!$rulePath[$index]->allows(
                 (string) ($hop['source_type'] ?? ''),
                 (string) ($hop['target_type'] ?? ''),
                 (string) ($hop['predicate'] ?? ''),
-                (string) ($hop['direction'] ?? 'incoming'),
+                $ruleDirection,
                 $category,
                 1,
                 $state,

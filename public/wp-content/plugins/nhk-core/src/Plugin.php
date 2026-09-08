@@ -75,7 +75,7 @@ use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
 
 final class Plugin {
-    private const REWRITE_VERSION = '9';
+    private const REWRITE_VERSION = '10';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
@@ -149,7 +149,14 @@ final class Plugin {
             $publicClaims = new WpdbKnowledgeRepository($wpdb);
             $publicSources = new WpdbSourceRepository($wpdb);
             $publicEvidence = new WpdbEvidenceRepository($wpdb);
-            add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus, $publicRoutes, $publicCollection), 'extend'], 10, 3);
+            $claimOwnerUrl = static function (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim) use ($publicAuthority, $publicRoutes, $publicEligibility): ?string {
+                $metadata = $claim->provenance['metadata'] ?? [];
+                $subjectId = is_array($metadata) ? trim((string) ($metadata['subject_uuid'] ?? $metadata['subject_id'] ?? $metadata['canonical_subject_uuid'] ?? $metadata['canonical_subject_id'] ?? '')) : '';
+                if ($subjectId === '') return null;
+                $entity = $publicAuthority->findByCanonicalId($subjectId);
+                return $entity && $publicEligibility->evaluate($entity)->eligible ? $publicRoutes->path($entity) : null;
+            };
+            add_filter('nhk_v3_search_semantic_results', [new SearchSemanticQuery($publicAuthority, $publicMedia, $publicVideos, $publicClaims, $publicTypes, $publicStatus, $publicRoutes, $publicCollection, $claimOwnerUrl), 'extend'], 10, 3);
             $publicRelated = new RelatedContentQuery($publicGraph, $publicAuthority, $publicMedia, $publicVideos, $publicTypes, $publicStatus, $publicEligibility);
             add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2);
             $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
@@ -190,9 +197,8 @@ final class Plugin {
             }, 20, 3);
             (new PublicMediaVideoRoutes(new MediaVideoPageQuery($publicMedia, $publicAssets, $publicUsages, $publicVideos, $publicStatus, null, $publicRelated, null, $publicClaims, $publicEvidence, $publicSources), $historicPublicRouteService))->register();
             (new PublicVideoSitemapRoutes($publicVideos, $publicStatus))->register();
-            $mediaRoot = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
-            if ($mediaRoot === '' && function_exists('wp_upload_dir')) { $upload = wp_upload_dir(); $mediaRoot = is_array($upload) ? (string) ($upload['basedir'] ?? '') : ''; }
-            (new PublicMediaAssetRoutes(new \NHK\Core\Application\Media\PublicMediaAssetDelivery($publicAssets, $publicMedia, $mediaRoot)))->register();
+            $publicMediaDelivery = \NHK\Core\Application\Media\PublicMediaAssetDelivery::fromEnvironment($publicAssets, $publicMedia);
+            if ($publicMediaDelivery !== null) (new PublicMediaAssetRoutes($publicMediaDelivery))->register();
             (new PublicKnowledgeRoutes(new KnowledgePageQuery($publicClaims, $publicEvidence, $publicSources, $publicStatus)))->register();
         }
         add_action('rest_api_init', static function () use (&$sharedAttachmentBridge): void {
@@ -366,13 +372,6 @@ final class Plugin {
             (new GovernanceApi($governance, $eligibility, $controlledApply, $endpoints))->register();
             $videoRelationAdmin = new \NHK\Core\Application\Video\VideoRelationAdminService($governance, $proposalRepository, $videos, $authority, $knowledgeService, $claims, $sources, $evidence);
             (new VideoRelationAdminApi($videoRelationAdmin))->register();
-            $claimOwnerUrl = static function (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim) use ($authority, $publicRoutes, $publicEligibility): ?string {
-                $metadata = $claim->provenance['metadata'] ?? [];
-                $subjectId = is_array($metadata) ? trim((string) ($metadata['subject_id'] ?? $metadata['subject_uuid'] ?? '')) : '';
-                if ($subjectId === '') return null;
-                $entity = $authority->findByCanonicalId($subjectId);
-                return $entity && $publicEligibility->evaluate($entity)->eligible ? $publicRoutes->path($entity) : null;
-            };
             (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection, $claimOwnerUrl))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();

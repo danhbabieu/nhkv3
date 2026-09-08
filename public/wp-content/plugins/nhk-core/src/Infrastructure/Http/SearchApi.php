@@ -38,7 +38,17 @@ final class SearchApi
         $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $item->active && $item->readiness === 'ready' && $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
         $videoSearch = new VideoSearchDocument($this->authority);
         $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $videoSearch->isDiscoverable($item) && $this->matches($term, ...$videoSearch->values($item))))) : [];
-        $groups['knowledge'] = !$this->status || $this->status->knowledgeStorageReady() ? array_map($this->claim(...), array_values(array_filter($this->claims->list(), fn (KnowledgeClaim $item): bool => $item->active && $item->isPublic() && $this->matches($term, $item->claimText, $item->stableKey)))) : [];
+        $groups['knowledge'] = [];
+        if (!$this->status || $this->status->knowledgeStorageReady()) {
+            $owners = [];
+            foreach ($this->claims->list() as $item) {
+                if (!$item->active || !$item->isPublic() || !$this->matches($term, $item->claimText, $item->stableKey)) continue;
+                $claim = $this->claim($item);
+                if ($claim === null || isset($owners[$claim['url']])) continue;
+                $owners[$claim['url']] = true;
+                $groups['knowledge'][] = $claim;
+            }
+        }
         $semanticTotals = [];
         $semanticOffset = ($page - 1) * $perPage;
         foreach (['entities', 'media', 'videos', 'knowledge'] as $group) {
@@ -51,9 +61,9 @@ final class SearchApi
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
     private function media(Media $item): array { return ['type' => 'media', 'title' => $item->canonicalName]; }
     private function video(Video $item): array { $search = new VideoSearchDocument($this->authority); $title = $search->title($item); $path = $search->publicUrl($item); $url = $path === null ? null : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'VideoObject'])['search']; return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url === null ? '' : (function_exists('home_url') ? home_url($url) : $url)]; }
-    private function claim(KnowledgeClaim $item): array
+    private function claim(KnowledgeClaim $item): ?array
     {
         $url = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
-        return ['type' => 'knowledge', 'title' => $item->claimText, 'url' => is_string($url) ? $url : ''];
+        return is_string($url) && trim($url) !== '' ? ['type' => 'knowledge', 'title' => $item->claimText, 'url' => $url] : null;
     }
 }

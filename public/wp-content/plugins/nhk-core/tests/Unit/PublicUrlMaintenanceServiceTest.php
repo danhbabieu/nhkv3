@@ -64,4 +64,22 @@ final class PublicUrlMaintenanceServiceTest extends TestCase
         self::assertSame('BLOCKED', $result['status']);
         self::assertSame(0, $writes);
     }
+
+    public function test_media_keep_is_distinguished_from_binary_delivery_evidence(): void
+    {
+        $service = new PublicUrlMaintenanceService(
+            static fn(): array => [[
+                'kind' => 'media_asset', 'owner_id' => 'asset-1', 'route_type' => 'media_image', 'scope' => 'root', 'name' => 'Ảnh ví dụ', 'current_slug' => 'anh-vi-du', 'qualifiers' => [],
+            ]],
+            static fn(array $item, string $slug): bool => false,
+            static function(array $item, string $key): void {},
+            deliveryVerifier: static fn(array $item): array => ['status' => 'PASS', 'reason_code' => 'BINARY_DELIVERY_PASS'],
+        );
+
+        $item = $service->audit()['items'][0];
+
+        self::assertSame('KEEP', $item['action']);
+        self::assertSame('URL_IDENTITY_KEEP', $item['url_identity_status']);
+        self::assertSame('BINARY_DELIVERY_PASS', $item['binary_delivery']['reason_code']);
+    }
 }

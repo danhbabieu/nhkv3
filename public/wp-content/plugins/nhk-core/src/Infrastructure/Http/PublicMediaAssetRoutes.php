@@ -44,25 +44,29 @@ final class PublicMediaAssetRoutes
             exit;
         }
 
-        $resolved = $this->delivery->resolveByPublicFilename(rawurldecode($filename));
-        if ($resolved === null) {
+        $response = $this->responseForFilename(rawurldecode($filename));
+        if ($response === null) {
             $this->notFound();
             return;
         }
-        $asset = $resolved['asset'];
-        $size = filesize($resolved['path']);
-        if ($size === false) {
-            $this->notFound();
-            return;
-        }
-        header('Content-Type: ' . $asset->mimeType);
-        header('Content-Length: ' . $size);
+        header('Content-Type: ' . $response['content_type']);
+        header('Content-Length: ' . $response['size']);
         header('Content-Disposition: inline');
         header('Cache-Control: public, max-age=31536000, immutable');
         header('X-Robots-Tag: noindex, nofollow');
         header('X-Content-Type-Options: nosniff');
-        readfile($resolved['path']);
+        readfile($response['path']);
         exit;
+    }
+
+    /** @return array{status:int,content_type:string,size:int,path:string}|null */
+    public function responseForFilename(string $filename): ?array
+    {
+        $resolved = $this->delivery->resolveByPublicFilename($filename);
+        if ($resolved === null) return null;
+        $size = filesize($resolved['path']);
+        if ($size === false) return null;
+        return ['status' => 200, 'content_type' => $resolved['asset']->mimeType, 'size' => $size, 'path' => $resolved['path']];
     }
 
     public function legacyAssetRedirectTarget(string $assetKey): ?string
@@ -81,5 +85,6 @@ final class PublicMediaAssetRoutes
     {
         status_header(404);
         nocache_headers();
+        exit;
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Graph\GraphService;
-use NHK\Core\Application\Projection\{ClaimClusterer, ClaimProjectionService, ClaimRanker, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder};
+use NHK\Core\Application\Projection\{ClaimClusterer, ClaimProjectionService, ClaimRanker, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionBackfillService, SeoProjectionBuilder};
 use NHK\Core\Domain\Projection\{ProjectionRevision, ProjectionStatus};
 use NHK\Core\Contracts\Graph\EndpointResolver;
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
@@ -21,7 +21,7 @@ final class SemanticClaimProjectionPipelineTest extends TestCase
 {
     public function test_resolver_preserves_subject_and_frames_variant_claim_on_model(): void
     {
-        $brand = UuidCodec::newV7(); $model = UuidCodec::newV7(); $variant = UuidCodec::newV7();
+        $brand = UuidCodec::newV7(); $model = 'c01c109c-5d39-401e-a16e-6d61a0a52f50'; $variant = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
         $claim = $this->claim('Odo36/10 thường sử dụng côn chữ M.', $variant, 'variant', 'configuration');
         $graphRepo = new InMemoryGraphRepository(); $graph = $this->graph($graphRepo, [$brand, $model, $variant]);
         $graph->create(new NodeReference('variant', $variant), 'variant_of', new NodeReference('model', $model));
@@ -34,6 +34,12 @@ final class SemanticClaimProjectionPipelineTest extends TestCase
         self::assertStringContainsString('Ở biến thể Odo36/10', $result['related'][0]->displayText);
         self::assertStringContainsString('côn chữ M', $result['related'][0]->displayText);
         self::assertStringNotContainsString('Odo36 sử dụng', $result['related'][0]->displayText);
+
+        $seo = (new SeoProjectionBuilder())->build([
+            'node_uuid' => $model,
+            'sections' => [['key' => 'configuration', 'label' => 'Cấu hình', 'claims' => [['display_text' => $result['related'][0]->displayText, 'status' => 'APPROVED']]]],
+        ], '/mau/odo36/', 'Odo36');
+        self::assertStringContainsString('Ở biến thể Odo36/10', $seo['sections']['configuration']['content']);
     }
 
     public function test_private_claim_is_not_resolved_and_cycle_is_bounded(): void
@@ -45,6 +51,80 @@ final class SemanticClaimProjectionPipelineTest extends TestCase
         $graph->create(new NodeReference('model', $model), 'about', new NodeReference('variant', $variant));
         $result = (new ClaimScopeResolver($this->claims([$private]), $graph, new GraphProjectionPolicy()))->resolve(new NodeReference('model', $model));
         self::assertSame([], $result['items']);
+    }
+
+    public function test_claim_invalidation_follows_child_to_parent_projection_paths(): void
+    {
+        $brand = UuidCodec::newV7(); $model = UuidCodec::newV7(); $variant = UuidCodec::newV7();
+        $claim = $this->claim('Odo36/10 thường sử dụng côn chữ M.', $variant, 'variant', 'configuration');
+        $repository = new InMemoryGraphRepository(); $graph = $this->graph($repository, [$brand, $model, $variant]);
+        $graph->create(new NodeReference('variant', $variant), 'variant_of', new NodeReference('model', $model));
+        $graph->create(new NodeReference('model', $model), 'model_of', new NodeReference('brand', $brand));
+        $resolver = new ClaimScopeResolver($this->claims([$claim]), $graph, new GraphProjectionPolicy());
+
+        $impacted = $resolver->impactNodesForClaim($claim->canonicalId);
+        $keys = array_map(static fn (array $item): string => (string) ($item['node_type'] ?? '') . ':' . (string) ($item['node_uuid'] ?? ''), $impacted);
+
+        self::assertContains('variant:' . $variant, $keys);
+        self::assertContains('model:' . $model, $keys);
+        self::assertContains('brand:' . $brand, $keys);
+    }
+
+    public function test_canonical_odo36_fixture_claims_are_direct_ledger_items(): void
+    {
+        $model = 'c01c109c-5d39-401e-a16e-6d61a0a52f50';
+        $claims = [
+            new KnowledgeClaim('01a07e84-a8d9-7707-8f0d-ddd98f1b064f', 'nhk:knowledge:odo36.dial.ellipse-logo', 'Odo36 và Odo30 mặt xoáy thường gặp logo elip trên mặt số.', 'fact', ['metadata' => ['subject_id' => $model, 'subject_type' => 'model', 'projection_category' => 'identification_rule', 'knowledge_status' => 'APPROVED']]),
+            new KnowledgeClaim('01a07f5d-e0ce-7cb7-ac7a-fc853e6deb47', 'nhk:knowledge:odo36.dial.20x20', 'Mặt số in 20x20 là loại phổ biến trên Odo36, gặp ở 36/8 và 36/10; thường đi kèm kim tháp, kim bút hoặc kim số 8.', 'fact', ['metadata' => ['subject_id' => $model, 'subject_type' => 'model', 'projection_category' => 'dial_and_hands', 'knowledge_status' => 'APPROVED']]),
+        ];
+        $graph = $this->graph(new InMemoryGraphRepository(), [$model]);
+        $result = (new ClaimScopeResolver($this->claims($claims), $graph, new GraphProjectionPolicy()))->resolve(new NodeReference('model', $model));
+
+        self::assertSame('available', $result['status']);
+        self::assertCount(2, $result['direct']);
+        self::assertSame([$claims[0]->canonicalId, $claims[1]->canonicalId], array_map(static fn (ProjectedClaim $item): string => $item->claim->canonicalId, $result['direct']));
+        self::assertSame([], $result['related']);
+
+        $ledger = (new LiveLedgerProjectionBuilder(new ClaimScopeResolver($this->claims($claims), $graph, new GraphProjectionPolicy())))->build(new NodeReference('model', $model));
+        self::assertSame(2, $ledger['claim_count']);
+        self::assertSame(['dial_and_hands', 'identification_rule'], array_values(array_map(static fn (array $section): string => $section['key'], $ledger['sections'])));
+    }
+
+    public function test_relation_invalidation_targets_the_relation_target_and_its_parents_not_the_child(): void
+    {
+        $brand = UuidCodec::newV7(); $model = UuidCodec::newV7(); $variant = UuidCodec::newV7();
+        $repository = new InMemoryGraphRepository(); $graph = $this->graph($repository, [$brand, $model, $variant]);
+        $edge = $graph->create(new NodeReference('variant', $variant), 'variant_of', new NodeReference('model', $model));
+        $graph->create(new NodeReference('model', $model), 'model_of', new NodeReference('brand', $brand));
+        $resolver = new ClaimScopeResolver($this->claims([]), $graph, new GraphProjectionPolicy());
+
+        $impacted = $resolver->impactNodesForRelation($edge->edge_uuid);
+        $keys = array_map(static fn (array $item): string => (string) ($item['node_type'] ?? '') . ':' . (string) ($item['node_uuid'] ?? ''), $impacted);
+
+        self::assertContains('model:' . $model, $keys);
+        self::assertContains('brand:' . $brand, $keys);
+        self::assertNotContains('variant:' . $variant, $keys);
+    }
+
+    public function test_backfill_dry_run_is_resumable_and_reports_projection_counts_without_publishing(): void
+    {
+        $node = UuidCodec::newV7();
+        $graph = $this->graph(new InMemoryGraphRepository(), [$node]);
+        $resolver = new ClaimScopeResolver($this->claims([]), $graph, new GraphProjectionPolicy());
+        $service = new ClaimProjectionService(new LiveLedgerProjectionBuilder($resolver), new InMemoryProjectionRevisionStore());
+
+        $report = (new ProjectionBackfillService($service))->run([
+            ['uuid' => $node, 'type' => 'model', 'canonical_url' => '/mau/odo36/', 'h1' => 'Odo 36'],
+            ['uuid' => '', 'type' => 'model'],
+        ], true, 1, 0);
+
+        self::assertSame('complete', $report['status']);
+        self::assertSame(1, $report['scanned']);
+        self::assertSame(1, $report['eligible']);
+        self::assertSame(0, $report['built']);
+        self::assertSame(0, $report['published_count']);
+        self::assertSame(1, $report['next_cursor']);
+        self::assertSame('would_rebuild', $report['results'][0]['status']);
     }
 
     public function test_ledger_groups_claims_and_paginates_without_merging_canonical_claims(): void

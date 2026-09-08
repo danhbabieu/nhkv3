@@ -1,5 +1,50 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Semantic Claim Display acceptance continuation
+
+The Semantic Claim Display path is now code-complete for the governed
+projection boundary. Claim invalidation walks active Graph edges from the
+claim subject outward (variant → model → brand), while the public projection
+policy still evaluates the canonical child-to-parent rule direction. Relation
+invalidation starts at the relation target and reaches its eligible parents;
+it no longer invalidates only the relation child.
+
+The canonical Odo36 unit fixture uses the supplied Model UUID
+`c01c109c-5d39-401e-a16e-6d61a0a52f50` and the two supplied claim UUIDs/stable
+keys. Both claims appear as direct Ledger items with their governed
+categories. The propagation fixture uses the supplied Odo36/10 variant UUID
+and proves direct, model-context and brand-context impact paths without
+creating semantic rows.
+
+Search now resolves claim matches to one eligible canonical owner URL,
+deduplicates multiple matching claims for that owner, skips orphaned claims,
+and never emits a claim URL. The entity template uses the Claim Ledger as the
+primary detail surface when available, suppresses the legacy duplicate facet
+block, uses the projection count, and exposes a Vietnamese “Tri thức & chứng
+cứ” anchor. Model context copy is reader-facing Vietnamese (`Ở mẫu`).
+
+Projection backfill dry-run reporting is resumable and now distinguishes
+scanned, eligible, built, skipped, failed, invalidated, candidate and
+published counts; dry-run remains non-publishing. No operator route, semantic
+data mutation, migration rerun, deploy, push or external runtime action was
+performed.
+
+Focused claim/search/frontend/migration verification passes `30 tests / 112
+assertions`. The complete Unit suite reaches `819 tests / 3,887 assertions`
+but has one unrelated existing `MediaAssetDeliveryTest` failure
+(`test_public_filename_delivery_resolves_the_bound_wordpress_attachment_not_the_canonical_filename`); the claim/search/frontend focused suites remain green. The
+run also reports the existing warnings/deprecations. Composer PHP lint and
+`git diff --check` pass. The guarded Integration command was attempted with
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`, but WordPress could not
+establish the database connection in this run; therefore real Odo36
+propagated-context, SEO read-back, invalidation/rebuild, search HTTP and
+frontend HTML acceptance remain `ENVIRONMENT_BLOCKED`.
+
+`CLAIM_DISPLAY_CODE_STATUS=GREEN`
+`ODO36_LIVE_RUNTIME_VERIFY=ENVIRONMENT_BLOCKED`
+`BACKFILL_OPERATOR_PATH=NOT_EXPOSED`
+`READY_FOR_DEPLOY=NO`
+
 ## Checkpoint — 2026-09-09 — Public media library real-asset projection and card UX
 
 Fresh source/runtime probing confirmed that `/thu-vien/` was rendering three
@@ -57,10 +102,14 @@ The managed WebP default is aligned to quality 86 (within the approved 82–88
 range); source processing remains aspect-preserving with a 2048px long-edge
 cap and no sharpening step. The Constitution, Media model and Media/Image SEO
 projection contract now record the source-original, minimum-width, no-upscale,
-quality and thumbnail rules. New regression coverage passes 4 tests / 11
+quality and thumbnail rules. New regression coverage passes 4 tests / 14
 assertions for source-only downscaling, large-asset selection, high-source
 fail-closed behavior and gallery URL/dimension read-back. Impacted
-Media/Article/frontend suites pass 62 tests / 380 assertions.
+Media/Article/frontend suites pass 62 tests / 382 assertions.
+The repository-wide PHPUnit invocation reaches 929 tests but remains
+environment-blocked/non-green with 4 integration errors (`update_option` is
+unavailable without WordPress bootstrap) and 13 existing P4 failures requiring
+`NHK_WP_TEST_PATH=public`; no selector test failed.
 
 The requested `mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp` file is not
 present in the local upload tree, and no target/production data was accessed or
@@ -5836,3 +5885,42 @@ with 1 test / 113 assertions; the existing guarded projection integration
 passes with 1 test / 9 assertions; the Unit suite passes with 799 tests / 3819
 assertions. PHP lint and `git diff --check` pass. No V2, production or staging
 data, deployment, push or destructive migration was performed.
+
+# Checkpoint — 2026-09-09 — Canonical `/anh/` binary delivery boundary
+
+Fresh code-path review confirmed that `/anh/<filename>.webp` already had a
+rewrite and priority-0 `template_redirect`, but the route's delivery resolver
+only reconstructed `MediaAsset.storage_key`. It did not resolve the bound
+WordPress attachment path, so a canonical filename could not serve a physical
+file whose attachment basename differed; unresolved requests were also allowed
+to continue into the WordPress theme. `KEEP` from public URL planning therefore
+proved identity ownership only, not binary delivery.
+
+The delivery boundary now uses the existing `MediaAsset.metadata` attachment
+binding (`wordpress_attachment_id`) and WordPress `get_attached_file()` through
+the environment factory, then applies realpath containment under the uploads
+root, PUBLIC/active/ready gates, byte-size and SHA-256 checks, WebP RIFF/WEBP
+magic, `getimagesize()` MIME and declared-dimension checks. The canonical route
+streams `image/webp` directly with length and `nosniff`, and exits before theme
+rendering. Unknown, private/hidden, missing, corrupt or HTML-disguised files
+fail closed. Rewrite version 10 ensures the rule is refreshed after rollout.
+
+Public URL audit items now retain the identity action/status separately from
+`binary_delivery`; WordPress runtime verification reports
+`BINARY_DELIVERY_PASS` only after the same delivery gate succeeds, otherwise it
+reports an explicit blocked/unverified state. No Media, MediaAsset, MediaUsage,
+attachment, slug or canonical URL was created or changed.
+
+Focused route/delivery/audit tests pass 15 tests / 64 assertions; the complete
+Unit suite passes 823 tests / 3,914 assertions with 7 warnings, 1 deprecation
+and 6 PHPUnit deprecations. Changed PHP files lint clean and `git diff --check`
+passes. Local HTTP route smoke is `ENVIRONMENT_BLOCKED` because no server is
+listening on `localhost:80`; the demo runtime was not deployed or mutated, so
+the required real #86 curl and `/thu-vien/` browser read-back remain pending
+authorized deployment/runtime access. Attachment #86 remains 240×320; no
+upscale or gallery repair was performed.
+
+`ANH_BINARY_DELIVERY_CODE_STATUS=GREEN`
+`ANH_LOCAL_RUNTIME_VERIFY=ENVIRONMENT_BLOCKED`
+`ANH_DEMO_RUNTIME_VERIFY=NOT_DEPLOYED`
+`READY_FOR_DEPLOY=NO`

@@ -75,6 +75,75 @@ projection workflow and read back the resulting dimensions before publication.
 
 **DECISION OWNER / DATE:** NHK V3 Owner decision, 2026-09-09.
 
+## Amendment record — 2026-09-09 — Universal MCP Post-Ingest Semantic Reconciliation
+
+**WHY:** An MCP ingest could previously be mistaken for completion when only
+the input write or one bounded owner read-back had succeeded. That leaves
+duplicate identity, undiscovered reusable records, missing justified Graph
+relations, stale representative imagery and unsupported provenance claims
+unresolved across Media, Video, Knowledge, Source, Evidence and Authority.
+
+**WHAT LAW CHANGES:** Every MCP data ingest, regardless of domain, must run a
+bounded deep semantic reconciliation after ingest. The mandatory sequence is:
+`ingest → read-back → canonical search → neighborhood/Graph inspection →
+duplicate/reuse analysis → relation candidate discovery → evidence/provenance
+validation → apply every justified registered relation → final read-back`.
+“Maximize relations” means maximize **justified useful relations**, never the
+number of edges. Weak, speculative or merely convenient edges are not created.
+An MCP operation is not `COMPLETE` from ingest success alone; completion
+requires canonical read-back, duplicate check, semantic research, relation
+reconciliation, representative-media reconciliation where applicable and final
+verification. A transport-only attachment upload is an intermediate storage
+outcome and must hand off to the governed Media ingest/reconciliation boundary.
+
+Media ingest additionally performs semantic enrichment and may attach one
+Media to multiple directly related canonical nodes when each use is justified.
+After each Media ingest, directly related nodes missing an image are inspected;
+the best currently available suitable image may become a temporary
+representative. Representative status is a presentation choice, not an
+immutable relation. A better candidate is compared by exact subject
+specificity, visual coverage, technical relevance, image quality/resolution,
+provenance confidence and current representative quality, in that order. The
+new candidate may be promoted and the old one demoted to gallery,
+`technical_detail` or evidence when it remains suitable; Media and provenance
+are never deleted. A variant image must not represent a broader Brand/Model
+unless its representative relevance is actually supported.
+
+Knowledge and user input must run the same relation reconciliation against
+registered Brand/Model/Variant/Movement/Component/Classification, Media,
+Source, Evidence and related Knowledge targets when justified. Provenance
+must preserve one of the controlled source classes
+`OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
+`EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`. User statements and image
+observations remain scoped inputs and are never promoted to universal facts
+without supporting evidence.
+
+**AFFECTED SUBSYSTEMS:** MCP/Admin orchestration, Authority, Graph, Knowledge,
+Source/Evidence, Media/MediaAsset/MediaUsage, Video, Public Projection,
+Governance, duplicate/reuse resolution and completion diagnostics.
+
+**COMPATIBILITY AND PUBLIC PROJECTION:** The reconciliation layer is bounded by
+registered vocabularies, endpoint/predicate allow-lists, existing traversal
+limits, result budgets, dependency closure and Governance. It creates no new
+entity type, field, predicate, relation type or parallel store. Relation
+application remains Proposal → Human Approval → Eligibility → Controlled Apply
+→ repository → audit. Preview, pending review, unavailable and partial
+outcomes are not `COMPLETE`.
+
+**DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no backfill, repair,
+merge, deletion, publication or production/staging mutation. Existing records
+are read-only unless a separately governed operation applies a validated
+relation or representative choice.
+
+**GOVERNANCE, TEST AND DEPLOYMENT:** Every ingest adapter must expose the
+reconciliation stage statuses and preserve idempotency, revisions, provenance,
+diagnostics and read-back evidence. Tests must prove the ordered stages,
+duplicate/reuse behavior, weak-edge rejection, multi-node Media usage,
+representative promotion/demotion, provenance scope protection and the rule
+that ingest success alone cannot produce `COMPLETE`.
+
+**DECISION OWNER / DATE:** NHK V3 Owner decision, 2026-09-09.
+
 ## Amendment record — 2026-09-02 — Article Ingest Boundary
 
 **WHY:** A V3 knowledge Article request may cross the editorial and semantic

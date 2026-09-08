@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\PublicIdentity;
 
 use NHK\Core\Application\Graph\StructuralContextQuery;
-use NHK\Core\Application\Media\PublicMediaAssetUrlResolver;
+use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaAssetUrlResolver};
 use NHK\Core\Application\PublicIdentity\{PublicIdentityService, PublicUrlMaintenanceService};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
@@ -44,10 +44,17 @@ final class WordPressPublicUrlMaintenanceRuntime
 
     public function service(): PublicUrlMaintenanceService
     {
+        $delivery = PublicMediaAssetDelivery::fromEnvironment($this->assets, $this->media);
         return new PublicUrlMaintenanceService(
             fn (): array => $this->inventory(),
             fn (array $item, string $candidate): bool => $this->externallyOccupied($item, $candidate),
             function (array $item, string $idempotencyKey): void { $this->apply($item, $idempotencyKey); },
+            deliveryVerifier: $delivery === null ? null : static function (array $item) use ($delivery): array {
+                $resolved = $delivery->resolve((string) ($item['owner_id'] ?? ''), true);
+                return $resolved === null
+                    ? ['status' => 'BLOCKED', 'reason_code' => 'BINARY_DELIVERY_UNAVAILABLE']
+                    : ['status' => 'PASS', 'reason_code' => 'BINARY_DELIVERY_PASS', 'byte_size' => filesize($resolved['path']) ?: 0];
+            },
         );
     }
 

@@ -33,10 +33,15 @@ final class SearchSemanticQuery
             if ($url !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url];
         }
         }
-        if ($this->ready('knowledge')) foreach ($this->claims->list() as $item) if ($item->active && $item->isPublic() && $this->matches($term, $item->claimText, $item->stableKey)) {
-            $path = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
-            $path ??= PublicRouteResolver::existingSemanticPath('knowledge', $item->canonicalId);
-            if ($path !== null) $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'canonical_url' => $path, 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Claim'])['search']];
+        if ($this->ready('knowledge')) {
+            $owners = [];
+            foreach ($this->claims->list() as $item) {
+                if (!$item->active || !$item->isPublic() || !$this->matches($term, $item->claimText, $item->stableKey)) continue;
+                $path = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
+                if (!is_string($path) || trim($path) === '' || isset($owners[$path])) continue;
+                $owners[$path] = true;
+                $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'canonical_url' => $path, 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Entity'])['search']];
+            }
         }
         $offset = ($page - 1) * $perPage;
         $groups['_totals'] = [];

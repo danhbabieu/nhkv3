@@ -38,6 +38,14 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         self::assertStringContainsString("'ký hiệu'", $functions);
     }
 
+    public function test_claim_ledger_is_the_primary_detail_surface_when_available(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/entity.php');
+        self::assertStringContainsString("if ((\$claimProjection['status'] ?? '') === 'available') \$facets = [];", $template);
+        self::assertStringContainsString("\$knowledgeCount = is_numeric(\$claimProjection['claim_count'] ?? null)", $template);
+        self::assertStringContainsString('href="#tri-thuc-chung-cu"', $template);
+    }
+
     public function test_canonical_entity_detail_keeps_graph_related_projection(): void
     {
         $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);

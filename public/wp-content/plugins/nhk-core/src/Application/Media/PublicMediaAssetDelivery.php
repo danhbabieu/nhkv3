@@ -15,7 +15,12 @@ final class PublicMediaAssetDelivery
         'audio/mpeg', 'audio/ogg', 'audio/wav', 'video/mp4',
     ];
 
-    public function __construct(private MediaAssetRepository $assets, private MediaRepository $media, private string $storageRoot) {}
+    private ?\Closure $attachmentPathResolver;
+
+    public function __construct(private MediaAssetRepository $assets, private MediaRepository $media, private string $storageRoot, ?callable $attachmentPathResolver = null)
+    {
+        $this->attachmentPathResolver = $attachmentPathResolver === null ? null : \Closure::fromCallable($attachmentPathResolver);
+    }
 
     public static function fromEnvironment(MediaAssetRepository $assets, MediaRepository $media): ?self
     {
@@ -24,27 +29,36 @@ final class PublicMediaAssetDelivery
             $upload = wp_upload_dir();
             $root = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
         }
-        return $root !== '' || function_exists('wp_upload_dir') ? new self($assets, $media, $root) : null;
+        $attachmentPathResolver = static function (MediaAsset $asset): ?string {
+            $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
+            if ($attachmentId < 1 || !function_exists('get_attached_file')) return null;
+            $path = get_attached_file($attachmentId, true);
+            return is_string($path) && $path !== '' ? $path : null;
+        };
+        return $root !== '' || function_exists('wp_upload_dir') ? new self($assets, $media, $root, $attachmentPathResolver) : null;
     }
 
     /** @return array{asset:MediaAsset,path:string}|null */
-    public function resolve(string $assetId): ?array
+    public function resolve(string $assetId, bool $requireWebp = false): ?array
     {
         if (!UuidCodec::isValid($assetId)) return null;
         $asset = $this->assets->findByAssetId($assetId);
         if (!$asset || $asset->visibility !== 'PUBLIC' || !in_array(strtolower($asset->mimeType), self::SAFE_MIME_TYPES, true)) return null;
+        if ($requireWebp && strtolower($asset->mimeType) !== 'image/webp') return null;
         $media = $this->media->findByCanonicalId($asset->mediaId);
         if (!$media || !$media->active || $media->readiness !== 'ready') return null;
         $root = realpath($this->storageRoot);
         if ($root === false || !is_dir($root)) return null;
         $storageKey = trim($asset->storageKey);
         if ($storageKey === '' || str_contains($storageKey, "\0")) return null;
-        $candidate = $this->isAbsolute($storageKey) ? $storageKey : $root . DIRECTORY_SEPARATOR . ltrim($storageKey, '/\\');
+        $candidate = $this->physicalCandidate($asset, $root, $storageKey);
+        if ($candidate === null) return null;
         $path = realpath($candidate);
         if ($path === false || !is_file($path) || !$this->within($root, $path)) return null;
         $size = filesize($path);
         $checksum = hash_file('sha256', $path);
         if ($size === false || $size !== $asset->byteSize || !is_string($checksum) || !hash_equals(strtolower($asset->checksum), strtolower($checksum))) return null;
+        if ($requireWebp && !$this->isWebp($path, $asset)) return null;
         return ['asset' => $asset, 'path' => $path];
     }
 
@@ -60,7 +74,8 @@ final class PublicMediaAssetDelivery
             if (!$asset instanceof MediaAsset) continue;
             $candidate = is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename($asset->storageKey);
             if ($resolver->path($candidate) !== '/anh/' . rawurlencode($wanted)) continue;
-            $resolved = $this->resolve($asset->assetId);
+            if (strtolower($asset->mimeType) !== 'image/webp') continue;
+            $resolved = $this->resolve($asset->assetId, true);
             if ($resolved !== null) return $resolved;
         }
         return null;
@@ -81,5 +96,26 @@ final class PublicMediaAssetDelivery
     {
         $root = rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         return str_starts_with($path, $root);
+    }
+
+    private function physicalCandidate(MediaAsset $asset, string $root, string $storageKey): ?string
+    {
+        $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
+        if ($attachmentId > 0) {
+            if ($this->attachmentPathResolver === null) return null;
+            $path = ($this->attachmentPathResolver)($asset);
+            return is_string($path) && $path !== '' ? $path : null;
+        }
+        return $this->isAbsolute($storageKey) ? $storageKey : $root . DIRECTORY_SEPARATOR . ltrim($storageKey, '/\\');
+    }
+
+    private function isWebp(string $path, MediaAsset $asset): bool
+    {
+        $magic = @file_get_contents($path, false, null, 0, 12);
+        if (!is_string($magic) || strlen($magic) < 12 || substr($magic, 0, 4) !== 'RIFF' || substr($magic, 8, 4) !== 'WEBP') return false;
+        $info = @getimagesize($path);
+        if (!is_array($info) || strtolower((string) ($info['mime'] ?? '')) !== 'image/webp') return false;
+        return ($asset->width === null || (int) ($info[0] ?? 0) === $asset->width)
+            && ($asset->height === null || (int) ($info[1] ?? 0) === $asset->height);
     }
 }

@@ -38,6 +38,8 @@ get_header();
     $claimProjection = is_array($entity['claim_projection'] ?? null) ? $entity['claim_projection'] : [];
     $publishedClaimProjection = is_array($entity['published_claim_projection'] ?? null) ? $entity['published_claim_projection'] : [];
     $facets = is_array($knowledge['facets'] ?? null) ? $knowledge['facets'] : [];
+    if (($claimProjection['status'] ?? '') === 'available') $facets = [];
+    $knowledgeCount = is_numeric($claimProjection['claim_count'] ?? null) ? (int) $claimProjection['claim_count'] : (int) ($knowledge['claim_count'] ?? 0);
     $legacyMedia = is_array($entity['media'] ?? null) ? $entity['media'] : [];
     $legacyGallery = is_array($legacyMedia['gallery'] ?? null) ? $legacyMedia['gallery'] : [];
     $primary = is_array($profile['primary_media'] ?? null) ? $profile['primary_media'] : (is_array($dossier['primary_media'] ?? null) ? $dossier['primary_media'] : (is_array($legacyMedia['representative'] ?? null) ? $legacyMedia['representative'] : null));
@@ -62,7 +64,7 @@ get_header();
       <p class="eyebrow"><?php echo esc_html($label); ?></p>
       <h1><?php echo esc_html(nhk_v3_public_brand_text((string) ($identity['name'] ?? ''))); ?></h1>
       <?php $description = trim((string) (($payload['description'] ?? '') ?: ($payload['summary'] ?? ''))); if ($description !== ''): ?><p class="entity-lead"><?php echo esc_html(nhk_v3_public_copy($description)); ?></p><?php else: ?><p class="entity-lead">Hồ sơ tổng hợp từ định danh, tri thức, quan hệ, hình ảnh và video đang có trong kho.</p><?php endif; ?>
-      <div class="dossier-stats"><span><strong><?php echo esc_html((string) count($gallery)); ?></strong> hình ảnh</span><span><strong><?php echo esc_html((string) ($knowledge['claim_count'] ?? 0)); ?></strong> ghi nhận tri thức</span><span><strong><?php echo esc_html((string) ($coverage['video_count'] ?? count($relationSections['videos'] ?? []))); ?></strong> video</span></div>
+      <div class="dossier-stats"><span><strong><?php echo esc_html((string) count($gallery)); ?></strong> hình ảnh</span><span><strong><?php echo esc_html((string) $knowledgeCount); ?></strong> ghi nhận tri thức</span><span><strong><?php echo esc_html((string) ($coverage['video_count'] ?? count($relationSections['videos'] ?? []))); ?></strong> video</span></div>
     </div>
   </header>
 
@@ -137,7 +139,7 @@ get_header();
     </div>
 
     <aside class="context-rail" aria-label="Thông tin liên quan">
-      <div class="context-box"><p class="eyebrow">Trong hồ sơ này</p><nav><?php if ($visiblePayload !== []): ?><a href="#ho-so">Thông tin định danh</a><?php endif; ?><?php if ($facets !== []): ?><a href="#tri-thuc">Tri thức</a><?php endif; ?><?php if ($gallery !== []): ?><a href="#hinh-anh">Hình ảnh</a><?php endif; ?><?php if ($hasLegacyAggregation): ?><a href="#cau-truc">Cấu trúc liên quan</a><?php endif; ?></nav></div>
+      <div class="context-box"><p class="eyebrow">Trong hồ sơ này</p><nav><?php if ($visiblePayload !== []): ?><a href="#ho-so">Thông tin định danh</a><?php endif; ?><?php if ($facets !== []): ?><a href="#tri-thuc">Tri thức</a><?php endif; ?><?php if ($claimProjection !== []): ?><a href="#tri-thuc-chung-cu">Tri thức &amp; chứng cứ</a><?php endif; ?><?php if ($gallery !== []): ?><a href="#hinh-anh">Hình ảnh</a><?php endif; ?><?php if ($hasLegacyAggregation): ?><a href="#cau-truc">Cấu trúc liên quan</a><?php endif; ?></nav></div>
       <?php if ($dictionaryTerms !== []): ?><div class="context-box"><p class="eyebrow">Từ điển liên quan</p><ul class="context-list"><?php foreach ($dictionaryTerms as $term): $url = nhk_v3_public_url($term['url'] ?? null); if ($url === '') continue; ?><li><a href="<?php echo esc_url($url); ?>"><strong><?php echo esc_html((string) ($term['title'] ?? '')); ?></strong><?php if (($term['description'] ?? '') !== ''): ?><span><?php echo esc_html(wp_trim_words((string) $term['description'], 14)); ?></span><?php endif; ?></a></li><?php endforeach; ?></ul></div><?php endif; ?>
       <div class="context-box"><p class="eyebrow">Khám phá tiếp</p><nav><a href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Kho hình ảnh</a><a href="<?php echo esc_url(home_url('/video/')); ?>">Kho video</a><a href="<?php echo esc_url(home_url('/tu-dien/')); ?>">Từ điển</a><a href="<?php echo esc_url(home_url('/tri-thuc/')); ?>">Bài nghiên cứu</a></nav></div>
     </aside>

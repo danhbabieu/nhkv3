@@ -65,6 +65,72 @@ final class MediaAssetDeliveryTest extends TestCase
         }
     }
 
+    public function test_public_filename_delivery_resolves_the_bound_wordpress_attachment_not_the_canonical_filename(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-media-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $fixture = dirname(__DIR__, 4) . '/uploads/integration-source-original-5.webp';
+        $path = $root . '/physical-attachment-name.webp';
+        self::assertFileExists($fixture);
+        self::assertTrue(copy($fixture, $path));
+        $contents = file_get_contents($path);
+        self::assertIsString($contents);
+        self::assertSame(['width' => 16, 'height' => 304, 'mime' => 'image/webp'], ['width' => (int) getimagesize($path)[0], 'height' => (int) getimagesize($path)[1], 'mime' => (string) getimagesize($path)['mime']]);
+        $mediaId = UuidCodec::newV7();
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/2026/09/physical-attachment-name.webp', hash('sha256', $contents), 'image/webp', strlen($contents), 16, 304, 'PUBLIC', [
+            'canonical_filename' => 'canonical-public-name.webp',
+            'wordpress_attachment_id' => 86,
+        ]);
+        $media = new Media($mediaId, 'wp-attachment:1:86', 'Canonical public name', 'ready');
+        try {
+            $delivery = new PublicMediaAssetDelivery(
+                $this->repository($asset),
+                $this->mediaRepository($media),
+                $root,
+                static fn (MediaAsset $bound): ?string => (int) ($bound->metadata['wordpress_attachment_id'] ?? 0) === 86 ? $path : null,
+            );
+
+            self::assertIsArray($delivery->resolve($asset->assetId, true));
+            $resolved = $delivery->resolveByPublicFilename('canonical-public-name.webp');
+
+            self::assertIsArray($resolved);
+            self::assertSame(realpath($path), $resolved['path']);
+            self::assertStringStartsWith('RIFF', (string) file_get_contents($resolved['path'], false, null, 0, 4));
+            self::assertSame('WEBP', (string) file_get_contents($resolved['path'], false, null, 8, 4));
+        } finally {
+            unlink($path);
+            rmdir($root);
+        }
+    }
+
+    public function test_public_filename_delivery_rejects_html_or_non_webp_bytes_even_when_metadata_says_webp(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-media-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $path = $root . '/not-really.webp';
+        $contents = '<!DOCTYPE html><html>not an image</html>';
+        file_put_contents($path, $contents);
+        $mediaId = UuidCodec::newV7();
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'wrong-storage-key.webp', hash('sha256', $contents), 'image/webp', strlen($contents), 1, 1, 'PUBLIC', [
+            'canonical_filename' => 'html-disguised.webp',
+            'wordpress_attachment_id' => 86,
+        ]);
+        $media = new Media($mediaId, 'wp-attachment:1:86', 'HTML disguised', 'ready');
+        try {
+            $delivery = new PublicMediaAssetDelivery(
+                $this->repository($asset),
+                $this->mediaRepository($media),
+                $root,
+                static fn (): string => $path,
+            );
+
+            self::assertNull($delivery->resolveByPublicFilename('html-disguised.webp'));
+        } finally {
+            unlink($path);
+            rmdir($root);
+        }
+    }
+
     private function repository(MediaAsset $asset): MediaAssetRepository
     {
         return new class($asset) implements MediaAssetRepository {
@@ -72,7 +138,7 @@ final class MediaAssetDeliveryTest extends TestCase
             public function findByAssetId(string $id): ?MediaAsset { return $id === $this->asset->assetId ? $this->asset : null; }
             public function create(MediaAsset $asset): MediaAsset { return $asset; }
             public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
-            public function listByMediaId(string $mediaId): array { return []; }
+            public function listByMediaId(string $mediaId): array { return $mediaId === $this->asset->mediaId ? [$this->asset] : []; }
             public function findByChecksum(string $checksum): array { return []; }
         };
     }
