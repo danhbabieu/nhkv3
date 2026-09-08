@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+## Media V3 writer Ability exposure — 2026-09-08
+
+The existing governed `nhk.media.ingest` writer was present in the current
+catalog, transport and Media gateway but was omitted from the WordPress
+Ability map because its direct multipart branch cannot carry a file part. The
+Ability bridge now exposes the canonical name `nhk-v3/media-ingest` for the
+metadata/attachment-binding path, including `wordpress_attachment_id` in the
+asset schema. It delegates through the existing MCP transport and Governance
+→ MediaIngestGateway → MediaService chain; multipart uploads remain on the
+custom transport. Focused MCP contract verification passes 16 tests / 207
+assertions. Runtime discovery and the requested IMG_1739.jpeg acceptance are
+pending a safe target runtime and available image file; no semantic runtime
+data was mutated.
+
+## Governance idempotency stale-binding guard — 2026-09-08
+
+The remaining Governance idempotency blocker is bounded at the canonical
+proposal repository boundary. `findByIdempotencyKey()` distinguishes an absent
+key from an existing row that cannot hydrate/read back and raises
+`IDEMPOTENCY_STALE_BINDING` for the latter. Create therefore fails fast without
+a duplicate INSERT, retry loop, stale UUID reuse or false success. The current
+contract deliberately chooses fail-fast over repair because atomic repair would
+require a separately governed binding/repair primitive that does not exist in
+the current schema.
+
+Regression coverage includes normal replay, changed-binding conflict, the
+canonical read-back failure guard, and stale binding during
+`GovernanceService` create. The full NHK Unit suite passes (761 tests / 3,676
+assertions). PHP lint and `git diff --check` pass. Guarded Integration remains
+environment-blocked: the explicit local
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3` attempt stops at `Error
+establishing a database connection`. The specified runtime probe key
+`odo-dial-ellipse-logo-about-odo36-20260908` was not probed because no safe
+runtime connection was available; no Graph edge or semantic record was
+created/changed by this checkpoint.
+
 ## Proposal persistence runtime diagnosis — 2026-09-08
 
 Direct WordPress/DB inspection on `demo.1945.vn` confirmed `$wpdb->prefix=wp_`,

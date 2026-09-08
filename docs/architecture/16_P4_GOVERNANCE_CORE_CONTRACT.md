@@ -14,6 +14,13 @@ P4 giữ governance ở application/domain boundary, không public mutation endp
 
 Proposal phải bind `subject_id`, operation, canonical payload fingerprint, expected revision và dependency-closure fingerprint. Replay cùng binding là idempotent; cùng proposal id với binding khác bị từ chối.
 
+Idempotency lookup is fail-closed: if a key row exists but its canonical Proposal
+cannot be hydrated/read back, the repository must raise the deterministic
+`IDEMPOTENCY_STALE_BINDING` outcome. It must not treat the binding as absent,
+retry the insert, reuse the unreadable UUID, or report success. Repair of such a
+row is outside the current repository contract and requires a separately
+governed atomic repair operation.
+
 State machine tối thiểu: `draft → approved → applied` hoặc `draft → rejected`. Approval chỉ hợp lệ khi cả content và dependency closure khớp. Apply chỉ hợp lệ khi binding khớp và actual revision bằng expected revision; stale proposal phải fail closed.
 
 ## Governance Automation Policy — 2026-09-07

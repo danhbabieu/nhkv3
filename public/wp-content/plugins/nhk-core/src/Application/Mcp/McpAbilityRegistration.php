@@ -50,6 +50,7 @@ final class McpAbilityRegistration
         'nhk.article.trash' => 'nhk-v3/article-trash',
         'nhk.article.restore' => 'nhk-v3/article-restore',
         'nhk.video.ingest' => 'nhk-v3/video-ingest',
+        'nhk.media.ingest' => 'nhk-v3/media-ingest',
         'nhk.knowledge.ingest' => 'nhk-v3/knowledge-ingest',
         'nhk.source.ingest' => 'nhk-v3/source-ingest',
         'nhk.evidence.ingest' => 'nhk-v3/evidence-ingest',
@@ -62,9 +63,7 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [
-        'nhk.media.ingest' => 'multipart canonical transport; WordPress Ability input cannot carry the file part',
-    ];
+    private const EXPLICIT_EXCLUSION_REASONS = [];
 
     /** @return list<string> */
     public static function readAbilityNames(): array

@@ -32,9 +32,10 @@ The current implementation already has the important domain pieces:
 The blocking defects are transport and atomicity defects, not missing Media or
 Video domain models:
 
-1. `nhk.media.ingest` is intentionally excluded from
-   `McpAbilityRegistration`; a JSON-only connected app therefore cannot send an
-   attached file to the governed Media tool.
+1. The direct multipart branch of `nhk.media.ingest` remains transport-only,
+   but the governed attachment-metadata branch is exposed through
+   `nhk-v3/media-ingest`; JSON-only clients can bind a WordPress attachment
+   without inventing a second Media writer.
 2. The direct file adapter creates a WordPress attachment before canonical
    adoption completes. Its `finally` block removes only some pre-attachment
    files; an adoption, mapping, source persistence or final read-back failure

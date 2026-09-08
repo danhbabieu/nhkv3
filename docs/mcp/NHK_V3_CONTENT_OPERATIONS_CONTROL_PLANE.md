@@ -51,8 +51,10 @@ multipart `nhk.media.ingest` adapter. It validates, orients, resizes and names
 from supplied editorial context, then enters the governed Media V3 boundary.
 The source-original is retained as a MediaAsset; WebP/responsive outputs are
 derivatives under the same Media identity. It does not use base64/data URLs or
-infer semantic relations from image content. No `nhk-v3/media-ingest` Ability
-is authorized or required.
+infer semantic relations from image content. The same governed contract is
+also exposed as `nhk-v3/media-ingest` for binding an already-uploaded
+`wordpress_attachment_id`; direct multipart file input remains on the custom
+MCP transport.
 Actual image bytes must validate before persistence. Corrupt/fake/unreadable
 payloads fail closed and partial attachment, mapping or semantic artifacts must
 be cleaned up. WordPress attachment is never semantic authority. Entity

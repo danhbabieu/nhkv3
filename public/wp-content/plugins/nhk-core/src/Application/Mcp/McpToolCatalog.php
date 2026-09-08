@@ -33,7 +33,7 @@ final class McpToolCatalog
             self::tool('nhk.article.restore', 'Restore one trashed native WordPress Post to draft with state-token CAS.', ['post_id' => ['type' => 'integer', 'minimum' => 1], 'expected_state_token' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'], 'idempotency_key' => ['type' => 'string', 'minLength' => 1]], ['post_id', 'expected_state_token', 'idempotency_key'], true),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
-            self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or process one direct multipart image attachment into the WordPress Media Library without semantic inference.', [
+            self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or bind one already-uploaded WordPress image attachment into the canonical Media lifecycle without semantic inference.', [
                 'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'name' => ['type' => 'string', 'minLength' => 1],
                 'readiness' => ['type' => 'string', 'enum' => ['draft', 'ready', 'blocked']],
@@ -172,6 +172,7 @@ final class McpToolCatalog
                 'height' => ['type' => 'integer', 'minimum' => 1],
                 'visibility' => ['type' => 'string', 'enum' => ['PUBLIC', 'PRIVATE', 'HIDDEN']],
                 'metadata' => ['type' => 'object'],
+                'wordpress_attachment_id' => ['type' => 'integer', 'minimum' => 1],
             ],
             'required' => ['kind', 'storage_key', 'checksum', 'mime_type', 'byte_size'],
             'additionalProperties' => false,
