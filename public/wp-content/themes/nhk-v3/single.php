@@ -45,8 +45,40 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
 
       <div class="article-content"><?php the_content(); ?></div>
 
-      <?php $galleryImages = array_values(array_filter($gallery, static fn($item): bool => is_array($item) && trim((string) ($item['url'] ?? '')) !== '')); if ($galleryImages !== []): ?>
-      <section class="article-media-gallery"><div class="section-head"><div><p class="eyebrow">Hình ảnh liên quan trực tiếp</p><h2>Ảnh trong hồ sơ bài viết</h2></div></div><div class="media-mosaic"><?php foreach ($galleryImages as $item): ?><figure class="media-figure"><img src="<?php echo esc_url((string) $item['url']); ?>" alt="<?php echo esc_attr((string) ($item['alt'] ?? '')); ?>" loading="lazy"></figure><?php endforeach; ?></div></section>
+      <?php
+      $galleryImages = array_values(array_filter($gallery, static fn($item): bool => is_array($item) && trim((string) ($item['url'] ?? '')) !== ''));
+      if ($galleryImages !== []):
+      ?>
+      <section class="article-media-gallery" aria-labelledby="article-gallery-title">
+        <div class="section-head"><div><p class="eyebrow">Hình ảnh liên quan trực tiếp</p><h2 id="article-gallery-title">Ảnh trong hồ sơ bài viết</h2></div></div>
+        <p class="album-story">Bộ ảnh được sắp theo thứ tự tư liệu của bài viết. Mỗi khung hình đi kèm chú thích riêng để người đọc theo dõi mạch nội dung từ tổng thể đến từng chi tiết.</p>
+        <div class="nhk-album" data-nhk-album tabindex="0" aria-label="Album ảnh trong bài viết">
+          <div class="album-stage">
+            <?php foreach ($galleryImages as $index => $item):
+              $alt = trim((string) ($item['alt'] ?? '')) ?: get_the_title();
+              $caption = trim((string) ($item['caption'] ?? '')) ?: $alt;
+              if ($caption === '') $caption = 'Ảnh tư liệu trong bài viết.';
+            ?>
+              <figure class="album-slide<?php echo $index === 0 ? ' is-active' : ''; ?>" data-album-slide aria-hidden="<?php echo $index === 0 ? 'false' : 'true'; ?>">
+                <img src="<?php echo esc_url((string) $item['url']); ?>" alt="<?php echo esc_attr($alt); ?>" loading="<?php echo $index === 0 ? 'eager' : 'lazy'; ?>"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>>
+                <figcaption><strong>Ảnh <?php echo esc_html((string) ($index + 1)); ?> / <?php echo esc_html((string) count($galleryImages)); ?></strong><?php echo esc_html($caption); ?></figcaption>
+              </figure>
+            <?php endforeach; ?>
+          </div>
+          <div class="album-controls">
+            <button type="button" data-album-prev aria-label="Xem ảnh trước">← Ảnh trước</button>
+            <span class="album-status" data-album-status aria-live="polite">Ảnh 1 / <?php echo esc_html((string) count($galleryImages)); ?></span>
+            <button type="button" data-album-next aria-label="Xem ảnh tiếp theo">Ảnh tiếp →</button>
+          </div>
+        </div>
+      </section>
+      <?php endif; ?>
+
+      <?php $faq = nhk_v3_article_faq($postId); if ($faq !== []): ?>
+      <section class="article-faq" aria-labelledby="article-faq-title">
+        <p class="eyebrow">Giải đáp</p><h2 id="article-faq-title">Câu hỏi thường gặp</h2>
+        <?php foreach ($faq as $item): ?><details><summary><?php echo esc_html($item['question']); ?></summary><p><?php echo esc_html($item['answer']); ?></p></details><?php endforeach; ?>
+      </section>
       <?php endif; ?>
     </article>
 

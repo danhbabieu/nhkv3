@@ -34,7 +34,9 @@ Article media/SEO stage incomplete and is excluded from preferred structured
 data images and image sitemaps.
 The representative image is selected by the deterministic Media precedence
 contract. Evidence and `technical_detail` usages remain separate supporting
-projections and never replace a representative automatically. WordPress
+projections and do not replace a representative solely by role, recency or
+size; a fully compared more suitable candidate may be promoted and the old
+one demoted when still suitable. WordPress
 attachment identity is only storage/projection state; the canonical Media
 identity and its PUBLIC derivative eligibility control SEO output.
 

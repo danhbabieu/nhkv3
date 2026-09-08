@@ -7,7 +7,7 @@ use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityP
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
 use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
-use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaGalleryQuery};
+use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
 use NHK\Core\Infrastructure\Admin\SemanticDossierCoverageAdminPage;
@@ -70,7 +70,7 @@ final class FrontendSemanticBootstrap
         $projectionAdmin = new ProjectionAdminApi($claimProjection);
         add_action('rest_api_init', [$projectionAdmin, 'register']);
 
-        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages);
+        $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media), $usages, PublicMediaArticleLinkResolver::fromWordPress());
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
         $entityKnowledge = new EntityKnowledgeProjection($claims, $evidence, $sources, $status);
         $knowledgeArchive = new KnowledgePageQuery($claims, $evidence, $sources, $status);

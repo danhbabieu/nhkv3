@@ -28,7 +28,7 @@ function nhk_v3_allow_semantic_search_pages(mixed $handled, \WP_Query $query): m
 }
 add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2);
 
-function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.2.0'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.4'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); }
+function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.2.0'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.4'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); if (is_singular('post')) wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.0.0', true); }
 add_action('wp_enqueue_scripts', 'nhk_v3_assets');
 
 function nhk_v3_nav_fallback(): void
@@ -220,6 +220,23 @@ function nhk_v3_article_media_seo(int $postId): array
     return is_array($value) ? $value : [];
 }
 
+/** @return list<array{question:string,answer:string}> */
+function nhk_v3_article_faq(int $postId): array
+{
+    $value = apply_filters('nhk_v3_article_faq', [], $postId);
+    if (!is_array($value)) return [];
+    $items = [];
+    foreach ($value as $item) {
+        if (!is_array($item)) continue;
+        $question = trim(wp_strip_all_tags((string) ($item['question'] ?? $item['q'] ?? '')));
+        $answer = trim(wp_strip_all_tags((string) ($item['answer'] ?? $item['a'] ?? '')));
+        if ($question === '' || $answer === '') continue;
+        $items[] = ['question' => $question, 'answer' => $answer];
+        if (count($items) >= 12) break;
+    }
+    return $items;
+}
+
 function nhk_v3_context_seo_projection(): array
 {
     foreach (['nhk_core_entity_context', 'nhk_core_media_context', 'nhk_core_video_context', 'nhk_core_knowledge_context', 'nhk_core_comparison_context'] as $key) {
@@ -347,7 +364,11 @@ function nhk_v3_seo_head(): void
     if (is_array($comparison_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'So sánh hồ sơ', 'item' => home_url('/so-sanh/')];
     echo '<script type="application/ld+json">' . wp_json_encode($breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
     if (!is_singular('post') && !is_array($video_context) && is_array($sharedSeo['json_ld'] ?? null) && $sharedSeo['json_ld'] !== []) echo '<script type="application/ld+json">' . wp_json_encode($sharedSeo['json_ld'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
-    if (is_singular('post')) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'image' => $articleImage !== '' ? $articleImage : null, 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+    if (is_singular('post')) {
+        echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => get_the_title(), 'image' => $articleImage !== '' ? $articleImage : null, 'datePublished' => get_the_date('c'), 'dateModified' => get_the_modified_date('c'), 'author' => ['@type' => 'Person', 'name' => get_the_author()], 'mainEntityOfPage' => get_permalink()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+        $faq = nhk_v3_article_faq((int) get_queried_object_id());
+        if ($faq !== []) echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => array_map(static fn (array $item): array => ['@type' => 'Question', 'name' => $item['question'], 'acceptedAnswer' => ['@type' => 'Answer', 'text' => $item['answer']]], $faq)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+    }
     // VideoObject is emitted from the canonical Video SEO projection.
     if (is_array($video_context) && ($video_context['mode'] ?? '') === 'detail' && is_array($video_context['video'] ?? null)) { $video = $video_context['video']; $videoObject = is_array($video['seo_projection']['video_object'] ?? null) && $video['seo_projection']['video_object'] !== [] ? $video['seo_projection']['video_object'] : null; if ($videoObject !== null) { $videoObject['url'] = $canonical; echo '<script type="application/ld+json">' . wp_json_encode($videoObject, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n"; } }
 }

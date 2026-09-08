@@ -71,7 +71,8 @@ allow-lists, traversal/result budgets, dependency closure and Governance. It
 maximizes justified useful relations, not relation count; weak, speculative,
 duplicate or convenience-only candidates remain unapplied with diagnostics.
 Canonical search must happen before minting a new identity, claim, Source,
-Evidence, Video or Media. A transport-only attachment upload is an intermediate
+Evidence, Video or Media; it means owner-bound canonical search/reuse, not only
+the public discovery result from `nhk.search`. A transport-only attachment upload is an intermediate
 storage result; it must hand off to governed Media semantic ingest before the
 overall operation can be complete.
 

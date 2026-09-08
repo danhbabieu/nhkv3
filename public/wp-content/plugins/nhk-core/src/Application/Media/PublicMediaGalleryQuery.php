@@ -19,6 +19,7 @@ final class PublicMediaGalleryQuery
         private MediaAssetRepository $assets,
         private ?PublicMediaAssetDelivery $delivery = null,
         private ?MediaUsageRepository $usages = null,
+        private ?PublicMediaArticleLinkResolver $articleLinks = null,
     ) {}
 
     /** @return array{page:int,per_page:int,total:int,items:list<array<string,mixed>>} */
@@ -51,6 +52,8 @@ final class PublicMediaGalleryQuery
     {
         if (!$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         $image = $this->firstImage($media);
+        $usages = $this->usagesForMedia($media);
+        $articleUrl = $this->articleLinks?->firstPublished($usages);
         return [
             'title' => $media->canonicalName,
             'image_url' => $image['image_url'] ?? null,
@@ -59,6 +62,7 @@ final class PublicMediaGalleryQuery
             'width' => $image['width'] ?? null,
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
+            'article_url' => $articleUrl,
         ];
     }
 
@@ -84,13 +88,18 @@ final class PublicMediaGalleryQuery
 
     private function summary(Media $media): string
     {
-        if ($this->usages !== null) {
-            foreach ($this->usages->listByMediaId($media->canonicalId) as $usage) {
-                $caption = trim(preg_replace('/\s+/u', ' ', $usage->caption) ?? '');
-                if ($caption !== '') return $this->shorten($caption);
-            }
+        foreach ($this->usagesForMedia($media) as $usage) {
+            $caption = trim(preg_replace('/\s+/u', ' ', $usage->caption) ?? '');
+            if ($caption !== '') return $this->shorten($caption);
         }
         return 'Ảnh tư liệu trong kho hình ảnh NHK.';
+    }
+
+    /** @return list<\NHK\Core\Domain\Media\MediaUsage> */
+    private function usagesForMedia(Media $media): array
+    {
+        if ($this->usages === null) return [];
+        return array_values(array_filter($this->usages->listByMediaId($media->canonicalId), static fn (mixed $usage): bool => $usage instanceof \NHK\Core\Domain\Media\MediaUsage));
     }
 
     private function shorten(string $value): string

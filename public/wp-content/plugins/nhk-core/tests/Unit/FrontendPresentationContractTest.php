@@ -64,12 +64,17 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString("['origin']", $source);
         self::assertStringContainsString('default-archive.svg', $source);
         self::assertStringContainsString('nhk_v3_public_dictionary_terms_for_text', $source);
+        self::assertStringContainsString('data-nhk-album', $source);
+        self::assertStringContainsString('data-album-prev', $source);
+        self::assertStringContainsString("['caption']", $source);
+        self::assertStringContainsString('nhk_v3_article_faq', $source);
     }
 
     public function test_media_archive_renders_images_without_requiring_a_fake_detail_url(): void
     {
         $source = $this->read('media.php');
         self::assertStringContainsString("['image_url']", $source);
+        self::assertStringContainsString("['article_url']", $source);
         self::assertStringNotContainsString("if ($itemUrl === '') continue", $source);
     }
 

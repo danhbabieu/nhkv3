@@ -31,16 +31,17 @@ get_header();
         $title = nhk_v3_public_brand_text((string) ($item['title'] ?? 'Hình ảnh hiện vật'));
         $alt = (string) ($item['alt'] ?? $title);
         $summary = trim((string) ($item['summary'] ?? '')) ?: 'Ảnh tư liệu trong kho hình ảnh NHK.';
+        $articleUrl = trim((string) ($item['article_url'] ?? ''));
       ?>
         <article class="library-item">
           <div class="library-image">
-            <?php if ($hasRealImage): ?><a class="library-image-link" href="<?php echo esc_url($image); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></a><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
+            <?php if ($hasRealImage && $articleUrl !== ''): ?><a class="library-image-link" href="<?php echo esc_url($articleUrl); ?>"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>></a><?php elseif ($hasRealImage): ?><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr($alt); ?>" loading="lazy"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>><?php else: ?><img src="<?php echo esc_url($fallback); ?>" alt="" loading="lazy" width="1200" height="750"><?php endif; ?>
           </div>
           <div class="library-item-body">
             <span class="eyebrow">Hình ảnh</span>
-            <h2><?php if ($hasRealImage): ?><a class="library-title-link" href="<?php echo esc_url($image); ?>"><?php echo esc_html($title); ?></a><?php else: ?><?php echo esc_html($title); ?><?php endif; ?></h2>
+            <h2><?php if ($articleUrl !== ''): ?><a class="library-title-link" href="<?php echo esc_url($articleUrl); ?>"><?php echo esc_html($title); ?></a><?php else: ?><?php echo esc_html($title); ?><?php endif; ?></h2>
             <p class="library-summary"><?php echo esc_html($summary); ?></p>
-            <?php if ($hasRealImage): ?><a class="library-cta" href="<?php echo esc_url($image); ?>">Xem ảnh <span aria-hidden="true">→</span></a><?php endif; ?>
+            <?php if ($articleUrl !== ''): ?><a class="library-cta" href="<?php echo esc_url($articleUrl); ?>">Đọc bài viết <span aria-hidden="true">→</span></a><?php elseif ($hasRealImage): ?><span class="library-note">Ảnh chưa gắn bài viết</span><?php endif; ?>
           </div>
         </article>
       <?php endforeach; ?>

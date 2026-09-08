@@ -315,8 +315,10 @@ At minimum, SEO respects existing roles:
 - technical_detail;
 - Article featured/inline contextual roles where defined.
 
-Evidence or technical-detail imagery never automatically replaces the
-representative image because it is newer or higher resolution.
+Evidence or technical-detail imagery does not replace the representative image
+solely because it is newer or higher resolution; after the post-ingest
+suitability comparison, a more suitable candidate may be promoted and the old
+one demoted when still suitable.
 
 ### 7.3 Preferred image eligibility
 
@@ -862,7 +864,8 @@ Minimum cross-domain regression set:
 ### Media/Image
 
 - representative selection is deterministic;
-- evidence/technical image does not replace representative by recency;
+- evidence/technical image does not replace representative by recency alone;
+  post-ingest suitability comparison may promote a better candidate;
 - private/placeholder asset excluded from preferred image/sitemap;
 - alt/caption changes create no Knowledge/Evidence/Graph mutation.
 

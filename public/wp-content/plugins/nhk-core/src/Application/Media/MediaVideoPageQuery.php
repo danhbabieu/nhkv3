@@ -31,7 +31,7 @@ final class MediaVideoPageQuery
         private ?SourceRepository $sources = null,
     ) {
         $this->delivery ??= PublicMediaAssetDelivery::fromEnvironment($assets, $media);
-        $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages);
+        $this->gallery = $gallery ?? new PublicMediaGalleryQuery($media, $assets, $this->delivery, $usages, PublicMediaArticleLinkResolver::fromWordPress());
     }
 
     public function mediaDetail(string $id): ?array

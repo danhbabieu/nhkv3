@@ -314,6 +314,9 @@ final class SemanticDossierQuery
         return [
             'url' => (string) $item['url'],
             'alt' => (string) ($item['alt'] ?? ''),
+            'caption' => (string) ($item['caption'] ?? ''),
+            'width' => isset($item['width']) ? (int) $item['width'] : null,
+            'height' => isset($item['height']) ? (int) $item['height'] : null,
             'role' => (string) ($item['role'] ?? ''),
         ];
     }

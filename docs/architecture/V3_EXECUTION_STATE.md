@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Universal MCP post-ingest reconciliation documentation
+
+Canonical documentation was reconciled under the Constitution's new universal
+MCP ingest law. Constitution §20.1 now requires every MCP ingest of Media,
+Video, Knowledge, Source, Evidence or Authority entity data to run the ordered
+bounded sequence `ingest → read-back → canonical search → neighborhood/Graph
+inspection → duplicate/reuse analysis → relation candidate discovery →
+evidence/provenance validation → apply every justified useful registered
+relation → final read-back`.
+
+The same completion gate now appears in the current MCP/Control Plane,
+Media/P6/Admin, Knowledge/Source/Evidence, Living Knowledge, Video, Article,
+SEO and Authority contracts. Media representative reconciliation is explicitly
+`BEST CURRENTLY AVAILABLE` with suitability ordering, temporary promotion and
+safe demotion; provenance classes and scope protection are explicit. Historical
+plan/spec/audit statements that described transport-only non-inference were
+qualified as transport-phase boundaries and now route to the post-ingest law.
+
+This was a documentation-only checkpoint. No semantic record, Graph edge,
+Media, attachment, migration, V2/staging/production data or public route was
+mutated. `composer validate`, full PHP `composer lint` and `git diff --check`
+pass. No repository markdown-link or Markdown-lint executable is configured;
+referenced canonical paths were checked against the workspace. Runtime
+orchestration and target-runtime completion evidence remain `CODE_GAP /
+RUNTIME-GATED` until separately verified.
+
 ## Checkpoint — 2026-09-09 — Persisted Odo36 Claim Projection acceptance
 
 The local integration root cause was isolated. `public/wp-config.php` already
@@ -43,6 +69,30 @@ performed.
 `ODO36_PERSISTED_ACCEPTANCE=PASS`
 `ODO36_HTTP_RUNTIME_VERIFY=BLOCKED_NO_PUBLIC_IDENTITY`
 `BACKFILL_OPERATOR_PATH=NOT_EXPOSED`
+`READY_FOR_DEPLOY=NO`
+
+# Checkpoint — 2026-09-09 — Native article presentation from media archive
+
+The public `/thu-vien/` projection now resolves each image card to the
+existing published native WordPress post referenced by its `MediaUsage`
+endpoint. It does not invent a Media detail route or change `/anh/` binary
+delivery; cards without a published article remain visibly unlinked rather
+than receiving a fake destination. Native post presentation now includes an
+accessible, keyboard-operable album with per-image curated captions and
+dimensions, while existing article content, metadata, canonical URL, Article
+JSON-LD and related projections remain in place. Optional FAQ data is rendered
+only when supplied through the article FAQ projection and then emits matching
+FAQPage JSON-LD.
+
+Focused frontend tests pass: 16 tests / 76 assertions with one existing
+warning. Changed PHP files lint clean, JavaScript syntax check passes and
+`git diff --check` passes. The complete PHPUnit invocation remains affected by
+the pre-existing unbootstrapped WordPress integration errors and required
+`NHK_WP_TEST_PATH=public` acceptance failures; no production/V2/staging data,
+deployment, push or semantic mutation was performed.
+
+`MEDIA_ARTICLE_PRESENTATION_CODE_STATUS=GREEN`
+`MEDIA_ARTICLE_RUNTIME_VERIFY=NOT_DEPLOYED`
 `READY_FOR_DEPLOY=NO`
 
 ## Checkpoint — 2026-09-09 — Semantic Claim Display acceptance continuation

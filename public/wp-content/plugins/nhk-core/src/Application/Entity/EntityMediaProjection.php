@@ -41,6 +41,6 @@ final class EntityMediaProjection
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== '' ? (string) $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));
         if ($filename === '') return null;
         $path = (new PublicMediaAssetUrlResolver())->path($filename);
-        return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'alt' => $usage->altText, 'role' => $usage->role, 'sort_order' => $usage->sortOrder];
+        return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'alt' => $usage->altText, 'caption' => $usage->caption, 'width' => $asset->width, 'height' => $asset->height, 'role' => $usage->role, 'sort_order' => $usage->sortOrder];
     }
 }

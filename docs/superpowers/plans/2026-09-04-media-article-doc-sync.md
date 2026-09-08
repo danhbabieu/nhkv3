@@ -15,7 +15,7 @@
 - Every Media file ingest/adoption uses the governed Media V3 flow.
 - WordPress attachments are storage/projection records, never semantic authority.
 - One canonical Media identity owns retained private source-original and public optimized derivatives.
-- `representative`, `evidence`, and `technical_detail` roles remain distinct; evidence/detail never auto-replaces representative.
+- `representative`, `evidence`, and `technical_detail` roles remain distinct; evidence/detail never replaces representative by role or recency alone, while the post-ingest suitability comparison may promote a better candidate.
 - Corrupt/fake image payloads fail closed before durable persistence and must not leave orphan records.
 - Article subject resolution is UUID, stable key, exact canonical name/alias; ambiguity fails closed and generic preflight never hard-codes a Post ID.
 - Runtime acceptance must cover real-file ingest through attachment, Media identity, assets/usages, projection, and Article preflight.

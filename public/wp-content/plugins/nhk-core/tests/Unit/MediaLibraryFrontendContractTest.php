@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Media\PublicMediaGalleryQuery;
+use NHK\Core\Application\Media\{PublicMediaArticleLinkResolver, PublicMediaGalleryQuery};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -18,13 +18,34 @@ final class MediaLibraryFrontendContractTest extends TestCase
         $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp']);
         $usage = new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured', 0, 'Ảnh mặt trước', 'Tư liệu ảnh mặt trước của hiện vật.');
 
-        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), null, $this->usageRepository([$usage])))->archive()['items'][0];
+        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), null, $this->usageRepository([$usage]), new PublicMediaArticleLinkResolver(
+            static fn (int $postId): object => (object) ['ID' => $postId, 'post_status' => 'publish'],
+            static fn (object $post): string => '/bai-viet/anh-mat-truoc/',
+        )))->archive()['items'][0];
 
         self::assertSame('/anh/example.webp', $item['image_url']);
         self::assertTrue($item['has_real_image']);
         self::assertSame('Tư liệu ảnh mặt trước của hiện vật.', $item['summary']);
+        self::assertSame('/bai-viet/anh-mat-truoc/', $item['article_url']);
         self::assertStringStartsWith('/anh/', parse_url((string) $item['image_url'], PHP_URL_PATH) ?: '');
         self::assertStringNotContainsString('/wp-content/uploads/', (string) $item['image_url']);
+    }
+
+    public function test_gallery_does_not_link_to_an_unpublished_or_non_article_endpoint(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'example', 'Ảnh tư liệu', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'example.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'example.webp']);
+        $usages = [
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured'),
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'brand', 'brand-1', 'gallery'),
+        ];
+        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), null, $this->usageRepository($usages), new PublicMediaArticleLinkResolver(
+            static fn (int $postId): object => (object) ['ID' => $postId, 'post_status' => 'draft'],
+            static fn (object $post): string => '/bai-viet/khong-duoc-mo/',
+        )))->archive()['items'][0];
+
+        self::assertNull($item['article_url']);
     }
 
     public function test_gallery_uses_short_fallback_summary_without_inventing_semantics(): void
@@ -57,7 +78,9 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertStringContainsString('class="library-image-link"', $template);
         self::assertStringContainsString('class="library-title-link"', $template);
         self::assertStringContainsString("['summary']", $template);
-        self::assertStringContainsString('Xem ảnh', $template);
+        self::assertStringContainsString('Đọc bài viết', $template);
+        self::assertStringContainsString("['article_url']", $template);
+        self::assertStringContainsString('library-note', $template);
         self::assertStringContainsString("['has_real_image']", $template);
     }
 
