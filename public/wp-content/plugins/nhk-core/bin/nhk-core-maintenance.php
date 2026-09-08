@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 use NHK\Core\Shared\Health\HealthCheck;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Plugin;
 use NHK\Core\Infrastructure\Maintenance\MaintenanceCapabilityBridge;
-use NHK\Core\Infrastructure\Migration\{DictionaryMigration015, PublicIdentityMigration014};
 
 $operation = null;
 $json = false;
@@ -40,9 +40,7 @@ if (!is_readable($wpLoad)) {
 try {
     require_once $wpLoad;
     if ($operation === 'migration-up') {
-        global $wpdb;
-        if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
-        if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
+        Plugin::runPendingMigrations();
         $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
     } elseif (in_array($operation, ['canonical-inventory', 'graph-inventory', 'relation-dry-run'], true)) {
         do_action('rest_api_init');

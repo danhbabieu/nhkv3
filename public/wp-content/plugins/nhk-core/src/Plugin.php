@@ -19,6 +19,7 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
+use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
@@ -464,18 +465,21 @@ final class Plugin {
     {
         return defined('NHK_RUN_MIGRATIONS') && NHK_RUN_MIGRATIONS === true;
     }
-    private static function runPendingMigrations(): void
+    public static function runPendingMigrations(): void
     {
+        global $wpdb;
+        MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PENDING_MIGRATIONS');
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleIngestMigration010::VERSION) (new ArticleIngestMigration010())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ArticleMediaMigration011::VERSION) (new ArticleMediaMigration011())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaWordPressBridgeMigration012::VERSION) (new MediaWordPressBridgeMigration012())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < OwnerPublicationDecisionMigration013::VERSION) (new OwnerPublicationDecisionMigration013())->up();
-        global $wpdb;
         if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ClaimProjectionMigration016::VERSION || !ClaimProjectionMigration016::schemaReady($wpdb)) (new ClaimProjectionMigration016())->up();
     }
     public static function activate(): void {
+        global $wpdb;
+        MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
         add_option('nhk_core_migration_target', ClaimProjectionMigration016::VERSION, '', false);
         (new GraphMigration001())->up();
