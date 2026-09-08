@@ -62,6 +62,9 @@ SEO candidate. Candidate publication is explicit and atomic; a claim update
 does not change URL, H1, canonical identity or published prose. Projection
 revisions/dependencies use additive migration 016 and separate tables; the
 legacy migration-009 projection context remains unrelated and body-free.
+The canonical operator migration-up entrypoint delegates to the shared
+`Plugin::runPendingMigrations()` sequence and now includes migration 016;
+ordinary frontend requests remain migration-free.
 Entity frontend detail consumes the shared service and renders a bounded
 Vietnamese Ledger with honest unavailable state. Event subscribers listen only
 to canonical application events, and the projection admin REST surface is

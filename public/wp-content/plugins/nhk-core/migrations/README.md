@@ -10,3 +10,27 @@ có body bằng `PROJECTION_BODY_FORBIDDEN`.
 
 Mọi migration tương lai phải có version riêng, idempotent, có status current/target,
 transaction khi phù hợp và không thực hiện thao tác phá huỷ ngầm.
+
+## Operator migration-up
+
+The canonical operator entrypoint is the versioned maintenance script:
+
+```sh
+cd /home/erourxcg/apps/nhkv3/public
+php wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php \
+  --operation=migration-up \
+  --pack=claim-projection-016 \
+  --run-id="$(date -u +%Y%m%dT%H%M%SZ)-claim-projection-016" \
+  --source-revision="$(git -C /home/erourxcg/apps/nhkv3 rev-parse HEAD)" \
+  --json
+```
+
+`migration-up` delegates to `Plugin::runPendingMigrations()`, which executes
+the pending sequence in order through Migration 016. It is an explicit
+maintenance operation; ordinary frontend requests do not run migrations.
+
+Every UP run first passes `MigrationDatabaseGuard`. Canonical development and
+integration databases are `nhk_v3` and `nhk_v3_test`. A demo staging run also
+requires `WP_ENVIRONMENT_TYPE=staging`, `NHK_MIGRATION_RUNTIME=demo` and an
+exact `NHK_AUTHORIZED_MIGRATION_DATABASE` match. The command must report
+`current=16` and `target=16`; a second invocation is an idempotent no-op.

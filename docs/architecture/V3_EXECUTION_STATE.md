@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Canonical operator migration-up includes 016
+
+The versioned `nhk-core/bin/nhk-core-maintenance.php --operation=migration-up`
+entrypoint now delegates to the existing `Plugin::runPendingMigrations()`
+sequence instead of duplicating 014/015 checks. The shared runner is callable
+from the maintenance boundary, retains the canonical 010→016 order, and
+checks `MigrationDatabaseGuard` before any pending step. Plugin activation and
+the explicit `NHK_RUN_MIGRATIONS=true` boot gate continue to use the same
+sequence; frontend requests remain migration-free when the gate is absent.
+
+The documented operator command is recorded in
+`public/wp-content/plugins/nhk-core/migrations/README.md`. It requires the
+existing maintenance context fields and reports `current=16` and `target=16`
+after a successful run. The projection migration remains additive and uses
+only `ClaimProjectionMigration016`/`dbDelta`; no Knowledge, Graph, Source or
+Evidence rows are written.
+
 ## Checkpoint — 2026-09-08 — Semantic Claim Projection missing-schema fail-soft
 
 The pre-migration failure was reproduced with a WPDB test double representing
