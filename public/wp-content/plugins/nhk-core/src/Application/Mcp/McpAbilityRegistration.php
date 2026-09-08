@@ -168,7 +168,9 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [];
+    private const EXPLICIT_EXCLUSION_REASONS = [
+        'nhk.media.upload-batch' => 'Requires multipart file parts on the custom /nhk/v1/mcp transport; WordPress Ability JSON calls cannot carry the binary payload.',
+    ];
 
     /** @return list<string> */
     public static function readAbilityNames(): array

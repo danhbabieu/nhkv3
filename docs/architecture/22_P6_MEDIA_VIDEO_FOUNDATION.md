@@ -48,6 +48,16 @@ foundation.
 
 ## Media contract
 
+Multipart batch upload is the primary file transport. URL import remains a
+secondary/import path and base64 remains a small-file compatibility fallback.
+`nhk.media.upload-batch` accepts one or more native multipart file parts and
+returns a reader-safe ordered manifest. It uses the same governed Media
+boundary and attachment read-back as the existing single-file path; it does
+not create semantic roles, Knowledge, Source, Evidence or Graph relations.
+The `nhk-v3/media-ingest` Ability remains metadata/attachment-binding
+semantics, while binary batch transport is exposed through custom MCP because
+the JSON-only Ability layer cannot carry multipart bytes.
+
 `Media` is semantic identity. `MediaAsset` owns a binary storage key, checksum,
 MIME and technical dimensions. `MediaUsage` owns placement and role. A checksum
 is indexed as a duplicate candidate only; it never merges semantic Media

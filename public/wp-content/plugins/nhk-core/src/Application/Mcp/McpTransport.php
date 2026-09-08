@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
+use NHK\Core\Application\Media\MediaBatchUploadService;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
@@ -30,6 +31,7 @@ final class McpTransport
         private ?EditorialDraftGateway $drafts = null,
         private ?CanonicalDependencyValidator $dependencies = null,
         private ?PublicUrlMaintenanceService $publicUrls = null,
+        private ?MediaBatchUploadService $mediaBatchUpload = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -89,7 +91,7 @@ final class McpTransport
     {
         $name = (string) ($params['name'] ?? '');
         $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
-        if ($name === 'nhk.media.ingest') $arguments = $this->fileArgumentMetadata($arguments, $files);
+        if (in_array($name, ['nhk.media.ingest', 'nhk.media.upload-batch'], true)) $arguments = $this->fileArgumentMetadata($arguments, $files);
         $definition = null;
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
@@ -99,6 +101,7 @@ final class McpTransport
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
+            'nhk.media.upload-batch' => 'upload_files',
             'nhk.video.ingest' => 'nhk_create_proposals',
             'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
@@ -140,6 +143,7 @@ final class McpTransport
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),
+            'nhk.media.upload-batch' => $this->batchUpload($arguments, $files),
             'nhk.media.attachment.get' => $this->read->mediaAttachmentGet((int) ($arguments['attachment_id'] ?? 0)),
             'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
@@ -159,6 +163,17 @@ final class McpTransport
         };
         $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
+    }
+
+    private function batchUpload(array $arguments, array $files): array
+    {
+        if ($this->mediaBatchUpload === null) throw new \RuntimeException('MEDIA_BATCH_UPLOAD_UNAVAILABLE');
+        return $this->mediaBatchUpload->upload(
+            (string) ($arguments['idempotency_key'] ?? ''),
+            is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+            $files,
+            is_array($arguments['items'] ?? null) ? $arguments['items'] : [],
+        );
     }
 
     private function validateArguments(array $schema, array $arguments): void
@@ -270,6 +285,21 @@ final class McpTransport
     /** @return array<string,mixed> */
     private function fileArgumentMetadata(array $arguments, array $files): array
     {
+        $batch = $files['files'] ?? null;
+        if (is_array($batch)) {
+                $metadata = [];
+                if (is_array($batch['tmp_name'] ?? null)) {
+                    foreach ($batch['tmp_name'] as $index => $tmpName) $metadata[] = ['name' => is_array($batch['name'] ?? null) ? (string) ($batch['name'][$index] ?? '') : '', 'type' => is_array($batch['type'] ?? null) ? (string) ($batch['type'][$index] ?? '') : '', 'size' => is_array($batch['size'] ?? null) ? (int) ($batch['size'][$index] ?? 0) : 0];
+                }
+                $walk = function (mixed $value) use (&$walk, &$metadata): void {
+                    if (!is_array($value)) return;
+                    if (array_key_exists('tmp_name', $value) && is_array($value['tmp_name'])) return;
+                    if (array_key_exists('tmp_name', $value)) { $metadata[] = ['name' => (string) ($value['name'] ?? ''), 'type' => (string) ($value['type'] ?? ''), 'size' => (int) ($value['size'] ?? 0)]; return; }
+                    foreach ($value as $nested) $walk($nested);
+                };
+                $walk($batch);
+                if ($metadata !== []) $arguments['files'] = $metadata;
+        }
         if (array_key_exists('file', $arguments)) {
             if (is_string($arguments['file']) && isset($files[$arguments['file']]) && is_array($files[$arguments['file']])) {
                 $file = $files[$arguments['file']];

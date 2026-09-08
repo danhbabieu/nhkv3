@@ -64,6 +64,7 @@ final class McpContractTest extends TestCase
             'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore',
             'nhk.entity.get',
             'nhk.media.get',
+            'nhk.media.upload-batch',
             'nhk.media.ingest',
             'nhk.media.attachment.get',
             'nhk.video.ingest',
@@ -304,7 +305,7 @@ final class McpContractTest extends TestCase
         ], McpAbilityRegistration::governedAbilityNames());
         self::assertSame('nhk-v3/article-preflight', McpAbilityRegistration::abilityNameForTool('nhk.article.preflight'));
         self::assertSame('nhk-v3/article-ingest', McpAbilityRegistration::abilityNameForTool('nhk.article.ingest'));
-        self::assertCount(count(McpToolCatalog::tools()), McpAbilityRegistration::abilityNames());
+        self::assertCount(count(McpToolCatalog::tools()) - count(McpAbilityRegistration::explicitExclusionReasons()), McpAbilityRegistration::abilityNames());
     }
 
     public function test_every_catalog_tool_is_registered_or_has_an_explicit_exclusion_reason(): void

@@ -302,6 +302,17 @@ source-original remains a private/protected MediaAsset and eligible optimized
 outputs remain derivatives under that same Media. It does not create Knowledge,
 Source, Evidence or Graph edges from image content.
 
+`nhk.media.upload-batch` is the primary multipart transport for one or more
+images. It accepts `files[]`, an idempotency key, optional batch metadata and
+per-file hints, then returns an ordered manifest with attachment/Media IDs,
+checksum, dimensions, MIME, byte size, read-back status and typed per-item
+errors. One file uses the same implementation with batch size one. Partial
+failure is retained per item and replay uses the same idempotency binding;
+different payload under the same key is a deterministic conflict. The custom
+`/nhk/v1/mcp` endpoint carries the binary parts. The tool is explicitly not
+exported as a JSON-only WordPress Ability because that transport cannot carry
+the required file parts; its custom MCP discovery entry is canonical.
+
 `nhk.media.attachment.get` reads back attachment projection state including the
 attachment ID, canonical URL, sanitized filename, MIME, dimensions, filesize and
 derivatives. Checksum is a duplicate candidate only; it never merges canonical

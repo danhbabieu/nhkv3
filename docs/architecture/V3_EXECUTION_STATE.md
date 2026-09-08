@@ -1,5 +1,18 @@
 # NHK V3 Execution State
 
+## Multipart batch media transport — 2026-09-08
+
+The primary multipart transport `nhk.media.upload-batch` is now registered in
+the executable MCP catalog and dispatches `files[]` through a shared batch
+service. It returns ordered per-item attachment/Media manifests with SHA-256,
+read-back status, partial-failure results and WordPress-Option idempotency
+bindings. JSON-only WordPress Ability export is explicitly excluded because it
+cannot carry multipart bytes; the custom `/nhk/v1/mcp` discovery path is the
+callable transport boundary. Focused service/MCP verification currently passes
+18 tests / 206 assertions. Native WordPress integration, full cleanup journal,
+and target-runtime discovery/read-back remain pending; no live semantic data
+was mutated and no deployment occurred.
+
 ## Media V3 writer Ability exposure — 2026-09-08
 
 The existing governed `nhk.media.ingest` writer was present in the current
