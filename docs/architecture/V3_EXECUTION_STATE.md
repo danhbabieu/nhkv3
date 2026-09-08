@@ -5615,3 +5615,18 @@ Ability mapping, enabled-list transformation and binary schema. PHP lint and
 multipart call remain runtime acceptance work because the local integration
 environment does not have the connector plugin/authenticated caller; no
 production/V2/staging data, deployment or push was performed.
+# Checkpoint — 2026-09-08 — Semantic Claim Projection Layer foundation
+
+Added the canonical design and implementation plan at
+`docs/superpowers/specs/2026-09-08-semantic-claim-projection-layer-design.md`
+and `docs/superpowers/plans/2026-09-08-semantic-claim-projection-layer.md`.
+The first implementation slice adds immutable projection contracts, the
+controlled claim taxonomy, node profiles, deterministic classification,
+central Graph projection policy, bounded subject-preserving scope resolution,
+ranking, projection-only clustering, public-safe Ledger/SEO builders,
+revisioned derived storage contracts, dependency invalidation, event/admin
+boundaries and shared entity frontend rendering. Additive migration 016 is
+code-side only in this checkpoint; no migration, semantic data mutation,
+backfill, publication, V2/staging/production action or external deployment was
+run. Focused projection tests pass. Full suite remains affected by the
+pre-existing WordPress integration/runtime blockers recorded by the baseline.

@@ -75,3 +75,12 @@ never Evidence merely because they are public.
 FAQ is an optional editorial/knowledge projection for reader usefulness. It is
 not a semantic store and absence of FAQ is not a rich-result or publication
 requirement.
+# Claim projection revision boundary — 2026-09-08
+
+Entity SEO may consume the published Claim Projection revision, never a dirty
+or candidate revision. Candidate prose is deterministic/template-first and is
+validated for subject preservation, contextual path, private-claim exclusion,
+HTML safety, stable H1 and stable canonical URL before publication. A claim
+mutation creates or dirties only its dependent section; it does not rewrite
+published prose, slug, URL, canonical identity or SEO title unless an
+existing explicit policy permits that independent change.

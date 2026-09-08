@@ -46,6 +46,29 @@ registry/catalog merely because its wording is present tense.
 
 ## 2. Current boundary snapshot
 
+### Semantic Claim Projection — 2026-09-08
+
+The Claim Projection Layer is a derived read model implemented under
+`Application/Projection`. `ClaimScopeResolver`, `GraphProjectionPolicy`,
+`ClaimClassifier`, `ClaimRanker`, `ClaimClusterer` and
+`LiveLedgerProjectionBuilder` expose public-safe direct/related claims without
+becoming semantic owners. The default graph bound is two governed incoming
+hops; `about`, `depicts` and unregistered inverses do not authorize
+propagation. `canonical_subject_uuid` and explainable source context are
+retained, while private Source/Evidence details are excluded.
+
+`ClaimProjectionService` separates a near-real-time Ledger from a revisioned
+SEO candidate. Candidate publication is explicit and atomic; a claim update
+does not change URL, H1, canonical identity or published prose. Projection
+revisions/dependencies use additive migration 016 and separate tables; the
+legacy migration-009 projection context remains unrelated and body-free.
+Entity frontend detail consumes the shared service and renders a bounded
+Vietnamese Ledger with honest unavailable state. Event subscribers listen only
+to canonical application events, and the projection admin REST surface is
+capability/nonce protected. Initial backfill is dry-run/resumable and never
+publishes candidates automatically. Target-runtime migration/read-back and
+full public acceptance remain environment gates until freshly verified.
+
 ### Current cross-surface law — 2026-09-07
 
 The current canonical read path is `Authority → Graph → canonical

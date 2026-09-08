@@ -35,6 +35,8 @@ get_header();
         $visiblePayload[$key] = $value;
     }
     $knowledge = is_array($profile['knowledge'] ?? null) ? $profile['knowledge'] : (is_array($dossier['knowledge'] ?? null) ? $dossier['knowledge'] : (is_array($entity['knowledge'] ?? null) ? $entity['knowledge'] : []));
+    $claimProjection = is_array($entity['claim_projection'] ?? null) ? $entity['claim_projection'] : [];
+    $publishedClaimProjection = is_array($entity['published_claim_projection'] ?? null) ? $entity['published_claim_projection'] : [];
     $facets = is_array($knowledge['facets'] ?? null) ? $knowledge['facets'] : [];
     $legacyMedia = is_array($entity['media'] ?? null) ? $entity['media'] : [];
     $legacyGallery = is_array($legacyMedia['gallery'] ?? null) ? $legacyMedia['gallery'] : [];
@@ -92,6 +94,22 @@ get_header();
           </article><?php endforeach; ?>
         </div></div>
         <?php endforeach; ?>
+      </section>
+      <?php endif; ?>
+
+      <?php if ($claimProjection !== []): ?>
+      <section id="tri-thuc-chung-cu" class="dossier-section claim-ledger" aria-labelledby="claim-ledger-title">
+        <div class="section-head"><div><p class="eyebrow">Tri thức &amp; chứng cứ</p><h2 id="claim-ledger-title">Tri thức về <?php echo esc_html(nhk_v3_public_brand_text((string) ($identity['name'] ?? 'hồ sơ này'))); ?></h2></div><span class="claim-ledger-count"><?php echo esc_html((string) ($claimProjection['claim_count'] ?? 0)); ?> ghi nhận</span></div>
+        <?php if (($claimProjection['status'] ?? '') !== 'available'): ?><p class="projection-note">Tri thức chi tiết đang được cập nhật.</p>
+        <?php elseif (!empty($claimProjection['sections'])): foreach ($claimProjection['sections'] as $section): if (!is_array($section) || empty($section['claims'])) continue; ?><details class="claim-ledger-section" <?php echo ((int) ($section['total_count'] ?? 0) <= 12) ? 'open' : ''; ?>><summary><span><?php echo esc_html((string) ($section['label'] ?? 'Tri thức')); ?></span><strong><?php echo esc_html((string) ($section['total_count'] ?? $section['claim_count'] ?? 0)); ?></strong></summary><div class="claim-ledger-stack">
+          <?php foreach ((array) $section['claims'] as $projectedClaim): if (!is_array($projectedClaim)) continue; ?><article class="claim-card"><p><?php echo esc_html(nhk_v3_public_copy((string) ($projectedClaim['display_text'] ?? ''))); ?></p><div class="claim-card-meta"><span class="claim-scope-badge"><?php echo esc_html(($projectedClaim['scope'] ?? 'direct') === 'direct' ? 'Áp dụng trực tiếp' : 'Liên quan có ngữ cảnh'); ?></span><span><?php echo esc_html((string) (($projectedClaim['evidence_summary']['source_count'] ?? 0) . ' nguồn · ' . ($projectedClaim['evidence_summary']['evidence_count'] ?? 0) . ' chứng cứ')); ?></span><?php if (($projectedClaim['status'] ?? '') === 'disputed'): ?><span>Đang tranh luận</span><?php elseif (($projectedClaim['status'] ?? '') === 'uncertain'): ?><span>Cần kiểm chứng</span><?php endif; ?></div><?php if (is_array($projectedClaim['source_context'] ?? null)): ?><small class="claim-context">Từ node liên quan: <?php echo esc_html((string) ($projectedClaim['source_context']['node_label'] ?? '')); ?></small><?php endif; ?></article><?php endforeach; ?>
+        </div></details><?php endforeach; else: ?><p class="projection-note">Chưa có ghi nhận công khai phù hợp.</p><?php endif; ?>
+      </section>
+      <?php endif; ?>
+
+      <?php if (($publishedClaimProjection['sections'] ?? []) !== []): ?>
+      <section id="noi-dung-semantic" class="dossier-section published-claim-projection" aria-labelledby="published-claim-title"><div class="section-head"><div><p class="eyebrow">Nội dung tổng hợp</p><h2 id="published-claim-title">Thông tin đã được biên tập</h2></div></div>
+        <?php foreach ((array) $publishedClaimProjection['sections'] as $publishedSection): if (!is_array($publishedSection) || trim((string) ($publishedSection['content'] ?? '')) === '') continue; ?><section class="published-claim-section"><h3><?php echo esc_html((string) ($publishedSection['label'] ?? '')); ?></h3><?php echo wp_kses_post((string) $publishedSection['content']); ?></section><?php endforeach; ?>
       </section>
       <?php endif; ?>
 

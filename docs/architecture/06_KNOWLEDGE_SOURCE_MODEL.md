@@ -85,3 +85,13 @@ The projection must not include raw Source, private Evidence excerpts/private
 metadata, canonical private IDs, or a reconstructed private payload. Public
 knowledge does not make a relation public: relation display independently
 requires Graph/public eligibility and must not leak private provenance.
+# Projection boundary — 2026-09-08
+
+Knowledge remains the canonical owner of atomic claims. The Semantic Claim
+Projection Layer may read approved Knowledge plus public Source/Evidence to
+materialize a Ledger or SEO candidate, but it never copies claim payload into
+WordPress editorial content, Authority payload or a canonical Knowledge row.
+Projection filtering preserves subject, scope, provenance eligibility and
+claim lifecycle; generated prose is never Evidence. Published SEO prose stays
+on its prior revision until the separate candidate passes validation and an
+explicit publish transition.

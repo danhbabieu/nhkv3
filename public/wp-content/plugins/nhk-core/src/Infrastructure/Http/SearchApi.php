@@ -18,7 +18,7 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchApi
 {
-    public function __construct(private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityCollectionQuery $collection = null) {}
+    public function __construct(private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicEntityCollectionQuery $collection = null, private $claimOwnerUrl = null) {}
 
     public function register(): void
     {
@@ -51,5 +51,9 @@ final class SearchApi
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
     private function media(Media $item): array { return ['type' => 'media', 'title' => $item->canonicalName]; }
     private function video(Video $item): array { $search = new VideoSearchDocument($this->authority); $title = $search->title($item); $path = $search->publicUrl($item); $url = $path === null ? null : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'VideoObject'])['search']; return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url === null ? '' : (function_exists('home_url') ? home_url($url) : $url)]; }
-    private function claim(KnowledgeClaim $item): array { return ['type' => 'knowledge', 'title' => $item->claimText]; }
+    private function claim(KnowledgeClaim $item): array
+    {
+        $url = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
+        return ['type' => 'knowledge', 'title' => $item->claimText, 'url' => is_string($url) ? $url : ''];
+    }
 }

@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Frontend;
 use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierCoverageAudit, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
+use NHK\Core\Application\Projection\{ClaimProjectionService, ClaimScopeResolver, GraphProjectionPolicy, LiveLedgerProjectionBuilder, ProjectionEventSubscriber, ProjectionInvalidationService};
 use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaGalleryQuery};
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
@@ -15,6 +16,8 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink,
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
+use NHK\Core\Infrastructure\Projection\{WpdbProjectionDependencyIndex, WpdbProjectionRevisionStore};
+use NHK\Core\Infrastructure\Http\ProjectionAdminApi;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 /**
@@ -47,6 +50,24 @@ final class FrontendSemanticBootstrap
         $contexts = new StructuralContextQuery($graph, $authority);
         $routes = new PublicRouteResolver($authority, $types, $contexts);
         $eligibility = new PublicEntityEligibilityPolicy($authority, $types, $routes, $contexts);
+
+        $claimResolver = new ClaimScopeResolver(
+            $claims,
+            $graph,
+            new GraphProjectionPolicy($predicates),
+            evidence: $evidence,
+            sources: $sources,
+            labelResolver: static function (\NHK\Core\Domain\Graph\NodeReference $reference) use ($authority): ?string {
+                $entity = $authority->findByCanonicalId($reference->endpoint_key);
+                return $entity?->canonicalName;
+            },
+        );
+        $projectionStore = new WpdbProjectionRevisionStore($wpdb);
+        $projectionDependencies = new WpdbProjectionDependencyIndex($wpdb);
+        $claimProjection = new ClaimProjectionService(new LiveLedgerProjectionBuilder($claimResolver), $projectionStore, dependencies: $projectionDependencies);
+        (new ProjectionEventSubscriber(new ProjectionInvalidationService($projectionDependencies, $projectionStore, $claimProjection)))->register();
+        $projectionAdmin = new ProjectionAdminApi($claimProjection);
+        add_action('rest_api_init', [$projectionAdmin, 'register']);
 
         $gallery = new PublicMediaGalleryQuery($media, $assets, PublicMediaAssetDelivery::fromEnvironment($assets, $media));
         $entityMedia = new EntityMediaProjection($media, $assets, $usages);
@@ -91,8 +112,13 @@ final class FrontendSemanticBootstrap
             return $modules;
         }, 20, 1);
 
-        add_filter('nhk_v3_entity_detail_projection', static function(array $item, object $entity) use ($dossier): array {
-            if ($entity instanceof AuthorityEntity) $item['dossier'] = $dossier->forEntity($entity);
+        add_filter('nhk_v3_entity_detail_projection', static function(array $item, object $entity) use ($dossier, $claimProjection): array {
+            if ($entity instanceof AuthorityEntity) {
+                $item['dossier'] = $dossier->forEntity($entity);
+                $item['claim_projection'] = $claimProjection->getLedger($entity->canonicalId, ['node_type' => $entity->entityType]);
+                $published = $claimProjection->getPublishedSeoProjection($entity->canonicalId);
+                if (is_array($published)) $item['published_claim_projection'] = $published;
+            }
             return $item;
         }, 10, 2);
 

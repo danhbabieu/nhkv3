@@ -146,3 +146,12 @@ Templates do not reconstruct facts from WordPress, external URLs, raw Source or
 private Evidence. `Frontend Available` requires route resolution and read-back;
 Apply PASS alone is not frontend success. “Xem trên web” resolves to the
 first-party Video route, while “Mở nguồn gốc” is the external source action.
+# Semantic Claim Ledger — 2026-09-08
+
+Entity detail pages consume `ClaimProjectionService` for the shared
+“Tri thức & chứng cứ” layer. The service returns materialized, public-safe
+sections with direct/related scope, category counts, contextual framing and
+bounded pagination. Templates do not infer semantics from Graph or query
+Knowledge repositories. Missing/failed projection is non-fatal and renders an
+honest updating state while the existing canonical entity summary remains
+available. Claim updates do not alter the entity URL, H1 or public identity.

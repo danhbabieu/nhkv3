@@ -15,7 +15,7 @@ use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class SearchSemanticQuery
 {
-    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null) {}
+    public function __construct(private AuthorityRepository $authority, private MediaRepository $media, private VideoRepository $videos, private KnowledgeRepository $claims, private EntityTypeRegistry $types, private ?MigrationStatus $status = null, private ?PublicRouteResolver $routes = null, private ?PublicEntityCollectionQuery $collection = null, private $claimOwnerUrl = null) {}
 
     public function extend(array $groups, string $term, int $page = 1, int $perPage = 12): array
     {
@@ -33,7 +33,11 @@ final class SearchSemanticQuery
             if ($url !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url];
         }
         }
-        if ($this->ready('knowledge')) foreach ($this->claims->list() as $item) if ($item->active && $item->isPublic() && ($path = PublicRouteResolver::existingSemanticPath('knowledge', $item->canonicalId)) !== null && $this->matches($term, $item->claimText, $item->stableKey)) $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'canonical_url' => $path, 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Claim'])['search']];
+        if ($this->ready('knowledge')) foreach ($this->claims->list() as $item) if ($item->active && $item->isPublic() && $this->matches($term, $item->claimText, $item->stableKey)) {
+            $path = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
+            $path ??= PublicRouteResolver::existingSemanticPath('knowledge', $item->canonicalId);
+            if ($path !== null) $groups['knowledge'][] = ['type' => 'knowledge', 'title' => $item->claimText, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'canonical_url' => $path, 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Claim'])['search']];
+        }
         $offset = ($page - 1) * $perPage;
         $groups['_totals'] = [];
         foreach (['entities', 'media', 'videos', 'knowledge'] as $group) {

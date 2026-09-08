@@ -18,6 +18,7 @@ use NHK\Core\Infrastructure\Migration\MediaWordPressBridgeMigration012;
 use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
+use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
@@ -77,7 +78,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', DictionaryMigration015::VERSION, false);
+        update_option('nhk_core_migration_target', ClaimProjectionMigration016::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
@@ -364,7 +365,14 @@ final class Plugin {
             (new GovernanceApi($governance, $eligibility, $controlledApply, $endpoints))->register();
             $videoRelationAdmin = new \NHK\Core\Application\Video\VideoRelationAdminService($governance, $proposalRepository, $videos, $authority, $knowledgeService, $claims, $sources, $evidence);
             (new VideoRelationAdminApi($videoRelationAdmin))->register();
-            (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection))->register();
+            $claimOwnerUrl = static function (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim) use ($authority, $publicRoutes, $publicEligibility): ?string {
+                $metadata = $claim->provenance['metadata'] ?? [];
+                $subjectId = is_array($metadata) ? trim((string) ($metadata['subject_id'] ?? $metadata['subject_uuid'] ?? '')) : '';
+                if ($subjectId === '') return null;
+                $entity = $authority->findByCanonicalId($subjectId);
+                return $entity && $publicEligibility->evaluate($entity)->eligible ? $publicRoutes->path($entity) : null;
+            };
+            (new SearchApi($media, $videos, $claims, $authority, $types, $publicStatus, $publicCollection, $claimOwnerUrl))->register();
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
             $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
@@ -465,10 +473,11 @@ final class Plugin {
         global $wpdb;
         if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < ClaimProjectionMigration016::VERSION || !ClaimProjectionMigration016::schemaReady($wpdb)) (new ClaimProjectionMigration016())->up();
     }
     public static function activate(): void {
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', PublicIdentityMigration014::VERSION, '', false);
+        add_option('nhk_core_migration_target', ClaimProjectionMigration016::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

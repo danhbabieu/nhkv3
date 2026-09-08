@@ -125,3 +125,12 @@ canonical read-back.
 `relation_create` bind `source_revision` và `target_revision` vào payload của
 proposal. Eligibility đối chiếu cả hai giá trị với canonical readers hiện tại
 và trả `TARGET_REVISION_CHANGED` nếu một endpoint đã đổi sau khi bind.
+# Claim projection traversal boundary — 2026-09-08
+
+The Graph remains the only relation store. Claim projection uses the central
+`GraphProjectionPolicy` and a maximum of two governed hops; a stored relation
+alone is not permission to propagate a claim. Unsupported predicates,
+unregistered inverses, inactive/dangling edges and ambiguous endpoints fail
+closed. Related claims retain the original semantic subject and an explainable
+path/context; no shortcut edge is persisted and the frontend never traverses
+Graph directly.
