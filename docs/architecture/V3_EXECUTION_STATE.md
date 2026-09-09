@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Collector runtime read-only acceptance follow-up
+
+DEMO was snapshotted before the authorized UP migration. Migration current and
+target are both `17`; schema read-back confirms migrations 016, 017,
+`nhk_claim_projection_revisions`, `nhk_claim_projection_dependencies` and
+`nhk_editorial_captures`, and an idempotent rerun passed. Health passed. Live
+Easy MCP discovery passed for `nhk.capture.ingest` and
+`nhk-v3/capture-ingest`, including native multipart `files[]`, text-only input,
+capability and output contract.
+
+Read-only Collector Profile read-back for Classification
+`01a07614-832d-7f27-959c-74eb0cd63f3e` proved Graph expected `86` Knowledge
+UUIDs equal Collector actual `86` UUIDs, with no duplicates, no missing or
+extra UUIDs, page `50 + 36`, and an unrelated Graph branch claim excluded.
+All 86 live claims remain explicit `unresolved` with zero recognized facet
+groups; this is an existing canonical metadata/data gap, not a projection
+write target. Media and Video remain empty and are reported incomplete.
+
+The planned public Classification route renders and shows the same truthful
+coverage. Public URL audit is read-only and reports the Classification owner as
+`ALLOCATE` with no persisted identity. Read-only Article preflight resolves the
+Classification and selects the native `Tri thức đồng hồ` category, but the
+DEMO artifact currently returns zero Knowledge because its preflight inventory
+path only accepts `subject_id` metadata. A minimal local Graph-branch wiring
+fix is committed in `3600a531`; code-only DEMO redeploy was not permitted by
+the execution policy, so that fix is not claimed as live runtime evidence.
+
+Capture fixtures and governed semantic write-back/apply were not invoked in
+this follow-up because the active request restricted runtime work to
+read-only and prohibited Article/semantic writes. Local Unit, Contract, PHP
+lint and `git diff --check` pass; the local Integration suite is blocked by
+the unavailable MySQL socket/service. No push, V2/production mutation or
+semantic data mutation was performed.
+
 ## Checkpoint — 2026-09-09 — Article/Media convergence follow-up
 
 The local implementation now closes the bounded Article/Media gaps identified
