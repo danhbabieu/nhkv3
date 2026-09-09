@@ -2,6 +2,28 @@
 
 This file is a short non-normative router, not a second Constitution.
 
+## Canonical documentation source and operator startup
+
+Canonical documentation remains file-based under `docs/` (with `AGENTS.md` as
+the explicit bootstrap root document). MCP V3 is only a read-only runtime
+projection of the exact deployed documentation snapshot; it is not a database
+documentation store, an editable rule source or a code-generated substitute.
+When a deployment does not carry repository `docs/`, the build must generate
+`nhk-core/resources/canonical-docs/` and its deterministic manifest from these
+files. The generated snapshot is immutable and is never edited by hand.
+
+An operator starts `CONNECT MCP → documentation-bootstrap → read READ_FIRST,
+Status Index and Execution State → documentation-list/get the ACTIVE contracts
+needed for the task → checkpoint → Capture`. GitHub is not required for this
+read path. A mutation-capable actor must be able to call the documentation
+read surface through the same MCP connection.
+
+The canonical documentation abilities are `nhk-v3/documentation-bootstrap`,
+`nhk-v3/documentation-get` and `nhk-v3/documentation-list`. `documentation-get`
+accepts only a manifest-allowlisted repository-relative path and bounded line
+ranges. Unknown, traversing, encoded-traversing, absolute, symlink-escaping or
+tampered paths fail closed.
+
 Before architectural or implementation work, read in this order:
 
 1. `AGENTS.md`.

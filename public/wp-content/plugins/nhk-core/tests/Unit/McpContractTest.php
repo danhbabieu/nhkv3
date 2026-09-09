@@ -44,6 +44,9 @@ final class McpContractTest extends TestCase
     public function test_catalog_has_exact_current_ordered_tool_contract(): void
     {
         self::assertSame([
+            'nhk.documentation.bootstrap',
+            'nhk.documentation.get',
+            'nhk.documentation.list',
             'nhk.docs.bootstrap',
             'nhk.docs.get',
             'nhk.search',
@@ -97,6 +100,10 @@ final class McpContractTest extends TestCase
         self::assertFalse($tools['nhk.docs.get']['governed']);
         self::assertSame(McpDocumentationRegistry::documentKeys(), $tools['nhk.docs.get']['inputSchema']['properties']['document_key']['enum']);
         self::assertSame([], $tools['nhk.docs.bootstrap']['inputSchema']['required']);
+        self::assertFalse($tools['nhk.documentation.bootstrap']['governed']);
+        self::assertSame(['path'], $tools['nhk.documentation.get']['inputSchema']['required']);
+        self::assertArrayHasKey('line_count', $tools['nhk.documentation.get']['inputSchema']['properties']);
+        self::assertArrayHasKey('path_prefix', $tools['nhk.documentation.list']['inputSchema']['properties']);
     }
 
     public function test_documentation_tools_dispatch_through_the_read_capability(): void
@@ -108,6 +115,41 @@ final class McpContractTest extends TestCase
         $document = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.docs.get', 'arguments' => ['document_key' => 'read-first']]]);
         self::assertSame(200, $document['status']);
         self::assertStringContainsString('Mandatory Read-First Router', $document['body']['result']['structuredContent']['content']);
+    }
+
+    public function test_canonical_documentation_tools_support_list_and_line_ranges(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'read');
+        $list = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.documentation.list', 'arguments' => ['status' => 'ACTIVE', 'path_prefix' => 'docs/architecture/']]]);
+        self::assertSame(200, $list['status']);
+        self::assertNotEmpty($list['body']['result']['structuredContent']['files']);
+        foreach ($list['body']['result']['structuredContent']['files'] as $entry) self::assertStringStartsWith('docs/architecture/', $entry['path']);
+        $page = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/call', 'params' => ['name' => 'nhk.documentation.get', 'arguments' => ['path' => 'docs/constitution/READ_FIRST.md', 'start_line' => 1, 'line_count' => 2]]]);
+        self::assertSame(200, $page['status']);
+        self::assertSame(1, $page['body']['result']['structuredContent']['start_line']);
+        self::assertSame(2, $page['body']['result']['structuredContent']['end_line']);
+        self::assertTrue($page['body']['result']['structuredContent']['has_more']);
+    }
+
+    public function test_documentation_permission_is_not_higher_than_mutation_permission(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'nhk_ingest_articles');
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/call', 'params' => ['name' => 'nhk.documentation.bootstrap', 'arguments' => []]]);
+        self::assertSame(403, $response['status']);
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 6, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => ['idempotency_key' => 'no-read', 'documentation_checkpoint' => ['manifest_hash' => str_repeat('a', 64), 'documentation_version' => str_repeat('b', 64)]]]]);
+        self::assertSame(403, $response['status']);
+    }
+
+    public function test_capture_rejects_a_stale_documentation_checkpoint_before_mutation(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true);
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 7, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+            'idempotency_key' => 'stale-checkpoint',
+            'documentation_checkpoint' => ['manifest_hash' => str_repeat('a', 64), 'documentation_version' => str_repeat('b', 64)],
+        ]]]);
+        self::assertSame(200, $response['status']);
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $response['body']['result']['structuredContent']['error']['code']);
     }
 
     public function test_new_submission_has_one_canonical_entry_point_and_direct_writers_are_internal_only(): void
@@ -328,6 +370,9 @@ final class McpContractTest extends TestCase
     public function test_wordpress_ability_allowlist_covers_the_catalog(): void
     {
         self::assertSame([
+            'nhk-v3/documentation-bootstrap',
+            'nhk-v3/documentation-get',
+            'nhk-v3/documentation-list',
             'nhk-v3/docs-bootstrap',
             'nhk-v3/docs-get',
             'nhk-v3/search',
@@ -439,7 +484,7 @@ final class McpContractTest extends TestCase
         $tool = $tools['nhk.capture.ingest'];
         self::assertSame('mutation', $tool['kind']);
         self::assertTrue($tool['governed']);
-        self::assertSame(['idempotency_key'], $tool['inputSchema']['required']);
+        self::assertSame(['idempotency_key', 'documentation_checkpoint'], $tool['inputSchema']['required']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
         self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
         self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
@@ -456,7 +501,7 @@ final class McpContractTest extends TestCase
     public function test_easy_mcp_keeps_standalone_video_as_internal_compatibility_only(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/documentation-bootstrap', 'nhk-v3/documentation-get', 'nhk-v3/documentation-list', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }
@@ -464,7 +509,7 @@ final class McpContractTest extends TestCase
     public function test_documentation_abilities_are_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/documentation-bootstrap', 'nhk-v3/documentation-get', 'nhk-v3/documentation-list', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }
@@ -479,5 +524,8 @@ final class McpContractTest extends TestCase
         self::assertFalse($tools['nhk.docs.get']['governed']);
         self::assertSame([], $tools['nhk.docs.bootstrap']['inputSchema']['required']);
         self::assertSame(McpDocumentationRegistry::documentKeys(), $tools['nhk.docs.get']['inputSchema']['properties']['document_key']['enum']);
+        self::assertSame('read', $tools['nhk.documentation.bootstrap']['kind']);
+        self::assertSame('read', $tools['nhk.documentation.get']['kind']);
+        self::assertSame('read', $tools['nhk.documentation.list']['kind']);
     }
 }

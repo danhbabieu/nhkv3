@@ -1,5 +1,49 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Canonical runtime documentation and Capture gate
+
+The canonical documentation owner remains repository files under `docs/`, with
+`AGENTS.md` explicitly allowlisted for bootstrap. `McpDocumentationRegistry`
+now projects either the checked-out canonical files or the immutable generated
+`public/wp-content/plugins/nhk-core/resources/canonical-docs/` snapshot through
+a deterministic SHA-256 manifest. The manifest records runtime version,
+documentation version, generated time, entry-point paths and per-file status;
+MCP never writes documentation or stores it in the database. The build command
+is `composer generate:mcp-docs` and the deployment preflight checks the same
+reader boundary.
+
+Canonical read-only surfaces are `nhk-v3/documentation-bootstrap`,
+`nhk-v3/documentation-get` and `nhk-v3/documentation-list`, backed by
+`nhk.documentation.bootstrap/get/list`. Get is path-allowlisted and paginated;
+manifest tampering, unavailable docs, traversal and symlink escape fail closed.
+The old `nhk-v3/docs-*` names are deprecated aliases only. Mutation capability
+also requires the `read` capability, satisfying the same-connection
+documentation permission invariant.
+
+`nhk.capture.ingest` now requires a current
+`documentation_checkpoint.manifest_hash` and `documentation_version` before
+any Capture or downstream mutation. A changed deployed manifest returns
+`DOCUMENTATION_CHECKPOINT_STALE`; missing checkpoint returns
+`DOCUMENTATION_CHECKPOINT_REQUIRED`; runtime/package mismatch returns
+`DOC_RUNTIME_MISMATCH`. Direct Media, Video, Knowledge, Source/Evidence,
+Article, relation and publication writers remain internal/admin guarded and
+are not normal submission paths.
+
+Focused MCP documentation/surface tests pass locally. Target DEMO deployment,
+live MCP documentation read-back, stale-checkpoint runtime proof and
+authenticated Capture replay remain `RUNTIME-GATED`; no database, DEMO,
+production, staging or V2 data was mutated and nothing was pushed.
+
+Checkpoint verification: focused MCP tests pass at 36 tests / 421 assertions;
+the complete `NHK Unit` suite passes at 869 tests / 4,257 assertions and the
+`NHK Contract` suite passes at 4 tests / 31 assertions. Guarded
+`McpTransportIntegrationTest` passes against `nhk_v3_test` at 22 tests / 331
+assertions, with 1 warning and 2 skips. Repeated snapshot generation is
+successful and returns the same deterministic manifest hash.
+Deployment preflight passes the canonical-documentation check but remains
+blocked on the unavailable local WordPress bootstrap/runtime; lint, Composer
+validation, diff check and the no-secret-marker review pass.
+
 ## Checkpoint — 2026-09-09 — Universal canonical Capture entry point
 
 The new-submission surface is now normalized to `nhk.capture.ingest` for

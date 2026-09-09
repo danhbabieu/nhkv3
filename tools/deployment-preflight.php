@@ -46,6 +46,15 @@ if ($wpLoaded && is_readable($root . '/public/wp-content/plugins/nhk-core/nhk-co
 }
 $check('nhk_core_bootstrap', $pluginLoaded, 'NHK_CORE_BOOTSTRAP_FAILED');
 
+$documentationReady = false;
+if ($autoloadLoaded && class_exists('NHK\\Core\\Application\\Mcp\\McpDocumentationRegistry')) {
+    try {
+        $bootstrap = (new NHK\Core\Application\Mcp\McpDocumentationRegistry($root, defined('NHK_CORE_VERSION') ? (string) NHK_CORE_VERSION : '0.1.0'))->bootstrap();
+        $documentationReady = isset($bootstrap['runtime_version'], $bootstrap['documentation_version'], $bootstrap['manifest_hash'], $bootstrap['read_first'], $bootstrap['documentation_status_index'], $bootstrap['execution_state_content']);
+    } catch (Throwable) { $documentationReady = false; }
+}
+$check('canonical_documentation', $documentationReady, 'CANONICAL_DOCUMENTATION_UNAVAILABLE');
+
 if ($wpLoaded) {
     global $wpdb;
     $migration = new NHK\Core\Shared\Migration\MigrationStatus();

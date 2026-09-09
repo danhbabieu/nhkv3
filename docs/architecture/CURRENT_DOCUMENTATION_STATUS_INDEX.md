@@ -9,16 +9,24 @@
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
 
-## 0. MCP documentation bootstrap — 2026-09-08
+## 0. MCP documentation bootstrap — 2026-09-09
 
-The normal read-only MCP surface now exposes `nhk.docs.bootstrap` and
-`nhk.docs.get`. They resolve only registry allowlisted canonical documents by
-key, with bounded UTF-8 reads and a content-hash documentation revision;
-callers do not need a GitHub connector. The bootstrap distinguishes
-`canonical_contract` from `runtime_status` and uses the executable MCP catalog
-and `McpCapabilityManifest` for runtime summaries. Code-side discovery is
-covered; target-runtime connector discovery/read-back remains an environment
-gate until freshly verified.
+Canonical documentation remains file-based under `docs/` (and the explicit
+`AGENTS.md` bootstrap document). The normal read-only MCP surface exposes
+`nhk.documentation.bootstrap`, `nhk.documentation.get` and
+`nhk.documentation.list`. They project the exact deployed files or the
+immutable `resources/canonical-docs/` snapshot through a deterministic,
+hash-verified manifest; they do not read GitHub, a database documentation
+store or arbitrary filesystem paths. Deprecated `nhk.docs.*` names, if
+enabled, are aliases to the same reader.
+
+Bootstrap returns runtime/documentation versions, manifest hash, the three
+mandatory bootstrap documents and the ACTIVE manifest list. Get accepts only a
+manifest path with bounded line ranges. A mismatch is
+`DOC_RUNTIME_MISMATCH`; a Capture started with a changed checkpoint fails
+closed as `DOCUMENTATION_CHECKPOINT_STALE`. Code-side discovery is covered;
+target-runtime connector discovery/read-back remains an environment gate until
+freshly verified.
 
 ## 1. Authority and read order
 
@@ -200,7 +208,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | new operator submissions carry files through Capture; `nhk.media.upload-batch`/`nhk.media.ingest` remain internal/admin physical and semantic compatibility boundaries with the same governed Media owner; post-ingest semantic enrichment, relation reconciliation and representative reconciliation are mandatory |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the sole normal new-submission boundary; direct mutation tools remain registered only as internal/admin compatibility and require `nhk_internal_content_operations`; catalog descriptions and Ability metadata expose the distinction |
+| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | documentation is a read-only manifest projection; `nhk.documentation.*` is the canonical docs surface; `nhk.capture.ingest` is the sole normal new-submission boundary; direct mutation tools remain registered only as internal/admin compatibility and require `nhk_internal_content_operations`; catalog descriptions and Ability metadata expose the distinction |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; a missing client-exposed Ability is a callability gap for that client, never permission to fall back to a generic writer; binary multipart batch remains on the approved custom MCP boundary while metadata Media ingest remains the Ability bridge |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
 | Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |

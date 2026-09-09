@@ -18,6 +18,26 @@
 → MCP and Admin adapters
 ```
 
+### Canonical documentation checkpoint
+
+The MCP documentation layer is a read-only runtime projection of repository
+`docs/`, or of the immutable build snapshot generated from it. The canonical
+operator startup is:
+
+`CONNECT MCP → documentation-bootstrap → read required ACTIVE docs → documentation checkpoint → Capture`.
+
+The checkpoint binds `manifest_hash` and `documentation_version` from the
+bootstrap to `nhk.capture.ingest`. If the deployed runtime changes between
+bootstrap and mutation, Capture returns `DOCUMENTATION_CHECKPOINT_STALE` and
+the operator must bootstrap again. Missing docs, invalid manifests, runtime
+drift and unsafe paths use `DOCS_NOT_AVAILABLE`, `DOC_MANIFEST_INVALID`,
+`DOC_RUNTIME_MISMATCH` or `DOC_PATH_NOT_ALLOWED`/`DOC_PATH_TRAVERSAL_BLOCKED`;
+they are not generic successful empty reads.
+
+Minimum machine-readable failure vocabulary also includes
+`DOCUMENTATION_CHECKPOINT_REQUIRED`, `DEPRECATED_FLOW`,
+`DIRECT_WRITE_BLOCKED` and `ADMIN_CAPABILITY_REQUIRED`.
+
 MCP and WordPress Admin must consume the same application services and
 capability source. New submissions use Capture; native WordPress editorial
 maintenance and domain lifecycle operations remain guarded internal/admin

@@ -45,6 +45,9 @@ final class SingleEntryPointPolicy
         'nhk.relation.backfill.apply',
     ];
 
+    /** Old names remain callable only as read-only compatibility aliases. */
+    private const DEPRECATED_TOOLS = ['nhk.docs.bootstrap', 'nhk.docs.get'];
+
     public static function isCanonical(string $tool): bool
     {
         return $tool === self::CANONICAL_TOOL;
@@ -55,6 +58,11 @@ final class SingleEntryPointPolicy
         return in_array($tool, self::INTERNAL_ONLY_TOOLS, true);
     }
 
+    public static function isDeprecated(string $tool): bool
+    {
+        return in_array($tool, self::DEPRECATED_TOOLS, true);
+    }
+
     /** @return list<string> */
     public static function internalOnlyTools(): array
     {
@@ -63,7 +71,7 @@ final class SingleEntryPointPolicy
 
     public static function surface(string $tool): string
     {
-        return self::isCanonical($tool) ? 'canonical' : (self::isInternalOnly($tool) ? 'internal_admin_only' : 'read_only');
+        return self::isCanonical($tool) ? 'canonical' : (self::isInternalOnly($tool) ? 'internal_admin_only' : (self::isDeprecated($tool) ? 'deprecated' : 'read_only'));
     }
 
     /** @param callable(string):bool|null $can */

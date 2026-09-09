@@ -9,6 +9,13 @@ final class McpToolCatalog
     public static function tools(): array
     {
         return [
+            self::tool('nhk.documentation.bootstrap', 'Read the compact bootstrap of the canonical documentation deployed with this runtime.', [], []),
+            self::tool('nhk.documentation.get', 'Read an allowlisted canonical documentation file by path with bounded line pagination.', [
+                'path' => ['type' => 'string', 'minLength' => 1], 'start_line' => ['type' => 'integer', 'minimum' => 1], 'line_count' => ['type' => 'integer', 'minimum' => 1, 'maximum' => McpDocumentationRegistry::MAX_LINE_COUNT],
+            ], ['path']),
+            self::tool('nhk.documentation.list', 'List only canonical documentation files present in the deployed manifest.', [
+                'status' => ['type' => 'string', 'enum' => ['ACTIVE', 'SUPERSEDED', 'HISTORICAL', 'DEPRECATED']], 'domain' => ['type' => 'string'], 'path_prefix' => ['type' => 'string'],
+            ], []),
             self::tool('nhk.docs.bootstrap', 'Read the compact canonical NHK V3 documentation bootstrap and current MCP runtime status.', [], []),
             self::tool('nhk.docs.get', 'Read one allowlisted canonical NHK V3 document by document key.', ['document_key' => ['type' => 'string', 'enum' => McpDocumentationRegistry::documentKeys()]], ['document_key']),
             self::tool('nhk.search', 'Search native editorial posts and active semantic records with bounded pagination.', ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['q']),
@@ -30,6 +37,15 @@ final class McpToolCatalog
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
                 'publish' => ['type' => 'boolean'],
+                'documentation_checkpoint' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'manifest_hash' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'],
+                        'documentation_version' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'],
+                    ],
+                    'required' => ['manifest_hash', 'documentation_version'],
+                    'additionalProperties' => false,
+                ],
                 'video' => [
                     'type' => 'object',
                     'properties' => [
@@ -49,7 +65,7 @@ final class McpToolCatalog
                     'format' => 'binary',
                     'description' => 'Native multipart file parts. Binary bytes are transported out-of-band; base64 and paths are not accepted.',
                 ]],
-            ], ['idempotency_key'], true),
+            ], ['idempotency_key', 'documentation_checkpoint'], true),
             self::tool('nhk.category.resolve', 'Resolve a native WordPress Category by ID, exact slug or exact name.', ['selector' => ['type' => 'object']], ['selector']),
             self::tool('nhk.category.create', 'Create or resolve one native WordPress Category idempotently.', ['name' => ['type' => 'string', 'minLength' => 1], 'slug' => ['type' => 'string'], 'parent' => ['type' => 'integer', 'minimum' => 0]], ['name'], true),
             self::tool('nhk.category.update', 'Update one native WordPress Category with optional state fingerprint CAS.', ['id' => ['type' => 'integer', 'minimum' => 1], 'changes' => ['type' => 'object'], 'expected_fingerprint' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$']], ['id', 'changes'], true),
@@ -189,6 +205,8 @@ final class McpToolCatalog
             $description = '[CANONICAL ENTRY POINT] ' . $description;
         } elseif ($surface === 'internal_admin_only') {
             $description = '[INTERNAL/ADMIN ONLY] New submissions must use nhk.capture.ingest. ' . $description;
+        } elseif ($surface === 'deprecated') {
+            $description = '[DEPRECATED COMPATIBILITY ALIAS] Use nhk.documentation.*. ' . $description;
         }
         return [
             'name' => $name,

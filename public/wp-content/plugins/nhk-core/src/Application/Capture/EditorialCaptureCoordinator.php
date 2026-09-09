@@ -7,6 +7,7 @@ use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, Subjec
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 
 /**
  * Shared Capture orchestration. Input/media adapters are injected at the edge;
@@ -30,6 +31,7 @@ final class EditorialCaptureCoordinator
         private $draftUpdater = null,
         private $mediaAdoption = null,
         private $publisher = null,
+        private ?McpDocumentationRegistry $documentation = null,
     ) {}
 
     /** @param array<string,mixed> $input */
@@ -37,6 +39,7 @@ final class EditorialCaptureCoordinator
     {
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if ($key === '') throw new \InvalidArgumentException('Capture idempotency key is required.');
+        $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
         $fingerprint = $this->fingerprint($input);
         $existing = $this->captures->findByIdempotencyKey($key);
         if ($existing !== null) {
@@ -57,6 +60,7 @@ final class EditorialCaptureCoordinator
                 'raw_input' => trim((string) ($input['text'] ?? $input['content'] ?? '')),
                 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [],
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
             ],
         ));
         return $this->run($record, $input);

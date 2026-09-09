@@ -28,6 +28,14 @@ The preflight does not import SQL, restore data, seed entities, repair Graph
 edges or change database state. A successful `git pull` alone is not release
 evidence.
 
+The release package must also pass the canonical documentation gate. It must
+carry either repository `docs/` or the generated immutable
+`nhk-core/resources/canonical-docs/manifest.json`; the generator fails when
+`AGENTS.md`, `READ_FIRST.md`, the Constitution, Status Index or Execution State
+is missing. Runtime documentation is checked by the same manifest reader used
+by MCP, so the deployed runtime version and documentation snapshot cannot drift
+silently.
+
 ### Odo runtime deployment evidence — 2026-09-03
 
 A human-controlled rsync deployment was executed to the configured remote

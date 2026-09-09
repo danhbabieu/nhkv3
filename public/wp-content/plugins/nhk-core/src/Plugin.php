@@ -24,7 +24,7 @@ use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
-use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
+use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
@@ -583,11 +583,13 @@ final class Plugin {
                 static function (array $context) use ($draftGateway): array {
                     return $draftGateway->publish((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), (array) ($context['evidence'] ?? []), (string) ($context['idempotency_key'] ?? ''));
                 },
+                new McpDocumentationRegistry(),
             );
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository($wpdb)))->service();
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, null, $capture)))->register();
+            $documentation = new McpDocumentationRegistry();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

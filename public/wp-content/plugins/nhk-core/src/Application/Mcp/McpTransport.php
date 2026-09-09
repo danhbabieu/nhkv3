@@ -76,6 +76,12 @@ final class McpTransport
                 'structuredContent' => ['error' => $error->toArray()],
                 'content' => [['type' => 'text', 'text' => $error->reasonCode . ': USE_CANONICAL_CAPTURE_FLOW']],
             ]]];
+        } catch (McpDocumentationException $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
+                'isError' => true,
+                'structuredContent' => ['error' => $error->toArray()],
+                'content' => [['type' => 'text', 'text' => $error->reasonCode]],
+            ]]];
         } catch (\InvalidArgumentException $error) {
             return $this->error($id, -32602, $error->getMessage(), 400);
         } catch (DependencyValidationException $error) {
@@ -106,7 +112,7 @@ final class McpTransport
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
         SingleEntryPointPolicy::guard($name, $this->can);
         $capability = match ($name) {
-            'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
+            'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
             'nhk.article.preflight' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
             'nhk.capture.ingest' => 'nhk_ingest_articles',
@@ -126,9 +132,12 @@ final class McpTransport
             default => null,
         };
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
+        if ($definition['kind'] === 'mutation' && $this->can !== null && !(bool) ($this->can)('read')) throw new McpPermissionDenied('read');
         $this->validateArguments($definition['inputSchema'], $arguments);
         $result = match ($name) {
-            'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
+            'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
+            'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
+            'nhk.documentation.list' => ($this->documentation ?? new McpDocumentationRegistry())->list(isset($arguments['status']) ? (string) $arguments['status'] : null, isset($arguments['domain']) ? (string) $arguments['domain'] : null, isset($arguments['path_prefix']) ? (string) $arguments['path_prefix'] : null),
             'nhk.docs.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['document_key'] ?? '')),
             'nhk.public-url.audit' => $this->publicUrls?->audit() ?? throw new \RuntimeException('PUBLIC_URL_MAINTENANCE_UNAVAILABLE'),
             'nhk.public-url.reproject' => $this->publicUrls?->reproject((string) ($arguments['idempotency_key'] ?? ''), (bool) ($arguments['pre_public_confirmed'] ?? false)) ?? throw new \RuntimeException('PUBLIC_URL_MAINTENANCE_UNAVAILABLE'),
@@ -193,6 +202,7 @@ final class McpTransport
 
     private function captureIngest(array $arguments, array $files): array
     {
+        ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
         if ($this->capture === null) throw new \RuntimeException('EDITORIAL_CAPTURE_UNAVAILABLE');
         unset($arguments['files']);
         if ($files !== []) $arguments['files'] = $files;

@@ -19,6 +19,7 @@ final class McpAbilityRegistration
     {
         if (!is_array($enabled) || $enabled === []) return [];
         if (!in_array('nhk-v3/capture-ingest', $enabled, true)) $enabled[] = 'nhk-v3/capture-ingest';
+        foreach (['nhk-v3/documentation-bootstrap', 'nhk-v3/documentation-get', 'nhk-v3/documentation-list'] as $ability) if (!in_array($ability, $enabled, true)) $enabled[] = $ability;
         if (!in_array('nhk-v3/docs-bootstrap', $enabled, true)) $enabled[] = 'nhk-v3/docs-bootstrap';
         if (!in_array('nhk-v3/docs-get', $enabled, true)) $enabled[] = 'nhk-v3/docs-get';
         return array_values($enabled);
@@ -116,6 +117,9 @@ final class McpAbilityRegistration
 
     /** @var array<string,string> */
     private const READ_TOOL_MAP = [
+        'nhk.documentation.bootstrap' => 'nhk-v3/documentation-bootstrap',
+        'nhk.documentation.get' => 'nhk-v3/documentation-get',
+        'nhk.documentation.list' => 'nhk-v3/documentation-list',
         'nhk.docs.bootstrap' => 'nhk-v3/docs-bootstrap',
         'nhk.docs.get' => 'nhk-v3/docs-get',
         'nhk.search' => 'nhk-v3/search',
@@ -340,7 +344,11 @@ final class McpAbilityRegistration
         if (isset($data['error'])) return new \WP_Error('nhk_mcp_' . (string) ($data['error']['code'] ?? 'error'), (string) ($data['error']['message'] ?? 'NHK V3 MCP call failed.'), ['status' => $response->get_status()]);
         $result = $data['result'] ?? null;
         if (!is_array($result)) return new \WP_Error('nhk_mcp_invalid_response', 'NHK V3 MCP returned no result.', ['status' => 502]);
-        if (($result['isError'] ?? false) === true) return new \WP_Error('nhk_mcp_operation_error', (string) (($result['content'][0]['text'] ?? 'NHK V3 MCP call failed.')), ['status' => 422]);
+        if (($result['isError'] ?? false) === true) {
+            $diagnostic = is_array($result['structuredContent']['error'] ?? null) ? $result['structuredContent']['error'] : [];
+            $code = (string) ($diagnostic['code'] ?? 'operation_error');
+            return new \WP_Error('nhk_mcp_' . strtolower($code), (string) (($result['content'][0]['text'] ?? 'NHK V3 MCP call failed.')), ['status' => 422, 'reason_code' => $code, 'diagnostic' => $diagnostic]);
+        }
         return $result['structuredContent'] ?? null;
     }
 
@@ -351,6 +359,9 @@ final class McpAbilityRegistration
 
     private static function canGoverned(string $tool): bool
     {
+        // Mutation and documentation are the same MCP connection contract:
+        // an actor who can mutate must also be able to bootstrap the rules.
+        if (function_exists('current_user_can') && !current_user_can('read')) return false;
         if (SingleEntryPointPolicy::isInternalOnly($tool) && (!function_exists('current_user_can') || !current_user_can(SingleEntryPointPolicy::INTERNAL_CAPABILITY))) return false;
         $capability = match ($tool) {
             'nhk.article.ingest', 'nhk.capture.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
@@ -376,7 +387,7 @@ final class McpAbilityRegistration
                 'nhk.graph.inventory' => $read->graphInventory((array) ($input['filters'] ?? []), (int) ($input['limit'] ?? 50), isset($input['after']) ? (string) $input['after'] : null),
                 'nhk.relation.backfill.dry_run' => $read->relationBackfillDryRun((array) ($input['records'] ?? [])),
                 'nhk.semantic.resolve' => $read->semanticResolve((array) ($input['context'] ?? [])),
-                'nhk.docs.bootstrap', 'nhk.docs.get' => self::executeMcp($tool, $input),
+                'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => self::executeMcp($tool, $input),
                 'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
                 'nhk.category.resolve' => self::executeMcp($tool, $input),
@@ -407,6 +418,9 @@ final class McpAbilityRegistration
         return [
             'nhk.docs.bootstrap' => 'NHK Documentation Bootstrap',
             'nhk.docs.get' => 'NHK Documentation Get',
+            'nhk.documentation.bootstrap' => 'NHK Canonical Documentation Bootstrap',
+            'nhk.documentation.get' => 'NHK Canonical Documentation Get',
+            'nhk.documentation.list' => 'NHK Canonical Documentation List',
             'nhk.public-url.audit' => 'NHK Public URL Audit',
             'nhk.public-url.reproject' => 'NHK Public URL Reproject',
             'nhk.search' => 'NHK Search',

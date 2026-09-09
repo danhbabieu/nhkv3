@@ -6,6 +6,42 @@
 public projection, WordPress editorial boundary, MCP/Admin, frontend, health và
 deployment. Văn bản này không cấp quyền thay đổi dữ liệu.
 
+## Amendment record — 2026-09-09 — Canonical Documentation Runtime Projection
+
+**WHY:** Operators and mutation-capable MCP actors must receive the governing
+rules from the same deployed runtime that will execute the operation. A GitHub
+checkout or a separately editable database copy can describe a different
+runtime and cannot be the authority for an active operation.
+
+**WHAT LAW CHANGES:** Canonical documentation remains file-based under `docs/`
+with `AGENTS.md` as an explicitly allowlisted bootstrap root document. MCP V3
+provides only a read-only projection of the deployed files or an immutable
+build-generated snapshot. A deterministic manifest records each allowed file's
+path, status and SHA-256 plus documentation/runtime identity. No documentation
+writer, database documentation store or parallel rule set is permitted.
+
+Any actor permitted to mutate through MCP must be able to read the governing
+documentation through that same MCP connection. The canonical operator startup
+is `documentation-bootstrap → required ACTIVE docs → checkpoint → Capture`.
+Capture rejects a missing or stale checkpoint with
+`DOCUMENTATION_CHECKPOINT_REQUIRED` or `DOCUMENTATION_CHECKPOINT_STALE`; a
+runtime/documentation mismatch is `DOC_RUNTIME_MISMATCH` and is never silently
+served as another version.
+
+**AFFECTED SUBSYSTEMS:** repository documentation, build/deployment package,
+MCP registry/catalog/transport/Abilities, Capture orchestration, permissions,
+Admin operator workflow and runtime health/preflight.
+
+**COMPATIBILITY:** Existing documentation remains in place. Deprecated
+read-only MCP documentation aliases may remain for clients, but they project
+the same manifest and never create a second owner. Existing data, UUIDs,
+stable keys and semantic/editorial records are not migrated or changed.
+
+**DATA, MIGRATION AND ROLLOUT:** No database documentation table, data
+population, migration, production/staging mutation or push is authorized.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-09.
+
 ## 1. Tối cao và phạm vi hiệu lực
 
 NHK V3 tuân theo một nguyên tắc tối cao:
@@ -1670,7 +1706,26 @@ Raw Graph REST có thể là administrator-only operational read; public API kh�
 được contract cho phép. WordPress Abilities chỉ là discoverability bridge của
 existing read contracts, không phải persistence hoặc write bypass.
 
-### 20.0.1 Canonical submission entry point
+### 20.0.1 Canonical documentation runtime projection
+
+`docs/` is the sole canonical documentation owner. The runtime may read these
+files directly or read the immutable generated snapshot produced by the build,
+but it must expose a deterministic manifest and verify file hashes before
+serving content. The reader uses an explicit allowlist only: it never exposes
+directory browsing, arbitrary filesystem paths, secrets, configuration,
+private keys or symlink escapes. `documentation-bootstrap`,
+`documentation-list` and `documentation-get` are read-only MCP surfaces; no
+documentation mutation operation exists.
+
+The manifest's `runtime_version`, `documentation_version` and `manifest_hash`
+must describe the same deployed package. A mismatch is a machine-readable
+`DOC_RUNTIME_MISMATCH`. A mutation-capable MCP principal must also pass the
+documentation read permission. The canonical Capture operator carries the
+bootstrap checkpoint; when the deployed manifest changes, the mutation fails
+closed with `DOCUMENTATION_CHECKPOINT_STALE` until the operator bootstraps
+again.
+
+### 20.0.2 Canonical submission entry point
 
 Runtime phải expose đúng một entry point cho submission mới:
 `nhk.capture.ingest`. Các direct mutation tools/Abilities không được trình bày

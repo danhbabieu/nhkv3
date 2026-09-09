@@ -52,4 +52,68 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertSame('registered_not_live_verified', $bootstrap['runtime_status']['status']);
         self::assertContains('nhk.docs.bootstrap', $bootstrap['runtime_status']['registered_tools']);
     }
+
+    public function test_manifest_list_get_and_bootstrap_are_deterministic_and_paginated(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        $first = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory . '/one', 'test-runtime', '2026-09-09T00:00:00+00:00');
+        $second = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory . '/two', 'test-runtime', '2026-09-09T23:59:59+00:00');
+        $rebuilt = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory . '/one', 'test-runtime', '2026-09-10T00:00:00+00:00');
+
+        self::assertSame($first['documentation_version'], $second['documentation_version']);
+        self::assertSame($first['manifest_hash'], $second['manifest_hash']);
+        self::assertSame($first['documentation_version'], $rebuilt['documentation_version']);
+        self::assertSame($first['manifest_hash'], $rebuilt['manifest_hash']);
+        self::assertSame(array_column($first['files'], 'path'), array_values(array_map(static fn (array $entry): string => $entry['path'], $first['files'])));
+
+        $registry = new McpDocumentationRegistry($directory . '/one', 'test-runtime');
+        $listed = $registry->list('ACTIVE', 'mcp', 'docs/mcp/');
+        self::assertNotEmpty($listed['files']);
+        $page = $registry->get('docs/constitution/READ_FIRST.md', 1, 2);
+        self::assertSame(1, $page['start_line']);
+        self::assertSame(2, $page['end_line']);
+        self::assertTrue($page['has_more']);
+        self::assertSame($first['manifest_hash'], $page['manifest_hash']);
+        self::assertSame(hash_file('sha256', $directory . '/one/docs/constitution/READ_FIRST.md'), $page['sha256']);
+        $bootstrap = $registry->bootstrap();
+        self::assertStringContainsString('Mandatory Read-First Router', $bootstrap['read_first']);
+        self::assertStringContainsString('Current Documentation Status Index', $bootstrap['documentation_status_index']);
+        self::assertStringContainsString('NHK V3 Execution State', $bootstrap['execution_state_content']);
+    }
+
+    public function test_manifest_runtime_mismatch_and_checkpoint_fail_closed(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-mismatch-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', '2026-09-09T00:00:00+00:00');
+        $registry = new McpDocumentationRegistry($directory, 'runtime-a');
+        $registry->assertCheckpoint(['manifest_hash' => $manifest['manifest_hash'], 'documentation_version' => $manifest['documentation_version']]);
+        try {
+            $registry->assertCheckpoint(['manifest_hash' => str_repeat('0', 64), 'documentation_version' => $manifest['documentation_version']]);
+            self::fail('Expected stale checkpoint.');
+        } catch (\RuntimeException $error) { self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $error->getMessage()); }
+        try {
+            (new McpDocumentationRegistry($directory, 'runtime-b'))->bootstrap();
+            self::fail('Expected runtime mismatch.');
+        } catch (\RuntimeException $error) { self::assertSame('DOC_RUNTIME_MISMATCH', $error->getMessage()); }
+    }
+
+    public function test_path_security_rejects_traversal_absolute_encoded_and_symlink_escape(): void
+    {
+        $registry = new McpDocumentationRegistry();
+        foreach (['../wp-config.php', '/etc/hosts', '%2e%2e/wp-config.php', "docs/constitution/READ_FIRST.md\0.txt"] as $path) {
+            try { $registry->get($path); self::fail('Expected path rejection for ' . $path); }
+            catch (\RuntimeException $error) { self::assertSame('DOC_PATH_TRAVERSAL_BLOCKED', $error->reasonCode); }
+        }
+
+        $directory = sys_get_temp_dir() . '/nhk-docs-symlink-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', '2026-09-09T00:00:00+00:00');
+        $target = $directory . '/docs/constitution/READ_FIRST.md';
+        unlink($target);
+        self::assertTrue(symlink('/etc/hosts', $target));
+        try { (new McpDocumentationRegistry($directory, 'runtime-a'))->bootstrap(); self::fail('Expected symlink rejection.'); }
+        catch (\RuntimeException $error) { self::assertSame('DOC_MANIFEST_INVALID', $error->getMessage()); }
+    }
 }

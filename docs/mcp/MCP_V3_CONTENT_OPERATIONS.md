@@ -157,22 +157,29 @@ keep binary parts out of `arguments`; optional per-file metadata belongs in
 
 ### Documentation bootstrap surface
 
-The normal read-only MCP catalog exposes `nhk.docs.bootstrap` and
-`nhk.docs.get`. `nhk.docs.bootstrap` is the entry point for a new client: it
-returns the current documentation content hash/source revision when available,
-Constitution identity, required reading, current contract keys, executable
-runtime status and documented registry gaps. It deliberately does not inline
-the canonical documents. `nhk.docs.get` accepts only a registry allowlisted
-document key and returns bounded UTF-8 content with its document hash; it never
-accepts a filesystem path or reads arbitrary source/config/secrets.
+The normal read-only MCP catalog exposes `nhk.documentation.bootstrap`,
+`nhk.documentation.get` and `nhk.documentation.list`. Bootstrap returns the
+runtime version, documentation version, deterministic manifest hash, generated
+time, entry-point paths, and bounded content for READ_FIRST, the Documentation
+Status Index and Execution State. List and Get resolve only manifest-allowlisted
+repository-relative paths; Get supports bounded line ranges and returns the
+file hash plus manifest identity. They never browse arbitrary filesystem paths
+or read source/config/secrets.
+
+The old `nhk.docs.bootstrap` and `nhk.docs.get` names remain read-only
+deprecated compatibility aliases only. They do not define a second rule set.
 
 Documentation truth and runtime truth remain separate: the bootstrap's
 `canonical_contract` describes what the Constitution/contracts require, while
-`runtime_status` describes what the current MCP catalog registers. A capability
-is not `LIVE` without fresh target discovery/read-back. When a deployment
-artifact does not contain repo-level `/docs`, the release build must generate
-the plugin documentation snapshot from canonical repo docs; the snapshot is
-not a separately edited source of truth.
+`runtime_status` describes what the current MCP catalog registers. The
+manifest's documentation version, runtime version and hash must be coherent;
+otherwise the machine-readable `DOC_RUNTIME_MISMATCH` outcome is returned.
+When a deployment artifact does not contain repo-level `/docs`, the release
+build must generate the plugin documentation snapshot from canonical repo docs;
+the snapshot is not a separately edited source of truth. Mutation requires a
+current `documentation_checkpoint` containing the bootstrap's manifest hash and
+documentation version; a redeploy makes it stale and fails closed with
+`DOCUMENTATION_CHECKPOINT_STALE`.
 
 
 ### Storage & Reuse Map — 2026-09-04
