@@ -71,6 +71,54 @@ performed.
 `BACKFILL_OPERATOR_PATH=NOT_EXPOSED`
 `READY_FOR_DEPLOY=NO`
 
+# Checkpoint — 2026-09-09 — Collector-centric implementation map
+
+The collector-centric pack was read in full and reconciled against the current
+Constitution, current documentation status index and executable runtime map.
+The implementation boundary is confirmed as a read-only projection over
+Classification/Authority, Graph, Knowledge, Media, Video and WordPress Post;
+no collector database, semantic vocabulary, relation or data seed was added.
+
+The current map records `EntityKnowledgeProjection::forSubject()` as the
+subject-scoped Knowledge source, `RelatedSemanticQuery`/`GraphService` as the
+bounded Graph source, `EntityMediaProjection` as endpoint-scoped Media source,
+`ArticleResearchPreflight` as the Article research boundary, and
+`SemanticDossierQuery`/`entity.php` as the existing frontend detail path.
+Collector Profile pagination, facet grouping, API exposure, frontend sections,
+Admin coverage and preflight isolation remain implementation work.
+
+Baseline Unit execution is currently `ENVIRONMENT_BLOCKED` at PHPUnit suite
+loading because the existing `EditorialCaptureSemanticCoreTest.php` references
+the unavailable `NHK\\Core\\Contracts\\Capture\\CaptureRepository` interface.
+No runtime data, migration, seed, public identity allocation, publication or
+external push occurred.
+
+ROOT GAP
+Collector Profile projection and branch-scoped pagination do not yet exist.
+
+WHAT CHANGED
+Updated `CURRENT_DOCUMENTATION_STATUS_INDEX.md` with the executable discovery
+map and the non-destructive scope of the collector implementation.
+
+CANONICAL EFFECT
+Documentation now distinguishes the pack's implementation guidance from the
+Constitution and points future work to existing canonical owners.
+
+TESTS
+Baseline Unit suite could not load due to the pre-existing missing Capture
+interface described above.
+
+RUNTIME READ-BACK
+No semantic or external runtime read-back was attempted; workspace git state
+was clean before this documentation checkpoint.
+
+UNRESOLVED
+Capture contract/test dependency; all Collector tasks after discovery.
+
+NEXT EXACT OPERATION
+Add failing unit tests for a branch-scoped Collector Profile with >50 claims,
+deduplication, unrelated-branch exclusion and truthful truncation.
+
 # Checkpoint — 2026-09-09 — Native article presentation from media archive
 
 The public `/thu-vien/` projection now resolves each image card to the

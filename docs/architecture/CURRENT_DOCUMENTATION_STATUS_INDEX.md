@@ -214,6 +214,30 @@ Do not rewrite history merely to make old checkpoints look current.
 
 ## 5. Known current gaps that remain intentional
 
+### Collector-centric clock-type projection discovery — 2026-09-09
+
+The collector pack is implementation guidance for a read-only projection over
+the existing canonical owners; it does not add a semantic store, Authority
+vocabulary or relation. The current runtime map is:
+
+| Concern | Current executable boundary | Initial finding |
+|---|---|---|
+| Classification/public detail | `PublicEntityCollectionQuery`, `EntityPageQuery`, `PublicRouteResolver`, `SemanticDossierQuery` | Classification detail is already a public dossier entry point, but has no collector-facet projection. |
+| Branch Knowledge | `EntityKnowledgeProjection::forSubject()` over `KnowledgeRepository::list()` | Subject filtering is metadata-scoped and read-only; retrieval has no dedicated page contract and must not inherit the 50-row Graph neighborhood cap. |
+| Graph traversal | `GraphService`, `RelatedSemanticQuery`, `SemanticNeighborhoodQuery` | Traversal is bounded and explainable, but per-edge reads are capped at 50; a collector projection needs branch-scoped pagination/deduplication and honest truncation diagnostics. |
+| Media | `EntityMediaProjection`, `PublicMediaGalleryQuery`, `MediaUsageRepository::listByEndpoint()` | Media is endpoint-scoped and excludes placeholders/unready assets; global Media must not be used as a readiness fallback. |
+| Video/articles | `VideoRepository`, `RelatedSemanticQuery`, WordPress post projector | Related resources are available through canonical Graph/read boundaries; branch relevance must be preserved in Article preflight and collector output. |
+| Article preflight | `ArticleResearchPreflight::research()` and `ArticleIngestPreflight::check()` | Research accepts an injected inventory reader, but does not itself enforce subject-scoped candidate sets; the integration boundary must provide isolated inventory and deterministic knowledge-category selection. |
+| Frontend | `FrontendSemanticBootstrap`, `EntityDossierBootstrap`, theme `entity.php` | Existing template renders generic knowledge/relation sections; collector ordering and facet labels are not yet first-class. |
+| Admin/API | `AdminWorkbenchReadApi`, `EntityApi`, Graph/inventory APIs | Existing read-only/admin surfaces are reusable; no collector coverage endpoint/workspace exists. |
+| Public identity | `PublicIdentityService`, `PublicIdentityRepository`, `PublicRouteResolver` | Persisted identity boundary exists in code, but branch allocation and live read-back remain runtime-gated; a planned URL is not canonical ownership. |
+
+The collector implementation therefore must reuse these owners, preserve
+canonical UUID/revision/provenance/scope, keep Brand secondary in presentation,
+and fail closed when a registered relation, identity owner, or runtime
+dependency cannot be resolved. No data seed, backfill, public URL allocation,
+or editorial publication is part of this discovery checkpoint.
+
 - Public Identity runtime activation/data coverage/current-route durable consumer
   parity and target-runtime re-projection are not proven. The current canary
   projection is intentionally read-only; no bulk persisted-identity rewrite or
