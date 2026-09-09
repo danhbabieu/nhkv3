@@ -8,7 +8,7 @@ use NHK\Core\Contracts\Governance\EligibilityReader;
 use NHK\Core\Domain\Governance\{DependencyGraph, Proposal, ProposalState};
 use NHK\Core\Infrastructure\Database\WpdbTransactionManager;
 use NHK\Core\Infrastructure\Governance\{WpdbAuditSink, WpdbDependencyRepository, WpdbProposalRepository};
-use NHK\Core\Governance\Exception\{DependencyCycle, GovernancePermissionDenied};
+use NHK\Core\Governance\Exception\{DependencyCycle, GovernancePermissionDenied, ProposalIdempotencyStaleBinding};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
@@ -107,7 +107,9 @@ final class P4GovernanceAcceptanceIntegrationTest extends TestCase
         ));
 
         self::assertNull($repository->find($proposal->id));
-        self::assertNull($repository->findByIdempotencyKey($proposal->idempotencyKey));
+        $this->expectException(ProposalIdempotencyStaleBinding::class);
+        $this->expectExceptionMessage('IDEMPOTENCY_STALE_BINDING');
+        $repository->findByIdempotencyKey($proposal->idempotencyKey);
     }
 
     public function test_proposal_repository_ignores_corrupt_durable_fields(): void
@@ -122,7 +124,9 @@ final class P4GovernanceAcceptanceIntegrationTest extends TestCase
             $proposal->idempotencyKey
         ));
 
-        self::assertNull($repository->findByIdempotencyKey($proposal->idempotencyKey));
+        $this->expectException(ProposalIdempotencyStaleBinding::class);
+        $this->expectExceptionMessage('IDEMPOTENCY_STALE_BINDING');
+        $repository->findByIdempotencyKey($proposal->idempotencyKey);
     }
 
     public function test_create_is_readable_immediately_and_from_an_independent_repository_request(): void

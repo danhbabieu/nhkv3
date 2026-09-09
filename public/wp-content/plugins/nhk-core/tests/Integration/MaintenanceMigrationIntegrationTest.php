@@ -38,16 +38,17 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
         update_option('nhk_core_migration_target', $this->previousTarget, false);
     }
 
-    public function test_pending_runner_moves_15_to_16_with_the_projection_schema_contract(): void
+    public function test_pending_runner_moves_15_to_17_with_the_projection_and_capture_schema_contract(): void
     {
         global $wpdb;
         $before = $this->canonicalCounts();
 
         Plugin::runPendingMigrations();
 
-        self::assertSame(16, (int) get_option('nhk_core_migration_current', 0));
-        self::assertSame(16, (int) get_option('nhk_core_migration_target', 0));
+        self::assertSame(17, (int) get_option('nhk_core_migration_current', 0));
+        self::assertSame(17, (int) get_option('nhk_core_migration_target', 0));
         self::assertTrue(ClaimProjectionMigration016::schemaReady($wpdb));
+        self::assertTrue(\NHK\Core\Infrastructure\Migration\EditorialCaptureMigration017::schemaReady($wpdb));
         self::assertSame([
             'PRIMARY',
             'projection_node_revision',
@@ -72,8 +73,8 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
 
         Plugin::runPendingMigrations();
 
-        self::assertSame(16, (int) get_option('nhk_core_migration_current', 0));
-        self::assertSame(16, (int) get_option('nhk_core_migration_target', 0));
+        self::assertSame(17, (int) get_option('nhk_core_migration_current', 0));
+        self::assertSame(17, (int) get_option('nhk_core_migration_target', 0));
         self::assertSame($firstSchema, $this->createStatements());
         self::assertSame($firstCounts, $this->canonicalCounts());
     }

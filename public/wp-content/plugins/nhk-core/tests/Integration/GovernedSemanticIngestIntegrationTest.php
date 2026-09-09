@@ -163,7 +163,9 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
                 'target_type' => 'variant', 'target_uuid' => $missingTarget, 'predicate' => 'about',
                 'evidence_refs' => [['evidence_id' => $evidence['canonical_id']]],
             ]]),
-        ], hash('sha256', $videoId), null, hash('sha256', 'video-relation-failure'), ProposalState::APPROVED, idempotencyKey: $this->prefix . '-video-relation-failure', entityType: 'video'));
+        ], hash('sha256', $videoId), null, hash('sha256', 'video-relation-failure'), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-video-relation-failure', entityType: 'video'));
+        $proposal = $governance->submit($proposal->id);
+        $proposal = $governance->approve($proposal->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'test-policy');
 
         try { $apply->apply($proposal->id); self::fail('Expected relation endpoint failure.'); }
         catch (\Throwable $error) { self::assertSame('Endpoint does not exist: variant:' . $missingTarget, $error->getMessage()); }
@@ -175,8 +177,9 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
     public function test_video_activation_phase_failure_rolls_back_video_and_relation(): void
     {
         $hook = new class implements ApplyExecutionHook {
+            public int $mutations = 0;
             public function afterAttemptStarted(): void {}
-            public function afterAuthorityMutation(): void { throw new \RuntimeException('VIDEO_ACTIVATION_PHASE_FAILED'); }
+            public function afterAuthorityMutation(): void { $this->mutations++; if ($this->mutations === 4) throw new \RuntimeException('VIDEO_ACTIVATION_PHASE_FAILED'); }
             public function beforeProposalApplied(): void {}
             public function beforeCommit(): void {}
         };
@@ -193,7 +196,9 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
                 'target_type' => 'variant', 'target_uuid' => $variant->canonicalId, 'predicate' => 'about',
                 'evidence_refs' => [['evidence_id' => $evidence['canonical_id']]],
             ]]),
-        ], hash('sha256', $videoId), null, hash('sha256', 'video-activation-failure'), ProposalState::APPROVED, idempotencyKey: $this->prefix . '-video-activation-failure', entityType: 'video'));
+        ], hash('sha256', $videoId), null, hash('sha256', 'video-activation-failure'), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-video-activation-failure', entityType: 'video'));
+        $proposal = $governance->submit($proposal->id);
+        $proposal = $governance->approve($proposal->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'test-policy');
 
         try { $apply->apply($proposal->id); self::fail('Expected activation phase failure.'); }
         catch (\Throwable $error) { self::assertSame('VIDEO_ACTIVATION_PHASE_FAILED', $error->getMessage()); }

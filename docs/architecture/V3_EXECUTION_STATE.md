@@ -6356,8 +6356,29 @@ Graph edge was invented and Graph read-back correctly returned an empty set.
 
 Focused acceptance tests pass 28 tests / 259 assertions; full Unit passes 847
 tests / 4,020 assertions; `composer lint` and `git diff --check` pass. The
-full Integration suite reached the permitted runtime but remains non-green at
-119 tests / 796 assertions: 3 errors, 8 failures and 4 skips, including
-pre-existing Governance/MCP fixture expectations and migration tests that
-expect version 16 after this authorized 017 run. Therefore this checkpoint is
-`RUNTIME_ACCEPTANCE_VERIFIED / REPOSITORY_ACCEPTANCE_BLOCKED`, not COMPLETE.
+prior Integration blockers were reconciled in the test/fixture contract and
+the guarded suite now passes 120 tests / 1,011 assertions on two consecutive
+runs, with 4 canonical skips, 1 warning and 1 deprecation. Editorial Capture
+runtime and repository acceptance are verified; Collector remains separately
+gated by its missing approved canonical fixture.
+
+# Checkpoint — 2026-09-09 — Editorial Capture Integration blocker closeout
+
+The remaining Integration failures were classified before changes. Governance
+rollback cases were stale fixtures that bypassed the durable approval binding;
+corrupt proposal cases had expectations predating the fail-closed
+`IDEMPOTENCY_STALE_BINDING` contract; maintenance tests still expected ledger
+16 after canonical migration 017; the MCP tools/list assertion depended on
+catalog order; the Ability export assertion omitted authentication; and the
+Media/Video ingest assertions expected the legacy proposal packet instead of
+the current `REVIEW_REQUIRED` automation packet. No production business logic,
+security gate or migration runner was weakened.
+
+The focused groups pass, and the guarded Full Integration command now passes
+twice consecutively on the exact `nhk_v3_test` runtime: 120 tests / 1,011
+assertions, 4 canonical skips, 1 warning and 1 deprecation, with zero errors
+or failures. Full Unit remains green at 847 tests / 4,020 assertions;
+`composer lint` and `git diff --check` pass. The test changes are limited to
+fixture lifecycle, current migration expectation, canonical stale-binding
+expectation and MCP contract/authentication assertions. No production,
+staging, V2 or demo database was modified and nothing was pushed.

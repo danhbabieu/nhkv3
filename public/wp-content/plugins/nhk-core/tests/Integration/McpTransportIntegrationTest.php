@@ -20,6 +20,7 @@ final class McpTransportIntegrationTest extends TestCase
         require_once rtrim((string) getenv('NHK_WP_TEST_PATH'), '/') . '/wp-load.php';
         TestDatabaseGuard::selectTestDatabase();
         TestDatabaseGuard::requireTestDatabase();
+        wp_set_current_user(0);
         require_once dirname(__DIR__, 2) . '/nhk-core.php';
         do_action('rest_api_init');
     }
@@ -31,7 +32,8 @@ final class McpTransportIntegrationTest extends TestCase
         $data = $response->get_data();
         self::assertSame('2.0', $data['jsonrpc']);
         self::assertCount(count(\NHK\Core\Application\Mcp\McpToolCatalog::tools()), $data['result']['tools']);
-        self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $data['result']['tools'][0]['inputSchema']);
+        $tools = array_column($data['result']['tools'], null, 'name');
+        self::assertSame(['type' => 'object', 'properties' => ['q' => ['type' => 'string'], 'page' => ['type' => 'integer', 'minimum' => 1], 'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], 'required' => ['q'], 'additionalProperties' => false], $tools['nhk.search']['inputSchema']);
         $names = array_column($data['result']['tools'], 'name');
         self::assertContains('nhk.docs.bootstrap', $names);
         self::assertContains('nhk.docs.get', $names);
@@ -74,10 +76,15 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertArrayHasKey('attachment_id', $tools['nhk.media.attachment.get']['inputSchema']['properties']);
 
         $export = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-ingest'));
-        self::assertSame(200, $export->get_status(), (string) wp_json_encode($export->get_data()));
-        self::assertSame('nhk-v3/media-ingest', $export->get_data()['name']);
-        self::assertArrayHasKey('wordpress_attachment_id', $export->get_data()['input_schema']['properties']['assets']['items']['properties']);
-        self::assertArrayNotHasKey('file', $export->get_data()['input_schema']['properties']);
+        self::assertSame(401, $export->get_status());
+        $previousUser = get_current_user_id();
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        self::assertNotEmpty($users);
+        $administrator = get_role('administrator');
+        self::assertNotNull($administrator);
+        $administrator->add_cap('read');
+        $administrator->add_cap('upload_files');
+        wp_set_current_user((int) $users[0]->ID);
         $batch = wp_get_ability('nhk-v3/media-upload-batch');
         self::assertNotNull($batch);
         self::assertTrue($batch->check_permissions());
@@ -87,6 +94,15 @@ final class McpTransportIntegrationTest extends TestCase
         $batchExport = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-upload-batch'));
         self::assertSame(200, $batchExport->get_status(), (string) wp_json_encode($batchExport->get_data()));
         self::assertSame('binary', $batchExport->get_data()['input_schema']['properties']['files']['items']['format']);
+        try {
+            $export = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-ingest'));
+            self::assertSame(200, $export->get_status(), (string) wp_json_encode($export->get_data()));
+            self::assertSame('nhk-v3/media-ingest', $export->get_data()['name']);
+            self::assertArrayHasKey('wordpress_attachment_id', $export->get_data()['input_schema']['properties']['assets']['items']['properties']);
+            self::assertArrayNotHasKey('file', $export->get_data()['input_schema']['properties']);
+        } finally {
+            wp_set_current_user($previousUser);
+        }
         foreach (McpAbilityRegistration::governedAbilityNames() as $abilityName) {
             $ability = wp_get_ability($abilityName);
             self::assertNotNull($ability, $abilityName);
@@ -394,11 +410,12 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame(200, $create->get_status(), (string) wp_json_encode($create->get_data()));
             $created = $create->get_data()['result']['structuredContent'];
             self::assertFalse($create->get_data()['result']['isError']);
-            self::assertSame('media', $created['entity_type']);
-            self::assertSame('ingest', $created['operation']);
+            self::assertSame('awaiting_review', $created['status']);
+            self::assertSame('REVIEW_REQUIRED', $created['mode']);
+            self::assertSame('review', $created['gate_reached']);
             $proposalId = (string) $created['proposal_id'];
             $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
-            self::assertNotNull($proposal);
+            self::assertNotNull($proposal, (string) wp_json_encode($created));
 
             $submit = $this->request('tools/call', ['id' => 6, 'params' => ['name' => 'nhk.proposal.submit', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.submit']);
             self::assertSame(200, $submit->get_status());
@@ -470,8 +487,9 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame(200, $create->get_status(), (string) wp_json_encode($create->get_data()));
             $created = $create->get_data()['result']['structuredContent'];
             self::assertFalse($create->get_data()['result']['isError']);
-            self::assertSame('video', $created['entity_type']);
-            self::assertSame('ingest', $created['operation']);
+            self::assertSame('awaiting_review', $created['status']);
+            self::assertSame('REVIEW_REQUIRED', $created['mode']);
+            self::assertSame('review', $created['gate_reached']);
             $proposalId = (string) $created['proposal_id'];
             $proposal = (new WpdbProposalRepository($wpdb))->find($proposalId);
             self::assertNotNull($proposal);

@@ -190,7 +190,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.semantic.resolve` | Authority context | READ | No | N/A | No raw edge | READY; ambiguity fails closed |
 | `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
-| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + native draft token | Bounded neighborhood read; relation writes remain governed | LIVE RUNTIME ACCEPTANCE PASS (2026-09-09); full legacy Integration suite remains non-green |
+| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + native draft token | Bounded neighborhood read; relation writes remain governed | LIVE RUNTIME ACCEPTANCE PASS (2026-09-09); guarded Integration PASS (120 tests / 1,011 assertions, 4 canonical skips) |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Local implementation + focused proof; real-file runtime byte/rollback proof required |

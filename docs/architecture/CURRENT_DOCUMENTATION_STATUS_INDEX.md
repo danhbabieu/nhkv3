@@ -145,7 +145,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | `nhk.media.upload-batch` is PRIMARY multipart transport; native WordPress attachment lifecycle and canonical read-back precede separate governed `nhk-v3/media-ingest`; URL import is SECONDARY/IMPORT; base64 is FALLBACK/COMPATIBILITY; post-ingest semantic enrichment, relation reconciliation and representative reconciliation are mandatory; target acceptance remains runtime-gated |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the governed one-submission Capture boundary; `nhk.media.upload-batch` remains the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; the Ability bridge preserves connector multipart parts while delegating to the same transport; authenticated discovery, multipart/text-only capture and canonical read-back PASS on 2026-09-09; full legacy Integration suite remains non-green |
+| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the governed one-submission Capture boundary; `nhk.media.upload-batch` remains the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; the Ability bridge preserves connector multipart parts while delegating to the same transport; authenticated discovery, multipart/text-only capture and canonical read-back PASS on 2026-09-09; guarded Integration PASS follows the fixture/authentication reconciliation |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; binary multipart batch remains on the approved custom MCP boundary while metadata Media ingest remains the Ability bridge |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
 | Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
@@ -364,12 +364,12 @@ approved fixture or snapshot. The live Collector read path correctly returns
 absence into zero or complete data. No Authority seed, Knowledge, Evidence,
 Graph edge, Media/Video relation, Article or publication was created.
 
-The full Integration suite now reaches WordPress and reports 119 tests,
-796 assertions, 3 errors, 7 failures and 4 skips in existing Governance,
-maintenance-migration and MCP fixture/authentication cases. This is not
-claimed as Collector runtime PASS; the target branch read-back remains
-unverifiable until an approved canonical fixture is present. The exact rerun
-command is:
+The full Integration suite now reaches WordPress and passes 120 tests / 1,011
+assertions with 4 canonical skips, 1 warning and 1 deprecation. This closes
+the prior Governance rollback, corrupt-field, migration-target and MCP
+fixture/authentication blocker set; it does not claim Collector runtime PASS.
+The target branch read-back remains unverifiable until an approved canonical
+fixture is present. The exact rerun command is:
 
 `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`
 
@@ -418,8 +418,10 @@ returned zero rather than inventing an edge.
 The runtime fix is limited to allowing the text-only physical phase and
 normalizing PHP multipart array shape before Capture fingerprinting; the latter
 prevents `Array to string conversion` warnings and binds retries to real file
-bytes. Focused tests pass 28 tests / 259 assertions; full Unit passes 847 /
-4,020; `composer lint` and `git diff --check` pass. The full Integration suite
-still reports 119 tests / 796 assertions with 3 errors, 8 failures and 4
-skips, so the overall repository acceptance checkpoint remains BLOCKED even
-though the Editorial Capture runtime path itself is verified.
+bytes. Focused acceptance tests pass 28 tests / 259 assertions; full Unit
+passes 847 / 4,020; `composer lint` and `git diff --check` pass. The prior
+Integration blockers were reconciled in the test/fixture contract and the
+guarded suite now passes 120 tests / 1,011 assertions on two consecutive
+runs, with 4 canonical skips, 1 warning and 1 deprecation. Editorial Capture
+runtime and repository acceptance are both verified; Collector remains
+separately gated by its missing approved canonical fixture.
