@@ -90,6 +90,7 @@ final class Plugin {
         // upgrades do not need a deactivate/activate cycle to authorize P4.
         GovernanceCapabilities::register();
         McpAbilityRegistration::reconcileEasyMcpEnabledAbilities();
+        McpAbilityRegistration::reconcileEasyMcpAllowedToolPatterns();
         add_action('wp_abilities_api_categories_init', [McpAbilityRegistration::class, 'registerCategory']);
         add_filter('option_easy_mcp_ai_enabled_abilities', [McpAbilityRegistration::class, 'ensureEasyMcpEnabledAbilities']);
         // Easy MCP AI registers dynamic ability tools from its own bootstrap.

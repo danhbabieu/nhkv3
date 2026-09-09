@@ -531,6 +531,38 @@ final class McpContractTest extends TestCase
         }
     }
 
+    public function test_easy_mcp_generic_whitelist_reconciles_to_safe_operator_patterns(): void
+    {
+        $expected = [
+            'wp_ability_core_*',
+            'wp_ability_nhk_v3_*',
+            'wp_get_*',
+            'wp_list_*',
+            'wp_search_*',
+            'wp_count_*',
+        ];
+
+        self::assertSame($expected, McpAbilityRegistration::canonicalEasyMcpAllowedToolPatterns());
+        self::assertSame($expected, McpAbilityRegistration::ensureEasyMcpAllowedToolPatterns([]));
+        self::assertSame($expected, McpAbilityRegistration::ensureEasyMcpAllowedToolPatterns(['*', 'wp_create_post', 'wp_upload_media']));
+        self::assertSame($expected, McpAbilityRegistration::ensureEasyMcpAllowedToolPatterns($expected));
+    }
+
+    public function test_easy_mcp_generic_whitelist_preserves_reads_but_excludes_content_mutations(): void
+    {
+        $patterns = McpAbilityRegistration::canonicalEasyMcpAllowedToolPatterns();
+
+        self::assertContains('wp_get_*', $patterns);
+        self::assertContains('wp_list_*', $patterns);
+        self::assertContains('wp_search_*', $patterns);
+        self::assertContains('wp_count_*', $patterns);
+        self::assertNotContains('wp_create_post', $patterns);
+        self::assertNotContains('wp_update_post', $patterns);
+        self::assertNotContains('wp_upload_media', $patterns);
+        self::assertNotContains('wp_publish_post', $patterns);
+        self::assertSame($patterns, McpAbilityRegistration::ensureEasyMcpAllowedToolPatterns($patterns));
+    }
+
     public function test_documentation_abilities_use_the_read_capability_and_read_only_annotations(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');

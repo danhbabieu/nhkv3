@@ -7,6 +7,16 @@ final class McpAbilityRegistration
 {
     private const CATEGORY = 'nhk-v3-content-operations';
 
+    /** @var list<string> */
+    private const EASY_MCP_OPERATOR_ALLOWED_TOOL_PATTERNS = [
+        'wp_ability_core_*',
+        'wp_ability_nhk_v3_*',
+        'wp_get_*',
+        'wp_list_*',
+        'wp_search_*',
+        'wp_count_*',
+    ];
+
     public static function bootstrapRegistry(): void
     {
         if (function_exists('wp_get_abilities')) {
@@ -44,6 +54,27 @@ final class McpAbilityRegistration
         $current = is_array($current) ? array_values($current) : [];
         $desired = self::ensureEasyMcpEnabledAbilities($current);
         if ($current !== $desired) update_option('easy_mcp_ai_enabled_abilities', $desired, false);
+    }
+
+    /** @return list<string> */
+    public static function canonicalEasyMcpAllowedToolPatterns(): array
+    {
+        return self::EASY_MCP_OPERATOR_ALLOWED_TOOL_PATTERNS;
+    }
+
+    /** @param mixed $patterns @return list<string> */
+    public static function ensureEasyMcpAllowedToolPatterns(mixed $patterns): array
+    {
+        return self::canonicalEasyMcpAllowedToolPatterns();
+    }
+
+    public static function reconcileEasyMcpAllowedToolPatterns(): void
+    {
+        if (!function_exists('get_option') || !function_exists('update_option')) return;
+        $current = get_option('easy_mcp_ai_allowed_tool_patterns', []);
+        $current = is_array($current) ? array_values($current) : [];
+        $desired = self::ensureEasyMcpAllowedToolPatterns($current);
+        if ($current !== $desired) update_option('easy_mcp_ai_allowed_tool_patterns', $desired, false);
     }
 
     /**
