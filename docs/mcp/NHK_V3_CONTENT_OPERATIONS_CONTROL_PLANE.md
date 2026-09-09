@@ -60,6 +60,40 @@ coordinator therefore reports `READY_FOR_PUBLICATION` or `REVIEW_REQUIRED`
 until an eligible owner publication operation returns a verified native
 published read-back.
 
+#### Claim selection, trace and connector-exposure rule — 2026-09-09
+
+Graph reachability is discovery only. A relation path may make a Claim a
+candidate, but it is never sufficient permission to use that Claim in Article
+prose. Capture Claim retrieval must keep the canonical Claim ID/revision,
+semantic subject, relation path, scope, provenance, evidence state and
+relevance decision. Direct use requires evidence that is supported within the
+same scope, usable provenance and sufficient relevance to the Capture intent;
+specimen-only Claims must not generalize upward. Missing/insufficient evidence
+or provenance remains `review`, and incompatible scope remains `exclude`.
+
+Article composition may synthesize only the selected Claim set and must retain a
+body-free `claim_trace` plus a research snapshot of Claim IDs/revisions. It must
+not dump raw Claim text as a semantic copy, turn generated prose into Evidence,
+or create a second factual store inside the Article/Capture receipt.
+
+The accepted Capture adapter currently covers text-only and multipart image
+submissions. Video remains a distinct canonical external-reference intake and
+is not yet a physical asset branch inside `nhk.capture.ingest`. A submission
+that includes Video must therefore preserve the Video boundary and must not be
+reported as one unified Capture-complete workflow until a registered shared
+adapter exists. The implementation may reuse the semantic core, but it must not
+create a duplicate Article, duplicate Video or convenience relation to imitate
+missing orchestration.
+
+Executable runtime capability and connector exposure are separate facts. A
+registered runtime tool/Ability can be absent from one connector surface or
+conversation. Such absence is a `CLIENT_EXPOSURE_GAP`, not proof that the
+runtime catalog lacks the capability. Conversely, a client that cannot invoke a
+required boundary must fail closed for that step; it must not substitute generic
+WordPress Post/Media writers, historical Ability assumptions or an old
+workflow. Fresh target discovery/read-back remains required before claiming
+client callability.
+
 The Governance Automation Policy is resolved in the shared application
 orchestration boundary used by MCP and Admin. Its only modes are
 `REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH`; absent configuration is
@@ -195,17 +229,19 @@ require their own governed proposal and read-back.
 | Area | Status | Classification |
 |---|---|---|
 | Existing Article reconcile preflight | partial | CODE_GAP for full research packet |
-| Editorial Capture coordinator | persisted/resumable boundary with text-only and multipart paths | authenticated multipart, canonical read-back and governed semantic apply PASS on 2026-09-09; publication remains owner-policy gated |
+| Editorial Capture coordinator | persisted/resumable boundary with text-only and multipart image paths; runtime/repository acceptance verified on 2026-09-09 | semantic candidates still require Governance and owner publication remains policy-gated |
+| Video inside shared Capture | not yet unified under the physical Capture adapter | CODE_GAP / ADAPTER_GAP; keep canonical Video intake separate and do not fake Capture completion |
+| Connector exposure parity | environment/client-specific subset may differ from executable runtime catalog | `CLIENT_EXPOSURE_GAP`; fresh discovery/read-back required, no generic-writer fallback |
 | SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
 | Shared capability source | partial catalog | CODE_GAP for manifest consumers |
-| WordPress editorial gateway | draft create/update boundary | runtime-unverified pending exact integration DB | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |
+| WordPress editorial gateway | draft create/update boundary | Capture integration acceptance verified for the tested path; other exact gateway operations remain runtime-specific | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |
 | Taxonomy gateway | typed category facade exposed in MCP | runtime-unverified pending exact integration DB | no fuzzy-create, no Graph/semantic mutation, guarded delete |
 | Related semantic query | existing bounded query, policy gaps remain | CODE_GAP/REGISTRY_GAP where traversal policy is absent |
-| Video → Living Knowledge | planning seam implemented; target-handoff smoke verified | apply remains separate Governance boundary; guarded integration still ENVIRONMENT_BLOCKED |
-| Media → Living Knowledge | not implemented | CODE_GAP; MediaUsage/depicts/OCR must not be promoted implicitly |
+| Video → Living Knowledge | planning seam implemented; target-handoff smoke verified | apply remains separate Governance boundary; no implicit Claim/Evidence write from preview |
+| Media → Living Knowledge | no automatic claim-writing adapter | CODE_GAP; MediaUsage/depicts/OCR must not be promoted implicitly, while post-ingest semantic reconciliation remains mandatory |
 | Article → Living Knowledge automatic body update | not implemented by design | suggestion-only until separately governed |
 | Product–Specimen persistence | unavailable | REGISTRY_GAP/CONTRACT_EXTENSION_REQUIRED |
-| Live data application | prohibited in this slice | HUMAN GATE |
+| Live data application | governed per owning workflow; not implied by documentation | HUMAN/POLICY GATE where current policy requires it |
 
 ## Current semantic merge blocker
 
