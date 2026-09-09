@@ -195,7 +195,7 @@ require their own governed proposal and read-back.
 | Area | Status | Classification |
 |---|---|---|
 | Existing Article reconcile preflight | partial | CODE_GAP for full research packet |
-| Editorial Capture coordinator | code-side persisted/resumable boundary with text-only and multipart paths | semantic apply, authenticated multipart and target-runtime read-back remain RUNTIME-GATED |
+| Editorial Capture coordinator | persisted/resumable boundary with text-only and multipart paths | authenticated multipart, canonical read-back and governed semantic apply PASS on 2026-09-09; publication remains owner-policy gated |
 | SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
 | Shared capability source | partial catalog | CODE_GAP for manifest consumers |
 | WordPress editorial gateway | draft create/update boundary | runtime-unverified pending exact integration DB | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |

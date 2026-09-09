@@ -462,10 +462,15 @@ final class Plugin {
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
                 static function (array $input) use ($mediaBatchUpload): array {
+                    $files = is_array($input['files'] ?? null) ? $input['files'] : [];
+                    if ($files === []) {
+                        return ['status' => 'verified', 'items' => [], 'count' => 0];
+                    }
+
                     return $mediaBatchUpload->upload(
                         (string) ($input['idempotency_key'] ?? '') . ':assets',
                         is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
-                        is_array($input['files'] ?? null) ? $input['files'] : [],
+                        $files,
                         is_array($input['items'] ?? null) ? $input['items'] : [],
                     );
                 },

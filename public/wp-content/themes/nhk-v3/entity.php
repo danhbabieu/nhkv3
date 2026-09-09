@@ -68,7 +68,7 @@ get_header();
         'condition_guidance' => 'Tình trạng hiện vật', 'originality_guidance' => 'Độ nguyên bản',
         'provenance' => 'Nguồn gốc', 'rarity' => 'Độ hiếm', 'origin_certification' => 'Xác nhận xuất xứ',
     ];
-    $collectorOrder = ['display_form', 'dimensions', 'dating', 'case_styles', 'motifs', 'materials', 'craft_modes', 'production_scale', 'movement_family', 'running_duration', 'drive_system', 'functions', 'sound', 'music', 'automata', 'night_shutoff', 'condition_guidance', 'originality_guidance', 'provenance', 'rarity', 'origin_certification'];
+    $collectorOrder = ['display_form', 'case_styles', 'dimensions', 'dating', 'movement_family', 'running_duration', 'drive_system', 'functions', 'sound', 'music', 'automata', 'night_shutoff', 'materials', 'craft_modes', 'production_scale', 'condition_guidance', 'originality_guidance', 'provenance', 'rarity', 'origin_certification'];
 ?>
   <p class="breadcrumb"><a href="<?php echo esc_url(home_url('/')); ?>">NHK</a> <span>/</span> <a href="<?php echo esc_url(home_url($archivePaths[$type] ?? '/')); ?>"><?php echo esc_html($label); ?></a></p>
 

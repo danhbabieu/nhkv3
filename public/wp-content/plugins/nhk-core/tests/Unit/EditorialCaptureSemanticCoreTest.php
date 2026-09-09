@@ -91,6 +91,56 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame('READY_FOR_PUBLICATION', $first->stage);
         self::assertContains('OWNER_PUBLICATION_REQUIRED', $first->diagnostics['publication']['blockers']);
     }
+
+    public function test_multipart_fingerprint_binds_file_content_without_array_cast_warnings(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 56, 'state_token' => 'token-56', 'post' => ['post_id' => 56]],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $firstPath = tempnam(sys_get_temp_dir(), 'nhk-capture-');
+        $secondPath = tempnam(sys_get_temp_dir(), 'nhk-capture-');
+        self::assertIsString($firstPath);
+        self::assertIsString($secondPath);
+        file_put_contents($firstPath, 'first image');
+        file_put_contents($secondPath, 'second image');
+        $input = static fn (string $path): array => [
+            'idempotency_key' => 'capture-multipart-fingerprint',
+            'text' => 'Multipart fingerprint test.',
+            'files' => ['files' => [
+                'name' => ['capture.jpg'],
+                'size' => [filesize($path)],
+                'tmp_name' => [$path],
+            ]],
+        ];
+
+        set_error_handler(static function (int $severity, string $message): never {
+            throw new \ErrorException($message, 0, $severity);
+        });
+        try {
+            $first = $coordinator->execute($input($firstPath));
+        } finally {
+            restore_error_handler();
+        }
+        $conflict = $coordinator->execute($input($secondPath));
+        @unlink($firstPath);
+        @unlink($secondPath);
+
+        self::assertSame('READY_FOR_PUBLICATION', $first->stage);
+        self::assertSame('IDEMPOTENCY_CONFLICT', $conflict->status);
+        self::assertSame('CAPTURE_IDEMPOTENCY_KEY_REUSED', $conflict->diagnostics['failure']['code']);
+    }
 }
 
 final class InMemoryCaptureRepository implements CaptureRepository

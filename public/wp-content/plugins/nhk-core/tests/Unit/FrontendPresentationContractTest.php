@@ -40,6 +40,13 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('nhk_v3_public_dictionary_terms_for_text', $source);
     }
 
+    public function test_collector_profile_uses_collector_first_facet_order_and_keeps_makers_last(): void
+    {
+        $source = $this->read('entity.php');
+        self::assertStringContainsString("\$collectorOrder = ['display_form', 'case_styles', 'dimensions', 'dating', 'movement_family', 'running_duration', 'drive_system', 'functions', 'sound', 'music', 'automata', 'night_shutoff', 'materials', 'craft_modes', 'production_scale', 'condition_guidance', 'originality_guidance', 'provenance', 'rarity', 'origin_certification'];", $source);
+        self::assertGreaterThan(strpos($source, 'collector-media-video'), strpos($source, 'collector-makers'));
+    }
+
     public function test_brand_detail_prefers_dossier_structural_sections_and_uses_legacy_aggregation_only_as_fallback(): void
     {
         $source = $this->read('entity.php');

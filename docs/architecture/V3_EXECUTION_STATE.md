@@ -6252,3 +6252,112 @@ upscale or gallery repair was performed.
 `ANH_LOCAL_RUNTIME_VERIFY=ENVIRONMENT_BLOCKED`
 `ANH_DEMO_RUNTIME_VERIFY=NOT_DEPLOYED`
 `READY_FOR_DEPLOY=NO`
+
+# Checkpoint — 2026-09-09 — Collector runtime/database and canonical fixture recheck
+
+The Collector continuation first ran the exact guarded Integration command:
+
+`NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`
+
+The first sandbox attempt stopped at WordPress database bootstrap with
+`Error establishing a database connection`. Read-only OS/config diagnostics
+found the existing Homebrew MySQL daemon listening on `127.0.0.1:3306`, the
+existing `/tmp/mysql.sock`, the root `wp-config.php` selected by
+`public/wp-load.php`, and deterministic test settings (`root`, empty password,
+TCP host). With the required local-runtime permission, `mysqladmin ping` over
+both TCP and socket succeeded; read-only MySQLi probes selected
+`nhk_v3_test` and confirmed that database exists. This classifies the original
+DB failure as `ENVIRONMENT_BLOCKED` for the sandbox runner, not a
+repository-managed code/bootstrap bug. No DB fix, credential change, service
+restart, migration, SQL mutation or seed was performed.
+
+The Integration suite then reached WordPress and ran 119 tests / 796
+assertions, with 3 errors, 7 failures and 4 skips. The failures are in existing
+Governance Video rollback, proposal corrupt-field fixtures, maintenance
+migration expectations and MCP schema/authentication fixtures; they are
+reported explicitly and were not hidden or downgraded. The suite is therefore
+not a green full-runtime gate.
+
+Collector read-back against the exact `nhk_v3_test` target found the Authority
+table/schema but no requested Classification:
+
+- UUID: `01a07614-832d-7f27-959c-74eb0cd63f3e`
+- stable key: `nhk:classification:clock-type.cuckoo-clock`
+- Profile result: `status=unavailable`, `reason=CLASSIFICATION_NOT_AVAILABLE`
+- coverage audit: `classification_count=0`, `available_count=0`
+
+Read-only comparison against development `nhk_v3` found 174 Classification
+rows but no requested UUID/stable key; its Collector audit reports no Knowledge,
+Media or Video for the observed Classification rows. The handoff ZIP was
+inspected and contains Markdown/specification documents only, with no approved
+fixture, snapshot or database dump. This is recorded as
+`CANONICAL_FIXTURE_BLOCKED`, not as a claim that the branch has zero data and
+not as permission to invent or seed an empty node.
+
+The implementation gates remain green at code level: focused Collector/API/
+frontend/preflight/coverage tests pass 86 tests / 800 assertions; full Unit
+passes 845 tests / 4,012 assertions; Composer validation is valid with the
+pre-existing missing-license warning; PHP lint and `git diff --check` pass;
+secret review found no matching key material. There is no separate project JS
+build/typecheck surface in this checkout. Collector runtime acceptance items
+1–4, Article preflight live read-back, candidate reconciliation/seed, coverage
+table on the named branch and exact idempotency replay remain `NOT_RUN` until
+an approved canonical fixture is supplied in the exact governed runtime.
+
+Required environment/data fix before rerun: execute the guarded command from a
+runner permitted to connect to local MySQL, and provide or restore the
+separately approved canonical Cuckoo fixture in `nhk_v3_test`; do not point
+Integration at `nhk_v3`, manufacture a fake DB, or create a node merely to
+make the profile available. Expected result after that prerequisite is a live
+subject read-back with the requested UUID/stable key, truthful >50 Knowledge
+pagination and branch-scoped Media/Video/Article/Brand diagnostics, followed
+by the governed acceptance sequence. No seed or production/V2/staging action
+was performed in this checkpoint.
+
+# Checkpoint — 2026-09-09 — Editorial Capture runtime acceptance
+
+Migration 017 was applied and rerun on `nhk_v3_test`; the migration ledger
+remained at 17 and the Capture checkpoint table read back with all expected
+columns. The exact runtime was authenticated with `nhk-mcp-466fd667` and no
+production, staging or V2 database was touched.
+
+Live MCP/Ability discovery passed for `nhk.capture.ingest` and
+`nhk-v3/capture-ingest`: the catalog and Ability schemas both expose native
+multipart `files[]`, text-only input and idempotency metadata; authenticated
+discovery returned 200 and anonymous discovery returned 401. The custom
+`/nhk/v1/mcp` transport accepted authenticated text-only and multipart calls.
+
+Runtime fixtures passed the complete Capture chain and final native
+WordPress read-back. Fixture A was text-only (Capture
+`01a0848c-1ba5-708f-8821-4a08dbdab531`, Article 2760); fixture B used one real
+image (Capture `01a0848d-bb1e-7deb-a5bb-6a8b26826e6f`, Article 2766, attachment
+2765, Media `01a0848d-bb59-72d2-805b-aab3d313bce2`); fixture C used two real
+images (Capture `01a0848e-918e-7d97-b0e4-8f17148fd020`, Article 2773,
+attachments 2771/2772, Media
+`01a0848e-91c9-7d8c-b475-c20086c1a108` and
+`01a0848e-91e3-7833-8dcd-fb7a0bf0019b`). Each resolved `Vertical Brand`,
+returned bounded Claim retrieval, reconciled MediaUsage, ran the publication
+gate and verified the final draft read-back. Publication remained
+`OWNER_REVIEW_REQUIRED`/`EDITORIAL_CAS_REQUIRED`, as required by policy.
+
+The same-key retries preserved one Capture and one Article for each fixture;
+the multipart fingerprint fix also binds retries to real file checksums and
+removes PHP array-cast warnings. Governed semantic write-back passed through
+the same boundary for all fixtures: A proposal
+`01a08495-1f73-75aa-9103-b835a7d1e266` applied Claim
+`01a08495-1f8c-7016-86e4-68460a178640`; B proposal
+`01a08495-c6e2-7ad0-a391-1a40c3d74bb3` applied Claim
+`01a08495-c6f3-77aa-b252-995b97de8997`; C proposal
+`01a08497-ae2b-713e-b4ee-ded253f55717` applied Claim
+`01a08497-ae41-7705-97b4-509df16e8575`. All passed submit → review → owner
+approve → eligibility ready → Controlled Apply → canonical read-back. Same-key
+replay returned the existing applied proposal. No relation hint existed, so no
+Graph edge was invented and Graph read-back correctly returned an empty set.
+
+Focused acceptance tests pass 28 tests / 259 assertions; full Unit passes 847
+tests / 4,020 assertions; `composer lint` and `git diff --check` pass. The
+full Integration suite reached the permitted runtime but remains non-green at
+119 tests / 796 assertions: 3 errors, 8 failures and 4 skips, including
+pre-existing Governance/MCP fixture expectations and migration tests that
+expect version 16 after this authorized 017 run. Therefore this checkpoint is
+`RUNTIME_ACCEPTANCE_VERIFIED / REPOSITORY_ACCEPTANCE_BLOCKED`, not COMPLETE.

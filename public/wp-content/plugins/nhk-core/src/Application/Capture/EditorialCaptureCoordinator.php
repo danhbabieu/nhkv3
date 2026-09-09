@@ -193,11 +193,27 @@ final class EditorialCaptureCoordinator
     private function fingerprint(array $input): string
     {
         unset($input['operation_id']);
-        if (isset($input['files']) && is_array($input['files'])) $input['files'] = array_map(function (mixed $file): mixed {
-            if (!is_array($file)) return $file;
-            $path = (string) ($file['tmp_name'] ?? '');
-            return ['name' => (string) ($file['name'] ?? ''), 'size' => (int) ($file['size'] ?? 0), 'checksum' => is_file($path) ? hash_file('sha256', $path) : null];
-        }, $input['files']);
+        if (isset($input['files']) && is_array($input['files'])) {
+            $batch = isset($input['files']['files']) && is_array($input['files']['files']) ? $input['files']['files'] : $input['files'];
+            if (isset($batch['tmp_name']) && is_array($batch['tmp_name'])) {
+                $normalized = [];
+                foreach ($batch['tmp_name'] as $index => $path) {
+                    $path = is_string($path) ? $path : '';
+                    $normalized[] = [
+                        'name' => is_array($batch['name'] ?? null) ? (string) ($batch['name'][$index] ?? '') : '',
+                        'size' => is_array($batch['size'] ?? null) ? (int) ($batch['size'][$index] ?? 0) : 0,
+                        'checksum' => is_file($path) ? hash_file('sha256', $path) : null,
+                    ];
+                }
+                $input['files'] = $normalized;
+            } else {
+                $input['files'] = array_map(static function (mixed $file): mixed {
+                    if (!is_array($file)) return $file;
+                    $path = is_string($file['tmp_name'] ?? null) ? $file['tmp_name'] : '';
+                    return ['name' => (string) ($file['name'] ?? ''), 'size' => (int) ($file['size'] ?? 0), 'checksum' => is_file($path) ? hash_file('sha256', $path) : null];
+                }, $input['files']);
+            }
+        }
         return hash('sha256', json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 

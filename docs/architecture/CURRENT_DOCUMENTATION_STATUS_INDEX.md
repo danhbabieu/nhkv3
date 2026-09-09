@@ -145,7 +145,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | `nhk.media.upload-batch` is PRIMARY multipart transport; native WordPress attachment lifecycle and canonical read-back precede separate governed `nhk-v3/media-ingest`; URL import is SECONDARY/IMPORT; base64 is FALLBACK/COMPATIBILITY; post-ingest semantic enrichment, relation reconciliation and representative reconciliation are mandatory; target acceptance remains runtime-gated |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the governed one-submission Capture boundary; `nhk.media.upload-batch` remains the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; the Ability bridge preserves connector multipart parts while delegating to the same transport; discovery existence is not live callability, and authenticated `upload_files`/capture read-back is still required |
+| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the governed one-submission Capture boundary; `nhk.media.upload-batch` remains the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; the Ability bridge preserves connector multipart parts while delegating to the same transport; authenticated discovery, multipart/text-only capture and canonical read-back PASS on 2026-09-09; full legacy Integration suite remains non-green |
 | WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; binary multipart batch remains on the approved custom MCP boundary while metadata Media ingest remains the Ability bridge |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
 | Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
@@ -343,3 +343,83 @@ branch-scoped Article preflight, inventory filter enforcement, coverage audit,
 candidate reconciliation, public identity and Governance suites. Target
 WordPress read-back is still environment-gated; no semantic seed, Graph edge,
 public URL allocation, article, publication or external push was performed.
+
+### Collector runtime recheck — 2026-09-09
+
+The exact Integration command was rerun with `NHK_WP_TEST_DB=nhk_v3_test` and
+`NHK_WP_TEST_PATH=public`. The initial sandbox database error was classified at
+the connection boundary: MySQL is alive on TCP `127.0.0.1:3306` and
+`/tmp/mysql.sock`, and read-only TCP/socket handshakes both select
+`nhk_v3_test` when executed with the required local-runtime permission. The
+repository `wp-config.php` and `public/wp-load.php` path are therefore not a
+code/bootstrap defect.
+
+The remaining Collector acceptance gate is `CANONICAL_FIXTURE_BLOCKED`: the
+requested Classification UUID
+`01a07614-832d-7f27-959c-74eb0cd63f3e` and stable key
+`nhk:classification:clock-type.cuckoo-clock` are absent from both
+`nhk_v3_test` and `nhk_v3`; the handoff ZIP contains documentation only and no
+approved fixture or snapshot. The live Collector read path correctly returns
+`CLASSIFICATION_NOT_AVAILABLE`, and the coverage audit does not convert that
+absence into zero or complete data. No Authority seed, Knowledge, Evidence,
+Graph edge, Media/Video relation, Article or publication was created.
+
+The full Integration suite now reaches WordPress and reports 119 tests,
+796 assertions, 3 errors, 7 failures and 4 skips in existing Governance,
+maintenance-migration and MCP fixture/authentication cases. This is not
+claimed as Collector runtime PASS; the target branch read-back remains
+unverifiable until an approved canonical fixture is present. The exact rerun
+command is:
+
+`NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`
+
+### Editorial Capture runtime acceptance — 2026-09-09
+
+Migration 017 was applied and rerun on the exact `nhk_v3_test` runtime. The
+ledger is `17` after both runs and `wp_nhk_editorial_captures` has the expected
+Capture checkpoint columns. No production or staging database was used.
+
+Authenticated live discovery returned both `nhk.capture.ingest` and
+`nhk-v3/capture-ingest`, with matching `files[]` binary schema, text-only
+contract, idempotency metadata and capability enforcement. Authenticated
+Ability discovery returned `200`; anonymous discovery returned `401`.
+
+Fixtures completed through native draft, attachment read-back, canonical Media
+adoption, subject resolution, bounded Claim retrieval, composition,
+MediaUsage, publication gate and final WordPress read-back:
+
+- A text-only: Capture `01a0848c-1ba5-708f-8821-4a08dbdab531`, Article `2760`,
+  subject `01a08489-b9b2-7840-ba91-f554562b11a4` (`Vertical Brand`), no
+  attachments, two placeholder MediaUsage slots, final state `PARTIAL` because
+  owner publication review remains required.
+- B text + one image: Capture `01a0848d-bb1e-7deb-a5bb-6a8b26826e6f`, Article
+  `2766`, attachment `2765`, Media
+  `01a0848d-bb59-72d2-805b-aab3d313bce2`, one canonical Media row and one
+  MediaUsage row; retry reused the same Capture/Article/attachment/Media.
+- C text + two images: Capture `01a0848e-918e-7d97-b0e4-8f17148fd020`, Article
+  `2773`, attachments `2771,2772`, Media
+  `01a0848e-91c9-7d8c-b475-c20086c1a108` and
+  `01a0848e-91e3-7833-8dcd-fb7a0bf0019b`; retry kept one Capture/Article and
+  two canonical Media/MediaUsage rows.
+
+Semantic write-back was exercised through the existing Governance boundary for
+all three fixtures. A used proposal
+`01a08495-1f73-75aa-9103-b835a7d1e266` and Claim
+`01a08495-1f8c-7016-86e4-68460a178640`; B used proposal
+`01a08495-c6e2-7ad0-a391-1a40c3d74bb3` and Claim
+`01a08495-c6f3-77aa-b252-995b97de8997`; C used proposal
+`01a08497-ae2b-713e-b4ee-ded253f55717` and Claim
+`01a08497-ae41-7705-97b4-509df16e8575`. Each passed submit, review, approve,
+eligibility and apply with canonical read-back; same-key proposal replay
+returned the existing applied proposal and the test database has one active
+Claim per fixture. No relation hint was produced, so Graph read-back correctly
+returned zero rather than inventing an edge.
+
+The runtime fix is limited to allowing the text-only physical phase and
+normalizing PHP multipart array shape before Capture fingerprinting; the latter
+prevents `Array to string conversion` warnings and binds retries to real file
+bytes. Focused tests pass 28 tests / 259 assertions; full Unit passes 847 /
+4,020; `composer lint` and `git diff --check` pass. The full Integration suite
+still reports 119 tests / 796 assertions with 3 errors, 8 failures and 4
+skips, so the overall repository acceptance checkpoint remains BLOCKED even
+though the Editorial Capture runtime path itself is verified.
