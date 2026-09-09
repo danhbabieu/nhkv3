@@ -111,13 +111,15 @@ final class McpReadHandler
     public function canonicalInventory(array $filters, int $limit = 50, ?string $after = null): array
     {
         if ($this->canonicalInventory === null) return ['status' => 'unavailable', 'reason' => 'CANONICAL_INVENTORY_UNAVAILABLE'];
-        return ['status' => 'available'] + $this->canonicalInventory->inventory($filters, $limit, $after)->toArray();
+        $page = $this->canonicalInventory->inventory($filters, $limit, $after);
+        return $page->reason !== null ? ['status' => 'unavailable', 'reason' => $page->reason] : ['status' => 'available'] + $page->toArray();
     }
 
     public function graphInventory(array $filters, int $limit = 50, ?string $after = null): array
     {
         if ($this->graphInventory === null) return ['status' => 'unavailable', 'reason' => 'GRAPH_INVENTORY_UNAVAILABLE'];
-        return ['status' => 'available'] + $this->graphInventory->inventory($filters, $limit, $after)->toArray();
+        $report = $this->graphInventory->inventory($filters, $limit, $after);
+        return $report->reason !== null ? ['status' => 'unavailable', 'reason' => $report->reason] : ['status' => 'available'] + $report->toArray();
     }
 
     public function relationBackfillDryRun(array $records): array

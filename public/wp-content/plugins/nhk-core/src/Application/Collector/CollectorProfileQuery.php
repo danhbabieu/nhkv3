@@ -130,7 +130,11 @@ final class CollectorProfileQuery
     private function facet(array $metadata): string
     {
         $requested = trim((string) ($metadata['collector_facet'] ?? ''));
-        if ($requested !== '') return in_array($requested, self::GROUPS, true) ? $requested : '';
+        if ($requested !== '') {
+            if (!in_array($requested, self::GROUPS, true)) return '';
+            if ($requested === 'automata' && !in_array((string) ($metadata['scope'] ?? ''), ['model', 'variant', 'specimen_observation'], true)) return '';
+            return $requested;
+        }
         return match ((string) ($metadata['facet'] ?? '')) {
             'chronology' => 'dating',
             'movement' => 'movement_family',

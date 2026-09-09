@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Frontend;
 
+use NHK\Core\Application\Collector\{CollectorCoverageAudit, CollectorProfileQuery};
 use NHK\Core\Application\Entity\{EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierCoverageAudit, SemanticDossierQuery};
 use NHK\Core\Application\Graph\{GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\{EntityKnowledgeProjection, KnowledgePageQuery};
@@ -17,7 +18,7 @@ use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepo
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\Projection\{WpdbProjectionDependencyIndex, WpdbProjectionRevisionStore, WpdbProjectionSchema};
-use NHK\Core\Infrastructure\Http\ProjectionAdminApi;
+use NHK\Core\Infrastructure\Http\{CollectorProfileApi, ProjectionAdminApi};
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 /**
@@ -84,13 +85,14 @@ final class FrontendSemanticBootstrap
                 'excerpt' => function_exists('get_the_excerpt') ? (string) get_the_excerpt($post) : '',
             ];
         };
+        $relatedQuery = new RelatedSemanticQuery($graph, new PredicateTraversalPolicy($predicates));
         $dossier = new SemanticDossierQuery(
             $authority,
             $types,
             new PublicIdentityContract($types),
             $eligibility,
             $routes,
-            new RelatedSemanticQuery($graph, new PredicateTraversalPolicy($predicates)),
+            $relatedQuery,
             $entityKnowledge,
             $entityMedia,
             $media,
@@ -98,8 +100,16 @@ final class FrontendSemanticBootstrap
             $postProjector,
             $gallery,
         );
+        $collectorProfile = new CollectorProfileQuery(
+            $authority,
+            $claims,
+            $evidence,
+            $sources,
+            self::collectorRelatedReader($relatedQuery, $authority, $eligibility, $routes, $media, $usages, $videos),
+        );
+        add_action('rest_api_init', [new CollectorProfileApi($collectorProfile), 'register']);
         $coverageAudit = new SemanticDossierCoverageAudit($types, $authority, static fn(AuthorityEntity $entity): array => $dossier->forEntity($entity));
-        (new SemanticDossierCoverageAdminPage($coverageAudit))->register();
+        (new SemanticDossierCoverageAdminPage($coverageAudit, new CollectorCoverageAudit($authority, $collectorProfile), new \NHK\Core\Application\Collector\CollectorAuthoritySeedReconciler($authority)))->register();
 
         add_filter('nhk_v3_home_semantic_modules', static function(array $modules) use ($status, $gallery, $knowledgeArchive): array {
             if ($status->mediaStorageReady()) $modules['media'] = $gallery->archive(1, 8)['items'];
@@ -113,12 +123,16 @@ final class FrontendSemanticBootstrap
             return $modules;
         }, 20, 1);
 
-        add_filter('nhk_v3_entity_detail_projection', static function(array $item, object $entity) use ($dossier, $claimProjection): array {
+        add_filter('nhk_v3_entity_detail_projection', static function(array $item, object $entity) use ($dossier, $claimProjection, $collectorProfile): array {
             if ($entity instanceof AuthorityEntity) {
                 $item['dossier'] = $dossier->forEntity($entity);
                 $item['claim_projection'] = $claimProjection->getLedger($entity->canonicalId, ['node_type' => $entity->entityType]);
                 $published = $claimProjection->getPublishedSeoProjection($entity->canonicalId);
                 if (is_array($published)) $item['published_claim_projection'] = $published;
+                if ($entity->entityType === 'classification') {
+                    $item['collector_profile'] = $collectorProfile->build($entity->canonicalId, 1, 50);
+                    if (is_array($item['dossier'] ?? null)) $item['dossier']['collector_profile'] = $item['collector_profile'];
+                }
             }
             return $item;
         }, 10, 2);
@@ -135,5 +149,45 @@ final class FrontendSemanticBootstrap
             $projection = $entityMedia->forEntity('wp_post', $blogId . ':' . $postId);
             return is_array($projection) ? $projection : $value;
         }, 10, 2);
+    }
+
+    private static function collectorRelatedReader(
+        RelatedSemanticQuery $relations,
+        WpdbAuthorityRepository $authority,
+        PublicEntityEligibilityPolicy $eligibility,
+        PublicRouteResolver $routes,
+        WpdbMediaRepository $media,
+        WpdbMediaUsageRepository $usages,
+        WpdbVideoRepository $videos,
+    ): \Closure {
+        return static function (string $classificationId, array $filters) use ($relations, $authority, $eligibility, $routes, $media, $usages, $videos): array {
+            if (($filters['subject_uuid'] ?? '') !== $classificationId || ($filters['branch_scoped'] ?? false) !== true) return ['status' => 'unavailable', 'reason' => 'BRANCH_FILTER_UNSUPPORTED'];
+            $result = $relations->query(new \NHK\Core\Domain\Graph\NodeReference('classification', $classificationId), ['brand', 'video', 'wp_post'], 2, 200);
+            if (($result['status'] ?? '') !== 'available') return ['status' => 'unavailable', 'reason' => 'BRANCH_RELATION_UNAVAILABLE'];
+            $groups = ['media' => [], 'videos' => [], 'articles' => [], 'makers' => []];
+            foreach ((array) ($result['items'] ?? []) as $item) {
+                if (!is_array($item)) continue;
+                $type = (string) ($item['target_entity_type'] ?? '');
+                $id = trim((string) ($item['target_entity_id'] ?? ''));
+                if ($id === '') continue;
+                if ($type === 'brand') {
+                    $entity = $authority->findByCanonicalId($id);
+                    if ($entity instanceof \NHK\Core\Domain\Authority\AuthorityEntity && $eligibility->evaluate($entity)->eligible && ($url = $routes->path($entity)) !== null) $groups['makers'][$id] = ['type' => 'brand', 'uuid' => $id, 'name' => $entity->canonicalName, 'url' => $url];
+                } elseif ($type === 'video') {
+                    $video = $videos->findByCanonicalId($id);
+                    if ($video !== null && $video->active && $video->hasValidPublicReference()) $groups['videos'][$id] = ['type' => 'video', 'uuid' => $id, 'title' => $video->title];
+                } elseif ($type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {
+                    $postId = (int) $match[2];
+                    if (function_exists('get_post_status') && get_post_status($postId) === 'publish') $groups['articles'][$id] = ['type' => 'wp_post', 'uuid' => $id, 'title' => function_exists('get_the_title') ? (string) get_the_title($postId) : ''];
+                }
+            }
+            foreach ($usages->listByEndpoint('classification', $classificationId) as $usage) {
+                $item = $media->findByCanonicalId($usage->mediaId);
+                if ($item !== null && $item->active && $item->readiness === 'ready' && !$item->isSystemPlaceholder()) $groups['media'][$item->canonicalId] = ['type' => 'media', 'uuid' => $item->canonicalId, 'name' => $item->canonicalName, 'role' => $usage->role];
+            }
+            foreach ($groups as &$items) $items = array_values($items);
+            unset($items);
+            return ['status' => 'available', 'scope' => 'subject', 'branch_scoped' => true] + $groups;
+        };
     }
 }

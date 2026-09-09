@@ -138,6 +138,49 @@ the approved candidate stable keys.
 
 CANONICAL EFFECT: no canonical schema, semantic writer or parallel collector
 store was introduced. Authority remains identity owner, Knowledge remains
+atomic claims, Source/Evidence remains provenance, Graph remains the relation
+system, Media/Video retain distinct boundaries and WordPress posts remain
+editorial truth. Candidate NO_MATCH results do not create empty nodes.
+
+TESTS: full Unit suite passes 845 tests / 4,012 assertions. Focused
+Collector/API/frontend/preflight/inventory/coverage/identity/Governance suites
+are green, PHP lint and git diff --check are green.
+
+RUNTIME READ-BACK: the guarded Integration suite cannot bootstrap the local
+WordPress database (`Error establishing a database connection`). No target
+read-back, candidate evidence attachment, semantic apply, public identity
+allocation or article creation was run. No V2, staging or production data was
+touched.
+
+UNRESOLVED: actual candidate creation requires runtime resolve with
+evidence-backed immediate consumers and governed create/read-back; the
+foundational collector article remains blocked until a resolved subject,
+isolated inventory, category/media readiness and authorized native draft
+runtime are available. No global reprojection is permitted.
+
+NEXT EXACT OPERATION: run the guarded target-runtime resolve/reconcile and
+coverage read-back; only for NO_MATCH candidates with existing Evidence-backed
+Knowledge, submit the governed Authority proposal and verify canonical
+read-back/idempotency. Then perform human-reviewed native WordPress draft
+planning; do not publish automatically.
+
+# Checkpoint — 2026-09-09 — Collector-centric projection and coverage closure
+
+ROOT GAP: the Classification branch had no first-class collector projection;
+Article research could inherit global Knowledge/Media/Video candidates; admin
+coverage did not expose collector facet gaps; and the approved candidate seed
+batch had no resolve-first read model.
+
+WHAT CHANGED: added branch-scoped Collector Profile query with deterministic
+facet ownership, duplicate elimination, evidence status and pagination;
+admin-only REST projection and frontend wiring; collector-first Vietnamese
+Classification sections with late maker/brand context; branch filtering in the
+Article research inventory; explicit unknown inventory filter handling;
+read-only collector coverage/facet matrix; and a resolve/reconcile report for
+the approved candidate stable keys.
+
+CANONICAL EFFECT: no canonical schema, semantic writer or parallel collector
+store was introduced. Authority remains identity owner, Knowledge remains
 atomic claims, Source/Evidence remain provenance, Graph remains the relation
 system, Media/Video retain distinct boundaries and WordPress posts remain
 editorial truth. Candidate NO_MATCH results do not create empty nodes.

@@ -27,6 +27,12 @@ final class ArticleResearchPreflight
         catch (\Throwable $e) { return $this->blocked($blockers === [] ? ['RUNTIME_UNAVAILABLE'] : $blockers, ['status' => 'unavailable', 'reason' => $e->getMessage()]); }
         $inventory = is_array($inventory) ? $inventory : ['status' => 'unavailable'];
         if (($inventory['status'] ?? '') !== 'available') $blockers[] = (string) ($inventory['reason'] ?? 'RUNTIME_UNAVAILABLE');
+        $subjectIds = [];
+        foreach ((array) ($resolution['subjects'] ?? []) as $resolvedSubject) if (is_array($resolvedSubject) && trim((string) ($resolvedSubject['id'] ?? '')) !== '') $subjectIds[] = trim((string) $resolvedSubject['id']);
+        if ($subjectIds === [] && is_array($resolution['primary'] ?? null) && trim((string) ($resolution['primary']['id'] ?? '')) !== '') $subjectIds[] = trim((string) $resolution['primary']['id']);
+        foreach (['knowledge', 'media', 'videos'] as $branchKey) {
+            if (is_array($inventory[$branchKey] ?? null)) $inventory[$branchKey] = $this->branchItems($inventory[$branchKey], $subjectIds);
+        }
         $posts = is_array($inventory['posts'] ?? null) ? $inventory['posts'] : [];
         $primaryId = (string) (($resolution['primary']['id'] ?? ''));
         $postId = (int) ($articleContext['post_id'] ?? 0);
@@ -72,7 +78,8 @@ final class ArticleResearchPreflight
         foreach ((array) ($dictionaryPlan['warnings'] ?? []) as $warning) if (is_string($warning) && trim($warning) !== '') $warnings[] = $warning;
 
         $compliance = ['status' => 'HUMAN_REVIEW_REQUIRED', 'warnings' => ['PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE']];
-        $blueprint = ['primary_subject' => $resolution['primary'] ?? null, 'intent' => trim($topic), 'title_intent' => trim($topic), 'h1_intent' => trim($topic), 'slug_intent' => $this->slug($topic), 'meta_description_intent' => trim($topic), 'outline' => [], 'media_complete' => $mediaComplete, 'structured_data_applicable' => true, 'canonical_expectation' => 'PUBLIC_CANONICAL_ROUTE', 'indexability_expectation' => 'INDEXABLE_IF_PUBLISHED'];
+        $plannedTitle = trim((string) ($articleContext['planned_title'] ?? $articleContext['title'] ?? $topic));
+        $blueprint = ['primary_subject' => $resolution['primary'] ?? null, 'intent' => trim($topic), 'title_intent' => $plannedTitle, 'h1_intent' => $plannedTitle, 'slug_intent' => $this->slug($plannedTitle), 'meta_description_intent' => $plannedTitle, 'outline' => [], 'media_complete' => $mediaComplete, 'structured_data_applicable' => true, 'canonical_expectation' => 'PUBLIC_CANONICAL_ROUTE', 'indexability_expectation' => 'INDEXABLE_IF_PUBLISHED'];
         $mediaPlan = ['candidates' => $media, 'media_complete' => $mediaComplete];
         if ($articleMedia !== []) $mediaPlan = array_merge($articleMedia, $mediaPlan, ['media_complete' => $mediaComplete]);
         if (!$mediaComplete && !isset($mediaPlan['diagnostics'])) $mediaPlan['diagnostics'] = [['code' => 'ARTICLE_MEDIA_INLINE_MISSING']];
@@ -83,7 +90,18 @@ final class ArticleResearchPreflight
     private function overlap(string $topic, string $subjectId, array $posts): array { foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true) && strcasecmp(trim((string) ($post['title'] ?? '')), trim($topic)) === 0) return ['classification' => 'EXISTING_CANONICAL_ARTICLE', 'post' => $post]; foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true)) return ['classification' => 'SUBSTANTIAL_OVERLAP', 'post' => $post]; return ['classification' => $posts === [] ? 'NO_OVERLAP' : 'COMPLEMENTARY_CONTENT', 'post' => null]; }
     private function relations(array $items, array &$blockers): array { $out = []; foreach ($items as $item) { $class = (string) ($item['class'] ?? 'UNSUPPORTED'); if (!in_array($class, ['DIRECT', 'DERIVED', 'PROPOSED_DIRECT', 'EDITORIAL_RELATED', 'AMBIGUOUS', 'UNSUPPORTED'], true)) $class = 'UNSUPPORTED'; if ($class === 'DERIVED' && count((array) ($item['path'] ?? [])) > 2) $class = 'UNSUPPORTED'; if (in_array($class, ['AMBIGUOUS', 'UNSUPPORTED'], true)) $blockers[] = $class . '_RELATION'; $item['classification'] = ['DIRECT' => 'EXISTING_DIRECT', 'DERIVED' => 'EXISTING_DERIVED', 'PROPOSED_DIRECT' => 'PROPOSED_DIRECT', 'EDITORIAL_RELATED' => 'EDITORIAL_RELATED', 'AMBIGUOUS' => 'AMBIGUOUS', 'UNSUPPORTED' => 'UNSUPPORTED'][$class]; $out[] = $item; } return $out; }
     private function links(array $relations, array $posts, array &$warnings): array { $links = []; foreach ($relations as $relation) if (in_array($relation['classification'], ['EXISTING_DIRECT', 'EXISTING_DERIVED'], true)) { try { $eligible = ($this->publicEligibility)($relation); } catch (\Throwable) { $eligible = ['eligible' => false, 'status' => 'unavailable']; } if (($eligible['status'] ?? '') === 'unavailable') { $warnings[] = 'PUBLIC_ROUTE_ELIGIBILITY_UNAVAILABLE'; continue; } if (($eligible['eligible'] ?? false) && trim((string) ($eligible['route'] ?? '')) !== '') $links[] = ['route' => $eligible['route'], 'relation_class' => $relation['classification'], 'reason' => $relation['reason'] ?? 'registered semantic context', 'source' => 'graph', 'path' => $relation['path'] ?? []]; } return $links; }
-    private function categoryPlan(array $categories): array { foreach ($categories as $category) if (isset($category['slug'])) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null]; return ['status' => 'CATEGORY_MISSING', 'category' => null, 'current_category' => null, 'recommendation' => 'CREATE_CATEGORY_BEFORE_DRAFT']; }
+    private function categoryPlan(array $categories): array
+    {
+        $valid = array_values(array_filter($categories, static fn (mixed $category): bool => is_array($category) && trim((string) ($category['slug'] ?? '')) !== ''));
+        if ($valid === []) return ['status' => 'CATEGORY_MISSING', 'category' => null, 'current_category' => null, 'recommendation' => 'CREATE_CATEGORY_BEFORE_DRAFT'];
+        foreach ($valid as $category) {
+            $slug = strtolower(trim((string) ($category['slug'] ?? '')));
+            $name = trim((string) ($category['name'] ?? ''));
+            if (in_array($slug, ['tri-thuc-dong-ho', 'tri-thuc'], true) || in_array($name, ['Tri thức đồng hồ', 'Tri thức'], true)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+        }
+        foreach ($valid as $category) if (strtolower(trim((string) ($category['slug'] ?? ''))) !== 'uncategorized') return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+        return ['status' => 'EXISTING', 'category' => $valid[0], 'current_category' => $valid[0], 'recommendation' => null];
+    }
     /** @param list<array<string,mixed>> $claims @param list<string> $blockers @param list<string> $warnings */
     private function claimEvidencePolicy(array $claims, array &$blockers, array &$warnings): void
     {
@@ -94,5 +112,23 @@ final class ArticleResearchPreflight
             elseif (($claim['legacy'] ?? false) === true && $status !== 'SUPPORTED_WITHIN_SCOPE') $warnings[] = 'LEGACY_EVIDENCE_DEBT';
         }
     }
-    private function slug(string $value): string { $value = function_exists('remove_accents') ? remove_accents($value) : $value; return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-') ?: 'article'; }
+    /** @param list<array<string,mixed>> $items @param list<string> $subjectIds @return list<array<string,mixed>> */
+    private function branchItems(array $items, array $subjectIds): array
+    {
+        $scoped = false;
+        foreach ($items as $item) if (is_array($item) && (array_key_exists('subject_id', $item) || array_key_exists('subject_ids', $item))) { $scoped = true; break; }
+        if (!$scoped || $subjectIds === []) return $items;
+        return array_values(array_filter($items, static function (mixed $item) use ($subjectIds): bool {
+            if (!is_array($item)) return false;
+            $ids = array_key_exists('subject_ids', $item) ? (array) $item['subject_ids'] : [(string) ($item['subject_id'] ?? '')];
+            return array_intersect(array_map('strval', $ids), $subjectIds) !== [];
+        }));
+    }
+    private function slug(string $value): string
+    {
+        if (function_exists('remove_accents')) $value = remove_accents($value);
+        elseif (function_exists('transliterator_transliterate')) $value = (string) transliterator_transliterate('Any-Latin; Latin-ASCII', $value);
+        elseif (function_exists('iconv')) $value = (string) iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+        return trim((string) preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-') ?: 'article';
+    }
 }

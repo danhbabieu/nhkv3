@@ -126,4 +126,50 @@ final class ArticleResearchPreflightTest extends TestCase
 
         self::assertSame('attached', $result->subjectResolution['persistence']['status']);
     }
+
+    public function test_branch_scoped_inventory_excludes_global_media_knowledge_and_video_candidates(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [],
+                'categories' => [['name' => 'Chưa phân loại', 'slug' => 'uncategorized'], ['name' => 'Tri thức đồng hồ', 'slug' => 'tri-thuc-dong-ho']],
+                'knowledge' => [
+                    ['id' => 'claim-1', 'subject_id' => 'classification-1', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+                    ['id' => 'claim-global', 'subject_id' => 'brand-elsewhere', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE'],
+                ],
+                'media' => [
+                    ['id' => 'media-global', 'subject_ids' => ['brand-elsewhere'], 'ready' => true, 'public' => true],
+                ],
+                'videos' => [
+                    ['id' => 'video-global', 'subject_id' => 'brand-elsewhere', 'public' => true],
+                ],
+                'sources' => [], 'evidence' => [], 'relations' => [],
+            ],
+            static fn (array $candidate): array => ['eligible' => true, 'route' => '/phan-loai/dong-ho-chim-cuc-cu/'],
+        );
+
+        $result = $service->research('Đồng hồ chim cúc cu', ['type' => 'classification']);
+
+        self::assertSame(['claim-1'], array_column($result->knowledgeInventory['claims'], 'id'));
+        self::assertSame([], $result->mediaPlan['candidates']);
+        self::assertFalse($result->mediaPlan['media_complete']);
+        self::assertSame([], $result->videoPlan['candidates']);
+        self::assertSame('Tri thức đồng hồ', $result->categoryPlan['category']['name']);
+    }
+
+    public function test_planned_title_is_preserved_in_seo_blueprint(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [], 'categories' => [], 'knowledge' => [], 'media' => [], 'videos' => [], 'sources' => [], 'evidence' => [], 'relations' => []],
+            static fn (array $candidate): array => ['eligible' => true, 'route' => '/x'],
+        );
+
+        $result = $service->research('collector topic', ['type' => 'classification'], ['planned_title' => 'Đồng hồ chim cúc cu: checklist cho người sưu tầm']);
+
+        self::assertSame('Đồng hồ chim cúc cu: checklist cho người sưu tầm', $result->seoBlueprint['title_intent']);
+        self::assertSame('dong-ho-chim-cuc-cu-checklist-cho-nguoi-suu-tam', $result->seoBlueprint['slug_intent']);
+    }
 }

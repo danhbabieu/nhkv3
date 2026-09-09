@@ -5,12 +5,15 @@ namespace NHK\Core\Application\Inventory;
 
 final class CanonicalInventoryService
 {
+    private const FILTERS = ['type', 'state', 'visibility', 'stable_key', 'uuid', 'active', 'subject_id', 'subject_uuid'];
     /** @param array<string,callable():list<array<string,mixed>>> $providers */
     public function __construct(private array $providers) {}
 
     public function inventory(array $filters, int $limit = 50, ?string $after = null): InventoryPage
     {
         $limit = max(1, min(10000, $limit));
+        $unknown = array_values(array_diff(array_keys($filters), self::FILTERS));
+        if ($unknown !== []) return new InventoryPage([], 0, null, 'UNSUPPORTED_FILTER');
         $type = isset($filters['type']) ? trim((string) $filters['type']) : null;
         if ($type !== null && $type !== '' && !isset($this->providers[$type])) return new InventoryPage([], 0, null);
         $types = $type !== null && $type !== '' ? [$type] : array_keys($this->providers);
@@ -45,6 +48,7 @@ final class CanonicalInventoryService
             'active' => $active,
             'provenance' => is_array($record['provenance'] ?? null) ? $record['provenance'] : [],
             'visibility' => isset($record['visibility']) ? strtoupper((string) $record['visibility']) : null,
+            'subject_id' => (string) (($record['provenance']['metadata']['subject_id'] ?? $record['provenance']['subject_id'] ?? '')),
         ];
     }
 
@@ -54,6 +58,8 @@ final class CanonicalInventoryService
             if (isset($filters[$key]) && (string) $filters[$key] !== '' && (string) $row[$key] !== (string) $filters[$key]) return false;
         }
         if (array_key_exists('active', $filters) && (bool) $row['active'] !== (bool) $filters['active']) return false;
+        $subject = (string) ($filters['subject_uuid'] ?? $filters['subject_id'] ?? '');
+        if ($subject !== '' && $row['subject_id'] !== $subject) return false;
         return true;
     }
 

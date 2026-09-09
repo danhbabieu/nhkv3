@@ -8,11 +8,16 @@ use NHK\Core\Domain\Graph\{EndpointTypeRegistry, GraphEdge, PredicateRegistry};
 
 final class GraphInventoryService
 {
+    private const FILTERS = ['predicate', 'state', 'source_type', 'target_type', 'direction', 'source_uuid', 'target_uuid', 'subject_uuid'];
     public function __construct(private GraphRepository $repository, private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates) {}
 
     public function inventory(array $filters, int $limit = 50, ?string $after = null): GraphInventoryReport
     {
         $limit = max(1, min(10000, $limit));
+        $unknown = array_values(array_diff(array_keys($filters), self::FILTERS));
+        if ($unknown !== []) return new GraphInventoryReport([], 0, null, $this->emptyCounters(), 'UNSUPPORTED_FILTER');
+        if (($filters['direction'] ?? 'both') === 'inbound') return new GraphInventoryReport([], 0, null, $this->emptyCounters(), 'UNSUPPORTED_FILTER');
+        if (isset($filters['direction']) && !in_array($filters['direction'], ['both', 'outbound'], true)) return new GraphInventoryReport([], 0, null, $this->emptyCounters(), 'UNSUPPORTED_FILTER');
         $all = $this->repository->allEdges(true);
         $logicalCounts = [];
         foreach ($all as $edge) $logicalCounts[$this->logicalKey($edge)] = ($logicalCounts[$this->logicalKey($edge)] ?? 0) + 1;
@@ -70,9 +75,14 @@ final class GraphInventoryService
     {
         foreach (['predicate', 'state'] as $key) if (isset($filters[$key]) && (string) $filters[$key] !== (string) $row[$key]) return false;
         foreach (['source_type' => 'source', 'target_type' => 'target'] as $filter => $side) if (isset($filters[$filter]) && (string) $filters[$filter] !== (string) $row[$side]['type']) return false;
-        if (isset($filters['direction']) && !in_array($filters['direction'], ['both', 'outbound', 'inbound'], true)) return false;
+        if (isset($filters['source_uuid']) && (string) $filters['source_uuid'] !== (string) $row['source']['uuid']) return false;
+        if (isset($filters['target_uuid']) && (string) $filters['target_uuid'] !== (string) $row['target']['uuid']) return false;
+        if (isset($filters['subject_uuid']) && (string) $filters['subject_uuid'] !== (string) $row['source']['uuid'] && (string) $filters['subject_uuid'] !== (string) $row['target']['uuid']) return false;
         return true;
     }
+
+    /** @return array<string,int> */
+    private function emptyCounters(): array { return ['total' => 0, 'active' => 0, 'retired' => 0, 'dangling' => 0, 'invalid_endpoint' => 0, 'duplicate' => 0]; }
 
     private function logicalKey(GraphEdge $edge): string
     {

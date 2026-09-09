@@ -36,4 +36,25 @@ final class CanonicalInventoryServiceTest extends TestCase
 
         self::assertSame(['items' => [], 'total' => 0, 'next' => null], $service->inventory(['type' => 'model'], 10, null)->toArray());
     }
+
+    public function test_subject_filter_is_applied_before_pagination(): void
+    {
+        $service = new CanonicalInventoryService([
+            'knowledge' => static fn (): array => [
+                ['uuid' => 'k-1', 'stable_key' => 'k:one', 'provenance' => ['metadata' => ['subject_id' => 'classification-1']]],
+                ['uuid' => 'k-2', 'stable_key' => 'k:two', 'provenance' => ['metadata' => ['subject_id' => 'brand-1']]],
+            ],
+        ]);
+
+        $page = $service->inventory(['type' => 'knowledge', 'subject_uuid' => 'classification-1'], 10);
+
+        self::assertSame(['k-1'], array_column($page->items, 'uuid'));
+    }
+
+    public function test_unknown_filter_is_explicitly_rejected(): void
+    {
+        $service = new CanonicalInventoryService(['brand' => static fn (): array => [['uuid' => 'b-1']]]);
+
+        self::assertSame('UNSUPPORTED_FILTER', $service->inventory(['branch' => 'classification-1'])->reason);
+    }
 }

@@ -316,3 +316,30 @@ when unresolved, and keep ambiguous terms unlinked until human curation.
 
 This index should remain compact. Detailed law belongs in the Constitution or
 approved domain contracts, not duplicated here.
+
+### Collector-centric execution closure checkpoint — 2026-09-09
+
+The collector branch now has a read-only profile query, admin-only REST
+adapter, classification frontend projection and collector-first Vietnamese
+sections. The projection keeps the existing Authority/Knowledge/
+Source/Evidence/Graph/Media/Video owners, paginates the full branch claim set,
+deduplicates canonical claims, reports truncation and evidence status, and
+rejects global related-resource scope. Article research inventory now filters
+Knowledge, Media and Video candidates by resolved subject scope; native
+WordPress remains the editorial owner and no article is auto-created or
+published by this work.
+
+The dossier coverage page now includes a Classification branch matrix for
+form, case style, movement, duration, sound/music, automata, night shutoff,
+material/craft/scale, condition/originality and provenance/rarity/origin. The
+approved candidate batch is resolved read-only against the Classification
+registry: exact matches are marked REUSE, near matches require review, and a
+NO_MATCH row remains `NO_MATCH_CREATE_REQUIRES_EVIDENCE` rather than becoming
+an empty Authority node. This preserves the Constitution's no-invention and
+Governance boundaries.
+
+Focused unit coverage is green for Collector Profile, API, frontend,
+branch-scoped Article preflight, inventory filter enforcement, coverage audit,
+candidate reconciliation, public identity and Governance suites. Target
+WordPress read-back is still environment-gated; no semantic seed, Graph edge,
+public URL allocation, article, publication or external push was performed.

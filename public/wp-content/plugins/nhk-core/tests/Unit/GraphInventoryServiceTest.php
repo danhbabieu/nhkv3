@@ -47,4 +47,29 @@ final class GraphInventoryServiceTest extends TestCase
         self::assertSame(1, $report->counters['dangling']);
         self::assertSame(['invalid_endpoint', 'dangling'], $report->items[0]['diagnostics']);
     }
+
+    public function test_endpoint_uuid_filters_are_applied_without_broadening(): void
+    {
+        $repository = new InMemoryGraphRepository();
+        $source = $repository->resolveNode(new NodeReference('brand', 'b1'));
+        $target = $repository->resolveNode(new NodeReference('model', 'm1'));
+        $repository->createEdge($source, (new PredicateRegistry())->get('model_of'), $target);
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('brand', new FakeEndpointResolver('brand', ['b1']));
+        $endpoints->register('model', new FakeEndpointResolver('model', ['m1']));
+
+        $report = (new GraphInventoryService($repository, $endpoints, new PredicateRegistry()))->inventory(['source_uuid' => 'b1', 'target_uuid' => 'm1']);
+
+        self::assertSame(1, $report->total);
+        self::assertSame('b1', $report->items[0]['source']['uuid']);
+    }
+
+    public function test_unsupported_direction_is_explicitly_rejected(): void
+    {
+        $repository = new InMemoryGraphRepository();
+        $endpoints = new EndpointTypeRegistry();
+        $report = (new GraphInventoryService($repository, $endpoints, new PredicateRegistry()))->inventory(['direction' => 'inbound']);
+
+        self::assertSame('UNSUPPORTED_FILTER', $report->reason);
+    }
 }
