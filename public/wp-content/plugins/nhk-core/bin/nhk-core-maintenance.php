@@ -109,7 +109,7 @@ try {
                 } else {
                     $stamp = gmdate('Ymd\THis\Z');
                     $path = $snapshotRoot . '/odo-' . $stamp . '-' . substr(hash('sha256', $runId), 0, 12) . '.json';
-                    $contents = json_encode($receipt, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . PHP_EOL;
+                    $contents = json_encode($receipt, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL;
                     if (file_put_contents($path, $contents, LOCK_EX) === false) {
                         $payload = ['status' => 'blocked', 'reason_code' => 'SNAPSHOT_WRITE_FAILED'];
                     } else {
@@ -129,5 +129,5 @@ try {
 } catch (Throwable $error) {
     $payload = ['status' => 'failed', 'reason_code' => 'REMOTE_RUNTIME_BOOTSTRAP_FAILED'];
 }
-echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . PHP_EOL;
 exit(($payload['status'] ?? '') === 'pass' ? 0 : 2);

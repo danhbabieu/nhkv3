@@ -54,4 +54,12 @@ final class DemoCutoverCliContractTest extends TestCase
         self::assertStringNotContainsString('UPDATE ', $contents);
         self::assertStringNotContainsString('DELETE ', $contents);
     }
+
+    public function test_snapshot_serialization_preserves_receipt_when_runtime_rows_contain_invalid_utf8(): void
+    {
+        $path = dirname(__DIR__, 2) . '/bin/nhk-core-maintenance.php';
+        $contents = (string) file_get_contents($path);
+
+        self::assertStringContainsString('JSON_INVALID_UTF8_SUBSTITUTE', $contents);
+    }
 }
