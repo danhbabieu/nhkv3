@@ -19,6 +19,7 @@ the operation:
 | Concern | Required documents |
 |---|---|
 | Article / News / editorial | `docs/architecture/ARTICLE_INGEST_CONTRACT.md`, `docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md`, `docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md` |
+| Editorial Capture / one-submission Article flow | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`, `docs/architecture/ARTICLE_INGEST_CONTRACT.md`, the owning Media/Video/Knowledge/Graph/Governance contracts involved by the submission, and the current executable `EditorialCaptureCoordinator`/Capture repository boundary |
 | Dictionary / lexical curation / auto-link | `docs/architecture/DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` plus the owning Article, Knowledge, Media/Image, Video, public-route and SEO contracts for the content being detected or linked |
 | Media / Image | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, relevant Media contracts and runtime registries |
 | Video | `docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `docs/architecture/VIDEO_RELATIONSHIP_CONTRACT.md`, `docs/architecture/VIDEO_HUB_CLASSIFICATION_CONTRACT.md`, `docs/architecture/VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `docs/seo/VIDEO_SEO_PROJECTION_CONTRACT.md`, `docs/seo/PUBLIC_URL_SLUG_CONTRACT.md`, `docs/mcp/MCP_V3_VIDEO_WORKFLOW.md` |
@@ -26,7 +27,7 @@ the operation:
 | Authority / Brand / Model / Variant / Movement / Music | `docs/architecture/02_AUTHORITY_BOUNDARY.md`, `docs/architecture/13_AUTHORITY_CORE_CONTRACT.md`, `docs/architecture/V3_BRAND_RELATIONSHIP_MATRIX.md`, `docs/architecture/PUBLIC_BRAND_NAMING_CONTRACT.md`, `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md` when public Entity detail aggregation/display is in scope |
 | Public Entity dossier / relation display | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`, the owning Authority/Graph/Knowledge/Media/Video/Article contracts, and the applicable entity relationship matrix; reachable graph context is not automatically inherited truth |
 | Public identity / route / SEO | `docs/seo/PUBLIC_URL_SLUG_CONTRACT.md`, `docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`, `docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md`, `docs/architecture/V3_FRONTEND_ROUTE_INVENTORY.md`, relevant SEO contracts, persisted-identity design/spec and the current PublicIdentity implementation/runtime evidence when in scope |
-| MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; all MCP ingest also follows Constitution §20.1 bounded post-ingest reconciliation and completion gate; current tool/Ability availability must be checked against executable catalog/registration and fresh runtime discovery. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only | 
+| MCP / Admin | current contract: `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`, `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; all MCP ingest also follows Constitution §20.1 bounded post-ingest reconciliation and completion gate; current tool/Ability availability must be checked against executable catalog/registration, fresh target runtime discovery and the actual client/connector surface. `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md` is historical/superseded evidence only |
 | Storage / schema / execution | current boundaries from the relevant domain contracts plus `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md`; `docs/architecture/21_P5_CANONICAL_DOMAIN_FOUNDATION.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/V3_EXECUTION_STATE.md` and `docs/architecture/V2_V3_PARITY_MATRIX.md` contain implementation/history evidence and must be interpreted by date/context |
 
 For Media upload specifically, read the Media model, P6 foundation, Admin Media
@@ -36,6 +37,39 @@ WordPress attachment lifecycle → canonical read-back / `media-attachment-get`
 → separate governed `media-ingest` → MediaAsset → Media → MediaUsage. Do not
 use the historical Ability exposure document or a JSON-only Ability as the
 multipart binary contract.
+
+For Editorial Capture specifically, treat the coordinator as orchestration over
+existing owners, never as a new semantic owner. The accepted shared path is
+text-only or multipart images: one new submission → one durable Capture → one
+native WordPress draft by default; each physical image keeps its own canonical
+Media identity and contextual MediaUsage. Replays with the same idempotency key
+and unchanged payload resume the same Capture; a changed payload conflicts
+instead of creating a duplicate Article or re-uploading completed assets.
+
+The semantic core is `interpret → resolve canonical subjects → bounded Graph
+neighborhood → retrieve candidate Claims → evaluate scope/provenance/evidence/
+relevance → governed semantic write-back/review → compose Article`. Graph
+reachability discovers candidates only. A relation path never authorizes Claim
+reuse by itself; selected Claims must retain canonical ID/revision, original
+semantic subject and explainable path, and must pass the applicable scope,
+provenance, evidence and relevance checks. Generated Article prose, image
+observations, captions, OCR and transcripts are not Evidence merely because the
+Capture can see them.
+
+The current accepted Capture adapter covers text-only and multipart image
+submissions. Video remains a distinct canonical external-reference intake until
+a registered shared Capture adapter exists. Do not manufacture a unified result
+by creating a duplicate Article, duplicate Video, convenience relation or a
+generic WordPress fallback.
+
+Runtime capability and client/connector exposure are separate facts. A tool or
+Ability can exist in the executable runtime catalog and still be unavailable to
+a particular connector/session. Treat that as `CLIENT_EXPOSURE_GAP`, not proof
+that the runtime capability is absent. Conversely, when the current client
+cannot invoke a required boundary, fail closed for that step; never substitute a
+generic Post/Media writer or a historical Ability assumption. Fresh target
+runtime discovery/read-back determines runtime availability, while fresh client
+connector discovery determines callability from the current session.
 
 ## Current versus historical evidence
 
