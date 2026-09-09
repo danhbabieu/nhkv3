@@ -111,7 +111,7 @@ never reported as frontend publication success.
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
 
-| Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is PRIVATE/protected, eligible derivatives are PUBLIC under that Media, representative/evidence/detail roles are distinct, and attachment mapping is idempotent |
+| Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is PRIVATE/protected, the normalized public derivative has max long edge 1200px with no upscale/crop and preserved aspect ratio, eligible derivatives are PUBLIC under that Media, representative/evidence/detail roles are distinct, and attachment mapping is idempotent |
 | Video | Video | Video intake/sync services | governed canonical external reference; optional Living Knowledge output is planning-only |
 | Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
 | Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |

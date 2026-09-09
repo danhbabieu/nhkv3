@@ -6530,3 +6530,47 @@ runtime-readiness checkpoint and remain intentionally untouched.
 NEXT ACTION: Preserve the exact guarded Integration command for reruns:
 
 `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`
+
+# Checkpoint — 2026-09-09 — Public image 1200px long-edge policy
+
+ROOT GAP: The managed image flow and current public projection contract still
+used a 2048px processing bound and a 900px minimum-width assumption, which did
+not implement the newly authorized public rule for small landscape/portrait
+assets or the required 800px short edge for a 1600×2400 source.
+
+ROOT CAUSE: The numeric resize rule was embedded in the WordPress attachment
+ingestor, while MCP defaults/schema and public asset selection carried related
+limits separately. Current canonical docs also described the prior minimum-size
+projection behavior.
+
+CODE FIX: Added `PublicImageSizingPolicy` as the executable owner with
+`MAX_LONG_EDGE = 1200`. It returns original dimensions for long edge `<=1200`
+and uses proportional rounded downscale only above the bound. The WordPress
+attachment ingestor, multipart upload service and MCP transport/catalog now use
+the shared bound. Public projection accepts only eligible image derivatives at
+or below the bound and still excludes thumbnails; it does not create Media or
+mutate MediaUsage, representative relations or Article relations.
+
+DB / DEMO EFFECT: No database, DEMO, V2, staging or production data was changed.
+No migration, backfill, URL rewrite or manual SQL was run.
+
+TEST: Unit coverage includes all requested dimension examples, aspect-ratio
+preservation, no-upscale/no-crop behavior, MCP schema limits and rejection of
+an oversized public candidate. Existing Media ingest integration coverage was
+extended to read the real fixture dimensions and verify the processed output
+matches the shared policy while retaining one Media and its source-original.
+
+RUNTIME READ-BACK: Guarded local `nhk_v3_test` focused ingest acceptance passes
+1 test / 16 assertions. The full guarded Integration suite passes twice
+consecutively at 120 tests / 1,016 assertions per run, with 4 skips, 1 warning
+and 1 deprecation. DEMO runtime was not written or used as a source of truth.
+
+STATUS: COMPLETE for the public image sizing implementation and local
+acceptance. Focused Unit passes 53 tests / 377 assertions; full NHK Unit passes
+858 tests / 4,095 assertions with the existing warnings/deprecations. Composer
+lint and diff checks pass. No Media identity, MediaUsage, representative or
+Article relation was changed by this policy work.
+
+NEXT ACTION: Commit this policy change locally, preserve unrelated `Plugin.php`
+worktree changes, verify the post-commit worktree and leave PUSH STATUS = NOT
+PUSHED.

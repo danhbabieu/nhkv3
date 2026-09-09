@@ -33,7 +33,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $featured = $service->create('odo-front', 'Odo 36/8 front', 'ready', ['detail_type' => 'WHOLE_FRONT']);
         $inline = $service->create('odo-dial', 'Odo 36/8 dial', 'ready', ['detail_type' => 'DIAL']);
-        $service->addAsset($featured->canonicalId, 'original', 'uploads/odo-front.jpg', hash('sha256', 'front'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addAsset($featured->canonicalId, 'original', 'uploads/odo-front.jpg', hash('sha256', 'front'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         $service->addAsset($inline->canonicalId, 'original', 'uploads/odo-dial.jpg', hash('sha256', 'dial'), 'image/jpeg', 10, 1000, 700, 'PUBLIC');
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
 
@@ -104,7 +104,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
         $initial = $coordinator->ensureForPost(47);
         $real = $service->create('replacement-front', 'Replacement front', 'ready');
-        $service->addAsset($real->canonicalId, 'original', 'uploads/replacement.jpg', hash('sha256', 'replacement'), 'image/jpeg', 11, 1600, 900, 'PUBLIC');
+        $service->addAsset($real->canonicalId, 'original', 'uploads/replacement.jpg', hash('sha256', 'replacement'), 'image/jpeg', 11, 1200, 675, 'PUBLIC');
 
         $result = $coordinator->ensureForPost(47, [], ['featured_primary' => $real->canonicalId]);
 
@@ -123,7 +123,7 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertFalse($projection->isImageSitemapEligible('1:48'));
 
         $real = $service->create('public-featured', 'Public featured', 'ready');
-        $service->addAsset($real->canonicalId, 'original', 'uploads/public-featured.jpg', hash('sha256', 'public-featured'), 'image/jpeg', 14, 1600, 900, 'PUBLIC');
+        $service->addAsset($real->canonicalId, 'original', 'uploads/public-featured.jpg', hash('sha256', 'public-featured'), 'image/jpeg', 14, 1200, 675, 'PUBLIC');
         $coordinator->ensureForPost(48, [], ['featured_primary' => $real->canonicalId]);
         self::assertTrue($projection->isImageSitemapEligible('1:48'));
     }
@@ -133,7 +133,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $featured = $service->create('bridge-featured', 'Bridge featured', 'ready');
         $inline = $service->create('bridge-inline', 'Bridge inline', 'ready');
-        $service->addAsset($featured->canonicalId, 'original', 'uploads/bridge-featured.jpg', hash('sha256', 'bridge-featured'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addAsset($featured->canonicalId, 'original', 'uploads/bridge-featured.jpg', hash('sha256', 'bridge-featured'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         $service->addAsset($inline->canonicalId, 'original', 'uploads/bridge-inline.jpg', hash('sha256', 'bridge-inline'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
         $adapter = new class implements WordPressArticleMediaAdapter {
             public array $synced = [];
@@ -157,12 +157,12 @@ final class ArticleMediaPolicyTest extends TestCase
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $item = $service->create('seo-bridge-featured', 'SEO bridge featured', 'ready');
-        $asset = $service->addAsset($item->canonicalId, 'original', 'uploads/seo-bridge.jpg', hash('sha256', 'seo-bridge'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $asset = $service->addAsset($item->canonicalId, 'original', 'uploads/seo-bridge.jpg', hash('sha256', 'seo-bridge'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         $service->addUsage($item->canonicalId, 'wp_post', '1:50', 'featured_primary', 0, 'Ảnh mặt trước');
         $adapter = new class implements WordPressArticleMediaAdapter {
             public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
             public function synchronize(int $postId, array $result): array { return $this->read($postId); }
-            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return ['url' => 'https://cdn.example.test/seo-bridge.jpg', 'src' => 'https://cdn.example.test/seo-bridge.jpg', 'srcset' => 'https://cdn.example.test/seo-bridge.jpg 1600w', 'sizes' => '100vw', 'width' => 1600, 'height' => 900, 'alt' => $contextualAlt, 'attachment_id' => 901]; }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return ['url' => 'https://cdn.example.test/seo-bridge.jpg', 'src' => 'https://cdn.example.test/seo-bridge.jpg', 'srcset' => 'https://cdn.example.test/seo-bridge.jpg 1200w', 'sizes' => '100vw', 'width' => 1200, 'height' => 675, 'alt' => $contextualAlt, 'attachment_id' => 901]; }
             public function adoptAttachment(int $attachmentId): ?string { return null; }
         };
 
@@ -173,6 +173,20 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('/anh/seo-bridge.webp', $result['image_url']);
         self::assertSame('100vw', $result['sizes']);
         self::assertSame('Ảnh mặt trước', $result['alt']);
+    }
+
+    public function test_article_seo_projection_resolves_valid_portrait_at_original_dimensions(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $item = $service->create('portrait-featured', 'Portrait featured', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/portrait-featured.webp', hash('sha256', 'portrait-featured'), 'image/webp', 10, 900, 1200, 'PUBLIC');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:51', 'featured_primary', 0, 'Ảnh dọc');
+
+        $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:51');
+
+        self::assertTrue($result['eligible']);
+        self::assertSame(900, $result['width']);
+        self::assertSame(1200, $result['height']);
     }
 
     public function test_bulk_ingest_uses_one_batch_context_but_keeps_media_independently_reviewable(): void
@@ -195,7 +209,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $representative = $service->create('entity-representative', 'Entity representative', 'ready');
         $evidence = $service->create('entity-serial', 'Entity serial detail', 'ready');
-        $service->addAsset($representative->canonicalId, 'original', 'uploads/entity-front.jpg', hash('sha256', 'entity-front'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addAsset($representative->canonicalId, 'original', 'uploads/entity-front.jpg', hash('sha256', 'entity-front'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         $service->addAsset($evidence->canonicalId, 'original', 'uploads/entity-serial.jpg', hash('sha256', 'entity-serial'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
 
         $service->addUsage($representative->canonicalId, 'variant', '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'representative', 0, 'Ảnh đại diện biến thể 36/10');
@@ -211,7 +225,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $later = $service->create('representative-z', 'Same subject', 'ready');
         $first = $service->create('representative-a', 'Same subject', 'ready');
         foreach ([[$later, 'later'], [$first, 'first']] as [$item, $suffix]) {
-            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $suffix . '.jpg', hash('sha256', $suffix), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $suffix . '.jpg', hash('sha256', $suffix), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         }
 
         $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(901, ['subject' => 'Same subject']);
@@ -223,7 +237,7 @@ final class ArticleMediaPolicyTest extends TestCase
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $source = ['kind' => 'original', 'storage_key' => 'uploads/odo-36-10-original.jpg', 'original_filename' => 'DSCF8291.JPG', 'checksum' => hash('sha256', 'source'), 'mime_type' => 'image/jpeg', 'byte_size' => 6, 'width' => 4000, 'height' => 3000, 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true]];
-        $derivative = ['kind' => 'derivative', 'storage_key' => 'uploads/odo-36-10.webp', 'original_filename' => 'odo-36-10.webp', 'checksum' => hash('sha256', 'derivative'), 'mime_type' => 'image/webp', 'byte_size' => 4, 'width' => 1600, 'height' => 1200, 'visibility' => 'PUBLIC', 'metadata' => ['derived_from' => 'odo-36-10-original.jpg']];
+        $derivative = ['kind' => 'derivative', 'storage_key' => 'uploads/odo-36-10.webp', 'original_filename' => 'odo-36-10.webp', 'checksum' => hash('sha256', 'derivative'), 'mime_type' => 'image/webp', 'byte_size' => 4, 'width' => 1200, 'height' => 900, 'visibility' => 'PUBLIC', 'metadata' => ['derived_from' => 'odo-36-10-original.jpg']];
 
         $first = $service->ingest('upload:odo-36-10:' . hash('sha256', 'source'), 'Odo 36/10', 'ready', ['source' => 'multipart'], [$source, $derivative]);
         $second = $service->ingest('upload:odo-36-10:' . hash('sha256', 'source'), 'Odo 36/10', 'ready', ['source' => 'multipart'], [$source, $derivative]);
@@ -237,7 +251,7 @@ final class ArticleMediaPolicyTest extends TestCase
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $existing = $service->create('wp-attachment:1:299', 'Ảnh attachment 299', 'ready', ['source' => 'wordpress_attachment_adoption']);
-        $service->addAsset($existing->canonicalId, 'original', 'uploads/attachment-299.webp', hash('sha256', 'attachment-299'), 'image/webp', 100, 1600, 1200, 'PUBLIC');
+        $service->addAsset($existing->canonicalId, 'original', 'uploads/attachment-299.webp', hash('sha256', 'attachment-299'), 'image/webp', 100, 1200, 900, 'PUBLIC');
 
         $reused = $service->ingest('wp-attachment:1:299', 'Tên đọc lại khác', 'draft', ['source' => 'mcp-replay'], [], [[
             'endpoint_type' => 'wp_post', 'endpoint_key' => '1:300', 'role' => 'featured_primary', 'alt_text' => 'Ảnh tư liệu attachment 299',
@@ -254,7 +268,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $old = $service->create('old-inline', 'Ảnh inline cũ', 'ready');
         $new = $service->create('new-featured', 'Ảnh hiện hành', 'ready');
         $service->addAsset($old->canonicalId, 'original', 'uploads/old.jpg', hash('sha256', 'old'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
-        $service->addAsset($new->canonicalId, 'original', 'uploads/new.jpg', hash('sha256', 'new'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $service->addAsset($new->canonicalId, 'original', 'uploads/new.jpg', hash('sha256', 'new'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
         $existingUsage = $service->addUsage($old->canonicalId, 'wp_post', '1:300', 'inline_primary', 0, 'Alt cũ');
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
 

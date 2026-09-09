@@ -59,13 +59,14 @@ gallery and standalone image viewing; selecting a small derivative such as
 canonical asset.
 
 **WHAT:** The canonical public `/anh/<slug>.webp` projection must be generated
-from the retained source-original, with aspect ratio preserved and no upscale
-from an existing derivative. A source-derived public image should be at least
-900px wide where the source permits it; approximately 960×1360 is the target
-for the stated portrait example. Smaller thumbnails may remain separate for
-listing performance, but they are never the canonical full-size asset. WebP
-encoding targets quality 82–88, with the current default at 86, without
-sharpening or color changes beyond the active encoder's normal conversion.
+from the retained source-original with `MAX_LONG_EDGE = 1200px`. If the source
+long edge is at most 1200px, its original dimensions are retained; if it is
+larger, both dimensions are rounded after proportional downscale so the long
+edge is 1200px. The rule never upscales, crops or changes aspect ratio. Smaller
+listing thumbnails may remain separate, but they are never the canonical
+full-size asset. WebP encoding targets quality 82–88, with the current default
+at 86, without sharpening or color changes beyond the active encoder's normal
+conversion.
 
 **DATA, MIGRATION AND ROLLOUT:** This amendment authorizes no bulk repair,
 backfill, file rename, attachment-path change or existing public URL rewrite.
@@ -1196,15 +1197,15 @@ public URL hoặc sitemap. SEO-critical imagery dùng semantic `img`/`picture`
 với `srcset`, `sizes`, width, height và meaningful contextual alt; loading policy
 phù hợp vị trí editorial.
 
-Public canonical image resolution is a separate projection invariant. When a
-source-original has width ≥ 900px, `/anh/<slug>.webp` must resolve to a public
-source-derived asset with width ≥ 900px; a 240×340 or other thumbnail derivative
-must never be selected as the full-size canonical asset. The derivative must be
-created from the source-original, never upscaled from a smaller derivative, and
-must preserve source aspect ratio. The current WebP quality target is 82–88
-(default 86); no extra sharpening or intentional color alteration is allowed.
-Listing thumbnails may be exposed separately, while the gallery image click
-must open the canonical full-size `/anh/<slug>.webp` URL.
+Public canonical image resolution is a separate projection invariant. The
+canonical source-derived asset must have a long edge no greater than 1200px.
+For a source long edge at most 1200px, dimensions remain unchanged; for a
+larger source, dimensions are `round(dimension × 1200 / source_long_edge)`.
+The operation never upscales, crops, stretches or forces a square canvas. A
+240×340 or other thumbnail derivative may be used for listings but must not
+replace the canonical full-size asset. The current WebP quality target is
+82–88 (default 86); no extra sharpening or intentional color alteration is
+allowed. Gallery clicks must open the canonical `/anh/<slug>.webp` URL.
 
 Article media state tối thiểu phải phân biệt `MEDIA_COMPLETE`,
 `MEDIA_INCOMPLETE_FEATURED`, `MEDIA_INCOMPLETE_INLINE`, `MEDIA_PLACEHOLDER`,

@@ -56,6 +56,14 @@ P6 checkpoints below. The active storage/reuse boundary is:
 - upload/EXIF/OCR/recognition/alt/caption do not automatically create Authority,
   Knowledge, Source, Evidence, `about` or `depicts`.
 
+The public image sizing policy is owned by the normalized WordPress
+attachment/public derivative boundary: `MAX_LONG_EDGE = 1200px`. A source with
+long edge `<= 1200px` is persisted at its original dimensions; a larger source
+is proportionally downscaled with `round(dimension × 1200 / long_edge)`. No
+upscale, crop, stretch or fixed square canvas is allowed. The source-original
+remains retained privately under the same Media identity, while the normalized
+public output and WordPress derivatives remain projections under that identity.
+
 Older checkpoint sentences describing temporary source cleanup refer to request
 workfiles/public upload projection only. They must not be read as permission to
 discard the constitutionally retained source-original MediaAsset.

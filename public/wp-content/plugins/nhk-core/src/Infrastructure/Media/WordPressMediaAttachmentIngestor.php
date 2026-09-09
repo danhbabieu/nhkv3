@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Media;
 
-use NHK\Core\Application\Media\MediaFilenameNormalizer;
+use NHK\Core\Application\Media\{MediaFilenameNormalizer, PublicImageSizingPolicy};
 use NHK\Core\Contracts\Media\WordPressArticleMediaAdapter;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor as WordPressMediaAttachmentIngestorContract;
 
@@ -16,17 +16,14 @@ use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor as WordPressMediaA
  */
 final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachmentIngestorContract
 {
-    public const MAX_LONG_EDGE = 2048;
+    public const MAX_LONG_EDGE = PublicImageSizingPolicy::MAX_LONG_EDGE;
 
     public function __construct(private ?WordPressArticleMediaAdapter $semanticMedia = null) {}
 
     /** @return array{width:int,height:int} */
     public static function constrainDimensions(int $width, int $height): array
     {
-        if ($width < 1 || $height < 1) throw new \InvalidArgumentException('Image dimensions must be positive.');
-        if (max($width, $height) <= self::MAX_LONG_EDGE) return ['width' => $width, 'height' => $height];
-        $scale = self::MAX_LONG_EDGE / max($width, $height);
-        return ['width' => max(1, (int) round($width * $scale)), 'height' => max(1, (int) round($height * $scale))];
+        return PublicImageSizingPolicy::constrain($width, $height);
     }
 
     public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
@@ -39,7 +36,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         if ($source === '' || !is_file($source) || !is_readable($source)) throw new \InvalidArgumentException('File attachment is unavailable.');
         if ($maxWidth < 1 || $maxHeight < 1) throw new \InvalidArgumentException('max_width and max_height must be positive.');
         if ($quality < 1 || $quality > 100) throw new \InvalidArgumentException('quality must be between 1 and 100.');
-        // The managed primary profile is fixed: at most 2048px on either edge.
+        // The managed public profile is fixed: at most 1200px on the long edge.
         // Caller-supplied limits cannot turn the primary into a thumbnail.
         $maxWidth = self::MAX_LONG_EDGE;
         $maxHeight = self::MAX_LONG_EDGE;

@@ -277,8 +277,8 @@ final class McpTransport
                 $attachment,
                 $filename,
                 (string) ($arguments['name'] ?? ''),
-                (int) ($arguments['max_width'] ?? 2048),
-                (int) ($arguments['max_height'] ?? 2048),
+                (int) ($arguments['max_width'] ?? \NHK\Core\Application\Media\PublicImageSizingPolicy::MAX_LONG_EDGE),
+                (int) ($arguments['max_height'] ?? \NHK\Core\Application\Media\PublicImageSizingPolicy::MAX_LONG_EDGE),
                 (int) ($arguments['quality'] ?? \NHK\Core\Application\Media\PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY),
             );
         }

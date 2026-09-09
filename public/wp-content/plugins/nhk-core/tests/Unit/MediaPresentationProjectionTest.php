@@ -15,7 +15,7 @@ final class MediaPresentationProjectionTest extends TestCase
         [$media, $assets, $usages, $service] = $this->stores();
         $representative = $service->create('entity-front', 'Entity front', 'ready');
         $evidence = $service->create('entity-serial', 'Entity serial', 'ready');
-        $service->addAsset($representative->canonicalId, 'original', 'uploads/entity-front.webp', hash('sha256', 'front'), 'image/webp', 10, 1600, 900, 'PUBLIC', ['canonical_filename' => 'entity-front.webp']);
+        $service->addAsset($representative->canonicalId, 'original', 'uploads/entity-front.webp', hash('sha256', 'front'), 'image/webp', 10, 1200, 675, 'PUBLIC', ['canonical_filename' => 'entity-front.webp']);
         $service->addAsset($evidence->canonicalId, 'original', 'uploads/entity-serial.webp', hash('sha256', 'serial'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'entity-serial.webp']);
         $service->addUsage($representative->canonicalId, 'variant', 'variant-36-10', 'representative', 0, 'Ảnh đại diện 36/10');
         $service->addUsage($evidence->canonicalId, 'variant', 'variant-36-10', 'evidence', 0, 'Ảnh serial 36/10');

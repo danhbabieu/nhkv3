@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Integration;
 
-use NHK\Core\Application\Media\MediaService;
+use NHK\Core\Application\Media\{MediaService, PublicImageSizingPolicy};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor};
 use NHK\Core\Infrastructure\Migration\{MediaAssetMetadataMigration008, MediaMigration004};
 use NHK\Tests\Support\TestDatabaseGuard;
@@ -27,6 +27,9 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
         $source = tempnam(sys_get_temp_dir(), 'nhk-upload-');
         self::assertIsString($source);
         self::assertTrue(copy(ABSPATH . 'wp-admin/images/post-formats-vs.png', $source));
+        $sourceInfo = getimagesize($source);
+        self::assertIsArray($sourceInfo);
+        $expectedDimensions = PublicImageSizingPolicy::constrain((int) $sourceInfo[0], (int) $sourceInfo[1]);
         $bridge = null;
         $attachmentId = 0;
         $mediaId = '';
@@ -48,6 +51,9 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             $attachmentId = (int) $result['attachment_id'];
             $mediaId = (string) ($result['media_id'] ?? '');
             self::assertNotSame('', $mediaId);
+            self::assertSame($expectedDimensions['width'], (int) $result['width']);
+            self::assertSame($expectedDimensions['height'], (int) $result['height']);
+            self::assertLessThanOrEqual(1200, max((int) $result['width'], (int) $result['height']));
             self::assertSame($mediaId, $bridge->adoptAttachment($attachmentId));
             self::assertSame($mediaId, $bridge->adoptAttachment($attachmentId));
             self::assertSame(1, (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", \NHK\Core\Shared\Uuid\UuidCodec::toBinary($mediaId))));

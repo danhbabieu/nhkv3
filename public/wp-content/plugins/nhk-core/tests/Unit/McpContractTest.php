@@ -228,7 +228,8 @@ final class McpContractTest extends TestCase
         self::assertStringContainsString('base64', $schema['file']['description']);
         self::assertArrayNotHasKey('data', $schema['file']['properties']);
         self::assertSame(1, $schema['max_width']['minimum']);
-        self::assertSame(2048, $schema['max_width']['maximum']);
+        self::assertSame(1200, $schema['max_width']['maximum']);
+        self::assertSame(1200, $schema['max_height']['maximum']);
         self::assertSame(1, $schema['quality']['minimum']);
         self::assertSame(100, $schema['quality']['maximum']);
         self::assertSame(1, $schema['assets']['items']['properties']['wordpress_attachment_id']['minimum']);
@@ -236,10 +237,10 @@ final class McpContractTest extends TestCase
         self::assertFalse($tools['nhk.media.attachment.get']['governed']);
     }
 
-    public function test_managed_image_policy_caps_long_edge_at_2048_without_upscale_or_crop(): void
+    public function test_managed_image_policy_caps_long_edge_at_1200_without_upscale_or_crop(): void
     {
-        self::assertSame(2048, ConcreteWordPressMediaAttachmentIngestor::MAX_LONG_EDGE);
-        self::assertSame(['width' => 2048, 'height' => 1365], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(6000, 4000));
+        self::assertSame(1200, ConcreteWordPressMediaAttachmentIngestor::MAX_LONG_EDGE);
+        self::assertSame(['width' => 1200, 'height' => 800], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(6000, 4000));
         self::assertSame(['width' => 1200, 'height' => 800], ConcreteWordPressMediaAttachmentIngestor::constrainDimensions(1200, 800));
     }
 
@@ -272,7 +273,7 @@ final class McpContractTest extends TestCase
         $transport = new McpTransport($read, new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, null, null, null, $ingestor);
         $path = tempnam(sys_get_temp_dir(), 'nhk-mcp-file-');
         self::assertIsString($path);
-        $request = ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.ingest', 'arguments' => ['name' => 'Ảnh thử', 'filename' => 'Ảnh mặt tiền.JPG', 'max_width' => 1600, 'max_height' => 1200, 'quality' => 84]]];
+        $request = ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.ingest', 'arguments' => ['name' => 'Ảnh thử', 'filename' => 'Ảnh mặt tiền.JPG', 'max_width' => 1200, 'max_height' => 1200, 'quality' => 84]]];
         try {
             $response = $transport->dispatch($request, [], ['file' => ['tmp_name' => $path, 'name' => 'IMG_0001.JPG', 'type' => 'image/jpeg', 'size' => 10, 'error' => UPLOAD_ERR_OK]]);
             self::assertSame(200, $response['status']);
@@ -280,7 +281,7 @@ final class McpContractTest extends TestCase
             self::assertIsArray($ingestor->received);
             self::assertSame($path, $ingestor->received[0]['tmp_name']);
             self::assertSame('Ảnh mặt tiền.JPG', $ingestor->received[1]);
-            self::assertSame(1600, $ingestor->received[3]);
+            self::assertSame(1200, $ingestor->received[3]);
             self::assertSame(1200, $ingestor->received[4]);
             self::assertSame(84, $ingestor->received[5]);
         } finally {

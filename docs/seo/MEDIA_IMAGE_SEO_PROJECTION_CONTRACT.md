@@ -27,16 +27,17 @@ observations only and never semantic writes.
 ## Canonical full-size image resolution
 
 The public canonical `/anh/<slug>.webp` must use a public derivative generated
-from the retained source-original. If that source is at least 900px wide, the
-canonical asset must also be at least 900px wide where the source permits it;
-240×340 and similar thumbnail derivatives are not valid canonical full-size
-assets. The projection must preserve the source aspect ratio and must never
-upscale a smaller derivative. WebP quality targets 82–88 (current default 86),
-with no excessive sharpening or intentional color change. A listing may use a
-separate thumbnail/srcset candidate, but clicking the gallery image must open
-the large canonical `/anh/<slug>.webp` asset. Missing source-derived output is
-an unavailable/incomplete projection, not permission to fall back to a
-thumbnail.
+from the retained source-original under **PUBLIC IMAGE MAX LONG EDGE = 1200
+PX**. When the source long edge is `<= 1200px`, retain its original dimensions;
+when it is larger, use `scale = 1200 / max(width, height)` and
+`round(dimension × scale)` for both dimensions. Never upscale, crop, stretch or
+force a square canvas; preserve the source aspect ratio. 240×340 and similar
+thumbnail derivatives are not canonical full-size assets. WebP quality targets
+82–88 (current default 86), with no excessive sharpening or intentional color
+change. Listings may use separate thumbnail/srcset candidates, but clicking
+the gallery image must open the canonical `/anh/<slug>.webp` asset. Missing
+source-derived output is an unavailable/incomplete projection, not permission
+to fall back to an oversized or thumbnail asset.
 
 After every MCP Media ingest, the Media semantic enrichment and representative
 reconciliation required by Constitution §20.1 must complete before the Media

@@ -17,10 +17,12 @@ public evidence reads remain fail-closed.
 
 New NHK-managed image bytes follow one governed Media V3 ingest law before
 durable persistence/public projection: validate the actual payload → auto-orient
-→ resize → contextual SEO-safe naming → WebP/eligible derivative encoding →
-retain source-original `PRIVATE`/protected → persist eligible optimized
-derivatives `PUBLIC` under the same Media identity → read-back verification →
-temporary-workfile cleanup.
+→ apply the 1200px maximum-long-edge rule → contextual SEO-safe naming →
+WebP/eligible derivative encoding → retain source-original `PRIVATE`/protected
+→ persist eligible optimized derivatives `PUBLIC` under the same Media identity
+→ read-back verification → temporary-workfile cleanup. Long edge `<= 1200px`
+keeps original dimensions; larger images use proportional rounded downscale.
+There is never an upscale, crop, stretch or forced square canvas.
 
 Corrupt, fake or unreadable payloads, invalid storage paths and unavailable
 required conversion fail closed. Partial attachment, mapping, asset or usage
@@ -419,7 +421,8 @@ preserves native multipart parts from the connector request and delegates to
 client filesystem paths.
 
 The canonical lifecycle is multipart batch → native WordPress attachment
-creation → `wp_generate_attachment_metadata()` and derivatives → canonical
+creation with the 1200px public sizing policy →
+`wp_generate_attachment_metadata()` and derivatives → canonical
 attachment read-back / `nhk.media.attachment.get` → governed
 `nhk-v3/media-ingest` attachment adoption/binding → MediaAsset → Media →
 MediaUsage. The upload transport phase does not infer or apply Knowledge,

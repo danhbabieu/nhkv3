@@ -69,6 +69,12 @@ sections are:
 - public-claim compliance state;
 - blockers, warnings and `ready_for_draft`.
 
+When the Media plan includes a public image, its normalized derivative follows
+the canonical 1200px maximum-long-edge rule: dimensions at or below 1200px are
+retained, larger images are proportionally downscaled, and no upscale, crop or
+aspect-ratio change is permitted. This is a projection/readiness constraint,
+not a new Media identity or an Article semantic mutation.
+
 `EXISTING_DERIVED` is query-only, bounded to an approved maximum of two hops,
 and is never persisted as a shortcut. `EDITORIAL_RELATED` does not become a
 Graph edge. Only a registry-valid, evidence/provenance-ready

@@ -55,7 +55,7 @@ final class MediaBatchUploadService
                 $filename = trim((string) ($item['filename'] ?? $file['name'] ?? ''));
                 $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
                 if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) throw new \InvalidArgumentException('FILE_EXTENSION_INVALID');
-                $result = $this->ingestor->ingest($file, $filename, $title, 2048, 2048, PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY);
+                $result = $this->ingestor->ingest($file, $filename, $title, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY);
                 $checksum = hash_file('sha256', (string) ($file['tmp_name'] ?? ''));
                 if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('CHECKSUM_FAILED');
                 $results[] = array_merge($this->manifestItem($result, $checksum, $clientId), ['sort_order' => (int) ($item['sort_order'] ?? $index)]);

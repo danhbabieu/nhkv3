@@ -50,7 +50,6 @@ final class ArticleMediaCoordinator
             $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
             if ($candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
-            foreach ($this->assets->listByMediaId($candidate->canonicalId) as $asset) if ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY && ($asset->width ?? 0) > 0 && $asset->width < 1200) { $diagnostics[] = ['code' => 'MEDIA_LOW_RESOLUTION', 'slot' => $slot, 'media_id' => $candidate->canonicalId]; if ($state === MediaSeoStateRegistry::COMPLETE) $state = MediaSeoStateRegistry::LOW_RESOLUTION; break; }
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;

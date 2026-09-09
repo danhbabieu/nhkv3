@@ -103,6 +103,16 @@ in another Article, Product, Specimen or projection.
 Existing legacy attachments are read-only unless a separately governed repair
 or migration task explicitly authorizes changes.
 
+### Public image sizing
+
+The governed image adapter applies `PUBLIC IMAGE MAX LONG EDGE = 1200 PX` to
+the normalized public output. Images whose long edge is `<= 1200px` keep their
+original dimensions. Larger images use proportional downscale with
+`scale = 1200 / max(width, height)` and rounded dimensions. The adapter never
+upscales, crops, stretches or forces a square canvas. This changes only the
+binary derivative dimensions; it does not create a Media, alter MediaUsage,
+representative relations or Article relations.
+
 ## Post-ingest semantic reconciliation — 2026-09-09
 
 Sau khi Media ingest đã canonical read-back, Admin phải dùng cùng bounded

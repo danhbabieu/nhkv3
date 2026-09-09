@@ -152,9 +152,12 @@ truth.
 Article media must reuse canonical `Media` where available. A new upload enters
 the governed Media boundary, retains the source-original as a private/protected
 MediaAsset and projects normalized WebP/responsive/WordPress attachment outputs
-under the same Media identity. Featured/inline selection remains WordPress
-editorial state; `MediaUsage` records contextual role/SEO metadata and does not
-itself create a Graph edge or Knowledge/Evidence.
+under the same Media identity. The normalized public image uses a 1200px
+maximum long edge: dimensions at or below that bound are retained, larger
+images are proportionally downscaled, and no upscale/crop/stretch is allowed.
+Featured/inline selection remains WordPress editorial state; `MediaUsage`
+records contextual role/SEO metadata and does not itself create a Graph edge or
+Knowledge/Evidence.
 
 An Article that repeats an existing fact should resolve and reuse the canonical
 Knowledge/Source/Evidence chain rather than minting a duplicate claim from its
