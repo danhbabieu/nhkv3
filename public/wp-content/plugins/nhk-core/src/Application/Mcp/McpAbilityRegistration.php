@@ -14,15 +14,36 @@ final class McpAbilityRegistration
         }
     }
 
+    /** @return list<string> */
+    public static function operatorEnabledAbilityAllowlist(): array
+    {
+        $allowlist = [];
+        foreach (McpToolCatalog::tools() as $tool) {
+            $toolName = (string) ($tool['name'] ?? '');
+            $abilityName = self::abilityNameForTool($toolName);
+            if ($abilityName === null || SingleEntryPointPolicy::isInternalOnly($toolName)) continue;
+            $allowlist[] = $abilityName;
+        }
+
+        return array_values(array_unique($allowlist));
+    }
+
     /** @param mixed $enabled @return list<string> */
     public static function ensureEasyMcpEnabledAbilities(mixed $enabled): array
     {
-        if (!is_array($enabled) || $enabled === []) return [];
-        if (!in_array('nhk-v3/capture-ingest', $enabled, true)) $enabled[] = 'nhk-v3/capture-ingest';
-        foreach (['nhk-v3/documentation-bootstrap', 'nhk-v3/documentation-get', 'nhk-v3/documentation-list'] as $ability) if (!in_array($ability, $enabled, true)) $enabled[] = $ability;
-        if (!in_array('nhk-v3/docs-bootstrap', $enabled, true)) $enabled[] = 'nhk-v3/docs-bootstrap';
-        if (!in_array('nhk-v3/docs-get', $enabled, true)) $enabled[] = 'nhk-v3/docs-get';
-        return array_values($enabled);
+        $enabled = is_array($enabled) ? $enabled : [];
+        $preserved = array_values(array_filter($enabled, static fn (mixed $ability): bool => is_string($ability) && !str_starts_with($ability, 'nhk-v3/')));
+
+        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist())));
+    }
+
+    public static function reconcileEasyMcpEnabledAbilities(): void
+    {
+        if (!function_exists('get_option') || !function_exists('update_option')) return;
+        $current = get_option('easy_mcp_ai_enabled_abilities', []);
+        $current = is_array($current) ? array_values($current) : [];
+        $desired = self::ensureEasyMcpEnabledAbilities($current);
+        if ($current !== $desired) update_option('easy_mcp_ai_enabled_abilities', $desired, false);
     }
 
     /**

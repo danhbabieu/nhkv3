@@ -498,20 +498,37 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/capture-ingest', $enabled);
     }
 
-    public function test_easy_mcp_keeps_standalone_video_as_internal_compatibility_only(): void
+    public function test_easy_mcp_reconciles_stale_internal_writers_to_the_operator_allowlist(): void
     {
-        self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/documentation-bootstrap', 'nhk-v3/documentation-get', 'nhk-v3/documentation-list', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
-            McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
-        );
+        $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([
+            'core/get-site-info',
+            'nhk-v3/video-ingest',
+            'nhk-v3/article-publish',
+            'nhk-v3/search',
+        ]);
+
+        self::assertContains('core/get-site-info', $enabled);
+        self::assertContains('nhk-v3/search', $enabled);
+        self::assertContains('nhk-v3/capture-ingest', $enabled);
+        self::assertContains('nhk-v3/documentation-bootstrap', $enabled);
+        self::assertContains('nhk-v3/documentation-get', $enabled);
+        self::assertContains('nhk-v3/documentation-list', $enabled);
+        self::assertNotContains('nhk-v3/video-ingest', $enabled);
+        self::assertNotContains('nhk-v3/article-publish', $enabled);
+        self::assertSame($enabled, McpAbilityRegistration::ensureEasyMcpEnabledAbilities($enabled));
     }
 
-    public function test_documentation_abilities_are_added_to_the_easy_mcp_enabled_ability_list(): void
+    public function test_empty_easy_mcp_option_gets_the_canonical_operator_surface(): void
     {
-        self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/documentation-bootstrap', 'nhk-v3/documentation-get', 'nhk-v3/documentation-list', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
-            McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
-        );
+        $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]);
+        self::assertSame(McpAbilityRegistration::operatorEnabledAbilityAllowlist(), $enabled);
+        self::assertContains('nhk-v3/capture-ingest', $enabled);
+        self::assertContains('nhk-v3/documentation-bootstrap', $enabled);
+        self::assertContains('nhk-v3/documentation-get', $enabled);
+        self::assertContains('nhk-v3/documentation-list', $enabled);
+        foreach (SingleEntryPointPolicy::internalOnlyTools() as $tool) {
+            self::assertNotContains(McpAbilityRegistration::abilityNameForTool($tool), $enabled);
+        }
     }
 
     public function test_documentation_abilities_use_the_read_capability_and_read_only_annotations(): void
