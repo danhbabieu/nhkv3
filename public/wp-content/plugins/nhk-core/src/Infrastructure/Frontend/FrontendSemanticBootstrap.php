@@ -106,6 +106,7 @@ final class FrontendSemanticBootstrap
             $evidence,
             $sources,
             self::collectorRelatedReader($relatedQuery, $authority, $eligibility, $routes, $media, $usages, $videos),
+            self::collectorBranchClaimReader($graph, $claims),
         );
         add_action('rest_api_init', [new CollectorProfileApi($collectorProfile), 'register']);
         $coverageAudit = new SemanticDossierCoverageAudit($types, $authority, static fn(AuthorityEntity $entity): array => $dossier->forEntity($entity));
@@ -188,6 +189,38 @@ final class FrontendSemanticBootstrap
             foreach ($groups as &$items) $items = array_values($items);
             unset($items);
             return ['status' => 'available', 'scope' => 'subject', 'branch_scoped' => true] + $groups;
+        };
+    }
+
+    private static function collectorBranchClaimReader(GraphService $graph, WpdbKnowledgeRepository $claims): \Closure
+    {
+        return static function (string $classificationId) use ($graph, $claims): array {
+            $items = [];
+            $after = 0;
+            try {
+                do {
+                    $page = $graph->findIncoming(
+                        new \NHK\Core\Domain\Graph\NodeReference('classification', $classificationId),
+                        'about',
+                        $after,
+                        200,
+                        false,
+                        'knowledge',
+                    );
+                    foreach ((array) ($page['items'] ?? []) as $edge) {
+                        if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive()) continue;
+                        $claim = $claims->findByCanonicalId($edge->source->reference->endpoint_key);
+                        if ($claim !== null) $items[$claim->canonicalId] = $claim;
+                    }
+                    $next = $page['next_cursor'] ?? null;
+                    if ($next === null) break;
+                    if (!is_int($next) || $next <= $after) return ['status' => 'unavailable', 'claims' => [], 'reason' => 'BRANCH_KNOWLEDGE_CURSOR_INVALID'];
+                    $after = $next;
+                } while (true);
+            } catch (\Throwable) {
+                return ['status' => 'unavailable', 'claims' => [], 'reason' => 'BRANCH_KNOWLEDGE_UNAVAILABLE'];
+            }
+            return ['status' => 'available', 'claims' => array_values($items)];
         };
     }
 }

@@ -91,6 +91,26 @@ final class CollectorProfileQueryTest extends TestCase
         self::assertSame([], $profile['media']);
     }
 
+    public function test_graph_owned_branch_claims_are_read_without_global_fallback(): void
+    {
+        $subjectId = UuidCodec::newV7();
+        $claim = new KnowledgeClaim(UuidCodec::newV7(), 'nhk:knowledge:graph-owned', 'Graph branch claim', 'fact', [
+            'metadata' => ['facet' => 'configuration', 'collector_facet' => 'running_duration', 'scope' => 'entity'],
+        ]);
+        $profile = (new CollectorProfileQuery(
+            $this->repositories($subjectId, UuidCodec::newV7(), 0)[0],
+            $this->claimRepository([$claim]),
+            $this->emptyEvidence(),
+            $this->emptySources(),
+            null,
+            static fn (string $id): array => ['status' => 'available', 'claims' => [$claim]],
+        ))->build($subjectId);
+
+        self::assertSame('available', $profile['status']);
+        self::assertSame(1, $profile['coverage']['knowledge_count']);
+        self::assertSame('Graph branch claim', $profile['knowledge'][0]['text']);
+    }
+
     public function test_collector_facets_keep_ownership_axes_and_scope_separate(): void
     {
         $subjectId = UuidCodec::newV7();

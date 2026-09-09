@@ -6296,6 +6296,43 @@ requested Classification and a permitted `manage_options` credential, then
 repeat the read-only Collector REST/profile and admin coverage read-back. Do
 not seed semantic data merely to satisfy the contract suite.
 
+# Checkpoint — 2026-09-09 — Graph-owned Collector branch read
+
+ROOT GAP: DEMO read-only canonical inventory confirmed the Cuckoo Classification
+exists, but the deployed Collector Profile returned `knowledge_count=0` even
+though the same runtime has direct Graph `knowledge → about → classification`
+edges. The gap was ownership resolution at the read boundary, not missing
+canonical data.
+
+WHAT CHANGED: Added a regression test for Graph-owned Knowledge and wired the
+existing Collector Profile bootstrap to a paginated Graph inbound `about`
+reader filtered to `knowledge`. The reader hydrates canonical Knowledge by UUID,
+deduplicates records and returns an explicit unavailable result for traversal or
+cursor failure. Metadata-only fixtures remain a test seam; there is no global
+fallback and no new storage/query system.
+
+CANONICAL EFFECT: No Authority, Knowledge, Source, Evidence, Graph, Article,
+Media, Video or public identity mutation. Only code/tests/docs changed locally.
+
+TESTS: Focused Collector query/API contract passes 11 tests / 64 assertions;
+Contract passes 4 tests / 31 assertions; Unit passes 848 tests / 4,023
+assertions; guarded Integration passes 120 tests / 1,011 assertions with 4
+canonical skips, 1 warning and 1 deprecation. Composer validation, PHP lint,
+`git diff --check` and secret review pass.
+
+RUNTIME READ-BACK: DEMO canonical inventory is PASS and exact subject identity
+is present. DEMO Collector Profile remains stale until this local fix is
+deployed; no deployment or push was performed.
+
+UNRESOLVED: Deploying the local fix to the authorized DEMO runtime and repeating
+read-only Collector Profile pagination, branch Media/Video/Article/maker scope,
+public identity owner and admin coverage read-back remain externally gated.
+
+NEXT EXACT OPERATION: After an authorized deployment of this fix, rerun the
+read-only DEMO Collector Profile request and verify `knowledge_count` matches
+the Graph branch inventory. Do not migrate, apply, seed or publish as part of
+that read-back.
+
 The first sandbox attempt stopped at WordPress database bootstrap with
 `Error establishing a database connection`. Read-only OS/config diagnostics
 found the existing Homebrew MySQL daemon listening on `127.0.0.1:3306`, the

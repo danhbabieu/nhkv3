@@ -24,12 +24,14 @@ final class CollectorProfileQuery
     ];
 
     /** @param callable(string,array<string,mixed>):array<string,mixed>|null $relatedReader */
+    /** @param callable(string):array{status:string,claims?:list<KnowledgeClaim>,reason?:string}|null $branchClaimReader */
     public function __construct(
         private AuthorityRepository $authority,
         private KnowledgeRepository $claims,
         private EvidenceRepository $evidence,
         private SourceRepository $sources,
         private $relatedReader = null,
+        private $branchClaimReader = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -43,7 +45,9 @@ final class CollectorProfileQuery
         $related = $this->related($classificationId);
         if (($related['status'] ?? 'available') !== 'available') return $this->unavailable((string) ($related['reason'] ?? 'BRANCH_RELATION_UNAVAILABLE'));
 
-        $records = $this->branchClaims($classificationId);
+        $branch = $this->branchClaims($classificationId);
+        if (($branch['status'] ?? '') !== 'available') return $this->unavailable((string) ($branch['reason'] ?? 'BRANCH_KNOWLEDGE_UNAVAILABLE'));
+        $records = $branch['items'];
         $total = count($records);
         $renderCap = max(0, $renderCap);
         $truncated = $renderCap > 0 && $total > $renderCap;
@@ -99,14 +103,30 @@ final class CollectorProfileQuery
         ];
     }
 
-    /** @return list<array<string,mixed>> */
+    /** @return array{status:string,items:list<array<string,mixed>>,reason?:string} */
     private function branchClaims(string $subjectId): array
     {
+        $relationScoped = is_callable($this->branchClaimReader);
+        if ($relationScoped) {
+            try {
+                $branch = ($this->branchClaimReader)($subjectId);
+            } catch (\Throwable) {
+                return ['status' => 'unavailable', 'items' => [], 'reason' => 'BRANCH_KNOWLEDGE_UNAVAILABLE'];
+            }
+            if (!is_array($branch) || ($branch['status'] ?? '') !== 'available') {
+                return ['status' => 'unavailable', 'items' => [], 'reason' => (string) ($branch['reason'] ?? 'BRANCH_KNOWLEDGE_UNAVAILABLE')];
+            }
+            $claims = is_array($branch['claims'] ?? null) ? $branch['claims'] : [];
+        } else {
+            $claims = $this->claims->list();
+        }
         $unique = [];
-        foreach ($this->claims->list() as $claim) {
+        foreach ($claims as $claim) {
             if (!$claim instanceof KnowledgeClaim || !$claim->active || !$claim->isPublic()) continue;
             $metadata = $claim->provenance['metadata'] ?? null;
-            if (!is_array($metadata) || (string) ($metadata['subject_id'] ?? '') !== $subjectId) continue;
+            if (!is_array($metadata)) $metadata = [];
+            $metadataSubject = trim((string) ($metadata['subject_id'] ?? ''));
+            if ($relationScoped ? ($metadataSubject !== '' && $metadataSubject !== $subjectId) : $metadataSubject !== $subjectId) continue;
             if (isset($unique[$claim->canonicalId])) continue;
             $facet = $this->facet($metadata);
             $evidenceCount = $this->publicEvidenceCount($claim);
@@ -123,7 +143,7 @@ final class CollectorProfileQuery
         }
         $records = array_values($unique);
         usort($records, static fn (array $left, array $right): int => $left['uuid'] <=> $right['uuid']);
-        return $records;
+        return ['status' => 'available', 'items' => $records];
     }
 
     /** @param array<string,mixed> $metadata */

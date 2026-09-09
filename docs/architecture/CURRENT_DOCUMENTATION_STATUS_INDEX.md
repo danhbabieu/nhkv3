@@ -425,6 +425,24 @@ Classification in local `nhk_v3` / `nhk_v3_test` into a live data PASS. The
 guarded semantic-equivalent fixture and the live runtime blocker remain
 separate evidence classes.
 
+### Collector DEMO read-only recheck — 2026-09-09
+
+The allowlisted read-only DEMO maintenance path confirmed the canonical
+Classification exists and is `ACTIVE`, revision `1`, under the requested UUID
+and stable key. The deployed Collector Profile read returned the subject but
+reported `knowledge_count=0`, while the same runtime's canonical Graph
+inventory reports direct `knowledge → about → classification` edges for the
+branch. The deployed implementation therefore still reads branch Knowledge
+from `provenance.metadata.subject_id` and misses relation-owned Knowledge.
+
+The local fix keeps the existing Graph boundary: the Collector Profile now
+accepts a branch claim reader that paginates incoming `about` edges filtered to
+`knowledge`, hydrates canonical Knowledge UUIDs, deduplicates them and fails
+closed on Graph/cursor errors. Metadata-only fixtures remain supported for the
+guarded test seam; no global fallback is introduced. This fix is committed
+locally but not deployed or pushed, so DEMO live profile read-back remains
+runtime-deployment gated.
+
 ### Editorial Capture runtime acceptance — 2026-09-09
 
 Migration 017 was applied and rerun on the exact `nhk_v3_test` runtime. The
