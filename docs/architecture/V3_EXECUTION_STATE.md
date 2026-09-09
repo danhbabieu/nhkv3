@@ -6608,3 +6608,40 @@ Article relation was changed by this policy work.
 NEXT ACTION: Commit this policy change locally, preserve unrelated `Plugin.php`
 worktree changes, verify the post-commit worktree and leave PUSH STATUS = NOT
 PUSHED.
+
+# Checkpoint — 2026-09-09 — Article preflight Graph-branch read-back
+
+ROOT GAP: The rebased Graph-branch fix `0562716b` correctly reads 86 active
+Knowledge edges for Classification `01a07614-832d-7f27-959c-74eb0cd63f3e`,
+but live Article preflight still returned zero claims.
+
+ROOT CAUSE: Preflight serialized Graph-only claims without canonical
+`metadata.subject_id` as `subject_id=''`; its existing branch filter then
+treated those rows as scoped and removed all 86. This was a mapper/serialization
+bug, not a missing Graph edge or claim hydration failure.
+
+CODE FIX: Commit `57ca530e` carries Graph branch subject IDs into the preflight
+rows as `subject_ids` and uses the first branch subject as the compatibility
+`subject_id`. A regression test proves Graph-only claims survive branch
+filtering. No semantic data, Article, Media, Video, identity or capability was
+changed.
+
+RUNTIME READ-BACK: Direct DEMO GraphService read returns 86 exact Knowledge
+UUIDs and claim hydration succeeds. The current DEMO artifact still has the
+pre-`57ca530e` hash, so live preflight remains 0/86 until the code-only deploy
+and read-back are permitted. DEMO facet inspection found all 21 facet metadata
+groups absent from the 86 claims; governed enrichment remains required.
+
+TEST: Focused Unit passes 28 tests / 127 assertions; full NHK Unit passes 859 /
+4,096; Contract passes 4 / 31; Composer lint, PHP lint, Composer validation
+and `git diff --check` pass. Guarded Integration had a prior successful run at
+120 tests / 1,016 assertions; the post-commit rerun was blocked at WordPress
+bootstrap by a local database-connection error and must be rerun.
+
+DEPLOYMENT: Code-only DEMO deployment was explicitly attempted but rejected
+by the execution security policy as an external runtime write. No workaround,
+migration, seed, apply, publish or semantic mutation was performed.
+
+STATUS: BLOCKED — Article preflight live read-back and DEMO deployment remain
+unverified after `57ca530e`; Collector facet data remains a governed data gap.
+PUSH STATUS = NOT PUSHED.
