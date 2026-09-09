@@ -117,3 +117,26 @@ provenance class: `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`,
 `CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`. User input and
 image observation stay scoped to their subject/facet and cannot become a
 universal fact without supporting Source/Evidence of the same scope.
+
+## Editorial Capture Claim reuse — 2026-09-09
+
+Editorial Capture reuses the same canonical Knowledge owner rather than creating
+an Article-specific fact store. The sequence is resolve subject → inspect bounded
+Graph context → retrieve candidate Claims → verify canonical Claim identity and
+revision → verify original subject/scope → verify provenance/Evidence → verify
+relevance → select or reject. Graph reachability is only a discovery signal; it
+never authorizes the Claim by itself.
+
+A selected Claim keeps its canonical ID/revision and original semantic subject.
+The Article may store a body-free `claim_trace` or research snapshot containing
+that identity, an explainable relation path and editorial usage reason. The
+Article body may synthesize the selected fact in new wording, but the resulting
+prose is WordPress editorial state, not a second Knowledge record and not new
+Evidence.
+
+If a candidate is specimen-scoped, unsupported, provenance-incomplete,
+evidence-incomplete or irrelevant to the current Capture, it must be excluded or
+kept review-only. The system must not broaden the Claim because a Model/Brand or
+other broader node is reachable in Graph. Before any new Claim proposal, the
+current canonical Knowledge set must be searched for reuse/add-Evidence first;
+repeated prose or repeated visual observation never justifies a duplicate Claim.
