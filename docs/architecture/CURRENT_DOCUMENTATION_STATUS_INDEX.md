@@ -72,6 +72,44 @@ A newer timestamp alone never overrides the Constitution or an approved
 contract. Conversely, an old checkpoint must not override a later executable
 registry/catalog merely because its wording is present tense.
 
+## 1.2 Editorial Capture operating interpretation — 2026-09-09
+
+The accepted Editorial Capture boundary is a cross-owner orchestrator, not a
+new semantic owner. For text-only and multipart image submissions, one new user
+submission maps by default to one durable Capture and one native WordPress
+draft. Replays with the same idempotency key and unchanged payload resume the
+same Capture; changed payloads conflict rather than creating a second Article or
+re-uploading completed physical assets.
+
+The reusable semantic core is `interpret → resolve canonical subjects → bounded
+Graph neighborhood → retrieve candidate Claims → evaluate scope/provenance/
+evidence/relevance → semantic write-back review/Governance → compose Article`.
+Graph reachability only discovers a Claim. A relation path is not permission to
+use the Claim in prose. The Claim must retain canonical ID/revision, original
+semantic subject and relation path, and it is directly usable only when scope,
+provenance, evidence and relevance pass. Specimen-only scope never generalizes
+upward; insufficient evidence or missing provenance remains review-only.
+
+Article composition is editorial synthesis over selected Claims, not a copy of
+Knowledge. The composer retains a body-free `claim_trace` and research snapshot
+of Claim IDs/revisions so later reconciliation can explain what was reused
+without storing a second factual body. Generated Article copy is never Evidence.
+
+The currently accepted Capture adapter supports text-only and multipart images.
+Video remains a distinct canonical external-reference intake and is not yet a
+physical branch inside `nhk.capture.ingest`. Until a registered shared adapter
+exists, a submission containing Video must preserve the Video boundary and must
+not be reported as one unified Capture-complete operation by creating duplicate
+Posts, Videos or convenience relations.
+
+Executable runtime capability and connector/client exposure are separate facts.
+A current connector may expose only a subset of a registered runtime catalog.
+That condition is a `CLIENT_EXPOSURE_GAP`, not evidence that the registered
+runtime capability does not exist. However, the current client must fail closed
+when a required operation is not callable; it must not substitute a generic
+WordPress writer, a historical Ability assumption or a superseded workflow.
+Fresh target discovery/read-back controls callability claims.
+
 ## 2. Current boundary snapshot
 
 ### Semantic Claim Projection — 2026-09-08
@@ -132,21 +170,21 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 
 | Area | Current boundary | Current status / reuse rule |
 |---|---|---|
-| Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the persisted one-Capture/one-draft orchestration boundary |
+| Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the persisted one-Capture/one-draft orchestration boundary for accepted text/image input |
 | Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
-| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; governed relation commands now preserve explicit endpoint UUIDs, bounded direct/inverse reads and a read-only semantic-neighborhood MCP seam exist; `classified_as` remains a documented `REGISTRY_GAP` pending approved Authority vocabulary, and physical row completeness/backfill is a separate runtime/data question |
+| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; governed relation commands now preserve explicit endpoint UUIDs, bounded direct/inverse reads and a read-only semantic-neighborhood MCP seam exist; Graph reachability only discovers candidate Claims and never overrides Claim scope/provenance/evidence/relevance; `classified_as` remains a documented `REGISTRY_GAP` pending approved Authority vocabulary, and physical row completeness/backfill is a separate runtime/data question |
 | Public Entity Dossier | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`; detail-only read model over existing canonical owners | shared dossier seam is wired through `nhk_v3_entity_detail_projection`; Brand is the first complete typed path-recipe projection; direct subject Knowledge remains subject-scoped, deep Brand context keeps origin path, archives stay outside the heavy dossier path, and no display shortcut relation is persisted |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
 | Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates, while guarded migration/data allocation/current-route durable consumer parity and live re-projection remain runtime-unverified |
-| Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence |
+| Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts | governed writes only; reuse canonical IDs/revisions; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence; Article reuse retains Claim revision/path trace rather than duplicating claim text into semantic storage |
 | Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |
-| Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; Dictionary observation after canonical write is lexical/non-blocking and does not broaden the target |
+| Video | canonical external reference | Video → Living Knowledge planning seam implemented; explicit validated `about` target is preserved as enrichment subject; Dictionary observation after canonical write is lexical/non-blocking and does not broaden the target; Video is not yet a physical asset branch inside the accepted Capture adapter |
 | Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | `nhk.media.upload-batch` is PRIMARY multipart transport; native WordPress attachment lifecycle and canonical read-back precede separate governed `nhk-v3/media-ingest`; URL import is SECONDARY/IMPORT; base64 is FALLBACK/COMPATIBILITY; post-ingest semantic enrichment, relation reconciliation and representative reconciliation are mandatory; target acceptance remains runtime-gated |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
-| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the governed one-submission Capture boundary; `nhk.media.upload-batch` remains the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; the Ability bridge preserves connector multipart parts while delegating to the same transport; authenticated discovery, multipart/text-only capture and canonical read-back PASS on 2026-09-09; guarded Integration PASS follows the fixture/authentication reconciliation |
-| WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; binary multipart batch remains on the approved custom MCP boundary while metadata Media ingest remains the Ability bridge |
+| MCP | `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` and `docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md`; executable catalog/transport are runtime truth | `nhk.capture.ingest` is the governed one-submission Capture boundary; `nhk.media.upload-batch` remains the canonical multipart/file transport on `/nhk/v1/mcp` and is exported as `nhk-v3/media-upload-batch` with top-level `files[]`; authenticated discovery, multipart/text-only capture and canonical read-back PASS on 2026-09-09; guarded Integration PASS follows the fixture/authentication reconciliation; environment-specific connector exposure may still be a subset and must not be used to infer a smaller runtime catalog |
+| WordPress Abilities | discoverability/adapter projection of supported MCP/application operations | historical limited allowlists are not current truth; inspect current registration + fresh discovery; a missing client-exposed Ability is a callability gap for that client, never permission to fall back to a generic writer; binary multipart batch remains on the approved custom MCP boundary while metadata Media ingest remains the Ability bridge |
 | SEO/Public Projection | `docs/seo/NHK_V3_SEO_CORE_CONTRACT.md`, `PUBLIC_URL_SLUG_CONTRACT.md`, `ENTITY_SEO_PROJECTION_CONTRACT.md`, `MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md`, `SITEMAP_INDEXABILITY_CONTRACT.md` plus existing Article/Video/Living Knowledge/Dictionary contracts | read/projection-only layer; one title/name-derived public-slug policy is reused by NHK-managed semantic generators; canonical/OpenGraph/schema/sitemap/internal-link surfaces consume the resolved canonical path rather than independently slugifying |
 | Admin Workbench | `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` plus current Admin Workbench design/implementation evidence | implemented shared workspaces; normal flows are guided and Governance-backed; technical identifiers remain Advanced-only |
 | Video frontend | `VIDEO_SEMANTIC_INGEST_CONTRACT.md`, `VIDEO_RELATIONSHIP_CONTRACT.md`, `VIDEO_YOUTUBE_SOURCE_CONTRACT.md`, `VIDEO_SEO_PROJECTION_CONTRACT.md` | first-party `/video/{slug}/` route and separate source action; external URL is never the canonical frontend destination |
@@ -157,7 +195,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 |---|---|---|
 | Canonical operational | `04_MEDIA_MODEL.md`, `22_P6_MEDIA_VIDEO_FOUNDATION.md`, `ADMIN_MEDIA_INPUT_GUIDANCE.md`, `MCP_V3_CONTENT_OPERATIONS.md`, `NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` | Current Media ownership, upload paths, attachment lifecycle, MCP boundary, semantic ingest and read-back rules. |
 | Bootstrap/router | `READ_FIRST.md`, this index | Direct new agents to the canonical set and distinguish code/runtime truth from dated evidence. |
-| Executable truth | `EditorialCaptureCoordinator`, `WpdbCaptureRepository`, migration 017, `MediaBatchUploadService`, `McpTransport`, `McpToolCatalog`, `McpAbilityRegistration`, attachment bridge/ingestor, `MediaIngestGateway`, idempotency repository | Actual Capture/Media vocabulary, dispatch, schemas, limits, checkpoints and implementation status; docs must not invent capabilities. |
+| Executable truth | `EditorialCaptureCoordinator`, `WpdbCaptureRepository`, migration 017, `TextInputInterpreter`, `SubjectResolutionService`, `ClaimRetrievalEngine`, `ArticleComposer`, `SemanticContextPackage`, `MediaBatchUploadService`, `McpTransport`, `McpToolCatalog`, `McpAbilityRegistration`, attachment bridge/ingestor, `MediaIngestGateway`, idempotency repository | Actual Capture/Media vocabulary, dispatch, schemas, limits, Claim selection/trace, checkpoints and implementation status; docs must not invent capabilities. |
 | Design/plan history | `docs/superpowers/specs/2026-09-08-multipart-batch-media-upload-design.md`, `docs/superpowers/plans/2026-09-08-multipart-batch-media-upload.md`, and this reconciliation plan | Rationale and implementation history; not canonical law or the only source of current workflow. |
 | Historical/superseded | `docs/mcp/MCP_V3_ABILITY_EXPOSURE.md`, older dated P-phase/checkpoint sections and legacy/V2 audits | Preserve evidence where useful, but do not use them for current capability or upload-path decisions. |
 
@@ -262,6 +300,12 @@ or editorial publication is part of this discovery checkpoint.
 - full physical Graph completeness/backfill where not runtime-proven;
 - Media → Living Knowledge automatic claim-writing adapter (Media semantic
   enrichment/relation reconciliation remains mandatory);
+- Video as a physical input branch inside the shared Editorial Capture adapter;
+  the current canonical Video intake remains separate until a registered adapter
+  reuses the semantic core without duplicating identity or Article state;
+- environment-specific connector exposure parity; a missing client surface is a
+  `CLIENT_EXPOSURE_GAP`, not permission to infer a smaller runtime catalog or
+  use a generic fallback writer;
 - universal per-domain MCP post-ingest reconciliation orchestration and final
   `COMPLETE` read-back evidence across all target runtimes;
 - automatic Article body rewrite from Knowledge (prohibited by design; only
