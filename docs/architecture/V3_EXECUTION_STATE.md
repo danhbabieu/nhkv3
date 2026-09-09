@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Permanent Easy MCP operator whitelist
+
+The Easy MCP plugin reads `easy_mcp_ai_allowed_tool_patterns` directly and
+does not expose a whitelist filter or higher-level configuration API. The
+supported WordPress option boundary is therefore reconciled by NHK bootstrap
+using the deterministic operator patterns
+`wp_ability_core_*`, `wp_ability_nhk_v3_*`, `wp_get_*`, `wp_list_*`,
+`wp_search_*` and `wp_count_*`. A stale broad or empty value is replaced; an
+already-canonical value is a no-op. This preserves safe generic reads while
+excluding generic create/update/upload/delete/publish mutation tools from the
+MCP operator surface. Native WordPress admin maintenance remains outside this
+MCP whitelist.
+
+Focused tests cover empty, broad/stale, safe-read, mutation-exclusion and
+repeated-reconciliation cases. The permanent NHK ability and generic
+whitelist fixes are committed locally and are ready for the authorized push;
+DEMO has not yet been redeployed at this checkpoint.
+
 ## Checkpoint — 2026-09-09 — DEMO post-deploy MCP acceptance
 
 The DEMO checkout was verified at `dc1d2e9ea9356ebcd2fd8b655477b9e4cc5ea4cb`,
