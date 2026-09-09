@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 final class McpToolCatalog
 {
-    /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool,surface:string}> */
+    /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool,surface:string,connectorMeta?:array}> */
     public static function tools(): array
     {
         return [
@@ -65,7 +65,7 @@ final class McpToolCatalog
                     'format' => 'binary',
                     'description' => 'Native multipart file parts. Binary bytes are transported out-of-band; base64 and paths are not accepted.',
                 ]],
-            ], ['idempotency_key', 'documentation_checkpoint'], true),
+            ], ['idempotency_key', 'documentation_checkpoint'], true, ['openai/fileParams' => ['files']]),
             self::tool('nhk.category.resolve', 'Resolve a native WordPress Category by ID, exact slug or exact name.', ['selector' => ['type' => 'object']], ['selector']),
             self::tool('nhk.category.create', 'Create or resolve one native WordPress Category idempotently.', ['name' => ['type' => 'string', 'minLength' => 1], 'slug' => ['type' => 'string'], 'parent' => ['type' => 'integer', 'minimum' => 0]], ['name'], true),
             self::tool('nhk.category.update', 'Update one native WordPress Category with optional state fingerprint CAS.', ['id' => ['type' => 'integer', 'minimum' => 1], 'changes' => ['type' => 'object'], 'expected_fingerprint' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$']], ['id', 'changes'], true),
@@ -198,7 +198,7 @@ final class McpToolCatalog
         return false;
     }
 
-    private static function tool(string $name, string $description, array $properties, array $required, bool $governed = false): array
+    private static function tool(string $name, string $description, array $properties, array $required, bool $governed = false, array $connectorMeta = []): array
     {
         $surface = SingleEntryPointPolicy::surface($name);
         if ($surface === 'canonical') {
@@ -208,7 +208,7 @@ final class McpToolCatalog
         } elseif ($surface === 'deprecated') {
             $description = '[DEPRECATED COMPATIBILITY ALIAS] Use nhk.documentation.*. ' . $description;
         }
-        return [
+        $definition = [
             'name' => $name,
             'description' => $description,
             'inputSchema' => ['type' => 'object', 'properties' => $properties, 'required' => $required, 'additionalProperties' => false],
@@ -216,6 +216,8 @@ final class McpToolCatalog
             'governed' => $governed,
             'surface' => $surface,
         ];
+        if ($connectorMeta !== []) $definition['connectorMeta'] = $connectorMeta;
+        return $definition;
     }
 
     /** @return array{type:string|list<string>,format:string,pattern:string} */

@@ -105,6 +105,7 @@ final class McpTransportIntegrationTest extends TestCase
             if ($abilityName === 'nhk-v3/capture-ingest') {
                 self::assertTrue($ability->get_meta_item('public'));
                 self::assertTrue($ability->get_meta_item('show_in_rest'));
+                self::assertSame(['files'], $ability->get_meta_item('_meta')['openai/fileParams']);
             } else {
                 self::assertFalse($ability->get_meta_item('public'));
                 self::assertFalse($ability->get_meta_item('show_in_rest'));

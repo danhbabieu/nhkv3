@@ -441,10 +441,19 @@ failure is retained per item and replay uses the same idempotency binding;
 different payload under the same key is a deterministic conflict. The custom
 `/nhk/v1/mcp` endpoint carries the binary parts. The same contract is exported
 as the `nhk-v3/media-upload-batch` WordPress Ability with a top-level `files[]`
-binary parameter so connector discovery can expose it. The Ability adapter
-preserves native multipart parts from the connector request and delegates to
-`/nhk/v1/mcp`; file bytes are never serialized into Ability JSON, base64 or
-client filesystem paths.
+binary parameter so connector discovery can expose it. The canonical Capture
+descriptor additionally exports `_meta["openai/fileParams"] = ["files"]`;
+this identifies the native multipart argument without changing the text-only
+schema or putting bytes, base64 or client filesystem paths into Ability JSON.
+
+The thin NHK Ability callback preserves native `$_FILES` parts when the Ability
+adapter receives them and delegates to `/nhk/v1/mcp`. An Easy MCP adapter must
+preserve both this `_meta` descriptor and the multipart request. Easy MCP
+1.7.17's stock dynamic Ability serializer currently emits only `inputSchema`
+and annotations and its MCP transport accepts JSON only; until that external
+adapter is upgraded or patched, its `wp_ability_nhk_v3_capture_ingest` surface
+remains a `CLIENT_EXPOSURE_GAP`. It is not permission to use a direct Media or
+WordPress writer.
 
 The canonical lifecycle is multipart batch → native WordPress attachment
 creation with the 1200px public sizing policy →

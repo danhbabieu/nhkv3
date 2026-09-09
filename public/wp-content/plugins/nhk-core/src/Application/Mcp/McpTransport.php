@@ -96,7 +96,11 @@ final class McpTransport
         return match ($method) {
             'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
             'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
-            'tools/list' => ['tools' => array_map(static fn (array $tool): array => ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']], McpToolCatalog::tools())],
+            'tools/list' => ['tools' => array_map(static function (array $tool): array {
+                $export = ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']];
+                if (is_array($tool['connectorMeta'] ?? null) && $tool['connectorMeta'] !== []) $export['_meta'] = $tool['connectorMeta'];
+                return $export;
+            }, McpToolCatalog::tools())],
             'tools/call' => $this->callTool($params, $files),
             default => throw new McpMethodNotFound($method),
         };

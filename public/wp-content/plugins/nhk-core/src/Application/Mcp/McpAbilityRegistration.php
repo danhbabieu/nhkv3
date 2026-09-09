@@ -357,7 +357,7 @@ final class McpAbilityRegistration
                         'destructive' => in_array($toolName, ['nhk.category.delete', 'nhk.article.publish', 'nhk.article.trash', 'nhk.proposal.reject', 'nhk.proposal.apply'], true),
                         'idempotent' => true,
                     ],
-                ],
+                ] + (is_array($tool['connectorMeta'] ?? null) && $tool['connectorMeta'] !== [] ? ['_meta' => $tool['connectorMeta']] : []),
             ]);
         }
     }

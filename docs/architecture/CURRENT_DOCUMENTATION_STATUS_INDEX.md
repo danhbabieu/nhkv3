@@ -523,6 +523,23 @@ guarded test seam; no global fallback is introduced. This fix is committed
 locally but not deployed or pushed, so DEMO live profile read-back remains
 runtime-deployment gated.
 
+### Editorial Capture multipart connector gap — 2026-09-09
+
+The Capture multipart connector gap is isolated at descriptor export. The
+canonical `nhk.capture.ingest` catalog and `nhk-v3/capture-ingest` Ability now
+declare `_meta["openai/fileParams"] = ["files"]` alongside the existing
+top-level native multipart `files[]` schema. Text-only input remains valid;
+multiple files remain bounded by `maxItems=20`; no base64, data or client path
+field is introduced. The custom MCP tools/list export includes the same
+descriptor metadata, and the Ability callback continues to preserve native
+`$_FILES` parts before delegating to the one `/nhk/v1/mcp` transport.
+
+This does not claim Easy MCP interoperability: the inspected stock Easy MCP
+1.7.17 dynamic Ability serializer drops arbitrary Ability metadata and its
+transport rejects non-JSON requests. Fresh connector schema refresh and live
+image acceptance therefore remain blocked until that external adapter carries
+the descriptor metadata and multipart request through.
+
 ### Editorial Capture runtime acceptance — 2026-09-09
 
 Migration 017 was applied and rerun on the exact `nhk_v3_test` runtime. The

@@ -1,5 +1,43 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Capture multipart connector descriptor
+
+The fresh-attachment failure was traced to the exported descriptor boundary,
+before Capture or the custom MCP transport: `nhk.capture.ingest` exposed only
+`files: array<object>` with `format=binary`, without the connector file
+parameter metadata required to classify the mounted attachment as a native
+multipart argument. The working `nhk.media.upload-batch` reference has the
+same top-level `files[]` binary shape, while its governed callback already
+preserves `$_FILES` before delegating to `/nhk/v1/mcp`; it remains internal and
+was not used as an operator workaround.
+
+The minimal fix adds `_meta["openai/fileParams"] = ["files"]` to the Capture
+catalog export and `nhk-v3/capture-ingest` Ability metadata, while the custom
+MCP `tools/list` exports the same descriptor metadata. Capture remains
+text-only capable, accepts up to 20 native file parts, and introduces no
+base64, data or client filesystem-path field. No domain contract, transport,
+writer, migration, semantic record or runtime data was changed.
+
+Red test failed at the missing file metadata, then passed after the fix.
+Capture/MCP focused tests pass 38 tests / 460 assertions; the complete Unit
+suite passes 872 tests / 4,319 assertions with existing warnings/deprecations;
+the Contract suite passes 4 tests / 31 assertions. Composer validation, full
+plugin PHP lint, `git diff --check` and the secret-pattern scan pass. The full
+combined suite remains environment-blocked by pre-existing WordPress
+integration errors/failures because `NHK_WP_TEST_PATH` is unset.
+
+The inspected stock Easy MCP Ability serializer still emits only
+`inputSchema`/annotations and its MCP transport accepts JSON only, so it drops
+the new descriptor metadata and cannot yet carry native multipart through its
+own surface. Fresh connector schema/read-back and live image Capture remain
+blocked until that external adapter is upgraded or patched. No completion
+claim is made.
+
+The canonical demo procedure was invoked locally with
+`./scripts/nhk-demo-cutover --target=demo.1945.vn --pack=odo --json` and
+failed closed with `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; `NHK_DEMO_DEPLOY_CONFIG`
+is not configured. No remote transfer or runtime mutation occurred.
+
 ## Checkpoint — 2026-09-09 — Permanent Easy MCP operator whitelist
 
 The Easy MCP plugin reads `easy_mcp_ai_allowed_tool_patterns` directly and

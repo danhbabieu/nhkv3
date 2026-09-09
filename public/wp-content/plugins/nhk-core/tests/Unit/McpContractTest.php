@@ -490,6 +490,30 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
     }
 
+    public function test_capture_export_declares_native_file_rewrite_metadata_without_changing_text_contract(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        $capture = $tools['nhk.capture.ingest'];
+        $files = $capture['inputSchema']['properties']['files'];
+
+        self::assertSame(['files'], $capture['connectorMeta']['openai/fileParams']);
+        self::assertSame(['idempotency_key', 'documentation_checkpoint'], $capture['inputSchema']['required']);
+        self::assertNotContains('files', $capture['inputSchema']['required']);
+        self::assertSame('array', $files['type']);
+        self::assertSame('object', $files['items']['type']);
+        self::assertSame('binary', $files['items']['format']);
+        self::assertSame(20, $files['maxItems']);
+        self::assertArrayNotHasKey('data', $files['items']);
+        self::assertArrayNotHasKey('path', $files['items']);
+        self::assertArrayNotHasKey('content_base64', $files['items']);
+
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())));
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list', 'params' => []]);
+        $exported = array_column($response['body']['result']['tools'], null, 'name')['nhk.capture.ingest'];
+
+        self::assertSame(['files'], $exported['_meta']['openai/fileParams']);
+    }
+
     public function test_easy_mcp_does_not_auto_enable_standalone_media_uploaders(): void
     {
         $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest']);
