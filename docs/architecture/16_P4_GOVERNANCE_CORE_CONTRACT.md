@@ -12,6 +12,16 @@ close still requires the non-destructive Migration003 UP on `nhk_v3`, health
 
 P4 giữ governance ở application/domain boundary, không public mutation endpoint và không phụ thuộc UI.
 
+## Single entry point for new semantic input — 2026-09-09
+
+Governance remains the only semantic mutation owner, but it is not a parallel
+operator intake surface. New semantic intent enters through
+`nhk.capture.ingest`, which resolves/retrieves context and produces the
+governed write-back packet before Article composition. Direct proposal,
+Knowledge, Evidence, Source or relation entry is retained only for
+internal/admin lifecycle work with `nhk_internal_content_operations`; it cannot
+replace Capture or report a partial submission as complete.
+
 Proposal phải bind `subject_id`, operation, canonical payload fingerprint, expected revision và dependency-closure fingerprint. Replay cùng binding là idempotent; cùng proposal id với binding khác bị từ chối.
 
 Idempotency lookup is fail-closed: if a key row exists but its canonical Proposal

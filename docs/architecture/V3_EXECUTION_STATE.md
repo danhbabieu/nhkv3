@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Universal canonical Capture entry point
+
+The new-submission surface is now normalized to `nhk.capture.ingest` for
+text-only, knowledge-only, multipart image, mixed image/text and registered
+Video submissions. Capture owns the resumable sequence
+`Capture → physical ingest → resolve → Graph → Claim retrieval → semantic
+write-back → Article composition → publication`; Video remains a distinct
+external-reference owner and enters through a registered adapter, while
+semantic write-back remains a review packet until Governance applies it.
+
+`SingleEntryPointPolicy` classifies the executable MCP catalog as canonical,
+internal/admin-only or read-only. Direct Article, Media, Video,
+Knowledge/Source/Evidence, proposal, relation and URL mutation tools now fail
+closed for non-internal callers with `DIRECT_WRITE_BLOCKED` and
+`USE_CANONICAL_CAPTURE_FLOW`. The internal capability is explicit, Ability
+metadata hides standalone mutation abilities from public REST exposure, Easy
+MCP auto-enables only Capture plus documentation abilities, and the Admin
+editorial workspace submits through the canonical Capture form. Governance and
+Video relation admin writes require the internal boundary as well.
+
+Constitution, READ_FIRST, Article/Media/Video/Knowledge/Graph/Governance
+contracts, MCP contracts/control-plane/workflow docs, documentation registry,
+capability manifest and acceptance tests were updated. No new entity type,
+predicate, relation vocabulary or semantic data mutation was introduced.
+
+Focused Contract/Capture tests pass: 33 tests / 288 assertions. Complete Unit
+suite previously passed: 862 tests / 4,111 assertions. Guarded Integration
+suite passes against `nhk_v3_test`: 120 tests / 1,016 assertions, with the
+existing warning/deprecation/skips. `composer lint` and `git diff --check`
+pass. No migration, runtime data mutation, deployment or push was performed;
+fresh external connector discovery/read-back remains a live-acceptance gap.
+
 ## Checkpoint — 2026-09-09 — Collector runtime read-only acceptance follow-up
 
 DEMO was snapshotted before the authorized UP migration. Migration current and

@@ -9,6 +9,15 @@ Admin and other operator-facing inputs must preserve the Media, MediaAsset and
 MediaUsage boundaries while allowing an editor to describe image intent. The
 Admin surface is an input adapter; it is not a second semantic write path.
 
+## One operator entry point — 2026-09-09
+
+For new content, Admin must start at the Capture workspace. Text, one or more
+images, Video and knowledge-only input use `nhk.capture.ingest`; the Capture
+coordinator then delegates to Media/Video owners and the shared semantic core.
+Standalone upload, Media ingest, Video ingest or relation controls are
+internal/admin maintenance boundaries only, require the dedicated internal
+capability and must not be presented as normal creation buttons.
+
 ## Required flow
 
 Admin composes a governed Media proposal and submits it through the existing

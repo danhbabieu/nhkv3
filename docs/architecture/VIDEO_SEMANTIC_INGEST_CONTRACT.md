@@ -17,6 +17,15 @@ is not `COMPLETE`; completion also requires duplicate check, semantic research,
 relation reconciliation and final verification. Weak/speculative relations are
 not created merely to maximize edge count.
 
+## Single entry point for new Video submissions — 2026-09-09
+
+New Video input is carried by the registered Video adapter of
+`nhk.capture.ingest`. The adapter preserves Video's external-reference identity
+and produces a governed Video proposal/review packet; it does not create a
+second Video owner or a duplicate Article. The standalone `nhk.video.ingest`
+surface remains internal/admin lifecycle compatibility and is not the normal
+operator entry point.
+
 Canonical public URL policy is `/video/{semantic-slug}/`; the external video ID
 remains internal identity metadata and is not a default public slug suffix.
 Semantic slug fallback order is explicit governed NHK semantic/editorial

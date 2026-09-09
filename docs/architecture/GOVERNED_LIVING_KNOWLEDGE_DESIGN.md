@@ -164,6 +164,11 @@ and image observations do not become universal facts without matching support.
 
 ## Claim discovery and Editorial Capture reuse — 2026-09-09
 
+All new knowledge input, including knowledge-only text, enters through the
+single `nhk.capture.ingest` boundary. Direct Knowledge/Source/Evidence writers
+remain governed internal/admin compatibility operations only and must not be
+used as the normal operator path.
+
 Graph is a discovery mechanism for related Knowledge, not an authorization
 mechanism for inherited truth. A direct or bounded relation path may make a
 Claim a candidate, but the Claim may be reused in synthesis only after its
@@ -184,11 +189,11 @@ record which canonical Claim revisions were used and why; generated Article
 prose remains editorial state in WordPress and never becomes Evidence by
 composition alone.
 
-The accepted shared Capture adapter currently covers text-only and multipart
-image submissions. Video retains its separate canonical external-reference
-intake until a registered shared adapter exists. Reusing the semantic core does
-not authorize duplicate Video identity, duplicate Article creation or a
-convenience relation to imitate missing orchestration.
+The accepted shared Capture adapter covers text-only, multipart image and
+registered Video submissions. Video retains its separate canonical
+external-reference owner and governed proposal/apply boundary; reusing the
+semantic core does not authorize duplicate Video identity, duplicate Article
+creation or a convenience relation to imitate missing orchestration.
 
 ## Governed apply boundary
 

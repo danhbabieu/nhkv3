@@ -493,20 +493,41 @@ final class Plugin {
                     return $rows;
                 },
             );
+            $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
+            $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
+            $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
-                static function (array $input) use ($mediaBatchUpload): array {
+                static function (array $input) use ($mediaBatchUpload, $videoIntake): array {
                     $files = is_array($input['files'] ?? null) ? $input['files'] : [];
-                    if ($files === []) {
-                        return ['status' => 'verified', 'items' => [], 'count' => 0];
+                    $manifest = ['status' => 'verified', 'items' => [], 'count' => 0];
+                    if ($files !== []) {
+                        $manifest = $mediaBatchUpload->upload(
+                            (string) ($input['idempotency_key'] ?? '') . ':assets',
+                            is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                            $files,
+                            is_array($input['items'] ?? null) ? $input['items'] : [],
+                        );
                     }
-
-                    return $mediaBatchUpload->upload(
-                        (string) ($input['idempotency_key'] ?? '') . ':assets',
-                        is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
-                        $files,
-                        is_array($input['items'] ?? null) ? $input['items'] : [],
-                    );
+                    $video = is_array($input['video'] ?? null) ? $input['video'] : [];
+                    if ($video !== []) {
+                        $preview = $videoIntake->preview(
+                            (string) ($video['url'] ?? ''),
+                            (string) ($video['user_hint'] ?? ''),
+                            isset($video['intended_category']) ? (string) $video['intended_category'] : null,
+                            is_array($video['intended_relations'] ?? null) ? $video['intended_relations'] : [],
+                            (string) ($video['editorial_instruction'] ?? ''),
+                        );
+                        $manifest['items'][] = [
+                            'kind' => 'video',
+                            'video_id' => $preview->videoId,
+                            'video_preview' => $preview->toArray(),
+                            'video_proposal' => $videoIntake->proposalArguments($preview, (string) ($input['idempotency_key'] ?? '') . ':video'),
+                        ];
+                        $manifest['video_preview'] = $preview->toArray();
+                    }
+                    $manifest['count'] = count((array) ($manifest['items'] ?? []));
+                    return $manifest;
                 },
                 static function (array $input) use ($draftGateway): array { return $draftGateway->create($input); },
                 new TextInputInterpreter(),
@@ -516,7 +537,12 @@ final class Plugin {
                     $interpretation = is_array($context['interpretation'] ?? null) ? $context['interpretation'] : [];
                     $candidates = [];
                     foreach ((array) ($interpretation['user_claim_candidates'] ?? []) as $candidate) if (is_array($candidate)) $candidates[] = ['kind' => 'claim_candidate', 'text' => (string) ($candidate['text'] ?? ''), 'provenance' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE'), 'scope' => (string) ($candidate['scope'] ?? 'capture')];
-                    return ['status' => 'REVIEW_REQUIRED', 'writes' => $candidates, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
+                    $videoCandidates = [];
+                    foreach ((array) ($context['assets'] ?? []) as $asset) {
+                        if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
+                        $videoCandidates[] = ['kind' => 'video_ingest_candidate', 'proposal' => $asset['video_proposal'], 'status' => 'REVIEW_REQUIRED'];
+                    }
+                    return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
                 static function (array $context) use ($articleMedia): array {
@@ -558,9 +584,6 @@ final class Plugin {
                     return $draftGateway->publish((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), (array) ($context['evidence'] ?? []), (string) ($context['idempotency_key'] ?? ''));
                 },
             );
-            $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
-            $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
-            $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository($wpdb)))->service();

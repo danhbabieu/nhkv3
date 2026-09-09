@@ -40,11 +40,18 @@ multipart binary contract.
 
 For Editorial Capture specifically, treat the coordinator as orchestration over
 existing owners, never as a new semantic owner. The accepted shared path is
-text-only or multipart images: one new submission → one durable Capture → one
-native WordPress draft by default; each physical image keeps its own canonical
-Media identity and contextual MediaUsage. Replays with the same idempotency key
+text-only, multipart images or the registered Video adapter: one new submission
+→ one durable Capture → one native WordPress draft by default; each physical
+image and external Video keeps its own canonical identity and owner boundary.
+Knowledge-only text uses the same path. Replays with the same idempotency key
 and unchanged payload resume the same Capture; a changed payload conflicts
 instead of creating a duplicate Article or re-uploading completed assets.
+
+`nhk.capture.ingest` is the only normal entry point for new content. Direct
+Media, Video, Knowledge, Source/Evidence, Article, relation and publication
+writers are internal/admin compatibility boundaries only and must fail closed
+without `nhk_internal_content_operations`; never substitute one of them when
+Capture is unavailable.
 
 The semantic core is `interpret → resolve canonical subjects → bounded Graph
 neighborhood → retrieve candidate Claims → evaluate scope/provenance/evidence/

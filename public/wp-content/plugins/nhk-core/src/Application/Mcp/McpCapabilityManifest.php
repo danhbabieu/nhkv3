@@ -47,6 +47,8 @@ final class McpCapabilityManifest
             $unsupported = array_values(array_diff($definition['tools'], array_merge($reads, $writes)));
             $manifest[$kind] = [
                 'owner' => $definition['owner'],
+                'canonical_entry_point' => $kind === 'editorial_capture',
+                'internal_only_tools' => array_values(array_intersect($definition['tools'], SingleEntryPointPolicy::internalOnlyTools())),
                 'endpoint_types' => $definition['endpoint_types'],
                 'reads' => $reads,
                 'writes' => $writes,

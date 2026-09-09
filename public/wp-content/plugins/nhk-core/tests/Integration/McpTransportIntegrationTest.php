@@ -67,8 +67,8 @@ final class McpTransportIntegrationTest extends TestCase
         $media = wp_get_ability('nhk-v3/media-ingest');
         self::assertNotNull($media);
         self::assertSame('NHK Image Intake / Upload Normalization', $media->get_label());
-        self::assertTrue($media->get_meta_item('public'));
-        self::assertTrue($media->get_meta_item('show_in_rest'));
+        self::assertFalse($media->get_meta_item('public'));
+        self::assertFalse($media->get_meta_item('show_in_rest'));
         $mediaSchema = $media->get_input_schema();
         self::assertArrayHasKey('assets', $mediaSchema['properties']);
         self::assertArrayHasKey('wordpress_attachment_id', $mediaSchema['properties']['assets']['items']['properties']);
@@ -92,22 +92,23 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame('array', $batchSchema['properties']['files']['type']);
         self::assertSame('binary', $batchSchema['properties']['files']['items']['format']);
         $batchExport = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-upload-batch'));
-        self::assertSame(200, $batchExport->get_status(), (string) wp_json_encode($batchExport->get_data()));
-        self::assertSame('binary', $batchExport->get_data()['input_schema']['properties']['files']['items']['format']);
+        self::assertSame(404, $batchExport->get_status(), (string) wp_json_encode($batchExport->get_data()));
         try {
             $export = rest_do_request(new \WP_REST_Request('GET', '/wp-abilities/v1/abilities/nhk-v3/media-ingest'));
-            self::assertSame(200, $export->get_status(), (string) wp_json_encode($export->get_data()));
-            self::assertSame('nhk-v3/media-ingest', $export->get_data()['name']);
-            self::assertArrayHasKey('wordpress_attachment_id', $export->get_data()['input_schema']['properties']['assets']['items']['properties']);
-            self::assertArrayNotHasKey('file', $export->get_data()['input_schema']['properties']);
+            self::assertSame(404, $export->get_status(), (string) wp_json_encode($export->get_data()));
         } finally {
             wp_set_current_user($previousUser);
         }
         foreach (McpAbilityRegistration::governedAbilityNames() as $abilityName) {
             $ability = wp_get_ability($abilityName);
             self::assertNotNull($ability, $abilityName);
-            self::assertTrue($ability->get_meta_item('public'));
-            self::assertTrue($ability->get_meta_item('show_in_rest'));
+            if ($abilityName === 'nhk-v3/capture-ingest') {
+                self::assertTrue($ability->get_meta_item('public'));
+                self::assertTrue($ability->get_meta_item('show_in_rest'));
+            } else {
+                self::assertFalse($ability->get_meta_item('public'));
+                self::assertFalse($ability->get_meta_item('show_in_rest'));
+            }
             self::assertFalse($ability->get_meta_item('annotations')['readonly']);
         }
         self::assertNotNull(wp_get_ability('nhk-v3/article-preflight'));
@@ -328,15 +329,17 @@ final class McpTransportIntegrationTest extends TestCase
     public function test_unauthenticated_governed_tool_call_is_rejected(): void
     {
         $response = $this->request('tools/call', ['id' => 3, 'params' => ['name' => 'nhk.proposal.create', 'arguments' => ['operation' => 'create', 'payload' => ['name' => 'blocked']]]], ['Mcp-Name' => 'nhk.proposal.create']);
-        self::assertSame(403, $response->get_status());
-        self::assertSame(-32003, $response->get_data()['error']['code']);
+        self::assertSame(200, $response->get_status());
+        self::assertTrue($response->get_data()['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response->get_data()['result']['structuredContent']['error']['code']);
     }
 
-    public function test_nullable_optional_mcp_uuid_fields_pass_schema_validation_before_capability_check(): void
+    public function test_unauthenticated_direct_writer_is_blocked_before_schema_or_mutation(): void
     {
         $response = $this->request('tools/call', ['id' => 26, 'params' => ['name' => 'nhk.proposal.create', 'arguments' => ['operation' => 'create', 'payload' => [], 'target_uuid' => null]]], ['Mcp-Name' => 'nhk.proposal.create']);
-        self::assertSame(403, $response->get_status());
-        self::assertSame(-32003, $response->get_data()['error']['code']);
+        self::assertSame(200, $response->get_status());
+        self::assertTrue($response->get_data()['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response->get_data()['result']['structuredContent']['error']['code']);
     }
 
     public function test_rest_proposal_create_normalizes_empty_optional_target_uuid(): void
@@ -364,8 +367,9 @@ final class McpTransportIntegrationTest extends TestCase
     public function test_unauthenticated_media_ingest_is_rejected_before_proposal_creation(): void
     {
         $response = $this->request('tools/call', ['id' => 4, 'params' => ['name' => 'nhk.media.ingest', 'arguments' => ['stable_key' => 'blocked-media', 'name' => 'Blocked Media']]], ['Mcp-Name' => 'nhk.media.ingest']);
-        self::assertSame(403, $response->get_status());
-        self::assertSame(-32003, $response->get_data()['error']['code']);
+        self::assertSame(200, $response->get_status());
+        self::assertTrue($response->get_data()['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response->get_data()['result']['structuredContent']['error']['code']);
     }
 
     public function test_authenticated_media_ingest_runs_through_governed_lifecycle_and_keeps_asset_private(): void

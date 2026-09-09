@@ -26,7 +26,7 @@ final class GovernanceApi
 
     public function register(): void
     {
-        register_rest_route('nhk/v1', '/governance/proposals', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_create_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->create($request)]);
+        register_rest_route('nhk/v1', '/governance/proposals', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_create_proposals') && current_user_can('nhk_internal_content_operations'), 'callback' => fn (\WP_REST_Request $request) => $this->create($request)]);
         register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/submit', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_submit_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'submit')]);
         register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance'), 'callback' => fn (\WP_REST_Request $request) => $this->review($request)]);
         register_rest_route('nhk/v1', '/governance/proposals/(?P<id>[0-9A-Fa-f-]{36})/approve', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_approve_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->transition($request, 'approve')]);

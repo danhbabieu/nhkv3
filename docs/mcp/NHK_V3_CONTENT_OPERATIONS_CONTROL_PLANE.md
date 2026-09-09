@@ -7,8 +7,9 @@
 ## Shared boundary
 
 ```text
-user intent → content kind → registered owner/endpoint
-→ application service → governed operation (when semantic)
+ user intent → nhk.capture.ingest (唯一 entry point cho submission mới)
+ → registered input adapter/owner
+ → application service → governed operation (when semantic)
 → ingest → canonical read-back → canonical search
 → neighborhood/Graph inspection → duplicate/reuse analysis
 → relation candidate discovery → evidence/provenance validation
@@ -18,8 +19,34 @@ user intent → content kind → registered owner/endpoint
 ```
 
 MCP and WordPress Admin must consume the same application services and
-capability source. Native WordPress editorial publishing remains independent;
-an MCP-managed V3 Article is complete only after the Article Ingest contract.
+capability source. New submissions use Capture; native WordPress editorial
+maintenance and domain lifecycle operations remain guarded internal/admin
+boundaries. An MCP-managed V3 Article is complete only after the Article Ingest
+contract.
+
+### One-entry-point operator law — 2026-09-09
+
+The operator-facing creation flow is `nhk.capture.ingest` only. Text, images,
+Video and knowledge-only input share one Capture coordinator and one default
+Capture → draft mapping. Direct Media, Video, Knowledge, Source/Evidence,
+Article, relation and publication mutations are not normal operator paths.
+They remain available only for explicitly bounded internal/admin lifecycle
+work with `nhk_internal_content_operations`; otherwise the runtime fails closed
+with `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`.
+
+### Entry-point inventory
+
+| Classification | Current surfaces | Rule |
+|---|---|---|
+| Canonical | `nhk.capture.ingest`, Admin “Capture nội dung mới” | only normal creation boundary; one Capture and one native draft by default |
+| Legacy but still needed internally | direct Article/draft/publication, Media upload/ingest, Video ingest, Knowledge/Source/Evidence ingest, proposal/relation and URL maintenance tools | retained for bounded lifecycle, migration or repair work; require `nhk_internal_content_operations` and are not auto-enabled for normal Easy MCP discovery |
+| Deprecated public/operator path | standalone creation buttons and direct mutation Ability exposure | removed from the normal Admin surface and public Ability metadata; no silent redirect is used when the input context would be lost |
+| Dangerous bypass path | any direct mutation call without the internal boundary | fails closed before schema/capability execution with `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`; no partial mutation or fallback writer is allowed |
+
+The read-only catalog and query surfaces remain available for discovery and
+verification. Existing records remain readable and maintainable through their
+owner/lifecycle boundaries; this inventory changes the creation route, not
+canonical identity or historical data.
 
 Every MCP ingest domain uses this bounded deep reconciliation, including
 Media, Video, Knowledge, Source, Evidence and Authority entities. “Maximize
@@ -76,14 +103,12 @@ body-free `claim_trace` plus a research snapshot of Claim IDs/revisions. It must
 not dump raw Claim text as a semantic copy, turn generated prose into Evidence,
 or create a second factual store inside the Article/Capture receipt.
 
-The accepted Capture adapter currently covers text-only and multipart image
-submissions. Video remains a distinct canonical external-reference intake and
-is not yet a physical asset branch inside `nhk.capture.ingest`. A submission
-that includes Video must therefore preserve the Video boundary and must not be
-reported as one unified Capture-complete workflow until a registered shared
-adapter exists. The implementation may reuse the semantic core, but it must not
-create a duplicate Article, duplicate Video or convenience relation to imitate
-missing orchestration.
+The Capture adapter covers text-only, multipart image and the registered Video
+input adapter. Video remains a distinct canonical external-reference owner,
+but new Video submissions enter through Capture and carry a governed Video
+proposal/review packet without creating a duplicate Video or Article. A Video
+preview/proposal is not itself complete: the same Capture still requires
+semantic review, composition, publication gating and final read-back.
 
 Executable runtime capability and connector exposure are separate facts. A
 registered runtime tool/Ability can be absent from one connector surface or
@@ -104,7 +129,7 @@ never reported as frontend publication success.
 
 | Content kind | Owner | Current boundary | Mutation policy |
 |---|---|---|---|
-| Post/Article | WordPress `wp_posts` | Article Ingest + editorial boundary | Post writes are editorial; semantic changes use Governance |
+| Post/Article | WordPress `wp_posts` | Capture for new submissions; guarded Article lifecycle for existing posts | new submission Post writes are Capture-owned; existing-post maintenance is internal/admin and semantic changes use Governance |
 | Editorial Capture | Capture repository + WordPress draft + downstream owners | `nhk.capture.ingest` coordinator | one Capture/one draft by idempotency; no implicit semantic apply/publication |
 | Category/hub | WordPress taxonomy | typed `CategoryGateway` + native WordPress adapter | deterministic resolve/create, parent validation, fingerprint CAS, guarded delete and read-back |
 | Authority | Authority registry | entity application services | governed revision/lifecycle |
@@ -112,7 +137,7 @@ never reported as frontend publication success.
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
 
 | Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is PRIVATE/protected, the normalized public derivative has max long edge 1200px with no upscale/crop and preserved aspect ratio, eligible derivatives are PUBLIC under that Media, representative/evidence/detail roles are distinct, and attachment mapping is idempotent |
-| Video | Video | Video intake/sync services | governed canonical external reference; optional Living Knowledge output is planning-only |
+| Video | Video | Capture Video adapter for new submissions; guarded Video intake/sync for lifecycle | governed canonical external reference; optional Living Knowledge output is planning-only |
 | Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
 | Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |
 
@@ -158,8 +183,10 @@ Source/Evidence record solely to change its locator.
 When the input is an editorial submission, `nhk.capture.ingest` owns the
 cross-boundary sequencing around this physical flow. It may call the batch
 uploader as its physical phase, then performs explicit attachment adoption and
-Article/MediaUsage reconciliation. The standalone upload tool remains useful
-for a media-first workflow and never substitutes for Capture completion.
+Article/MediaUsage reconciliation. The standalone upload tool remains an
+internal/admin compatibility boundary for attachment maintenance; normal new
+submissions must use Capture and cannot substitute a partial media upload for
+Capture completion.
 
 Batch results are per-item rather than all-or-nothing: successful attachments
 remain when another item fails, the batch returns `partial_success`, and failed
@@ -230,7 +257,7 @@ require their own governed proposal and read-back.
 |---|---|---|
 | Existing Article reconcile preflight | partial | CODE_GAP for full research packet |
 | Editorial Capture coordinator | persisted/resumable boundary with text-only and multipart image paths; runtime/repository acceptance verified on 2026-09-09 | semantic candidates still require Governance and owner publication remains policy-gated |
-| Video inside shared Capture | not yet unified under the physical Capture adapter | CODE_GAP / ADAPTER_GAP; keep canonical Video intake separate and do not fake Capture completion |
+| Video inside shared Capture | registered Video adapter enters the physical Capture phase; governed Video proposal remains distinct | IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING; no duplicate Article or implicit Video apply |
 | Connector exposure parity | environment/client-specific subset may differ from executable runtime catalog | `CLIENT_EXPOSURE_GAP`; fresh discovery/read-back required, no generic-writer fallback |
 | SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
 | Shared capability source | partial catalog | CODE_GAP for manifest consumers |

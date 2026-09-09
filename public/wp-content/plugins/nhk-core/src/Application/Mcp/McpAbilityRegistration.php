@@ -18,8 +18,6 @@ final class McpAbilityRegistration
     public static function ensureEasyMcpEnabledAbilities(mixed $enabled): array
     {
         if (!is_array($enabled) || $enabled === []) return [];
-        if (!in_array('nhk-v3/media-ingest', $enabled, true)) $enabled[] = 'nhk-v3/media-ingest';
-        if (!in_array('nhk-v3/media-upload-batch', $enabled, true)) $enabled[] = 'nhk-v3/media-upload-batch';
         if (!in_array('nhk-v3/capture-ingest', $enabled, true)) $enabled[] = 'nhk-v3/capture-ingest';
         if (!in_array('nhk-v3/docs-bootstrap', $enabled, true)) $enabled[] = 'nhk-v3/docs-bootstrap';
         if (!in_array('nhk-v3/docs-get', $enabled, true)) $enabled[] = 'nhk-v3/docs-get';
@@ -240,6 +238,7 @@ final class McpAbilityRegistration
                 'meta' => [
                     'public' => true,
                     'show_in_rest' => true,
+                    'surface' => 'read_only',
                     'annotations' => ['readonly' => true, 'destructive' => false, 'idempotent' => true],
                 ],
             ]);
@@ -264,6 +263,7 @@ final class McpAbilityRegistration
                 'meta' => [
                     'public' => true,
                     'show_in_rest' => true,
+                    'surface' => 'read_only',
                     'annotations' => ['readonly' => true, 'destructive' => false, 'idempotent' => true],
                 ],
             ]);
@@ -293,8 +293,9 @@ final class McpAbilityRegistration
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
                 'permission_callback' => static fn (): bool => self::canGoverned($toolName),
                 'meta' => [
-                    'public' => true,
-                    'show_in_rest' => true,
+                    'public' => !SingleEntryPointPolicy::isInternalOnly($toolName),
+                    'show_in_rest' => !SingleEntryPointPolicy::isInternalOnly($toolName),
+                    'surface' => SingleEntryPointPolicy::surface($toolName),
                     'annotations' => [
                         'readonly' => false,
                         'destructive' => in_array($toolName, ['nhk.category.delete', 'nhk.article.publish', 'nhk.article.trash', 'nhk.proposal.reject', 'nhk.proposal.apply'], true),
@@ -350,6 +351,7 @@ final class McpAbilityRegistration
 
     private static function canGoverned(string $tool): bool
     {
+        if (SingleEntryPointPolicy::isInternalOnly($tool) && (!function_exists('current_user_can') || !current_user_can(SingleEntryPointPolicy::INTERNAL_CAPABILITY))) return false;
         $capability = match ($tool) {
             'nhk.article.ingest', 'nhk.capture.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.submit' => 'nhk_submit_proposals',

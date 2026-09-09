@@ -20,6 +20,15 @@ Article Ingest is an operation-level coordination boundary, not a Graph endpoint
 It may reference a registered `wp_post` and registered semantic endpoints only;
 there is no `article` endpoint and no Article semantic identity or body in Graph.
 
+## Single entry point for new relation intent — 2026-09-09
+
+New relation intent arrives through `nhk.capture.ingest`, where Graph is used
+for bounded discovery and candidate retrieval before semantic write-back. A
+direct relation/proposal/admin relation operation is internal/admin lifecycle
+compatibility only, requires `nhk_internal_content_operations` at its exposed
+boundary and cannot be used as a normal submission path or as a partial
+replacement for Capture.
+
 ## Types and registries
 
 `NodeReference` gồm `endpoint_type` và `endpoint_key`. `EndpointTypeRegistry`

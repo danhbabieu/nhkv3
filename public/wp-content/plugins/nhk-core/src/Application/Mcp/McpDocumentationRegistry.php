@@ -86,6 +86,12 @@ final class McpDocumentationRegistry
                 'Graph' => 'graph', 'Governance' => 'governance', 'Media' => 'media', 'MCP' => 'mcp',
                 'Product/Specimen' => 'constitution',
             ],
+            'single_entry_point' => [
+                'canonical_tool' => SingleEntryPointPolicy::CANONICAL_TOOL,
+                'rule' => 'All new submissions enter Capture; direct content writers are internal/admin-only and fail closed without the dedicated capability.',
+                'internal_capability' => SingleEntryPointPolicy::INTERNAL_CAPABILITY,
+                'internal_only_tools' => SingleEntryPointPolicy::internalOnlyTools(),
+            ],
             'runtime_status' => [
                 'surface' => 'mcp', 'status' => 'registered_not_live_verified',
                 'tool_count' => count($registeredTools), 'read_tool_count' => count($registeredTools) - count($governed),

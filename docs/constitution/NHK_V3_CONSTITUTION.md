@@ -145,6 +145,42 @@ that ingest success alone cannot produce `COMPLETE`.
 
 **DECISION OWNER / DATE:** NHK V3 Owner decision, 2026-09-09.
 
+## Amendment record — 2026-09-09 — Universal Canonical Capture Entry Point
+
+**WHY:** Multiple valid governed writers could still be mistaken for normal
+submission surfaces. That permits a new image, Video, Article, Knowledge item,
+relation or publication intent to enter the system halfway through the
+canonical semantic/editorial sequence.
+
+**WHAT LAW CHANGES:** Every new content submission enters through exactly one
+canonical boundary: `nhk.capture.ingest` / the Editorial Capture coordinator.
+The boundary accepts text, text plus one or more images, text plus Video and
+knowledge-only text, then runs `Capture → physical ingest when applicable →
+resolve → Graph discovery → Claim retrieval → governed semantic write-back /
+review → Article composition → publication gate → publication when explicitly
+allowed → final read-back`. A new submission creates one Capture and one new
+native Article draft by default. Video, Media, Knowledge, Source, Evidence and
+Graph retain their canonical owners and identities, but none may be entered by
+a new operator submission through a direct writer.
+
+Direct Media, Video, Knowledge, Source, Evidence, Article draft/update/publish,
+relation and proposal writers may remain only as explicitly internal/admin
+compatibility or lifecycle boundaries. They require the dedicated
+`nhk_internal_content_operations` capability, are marked internal-only in
+runtime exposure, and fail closed with `DIRECT_WRITE_BLOCKED` and
+`USE_CANONICAL_CAPTURE_FLOW` without that boundary. They are never the default
+operator path and may not be used to perform a partial mutation that pretends
+to be a completed submission.
+
+**COMPATIBILITY:** Existing data and existing-post maintenance remain readable
+and are not migrated, duplicated or deleted. Native WordPress and domain
+repositories remain owners; this amendment governs new submission entry and
+does not create a second persistence owner. Admin review, Governance approval,
+controlled apply and other internal lifecycle actions remain available only at
+their explicit guarded boundaries.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-09.
+
 ## Amendment record — 2026-09-02 — Article Ingest Boundary
 
 **WHY:** A V3 knowledge Article request may cross the editorial and semantic
@@ -1295,6 +1331,15 @@ Một fact canonical chỉ có một owner. Article, FAQ, Search và hub chỉ �
 registered Authority, Knowledge, Source/Evidence và Graph data; không tạo FAQ
 entity hoặc semantic type mới bằng workflow Article.
 
+#### Single entry point for new submissions
+
+Mọi Article mới hoặc Post mới có semantic intent phải bắt đầu tại Editorial
+Capture. `nhk.capture.ingest` là cổng canonical duy nhất cho text, image, Video
+và knowledge-only input; nó tạo Capture và native draft rồi mới gọi các owner
+semantic/editorial theo thứ tự đã định. `nhk.article.ingest`, draft writer và
+publication writer chỉ còn là boundary internal/admin cho lifecycle đã có hoặc
+được Capture gọi nội bộ, không phải entry point cho submission mới.
+
 Alias/model/component/classification trong bài phải resolve qua registry. Không
 dùng prose, title, body, URL, slug, checksum hoặc display name làm semantic
 identity. Post endpoint dùng `wp_post` với stable key `<blog_id>:<post_id>`;
@@ -1625,6 +1670,20 @@ Raw Graph REST có thể là administrator-only operational read; public API kh�
 được contract cho phép. WordPress Abilities chỉ là discoverability bridge của
 existing read contracts, không phải persistence hoặc write bypass.
 
+### 20.0.1 Canonical submission entry point
+
+Runtime phải expose đúng một entry point cho submission mới:
+`nhk.capture.ingest`. Các direct mutation tools/Abilities không được trình bày
+như luồng mặc định; chúng phải mang nhãn `internal_admin_only`, yêu cầu
+`nhk_internal_content_operations` ngoài capability nghiệp vụ hiện có và fail
+closed nếu được gọi từ bề mặt không đủ quyền. Lỗi phải giữ mã
+`DIRECT_WRITE_BLOCKED` và hướng dẫn `USE_CANONICAL_CAPTURE_FLOW`.
+
+Admin Workbench phải đưa Capture lên làm màn hình tạo mới duy nhất. Proposal,
+relation, Media, Video, Knowledge và native Article controls chỉ nằm trong
+workspace kỹ thuật/lifecycle có guard riêng. Không có adapter nào được dùng
+để tạo mutation nửa vời rồi báo hoàn thành thay cho Capture.
+
 ### 20.1 Universal MCP post-ingest reconciliation law
 
 Mọi dữ liệu đi qua MCP ingest, gồm Media, Video, Knowledge, Source, Evidence
@@ -1934,6 +1993,12 @@ editorial, semantic and verification stages.
 88. Knowledge và user input phải relation-reconcile với các target canonical liên quan đã registered, gồm Authority types, Media, Source, Evidence và Knowledge.
 89. Provenance source class phải được giữ rõ: `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH`, `SYSTEM_INFERENCE`.
 90. User statement và image observation không được nâng thành universal fact nếu evidence không hỗ trợ đúng subject và scope.
+91. Mọi new submission chỉ có một canonical entry point là Editorial Capture; direct writer không phải đường vận hành mặc định.
+92. Text-only, image, multi-image, Video và knowledge-only input đều phải đi qua cùng Capture orchestration boundary.
+93. Direct Media/Video/Knowledge/Source/Evidence/Article/Graph/publication mutation chỉ được internal/admin với capability guard riêng hoặc bị block fail-closed.
+94. Direct mutation bị block phải trả `DIRECT_WRITE_BLOCKED` và `USE_CANONICAL_CAPTURE_FLOW`, không tạo partial semantic/editorial side effect.
+95. Một submission mới mặc định tạo đúng một Capture và một native Article draft; physical Media/Video identities vẫn do owner riêng sở hữu.
+96. Publication là chặng cuối của Capture; direct publish không phải entry point cho submission mới.
 
 ---
 

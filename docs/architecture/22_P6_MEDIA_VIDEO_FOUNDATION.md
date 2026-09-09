@@ -3,6 +3,15 @@
 > **NON-NORMATIVE.** This is implementation evidence. If it conflicts with
 > `docs/constitution/NHK_V3_CONSTITUTION.md`, the Constitution controls.
 
+## Universal Capture entry point — 2026-09-09
+
+New image or Video input is accepted through `nhk.capture.ingest`. Capture
+delegates physical image storage to the shared attachment/Media boundary and
+preserves Video as a separate external-reference owner, then continues through
+the same resolve, Graph discovery, Claim retrieval, governed write-back,
+composition and publication gates. Standalone Media/Video ingest remains
+internal/admin lifecycle compatibility and is not an operator creation path.
+
 ## Current status — 2026-09-04
 
 Media/Article implementation is present locally and the focused contract/unit

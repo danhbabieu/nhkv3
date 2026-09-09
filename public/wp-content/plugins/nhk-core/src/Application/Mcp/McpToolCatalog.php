@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 final class McpToolCatalog
 {
-    /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool}> */
+    /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool,surface:string}> */
     public static function tools(): array
     {
         return [
@@ -30,6 +30,20 @@ final class McpToolCatalog
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
                 'publish' => ['type' => 'boolean'],
+                'video' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'url' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1],
+                        'title' => ['type' => 'string'],
+                        'metadata' => ['type' => 'object'],
+                        'user_hint' => ['type' => 'string', 'maxLength' => 20000],
+                        'intended_category' => ['type' => 'string', 'enum' => ['01', '02', '03', '04', '05', '06', '07', '08']],
+                        'editorial_instruction' => ['type' => 'string', 'maxLength' => 20000],
+                        'intended_relations' => ['type' => 'array', 'items' => ['type' => 'object']],
+                    ],
+                    'required' => ['url'],
+                    'additionalProperties' => false,
+                ],
                 'files' => ['type' => 'array', 'maxItems' => 20, 'items' => [
                     'type' => 'object',
                     'format' => 'binary',
@@ -170,12 +184,19 @@ final class McpToolCatalog
 
     private static function tool(string $name, string $description, array $properties, array $required, bool $governed = false): array
     {
+        $surface = SingleEntryPointPolicy::surface($name);
+        if ($surface === 'canonical') {
+            $description = '[CANONICAL ENTRY POINT] ' . $description;
+        } elseif ($surface === 'internal_admin_only') {
+            $description = '[INTERNAL/ADMIN ONLY] New submissions must use nhk.capture.ingest. ' . $description;
+        }
         return [
             'name' => $name,
             'description' => $description,
             'inputSchema' => ['type' => 'object', 'properties' => $properties, 'required' => $required, 'additionalProperties' => false],
             'kind' => $governed ? 'mutation' : 'read',
             'governed' => $governed,
+            'surface' => $surface,
         ];
     }
 

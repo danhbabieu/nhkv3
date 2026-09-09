@@ -133,6 +133,10 @@ final class AdminWorkbenchPage
 
     private static function renderContentWorkspace(): void
     {
+        echo '<section class="nhk-admin-panel"><h2>Capture nội dung mới</h2><p>Submission mới bắt đầu tại một cửa duy nhất; tìm kiếm và đọc lại nằm bên dưới.</p>';
+        AdminPage::renderEditorialCapture('Capture canonical trong Admin Workbench.');
+        AdminPage::captureScripts();
+        echo '</section>';
         echo '<section class="nhk-admin-panel"><nav class="nhk-admin-tabs" aria-label="Loại nội dung"><a class="is-active" href="#nhk-content-articles">Bài viết</a><a href="#nhk-content-videos">Video</a></nav><form class="nhk-admin-search" data-nhk-search="content"><label for="nhk-content-query">Tìm kiếm</label><input id="nhk-content-query" name="q" type="search" minlength="2" placeholder="Tiêu đề, YouTube ID hoặc canonical UUID"><button class="button button-primary">Tìm</button></form><div id="nhk-content-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa để tra cứu Nội dung.</p></div></section>';
         echo '<section id="nhk-content-videos" class="nhk-admin-panel"><h2>Video workspace</h2><p>Chọn Video từ kết quả tìm kiếm để mở detail, player, provenance, relation và read-back.</p><div id="nhk-video-detail" class="nhk-admin-detail" aria-live="polite"></div></section>';
     }

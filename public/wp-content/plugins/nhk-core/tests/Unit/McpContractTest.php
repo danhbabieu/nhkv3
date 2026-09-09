@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Mcp\McpToolCatalog;
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
-use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
+use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport, SingleEntryPointPolicy};
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
@@ -108,6 +108,42 @@ final class McpContractTest extends TestCase
         $document = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.docs.get', 'arguments' => ['document_key' => 'read-first']]]);
         self::assertSame(200, $document['status']);
         self::assertStringContainsString('Mandatory Read-First Router', $document['body']['result']['structuredContent']['content']);
+    }
+
+    public function test_new_submission_has_one_canonical_entry_point_and_direct_writers_are_internal_only(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        self::assertSame('nhk.capture.ingest', SingleEntryPointPolicy::CANONICAL_TOOL);
+        self::assertSame('canonical', $tools['nhk.capture.ingest']['surface']);
+        self::assertSame('internal_admin_only', $tools['nhk.media.ingest']['surface']);
+        self::assertSame('internal_admin_only', $tools['nhk.video.ingest']['surface']);
+        self::assertSame('internal_admin_only', $tools['nhk.knowledge.ingest']['surface']);
+        self::assertArrayHasKey('video', $tools['nhk.capture.ingest']['inputSchema']['properties']);
+        self::assertContains('nhk.article.publish', SingleEntryPointPolicy::internalOnlyTools());
+    }
+
+    public function test_direct_writer_fails_closed_without_internal_boundary(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'nhk_create_proposals');
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 77, 'method' => 'tools/call', 'params' => ['name' => 'nhk.knowledge.ingest', 'arguments' => ['stable_key' => 'direct.blocked', 'text' => 'blocked']]]);
+        self::assertSame(200, $response['status']);
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response['body']['result']['structuredContent']['error']['code']);
+        self::assertSame('USE_CANONICAL_CAPTURE_FLOW', $response['body']['result']['structuredContent']['error']['reason']);
+    }
+
+    public function test_every_registered_direct_mutation_is_internal_guarded(): void
+    {
+        foreach (SingleEntryPointPolicy::internalOnlyTools() as $tool) {
+            try {
+                SingleEntryPointPolicy::guard($tool, static fn (string $capability): bool => false);
+                self::fail('Direct mutation was not guarded: ' . $tool);
+            } catch (\Throwable $error) {
+                self::assertInstanceOf(\NHK\Core\Application\Mcp\SingleEntryPointViolation::class, $error);
+                self::assertSame('DIRECT_WRITE_BLOCKED', $error->reasonCode);
+                self::assertSame('USE_CANONICAL_CAPTURE_FLOW', $error->toArray()['reason']);
+            }
+        }
     }
 
     private function readHandler(): McpReadHandler
@@ -409,18 +445,18 @@ final class McpContractTest extends TestCase
         self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
     }
 
-    public function test_multipart_batch_upload_is_added_to_the_easy_mcp_enabled_ability_list(): void
+    public function test_easy_mcp_does_not_auto_enable_standalone_media_uploaders(): void
     {
-        self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
-            McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
-        );
+        $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest']);
+        self::assertNotContains('nhk-v3/media-upload-batch', $enabled);
+        self::assertNotContains('nhk-v3/media-ingest', $enabled);
+        self::assertContains('nhk-v3/capture-ingest', $enabled);
     }
 
-    public function test_media_ingest_is_added_to_the_easy_mcp_enabled_ability_list(): void
+    public function test_easy_mcp_keeps_standalone_video_as_internal_compatibility_only(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }
@@ -428,7 +464,7 @@ final class McpContractTest extends TestCase
     public function test_documentation_abilities_are_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }

@@ -70,6 +70,12 @@ final class McpTransport
             return $this->error($id, -32601, $error->getMessage(), 404);
         } catch (McpPermissionDenied $error) {
             return $this->error($id, -32003, 'Capability required: ' . $error->getMessage() . '.', 403);
+        } catch (SingleEntryPointViolation $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
+                'isError' => true,
+                'structuredContent' => ['error' => $error->toArray()],
+                'content' => [['type' => 'text', 'text' => $error->reasonCode . ': USE_CANONICAL_CAPTURE_FLOW']],
+            ]]];
         } catch (\InvalidArgumentException $error) {
             return $this->error($id, -32602, $error->getMessage(), 400);
         } catch (DependencyValidationException $error) {
@@ -98,6 +104,7 @@ final class McpTransport
         $definition = null;
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
+        SingleEntryPointPolicy::guard($name, $this->can);
         $capability = match ($name) {
             'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
             'nhk.article.preflight' => 'read',

@@ -21,6 +21,16 @@ mutation, read-back verification and WordPress publish. A direct link write
 outside Governance/Controlled Apply is a `CONSTITUTION_CONFLICT`; future Article
 implementation must route the link through the approved governed boundary.
 
+## Single entry point for new knowledge input — 2026-09-09
+
+Knowledge-only text is still a new submission and enters `nhk.capture.ingest`.
+Capture resolves canonical subjects, inspects bounded Graph context, retrieves
+and evaluates Claims, then returns semantic write-back through Governance before
+composing the native Article draft. `nhk.knowledge.ingest`, Source and Evidence
+writers remain internal/admin governed compatibility boundaries, not normal
+operator entry points; direct calls without the dedicated internal capability
+fail closed.
+
 Public read boundaries require active records and fail closed when persisted
 Source or Evidence metadata explicitly declares a non-`PUBLIC` visibility
 (including `PRIVATE` and `HIDDEN`). Public serializers omit the persisted

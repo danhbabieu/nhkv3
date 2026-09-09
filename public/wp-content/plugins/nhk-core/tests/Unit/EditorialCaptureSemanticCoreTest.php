@@ -92,6 +92,32 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertContains('OWNER_PUBLICATION_REQUIRED', $first->diagnostics['publication']['blockers']);
     }
 
+    public function test_video_input_uses_capture_and_preserves_distinct_video_owner_context(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $seen = [];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => [['kind' => 'video', 'video_id' => 'video-1', 'video_proposal' => ['entity_type' => 'video']]]],
+            static fn (array $input): array => ['post_id' => 58, 'state_token' => 'token-58', 'post' => ['post_id' => 58]],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$seen): array { $seen = $context['assets']; return ['status' => 'REVIEW_REQUIRED', 'writes' => $context['assets']]; },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'capture-video-1', 'text' => 'Ghi chú về Video.', 'video' => ['url' => 'https://youtu.be/video-1']]);
+
+        self::assertSame('READY_FOR_PUBLICATION', $result->stage);
+        self::assertSame(58, $result->articleId);
+        self::assertSame('video', $seen[0]['kind']);
+        self::assertSame('video-1', $seen[0]['video_id']);
+    }
+
     public function test_multipart_fingerprint_binds_file_content_without_array_cast_warnings(): void
     {
         $repository = new InMemoryCaptureRepository();

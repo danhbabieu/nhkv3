@@ -5,6 +5,15 @@
 > transport và runtime capability được chốt ở các contract hiện hành được
 > router trong `READ_FIRST.md` dẫn tới.
 
+## Single entry point for new media submissions — 2026-09-09
+
+New image input is submitted through `nhk.capture.ingest`, including one image
+or multiple images attached to text or knowledge-only context. The Capture
+physical phase delegates to the canonical Media/MediaAsset/MediaUsage owner;
+it never creates a second Media store. Standalone Media upload/ingest remains
+internal/admin compatibility or lifecycle tooling only and is not the normal
+operator path.
+
 
 Media là semantic entity độc lập. Media identity tách khỏi MediaAsset và
 MediaUsage: cùng một binary có thể dùng cho nhiều Post, entity, gallery Model,

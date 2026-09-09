@@ -29,6 +29,20 @@ SEO/meta projection where those surfaces make promotional claims. Compliance
 review does not transfer editorial ownership away from WordPress and does not
 turn generated copy into Evidence.
 
+## Single canonical entry point for new content
+
+New Article/Post submissions do not begin at a draft writer, Article writer or
+publication writer. The only normal entry point is `nhk.capture.ingest`, which
+accepts text-only, knowledge-only text, images and the registered Video adapter
+and creates one Capture plus one native draft by default. Capture then runs the
+shared semantic core before Article composition and publication.
+
+`nhk.article.ingest` and typed native draft/publication operations remain
+internal/admin lifecycle boundaries for existing records or Capture-controlled
+continuations. They require `nhk_internal_content_operations` at the MCP/Admin
+surface; without it they fail closed with `DIRECT_WRITE_BLOCKED` and
+`USE_CANONICAL_CAPTURE_FLOW`.
+
 ## Required stage order
 
 1. Resolve all semantic references through the runtime registries. Subject
@@ -70,8 +84,10 @@ turn generated copy into Evidence.
    evidence-bound, genuinely narrowed by rewrite, or blocked for human review;
    synonym substitution alone is not a compliant rewrite.
 9. Publish the WordPress Post only when all required stages have satisfied this
-   contract. Generic WordPress publication remains independently valid, but it
-   is not a completed V3 knowledge Article workflow without these stages.
+   contract. Generic WordPress publication remains an owner maintenance
+   capability for existing editorial records, but it is not a new-submission
+   entry point or a completed V3 knowledge Article workflow without these
+   stages.
 
 ## Completion and failure
 

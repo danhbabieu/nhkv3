@@ -12,7 +12,7 @@ final class VideoRelationAdminApi
     public function register(): void
     {
         register_rest_route('nhk/v1', '/admin/video-relation/context/(?P<video>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance'), 'callback' => fn (\WP_REST_Request $request) => $this->context($request)]);
-        register_rest_route('nhk/v1', '/admin/video-relation', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_create_proposals'), 'callback' => fn (\WP_REST_Request $request) => $this->create($request)]);
+        register_rest_route('nhk/v1', '/admin/video-relation', ['methods' => 'POST', 'permission_callback' => fn (): bool => current_user_can('nhk_create_proposals') && current_user_can('nhk_internal_content_operations'), 'callback' => fn (\WP_REST_Request $request) => $this->create($request)]);
     }
 
     private function context(\WP_REST_Request $request): array|\WP_Error

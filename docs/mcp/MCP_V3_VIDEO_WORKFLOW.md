@@ -1,5 +1,11 @@
 # MCP V3 Video Workflow
 
+New Video submissions use the registered Video adapter inside
+`nhk.capture.ingest`, not a standalone operator writer. The Video identity and
+external-reference boundary remain distinct, while Capture owns the submission
+sequence and default Article draft. `nhk.video.ingest` is internal/admin
+lifecycle compatibility and requires the dedicated internal capability.
+
 `nhk.video.ingest` is the one-shot governed adapter for YouTube intake. It
 accepts a URL and short user hint, then returns the source snapshot, duplicate
 mode, NHK editorial package, Hub classification, semantic attachment

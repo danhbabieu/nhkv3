@@ -33,6 +33,24 @@ This shared guide describes the MCP V3 runtime actually present for ChatGPT and
 Codex. It does not authorize new entity types, predicates, relation types,
 fields, operations, taxonomy or data population.
 
+## Single canonical submission entry point — 2026-09-09
+
+`nhk.capture.ingest` is the only normal MCP entry point for a new submission.
+It accepts text-only, knowledge-only text, text with one or more multipart
+images, and the registered Video adapter. Each submission creates one Capture
+and one native Article draft by default, then follows
+`physical ingest when applicable → resolve → Graph discovery → Claim retrieval
+→ semantic write-back/review → Article composition → publication gate → final
+read-back`.
+
+The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
+Article draft/update/publish, relation and proposal creation are retained only
+for internal/admin compatibility or lifecycle operations. They are marked
+`internal_admin_only` in the executable catalog/Ability metadata, require
+`nhk_internal_content_operations`, and return `DIRECT_WRITE_BLOCKED` with
+`USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
+not fall back to one of these writers when Capture is unavailable.
+
 ## 1. MCP architecture
 
 The endpoint is `/wp-json/nhk/v1/mcp`, using JSON-RPC 2.0 and Streamable HTTP.
@@ -88,13 +106,14 @@ creation alone is never `COMPLETE`.
 
 `nhk.capture.ingest` is the shared editorial boundary for one user submission.
 It persists one Capture identity and idempotency key, stores the raw editorial
-intent and subject hints, accepts text-only or multipart image input, creates
-one native WordPress draft, adopts each verified attachment into canonical
-Media, interprets text into scoped candidates, resolves Authority subjects,
-retrieves bounded Claims through the Graph neighborhood, composes the draft,
-reconciles `MediaUsage`, runs the publication gate and performs final native
-read-back. Replays resume the same Capture and must not create a second Post or
-re-upload an already completed physical phase.
+intent and subject hints, accepts text-only, multipart images or the registered
+Video adapter, creates one native WordPress draft, adopts each verified image
+attachment into canonical Media, preserves Video as a distinct governed owner,
+interprets text into scoped candidates, resolves Authority subjects, retrieves
+bounded Claims through the Graph neighborhood, composes the draft, reconciles
+`MediaUsage`, runs the publication gate and performs final native read-back.
+Replays resume the same Capture and must not create a second Post or re-upload
+an already completed physical phase.
 
 The Capture tool is capability-gated by `nhk_ingest_articles`; its optional
 `files[]` are native multipart parts and never base64, paths or JSON bytes.
@@ -211,12 +230,12 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.semantic.resolve` | Authority context | READ | No | N/A | No raw edge | READY; ambiguity fails closed |
 | `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
-| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + native draft token | Bounded neighborhood read; relation writes remain governed | LIVE RUNTIME ACCEPTANCE PASS (2026-09-09); guarded Integration PASS (120 tests / 1,011 assertions, 4 canonical skips) |
+| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + native draft token | Bounded neighborhood read; relation writes remain governed | LIVE RUNTIME ACCEPTANCE PASS (2026-09-09); guarded Integration PASS (120 tests / 1,016 assertions, 4 canonical skips) |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
-| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Local implementation + focused proof; real-file runtime byte/rollback proof required |
+| `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE / INTERNAL | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Internal/admin compatibility boundary; new submissions use Capture |
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
-| `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE | Yes | Apply creates revision | Approved attachment candidates apply through Graph | READY for validated YouTube URL; optional Knowledge output is planning-only |
+| `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE / INTERNAL | Yes | Apply creates revision | Approved attachment candidates apply through Graph | Internal/admin compatibility boundary; new submissions use Capture; optional Knowledge output is planning-only |
 | `nhk.video.get` | Video | READ | No | N/A | No raw edge | READY for active valid public reference |
 | `nhk.knowledge.get` | Knowledge + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |
 | `nhk.source.get` | Source + public evidence | READ | No | N/A | No raw edge | READY for active/public chain |

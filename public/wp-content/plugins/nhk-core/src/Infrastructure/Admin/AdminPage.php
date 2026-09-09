@@ -38,7 +38,7 @@ final class AdminPage
                 self::renderProposalLookup($status);
             });
             AdminShell::renderWorkspaceRegion('editorial', $workspaces['editorial']['label'], static function () use ($workspaces): void {
-                echo '<p class="notice notice-info">' . esc_html($workspaces['editorial']['reason']) . '</p>';
+                self::renderEditorialCapture($workspaces['editorial']['reason']);
             });
             AdminShell::renderWorkspaceRegion('semantic', $workspaces['semantic']['label'], static function () use ($status): void {
                 self::renderEntityLookup($status);
@@ -56,7 +56,23 @@ final class AdminPage
             });
             echo '<p><strong>Invariant:</strong> WordPress Post giữ editorial body; mọi semantic mutation phải qua Governance. Trang này không ghi trực tiếp vào domain tables.</p>';
         });
-        self::scripts(); self::readScripts();
+        self::scripts(); self::captureScripts(); self::readScripts();
+    }
+
+    public static function renderEditorialCapture(string $reason): void
+    {
+        if (!current_user_can('nhk_ingest_articles')) {
+            echo '<p class="notice notice-warning">Capture canonical cần quyền nhk_ingest_articles.</p>';
+            return;
+        }
+        echo '<h2 id="nhk-capture-heading">Capture nội dung mới</h2><p id="nhk-capture-help">Đây là cửa vào duy nhất cho submission mới: văn bản, ảnh, Video và nội dung tri thức đều được tiếp nhận tại đây, sau đó hệ thống tự chạy resolve → Graph → Claim retrieval → semantic review → biên tập → publication gate. Không tạo bài, Media, Knowledge, relation hoặc publish trực tiếp từ màn hình khác.</p><form id="nhk-capture-form" enctype="multipart/form-data" aria-labelledby="nhk-capture-heading" aria-describedby="nhk-capture-help"><p><label for="nhk-capture-title">Tiêu đề</label> <input id="nhk-capture-title" name="title" type="text" size="60"><label for="nhk-capture-video">Video URL (tuỳ chọn)</label> <input id="nhk-capture-video" name="video_url" type="url" size="44" placeholder="https://youtu.be/..." /></p><p><label for="nhk-capture-text">Nội dung / ghi chú</label><br><textarea id="nhk-capture-text" name="text" rows="8" cols="100" required></textarea></p><p><label for="nhk-capture-subjects">Chủ thể gợi ý (mỗi dòng một mục)</label><br><textarea id="nhk-capture-subjects" name="subject_hints" rows="3" cols="60"></textarea></p><p><label for="nhk-capture-files">Ảnh gửi kèm</label> <input id="nhk-capture-files" name="files" type="file" accept="image/*" multiple> <label><input name="publish" type="checkbox" value="1"> yêu cầu publication sau khi đủ gate</label></p><p><button class="button button-primary" type="submit">Gửi qua Capture canonical</button></p><pre id="nhk-capture-result" class="nhk-governance-result" aria-live="polite"></pre></form><p class="description">' . esc_html($reason) . ' Các thao tác kỹ thuật/internal còn lại chỉ dành cho quản trị viên có quyền riêng và không phải đường vận hành chuẩn.</p>';
+    }
+
+    public static function captureScripts(): void
+    {
+        $endpoint = esc_url_raw(rest_url('nhk/v1/mcp'));
+        $nonce = esc_js(wp_create_nonce('wp_rest'));
+        echo '<script>(function(){var form=document.getElementById("nhk-capture-form");if(!form)return;form.addEventListener("submit",function(event){event.preventDefault();var result=document.getElementById("nhk-capture-result"),data=new FormData(form),files=data.getAll("files"),key="admin-capture-"+Date.now()+"-"+Math.random().toString(36).slice(2),args={idempotency_key:key,title:String(data.get("title")||""),text:String(data.get("text")||""),subject_hints:String(data.get("subject_hints")||"").split(/\\r?\\n/).map(function(item){return item.trim();}).filter(Boolean),publish:data.get("publish")==="1"};var video=String(data.get("video_url")||"").trim();if(video)args.video={url:video,title:args.title};data.delete("title");data.delete("text");data.delete("subject_hints");data.delete("video_url");data.delete("publish");data.delete("files");files.forEach(function(file){if(file instanceof File&&file.size>0)data.append("files[]",file);});data.append("request",JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"nhk.capture.ingest",arguments:args}}));fetch("' . $endpoint . '",{method:"POST",headers:{"X-WP-Nonce":"' . $nonce . '"},body:data}).then(function(response){return response.json().then(function(body){return {ok:response.ok,body:body};});}).then(function(value){result.textContent=JSON.stringify(value.body,null,2);}).catch(function(error){result.textContent=String(error);});});})();</script>';
     }
 
     /** @param array<string,array<string,mixed>> $health */
@@ -138,10 +154,13 @@ final class AdminPage
 
     private static function renderProposalComposer(): void
     {
-        if (!current_user_can('nhk_create_proposals')) return;
+        if (!current_user_can('nhk_internal_content_operations')) {
+            echo '<p class="notice notice-info">Submission mới phải bắt đầu tại Capture nội dung mới. Proposal composer là công cụ internal/admin, không phải entry point vận hành.</p>';
+            return;
+        }
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
-        echo '<h2 id="nhk-proposal-composer-heading">Create governed proposal</h2><p id="nhk-proposal-composer-help">Soạn lệnh semantic để đưa vào lifecycle Submit → Approve → Controlled Apply.</p><form id="nhk-proposal-composer" class="nhk-proposal-composer" aria-labelledby="nhk-proposal-composer-heading" aria-describedby="nhk-proposal-composer-help"><p><label for="nhk-operation">Operation</label> <select id="nhk-operation" name="operation"><option value="create">create</option><option value="ingest">ingest</option><option value="relation_create">relation_create</option><option value="rekey">rekey</option><option value="rename">rename</option><option value="update">update</option><option value="retire">retire</option><option value="relation_retire">relation_retire</option><option value="reactivate">reactivate</option><option value="relation_reactivate">relation_reactivate</option></select> <label for="nhk-entity-type-composer">Entity type</label> <select id="nhk-entity-type-composer" name="entity_type">';
+        echo '<h2 id="nhk-proposal-composer-heading">Internal/admin proposal composer</h2><p id="nhk-proposal-composer-help">INTERNAL ONLY — dùng cho migration/maintenance hoặc lifecycle đã được phân quyền. Submission mới phải dùng Capture.</p><form id="nhk-proposal-composer" class="nhk-proposal-composer" aria-labelledby="nhk-proposal-composer-heading" aria-describedby="nhk-proposal-composer-help"><p><label for="nhk-operation">Operation</label> <select id="nhk-operation" name="operation"><option value="create">create</option><option value="ingest">ingest</option><option value="relation_create">relation_create</option><option value="rekey">rekey</option><option value="rename">rename</option><option value="update">update</option><option value="retire">retire</option><option value="relation_retire">relation_retire</option><option value="reactivate">reactivate</option><option value="relation_reactivate">relation_reactivate</option></select> <label for="nhk-entity-type-composer">Entity type</label> <select id="nhk-entity-type-composer" name="entity_type">';
         foreach ($types->all() as $definition) echo '<option value="' . esc_attr($definition->type) . '">' . esc_html($definition->type) . '</option>';
         echo '<option value="media">media</option>';
         echo '<option value="video">video</option>';
@@ -153,7 +172,11 @@ final class AdminPage
 
     private static function renderVideoRelationWorkspace(): void
     {
-        echo '<h2 id="nhk-video-relation-heading">Gắn Video với Authority</h2><p id="nhk-video-relation-help">Luồng governed cho Video thiếu semantic attachment: nhập canonical Video và chọn Authority. Hệ thống tự resolve Video proposal, tạo hoặc dùng lại Evidence provenance YouTube, rồi đưa relation qua Submit → Approve → Eligibility → Controlled Apply → đọc lại.</p>';
+        if (!current_user_can('nhk_internal_content_operations')) {
+            echo '<p class="notice notice-info">Video submission mới phải đi qua Capture. Relation workspace chỉ dành cho internal/admin maintenance.</p>';
+            return;
+        }
+        echo '<h2 id="nhk-video-relation-heading">Internal/admin: Gắn Video với Authority</h2><p id="nhk-video-relation-help">INTERNAL ONLY — maintenance cho Video đã tồn tại. Submission mới phải bắt đầu tại Capture.</p>';
         echo '<form id="nhk-video-relation-form" aria-labelledby="nhk-video-relation-heading" aria-describedby="nhk-video-relation-help"><p><label for="nhk-video-id">Video canonical UUID</label> <input id="nhk-video-id" name="video_id" required size="40"> <button class="button" type="button" id="nhk-video-context">Kiểm tra Video</button></p><div id="nhk-video-context-result" class="nhk-admin-context" aria-live="polite"></div><p><label for="nhk-video-target-type">Loại Authority</label> <select id="nhk-video-target-type" name="target_type"><option value="variant">variant</option><option value="model">model</option><option value="brand">brand</option><option value="movement">movement</option><option value="music">music</option><option value="component">component</option><option value="classification">classification</option><option value="specimen">specimen</option><option value="product">product</option></select> <label for="nhk-video-target-id">Authority canonical UUID</label> <input id="nhk-video-target-id" name="target_id" required size="40"></p><p><button class="button button-primary" type="submit">Tạo relation_create proposal</button></p><div id="nhk-video-relation-result" class="nhk-governance-result" aria-live="polite"></div></form><p class="description">Evidence provenance được tạo/resolved tự động từ YouTube canonical với visibility PRIVATE, locator và fingerprint; không nhập Evidence UUID hoặc Video proposal UUID. Nếu cùng relation đã tồn tại, hệ thống reuse proposal/evidence và không tạo bản trùng.</p>';
     }
 
