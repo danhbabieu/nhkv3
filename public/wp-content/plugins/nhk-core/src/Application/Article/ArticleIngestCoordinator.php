@@ -73,7 +73,9 @@ final class ArticleIngestCoordinator
         if ($postId === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'WP_POST_TARGET_REQUIRED']);
         $state = $this->editorial->read($postId);
         if ($state === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE']);
-        if ($receipt->wpStateToken !== null && $receipt->wpStateToken !== $state->token) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, true, ['code' => 'EDITORIAL_STATE_CHANGED'], $state->token);
+        // A prior bounded phase (notably MediaUsage/editorial placement) may
+        // have advanced the native token. Refresh and continue from the
+        // canonical Post; only a caller-supplied expected token is a hard CAS.
         $expectedToken = is_array($input['expected_editorial_state'] ?? null) ? trim((string) ($input['expected_editorial_state']['state_token'] ?? '')) : '';
         if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
         if ($this->articleMedia !== null) {

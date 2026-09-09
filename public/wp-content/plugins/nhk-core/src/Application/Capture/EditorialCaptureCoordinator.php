@@ -133,7 +133,8 @@ final class EditorialCaptureCoordinator
             $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
             $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken);
 
-            $composition = $this->composer->compose($text, $semanticContext['observations'], $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? '')]);
+            $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
+            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? '')]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot']];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {
@@ -155,7 +156,21 @@ final class EditorialCaptureCoordinator
 
             $media = ($this->mediaReconcile)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'composition' => $this->withoutBody($composition)]);
             $diagnostics['media_usage'] = $this->withoutBody($media);
-            $publication = ($this->publicationGate)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved]);
+            if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
+                $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
+            }
+            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved];
+            $publication = ($this->publicationGate)($publicationContext);
+            // A native media/editorial write may rotate the token between the
+            // first gate read and review. Refresh once, then continue with the
+            // current canonical state; never replay the old plan indefinitely.
+            if (($publication['eligible'] ?? false) !== true && array_intersect(['EDITORIAL_CAS_REQUIRED', 'EDITORIAL_STATE_CHANGED'], array_map('strval', (array) ($publication['blockers'] ?? $publication['diagnostics'] ?? []))) !== []) {
+                $publicationContext['refresh_current_state'] = true;
+                $publication = ($this->publicationGate)($publicationContext);
+            }
+            if (trim((string) ($publication['state_token'] ?? '')) !== '' && $publication['state_token'] !== $record->articleStateToken) {
+                $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $publication['state_token']);
+            }
             $diagnostics['publication'] = $publication;
             $eligible = ($publication['eligible'] ?? false) === true;
             $published = false;

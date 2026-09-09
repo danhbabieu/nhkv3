@@ -29,11 +29,19 @@ final class TextInputInterpreter
             'scope' => 'capture',
             'status' => 'CANDIDATE',
         ];
+        $mediaObservations = [];
+        foreach ($assets as $asset) {
+            if (!is_array($asset)) continue;
+            $observation = trim((string) ($asset['observation'] ?? $asset['observed_text'] ?? ''));
+            if ($observation === '') continue;
+            $mediaObservations[] = ['text' => $observation, 'provenance' => 'OBSERVED_FROM_MEDIA', 'media_id' => (string) ($asset['media_id'] ?? '')];
+        }
         return [
             'primary_subject_hints' => array_values(array_unique(array_map('strval', $subjectHints))),
             'secondary_subject_hints' => [],
             'entity_mentions' => $mentions,
             'user_claim_candidates' => $claims,
+            'media_observations' => $mediaObservations,
             'relation_hints' => [],
             'article_intent' => $text,
             'uncertainty' => $text === '' ? ['EMPTY_INPUT'] : [],

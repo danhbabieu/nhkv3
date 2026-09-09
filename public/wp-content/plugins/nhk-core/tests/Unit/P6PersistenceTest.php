@@ -7,7 +7,7 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Governance\AuthorityProposalExecutor;
 use NHK\Core\Application\Media\MediaService;
 use NHK\Core\Application\Video\VideoService;
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -39,11 +39,12 @@ final class P6PersistenceTest extends TestCase
             public function listByMediaId(string $id): array { return array_values(array_filter($this->items, fn (MediaAsset $item): bool => $item->mediaId === $id)); }
             public function findByChecksum(string $checksum): array { return array_values(array_filter($this->items, fn (MediaAsset $item): bool => $item->checksum === $checksum)); }
         };
-        $usages = new class implements MediaUsageRepository {
+        $usages = new class implements MediaUsageRepository, MediaUsageUpdater {
             public array $items = [];
             public function create(MediaUsage $item): MediaUsage { return $this->items[$item->usageId] = $item; }
             public function listByMediaId(string $id, ?string $role = null): array { return array_values(array_filter($this->items, fn (MediaUsage $item): bool => $item->mediaId === $id && ($role === null || $item->role === $role))); }
             public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, fn (MediaUsage $item): bool => $item->endpointType === $type && $item->endpointKey === $key && ($role === null || $item->role === $role))); }
+            public function update(MediaUsage $item): MediaUsage { return $this->items[$item->usageId] = $item; }
         };
         $service = new MediaService($media, $assets, $usages);
         $created = $service->create('odo-front', 'Odo front', 'ready', ['source' => 'migration']);
@@ -64,12 +65,9 @@ final class P6PersistenceTest extends TestCase
         } catch (\NHK\Core\Domain\Media\MediaException $exception) {
             self::assertSame('Media asset storage key is already bound to different content.', $exception->getMessage());
         }
-        try {
-            $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured', 1);
-            self::fail('Expected a conflicting Media usage sort order to be rejected.');
-        } catch (\NHK\Core\Domain\Media\MediaException $exception) {
-            self::assertSame('Media usage is already bound to a different sort order.', $exception->getMessage());
-        }
+        $updatedUsage = $service->addUsage($created->canonicalId, 'wp_post', '1:42', 'featured', 1);
+        self::assertSame($usage->usageId, $updatedUsage->usageId);
+        self::assertSame(1, $updatedUsage->sortOrder);
         self::assertCount(1, $service->assets($created->canonicalId));
         self::assertCount(1, $service->usages($created->canonicalId));
 

@@ -75,6 +75,29 @@ hai. Downstream reuse phải ưu tiên canonical Media UUID/stable key + revisio
 sau đó dùng asset/usage phù hợp thay vì upload hoặc nhân bản lại cùng semantic
 identity.
 
+## Usage reconciliation and representative convergence — 2026-09-09
+
+WordPress Media là authority của physical file; V3 `Media` là semantic
+identity; `MediaUsage` là quan hệ semantic/presentation theo endpoint và role.
+Attachment adoption phải `create-or-resolve` theo canonical UUID/stable key:
+Media hiện hữu được bổ sung hoặc cập nhật asset/usage, không tạo Media mới chỉ
+vì tên đọc lại, attachment replay hoặc Article khác. Cùng một Media được phép
+đồng thời là `featured_primary`, `inline_primary`, `technical_detail`,
+`evidence`, `gallery` và `representative` trong những context hợp lệ.
+
+Usage reconcile là deterministic và idempotent: `KEEP`, `ADD`, `UPDATE`,
+`DEMOTE`, `RETIRE`, `CONFLICT` hoặc `OWNER_REVIEW_REQUIRED`. Existing usage
+UUID được giữ khi đổi Media binding hoặc contextual metadata; bản ghi cũ không
+bị xóa để che giấu provenance. Duplicate current usage, ambiguous scope hoặc
+candidate không có asset/readiness/public eligibility phải fail closed.
+
+Representative là presentation-only và scoped theo đúng node/facet được caller
+chứng minh. Điểm chọn hiện hành so sánh semantic specificity, visual coverage,
+technical usefulness, clarity/resolution, provenance confidence và obstruction;
+ảnh tốt hơn được promote, ảnh cũ được demote nếu vẫn phù hợp, không xóa Media,
+MediaAsset hay provenance. Representative không phải Claim và không tự tạo
+Graph edge.
+
 ## Canonical file-to-Media workflow — 2026-09-08
 
 Đường upload file canonical là:

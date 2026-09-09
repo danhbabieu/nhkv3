@@ -27,8 +27,12 @@ final class ArticleComposer
         foreach ($selectedClaims as $claim) $trace[] = [
             'claim_id' => (string) ($claim['claim_id'] ?? $claim['id'] ?? ''),
             'claim_revision' => max(1, (int) ($claim['claim_revision'] ?? $claim['revision'] ?? 1)),
+            'subject_id' => (string) ($claim['subject_id'] ?? ''),
             'usage_role' => 'supporting_fact',
             'relation_path' => is_array($claim['relation_path'] ?? null) ? $claim['relation_path'] : [],
+            'scope' => (string) ($claim['scope'] ?? ''),
+            'provenance' => (string) ($claim['provenance'] ?? ''),
+            'evidence_status' => (string) ($claim['evidence_status'] ?? ''),
             'composition_reason' => (string) ($claim['reason'] ?? 'bounded relevant canonical knowledge'),
         ];
         return [

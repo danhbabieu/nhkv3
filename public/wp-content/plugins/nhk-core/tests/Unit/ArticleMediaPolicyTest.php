@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaBatchIngestService, MediaFilenameNormalizer, MediaIngestGateway, MediaService};
-use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MutableMediaUsageRepository, WordPressArticleMediaAdapter};
+use NHK\Core\Contracts\Media\{ArticleMediaBlueprintRepository, MediaAssetRepository, MediaRepository, MediaUsageUpdater, MutableMediaUsageRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoBlueprint, MediaUsage};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -45,7 +45,7 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_COMPLETE', $result->state);
     }
 
-    public function test_mandatory_slots_cannot_share_a_media_identity(): void
+    public function test_one_media_identity_can_fill_both_mandatory_article_roles(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $item = $service->create('one-image', 'One image', 'ready');
@@ -55,9 +55,9 @@ final class ArticleMediaPolicyTest extends TestCase
         $result = $coordinator->ensureForPost(44, [], ['featured_primary' => $item->canonicalId, 'inline_primary' => $item->canonicalId]);
 
         self::assertSame($item->canonicalId, $result->slotMedia['featured_primary']);
-        self::assertNotSame($item->canonicalId, $result->slotMedia['inline_primary']);
-        self::assertTrue($result->slots['inline_primary']['placeholder']);
-        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->diagnostics, 'code'));
+        self::assertSame($item->canonicalId, $result->slotMedia['inline_primary']);
+        self::assertFalse($result->slots['inline_primary']['placeholder']);
+        self::assertNotContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->diagnostics, 'code'));
     }
 
     public function test_same_media_supports_different_contextual_usage_text_without_binary_duplication(): void
@@ -233,6 +233,41 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame(['original', 'derivative'], array_column($assets->listByMediaId($first->canonicalId), 'kind'));
     }
 
+    public function test_existing_media_ingest_adds_usage_without_duplicate_create_or_media_identity(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $existing = $service->create('wp-attachment:1:299', 'Ảnh attachment 299', 'ready', ['source' => 'wordpress_attachment_adoption']);
+        $service->addAsset($existing->canonicalId, 'original', 'uploads/attachment-299.webp', hash('sha256', 'attachment-299'), 'image/webp', 100, 1600, 1200, 'PUBLIC');
+
+        $reused = $service->ingest('wp-attachment:1:299', 'Tên đọc lại khác', 'draft', ['source' => 'mcp-replay'], [], [[
+            'endpoint_type' => 'wp_post', 'endpoint_key' => '1:300', 'role' => 'featured_primary', 'alt_text' => 'Ảnh tư liệu attachment 299',
+        ]]);
+
+        self::assertSame($existing->canonicalId, $reused->canonicalId);
+        self::assertCount(1, $media->items);
+        self::assertCount(1, $usages->listByEndpoint('wp_post', '1:300', 'featured_primary'));
+    }
+
+    public function test_usage_replacement_updates_existing_usage_in_place_and_is_idempotent(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $old = $service->create('old-inline', 'Ảnh inline cũ', 'ready');
+        $new = $service->create('new-featured', 'Ảnh hiện hành', 'ready');
+        $service->addAsset($old->canonicalId, 'original', 'uploads/old.jpg', hash('sha256', 'old'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $service->addAsset($new->canonicalId, 'original', 'uploads/new.jpg', hash('sha256', 'new'), 'image/jpeg', 10, 1600, 900, 'PUBLIC');
+        $existingUsage = $service->addUsage($old->canonicalId, 'wp_post', '1:300', 'inline_primary', 0, 'Alt cũ');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $coordinator->ensureForPost(300, [], ['inline_primary' => $new->canonicalId, 'featured_primary' => $new->canonicalId]);
+        $coordinator->ensureForPost(300, [], ['inline_primary' => $new->canonicalId, 'featured_primary' => $new->canonicalId]);
+        $updated = $usages->listByEndpoint('wp_post', '1:300', 'inline_primary');
+
+        self::assertCount(1, $updated);
+        self::assertSame($existingUsage->usageId, $updated[0]->usageId);
+        self::assertSame($new->canonicalId, $updated[0]->mediaId);
+        self::assertSame(2, count($usages->items));
+    }
+
     /** @return array{0:object,1:object,2:object,3:object,4:MediaService} */
     private function stores(): array
     {
@@ -252,11 +287,12 @@ final class ArticleMediaPolicyTest extends TestCase
             public function listByMediaId(string $id): array { return array_values(array_filter($this->items, static fn (MediaAsset $asset): bool => $asset->mediaId === $id)); }
             public function findByChecksum(string $checksum): array { return array_values(array_filter($this->items, static fn (MediaAsset $asset): bool => $asset->checksum === $checksum)); }
         };
-        $usages = new class implements MutableMediaUsageRepository {
+        $usages = new class implements MutableMediaUsageRepository, MediaUsageUpdater {
             public array $items = [];
             public function create(MediaUsage $usage): MediaUsage { return $this->items[$usage->usageId] = $usage; }
             public function listByMediaId(string $id, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $usage): bool => $usage->mediaId === $id && ($role === null || $usage->role === $role))); }
             public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $usage): bool => $usage->endpointType === $type && $usage->endpointKey === $key && ($role === null || $usage->role === $role))); }
+            public function update(MediaUsage $usage): MediaUsage { return $this->items[$usage->usageId] = $usage; }
             public function removeByEndpointRole(string $type, string $key, string $role): int { $before = count($this->items); foreach ($this->items as $id => $usage) if ($usage->endpointType === $type && $usage->endpointKey === $key && $usage->role === $role) unset($this->items[$id]); return $before - count($this->items); }
         };
         $blueprints = new class implements ArticleMediaBlueprintRepository {

@@ -13,11 +13,12 @@ final readonly class ArticleMediaResult
         public array $slotMedia,
         public array $slots,
         public array $diagnostics = [],
+        public string $editorialStateToken = '',
     ) {}
 
     /** @return array<string,mixed> */
     public function toArray(): array
     {
-        return ['post_id' => $this->postId, 'endpoint_key' => $this->endpointKey, 'state' => $this->state, 'slot_media' => $this->slotMedia, 'slots' => $this->slots, 'diagnostics' => $this->diagnostics];
+        return ['post_id' => $this->postId, 'endpoint_key' => $this->endpointKey, 'state' => $this->state, 'slot_media' => $this->slotMedia, 'slots' => $this->slots, 'diagnostics' => $this->diagnostics, 'editorial_state_token' => $this->editorialStateToken];
     }
 }

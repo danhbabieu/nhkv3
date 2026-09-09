@@ -3,11 +3,11 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Media;
 
-use NHK\Core\Contracts\Media\MutableMediaUsageRepository;
+use NHK\Core\Contracts\Media\{MediaUsageUpdater, MutableMediaUsageRepository};
 use NHK\Core\Domain\Media\{MediaException, MediaUsage};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbMediaUsageRepository implements MutableMediaUsageRepository
+final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, MediaUsageUpdater
 {
     private string $table;
     private string $mediaTable;
@@ -57,6 +57,20 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository
         if ($role !== null) { $where .= ' AND usage_role=%s'; $args[] = $role; }
         $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE {$where} ORDER BY sort_order,id", ...$args), ARRAY_A);
         return $this->hydrateList($rows ?: []);
+    }
+
+    public function update(MediaUsage $usage): MediaUsage
+    {
+        $mediaId = $this->mediaInternalId($usage->mediaId);
+        if ($mediaId === null) throw new MediaException('Media parent not found.');
+        $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE usage_uuid=%s LIMIT 1", UuidCodec::toBinary($usage->usageId)), ARRAY_A);
+        if (!is_array($existing)) throw new MediaException('Media usage not found.');
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET media_id=%d,endpoint_type=%s,endpoint_key=%s,usage_role=%s,sort_order=%d,alt_text=%s,caption=%s,keyword_groups_json=%s WHERE usage_uuid=%s", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, wp_json_encode($usage->keywordGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), UuidCodec::toBinary($usage->usageId)));
+        if ($ok === false) throw new MediaException('Media usage update conflict.');
+        $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE usage_uuid=%s LIMIT 1", UuidCodec::toBinary($usage->usageId)), ARRAY_A);
+        $readback = is_array($row) ? $this->hydrate($row) : null;
+        if (!$readback instanceof MediaUsage) throw new MediaException('Media usage read-back failed.');
+        return $readback;
     }
 
     public function removeByEndpointRole(string $endpointType, string $endpointKey, string $role): int

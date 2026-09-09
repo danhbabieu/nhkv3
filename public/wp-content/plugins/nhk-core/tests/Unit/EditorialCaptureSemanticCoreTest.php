@@ -141,6 +141,43 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame('IDEMPOTENCY_CONFLICT', $conflict->status);
         self::assertSame('CAPTURE_IDEMPOTENCY_KEY_REUSED', $conflict->diagnostics['failure']['code']);
     }
+
+    public function test_publication_state_token_refresh_converges_without_replaying_stale_plan(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $publicationCalls = 0;
+        $publisherToken = '';
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 57, 'state_token' => 'token-old', 'post' => ['post_id' => 57]],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static function (array $context) use (&$publicationCalls): array {
+                $publicationCalls++;
+                return $publicationCalls === 1
+                    ? ['eligible' => false, 'blockers' => ['EDITORIAL_CAS_REQUIRED']]
+                    : ['eligible' => true, 'blockers' => [], 'state_token' => 'token-current'];
+            },
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            static function (array $context) use (&$publisherToken): array {
+                $publisherToken = (string) ($context['expected_state_token'] ?? '');
+                return ['ok' => true, 'post' => ['status' => 'publish']];
+            },
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'capture-publication-refresh', 'text' => 'Bài đã được xác minh.', 'publish' => true]);
+
+        self::assertSame('PUBLISHED', $result->stage);
+        self::assertSame(2, $publicationCalls);
+        self::assertSame('token-current', $publisherToken);
+    }
 }
 
 final class InMemoryCaptureRepository implements CaptureRepository

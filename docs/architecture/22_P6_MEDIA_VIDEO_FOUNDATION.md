@@ -212,6 +212,15 @@ managed Gutenberg inline replacement, attachment adoption and responsive
 attachment representation. Byte upload is supported for controlled packets
 that provide a local file path; metadata-only MCP ingest remains metadata-only.
 
+The current implementation also resolves an existing Media stable key during
+attachment adoption/replay, preserves its canonical UUID, and upserts usage
+context without creating a duplicate Media. Article slot reconciliation may
+reuse that same Media for featured and inline roles. Existing usage UUIDs are
+preserved for replacement/update when the repository supports the governed
+updater; unsupported duplicate current rows remain `CONFLICT`/
+`OWNER_REVIEW_REQUIRED`. WordPress content is read back after synchronization so
+stale inline blocks cannot outrank the current Capture plan.
+
 Focused checkpoint evidence: `ArticleMediaPolicyTest` covers placeholders,
 reuse, distinct slots, replacement, contextual usage, filename normalization,
 keyword validation, batch context and sitemap eligibility. Legacy data and

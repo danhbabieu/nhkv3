@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Media;
 
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaException, MediaUsage};
 use NHK\Core\Domain\Media\{MediaDetailTypeRegistry, SeoKeywordGroupRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -34,7 +34,10 @@ final class MediaService
      */
     public function ingest(string $stableKey, string $name, string $readiness = 'draft', array $provenance = [], array $assetSpecs = [], array $usageSpecs = []): Media
     {
-        $media = $this->create($stableKey, $name, $readiness, $provenance);
+        // Ingest is create-or-resolve. A stable key may be replayed with a
+        // usage/asset delta; that delta must not be mistaken for a duplicate
+        // Media create. Explicit Media updates remain on update().
+        $media = $this->media->findByStableKey($stableKey) ?? $this->create($stableKey, $name, $readiness, $provenance);
         $existingAssets = $this->assets->listByMediaId($media->canonicalId);
         foreach ($assetSpecs as $spec) {
             $spec = $this->normalizeAssetSpec($spec, $name, $provenance);
@@ -75,7 +78,7 @@ final class MediaService
             $existing = null;
             foreach ($existingUsages as $usage) if ($usage->endpointType === $candidate->endpointType && $usage->endpointKey === $candidate->endpointKey && $usage->role === $candidate->role) { $existing = $usage; break; }
             if ($existing !== null) {
-                if ($existing->sortOrder !== $candidate->sortOrder) throw new MediaException('Media usage is already bound to a different sort order.');
+                $existingUsages[] = $this->upsertUsage($existing, $candidate);
                 continue;
             }
             $existingUsages[] = $this->usages->create($candidate);
@@ -149,7 +152,7 @@ final class MediaService
         foreach ($this->usages->listByMediaId($mediaId) as $existing) {
             if ($existing->endpointType !== $candidate->endpointType || $existing->endpointKey !== $candidate->endpointKey || $existing->role !== $candidate->role) continue;
             if ($this->sameUsage($existing, $candidate)) return $existing;
-            throw new MediaException('Media usage is already bound to a different sort order.');
+            return $this->upsertUsage($existing, $candidate);
         }
         return $this->usages->create($candidate);
     }
@@ -181,6 +184,13 @@ final class MediaService
             && $left->altText === $right->altText
             && $left->caption === $right->caption
             && $left->keywordGroups === $right->keywordGroups;
+    }
+
+    private function upsertUsage(MediaUsage $existing, MediaUsage $candidate): MediaUsage
+    {
+        $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups);
+        if ($this->usages instanceof MediaUsageUpdater) return $this->usages->update($updated);
+        throw new MediaException('Media usage update capability is unavailable.');
     }
 
     private function changeState(string $id, int $revision, bool $active): Media

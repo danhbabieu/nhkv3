@@ -211,6 +211,16 @@ Product/Specimen future sequencing is allowed as a workflow shape only;
 the entities remain distinct and Product–Specimen remains `REGISTRY_GAP` until
 an approved relation is registered.
 
+### 2.3 Current Article/Media convergence checkpoint — 2026-09-09
+
+The local code slice now covers existing-Media usage deltas, same-usage retries,
+same-Media featured/inline reuse, stale-inline replacement under an explicit
+current plan, deterministic representative add/promote/demote planning, Media-
+aware observation input and publication-token refresh. Focused unit evidence is
+local only; exact attachment `299` / Article `300` / target integration runtime
+acceptance remains a separate gate. No demo, production, V2 or staging data is
+changed by this checkpoint.
+
 ## 3. Current storage and writer rule
 
 Every domain has one canonical owner and authorized writer boundary:

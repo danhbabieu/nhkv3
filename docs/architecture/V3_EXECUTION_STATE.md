@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Article/Media convergence follow-up
+
+The local implementation now closes the bounded Article/Media gaps identified
+after the Editorial Capture foundation: existing Media stable keys are resolved
+for replay/delta ingest; MediaUsage replacement and contextual metadata updates
+are idempotent and preserve usage UUIDs through the governed updater; one Media
+may fill both Article mandatory roles; explicit current Capture selection can
+replace a stale inline block; and representative selection is scoped,
+presentation-only, deterministic and safely demotes the prior usage without
+deleting Media, assets or provenance. Capture composition now includes typed
+Media observations and machine-readable Claim subject/path/evidence trace, and
+native state-token changes trigger one bounded publication refresh.
+
+Focused proof: 26 tests / 96 assertions for MediaUsage, representative and
+Capture behavior; complete Unit suite 856 tests / 4,051 assertions, with the
+existing 7 warnings, 1 deprecation and 6 PHPUnit deprecations. PHP lint,
+`composer lint` and `git diff --check` pass. The exact guarded Integration
+command was attempted with `NHK_WP_TEST_DB=nhk_v3_test` and
+`NHK_WP_TEST_PATH=public`, but the local MySQL service is unavailable, so the
+WordPress integration suite and attachment `299`/Article `300` demo acceptance
+remain blocked and no runtime data was mutated. No push, deployment, V2 or
+production/staging change was performed.
+
+Canonical owner docs updated: Media model/P6 foundation, Article Ingest,
+Article semantic preflight, MCP Content Operations, MCP Control Plane and the
+current documentation index. Product/Specimen invariants and unrelated
+Collector/Inventory behavior were not changed.
+
 ## Checkpoint — 2026-09-09 — Editorial Capture & Semantic Enrichment foundation
 
 The handoff package and pasted request were reconciled against the Constitution

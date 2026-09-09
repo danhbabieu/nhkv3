@@ -489,9 +489,20 @@ final class Plugin {
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
                     $selected = [];
-                    if (isset($mediaIds[0])) $selected['featured_primary'] = $mediaIds[0];
+                    if (isset($mediaIds[0])) {
+                        $selected['featured_primary'] = $mediaIds[0];
+                        // A single Capture image is the current publication
+                        // plan for both mandatory editorial slots. Sharing one
+                        // canonical Media identity is allowed and avoids
+                        // replaying an older inline image from the Post.
+                        if (!isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[0];
+                    }
                     if (isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[1];
-                    return $articleMedia->ensureForPost((int) ($context['article_id'] ?? 0), ['capture_id' => (string) (($context['capture']['capture_id'] ?? ''))], $selected, array_slice($mediaIds, 2))->toArray();
+                    $result = $articleMedia->ensureForPost((int) ($context['article_id'] ?? 0), ['capture_id' => (string) (($context['capture']['capture_id'] ?? '')), 'force_inline_reconcile' => isset($selected['inline_primary'])], $selected, array_slice($mediaIds, 2));
+                    $payload = $result->toArray();
+                    $payload['force_inline_reconcile'] = isset($selected['inline_primary']);
+                    $payload['editorial_state_token'] = $result->editorialStateToken;
+                    return $payload;
                 },
                 static function (array $context) use ($draftGateway): array {
                     $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), ['semantic' => $context['semantic'] ?? [], 'media' => $context['media'] ?? []], (string) ($context['capture']['capture_id'] ?? '') . ':review');

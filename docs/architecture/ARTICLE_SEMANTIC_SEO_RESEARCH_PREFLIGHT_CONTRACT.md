@@ -88,6 +88,25 @@ applied or publication is allowed. Draft, Governance, read-back, rendered
 SEO/public verification and publication remain separate gates defined by
 `ARTICLE_INGEST_CONTRACT.md`.
 
+## Media-aware Claim retrieval — 2026-09-09
+
+Khi Article có Media, preflight nghiên cứu theo bounded chain
+`input → subjects → Graph neighborhood → related Claims → scope/provenance/
+evidence/relevance → selected editorial claims`. Exact Variant là tín hiệu
+chính nhưng không phải giới hạn duy nhất: Model, Movement, Classification,
+Component và direct Knowledge có thể được xem xét khi path, scope và evidence
+phù hợp; far-path và weak keyword matches bị loại. Candidate phải giữ
+`subject_id`, scope, provenance, evidence status, relation path và relevance để
+composition chọn có kiểm soát.
+
+Mọi input được phân loại trước khi dùng: `OBSERVED_FROM_MEDIA`,
+`EXPLICIT_USER_KNOWLEDGE` hoặc `CANONICAL_CLAIM`. Claim canonical đã có phải
+được reuse theo UUID/stable key/revision trước khi tạo proposal mới. MediaUsage,
+caption, OCR, filename và visual recognition chỉ là contextual observation;
+chúng không tự trở thành Claim, Evidence hoặc Graph relation. Related Article
+chỉ được đưa vào candidate/update khi có semantic relation và public-route
+eligibility, không dựa trên keyword-only matching.
+
 ## Update semantics
 
 An update reruns research against the current Post revision, semantic links,

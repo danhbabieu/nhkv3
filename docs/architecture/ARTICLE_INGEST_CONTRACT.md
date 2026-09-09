@@ -174,6 +174,32 @@ Media/MediaAsset/MediaUsage for image state, Video for external-reference state,
 Knowledge/Source/Evidence for factual state, and Graph only for registered typed
 relations.
 
+## Capture composition and current-state reconciliation — 2026-09-09
+
+Một Capture mặc định tạo một Article draft; N assets tạo N canonical Media/
+MediaAsset identities nhưng không tạo N Article. Mỗi asset giữ caption, alt,
+description, observation và relation context riêng. Composition chỉ dùng ba
+nguồn đã phân loại: user input, observation từ Media và canonical Claims đã
+được chọn; không dump raw claim payload vào body. Trace máy đọc được phải giữ
+Claim ID, revision, subject, relation path/role và evidence/provenance status.
+
+Claim research đi từ input → resolved subjects → bounded Graph neighborhood →
+related Claims → scope/provenance/evidence/relevance → editorial selection.
+Không giới hạn ở exact Variant, nhưng cũng không nhảy qua far path. User input
+phải giữ loại `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE` hoặc
+`CANONICAL_CLAIM`; reuse claim hiện hữu trước khi đề xuất claim mới. Related
+Article chỉ là candidate/update khi semantic relation đã được chứng minh, không
+được tạo từ keyword overlap đơn thuần.
+
+MediaUsage và native WordPress attachment/content phải reconcile theo thứ tự ưu
+tiên: usage hiện tại đã reconcile, attachment state read-back hiện tại, Media
+plan của Capture hiện tại, rồi mới đến historical planning (chỉ diagnostic).
+Stale inline image hoặc representative không được replay để ghi đè state mới.
+Sau mỗi native write phải đọc lại token; nếu token đổi thì refresh và chạy lại
+bounded preflight/reconcile một lần, không replay vô hạn. Article và Media
+selected được coi là một publication unit; không publish khi còn placeholder,
+inline stale/unrelated hoặc representative sai scope.
+
 ## Runtime acceptance boundary
 
 Media and semantic identity operations remain separate inside this chain:

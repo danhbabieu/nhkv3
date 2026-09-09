@@ -105,6 +105,25 @@ than silently applying new semantic records, so the capture can reach
 `READY_FOR_PUBLICATION`/`REVIEW_REQUIRED` but cannot claim publication without
 an explicit eligible owner publication operation and read-back.
 
+For a Capture with images, the orchestration unit is
+`Capture → attachments → attachment read-back → canonical Media adoption →
+Media interpretation → subject resolution → bounded Graph/Claim retrieval →
+semantic write-back → MediaUsage/representative reconciliation → Article
+composition → publication review → optional publish → final read-back`. One
+Capture normally owns one Article; each asset retains its own contextual
+caption, alt, description, observations and relation candidates. Existing
+Media is resolved by canonical UUID/stable key and receives usage deltas rather
+than a duplicate identity. Publication review must inspect current canonical
+state/token and refresh once after a concurrent native write; it must not replay
+stale inline or representative planning.
+
+Composition exposes an editorial claim trace rather than a raw claim dump. Each
+selected claim records its canonical ID/revision, subject, bounded relation path,
+editorial role and evidence/provenance status. `OBSERVED_FROM_MEDIA`,
+`EXPLICIT_USER_KNOWLEDGE` and `CANONICAL_CLAIM` remain distinct input classes;
+only a governed semantic operation may turn a candidate into durable Claim,
+Evidence or Graph state.
+
 Text-only example:
 
 ```json

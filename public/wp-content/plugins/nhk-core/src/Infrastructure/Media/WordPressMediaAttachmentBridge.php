@@ -83,6 +83,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 $image = $this->renderImage($attachmentId, (string) ($slots['inline_primary']['blueprint']['planned_alt_intent'] ?? ''));
                 if ($managedId > 0) {
                     $content = $this->replaceManagedBlock($content, $image, $attachmentId);
+                } elseif (($result['force_inline_reconcile'] ?? false) === true && $inlineIds !== []) {
+                    $content = $this->replaceFirstImageBlock($content, $image, $attachmentId);
                 } elseif ($this->hasMappedInlineMedia($inlineIds, (string) ($current['featured_media_id'] ?? ''))) {
                     // A human-selected, mapped inline image already satisfies
                     // the mandatory editorial role. Never reorder it.
@@ -286,6 +288,13 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     {
         $updated = preg_replace('/\s*<!-- wp:image\b[^>]*nhk-managed-inline-primary[^>]*-->.*?<!-- \/wp:image -->\s*/is', "\n", $content, 1);
         return is_string($updated) ? trim($updated) : $content;
+    }
+
+    private function replaceFirstImageBlock(string $content, string $image, int $attachmentId): string
+    {
+        $replacement = $this->managedBlock($attachmentId, $image);
+        $updated = preg_replace('/<!-- wp:image\b.*?<!-- \/wp:image -->/is', $replacement, $content, 1);
+        return is_string($updated) ? $updated : $content;
     }
 
     /** @return list<int> */
