@@ -1,5 +1,55 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — Editorial Capture & Semantic Enrichment foundation
+
+The handoff package and pasted request were reconciled against the Constitution
+and current Media, Article, Knowledge, Graph, Governance, SEO and MCP
+contracts. The implementation keeps Capture as a distinct cross-boundary
+orchestrator; it does not change the existing reconcile-only semantics of
+`nhk.article.ingest` and does not invent entity types, predicates or relation
+vocabulary.
+
+The code-side vertical slice adds `CaptureRecord`, bounded stages, a durable
+`CaptureRepository` contract and WPDB persistence behind additive migration
+017. `EditorialCaptureCoordinator` enforces one idempotency key → one Capture
+→ one native draft, supports text-only and multipart inputs, checkpoints
+physical attachment storage, explicit Media adoption, text interpretation,
+Authority resolution, bounded Claim retrieval with relation paths, composition,
+MediaUsage reconciliation, publication gating and final read-back. Native
+WordPress remains the sole Article title/body/excerpt owner. Replays reuse the
+same Capture and changed payloads return an idempotency conflict.
+
+`nhk.capture.ingest` is now in the executable MCP catalog and governed Ability
+allowlist with optional top-level multipart `files[]`; Easy MCP keeps the bytes
+out of Ability JSON and delegates to the canonical transport. Semantic
+write-back is deliberately a Governance review packet at this checkpoint, not
+an implicit Claim/Graph mutation. Publication remains fail-closed and the
+coordinator only reports `PUBLISHED` after an explicit owner publication call
+and verified native read-back.
+
+MCP documentation was reconciled in `MCP_V3_CONTENT_OPERATIONS.md`,
+`NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md` and
+`CURRENT_DOCUMENTATION_STATUS_INDEX.md`: the Capture sequence, text-only path,
+multipart boundary, Ability schema, resumability, blocker states and current
+runtime gaps are documented; stale fixed tool-count and related-navigation-gap
+wording was removed. The reconciliation matrix is recorded at
+`docs/architecture/EDITORIAL_CAPTURE_SEMANTIC_ENRICHMENT_CONFLICT_MATRIX_2026-09-09.md`.
+
+Evidence: focused Capture/MCP/migration verification passes 32 tests / 269
+assertions; the complete current Unit suite passes 845 tests / 4,012
+assertions with 7 warnings, 1 deprecation and 6 PHPUnit deprecations.
+`composer lint` and `git diff --check` pass. No runtime migration, semantic record, Graph edge,
+Media, attachment, publication, V2/production/staging data, deployment or
+push was performed. Authenticated multipart/capture integration, exact
+`nhk_v3_test` migration read-back and Easy MCP live callability remain
+RUNTIME-GATED.
+
+MCP DOCUMENTATION — canonical docs read: PASS; docs modified: PASS; rules
+reconciled: PASS; deprecated contradictory wording removed: PASS; Ability
+schemas documented: PASS; examples/workflow updated: PASS; documentation index
+updated: PASS; runtime/docs consistency: PASS for catalog/schema/static wiring,
+RUNTIME-GATED for live discovery and authenticated execution.
+
 ## Checkpoint — 2026-09-09 — Universal MCP post-ingest reconciliation documentation
 
 Canonical documentation was reconciled under the Constitution's new universal
@@ -70,6 +120,50 @@ performed.
 `ODO36_HTTP_RUNTIME_VERIFY=BLOCKED_NO_PUBLIC_IDENTITY`
 `BACKFILL_OPERATOR_PATH=NOT_EXPOSED`
 `READY_FOR_DEPLOY=NO`
+
+# Checkpoint — 2026-09-09 — Collector-centric projection and coverage closure
+
+ROOT GAP: the Classification branch had no first-class collector projection;
+Article research could inherit global Knowledge/Media/Video candidates; admin
+coverage did not expose collector facet gaps; and the approved candidate seed
+batch had no resolve-first read model.
+
+WHAT CHANGED: added branch-scoped Collector Profile query with deterministic
+facet ownership, duplicate elimination, evidence status and pagination;
+admin-only REST projection and frontend wiring; collector-first Vietnamese
+Classification sections with late maker/brand context; branch filtering in the
+Article research inventory; explicit unknown inventory filter handling;
+read-only collector coverage/facet matrix; and a resolve/reconcile report for
+the approved candidate stable keys.
+
+CANONICAL EFFECT: no canonical schema, semantic writer or parallel collector
+store was introduced. Authority remains identity owner, Knowledge remains
+atomic claims, Source/Evidence remain provenance, Graph remains the relation
+system, Media/Video retain distinct boundaries and WordPress posts remain
+editorial truth. Candidate NO_MATCH results do not create empty nodes.
+
+TESTS: focused Collector/API/frontend/preflight/inventory/coverage/identity/
+Governance suites are green. PHP lint is green for changed PHP files. The
+baseline Unit suite still has the known unrelated Capture bootstrap failure
+when the test is loaded without its missing CaptureRepository dependency; the
+existing full integration environment remains separately runtime-gated.
+
+RUNTIME READ-BACK: no target WordPress/database read-back, candidate evidence
+attachment, semantic apply, public identity allocation or article creation was
+run. The code path is read-only for this checkpoint; no V2, staging or
+production data was touched.
+
+UNRESOLVED: actual candidate creation requires runtime resolve with evidence-
+backed immediate consumers and governed create/read-back; the foundational
+collector article remains blocked until a resolved subject, isolated
+inventory, category/media readiness and authorized native draft runtime are
+available. No global reprojection is permitted.
+
+NEXT EXACT OPERATION: run the guarded target-runtime resolve/reconcile and
+coverage read-back; only for NO_MATCH candidates with existing Evidence-backed
+Knowledge, submit the governed Authority proposal and verify canonical
+read-back/idempotency. Then perform human-reviewed native WordPress draft
+planning; do not publish automatically.
 
 # Checkpoint — 2026-09-09 — Collector Profile branch retrieval
 

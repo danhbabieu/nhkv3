@@ -82,6 +82,39 @@ reconciliation where applicable and final verification. Ingest success,
 proposal creation, preview, partial success, pending review or attachment
 creation alone is never `COMPLETE`.
 
+### Editorial Capture and Semantic Enrichment
+
+`nhk.capture.ingest` is the shared editorial boundary for one user submission.
+It persists one Capture identity and idempotency key, stores the raw editorial
+intent and subject hints, accepts text-only or multipart image input, creates
+one native WordPress draft, adopts each verified attachment into canonical
+Media, interprets text into scoped candidates, resolves Authority subjects,
+retrieves bounded Claims through the Graph neighborhood, composes the draft,
+reconciles `MediaUsage`, runs the publication gate and performs final native
+read-back. Replays resume the same Capture and must not create a second Post or
+re-upload an already completed physical phase.
+
+The Capture tool is capability-gated by `nhk_ingest_articles`; its optional
+`files[]` are native multipart parts and never base64, paths or JSON bytes.
+The text-only path is valid and still runs interpretation, subject resolution,
+Claim retrieval and publication checks. User statements and image observations
+remain scoped input/candidate provenance; they do not become universal Claims,
+Evidence or Graph edges implicitly. Semantic write-back currently returns a
+Governance review packet (`SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE`) rather
+than silently applying new semantic records, so the capture can reach
+`READY_FOR_PUBLICATION`/`REVIEW_REQUIRED` but cannot claim publication without
+an explicit eligible owner publication operation and read-back.
+
+Text-only example:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"nhk.capture.ingest","arguments":{"idempotency_key":"capture-2026-09-09-001","text":"Một ghi chú về chiếc đồng hồ.","subject_hints":["Ô Đô 36/10"]}}}
+```
+
+For images, send the same tool call as multipart with top-level `files[]` and
+keep binary parts out of `arguments`; optional per-file metadata belongs in
+`items[]`. A replay uses the same idempotency key and unchanged payload.
+
 ### Documentation bootstrap surface
 
 The normal read-only MCP catalog exposes `nhk.docs.bootstrap` and
@@ -145,13 +178,11 @@ required stage is pending, unavailable, ambiguous or only proposed.
 
 ## 2. Tool catalog thực tế
 
-`McpToolCatalog::tools()` exposes the exact current registered tool list. In
-this 2026-09-03 workspace it contains 36 tools. `kind=mutation` implies
-`governed=true`. The coordinated Article tools occupy positions 3–4; the
-catalog's final position is `nhk.proposal.apply`. The clean HEAD
-catalog and the wire smoke both use this
-same ordered list; the local HTTP wire smoke remains an environment check and
-must not be replaced by a static catalog assertion.
+`McpToolCatalog::tools()` exposes the exact current registered tool list.
+`kind=mutation` implies `governed=true`; the current list includes the
+capability-gated `nhk.capture.ingest` boundary. The executable catalog and
+fresh wire discovery, not a dated tool count, are the authority for current
+availability; local HTTP wire smoke remains an environment check.
 
 | TOOL | DOMAIN | READ/WRITE | GOVERNED | REVISION | GRAPH | STATUS |
 |---|---|---|---|---|---|---|
@@ -159,6 +190,7 @@ must not be replaced by a static catalog assertion.
 | `nhk.semantic.resolve` | Authority context | READ | No | N/A | No raw edge | READY; ambiguity fails closed |
 | `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
+| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + native draft token | Bounded neighborhood read; relation writes remain governed | CODE-SIDE READY; semantic apply and live multipart/read-back remain runtime-gated |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Local implementation + focused proof; real-file runtime byte/rollback proof required |
@@ -197,6 +229,7 @@ preflight is read-gated.
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
 | Read/create relation | Governed `relation_create`; raw Graph inventory and relation dry-run are read-only MCP tools; relation creation remains governed | PARTIAL / IMPLEMENTATION_GAP |
 | Create/update/publish Post | typed Article draft create/update plus gated publish/trash/restore boundary; exact live catalog/runtime still requires discovery/read-back | PARTIAL / RUNTIME-GATED |
+| Capture editorial text/images into one draft | `nhk.capture.ingest` | CODE-SIDE READY; Governance review and target runtime read-back remain required |
 | Upload/find Media | governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
 | Attach MediaUsage | nested in Media ingest only | PARTIAL |
 | Product / Specimen | registered Authority types via generic paths | PARTIAL |
@@ -331,15 +364,13 @@ classification, a maximum of two hops, direction-aware traversal, path
 explainability, deduplication and public eligibility/readiness before
 serialization.
 
-The current MCP surface has no related/Graph read tool. Raw Graph REST remains
-administrator-only, and the WordPress read Abilities mirror the existing
-catalog rather than adding related navigation. This is an
-`IMPLEMENTATION_GAP`/`P1` query-exposure gap, not permission to expose raw edges
-or to add a new MCP tool in this documentation task. A future MCP read review
-must delegate to the shared application query contract, return reader-safe
-paths and preserve the existing capability, identity and fail-closed rules.
-No taxonomy, post meta, hard-coded ID or generic WordPress read may substitute
-for the governed Graph query.
+`nhk.entity.neighborhood` now exposes the shared bounded query for registered
+profiles. Raw Graph REST remains administrator-only, and the Capture boundary
+delegates to the same application query contract rather than exposing raw
+edges. The query returns reader-safe paths, deduplicated targets and a maximum
+of two hops; unsupported profiles/bounds fail closed. No taxonomy, post meta,
+hard-coded ID or generic WordPress read may substitute for the governed Graph
+query.
 
 ## 8. Media workflow
 

@@ -13,6 +13,8 @@ final class McpCapabilityManifestTest extends TestCase
         $manifest = McpCapabilityManifest::all();
 
         self::assertArrayHasKey('article', $manifest);
+        self::assertContains('nhk.capture.ingest', $manifest['editorial_capture']['writes']);
+        self::assertTrue($manifest['editorial_capture']['media_support']);
         self::assertContains('nhk.article.preflight', $manifest['article']['reads']);
         self::assertContains('nhk.article.ingest', $manifest['article']['writes']);
         self::assertTrue($manifest['article']['seo_preflight']);

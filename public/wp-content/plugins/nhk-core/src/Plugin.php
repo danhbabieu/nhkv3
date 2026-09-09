@@ -19,12 +19,15 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
+use NHK\Core\Infrastructure\Migration\EditorialCaptureMigration017;
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport};
 use NHK\Core\Application\Media\MediaBatchUploadService;
+use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\AdminWorkbenchReadApi;
@@ -73,13 +76,14 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Governance\CanonicalApplyReadBackVerifier;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
+use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
 
 final class Plugin {
     private const REWRITE_VERSION = '10';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', ClaimProjectionMigration016::VERSION, false);
+        update_option('nhk_core_migration_target', EditorialCaptureMigration017::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
@@ -314,6 +318,8 @@ final class Plugin {
                 },
                 static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $usages, $videos, $graphService, $predicates): array {
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
+                    $subjects = is_array($input['subject_resolution']['subjects'] ?? null) ? $input['subject_resolution']['subjects'] : ($primary !== [] ? [$primary] : []);
+                    $subjectIds = array_values(array_unique(array_filter(array_map(static fn (mixed $subject): string => is_array($subject) ? trim((string) ($subject['id'] ?? '')) : '', $subjects))));
                     $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
                     $articlePostId = (int) ($input['article_context']['post_id'] ?? 0);
                     $currentCategories = $articlePostId > 0 && function_exists('get_the_category')
@@ -337,7 +343,11 @@ final class Plugin {
                     $knowledgeRows = [];
                     $sourceRows = [];
                     $evidenceRows = [];
-                    foreach (array_slice($claims->list(), 0, 50) as $claim) {
+                    foreach ($claims->list() as $claim) {
+                        $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+                        $claimSubjectId = trim((string) ($claimMetadata['subject_id'] ?? ''));
+                        if ($subjectIds !== [] && !in_array($claimSubjectId, $subjectIds, true)) continue;
+                        if ($subjectIds !== [] && $claimSubjectId === '') continue;
                         $claimEvidence = array_slice($evidence->listByClaim($claim->canonicalId), 0, 20);
                         $evidenceForClaim = [];
                         foreach ($claimEvidence as $item) {
@@ -347,25 +357,43 @@ final class Plugin {
                             if ($source !== null && count($sourceRows) < 50) $sourceRows[$source->canonicalId] = ['id' => $source->canonicalId, 'title' => $source->title, 'locator' => $source->locator, 'public' => $source->isPublic(), 'active' => $source->active];
                         }
                         $support = array_values(array_filter($evidenceForClaim, static fn (array $item): bool => $item['relation'] === 'supports' && $item['active'] === true));
-                        $knowledgeRows[] = ['id' => $claim->canonicalId, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'active' => $claim->active, 'public' => $claim->isPublic(), 'evidence' => $evidenceForClaim, 'evidence_status' => $support === [] ? ($claimEvidence === [] ? 'NO_EVIDENCE' : 'INSUFFICIENT_EVIDENCE') : 'SUPPORTED_WITHIN_SCOPE'];
+                        $knowledgeRows[] = ['id' => $claim->canonicalId, 'subject_id' => $claimSubjectId, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'active' => $claim->active, 'public' => $claim->isPublic(), 'evidence' => $evidenceForClaim, 'evidence_status' => $support === [] ? ($claimEvidence === [] ? 'NO_EVIDENCE' : 'INSUFFICIENT_EVIDENCE') : 'SUPPORTED_WITHIN_SCOPE'];
                     }
-                    $mediaRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'ready' => $item->readiness === 'ready', 'public' => $item->active], $media->list());
-                    $videoRows = array_map(static fn ($item): array => ['id' => $item->canonicalId, 'public' => $item->active && $item->hasValidPublicReference()], $videos->list());
+                    $mediaRows = [];
+                    foreach ($subjectIds as $subjectId) {
+                        foreach ($usages->listByEndpoint('classification', $subjectId) as $usage) {
+                            $mediaItem = $media->findByCanonicalId($usage->mediaId);
+                            if ($mediaItem === null) continue;
+                            $mediaRows[$mediaItem->canonicalId] = ['id' => $mediaItem->canonicalId, 'subject_ids' => [$subjectId], 'ready' => $mediaItem->readiness === 'ready', 'public' => $mediaItem->active];
+                        }
+                    }
+                    $videoRows = [];
+                    $branchVideoIds = [];
                     $relations = [];
-                    $subjects = is_array($input['subject_resolution']['subjects'] ?? null) ? $input['subject_resolution']['subjects'] : ($primary !== [] ? [$primary] : []);
                     if ($subjects !== []) {
                         try {
                             $query = new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy($predicates));
                             foreach ($subjects as $subject) {
                                 $ref = new \NHK\Core\Domain\Graph\NodeReference((string) $subject['type'], (string) $subject['id']);
                                 $related = $query->query($ref, [], 2, 50);
-                                foreach ($related['items'] as $item) $relations[$item['target_entity_type'].':'.$item['target_entity_id']] = ['class' => $item['relationship_class'], 'predicate' => $item['best_path'][array_key_last($item['best_path'])]['predicate'] ?? '', 'target_id' => $item['target_entity_id'], 'target_type' => $item['target_entity_type'], 'path' => $item['best_path'], 'reason' => 'registered Graph traversal'];
+                                foreach ($related['items'] as $item) {
+                                    $targetType = (string) ($item['target_entity_type'] ?? '');
+                                    $targetId = (string) ($item['target_entity_id'] ?? '');
+                                    $relations[$targetType . ':' . $targetId] = ['class' => $item['relationship_class'], 'predicate' => $item['best_path'][array_key_last($item['best_path'])]['predicate'] ?? '', 'target_id' => $targetId, 'target_type' => $targetType, 'path' => $item['best_path'], 'reason' => 'registered Graph traversal'];
+                                    if ($targetType === 'video' && $targetId !== '') $branchVideoIds[$targetId][] = $subject['id'];
+                                }
                                 foreach ($graphService->findIncoming($ref, null, 0, 50)['items'] as $edge) { $postRef = $edge->source->reference; if ($postRef->endpoint_type !== 'wp_post') continue; foreach ($posts as &$post) if ($post['id'] === substr($postRef->endpoint_key, strpos($postRef->endpoint_key, ':') + 1)) $post['subject_ids'][] = $subject['id']; unset($post); }
                             }
                             $relations = array_values($relations);
+                            foreach ($branchVideoIds as $videoId => $videoSubjectIds) {
+                                $video = $videos->findByCanonicalId((string) $videoId);
+                                if ($video === null) continue;
+                                $videoRows[(string) $videoId] = ['id' => $video->canonicalId, 'subject_ids' => array_values(array_unique($videoSubjectIds)), 'public' => $video->active && $video->hasValidPublicReference()];
+                            }
+                            $posts = array_values(array_filter($posts, static fn (array $post): bool => array_intersect($post['subject_ids'], $subjectIds) !== []));
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
-                    return ['status' => 'available', 'posts' => $posts, 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => $knowledgeRows, 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => $mediaRows, 'videos' => $videoRows, 'relations' => $relations];
+                    return ['status' => 'available', 'posts' => $posts, 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => array_values($knowledgeRows), 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => array_values($mediaRows), 'videos' => array_values($videoRows), 'relations' => $relations];
                 },
                 [$articlePublicEligibility, 'evaluate'],
             );
@@ -391,13 +419,102 @@ final class Plugin {
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
             $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'));
             $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
+            $captureRepository = new WpdbCaptureRepository($wpdb);
+            $captureSubjectResolver = new SubjectResolutionService(static function (string $hint) use ($authority, $types): array {
+                $needle = function_exists('mb_strtolower') ? mb_strtolower(trim($hint)) : strtolower(trim($hint));
+                if ($needle === '') return [];
+                $matches = [];
+                foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) {
+                    $names = [$entity->canonicalName, $entity->stableKey];
+                    foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) $names[] = (string) $alias;
+                    foreach ($names as $name) {
+                        $normalized = function_exists('mb_strtolower') ? mb_strtolower(trim((string) $name)) : strtolower(trim((string) $name));
+                        if ($normalized !== '' && $normalized === $needle) {
+                            $matches[$entity->canonicalId] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'revision' => $entity->revision];
+                            break;
+                        }
+                    }
+                }
+                return array_values($matches);
+            });
+            $captureNeighborhood = $mcpNeighborhood;
+            $captureClaims = new ClaimRetrievalEngine(
+                static function (array $subject) use ($captureNeighborhood): array {
+                    $type = (string) ($subject['type'] ?? '');
+                    $profile = in_array($type, ['brand', 'model', 'variant', 'classification', 'specimen'], true) ? $type : 'variant';
+                    return $captureNeighborhood->query(new \NHK\Core\Domain\Graph\NodeReference($type, (string) ($subject['id'] ?? '')), $profile, 2, 50);
+                },
+                static function (array $subject, array $neighborhood) use ($claims, $evidence): array {
+                    $allowed = [(string) ($subject['id'] ?? '')];
+                    foreach ((array) ($neighborhood['items'] ?? []) as $item) if (is_array($item) && isset($item['target_entity_id'])) $allowed[] = (string) $item['target_entity_id'];
+                    $rows = [];
+                    foreach ($claims->list() as $claim) {
+                        $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+                        $claimSubject = (string) ($metadata['subject_id'] ?? $claim->provenance['subject_id'] ?? '');
+                        if ($claimSubject === '' || !in_array($claimSubject, $allowed, true)) continue;
+                        $support = false;
+                        foreach ($evidence->listByClaim($claim->canonicalId) as $citation) if ($citation->active && $citation->relation === 'supports') { $support = true; break; }
+                        $rows[] = ['id' => $claim->canonicalId, 'revision' => $claim->revision, 'text' => $claim->claimText, 'subject_id' => $claimSubject, 'scope' => (string) ($metadata['scope'] ?? $claim->claimType), 'provenance' => (string) ($metadata['provenance'] ?? 'CATALOG_SUPPORTED'), 'evidence_status' => $support ? 'SUPPORTED_WITHIN_SCOPE' : 'INSUFFICIENT_EVIDENCE', 'relevance' => $claimSubject === (string) ($subject['id'] ?? '') ? 1.0 : 0.7];
+                    }
+                    return $rows;
+                },
+            );
+            $capture = new EditorialCaptureCoordinator(
+                $captureRepository,
+                static function (array $input) use ($mediaBatchUpload): array {
+                    return $mediaBatchUpload->upload(
+                        (string) ($input['idempotency_key'] ?? '') . ':assets',
+                        is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                        is_array($input['files'] ?? null) ? $input['files'] : [],
+                        is_array($input['items'] ?? null) ? $input['items'] : [],
+                    );
+                },
+                static function (array $input) use ($draftGateway): array { return $draftGateway->create($input); },
+                new TextInputInterpreter(),
+                $captureSubjectResolver,
+                $captureClaims,
+                static function (array $context) use ($mcpGovernance): array {
+                    $interpretation = is_array($context['interpretation'] ?? null) ? $context['interpretation'] : [];
+                    $candidates = [];
+                    foreach ((array) ($interpretation['user_claim_candidates'] ?? []) as $candidate) if (is_array($candidate)) $candidates[] = ['kind' => 'claim_candidate', 'text' => (string) ($candidate['text'] ?? ''), 'provenance' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE'), 'scope' => (string) ($candidate['scope'] ?? 'capture')];
+                    return ['status' => 'REVIEW_REQUIRED', 'writes' => $candidates, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
+                },
+                new ArticleComposer(),
+                static function (array $context) use ($articleMedia): array {
+                    $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
+                    $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
+                    $selected = [];
+                    if (isset($mediaIds[0])) $selected['featured_primary'] = $mediaIds[0];
+                    if (isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[1];
+                    return $articleMedia->ensureForPost((int) ($context['article_id'] ?? 0), ['capture_id' => (string) (($context['capture']['capture_id'] ?? ''))], $selected, array_slice($mediaIds, 2))->toArray();
+                },
+                static function (array $context) use ($draftGateway): array {
+                    $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), ['semantic' => $context['semantic'] ?? [], 'media' => $context['media'] ?? []], (string) ($context['capture']['capture_id'] ?? '') . ':review');
+                    $blockers = (array) ($review['blockers'] ?? $review['diagnostics'] ?? []);
+                    return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review];
+                },
+                static function (array $context) use ($articleEditorial): array {
+                    $post = $articleEditorial->read((int) ($context['article_id'] ?? 0));
+                    return $post === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'post' => $post->snapshot()];
+                },
+                static function (array $context) use ($draftGateway): array {
+                    return $draftGateway->update((int) ($context['article_id'] ?? 0), (array) ($context['fields'] ?? []), (string) ($context['expected_state_token'] ?? ''));
+                },
+                static function (array $context) use ($attachmentBridge): array {
+                    $mediaId = $attachmentBridge->adoptAttachment((int) ($context['attachment_id'] ?? 0));
+                    return $mediaId === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'media_id' => $mediaId];
+                },
+                static function (array $context) use ($draftGateway): array {
+                    return $draftGateway->publish((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), (array) ($context['evidence'] ?? []), (string) ($context['idempotency_key'] ?? ''));
+                },
+            );
             $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository($wpdb)))->service();
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, null, $capture)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
@@ -476,12 +593,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < PublicIdentityMigration014::VERSION || !PublicIdentityMigration014::schemaReady($wpdb)) (new PublicIdentityMigration014())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ClaimProjectionMigration016::VERSION || !ClaimProjectionMigration016::schemaReady($wpdb)) (new ClaimProjectionMigration016())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureMigration017::VERSION || !EditorialCaptureMigration017::schemaReady($wpdb)) (new EditorialCaptureMigration017())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', ClaimProjectionMigration016::VERSION, '', false);
+        add_option('nhk_core_migration_target', EditorialCaptureMigration017::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

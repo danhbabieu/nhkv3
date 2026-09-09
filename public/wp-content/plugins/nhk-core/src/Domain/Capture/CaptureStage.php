@@ -1,0 +1,19 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Domain\Capture;
+
+enum CaptureStage: string
+{
+    case RECEIVED = 'RECEIVED';
+    case ASSETS_STORED = 'ASSETS_STORED';
+    case DRAFT_CREATED = 'DRAFT_CREATED';
+    case MEDIA_ADOPTED = 'MEDIA_ADOPTED';
+    case INTERPRETED = 'INTERPRETED';
+    case SUBJECTS_RESOLVED = 'SUBJECTS_RESOLVED';
+    case KNOWLEDGE_RETRIEVED = 'KNOWLEDGE_RETRIEVED';
+    case SEMANTICS_RECONCILED = 'SEMANTICS_RECONCILED';
+    case COMPOSED = 'COMPOSED';
+    case READY_FOR_PUBLICATION = 'READY_FOR_PUBLICATION';
+    case PUBLISHED = 'PUBLISHED';
+}

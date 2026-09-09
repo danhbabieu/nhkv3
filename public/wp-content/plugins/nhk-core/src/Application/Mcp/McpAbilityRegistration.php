@@ -20,6 +20,7 @@ final class McpAbilityRegistration
         if (!is_array($enabled) || $enabled === []) return [];
         if (!in_array('nhk-v3/media-ingest', $enabled, true)) $enabled[] = 'nhk-v3/media-ingest';
         if (!in_array('nhk-v3/media-upload-batch', $enabled, true)) $enabled[] = 'nhk-v3/media-upload-batch';
+        if (!in_array('nhk-v3/capture-ingest', $enabled, true)) $enabled[] = 'nhk-v3/capture-ingest';
         if (!in_array('nhk-v3/docs-bootstrap', $enabled, true)) $enabled[] = 'nhk-v3/docs-bootstrap';
         if (!in_array('nhk-v3/docs-get', $enabled, true)) $enabled[] = 'nhk-v3/docs-get';
         return array_values($enabled);
@@ -147,6 +148,7 @@ final class McpAbilityRegistration
     private const GOVERNED_TOOL_MAP = [
         'nhk.public-url.reproject' => 'nhk-v3/public-url-reproject',
         'nhk.article.ingest' => 'nhk-v3/article-ingest',
+        'nhk.capture.ingest' => 'nhk-v3/capture-ingest',
         'nhk.category.create' => 'nhk-v3/category-create',
         'nhk.category.update' => 'nhk-v3/category-update',
         'nhk.category.assign' => 'nhk-v3/category-assign',
@@ -319,7 +321,7 @@ final class McpAbilityRegistration
     {
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
         $request->set_header('Content-Type', 'application/json');
-        if ($tool === 'nhk.media.upload-batch' && isset($_FILES) && is_array($_FILES)) {
+        if (in_array($tool, ['nhk.media.upload-batch', 'nhk.capture.ingest'], true) && isset($_FILES) && is_array($_FILES)) {
             // Preserve connector multipart parts while delegating to the
             // canonical custom transport; bytes never enter Ability JSON.
             $request->set_file_params($_FILES);
@@ -349,7 +351,7 @@ final class McpAbilityRegistration
     private static function canGoverned(string $tool): bool
     {
         $capability = match ($tool) {
-            'nhk.article.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
+            'nhk.article.ingest', 'nhk.capture.ingest', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
             'nhk.proposal.approve', 'nhk.proposal.reject' => 'nhk_approve_proposals',
             'nhk.proposal.eligibility' => 'nhk_view_governance',
@@ -420,6 +422,7 @@ final class McpAbilityRegistration
             'nhk.category.resolve' => 'NHK Category Search / Get',
             'nhk.media.attachment.get' => 'NHK Media Read-back',
             'nhk.article.ingest' => 'NHK Article Ingest / Create Draft',
+            'nhk.capture.ingest' => 'NHK Editorial Capture / Semantic Enrichment',
             'nhk.category.create' => 'NHK Category Create',
             'nhk.category.update' => 'NHK Category Update',
             'nhk.category.assign' => 'NHK Category Assign',

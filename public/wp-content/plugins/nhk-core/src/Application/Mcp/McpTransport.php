@@ -10,6 +10,7 @@ use NHK\Core\Application\Media\MediaBatchUploadService;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
+use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
@@ -33,6 +34,7 @@ final class McpTransport
         private ?PublicUrlMaintenanceService $publicUrls = null,
         private ?MediaBatchUploadService $mediaBatchUpload = null,
         private ?McpDocumentationRegistry $documentation = null,
+        private ?EditorialCaptureCoordinator $capture = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -92,7 +94,7 @@ final class McpTransport
     {
         $name = (string) ($params['name'] ?? '');
         $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
-        if (in_array($name, ['nhk.media.ingest', 'nhk.media.upload-batch'], true)) $arguments = $this->fileArgumentMetadata($arguments, $files);
+        if (in_array($name, ['nhk.media.ingest', 'nhk.media.upload-batch', 'nhk.capture.ingest'], true)) $arguments = $this->fileArgumentMetadata($arguments, $files);
         $definition = null;
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
@@ -100,6 +102,7 @@ final class McpTransport
             'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
             'nhk.article.preflight' => 'read',
             'nhk.article.ingest' => 'nhk_ingest_articles',
+            'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
@@ -131,6 +134,7 @@ final class McpTransport
             'nhk.entity.neighborhood' => $this->read->entityNeighborhood((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? ''), (string) ($arguments['profile'] ?? ''), (int) ($arguments['max_hops'] ?? 2), (int) ($arguments['limit'] ?? 50)),
             'nhk.article.preflight' => $this->article?->preflight($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
             'nhk.article.ingest' => $this->article?->ingest($arguments) ?? throw new \RuntimeException('ARTICLE_INGEST_HANDLER_UNAVAILABLE'),
+            'nhk.capture.ingest' => $this->captureIngest($arguments, $files),
             'nhk.category.resolve' => $this->categories?->resolve((array) ($arguments['selector'] ?? [])) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
             'nhk.category.create' => $this->categories?->create((string) ($arguments['name'] ?? ''), (string) ($arguments['slug'] ?? ''), (int) ($arguments['parent'] ?? 0)) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
             'nhk.category.update' => $this->categories?->update((int) ($arguments['id'] ?? 0), (array) ($arguments['changes'] ?? []), isset($arguments['expected_fingerprint']) ? (string) $arguments['expected_fingerprint'] : null) ?? throw new \RuntimeException('CATEGORY_GATEWAY_UNAVAILABLE'),
@@ -178,6 +182,14 @@ final class McpTransport
             $files,
             is_array($arguments['items'] ?? null) ? $arguments['items'] : [],
         );
+    }
+
+    private function captureIngest(array $arguments, array $files): array
+    {
+        if ($this->capture === null) throw new \RuntimeException('EDITORIAL_CAPTURE_UNAVAILABLE');
+        unset($arguments['files']);
+        if ($files !== []) $arguments['files'] = $files;
+        return $this->capture->execute($arguments)->toArray();
     }
 
     private function validateArguments(array $schema, array $arguments): void

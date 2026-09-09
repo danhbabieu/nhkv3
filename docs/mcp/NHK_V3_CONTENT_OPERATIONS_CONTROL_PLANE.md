@@ -30,6 +30,36 @@ reconciliation, representative-media reconciliation where applicable and final
 verification. Attachment-only transport, preview, partial, pending or
 unavailable outcomes are intermediate and cannot be reported as complete.
 
+### Editorial Capture boundary — 2026-09-09
+
+`nhk.capture.ingest` is the single-submission coordinator for editorial text
+and optional images. One idempotency key maps to one durable Capture and one
+native WordPress draft. The resumable phases are:
+
+```text
+Capture received → physical attachments stored/read back → draft created
+→ Media adopted → text interpreted → subjects resolved
+→ bounded Claims retrieved → semantic write-back review packet
+→ Article composed/updated → MediaUsage reconciled
+→ publication gate → final native read-back
+```
+
+Text-only input is valid. Multipart files remain binary transport data and are
+never put into JSON, Knowledge, Evidence or Graph storage. The Capture stores
+editorial intent, observations, candidate provenance and phase receipts; the
+WordPress Post remains the only owner of article title/body/excerpt. A replay
+with the same payload resumes the Capture; a changed payload returns an
+idempotency conflict. Ambiguous subject resolution, unavailable semantic
+Governance, incomplete MediaUsage or missing publication evidence remain
+machine-readable review/blocker states.
+
+The current code-side semantic write-back phase creates a bounded review
+packet and does not silently apply candidate Claims or relations. Canonical
+semantic mutation still requires the existing Governance lifecycle. The
+coordinator therefore reports `READY_FOR_PUBLICATION` or `REVIEW_REQUIRED`
+until an eligible owner publication operation returns a verified native
+published read-back.
+
 The Governance Automation Policy is resolved in the shared application
 orchestration boundary used by MCP and Admin. Its only modes are
 `REVIEW_REQUIRED`, `AUTO_APPROVE` and `AUTO_PUBLISH`; absent configuration is
@@ -41,6 +71,7 @@ never reported as frontend publication success.
 | Content kind | Owner | Current boundary | Mutation policy |
 |---|---|---|---|
 | Post/Article | WordPress `wp_posts` | Article Ingest + editorial boundary | Post writes are editorial; semantic changes use Governance |
+| Editorial Capture | Capture repository + WordPress draft + downstream owners | `nhk.capture.ingest` coordinator | one Capture/one draft by idempotency; no implicit semantic apply/publication |
 | Category/hub | WordPress taxonomy | typed `CategoryGateway` + native WordPress adapter | deterministic resolve/create, parent validation, fingerprint CAS, guarded delete and read-back |
 | Authority | Authority registry | entity application services | governed revision/lifecycle |
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
@@ -89,6 +120,12 @@ Media read-back. Source/Evidence is reconciled only by a later governed
 semantic workflow, and a durable
 WordPress locator is preferred after canonical read-back without duplicating a
 Source/Evidence record solely to change its locator.
+
+When the input is an editorial submission, `nhk.capture.ingest` owns the
+cross-boundary sequencing around this physical flow. It may call the batch
+uploader as its physical phase, then performs explicit attachment adoption and
+Article/MediaUsage reconciliation. The standalone upload tool remains useful
+for a media-first workflow and never substitutes for Capture completion.
 
 Batch results are per-item rather than all-or-nothing: successful attachments
 remain when another item fails, the batch returns `partial_success`, and failed
@@ -158,6 +195,7 @@ require their own governed proposal and read-back.
 | Area | Status | Classification |
 |---|---|---|
 | Existing Article reconcile preflight | partial | CODE_GAP for full research packet |
+| Editorial Capture coordinator | code-side persisted/resumable boundary with text-only and multipart paths | semantic apply, authenticated multipart and target-runtime read-back remain RUNTIME-GATED |
 | SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
 | Shared capability source | partial catalog | CODE_GAP for manifest consumers |
 | WordPress editorial gateway | draft create/update boundary | runtime-unverified pending exact integration DB | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |

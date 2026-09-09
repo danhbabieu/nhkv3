@@ -55,6 +55,7 @@ final class McpContractTest extends TestCase
             'nhk.entity.neighborhood',
             'nhk.article.preflight',
             'nhk.article.ingest',
+            'nhk.capture.ingest',
             'nhk.category.resolve',
             'nhk.category.create',
             'nhk.category.update',
@@ -319,6 +320,7 @@ final class McpContractTest extends TestCase
         self::assertSame([
             'nhk-v3/public-url-reproject',
             'nhk-v3/article-ingest',
+            'nhk-v3/capture-ingest',
             'nhk-v3/category-create',
             'nhk-v3/category-update',
             'nhk-v3/category-assign',
@@ -394,10 +396,22 @@ final class McpContractTest extends TestCase
         self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
     }
 
+    public function test_editorial_capture_is_governed_and_accepts_text_only_or_multipart_input(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        $tool = $tools['nhk.capture.ingest'];
+        self::assertSame('mutation', $tool['kind']);
+        self::assertTrue($tool['governed']);
+        self::assertSame(['idempotency_key'], $tool['inputSchema']['required']);
+        self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
+        self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
+        self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
+    }
+
     public function test_multipart_batch_upload_is_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }
@@ -405,7 +419,7 @@ final class McpContractTest extends TestCase
     public function test_media_ingest_is_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }
@@ -413,7 +427,7 @@ final class McpContractTest extends TestCase
     public function test_documentation_abilities_are_added_to_the_easy_mcp_enabled_ability_list(): void
     {
         self::assertSame(
-            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
+            ['nhk-v3/video-ingest', 'nhk-v3/media-ingest', 'nhk-v3/media-upload-batch', 'nhk-v3/capture-ingest', 'nhk-v3/docs-bootstrap', 'nhk-v3/docs-get'],
             McpAbilityRegistration::ensureEasyMcpEnabledAbilities(['nhk-v3/video-ingest'])
         );
     }

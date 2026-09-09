@@ -19,6 +19,7 @@ final class McpCapabilityManifest
         foreach (McpToolCatalog::tools() as $tool) $tools[$tool['name']] = $tool;
 
         $definitions = [
+            'editorial_capture' => ['owner' => 'capture_wordpress', 'endpoint_types' => ['wp_post'], 'tools' => ['nhk.capture.ingest'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
             'article' => ['owner' => 'wordpress', 'endpoint_types' => ['wp_post'], 'tools' => ['nhk.article.preflight', 'nhk.article.ingest', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.trash', 'nhk.article.restore'], 'seo_preflight' => true, 'relation_support' => true, 'media_support' => true, 'read_back' => true],
             'category' => ['owner' => 'wordpress_taxonomy', 'endpoint_types' => [], 'tools' => ['nhk.category.resolve', 'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete'], 'seo_preflight' => false, 'relation_support' => false, 'media_support' => false, 'read_back' => true],
             'authority' => ['owner' => 'authority', 'endpoint_types' => ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], 'tools' => ['nhk.entity.get', 'nhk.semantic.resolve'], 'seo_preflight' => false, 'relation_support' => true, 'media_support' => false, 'read_back' => true],
@@ -51,7 +52,7 @@ final class McpCapabilityManifest
                 'writes' => $writes,
                 'governed' => $writes !== [],
                 'expected_revision' => $writes !== [],
-                'idempotency' => in_array($kind, ['article', 'category', 'media', 'video', 'knowledge', 'source', 'evidence', 'public_url'], true),
+                'idempotency' => in_array($kind, ['editorial_capture', 'article', 'category', 'media', 'video', 'knowledge', 'source', 'evidence', 'public_url'], true),
                 'relation_support' => $definition['relation_support'],
                 'media_support' => $definition['media_support'],
                 'seo_preflight' => $definition['seo_preflight'],
