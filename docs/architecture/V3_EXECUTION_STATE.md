@@ -6382,3 +6382,49 @@ or failures. Full Unit remains green at 847 tests / 4,020 assertions;
 fixture lifecycle, current migration expectation, canonical stale-binding
 expectation and MCP contract/authentication assertions. No production,
 staging, V2 or demo database was modified and nothing was pushed.
+
+# Checkpoint — 2026-09-09 — Collector canonical fixture acceptance
+
+ROOT GAP: `CANONICAL_FIXTURE_BLOCKED` prevented live Collector Integration
+acceptance because `nhk_v3_test` had no Classification fixture for the exact
+Cuckoo Clock root.
+
+ROOT CAUSE: The local test database did not contain the approved semantic
+branch fixture. The DEMO root and branch are separate canonical runtime data;
+the handoff ZIP contains no database snapshot and is not a fixture source.
+
+CODE FIX: No Collector production behavior was changed. A minimal guarded
+Integration fixture now creates the exact Classification root, 55 public
+branch Knowledge claims, representative facets, one public supporting
+Evidence chain and one unrelated-branch claim in `nhk_v3_test`. Teardown
+removes only the fixture rows. The MCP Integration harness also resets the
+current WordPress user at bootstrap to prevent authentication state leaking
+between tests.
+
+DB / DEMO EFFECT: Only `nhk_v3_test` was mutated by the test lifecycle. No
+`nhk_v3`, V2, production, staging or DEMO record was written. No Article,
+Media, Video, Brand, candidate Authority or Graph edge was invented locally.
+
+TEST: The focused Collector fixture test passes 1 test / 25 assertions. The
+guarded Full Integration suite passes 120 tests / 1,011 assertions with 4
+canonical skips, 1 warning and 1 deprecation. The fixture verifies exact root
+identity, >50 pagination, deduplication, facet grouping, evidence status,
+unrelated-branch isolation, empty Media/Video readiness and Article preflight
+scope/category/title planning.
+
+RUNTIME READ-BACK: DEMO MCP read-only calls confirm the exact root is ACTIVE at
+revision 1. Graph inventory returns 86 active direct `knowledge → about →
+classification` edges; bounded neighborhood returns 50 items at its hard cap.
+A representative Knowledge read returns supporting public Evidence. A
+Knowledge inventory `subject_uuid` filter returns zero, so Graph relation
+ownership remains the authoritative branch count; this is not interpreted as
+an empty branch.
+
+STATUS: COMPLETE for the Collector local semantic-equivalent acceptance slice;
+the Collector implementation remains read-only and branch-scoped. Article
+creation/publication and Media/Video creation were not requested by this
+runtime-readiness checkpoint and remain intentionally untouched.
+
+NEXT ACTION: Preserve the exact guarded Integration command for reruns:
+
+`NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`

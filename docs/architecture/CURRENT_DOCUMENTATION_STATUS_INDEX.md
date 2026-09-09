@@ -373,6 +373,41 @@ fixture is present. The exact rerun command is:
 
 `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`
 
+### Collector canonical fixture acceptance — 2026-09-09
+
+The exact Collector fixture gap is closed locally without copying the DEMO
+dataset or creating a production/domain seed. The guarded Integration fixture
+creates the requested Classification with the canonical UUID, stable key,
+Vietnamese name, ACTIVE state and revision 1 in `nhk_v3_test` only. It creates
+55 public branch Knowledge claims (>50), representative Collector facets,
+one public supporting Evidence chain, one unrelated-branch claim and no
+Article, Media, Video or Brand fixture. Teardown removes the fixture through
+the exact test database guard.
+
+DEMO read-only MCP verification found the real Classification
+`01a07614-832d-7f27-959c-74eb0cd63f3e` with stable key
+`nhk:classification:clock-type.cuckoo-clock`, `ACTIVE`, revision `1`.
+Graph inventory for the root returned `86` active direct `knowledge → about →
+classification` edges; bounded neighborhood returned `50` items at its
+contractual cap. A representative Knowledge read returned public supporting
+Evidence. The Knowledge inventory subject filter returned zero because these
+claims are relation-owned in Graph; this is not treated as branch emptiness.
+No DEMO record was created, changed, reconciled or retired.
+
+The guarded Collector fixture test passes `1` test / `25` assertions. The full
+Integration suite passes `120` tests / `1,011` assertions with 4 canonical
+skips, 1 warning and 1 deprecation. MCP test isolation resets the current
+WordPress user before route registration so test order cannot leak
+authentication state. Collector runtime acceptance is now GREEN for the
+semantic-equivalent local slice: exact root, >50 pagination, facet grouping,
+deduplication, evidence status, unrelated-branch isolation, empty Media/Video
+readiness and Article preflight scope/category/title planning.
+
+Article creation/publication and Media/Video creation remain intentionally
+out of scope. The local fixture is not DEMO data, and no candidate Authority
+node or Graph edge was invented because the real root and its canonical branch
+already exist.
+
 ### Editorial Capture runtime acceptance — 2026-09-09
 
 Migration 017 was applied and rerun on the exact `nhk_v3_test` runtime. The
