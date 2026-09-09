@@ -159,6 +159,25 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertSame('Tri thức đồng hồ', $result->categoryPlan['category']['name']);
     }
 
+    public function test_graph_branch_claims_without_metadata_subject_are_retained_by_subject_ids(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            static fn (array $context): array => [
+                'status' => 'available', 'posts' => [], 'categories' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'knowledge' => [
+                    ['id' => 'graph-claim', 'subject_id' => '', 'subject_ids' => ['classification-1'], 'evidence_status' => 'NO_EVIDENCE'],
+                    ['id' => 'other-claim', 'subject_id' => 'classification-2', 'evidence_status' => 'NO_EVIDENCE'],
+                ],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Đồng hồ chim cúc cu', ['type' => 'classification']);
+
+        self::assertSame(['graph-claim'], array_column($result->knowledgeInventory['claims'], 'id'));
+    }
+
     public function test_planned_title_is_preserved_in_seo_blueprint(): void
     {
         $service = new ArticleResearchPreflight(

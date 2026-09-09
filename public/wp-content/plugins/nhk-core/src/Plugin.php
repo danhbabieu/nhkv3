@@ -341,6 +341,7 @@ final class Plugin {
                     $authorityRows = [];
                     foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];
                     $branchKnowledge = [];
+                    $branchKnowledgeSubjects = [];
                     if ($subjects !== []) {
                         try {
                             foreach ($subjects as $subject) {
@@ -356,6 +357,7 @@ final class Plugin {
                                         $metadataSubject = trim((string) ($metadata['subject_id'] ?? ''));
                                         if ($subjectIds !== [] && $metadataSubject !== '' && !in_array($metadataSubject, $subjectIds, true)) continue;
                                         $branchKnowledge[$claim->canonicalId] = $claim;
+                                        $branchKnowledgeSubjects[$claim->canonicalId][] = (string) $subject['id'];
                                     }
                                     $next = $page['next_cursor'] ?? null;
                                     if ($next === null) break;
@@ -379,6 +381,7 @@ final class Plugin {
                     foreach ($knowledgeClaims as $claim) {
                         $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
                         $claimSubjectId = trim((string) ($claimMetadata['subject_id'] ?? ''));
+                        $claimSubjectIds = array_values(array_unique(array_filter(array_map('strval', (array) ($branchKnowledgeSubjects[$claim->canonicalId] ?? [])))));
                         $claimEvidence = array_slice($evidence->listByClaim($claim->canonicalId), 0, 20);
                         $evidenceForClaim = [];
                         foreach ($claimEvidence as $item) {
@@ -388,7 +391,7 @@ final class Plugin {
                             if ($source !== null && count($sourceRows) < 50) $sourceRows[$source->canonicalId] = ['id' => $source->canonicalId, 'title' => $source->title, 'locator' => $source->locator, 'public' => $source->isPublic(), 'active' => $source->active];
                         }
                         $support = array_values(array_filter($evidenceForClaim, static fn (array $item): bool => $item['relation'] === 'supports' && $item['active'] === true));
-                        $knowledgeRows[] = ['id' => $claim->canonicalId, 'subject_id' => $claimSubjectId, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'active' => $claim->active, 'public' => $claim->isPublic(), 'evidence' => $evidenceForClaim, 'evidence_status' => $support === [] ? ($claimEvidence === [] ? 'NO_EVIDENCE' : 'INSUFFICIENT_EVIDENCE') : 'SUPPORTED_WITHIN_SCOPE'];
+                        $knowledgeRows[] = ['id' => $claim->canonicalId, 'subject_id' => $claimSubjectId !== '' ? $claimSubjectId : ($claimSubjectIds[0] ?? ''), 'subject_ids' => $claimSubjectIds, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'active' => $claim->active, 'public' => $claim->isPublic(), 'evidence' => $evidenceForClaim, 'evidence_status' => $support === [] ? ($claimEvidence === [] ? 'NO_EVIDENCE' : 'INSUFFICIENT_EVIDENCE') : 'SUPPORTED_WITHIN_SCOPE'];
                     }
                     $mediaRows = [];
                     foreach ($subjectIds as $subjectId) {
