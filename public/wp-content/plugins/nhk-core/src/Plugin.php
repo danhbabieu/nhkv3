@@ -340,14 +340,45 @@ final class Plugin {
                     }
                     $authorityRows = [];
                     foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];
+                    $branchKnowledge = [];
+                    if ($subjects !== []) {
+                        try {
+                            foreach ($subjects as $subject) {
+                                $reference = new \NHK\Core\Domain\Graph\NodeReference((string) $subject['type'], (string) $subject['id']);
+                                $after = 0;
+                                do {
+                                    $page = $graphService->findIncoming($reference, 'about', $after, 200, false, 'knowledge');
+                                    foreach ((array) ($page['items'] ?? []) as $edge) {
+                                        if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive()) continue;
+                                        $claim = $claims->findByCanonicalId($edge->source->reference->endpoint_key);
+                                        if ($claim === null) continue;
+                                        $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+                                        $metadataSubject = trim((string) ($metadata['subject_id'] ?? ''));
+                                        if ($subjectIds !== [] && $metadataSubject !== '' && !in_array($metadataSubject, $subjectIds, true)) continue;
+                                        $branchKnowledge[$claim->canonicalId] = $claim;
+                                    }
+                                    $next = $page['next_cursor'] ?? null;
+                                    if ($next === null) break;
+                                    if (!is_int($next) || $next <= $after) return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE'];
+                                    $after = $next;
+                                } while (true);
+                            }
+                        } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
+                    }
                     $knowledgeRows = [];
                     $sourceRows = [];
                     $evidenceRows = [];
+                    $knowledgeClaims = $branchKnowledge;
                     foreach ($claims->list() as $claim) {
                         $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
                         $claimSubjectId = trim((string) ($claimMetadata['subject_id'] ?? ''));
                         if ($subjectIds !== [] && !in_array($claimSubjectId, $subjectIds, true)) continue;
                         if ($subjectIds !== [] && $claimSubjectId === '') continue;
+                        $knowledgeClaims[$claim->canonicalId] = $claim;
+                    }
+                    foreach ($knowledgeClaims as $claim) {
+                        $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+                        $claimSubjectId = trim((string) ($claimMetadata['subject_id'] ?? ''));
                         $claimEvidence = array_slice($evidence->listByClaim($claim->canonicalId), 0, 20);
                         $evidenceForClaim = [];
                         foreach ($claimEvidence as $item) {
