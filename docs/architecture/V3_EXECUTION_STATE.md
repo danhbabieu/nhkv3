@@ -1,5 +1,48 @@
 # NHK V3 Execution State
 
+## Checkpoint — 2026-09-09 — DEMO post-deploy MCP acceptance
+
+The DEMO checkout was verified at `dc1d2e9ea9356ebcd2fd8b655477b9e4cc5ea4cb`,
+which contains the canonical Capture entry-point commit and the MCP
+documentation projection commit. The generated documentation snapshot was
+rebuilt on DEMO with `composer generate:mcp-docs`; it contains all 28 ACTIVE
+documents plus `manifest.json`, and repeated generation is deterministic.
+
+The DEMO Easy MCP Ability Settings were reconciled through the supported admin
+mechanism. The stored operator surface now contains 24 NHK abilities: the
+documentation bootstrap/get/list abilities, permitted readers and canonical
+Capture. The 26 stale direct/internal NHK writers were removed from the
+enabled option while remaining registered for internal boundaries. The core
+site/user/environment readers remain enabled.
+
+Easy MCP generic discovery was separately constrained through its supported
+tool whitelist. The fresh MCP V3 connector catalog is now 69 tools: NHK
+documentation and Capture are visible; direct NHK writers and generic content
+mutation tools such as post create/update, media upload and publish mutation
+are not exposed. Safe generic read/list/search/count tools remain available.
+
+Runtime read-back passed for documentation bootstrap/get/list, the required
+bootstrap documents, current checkpoint, stale checkpoint
+(`DOCUMENTATION_CHECKPOINT_STALE`) and missing checkpoint
+(`DOCUMENTATION_CHECKPOINT_REQUIRED`). The same runtime version,
+documentation version and manifest hash were returned across the documentation
+surfaces. DEMO health and WordPress bootstrap passed; no PHP-FPM/opcode reload
+was required by the repository deployment procedure. The deployment
+preflight CLI remains unavailable on the host because `shell_exec()` is
+disabled, so that diagnostic is recorded as an environment limitation rather
+than a product failure.
+
+Existing DEMO execution evidence continues to cover text, image, multi-image,
+governance resume and idempotent Capture behavior. Knowledge-only and Video
+paths are catalog/schema-visible and remain governed through the same Capture
+entry point; this post-deploy pass did not create new semantic records.
+
+The append-only Easy MCP option behavior was corrected locally to reconcile
+the NHK portion against the canonical `McpToolCatalog` and
+`SingleEntryPointPolicy` allowlist on plugin bootstrap. The fix is committed
+locally but intentionally not pushed or deployed in this no-push checkpoint;
+the DEMO option was corrected through the supported settings mechanism.
+
 ## Checkpoint — 2026-09-09 — Canonical runtime documentation and Capture gate
 
 The canonical documentation owner remains repository files under `docs/`, with
