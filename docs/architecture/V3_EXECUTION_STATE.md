@@ -6259,6 +6259,43 @@ The Collector continuation first ran the exact guarded Integration command:
 
 `NHK_WP_TEST_DB=nhk_v3_test NHK_WP_TEST_PATH=public vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite 'NHK Integration'`
 
+# Checkpoint — 2026-09-09 — Collector Profile API contract coverage
+
+ROOT GAP: The Collector Profile implementation had Unit/Integration coverage
+but the declared PHPUnit `NHK Contract` suite contained only `.gitkeep`; live
+canonical Cuckoo read-back remains blocked because the requested Classification
+is absent from local `nhk_v3` and `nhk_v3_test`.
+
+WHAT CHANGED: Added a boundary contract test for Collector Profile response
+identity, the complete declared facet-key shape, coverage/pagination
+diagnostics, allowed status vocabulary, branch-scoped related IDs, maker
+placement, unsupported-filter and unavailable fail-closed behavior, and the
+anonymous permission boundary. The smallest production correction materializes
+all declared facet groups and exposes an explicit fail-closed permission
+callback. No semantic data or new storage was added.
+
+CANONICAL EFFECT: None on Authority, Knowledge, Source, Evidence, Graph,
+Article, Media, Video or public identity records. Existing branch-scoped
+projection and Governance boundaries remain unchanged.
+
+TESTS: Contract passes 4 tests / 31 assertions; Unit passes 847 tests / 4,020
+assertions; guarded Integration passes 120 tests / 1,011 assertions with 4
+canonical skips, 1 warning and 1 deprecation. Composer validation, PHP lint,
+`git diff --check` and secret review pass. No repository JS/build surface is
+present.
+
+RUNTIME READ-BACK: The Collector REST route remains registered and fail-closed;
+the exact local root still returns `CLASSIFICATION_NOT_AVAILABLE`. No local
+semantic seed or live admin capability mutation was performed.
+
+UNRESOLVED: Live branch read-back, public identity owner read-back, live
+coverage matrix and foundational Article remain runtime/data-authorized gates.
+
+NEXT EXACT OPERATION: Supply an authorized canonical runtime containing the
+requested Classification and a permitted `manage_options` credential, then
+repeat the read-only Collector REST/profile and admin coverage read-back. Do
+not seed semantic data merely to satisfy the contract suite.
+
 The first sandbox attempt stopped at WordPress database bootstrap with
 `Error establishing a database connection`. Read-only OS/config diagnostics
 found the existing Homebrew MySQL daemon listening on `127.0.0.1:3306`, the

@@ -53,7 +53,7 @@ final class CollectorProfileQuery
         $offset = ($page - 1) * $perPage;
         $pageRecords = array_slice($availableRecords, $offset, $perPage);
         $hasNextPage = ($offset + count($pageRecords)) < count($availableRecords);
-        $facets = [];
+        $facets = array_fill_keys(self::GROUPS, []);
         $unresolved = [];
         foreach ($pageRecords as $record) {
             $facet = (string) ($record['facet'] ?? '');

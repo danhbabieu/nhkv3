@@ -408,6 +408,23 @@ out of scope. The local fixture is not DEMO data, and no candidate Authority
 node or Graph edge was invented because the real root and its canonical branch
 already exist.
 
+### Collector Profile API contract acceptance — 2026-09-09
+
+The previously empty `tests/Contract` suite now contains the read-only
+Collector Profile boundary contract. It covers canonical subject identity, the
+complete facet-key shape including empty groups, coverage and pagination
+diagnostics, the `verified`/`partial`/`unresolved` status vocabulary,
+branch-scoped Article/Media/Video/maker IDs, fail-closed unsupported filters
+and missing Classification behavior, and the permission boundary. The
+contract suite passes 4 tests / 31 assertions. The implementation change only
+materializes the declared facet groups and makes the permission callback
+explicitly fail closed when WordPress capability context is unavailable.
+
+This is a code/API contract PASS. It does not turn the absent canonical Cuckoo
+Classification in local `nhk_v3` / `nhk_v3_test` into a live data PASS. The
+guarded semantic-equivalent fixture and the live runtime blocker remain
+separate evidence classes.
+
 ### Editorial Capture runtime acceptance — 2026-09-09
 
 Migration 017 was applied and rerun on the exact `nhk_v3_test` runtime. The

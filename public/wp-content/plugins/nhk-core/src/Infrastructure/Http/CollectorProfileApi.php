@@ -14,10 +14,15 @@ final class CollectorProfileApi
     {
         register_rest_route('nhk/v1', '/collector-profile/(?P<id>[0-9a-f-]{36})', [
             'methods' => 'GET',
-            'permission_callback' => static fn (): bool => current_user_can('manage_options'),
+            'permission_callback' => [self::class, 'permission'],
             'args' => self::args(),
             'callback' => fn (\WP_REST_Request $request): array|\WP_Error => $this->request($request),
         ]);
+    }
+
+    public static function permission(): bool
+    {
+        return function_exists('current_user_can') && current_user_can('manage_options');
     }
 
     /** @return array<string,array<string,mixed>> */
