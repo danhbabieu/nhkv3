@@ -266,6 +266,23 @@ or editorial publication is part of this discovery checkpoint.
 - any capability whose availability has not been confirmed by current runtime
   discovery/read-back in the target environment.
 
+### Collector Profile implementation checkpoint — 2026-09-09
+
+`Application/Collector/CollectorProfileQuery` is now the read-only branch
+projection seam for a canonical Classification. It resolves one active
+Classification, filters active/public Knowledge by exact
+`provenance.metadata.subject_id`, deduplicates canonical UUIDs, paginates the
+branch after retrieval, preserves evidence counts, and reports page versus
+render-cap truncation separately. Optional related-resource input is accepted
+only when the reader declares `scope=subject` and `branch_scoped=true`; global
+inventory is an explicit unavailable result, never a fallback.
+
+The first focused tests pass for >50 branch claims, duplicate canonical
+records, unrelated-branch exclusion, truthful render caps and global-scope
+rejection. Facet grouping, REST/Ability exposure, Article preflight wiring,
+frontend/Admin integration and live runtime read-back remain open. No
+semantic data, Graph edge, public identity or editorial record was mutated.
+
 A gap is not permission to invent a shortcut.
 
 ## 6. Downstream operating rule

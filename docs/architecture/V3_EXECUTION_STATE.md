@@ -71,6 +71,53 @@ performed.
 `BACKFILL_OPERATOR_PATH=NOT_EXPOSED`
 `READY_FOR_DEPLOY=NO`
 
+# Checkpoint — 2026-09-09 — Collector Profile branch retrieval
+
+Tasks 2–3 of the collector-centric implementation are green. Added
+`Application/Collector/CollectorProfileQuery`, a read-only projection over
+the active/public Knowledge owner for one Classification. It retrieves the
+full branch before page slicing, deduplicates canonical UUIDs, keeps evidence
+counts and scope, emits page/total/has-next diagnostics, and marks an explicit
+render-cap truncation without claiming complete coverage. Related resources
+are accepted only from a reader that declares subject scope; global scope is
+rejected as `BRANCH_FILTER_UNSUPPORTED`.
+
+Focused verification: `CollectorProfileQueryTest` passes 4 tests / 18
+assertions; changed PHP files lint clean and `git diff --check` passes. The
+full Unit suite remains blocked at collection by the pre-existing missing
+`NHK\\Core\\Contracts\\Capture\\CaptureRepository` interface referenced by
+`EditorialCaptureSemanticCoreTest.php`. No semantic data, Graph edge, public
+identity allocation, migration, seed, publication or external push occurred.
+
+ROOT GAP
+Collector facet grouping, API exposure, Article preflight isolation and
+frontend/Admin integration remain open.
+
+WHAT CHANGED
+Added the branch-scoped Collector Profile query and focused TDD coverage;
+updated the current status index.
+
+CANONICAL EFFECT
+Collector retrieval is a bounded read model over existing canonical owners;
+it does not create new semantic fields, types, relations or storage.
+
+TESTS
+4 tests / 18 assertions pass for pagination, deduplication, branch isolation,
+render truncation and global-filter rejection.
+
+RUNTIME READ-BACK
+No live runtime read-back was required or attempted for this read-only code
+slice; WordPress integration remains subject to the existing environment gate.
+
+UNRESOLVED
+Pre-existing Capture interface suite-loader failure and all later collector
+tasks.
+
+NEXT EXACT OPERATION
+Add failing facet-grouping tests and a controlled collector facet registry
+that keeps movement/running, display form, craft/production, style/motif and
+condition/originality scopes distinct.
+
 # Checkpoint — 2026-09-09 — Collector-centric implementation map
 
 The collector-centric pack was read in full and reconciled against the current
