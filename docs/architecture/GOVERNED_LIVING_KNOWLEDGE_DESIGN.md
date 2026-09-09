@@ -1,6 +1,6 @@
 # Governed Living Knowledge Design
 
-**Status:** owner-approved incremental design, updated 2026-09-05.
+**Status:** owner-approved incremental design, updated 2026-09-09.
 
 ## Ownership
 
@@ -161,6 +161,34 @@ related Knowledge nodes when the evidence supports them. Provenance remains
 explicit as `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`,
 `CATALOG_SUPPORTED`, `EXTERNAL_RESEARCH` or `SYSTEM_INFERENCE`; user statements
 and image observations do not become universal facts without matching support.
+
+## Claim discovery and Editorial Capture reuse — 2026-09-09
+
+Graph is a discovery mechanism for related Knowledge, not an authorization
+mechanism for inherited truth. A direct or bounded relation path may make a
+Claim a candidate, but the Claim may be reused in synthesis only after its
+canonical identity/revision, original semantic subject, scope, provenance,
+Evidence state and relevance to the current editorial intent have been checked.
+A reachable Claim with incompatible scope is excluded; missing or insufficient
+provenance/Evidence remains review-only. A specimen-only Claim is never promoted
+to Variant, Model, Brand or another broader subject merely because a Graph path
+exists.
+
+Editorial Capture consumes this same read-only semantic core. It must search and
+reuse current canonical Knowledge before proposing a new Claim, preserve the
+selected Claim ID/revision and explainable relation path, and keep user/image
+observations separate from canonical Claims. Article composition may synthesize
+selected Claims into new editorial prose, but it must not copy raw Claim payloads
+into a second semantic store. A body-free `claim_trace`/research snapshot may
+record which canonical Claim revisions were used and why; generated Article
+prose remains editorial state in WordPress and never becomes Evidence by
+composition alone.
+
+The accepted shared Capture adapter currently covers text-only and multipart
+image submissions. Video retains its separate canonical external-reference
+intake until a registered shared adapter exists. Reusing the semantic core does
+not authorize duplicate Video identity, duplicate Article creation or a
+convenience relation to imitate missing orchestration.
 
 ## Governed apply boundary
 
