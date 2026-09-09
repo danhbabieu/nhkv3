@@ -134,3 +134,26 @@ unregistered inverses, inactive/dangling edges and ambiguous endpoints fail
 closed. Related claims retain the original semantic subject and an explainable
 path/context; no shortcut edge is persisted and the frontend never traverses
 Graph directly.
+
+## Editorial Capture Claim-discovery boundary — 2026-09-09
+
+Editorial Capture may use the same bounded neighborhood/query layer to discover
+related canonical nodes and candidate Claims. The Graph output is path/context
+only: endpoint identity, relation direction/predicate and bounded hop path. It
+must not decide Claim truth, Evidence sufficiency, semantic scope or editorial
+relevance, and it must not rewrite the Claim subject to the Capture subject.
+
+A reachable Claim is handed back to the Knowledge/Claim retrieval boundary with
+its original canonical subject. That boundary must verify Claim identity and
+revision, scope, provenance, Evidence state and relevance before the Claim can be
+selected for Article synthesis. A relation path is therefore necessary context
+for explainability, not authorization for inherited truth. Incompatible scope,
+unsupported Evidence/provenance or irrelevant Claims remain excluded/review and
+must not be promoted by adding a shortcut edge.
+
+The Article/Capture layer may retain the selected relation path in a body-free
+`claim_trace` or research snapshot for later reconciliation. Graph stores no
+Article body, Claim copy, generated prose, Media caption/OCR payload or Capture
+receipt. Generated editorial copy and Media observations remain outside Graph
+and do not become Evidence or relation truth merely because they were reached
+through a neighborhood query.
