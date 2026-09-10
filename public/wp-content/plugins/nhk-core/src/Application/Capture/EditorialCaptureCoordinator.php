@@ -15,7 +15,7 @@ use NHK\Core\Application\Mcp\McpDocumentationRegistry;
  */
 final class EditorialCaptureCoordinator
 {
-    /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher @param (callable(array<string,mixed>):array)|null $videoEnrichment */
+    /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher @param (callable(array<string,mixed>):array)|null $videoEnrichment @param (callable(array<string,mixed>):array)|null $videoPublicationVerifier */
     public function __construct(
         private CaptureRepository $captures,
         private $physicalIngest,
@@ -33,6 +33,7 @@ final class EditorialCaptureCoordinator
         private $publisher = null,
         private ?McpDocumentationRegistry $documentation = null,
         private $videoEnrichment = null,
+        private $videoPublicationVerifier = null,
     ) {}
 
     /** @param array<string,mixed> $input */
@@ -180,6 +181,11 @@ final class EditorialCaptureCoordinator
             $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
             $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken);
 
+            $videoPublication = is_callable($this->videoPublicationVerifier)
+                ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
+                : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
+            $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
+
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot']];
@@ -233,7 +239,7 @@ final class EditorialCaptureCoordinator
                 $diagnostics['publication_write'] = $this->withoutBody($publishedResult);
                 if (!$published) throw new \RuntimeException((string) ($publishedResult['reason'] ?? 'PUBLICATION_RESULT_UNCERTAIN'));
             }
-            $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'published' => $published]);
+            $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'video_publication' => $videoPublication, 'semantic_write_back' => $writes, 'published' => $published]);
             $diagnostics['final_read_back'] = $this->withoutBody($final);
             if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
             $stage = $published ? CaptureStage::PUBLISHED->value : CaptureStage::READY_FOR_PUBLICATION->value;

@@ -46,7 +46,7 @@ final class ArticleResearchPreflight
             'post_id' => $postId > 0 ? $postId : null,
             'subject_id' => $primaryId,
         ];
-        $overlap = $this->overlap($topic, $primaryId, $posts);
+        $overlap = $this->overlap($topic, $primaryId, $posts, $postId);
         if (in_array($overlap['classification'], ['LIKELY_DUPLICATE_INTENT', 'EXISTING_CANONICAL_ARTICLE'], true)) $blockers[] = 'EXISTING_ARTICLE_OVERLAP';
         $relations = $this->relations(is_array($inventory['relations'] ?? null) ? $inventory['relations'] : [], $blockers);
         $links = $this->links($relations, is_array($inventory['posts'] ?? null) ? $inventory['posts'] : [], $warnings);
@@ -57,9 +57,8 @@ final class ArticleResearchPreflight
             : count(array_filter($media, static fn (array $item): bool => ($item['ready'] ?? false) && ($item['public'] ?? false))) > 0;
         if (!$mediaComplete) $warnings[] = 'MEDIA_PLACEHOLDER_OR_UNAVAILABLE';
         $category = $this->categoryPlan(
-            array_key_exists('post_id', $articleContext)
-                ? (is_array($inventory['current_categories'] ?? null) ? $inventory['current_categories'] : [])
-                : (is_array($inventory['categories'] ?? null) ? $inventory['categories'] : [])
+            array_key_exists('post_id', $articleContext) ? (is_array($inventory['current_categories'] ?? null) ? $inventory['current_categories'] : []) : [],
+            is_array($inventory['categories'] ?? null) ? $inventory['categories'] : [],
         );
         if ($category['status'] === 'CATEGORY_MISSING') $warnings[] = 'CATEGORY_MISSING';
         $this->claimEvidencePolicy(is_array($inventory['knowledge'] ?? null) ? $inventory['knowledge'] : [], $blockers, $warnings);
@@ -87,21 +86,44 @@ final class ArticleResearchPreflight
     }
 
     private function blocked(array $blockers, array $inventory): ArticleResearchResult { return new ArticleResearchResult([], $inventory, ['classification' => 'UNCERTAIN'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [], ['status' => 'UNKNOWN'], ['candidates' => [], 'media_complete' => false], ['candidates' => []], [], ['status' => 'UNAVAILABLE'], array_values(array_unique($blockers)), [], false, ['status' => 'UNAVAILABLE', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => ['DICTIONARY_PLANNING_UNAVAILABLE'], 'blocking' => false]); }
-    private function overlap(string $topic, string $subjectId, array $posts): array { foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true) && strcasecmp(trim((string) ($post['title'] ?? '')), trim($topic)) === 0) return ['classification' => 'EXISTING_CANONICAL_ARTICLE', 'post' => $post]; foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true)) return ['classification' => 'SUBSTANTIAL_OVERLAP', 'post' => $post]; return ['classification' => $posts === [] ? 'NO_OVERLAP' : 'COMPLEMENTARY_CONTENT', 'post' => null]; }
+    private function overlap(string $topic, string $subjectId, array $posts, int $currentPostId = 0): array
+    {
+        $posts = array_values(array_filter($posts, static function (mixed $post) use ($currentPostId): bool {
+            if (!is_array($post) || $currentPostId < 1) return is_array($post);
+            return (int) preg_replace('/^.*:/', '', (string) ($post['id'] ?? '')) !== $currentPostId;
+        }));
+        foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true) && strcasecmp(trim((string) ($post['title'] ?? '')), trim($topic)) === 0) return ['classification' => 'EXISTING_CANONICAL_ARTICLE', 'post' => $post];
+        foreach ($posts as $post) if (in_array($subjectId, (array) ($post['subject_ids'] ?? []), true)) return ['classification' => 'SUBSTANTIAL_OVERLAP', 'post' => $post];
+        return ['classification' => $posts === [] ? 'NO_OVERLAP' : 'COMPLEMENTARY_CONTENT', 'post' => null];
+    }
     private function relations(array $items, array &$blockers): array { $out = []; foreach ($items as $item) { $class = (string) ($item['class'] ?? 'UNSUPPORTED'); if (!in_array($class, ['DIRECT', 'DERIVED', 'PROPOSED_DIRECT', 'EDITORIAL_RELATED', 'AMBIGUOUS', 'UNSUPPORTED'], true)) $class = 'UNSUPPORTED'; if ($class === 'DERIVED' && count((array) ($item['path'] ?? [])) > 2) $class = 'UNSUPPORTED'; if (in_array($class, ['AMBIGUOUS', 'UNSUPPORTED'], true)) $blockers[] = $class . '_RELATION'; $item['classification'] = ['DIRECT' => 'EXISTING_DIRECT', 'DERIVED' => 'EXISTING_DERIVED', 'PROPOSED_DIRECT' => 'PROPOSED_DIRECT', 'EDITORIAL_RELATED' => 'EDITORIAL_RELATED', 'AMBIGUOUS' => 'AMBIGUOUS', 'UNSUPPORTED' => 'UNSUPPORTED'][$class]; $out[] = $item; } return $out; }
     private function links(array $relations, array $posts, array &$warnings): array { $links = []; foreach ($relations as $relation) if (in_array($relation['classification'], ['EXISTING_DIRECT', 'EXISTING_DERIVED'], true)) { try { $eligible = ($this->publicEligibility)($relation); } catch (\Throwable) { $eligible = ['eligible' => false, 'status' => 'unavailable']; } if (($eligible['status'] ?? '') === 'unavailable') { $warnings[] = 'PUBLIC_ROUTE_ELIGIBILITY_UNAVAILABLE'; continue; } if (($eligible['eligible'] ?? false) && trim((string) ($eligible['route'] ?? '')) !== '') $links[] = ['route' => $eligible['route'], 'relation_class' => $relation['classification'], 'reason' => $relation['reason'] ?? 'registered semantic context', 'source' => 'graph', 'path' => $relation['path'] ?? []]; } return $links; }
-    private function categoryPlan(array $categories): array
+    private function categoryPlan(array $currentCategories, array $availableCategories = []): array
     {
-        $valid = array_values(array_filter($categories, static fn (mixed $category): bool => is_array($category) && trim((string) ($category['slug'] ?? '')) !== ''));
+        $current = array_values(array_filter($currentCategories, static fn (mixed $category): bool => is_array($category) && trim((string) ($category['slug'] ?? '')) !== ''));
+        $available = array_values(array_filter($availableCategories, static fn (mixed $category): bool => is_array($category) && trim((string) ($category['slug'] ?? '')) !== ''));
+        $valid = [];
+        foreach (array_merge($current, $available) as $category) {
+            $key = trim((string) ($category['id'] ?? $category['slug'] ?? $category['name'] ?? ''));
+            if ($key !== '') $valid[$key] = $category;
+        }
+        $valid = array_values($valid);
         if ($valid === []) return ['status' => 'CATEGORY_MISSING', 'category' => null, 'current_category' => null, 'recommendation' => 'CREATE_CATEGORY_BEFORE_DRAFT'];
+        $currentUsable = array_values(array_filter($current, fn (array $category): bool => !$this->isDefaultCategory($category)));
+        foreach ($currentUsable as $category) {
+            if ($this->isPreferredCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+        }
+        foreach ($currentUsable as $category) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
         foreach ($valid as $category) {
             $slug = strtolower(trim((string) ($category['slug'] ?? '')));
             $name = trim((string) ($category['name'] ?? ''));
-            if (in_array($slug, ['tri-thuc-dong-ho', 'tri-thuc'], true) || in_array($name, ['Tri thức đồng hồ', 'Tri thức'], true)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+            if ($this->isPreferredCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'previous_category' => $current[0] ?? null, 'recommendation' => null];
         }
-        foreach ($valid as $category) if (strtolower(trim((string) ($category['slug'] ?? ''))) !== 'uncategorized') return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'recommendation' => null];
+        foreach ($valid as $category) if (!$this->isDefaultCategory($category)) return ['status' => 'EXISTING', 'category' => $category, 'current_category' => $category, 'previous_category' => $current[0] ?? null, 'recommendation' => null];
         return ['status' => 'EXISTING', 'category' => $valid[0], 'current_category' => $valid[0], 'recommendation' => null];
     }
+    private function isPreferredCategory(array $category): bool { return in_array(strtolower(trim((string) ($category['slug'] ?? ''))), ['tri-thuc-dong-ho', 'tri-thuc'], true) || in_array(trim((string) ($category['name'] ?? '')), ['Tri thức đồng hồ', 'Tri thức'], true); }
+    private function isDefaultCategory(array $category): bool { return ($category['is_default'] ?? false) === true || in_array(strtolower(trim((string) ($category['slug'] ?? ''))), ['uncategorized', 'chua-phan-loai'], true); }
     /** @param list<array<string,mixed>> $claims @param list<string> $blockers @param list<string> $warnings */
     private function claimEvidencePolicy(array $claims, array &$blockers, array &$warnings): void
     {

@@ -1,5 +1,78 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-11 — Capture Video source-specific provenance dependency chain
+
+ROOT CAUSE: the Capture Video branch stopped at the Video adapter's planning
+output. `VideoIntakeService` intentionally produced no canonical Source or
+Evidence, while `AuthorityProposalExecutor::materializeVideoAttachments()`
+correctly fail-closed on empty attachments. The Capture continuation then sent
+the empty Video proposal directly to the Video contract, producing
+`NO_SEMANTIC_ATTACHMENT` and preventing canonical/public Video completion.
+
+FIRST MISSING BOUNDARY: the Capture-owned orchestration boundary between the
+immutable YouTube source snapshot plus exact subject-resolution packet and the
+Video proposal. No governed Source → provenance Claim → Evidence dependency
+plan existed there. This is now a planning-only
+`CaptureVideoProvenancePlanner`; the Capture continuation applies its
+dependencies through the existing Proposal → Submit → approval policy →
+Eligibility → Controlled Apply → canonical read-back lifecycle.
+
+SOURCE/EVIDENCE DESIGN: Source identity is scoped to platform, external Video
+ID and canonical locator. The Claim is narrow provenance only: the source
+identifies the Video as concerning the canonical exact Variant. Evidence is
+created only after Source and Claim canonical read-back and is bound to those
+canonical IDs. A new external Video never borrows another Video's Evidence by
+matching Variant alone. A title that does not explicitly identify the locked
+subject yields typed `SOURCE_SUBJECT_IDENTITY_UNCONFIRMED` with no dependency
+or relation. Marketing adjectives and conflicting material classifications are
+diagnostic/context only.
+
+VIDEO READ-BACK/PUBLIC IDENTITY: Video Apply still requires a non-empty
+Evidence-backed `about` attachment and creates the Graph edge in the same
+Controlled Apply. Capture now verifies canonical Video metadata, active
+Evidence dependencies and, when Graph is wired, the active exact `video →
+about → target` edge. A new ingest allocates and reads back the canonical
+Public Identity only after Video verification, then requires persisted
+`/video/{slug}/`; update paths do not silently backfill an identity. The
+companion Article gate remains independent.
+
+ARTICLE HANDOFF: publication review now performs a fresh Article owner read and
+fresh `ArticleResearchPreflight` before evaluating stale Capture diagnostics.
+The current Article is excluded from its own duplicate scan. Existing category
+inventory includes IDs/default markers; default Uncategorized/Chưa phân loại
+does not mask an available preferred configured category. Article media,
+category and human claim-review blockers remain Article-owned and cannot
+invalidate an otherwise verified Video.
+
+RED/GREEN: TDD regressions first observed missing planner class errors, default
+category selection failures and false self-overlap; the implemented planner,
+category resolver and fresh-owner handoff now pass. Video provenance/publication
+focused tests: 10 tests / 46 assertions; Article preflight/handoff focused
+tests: 20 tests / 86 assertions. The focused planner test also seeds a
+source-specific old attachment and verifies it is discarded before the new
+Evidence is attached.
+
+VERIFICATION: NHK Unit — 1,069 tests / 5,434 assertions, 0 failures (18
+warnings, 6 deprecations, 11 PHPUnit deprecations). NHK Contract — 4 tests / 31
+assertions, 0 failures. Composer validation, Composer lint/PHP lint and
+`git diff --check` pass. NHK Integration was attempted: 127 tests, 4 errors
+from missing WordPress functions, 14 mandatory-environment failures requiring
+`NHK_WP_TEST_PATH=public`, and 108 skips; therefore Integration is not claimed
+as a pass. Local MCP smoke could not connect to localhost. No live Capture
+continuation was called.
+
+CAPTURE_ID_SCHEMA: `McpToolCatalog` and the local Easy MCP final descriptor
+contain optional `capture_id`; the available connector discovery observed in
+this session omitted it. Raw authenticated live `tools/list` could not be
+completed because no authenticated live MCP endpoint was available. Classified
+as `CONNECTOR_SCHEMA_STALE / CLIENT_EXPOSURE_GAP` based on the canonical/local
+descriptor versus connector exposure, with live deployment parity remaining
+unverified.
+
+LIVE_DATA_MUTATION=NONE. DEPLOYMENT=NOT_PERFORMED. PUSH STATUS = PENDING.
+STATUS: local implementation and non-live regression verification complete;
+integration/live runtime verification remains an external-environment gap.
+
 # Checkpoint — 2026-09-11 — Capture editorial Media write-boundary integrity
 
 ROOT CAUSE: the initial Capture draft was created through

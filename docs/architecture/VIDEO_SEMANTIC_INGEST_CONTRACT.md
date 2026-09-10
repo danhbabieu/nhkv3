@@ -104,19 +104,27 @@ extractor failure is diagnostic and does not fail Video intake. Generated
 editorial text is never passed to the Knowledge planner or represented as
 Evidence.
 
-At this phase Video does not resolve or create a canonical NHK Source entity.
-The intake therefore passes no invented Source ID. If a future caller supplies
-canonical `source_id` plus `source_revision`, the shared planner may produce a
-proposal-ready `add_evidence` candidate. Without that canonical binding,
-existing-claim evidence remains `same_claim`/review-only and the packet records
-`SOURCE_RESOLUTION_NEEDED`; Video intake does not create Source or Evidence.
+The standalone Video intake preview does not resolve or create a canonical NHK
+Source entity and therefore never invents a Source ID. When Video is a child of
+`nhk.capture.ingest`, the Capture-owned coordinated path may instead emit
+governed Source, provenance Claim and Evidence proposals from the immutable
+external Video snapshot and the locked exact subject handoff. Those proposals
+are applied and read back before the Video proposal is constructed; they are
+not written by the Video adapter and are not a second semantic writer. If the
+source snapshot does not explicitly identify the locked subject, the
+coordinated path records `SOURCE_SUBJECT_IDENTITY_UNCONFIRMED` and creates no
+dependency or relation. Existing-claim evidence remains `same_claim`/
+review-only unless its canonical source identity matches the current external
+Video.
 
-The seam is planning-only: it does not call Knowledge/Evidence repositories,
-submit or approve proposals, apply mutations, or create Graph predicates. A
-planner failure is diagnostic and fail-closed for enrichment while preserving
-the complete Video intake preview and its existing `about` relation/proposal
-flow. Same-claim and add-Evidence idempotency remain governed by the shared
-Knowledge planner/factory; Video intake does not apply either result.
+The Video adapter seam remains planning-only: it does not call
+Knowledge/Evidence repositories, submit or approve proposals, apply mutations,
+or create Graph predicates. A planner failure is diagnostic and fail-closed for
+enrichment while preserving the complete Video intake preview. The coordinated
+Capture orchestrator owns the dependency sequencing and applies only through
+the shared Governance lifecycle. Same-claim and add-Evidence idempotency
+remain governed by the shared Knowledge planner/factory; the Video adapter
+does not apply either result.
 
 ## Dictionary lexical integration — 2026-09-05
 

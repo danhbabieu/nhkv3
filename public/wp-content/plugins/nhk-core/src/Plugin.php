@@ -24,7 +24,7 @@ use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
-use NHK\Core\Application\Capture\{CaptureEditorialWriteGuard, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
+use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -166,6 +166,7 @@ final class Plugin {
             add_filter('nhk_v3_post_related_content', static function (array $value, int $postId) use ($publicRelated): array { return $publicRelated->forPost($postId); }, 10, 2);
             $publicEntityQuery = new EntityPageQuery($publicAuthority, $publicTypes, $publicRelated, $publicStatus, $publicRoutes, $publicCollection);
             $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
+            \NHK\Core\Application\PublicIdentity\PublicIdentityReadRegistry::register($publicIdentityRepository);
             $historicPublicRouteService = new HistoricPublicRouteService($publicIdentityRepository);
             (new PublicEntityRoutes($publicEntityQuery, $publicTypes, $historicPublicRouteService))->register();
             (new PublicComparisonRoutes(new ComparisonPageQuery($publicEntityQuery)))->register();
@@ -218,6 +219,9 @@ final class Plugin {
             $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink());
             $publicStatus = new MigrationStatus();
             $publicContexts = new StructuralContextQuery($graphService, $authority);
+            $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
+            \NHK\Core\Application\PublicIdentity\PublicIdentityReadRegistry::register($publicIdentityRepository);
+            $publicIdentityService = new \NHK\Core\Application\PublicIdentity\PublicIdentityService($publicIdentityRepository, static fn (string $slug): bool => false);
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
             $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($media, $assets, $usages));
@@ -325,8 +329,9 @@ final class Plugin {
                     $subjectIds = array_values(array_unique(array_filter(array_map(static fn (mixed $subject): string => is_array($subject) ? trim((string) ($subject['id'] ?? '')) : '', $subjects))));
                     $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
                     $articlePostId = (int) ($input['article_context']['post_id'] ?? 0);
+                    $defaultCategoryId = function_exists('get_option') ? (int) get_option('default_category', 0) : 0;
                     $currentCategories = $articlePostId > 0 && function_exists('get_the_category')
-                        ? array_map(static fn ($category): array => ['name' => (string) $category->name, 'slug' => (string) $category->slug], (array) get_the_category($articlePostId))
+                        ? array_map(static fn ($category): array => ['id' => (int) $category->term_id, 'name' => (string) $category->name, 'slug' => (string) $category->slug, 'is_default' => (int) $category->term_id === $defaultCategoryId], (array) get_the_category($articlePostId))
                         : [];
                     $articleMedia = [];
                     if ($articlePostId > 0) {
@@ -430,11 +435,12 @@ final class Plugin {
                             $posts = array_values(array_filter($posts, static fn (array $post): bool => array_intersect($post['subject_ids'], $subjectIds) !== []));
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
-                    return ['status' => 'available', 'posts' => $posts, 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['name' => $category->name, 'slug' => $category->slug], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => array_values($knowledgeRows), 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => array_values($mediaRows), 'videos' => array_values($videoRows), 'relations' => $relations];
+                    return ['status' => 'available', 'posts' => $posts, 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['id' => (int) $category->term_id, 'name' => $category->name, 'slug' => $category->slug, 'is_default' => (int) $category->term_id === $defaultCategoryId], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => array_values($knowledgeRows), 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => array_values($mediaRows), 'videos' => array_values($videoRows), 'relations' => $relations];
                 },
                 [$articlePublicEligibility, 'evaluate'],
             );
             $articleHandler = new McpArticleIngestHandler($articleCoordinator, $articlePreflight, $articleEditorial, $articleMedia, $articleResearch);
+            $articlePreflightHandoff = new CaptureArticlePreflightHandoff();
             (new GovernanceApi($governance, $eligibility, $controlledApply, $endpoints))->register();
             $videoRelationAdmin = new \NHK\Core\Application\Video\VideoRelationAdminService($governance, $proposalRepository, $videos, $authority, $knowledgeService, $claims, $sources, $evidence);
             (new VideoRelationAdminApi($videoRelationAdmin))->register();
@@ -458,6 +464,7 @@ final class Plugin {
                 $automationResolver,
                 static fn (string $capability): bool => current_user_can($capability),
                 $captureClaimReuse,
+                new CaptureVideoProvenancePlanner(),
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
@@ -491,7 +498,27 @@ final class Plugin {
             );
             $youtubeConfiguration = new \NHK\Core\Application\Video\YouTubeApiConfiguration();
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
-            $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
+            $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
+            $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
+            $videoPublicationVerifier = new CaptureVideoPublicationVerifier(
+                $videos,
+                $publicIdentityService,
+                $publicIdentityRepository,
+                $canonicalDependencies,
+                static function (string $videoId, string $targetType, string $targetId) use ($graphService): bool {
+                    try {
+                        $edge = $graphService->findEdge(
+                            new \NHK\Core\Domain\Graph\NodeReference('video', $videoId),
+                            'about',
+                            new \NHK\Core\Domain\Graph\NodeReference($targetType, $targetId),
+                        );
+                        return $edge !== null && $edge->isActive();
+                    } catch (\Throwable) {
+                        throw new \RuntimeException('VIDEO_ABOUT_RELATION_READBACK_UNAVAILABLE');
+                    }
+                },
+            );
+            $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
                 static function (array $input) use ($mediaBatchUpload): array {
@@ -548,6 +575,7 @@ final class Plugin {
                         (string) ($context['capture_id'] ?? ''),
                         (string) ($context['capture_id'] ?? '') . ':semantic',
                         $context + ['retrieval' => $context['retrieval'] ?? []],
+                        is_array($context['governance'] ?? null) ? $context['governance'] : [],
                     );
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
@@ -586,7 +614,7 @@ final class Plugin {
                     $payload['editorial_state_token'] = $result->editorialStateToken;
                     return $payload;
                 },
-                static function (array $context) use ($draftGateway, $articleEditorial): array {
+                static function (array $context) use ($draftGateway, $articleEditorial, $articleResearch, $articlePreflightHandoff): array {
                     // Media/editorial reconciliation can rotate the native
                     // token after Capture persisted its last receipt. On the
                     // bounded one-time refresh, re-read the Article owner and
@@ -598,16 +626,32 @@ final class Plugin {
                     }
                     $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
                     $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
-                    $evidence = [
-                        'subject_resolution' => $resolution,
-                        'subject_resolved' => ($resolution['status'] ?? '') === 'resolved' && trim((string) ($primary['id'] ?? '')) !== '',
-                        'semantic' => $context['semantic'] ?? [],
-                        'semantic_write_back' => $context['semantic_write_back'] ?? [],
-                        'media' => $context['media'] ?? [],
-                    ];
+                    $current = $articleEditorial->read((int) ($context['article_id'] ?? 0));
+                    if ($current !== null) $expectedToken = $current->token;
+                    $composition = is_array($context['composition'] ?? null) ? $context['composition'] : [];
+                    $topic = trim((string) ($composition['title'] ?? $current?->title ?? $context['capture']['context']['raw_input'] ?? ''));
+                    $freshResearch = $articleResearch->research($topic, $primary, [
+                        'post_id' => (int) ($context['article_id'] ?? 0),
+                        'title' => (string) ($current?->title ?? $topic),
+                        'excerpt' => (string) ($current?->excerpt ?? ''),
+                        'body' => (string) ($current?->content ?? ''),
+                        'planned_title' => $topic,
+                    ]);
+                    $evidence = $articlePreflightHandoff->build(
+                        // The handoff supplies the gate's locked
+                        // The resulting evidence contains 'subject_resolved' =>
+                        // true/false from a fresh owner read.
+                        $freshResearch,
+                        is_array($context['media'] ?? null) ? $context['media'] : [],
+                        is_array($context['semantic_write_back'] ?? null) ? $context['semantic_write_back'] : [],
+                        $current?->snapshot() ?? [],
+                    );
+                    $evidence['semantic'] = $context['semantic'] ?? [];
+                    $evidence['semantic_write_back'] = $context['semantic_write_back'] ?? [];
+                    $evidence['media'] = $context['media'] ?? [];
                     $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), $expectedToken, $evidence, (string) ($context['capture']['capture_id'] ?? '') . ':review');
                     $blockers = (array) ($review['blockers'] ?? $review['diagnostics'] ?? []);
-                    return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'state_token' => $review['state_token'] ?? $expectedToken];
+                    return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'fresh_preflight' => $freshResearch->toArray(), 'state_token' => $review['state_token'] ?? $expectedToken];
                 },
                 static function (array $context) use ($articleEditorial): array {
                     $post = $articleEditorial->read((int) ($context['article_id'] ?? 0));
@@ -657,11 +701,13 @@ final class Plugin {
                         'video_preview' => $preview->toArray(),
                     ];
                 },
+                static function (array $context) use ($videoPublicationVerifier): array {
+                    return $videoPublicationVerifier->verify($context);
+                },
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
-            $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository($wpdb)))->service();
             $documentation = new McpDocumentationRegistry();
             (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);

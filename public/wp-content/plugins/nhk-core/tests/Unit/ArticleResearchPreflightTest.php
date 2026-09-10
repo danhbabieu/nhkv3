@@ -127,6 +127,49 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertSame('attached', $result->subjectResolution['persistence']['status']);
     }
 
+    public function test_existing_default_uncategorized_does_not_hide_configured_available_category(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'variant-1', 'type' => 'variant', 'name' => 'Variant A']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [],
+                'current_categories' => [['id' => 1, 'name' => 'Uncategorized', 'slug' => 'uncategorized', 'is_default' => true]],
+                'categories' => [
+                    ['id' => 1, 'name' => 'Uncategorized', 'slug' => 'uncategorized', 'is_default' => true],
+                    ['id' => 4, 'name' => 'Tri thức đồng hồ', 'slug' => 'tri-thuc-dong-ho', 'is_default' => false],
+                ],
+                'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Variant A', ['type' => 'variant'], ['post_id' => 123]);
+
+        self::assertSame('Tri thức đồng hồ', $result->categoryPlan['category']['name']);
+        self::assertSame('EXISTING', $result->categoryPlan['status']);
+        self::assertNotSame($result->categoryPlan['category']['id'], 1);
+    }
+
+    public function test_fresh_preflight_does_not_report_current_article_as_duplicate_intent(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'variant-1', 'type' => 'variant', 'name' => 'Variant A']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [['id' => '1:123', 'title' => 'Variant A', 'subject_ids' => ['variant-1'], 'published' => false]],
+                'categories' => [['name' => 'Tri thức đồng hồ', 'slug' => 'tri-thuc-dong-ho']],
+                'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Variant A', ['type' => 'variant'], ['post_id' => 123, 'planned_title' => 'Variant A']);
+
+        self::assertSame('NO_OVERLAP', $result->overlap['classification']);
+        self::assertNotContains('EXISTING_ARTICLE_OVERLAP', $result->blockers);
+    }
+
     public function test_branch_scoped_inventory_excludes_global_media_knowledge_and_video_candidates(): void
     {
         $service = new ArticleResearchPreflight(

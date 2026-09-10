@@ -24,6 +24,7 @@ final class GovernedCaptureContinuationService
         private GovernanceAutomationPolicyResolver $policies,
         private $can,
         private ?ClaimReusePolicy $claimReuse = null,
+        private ?CaptureVideoProvenancePlanner $videoProvenance = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -37,46 +38,12 @@ final class GovernedCaptureContinuationService
         $writes = [];
         $lifecycle = [];
         foreach ($plans as $plan) {
+            if (isset($plan['capture_video_provenance']) && is_array($plan['capture_video_provenance'])) {
+                $this->executeVideoProvenancePlan($plan['capture_video_provenance'], $control, $writes, $lifecycle);
+                continue;
+            }
             try {
-                if (isset($plan['proposal_id'])) {
-                    $review = $this->governance->review((string) $plan['proposal_id']);
-                    $proposal = $this->proposalFromReview((string) $plan['proposal_id'], $review);
-                } else {
-                    $proposal = $this->governance->createFromArguments($plan);
-                    $review = $this->governance->review($proposal->id);
-                }
-                $lifecycle[] = 'PROPOSAL';
-                if (($review['state'] ?? $proposal->state->value) === ProposalState::DRAFT->value) {
-                    $proposal = $this->governance->submit($proposal->id);
-                    $lifecycle[] = 'SUBMIT';
-                    $review = $this->governance->review($proposal->id);
-                }
-                $state = (string) ($review['state'] ?? $proposal->state->value);
-                if ($state === ProposalState::SUBMITTED->value) {
-                    $mode = $this->policies->resolve((string) ($plan['entity_type'] ?? $review['entity_type'] ?? $proposal->entityType));
-                    if ($mode->value === 'REVIEW_REQUIRED' && !(bool) ($control['approval_confirmed'] ?? false)) {
-                        $writes[] = $this->pending($proposal, $review);
-                        continue;
-                    }
-                    if (!(bool) ($this->can)('nhk_internal_content_operations')) throw new \RuntimeException('INTERNAL_CAPABILITY_REQUIRED_FOR_CAPTURE_GOVERNANCE_APPROVAL');
-                    $proposal = $this->governance->approve($proposal->id, (string) ($review['content_fingerprint'] ?? $proposal->contentFingerprint), (string) ($review['dependency_fingerprint'] ?? $proposal->dependencyFingerprint), $this->actor());
-                    $lifecycle[] = 'APPROVE';
-                }
-                if ($proposal->state === ProposalState::APPLIED || $state === ProposalState::APPLIED->value) {
-                    $applied = ($this->apply)($proposal->id);
-                    $lifecycle[] = 'CONTROLLED_APPLY';
-                    $writes[] = $this->applied($proposal, $applied);
-                    continue;
-                }
-                $eligibility = $this->governance->eligibility($proposal->id);
-                $lifecycle[] = 'ELIGIBILITY';
-                if (($eligibility['ready'] ?? false) !== true) {
-                    $writes[] = ['proposal_id' => $proposal->id, 'status' => 'SYSTEM_BLOCKED', 'blockers' => array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])))];
-                    continue;
-                }
-                $applied = ($this->apply)($proposal->id);
-                $lifecycle[] = 'CONTROLLED_APPLY';
-                $writes[] = $this->applied($proposal, $applied);
+                $writes[] = $this->runGovernedPlan($plan, $control, $lifecycle);
             } catch (\Throwable $error) {
                 $writes[] = ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => [$error->getMessage()]];
             }
@@ -135,9 +102,126 @@ final class GovernedCaptureContinuationService
             $operation = trim((string) ($video['operation'] ?? 'ingest')) ?: 'ingest';
             $subjectId = trim((string) ($video['subject_id'] ?? ''));
             $payload = is_array($video['payload'] ?? null) ? $video['payload'] : $video;
+            if ($this->videoProvenance !== null && $entityType === 'video' && $operation === 'ingest') {
+                $source = is_array($payload['metadata']['source'] ?? null) ? $payload['metadata']['source'] : (is_array($payload['metadata']['source_snapshot'] ?? null) ? $payload['metadata']['source_snapshot'] : []);
+                $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
+                if ($primary === []) {
+                    $resolvedVariants = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? '') === 'variant'));
+                    $primary = $resolvedVariants[0] ?? [];
+                }
+                $hint = is_array($payload['metadata']['provenance']['user_hint'] ?? null) ? (string) ($payload['metadata']['provenance']['user_hint']['value'] ?? '') : '';
+                $plans[] = ['capture_video_provenance' => $this->videoProvenance->plan($captureId, $video, $source, $primary, ['user_hint' => $hint])];
+                continue;
+            }
             $plans[] = $this->arguments($entityType, $operation, $subjectId, $payload, 'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
         }
         return $plans;
+    }
+
+    /** @param array<string,mixed> $provenancePlan @param list<array<string,mixed>> $writes @param list<string> $lifecycle */
+    private function executeVideoProvenancePlan(array $provenancePlan, array $control, array &$writes, array &$lifecycle): void
+    {
+        if (($provenancePlan['status'] ?? '') !== 'READY') {
+            $writes[] = ['status' => 'REVIEW_REQUIRED', 'blockers' => array_values(array_map('strval', (array) ($provenancePlan['blockers'] ?? ['SOURCE_SUBJECT_IDENTITY_UNCONFIRMED']))), 'diagnostics' => $provenancePlan['diagnostics'] ?? []];
+            return;
+        }
+        $dependencyWrites = [];
+        $canonicalIds = [];
+        foreach (array_slice((array) ($provenancePlan['dependencies'] ?? []), 0, 2) as $dependency) {
+            try {
+                $write = $this->runGovernedPlan($dependency, $control, $lifecycle);
+            } catch (\Throwable $error) {
+                $write = ['status' => 'SYSTEM_BLOCKED', 'blockers' => [$error->getMessage()]];
+            }
+            $dependencyWrites[] = $write;
+            if (($write['status'] ?? '') !== 'APPLIED') {
+                array_push($writes, ...$dependencyWrites);
+                return;
+            }
+            $canonicalId = trim((string) ($write['canonical_id'] ?? ''));
+            if (!$this->hasCanonicalReadback($write, $canonicalId)) {
+                array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['CANONICAL_READBACK_VERIFICATION_FAILED']]]));
+                return;
+            }
+            $canonicalIds[] = $canonicalId;
+        }
+        if (count($canonicalIds) !== 2) {
+            array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['VIDEO_PROVENANCE_DEPENDENCY_READBACK_INCOMPLETE']]]));
+            return;
+        }
+        $withEvidence = $this->videoProvenance?->attachEvidence($provenancePlan, $canonicalIds[0], $canonicalIds[1], 'pending-evidence');
+        if (!is_array($withEvidence)) {
+            array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['VIDEO_PROVENANCE_PLANNER_UNAVAILABLE']]]));
+            return;
+        }
+        $evidenceArguments = (array) ($withEvidence['dependencies'][2] ?? []);
+        try {
+            $evidenceWrite = $this->runGovernedPlan($evidenceArguments, $control, $lifecycle);
+        } catch (\Throwable $error) {
+            $evidenceWrite = ['status' => 'SYSTEM_BLOCKED', 'blockers' => [$error->getMessage()]];
+        }
+        $allWrites = array_merge($dependencyWrites, [$evidenceWrite]);
+        if (($evidenceWrite['status'] ?? '') !== 'APPLIED') {
+            array_push($writes, ...$allWrites);
+            return;
+        }
+        $evidenceId = trim((string) ($evidenceWrite['canonical_id'] ?? ''));
+        if (!$this->hasCanonicalReadback($evidenceWrite, $evidenceId)) {
+            array_push($writes, ...array_merge($allWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['CANONICAL_READBACK_VERIFICATION_FAILED']]]));
+            return;
+        }
+        $complete = $this->videoProvenance->attachEvidence($provenancePlan, $canonicalIds[0], $canonicalIds[1], $evidenceId);
+        try {
+            $videoWrite = $this->runGovernedPlan((array) ($complete['video_proposal'] ?? []), $control, $lifecycle);
+        } catch (\Throwable $error) {
+            $videoWrite = ['status' => 'SYSTEM_BLOCKED', 'blockers' => [$error->getMessage()]];
+        }
+        array_push($writes, ...array_merge($allWrites, [$videoWrite]));
+    }
+
+    /** @param array<string,mixed> $write */
+    private function hasCanonicalReadback(array $write, string $canonicalId): bool
+    {
+        if (!UuidCodec::isValid($canonicalId)) return false;
+        $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
+        return (string) ($readback['canonical_id'] ?? '') === $canonicalId && ($readback['active'] ?? false) === true;
+    }
+
+    /** @param array<string,mixed> $plan @param list<string> $lifecycle @return array<string,mixed> */
+    private function runGovernedPlan(array $plan, array $control, array &$lifecycle): array
+    {
+        if (isset($plan['proposal_id'])) {
+            $review = $this->governance->review((string) $plan['proposal_id']);
+            $proposal = $this->proposalFromReview((string) $plan['proposal_id'], $review);
+        } else {
+            $proposal = $this->governance->createFromArguments($plan);
+            $review = $this->governance->review($proposal->id);
+        }
+        $lifecycle[] = 'PROPOSAL';
+        if (($review['state'] ?? $proposal->state->value) === ProposalState::DRAFT->value) {
+            $proposal = $this->governance->submit($proposal->id);
+            $lifecycle[] = 'SUBMIT';
+            $review = $this->governance->review($proposal->id);
+        }
+        $state = (string) ($review['state'] ?? $proposal->state->value);
+        if ($state === ProposalState::SUBMITTED->value) {
+            $mode = $this->policies->resolve((string) ($plan['entity_type'] ?? $review['entity_type'] ?? $proposal->entityType));
+            if ($mode->value === 'REVIEW_REQUIRED' && !(bool) ($control['approval_confirmed'] ?? false)) return $this->pending($proposal, $review);
+            if (!(bool) ($this->can)('nhk_internal_content_operations')) throw new \RuntimeException('INTERNAL_CAPABILITY_REQUIRED_FOR_CAPTURE_GOVERNANCE_APPROVAL');
+            $proposal = $this->governance->approve($proposal->id, (string) ($review['content_fingerprint'] ?? $proposal->contentFingerprint), (string) ($review['dependency_fingerprint'] ?? $proposal->dependencyFingerprint), $this->actor());
+            $lifecycle[] = 'APPROVE';
+        }
+        if ($proposal->state === ProposalState::APPLIED || $state === ProposalState::APPLIED->value) {
+            $applied = ($this->apply)($proposal->id);
+            $lifecycle[] = 'CONTROLLED_APPLY';
+            return $this->applied($proposal, $applied);
+        }
+        $eligibility = $this->governance->eligibility($proposal->id);
+        $lifecycle[] = 'ELIGIBILITY';
+        if (($eligibility['ready'] ?? false) !== true) return ['proposal_id' => $proposal->id, 'status' => 'SYSTEM_BLOCKED', 'blockers' => array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])))];
+        $applied = ($this->apply)($proposal->id);
+        $lifecycle[] = 'CONTROLLED_APPLY';
+        return $this->applied($proposal, $applied);
     }
 
     /** @return list<array<string,mixed>> */
