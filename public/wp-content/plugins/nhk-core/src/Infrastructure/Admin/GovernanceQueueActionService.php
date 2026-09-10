@@ -1,0 +1,128 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Core\Infrastructure\Admin;
+
+use NHK\Core\Contracts\Governance\GovernanceActionPort;
+use NHK\Core\Domain\Governance\{EligibilityResult, Proposal, ProposalState};
+use NHK\Core\Governance\Exception\{GovernancePermissionDenied, InvalidProposalTransition, ProposalBindingConflict, ProposalNotFound};
+use NHK\Core\Shared\Uuid\UuidCodec;
+
+final class GovernanceQueueActionService
+{
+    /** @var array<string, string> */
+    private const CAPABILITIES = [
+        'submit' => 'nhk_submit_proposals',
+        'approve' => 'nhk_approve_proposals',
+        'reject' => 'nhk_approve_proposals',
+        'apply' => 'nhk_apply_proposals',
+    ];
+
+    /** @param callable(string): bool $can  @param callable(): string|int $actor */
+    public function __construct(
+        private GovernanceActionPort $port,
+        private $can,
+        private $actor,
+    ) {}
+
+    /** @return array<string, mixed> */
+    public function execute(string $action, string $id, array $snapshot = []): array
+    {
+        $base = ['ok' => false, 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => null];
+        if (!isset(self::CAPABILITIES[$action])) return array_merge($base, ['reason' => 'INVALID_ACTION']);
+        if (!UuidCodec::isValid($id)) return array_merge($base, ['reason' => 'INVALID_PROPOSAL_ID']);
+        if (array_key_exists('proposal_id', $snapshot) && (!is_string($snapshot['proposal_id']) || $snapshot['proposal_id'] !== $id)) {
+            return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
+        }
+
+        try {
+            if (!(($this->can)(self::CAPABILITIES[$action]))) return array_merge($base, ['reason' => 'CAPABILITY_DENIED']);
+            $proposal = $this->port->find($id);
+            if ($proposal === null) return array_merge($base, ['reason' => 'PROPOSAL_NOT_FOUND']);
+            $base['state'] = $proposal->state->value;
+            if (!$this->matchesSnapshot($proposal, $snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
+            if (!$this->allows($action, $proposal->state)) return array_merge($base, ['reason' => 'INVALID_LIFECYCLE_ACTION']);
+
+            if ($action === 'apply') {
+                $eligibility = $this->port->eligibility($id);
+                if (!$eligibility->ready && !$this->isIdempotentEligibility($eligibility)) {
+                    return array_merge($base, ['reason' => $this->reason($eligibility->reasons)]);
+                }
+                $result = $this->port->apply($id);
+                return ['ok' => true, 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'result' => $result];
+            }
+
+            $result = match ($action) {
+                'submit' => $this->port->submit($id),
+                'approve' => $this->port->approve($id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, (string) (($this->actor)())),
+                'reject' => $this->port->reject($id, (string) (($this->actor)())),
+            };
+            return ['ok' => true, 'proposal_id' => $id, 'action' => $action, 'state' => $result->state->value, 'reason' => null];
+        } catch (\Throwable $error) {
+            return array_merge($base, ['reason' => $this->exceptionReason($error), 'message' => $error->getMessage()]);
+        }
+    }
+
+    /** @param array<int, mixed> $items @return array<string, mixed> */
+    public function bulk(string $action, array $items): array
+    {
+        $results = [];
+        $failures = [];
+        foreach ($items as $item) {
+            $snapshot = is_array($item) ? $item : [];
+            $id = is_array($item) ? (string) ($item['proposal_id'] ?? '') : '';
+            $result = $this->execute($action, $id, $snapshot);
+            $results[] = $result;
+            if ($result['ok'] !== true) $failures[] = $result;
+        }
+        $selected = count($items);
+        return ['selected' => $selected, 'succeeded' => $selected - count($failures), 'failed' => count($failures), 'failures' => $failures, 'results' => $results];
+    }
+
+    private function matchesSnapshot(Proposal $proposal, array $snapshot): bool
+    {
+        $checks = [
+            'revision' => $proposal->revision,
+            'content_fingerprint' => $proposal->contentFingerprint,
+            'dependency_fingerprint' => $proposal->dependencyFingerprint,
+            'state' => $proposal->state->value,
+        ];
+        foreach ($checks as $key => $current) {
+            if (!array_key_exists($key, $snapshot)) continue;
+            if (!is_scalar($snapshot[$key]) || (string) $snapshot[$key] !== (string) $current) return false;
+        }
+        return true;
+    }
+
+    private function allows(string $action, ProposalState $state): bool
+    {
+        return match ($action) {
+            'submit' => $state === ProposalState::DRAFT,
+            'approve', 'reject' => in_array($state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true),
+            'apply' => in_array($state, [ProposalState::APPROVED, ProposalState::APPLIED], true),
+            default => false,
+        };
+    }
+
+    private function isIdempotentEligibility(EligibilityResult $eligibility): bool
+    {
+        return count($eligibility->reasons) === 1 && $eligibility->reasons[0] === 'ALREADY_APPLIED';
+    }
+
+    private function reason(array $reasons): string|array
+    {
+        $reasons = array_values($reasons);
+        return count($reasons) === 1 ? (string) $reasons[0] : $reasons;
+    }
+
+    private function exceptionReason(\Throwable $error): string
+    {
+        return match (true) {
+            $error instanceof ProposalNotFound => 'PROPOSAL_NOT_FOUND',
+            $error instanceof GovernancePermissionDenied => 'CAPABILITY_DENIED',
+            $error instanceof ProposalBindingConflict => 'STALE_BINDING',
+            $error instanceof InvalidProposalTransition => 'INVALID_LIFECYCLE_ACTION',
+            default => 'OPERATION_FAILED',
+        };
+    }
+}
