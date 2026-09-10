@@ -90,6 +90,48 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertStringContainsString('LIMIT 2 OFFSET 4', $this->db->lastPrepared);
     }
 
+    /** @dataProvider behavioralSortOrders */
+    public function test_behavioral_sorting_orders_rows_and_applies_id_tiebreaker(string $orderBy, string $order, array $expectedIds): void
+    {
+        $rows = $this->sortableRows();
+        $this->db = new RecordingProposalDatabase($rows, count($rows), true);
+        $this->query = new WpdbGovernanceQueueQuery($this->db);
+
+        $page = $this->query->page(['order_by' => $orderBy, 'order' => $order, 'per_page' => 20]);
+
+        self::assertSame($expectedIds, array_map(static fn (array $item): int => (int) $item['revision'], $page['items']));
+        self::assertSame(count($expectedIds), $page['total_items']);
+    }
+
+    /** @return iterable<string,array{string,string,list<int>}> */
+    public static function behavioralSortOrders(): iterable
+    {
+        yield 'created ascending' => ['created', 'asc', [101, 102, 104, 103]];
+        yield 'created descending' => ['created', 'desc', [103, 104, 102, 101]];
+        yield 'updated ascending' => ['updated', 'asc', [102, 103, 104, 101]];
+        yield 'updated descending' => ['updated', 'desc', [101, 104, 103, 102]];
+        yield 'name ascending' => ['name', 'asc', [102, 101, 103, 104]];
+        yield 'name descending' => ['name', 'desc', [104, 103, 101, 102]];
+        yield 'id ascending' => ['id', 'asc', [101, 102, 103, 104]];
+        yield 'id descending' => ['id', 'desc', [104, 103, 102, 101]];
+        yield 'status ascending' => ['status', 'asc', [102, 103, 101, 104]];
+        yield 'status descending' => ['status', 'desc', [104, 101, 103, 102]];
+    }
+
+    public function test_behavioral_sorting_is_applied_before_page_slicing_at_tied_boundary(): void
+    {
+        $rows = $this->sortableRows();
+        $this->db = new RecordingProposalDatabase($rows, count($rows), true);
+        $this->query = new WpdbGovernanceQueueQuery($this->db);
+
+        $page = $this->query->page(['order_by' => 'name', 'order' => 'asc', 'page' => 2, 'per_page' => 2]);
+
+        self::assertSame([103, 104], array_map(static fn (array $item): int => (int) $item['revision'], $page['items']));
+        self::assertSame(2, $page['page']);
+        self::assertSame(2, $page['per_page']);
+        self::assertSame(2, $page['total_pages']);
+    }
+
     public function test_partial_uuid_search_and_type_filter_are_bounded_server_side(): void
     {
         $page = $this->query->page([
@@ -128,6 +170,13 @@ final class GovernanceQueueQueryTest extends TestCase
         yield 'relation create normalizes expected revision' => [static fn (array $row): array => array_replace($row, ['entity_type' => 'relation', 'operation' => 'relation_create', 'expected_revision' => 0, 'command_json' => json_encode(['source_uuid' => '0198f8d5-1d55-7a10-8d4e-5f0d9d8d0001'])]), true, null];
         yield 'positive relation create expected revision is invalid' => [static fn (array $row): array => array_replace($row, ['entity_type' => 'relation', 'operation' => 'relation_create', 'expected_revision' => 1, 'command_json' => json_encode(['source_uuid' => '0198f8d5-1d55-7a10-8d4e-5f0d9d8d0001'])]), false, 'PROPOSAL_BINDING_INVALID'];
         yield 'targetless create accepts zero expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'create', 'target_uuid' => null, 'expected_revision' => 0]), true, null];
+        yield 'targetless create accepts null expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'create', 'target_uuid' => null, 'expected_revision' => null]), true, null];
+        yield 'targetless create accepts empty expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'create', 'target_uuid' => null, 'expected_revision' => '']), true, null];
+        yield 'targetless create accepts positive expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'create', 'target_uuid' => null, 'expected_revision' => 4]), true, null];
+        yield 'targetless ingest accepts null expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'ingest', 'target_uuid' => null, 'expected_revision' => null]), true, null];
+        yield 'targetless ingest accepts empty expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'ingest', 'target_uuid' => null, 'expected_revision' => '']), true, null];
+        yield 'targetless ingest accepts zero expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'ingest', 'target_uuid' => null, 'expected_revision' => 0]), true, null];
+        yield 'targetless ingest accepts positive expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'ingest', 'target_uuid' => null, 'expected_revision' => 4]), true, null];
     }
 
     /** @dataProvider sortableOrders */
@@ -269,6 +318,28 @@ final class GovernanceQueueQueryTest extends TestCase
             'dependency_fingerprint' => hex2bin(str_repeat('b', 64)),
         ];
     }
+
+    /** @return list<array<string,mixed>> */
+    private function sortableRows(): array
+    {
+        $rows = [];
+        foreach ([
+            [10, 101, '2026-09-10 01:00:00', '2026-09-10 04:00:00', 'Bravo', 2],
+            [20, 102, '2026-09-10 01:00:00', '2026-09-10 01:00:00', 'Alpha', 1],
+            [30, 103, '2026-09-10 03:00:00', '2026-09-10 02:00:00', 'Delta', 1],
+            [40, 104, '2026-09-10 02:00:00', '2026-09-10 03:00:00', 'Delta', 2],
+        ] as [$id, $revision, $created, $updated, $name, $state]) {
+            $row = $this->proposalRow();
+            $row['id'] = $id;
+            $row['revision'] = $revision;
+            $row['created_at'] = $created;
+            $row['updated_at'] = $updated;
+            $row['command_json'] = json_encode(['name' => $name], JSON_THROW_ON_ERROR);
+            $row['state'] = $state;
+            $rows[] = $row;
+        }
+        return $rows;
+    }
 }
 
 final class RecordingProposalDatabase
@@ -361,6 +432,39 @@ final class RecordingProposalDatabase
         }
         if (preg_match('/state = (\d+)/', $query, $state)) $rows = array_values(array_filter($rows, static fn (array $row): bool => (int) $row['state'] === (int) $state[1]));
         if (preg_match("/entity_type = '([^']*)'/", $query, $type)) $rows = array_values(array_filter($rows, static fn (array $row): bool => (string) $row['entity_type'] === $type[1]));
+        if (preg_match('/ORDER BY (.+?) (ASC|DESC), id (ASC|DESC)/', $query, $order)) {
+            $expression = $order[1];
+            $direction = $order[2] === 'ASC' ? 1 : -1;
+            usort($rows, static function (array $left, array $right) use ($expression, $direction): int {
+                $leftValue = match (true) {
+                    str_contains($expression, 'created_at') => (string) $left['created_at'],
+                    str_contains($expression, 'updated_at') => (string) $left['updated_at'],
+                    str_contains($expression, 'proposal_uuid') => bin2hex((string) $left['proposal_uuid']),
+                    str_contains($expression, 'state') => (int) $left['state'],
+                    default => self::payloadSortValue($left),
+                };
+                $rightValue = match (true) {
+                    str_contains($expression, 'created_at') => (string) $right['created_at'],
+                    str_contains($expression, 'updated_at') => (string) $right['updated_at'],
+                    str_contains($expression, 'proposal_uuid') => bin2hex((string) $right['proposal_uuid']),
+                    str_contains($expression, 'state') => (int) $right['state'],
+                    default => self::payloadSortValue($right),
+                };
+                $comparison = $leftValue <=> $rightValue;
+                return $comparison !== 0 ? $comparison * $direction : ((int) $left['id'] <=> (int) $right['id']) * $direction;
+            });
+        }
         return $rows;
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function payloadSortValue(array $row): string
+    {
+        $payload = json_decode((string) ($row['command_json'] ?? ''), true);
+        if (!is_array($payload)) return (string) ($row['entity_type'] ?? '');
+        foreach (['name', 'title', 'text', 'claim_text'] as $key) {
+            if (isset($payload[$key]) && is_string($payload[$key])) return $payload[$key];
+        }
+        return (string) ($row['entity_type'] ?? '');
     }
 }
