@@ -31,7 +31,7 @@ final class GovernanceQueueActionService
         $base = ['ok' => false, 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => null];
         if (!isset(self::CAPABILITIES[$action])) return array_merge($base, ['reason' => 'INVALID_ACTION']);
         if (!UuidCodec::isValid($id)) return array_merge($base, ['reason' => 'INVALID_PROPOSAL_ID']);
-        if (!$this->validMutationSnapshot($snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
+        if (!$this->validMutationSnapshot($action, $snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
         if (array_key_exists('proposal_id', $snapshot) && (!is_string($snapshot['proposal_id']) || $snapshot['proposal_id'] !== $id)) {
             return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
         }
@@ -41,7 +41,7 @@ final class GovernanceQueueActionService
             $proposal = $this->port->find($id);
             if ($proposal === null) return array_merge($base, ['reason' => 'PROPOSAL_NOT_FOUND']);
             $base['state'] = $proposal->state->value;
-            if (!$this->matchesSnapshot($proposal, $snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
+            if (!$this->matchesSnapshot($action, $proposal, $snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
             if (!$this->allows($action, $proposal->state)) return array_merge($base, ['reason' => 'INVALID_LIFECYCLE_ACTION']);
 
             if ($action === 'apply') {
@@ -80,14 +80,13 @@ final class GovernanceQueueActionService
         return ['selected' => $selected, 'succeeded' => $selected - count($failures), 'failed' => count($failures), 'failures' => $failures, 'results' => $results];
     }
 
-    private function matchesSnapshot(Proposal $proposal, array $snapshot): bool
+    private function matchesSnapshot(string $action, Proposal $proposal, array $snapshot): bool
     {
-        $checks = [
-            'revision' => $proposal->revision,
-            'content_fingerprint' => $proposal->contentFingerprint,
-            'dependency_fingerprint' => $proposal->dependencyFingerprint,
-            'state' => $proposal->state->value,
-        ];
+        $checks = ['revision' => $proposal->revision, 'state' => $proposal->state->value];
+        if (in_array($action, ['approve', 'apply'], true)) {
+            $checks['content_fingerprint'] = $proposal->contentFingerprint;
+            $checks['dependency_fingerprint'] = $proposal->dependencyFingerprint;
+        }
         foreach ($checks as $key => $current) {
             if ($key === 'revision') {
                 if (!is_int($snapshot[$key]) || $snapshot[$key] !== $current) return false;
@@ -96,15 +95,17 @@ final class GovernanceQueueActionService
         return true;
     }
 
-    private function validMutationSnapshot(array $snapshot): bool
+    private function validMutationSnapshot(string $action, array $snapshot): bool
     {
-        foreach (['revision', 'state', 'content_fingerprint', 'dependency_fingerprint'] as $key) {
+        foreach (['revision', 'state'] as $key) {
             if (!array_key_exists($key, $snapshot)) return false;
         }
         if (!is_int($snapshot['revision']) || $snapshot['revision'] < 1) return false;
         if (!is_string($snapshot['state']) || ProposalState::tryFrom($snapshot['state']) === null) return false;
-        foreach (['content_fingerprint', 'dependency_fingerprint'] as $key) {
-            if (!is_string($snapshot[$key]) || $snapshot[$key] === '' || strlen($snapshot[$key]) > 128 || preg_match('/[^[:print:]]/', $snapshot[$key]) === 1) return false;
+        if (in_array($action, ['approve', 'apply'], true)) {
+            foreach (['content_fingerprint', 'dependency_fingerprint'] as $key) {
+                if (!array_key_exists($key, $snapshot) || !is_string($snapshot[$key]) || $snapshot[$key] === '' || strlen($snapshot[$key]) > 128 || preg_match('/[^[:print:]]/', $snapshot[$key]) === 1) return false;
+            }
         }
         return true;
     }

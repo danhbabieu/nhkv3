@@ -126,6 +126,39 @@ final class GovernanceQueueActionServiceTest extends TestCase
         self::assertSame([], $this->port->callsFor(self::FIRST));
     }
 
+    public function test_submit_and_reject_accept_scoped_revision_state_snapshots_without_fingerprints(): void
+    {
+        $this->port->proposals[self::FIRST] = $this->proposal(self::FIRST, ProposalState::DRAFT);
+        $submitSnapshot = ['proposal_id' => self::FIRST, 'revision' => 1, 'state' => ProposalState::DRAFT->value];
+
+        $submitted = $this->service->execute('submit', self::FIRST, $submitSnapshot);
+
+        self::assertTrue($submitted['ok']);
+        self::assertSame('draft', $submitted['state']);
+
+        $this->port->proposals[self::FIRST] = $this->proposal(self::FIRST, ProposalState::SUBMITTED);
+        $rejectSnapshot = ['proposal_id' => self::FIRST, 'revision' => 1, 'state' => ProposalState::SUBMITTED->value];
+
+        $rejected = $this->service->execute('reject', self::FIRST, $rejectSnapshot);
+
+        self::assertTrue($rejected['ok']);
+        self::assertSame('rejected', $rejected['state']);
+    }
+
+    public function test_approve_and_apply_reject_missing_fingerprints(): void
+    {
+        foreach (['approve', 'apply'] as $action) {
+            $proposalState = $action === 'apply' ? ProposalState::APPROVED : ProposalState::SUBMITTED;
+            $this->port->proposals[self::FIRST] = $this->proposal(self::FIRST, $proposalState);
+            $snapshot = ['proposal_id' => self::FIRST, 'revision' => 1, 'state' => $proposalState->value];
+
+            $result = $this->service->execute($action, self::FIRST, $snapshot);
+
+            self::assertFalse($result['ok']);
+            self::assertSame('STALE_SNAPSHOT', $result['reason']);
+        }
+    }
+
     public function test_malformed_snapshot_fields_fail_closed_without_mutation(): void
     {
         foreach ([
