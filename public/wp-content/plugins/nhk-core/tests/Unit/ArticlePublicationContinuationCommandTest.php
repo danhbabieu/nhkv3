@@ -105,6 +105,7 @@ final class ArticlePublicationContinuationCommandTest extends TestCase
         self::assertStringContainsString('nhk.article.publish.approve', $implementation);
         self::assertStringContainsString('nhk.article.publish', $implementation);
         self::assertStringContainsString('ArticlePublicationContinuationCommand', $source);
+        self::assertStringContainsString('RenderedArticleVerifier', $source);
         self::assertStringNotContainsString('wp_update_post', $source);
         self::assertStringNotContainsString('post_status', $source);
     }

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use NHK\Core\Application\Article\ArticlePublicationContinuationCommand;
+use NHK\Core\Application\Article\RenderedArticleVerifier;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Infrastructure\Article\WpEditorialStateReader;
 use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
@@ -61,12 +62,23 @@ try {
         if (!is_array($structured)) throw new RuntimeException('CANONICAL_MCP_RECEIPT_INVALID');
         return $structured;
     };
-    $publicReadBack = static function (string $url): array {
+    $publicReadBack = static function (string $url) use ($evidence): array {
         $response = wp_remote_get($url, ['timeout' => 20, 'redirection' => 3]);
         if (is_wp_error($response)) return ['status' => 'unavailable', 'error' => 'PUBLIC_ROUTE_REQUEST_FAILED'];
         $status = (int) wp_remote_retrieve_response_code($response);
         $body = (string) wp_remote_retrieve_body($response);
-        return $status >= 200 && $status < 300 && trim($body) !== '' ? ['status' => 'verified', 'http_status' => $status, 'url' => $url] : ['status' => 'failed', 'http_status' => $status, 'url' => $url];
+        if ($status < 200 || $status >= 300 || trim($body) === '') return ['status' => 'failed', 'http_status' => $status, 'url' => $url];
+        $verification = (new RenderedArticleVerifier())->verify(
+            $body,
+            $url,
+            [
+                'claim_compliance_acceptable' => ($evidence['claim_compliance']['status'] ?? '') === 'PASS',
+                'semantic_ready' => ($evidence['semantic_readback_verified'] ?? false) === true,
+                'media_complete' => ($evidence['media_usage']['status'] ?? '') === 'PASS',
+            ],
+            is_array($evidence['rendered_expectations'] ?? null) ? $evidence['rendered_expectations'] : [],
+        );
+        return ['status' => $verification->verified ? 'verified' : 'failed', 'http_status' => $status, 'url' => $url] + $verification->toArray();
     };
     $command = new ArticlePublicationContinuationCommand(new WpdbCaptureRepository($wpdb), new WpEditorialStateReader(), $invoke, static fn (): array => ['documentation_version' => (string) $bootstrap['documentation_version'], 'manifest_hash' => (string) $bootstrap['manifest_hash']], $publicReadBack);
     $input = ['operation' => $operation, 'capture_id' => $captureId, 'article_id' => $articleId, 'idempotency_key' => $idempotencyKey, 'evidence' => $evidence];
