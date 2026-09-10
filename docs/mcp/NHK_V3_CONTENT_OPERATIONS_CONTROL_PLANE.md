@@ -345,3 +345,23 @@ revision or raw JSON; those belong only to Kỹ thuật/Nâng cao.
 Admin remains a control plane over the same application services and Governance
 boundary. “Xem trên web” opens the canonical first-party Video route only when
 the projection is eligible; “Mở nguồn gốc” is the external source action.
+
+### Admin Queue lifecycle workspace — 2026-09-10
+
+The **Duyệt dữ liệu** workspace lists existing Proposal records only. Its
+server-side search, status/type filters, allowlisted sort order and bounded
+pagination query the Proposal store read-only; unavailable storage and
+malformed rows remain explicit unavailable/blocked diagnostics rather than an
+empty success. Per-item and current-page bulk actions are POST-only, require
+the view/action capability and WordPress nonce, validate UUIDs and allowlisted
+state/action values, and compare the submitted revision plus approval/apply
+fingerprints before calling the canonical Governance lifecycle services.
+
+The queue supports only the existing submit, approve, reject and apply
+lifecycle actions. Apply rechecks Eligibility and Controlled Apply, preserving
+canonical audit/read-back and per-item partial-failure results; the queue does
+not write semantic tables, issue direct SQL mutations or create proposals.
+The Admin page is therefore a lifecycle workspace for existing records, not a
+new content-entry surface. New content remains Capture-only through
+`nhk.capture.ingest`; the MCP catalog, operator Ability allowlist and internal
+proposal tools are unchanged, with no queue/Admin MCP tool or writer.

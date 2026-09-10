@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Governance Admin Queue boundary verification
+
+The Admin **Duyệt dữ liệu** queue is recorded as an existing-Proposal lifecycle
+workspace only. Its supported read actions are bounded server-side search,
+status/type filtering, allowlisted sort and pagination; its supported actions
+are the existing `submit`, `approve`, `reject` and `apply` lifecycle calls.
+POST-only handlers require the view/action capability and WordPress nonce,
+validate UUID/state/action input, and compare revision plus approval/apply
+fingerprints before delegating to the canonical Governance, Eligibility and
+Controlled Apply services. Each item is reported independently, so unavailable
+rows, stale bindings and ineligible items remain explicit partial failures;
+the queue has no semantic-table SQL writer or proposal-creation path.
+
+The MCP regression test proves the exact current `McpToolCatalog::tools()`
+names, Easy MCP operator Ability allowlist and allowed tool patterns remain
+unchanged; `nhk.capture.ingest` remains the canonical new-content entry point,
+`nhk.proposal.apply` remains internal-only, and no queue/Admin MCP tool is
+present. Queue source assertions cover the three `GovernanceQueue*.php` files
+and find no MCP registration or generic WordPress/database writer.
+
+Verification evidence for this checkpoint: focused relevant filter — 150 tests
+/ 1,040 assertions, 0 failures; NHK Unit — 1,019 / 4,975, 0 failures; NHK
+Contract — 4 / 31, 0 failures; `composer lint` — exit 0; `composer validate
+--no-check-publish` — exit 0 with the existing missing-license warning; `git
+diff --check` — exit 0. `composer generate:mcp-docs` ran twice; the decoded
+snapshots match apart from generator-time metadata (`generated_at`), with the
+final manifest hash recorded in `task-5-report.md`.
+The generated `resources/canonical-docs/` remains ignored
+and was not deployed. The requested secret scan had one self-referential regex
+match in the plan text and no credential; a target-source scan excluding that
+plan is clean. No database, SSH, remote runtime, deployment or publish action
+was attempted.
+
 # Checkpoint — 2026-09-10 — Canonical Capture orchestration convergence
 
 The Capture root cause was a split identity boundary: Capture used the
