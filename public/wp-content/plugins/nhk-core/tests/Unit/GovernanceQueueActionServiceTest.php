@@ -31,7 +31,7 @@ final class GovernanceQueueActionServiceTest extends TestCase
     {
         $result = $this->service->bulk('approve', [
             $this->snapshot(self::FIRST),
-            ['proposal_id' => '00000000-0000-4000-8000-000000000001', 'revision' => 1],
+            ['proposal_id' => '00000000-0000-4000-8000-000000000001', 'revision' => 1, 'state' => 'submitted', 'content_fingerprint' => 'unknown', 'dependency_fingerprint' => 'unknown'],
             $this->snapshot(self::SECOND, ProposalState::SUBMITTED),
         ]);
 
@@ -113,6 +113,49 @@ final class GovernanceQueueActionServiceTest extends TestCase
         self::assertSame([], $this->port->callsFor(self::FIRST));
     }
 
+    public function test_mutation_requires_all_snapshot_fields_before_read_or_write(): void
+    {
+        foreach (['revision', 'state', 'content_fingerprint', 'dependency_fingerprint'] as $missing) {
+            $snapshot = $this->snapshot(self::FIRST);
+            unset($snapshot[$missing]);
+            $result = $this->service->execute('approve', self::FIRST, $snapshot);
+            self::assertFalse($result['ok']);
+            self::assertSame('STALE_SNAPSHOT', $result['reason']);
+        }
+
+        self::assertSame([], $this->port->callsFor(self::FIRST));
+    }
+
+    public function test_malformed_snapshot_fields_fail_closed_without_mutation(): void
+    {
+        foreach ([
+            ['revision' => '1'],
+            ['revision' => 0],
+            ['state' => 'not-a-proposal-state'],
+            ['content_fingerprint' => ''],
+            ['dependency_fingerprint' => 123],
+        ] as $malformed) {
+            $result = $this->service->execute('approve', self::FIRST, array_merge($this->snapshot(self::FIRST), $malformed));
+            self::assertFalse($result['ok']);
+            self::assertSame('STALE_SNAPSHOT', $result['reason']);
+        }
+
+        self::assertSame([], $this->port->callsFor(self::FIRST));
+    }
+
+    public function test_exception_diagnostic_is_sanitized_and_bounded(): void
+    {
+        $this->port->throwOn['approve'] = new \RuntimeException("secret\n" . str_repeat('x', 400));
+        $result = $this->service->execute('approve', self::FIRST, $this->snapshot(self::FIRST));
+
+        self::assertFalse($result['ok']);
+        self::assertSame('OPERATION_FAILED', $result['reason']);
+        self::assertArrayHasKey('message', $result);
+        self::assertLessThanOrEqual(160, strlen($result['message']));
+        self::assertStringNotContainsString("\n", $result['message']);
+        self::assertStringNotContainsString('secret', $result['message']);
+    }
+
     public function test_invalid_action_identifier_missing_capability_and_lifecycle_fail_closed(): void
     {
         self::assertSame('INVALID_ACTION', $this->service->execute('publish', self::FIRST)['reason']);
@@ -170,10 +213,12 @@ final class RecordingGovernanceActionPort implements GovernanceActionPort
     public array $actors = [];
     /** @var list<array{action:string,id:string}> */
     public array $calls = [];
+    /** @var array<string, \Throwable> */
+    public array $throwOn = [];
 
     public function find(string $id): ?Proposal { $this->calls[] = ['action' => 'find', 'id' => $id]; return $this->proposals[$id] ?? null; }
     public function submit(string $id): Proposal { $this->calls[] = ['action' => 'submit', 'id' => $id]; return $this->proposals[$id]; }
-    public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { $this->calls[] = ['action' => 'approve', 'id' => $id]; $this->actors[] = $actor; return $this->proposals[$id]->transition(ProposalState::APPROVED, $actor); }
+    public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { if (isset($this->throwOn['approve'])) throw $this->throwOn['approve']; $this->calls[] = ['action' => 'approve', 'id' => $id]; $this->actors[] = $actor; return $this->proposals[$id]->transition(ProposalState::APPROVED, $actor); }
     public function reject(string $id, string $actor): Proposal { $this->calls[] = ['action' => 'reject', 'id' => $id]; $this->actors[] = $actor; return $this->proposals[$id]->transition(ProposalState::REJECTED, $actor); }
     public function eligibility(string $id): EligibilityResult { $this->calls[] = ['action' => 'eligibility', 'id' => $id]; return $this->eligibility[$id] ?? EligibilityResult::ready(); }
     public function apply(string $id): array { $this->calls[] = ['action' => 'apply', 'id' => $id]; return ['proposal_id' => $id, 'idempotent' => $this->proposals[$id]->state === ProposalState::APPLIED]; }

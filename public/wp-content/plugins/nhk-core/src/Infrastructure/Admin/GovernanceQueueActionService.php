@@ -31,6 +31,7 @@ final class GovernanceQueueActionService
         $base = ['ok' => false, 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => null];
         if (!isset(self::CAPABILITIES[$action])) return array_merge($base, ['reason' => 'INVALID_ACTION']);
         if (!UuidCodec::isValid($id)) return array_merge($base, ['reason' => 'INVALID_PROPOSAL_ID']);
+        if (!$this->validMutationSnapshot($snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
         if (array_key_exists('proposal_id', $snapshot) && (!is_string($snapshot['proposal_id']) || $snapshot['proposal_id'] !== $id)) {
             return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
         }
@@ -59,7 +60,7 @@ final class GovernanceQueueActionService
             };
             return ['ok' => true, 'proposal_id' => $id, 'action' => $action, 'state' => $result->state->value, 'reason' => null];
         } catch (\Throwable $error) {
-            return array_merge($base, ['reason' => $this->exceptionReason($error), 'message' => $error->getMessage()]);
+            return array_merge($base, ['reason' => $this->exceptionReason($error), 'message' => $this->exceptionMessage($error)]);
         }
     }
 
@@ -88,8 +89,22 @@ final class GovernanceQueueActionService
             'state' => $proposal->state->value,
         ];
         foreach ($checks as $key => $current) {
-            if (!array_key_exists($key, $snapshot)) continue;
-            if (!is_scalar($snapshot[$key]) || (string) $snapshot[$key] !== (string) $current) return false;
+            if ($key === 'revision') {
+                if (!is_int($snapshot[$key]) || $snapshot[$key] !== $current) return false;
+            } elseif ((string) $snapshot[$key] !== (string) $current) return false;
+        }
+        return true;
+    }
+
+    private function validMutationSnapshot(array $snapshot): bool
+    {
+        foreach (['revision', 'state', 'content_fingerprint', 'dependency_fingerprint'] as $key) {
+            if (!array_key_exists($key, $snapshot)) return false;
+        }
+        if (!is_int($snapshot['revision']) || $snapshot['revision'] < 1) return false;
+        if (!is_string($snapshot['state']) || ProposalState::tryFrom($snapshot['state']) === null) return false;
+        foreach (['content_fingerprint', 'dependency_fingerprint'] as $key) {
+            if (!is_string($snapshot[$key]) || $snapshot[$key] === '' || strlen($snapshot[$key]) > 128 || preg_match('/[^[:print:]]/', $snapshot[$key]) === 1) return false;
         }
         return true;
     }
@@ -124,5 +139,14 @@ final class GovernanceQueueActionService
             $error instanceof InvalidProposalTransition => 'INVALID_LIFECYCLE_ACTION',
             default => 'OPERATION_FAILED',
         };
+    }
+
+    private function exceptionMessage(\Throwable $error): string
+    {
+        if ($error instanceof ProposalNotFound || $error instanceof GovernancePermissionDenied || $error instanceof ProposalBindingConflict || $error instanceof InvalidProposalTransition) {
+            $message = preg_replace('/\s+/', ' ', trim($error->getMessage())) ?: 'Governance action failed.';
+            return substr($message, 0, 160);
+        }
+        return 'Governance action failed.';
     }
 }
