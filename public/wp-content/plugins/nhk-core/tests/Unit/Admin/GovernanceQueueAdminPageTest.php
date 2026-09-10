@@ -15,6 +15,10 @@ namespace {
     if (!function_exists('sanitize_textarea_field')) { function sanitize_textarea_field($value) { return trim((string) $value); } }
     if (!function_exists('absint')) { function absint($value) { return abs((int) $value); } }
     if (!function_exists('wp_json_encode')) { function wp_json_encode($value, $flags = 0) { return json_encode($value, $flags); } }
+    if (!function_exists('esc_html')) { function esc_html($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }
+    if (!function_exists('esc_attr')) { function esc_attr($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }
+    if (!function_exists('esc_url')) { function esc_url($value) { return esc_attr($value); } }
+    if (!function_exists('selected')) { function selected($selected, $current, $echo = true) { $value = (string) $selected === (string) $current ? ' selected="selected"' : ''; if ($echo) echo $value; return $value; } }
 }
 
 namespace NHK\Tests\Unit\Admin {
@@ -59,8 +63,11 @@ final class GovernanceQueueAdminPageTest extends TestCase
         $_GET = ['status' => 'submitted', 'type' => 'knowledge', 'order_by' => 'name', 'order' => 'asc'];
 
         ob_start();
-        GovernanceQueueAdminPage::render();
-        ob_end_clean();
+        try {
+            GovernanceQueueAdminPage::render();
+        } finally {
+            ob_end_clean();
+        }
 
         self::assertCount(1, $query->calls);
         self::assertSame('submitted', $query->calls[0]['status']);
@@ -77,8 +84,12 @@ final class GovernanceQueueAdminPageTest extends TestCase
             $_GET = [$key => $value];
 
             ob_start();
-            GovernanceQueueAdminPage::render();
-            $html = (string) ob_get_clean();
+            try {
+                GovernanceQueueAdminPage::render();
+                $html = (string) ob_get_contents();
+            } finally {
+                ob_end_clean();
+            }
 
             self::assertSame([], $query->calls, $key);
             self::assertStringContainsString('INVALID_FILTER', $html, $key);
