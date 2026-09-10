@@ -29,6 +29,9 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertCount(2, $this->db->preparedStatements);
         self::assertStringContainsString('HEX(proposal_uuid)', $this->db->preparedStatements[0]['template']);
         self::assertStringContainsString('HEX(proposal_uuid)', $this->db->preparedStatements[1]['template']);
+        self::assertSame('%' . str_replace('-', '', $this->proposalId) . '%', $this->db->preparedStatements[0]['arguments'][0]);
+        self::assertSame('%' . str_replace('-', '', $this->proposalId) . '%', $this->db->preparedStatements[0]['arguments'][1]);
+        self::assertSame('%' . $this->proposalId . '%', $this->db->preparedStatements[0]['arguments'][2]);
         self::assertSame($this->db->preparedStatements[0]['arguments'], array_slice($this->db->preparedStatements[1]['arguments'], 0, -2));
     }
 
@@ -76,6 +79,28 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertSame(100, $page['per_page']);
         self::assertStringContainsString('entity_type', $this->db->lastPrepared);
         self::assertStringContainsString('LIMIT 100 OFFSET 0', $this->db->lastPrepared);
+    }
+
+    /** @dataProvider canonicalBindingRows */
+    public function test_canonical_binding_errors_are_blocked_but_supported_exceptions_remain_actionable(callable $change, bool $actionable, ?string $diagnostic): void
+    {
+        $this->db = new RecordingProposalDatabase([$change($this->proposalRow())], 1);
+        $this->query = new WpdbGovernanceQueueQuery($this->db);
+
+        $page = $this->query->page();
+
+        self::assertSame($actionable, $page['items'][0]['actionable']);
+        self::assertSame($diagnostic === null ? [] : [$diagnostic], $page['diagnostics']);
+    }
+
+    /** @return iterable<string,array{callable,bool,?string}> */
+    public static function canonicalBindingRows(): iterable
+    {
+        yield 'zero expected revision on rename' => [static fn (array $row): array => array_replace($row, ['expected_revision' => 0]), false, 'PROPOSAL_BINDING_INVALID'];
+        yield 'empty operation' => [static fn (array $row): array => array_replace($row, ['operation' => '']), false, 'PROPOSAL_BINDING_INVALID'];
+        yield 'empty entity type' => [static fn (array $row): array => array_replace($row, ['entity_type' => '']), false, 'PROPOSAL_BINDING_INVALID'];
+        yield 'relation create normalizes expected revision' => [static fn (array $row): array => array_replace($row, ['entity_type' => 'relation', 'operation' => 'relation_create', 'expected_revision' => 0, 'command_json' => json_encode(['source_uuid' => '0198f8d5-1d55-7a10-8d4e-5f0d9d8d0001'])]), true, null];
+        yield 'targetless create accepts zero expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'create', 'target_uuid' => null, 'expected_revision' => 0]), true, null];
     }
 
     /** @dataProvider sortableOrders */
@@ -199,6 +224,7 @@ final class GovernanceQueueQueryTest extends TestCase
             'proposal_uuid' => hex2bin(str_replace('-', '', $this->proposalId)),
             'entity_type' => 'brand',
             'operation' => 'rename',
+            'expected_revision' => 3,
             'target_uuid' => hex2bin(str_replace('-', '', $this->targetId)),
             'command_json' => json_encode([
                 'name' => 'Vertical Brand',

@@ -41,7 +41,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         $orderExpression = self::SORTS[$filters['order_by']];
         $direction = strtoupper($filters['order']);
         $itemsSql = sprintf(
-            'SELECT id, proposal_uuid, entity_type, operation, target_uuid, command_json, state, created_at, updated_at, revision, fingerprint, dependency_fingerprint FROM %s%s ORDER BY %s %s, id %s LIMIT %%d OFFSET %%d',
+            'SELECT id, proposal_uuid, entity_type, operation, target_uuid, expected_revision, command_json, state, created_at, updated_at, revision, fingerprint, dependency_fingerprint FROM %s%s ORDER BY %s %s, id %s LIMIT %%d OFFSET %%d',
             $table,
             $whereSql,
             $orderExpression,
@@ -171,8 +171,9 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         $parameters = [];
         if ($filters['search'] !== '') {
             $like = '%' . $this->escapeLike($filters['search']) . '%';
+            $uuidLike = '%' . $this->escapeLike(str_replace('-', '', $filters['search'])) . '%';
             $where[] = '(LOWER(HEX(proposal_uuid)) LIKE %s OR LOWER(HEX(target_uuid)) LIKE %s OR LOWER(entity_type) LIKE %s OR LOWER(command_json) LIKE %s)';
-            array_push($parameters, $like, $like, $like, $like);
+            array_push($parameters, $uuidLike, $uuidLike, $like, $like);
         }
         if ($filters['status'] !== '') {
             $where[] = 'state = %d';
@@ -269,11 +270,28 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         if (!$this->revisionIsValid($row['revision'] ?? null)) {
             return 'PROPOSAL_REVISION_INVALID';
         }
+        if (!$this->bindingIsValid($row)) {
+            return 'PROPOSAL_BINDING_INVALID';
+        }
         if (!$this->fingerprintIsValid($row['fingerprint'] ?? $row['content_fingerprint'] ?? null)
             || !$this->fingerprintIsValid($row['dependency_fingerprint'] ?? null)) {
             return 'PROPOSAL_FINGERPRINT_INVALID';
         }
         return null;
+    }
+
+    /** @param array<string,mixed> $row */
+    private function bindingIsValid(array $row): bool
+    {
+        $entityType = trim((string) ($row['entity_type'] ?? ''));
+        $operation = trim((string) ($row['operation'] ?? ''));
+        if ($entityType === '' || $operation === '') return false;
+
+        $expected = $row['expected_revision'] ?? null;
+        $isTargetlessCreate = in_array($operation, ['create', 'ingest'], true) && $this->targetUuid($row['target_uuid'] ?? null) === null;
+        if ($operation === 'relation_create') return $entityType === 'relation';
+        if ($isTargetlessCreate && ($expected === null || $expected === '' || (string) $expected === '0')) return true;
+        return $this->revisionIsValid($expected);
     }
 
     private function state(mixed $value): ?ProposalState
