@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Easy MCP 1.7.16 final JSON boundary repair
+
+The Easy MCP 1.7.16 source trace is complete. Its ability path is
+`wp_get_abilities()` → `Dynamic_Tool_Registrar::register_ability_tools()` →
+`Tool_Registry::get_all_definitions()` → `Server::handle_tools_list()` →
+`Transport::handle_post()` → WordPress REST response normalization. The
+registrar reads `Ability::get_input_schema()`, finalizes and recursively
+normalizes it, and `handle_tools_list()` applies `Gemini_Safe_Schema::sanitize`
+before returning JSON-RPC `tools/list`. Those steps preserve ordinary
+`capture_id` properties; Easy MCP has no later tools/list rebuild or
+`rest_post_dispatch` serializer. `Base_Tool::get_definition()` emits
+`name`, `description`, `inputSchema` and optional annotations, but no NHK
+`_meta` connector metadata.
+
+The exact field-visibility defect was in the NHK compatibility projection
+boundary, not the canonical Ability or `McpToolCatalog`: projection was
+registered on WordPress `rest_post_dispatch`, which receives a response object
+before WordPress converts it through `response_to_data()` for JSON encoding.
+The adapter now projects only the existing target tool at
+`rest_pre_echo_response`, the final data boundary. It reuses the canonical
+`McpToolCatalog` descriptor and preserves Easy MCP tool presence, filtering and
+annotations. No new tool, semantic field, Capture operation, database path or
+live mutation was added. The multipart proxy remains independently scoped to
+Easy MCP 1.7.16/1.7.17.
+
+Regression coverage models the 1.7.16 Ability → registry → tools/list path and
+asserts the final target descriptor contains optional UUID `capture_id`, native
+binary `files[]`, `_meta.openai/fileParams=["files"]`, and only
+`idempotency_key` plus `documentation_checkpoint` as required fields; an
+unrelated tool remains byte-for-byte unchanged. Verification: focused Easy
+MCP/boot/contract slice — 50 tests / 517 assertions, 0 failures; NHK Unit —
+1,043 tests / 5,323 assertions, 0 failures; NHK Contract — 4 tests / 31
+assertions, 0 failures; PHP lint, Composer validation and `git diff --check`
+pass. The guarded integration suite remains environment-blocked by the absent
+WordPress test bootstrap/database and existing mandatory P4 environment gate;
+no production, staging, V2 or live MCP request was made.
+
 # Checkpoint — 2026-09-10 — Governance queue sequential workflow enforcement
 
 The Admin **Duyệt dữ liệu** queue now presents only the next valid Vietnamese

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
+use NHK\Core\Application\Mcp\McpToolCatalog;
 use PHPUnit\Framework\TestCase;
 
 final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
@@ -35,31 +36,104 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame([$tool], EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool]));
     }
 
-    public function test_tools_list_projection_keeps_capture_descriptor_on_newer_or_unreported_easy_mcp_versions(): void
+    public function test_final_easy_mcp_1716_pipeline_projects_canonical_capture_descriptor(): void
     {
+        $catalog = array_column(McpToolCatalog::tools(), null, 'name');
+        $capture = $catalog['nhk.capture.ingest'];
+
+        // This simulates Easy MCP 1.7.16's real path:
+        // wp_get_abilities() -> Dynamic_Tool_Registrar -> Tool_Registry ->
+        // Server::handle_tools_list() -> Transport -> final REST data.
+        // The upstream registrar copies Ability::get_input_schema() into the
+        // Dynamic_Tool definition, while Base_Tool::get_definition() does not
+        // carry NHK connector metadata. The final REST data is therefore the
+        // exact boundary this adapter must repair.
+        $abilities = [
+            'nhk-v3/capture-ingest' => [
+                'label' => 'Capture',
+                'description' => $capture['description'],
+                'input_schema' => $capture['inputSchema'],
+                'annotations' => [],
+            ],
+            'nhk-v3/media-ingest' => [
+                'label' => 'Media',
+                'description' => 'unrelated tool',
+                'input_schema' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']]],
+                'annotations' => [],
+            ],
+        ];
+        $response = self::simulateEasyMcp1716ToolsList($abilities);
+        $easyMcpTools = $response['result']['tools'];
+
         $request = new class {
             public function get_route(): string { return '/easy-mcp-ai/v1/mcp/'; }
-            public function get_param(string $key): mixed { return null; }
-            public function get_json_params(): ?array { return null; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']; }
         };
-        $response = new class {
-            private array $data = ['result' => ['tools' => [[
-                'name' => 'wp_ability_nhk_v3_capture_ingest',
-                'inputSchema' => ['type' => 'object', 'properties' => []],
-            ], [
-                'name' => 'wp_ability_nhk_v3_media_ingest',
-                'inputSchema' => ['type' => 'object'],
-            ]]]];
-            public function get_data(): array { return $this->data; }
-            public function set_data(array $data): void { $this->data = $data; }
-        };
+        $response = ['jsonrpc' => '2.0', 'id' => 1, 'result' => ['tools' => $easyMcpTools]];
 
-        $projected = EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, null, $request);
-        $tools = array_column($projected->get_data()['result']['tools'], null, 'name');
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+        $tools = array_column($final['result']['tools'], null, 'name');
 
         self::assertArrayHasKey('capture_id', $tools[self::TARGET]['inputSchema']['properties']);
+        self::assertSame('string', $tools[self::TARGET]['inputSchema']['properties']['capture_id']['type']);
+        self::assertSame('uuid', $tools[self::TARGET]['inputSchema']['properties']['capture_id']['format']);
+        self::assertNotContains('capture_id', $tools[self::TARGET]['inputSchema']['required']);
+        self::assertSame(['idempotency_key', 'documentation_checkpoint'], $tools[self::TARGET]['inputSchema']['required']);
+        self::assertSame('array', $tools[self::TARGET]['inputSchema']['properties']['files']['type']);
+        self::assertSame('object', $tools[self::TARGET]['inputSchema']['properties']['files']['items']['type']);
+        self::assertSame('binary', $tools[self::TARGET]['inputSchema']['properties']['files']['items']['format']);
         self::assertSame(['files'], $tools[self::TARGET]['_meta']['openai/fileParams']);
-        self::assertArrayNotHasKey('_meta', $tools['wp_ability_nhk_v3_media_ingest']);
+        self::assertSame($easyMcpTools[1], $tools['wp_ability_nhk_v3_media_ingest']);
+    }
+
+    /**
+     * Minimal executable model of Easy MCP 1.7.16's ability registration,
+     * definition materialization, tools/list sanitization, and JSON-RPC
+     * response construction. It intentionally does not project NHK metadata.
+     *
+     * @param array<string,array<string,mixed>> $abilities
+     * @return array<string,mixed>
+     */
+    private static function simulateEasyMcp1716ToolsList(array $abilities): array
+    {
+        $tools = [];
+        foreach ($abilities as $slug => $ability) {
+            $inputSchema = $ability['input_schema'];
+            if (!is_array($inputSchema) || $inputSchema === []) {
+                $inputSchema = ['type' => 'object', 'properties' => new \stdClass()];
+            } else {
+                $inputSchema['type'] = 'object';
+                $inputSchema['properties'] ??= new \stdClass();
+                $inputSchema = self::normalizeEasyMcpSchema($inputSchema);
+            }
+
+            $tools[] = [
+                'name' => 'wp_ability_' . trim((string) preg_replace('/[^a-z0-9]+/i', '_', strtolower($slug)), '_'),
+                'description' => $ability['description'] . ' (ability: ' . $slug . ')',
+                'inputSchema' => $inputSchema,
+                'annotations' => ['title' => $ability['label'], 'openWorldHint' => true],
+            ];
+        }
+
+        return ['jsonrpc' => '2.0', 'id' => 1, 'result' => ['tools' => $tools]];
+    }
+
+    /** @param array<string,mixed> $schema @return array<string,mixed> */
+    private static function normalizeEasyMcpSchema(array $schema): array
+    {
+        foreach (['properties', 'patternProperties', '$defs', 'definitions'] as $key) {
+            if (!is_array($schema[$key] ?? null)) continue;
+            foreach ($schema[$key] as $name => $child) {
+                if (is_array($child)) $schema[$key][$name] = self::normalizeEasyMcpSchema($child);
+            }
+        }
+        foreach (['allOf', 'anyOf', 'oneOf', 'prefixItems'] as $key) {
+            if (!is_array($schema[$key] ?? null)) continue;
+            foreach ($schema[$key] as $index => $child) {
+                if (is_array($child)) $schema[$key][$index] = self::normalizeEasyMcpSchema($child);
+            }
+        }
+        return $schema;
     }
 
     public function test_only_supported_easy_mcp_versions_are_enabled(): void

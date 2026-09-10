@@ -30,7 +30,11 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (self::$registered || !function_exists('add_filter')) return;
         self::$registered = true;
         add_filter('rest_request_before_callbacks', [self::class, 'interceptMultipartCapture'], 10, 3);
-        add_filter('rest_post_dispatch', [self::class, 'projectToolsListDescriptor'], 10, 3);
+        // WordPress applies rest_post_dispatch before it converts the response
+        // object to the data that is actually JSON-encoded. Project at the
+        // final echo boundary so Easy MCP/WordPress cannot serve a descriptor
+        // different from the one we verified here.
+        add_filter('rest_pre_echo_response', [self::class, 'projectFinalToolsListDescriptor'], 10, 3);
     }
 
     public static function isSupportedVersion(string $version): bool
@@ -115,24 +119,21 @@ final class EasyMcpNativeFileCompatibilityAdapter
         }
     }
 
-    public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed
+    public static function projectFinalToolsListDescriptor(mixed $data, mixed $server, mixed $request): mixed
     {
-        if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
-        $rpc = self::requestRpc($request);
-        // Descriptor projection is independent of the multipart compatibility
-        // proxy. Do not suppress it merely because the installed Easy MCP
-        // version is newer than the versions that need the file proxy.
-        if ($rpc !== null && ($rpc['method'] ?? null) !== 'tools/list') return $response;
-        if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
+        if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
+        return self::projectToolsListData($data);
+    }
 
-        $data = $response->get_data();
-        if (!is_array($data)) return $response;
+    /** @param mixed $data @return mixed */
+    private static function projectToolsListData(mixed $data): mixed
+    {
+        if (!is_array($data)) return $data;
         $result = is_array($data['result'] ?? null) ? $data['result'] : [];
-        if (!is_array($result['tools'] ?? null)) return $response;
-        if (!array_filter($result['tools'], static fn (mixed $tool): bool => is_array($tool) && (string) ($tool['name'] ?? '') === self::TARGET_TOOL)) return $response;
+        if (!is_array($result['tools'] ?? null)) return $data;
+        if (!array_filter($result['tools'], static fn (mixed $tool): bool => is_array($tool) && (string) ($tool['name'] ?? '') === self::TARGET_TOOL)) return $data;
         $data['result']['tools'] = self::projectTools($result['tools']);
-        $response->set_data($data);
-        return $response;
+        return $data;
     }
 
     private static function installedVersion(): string

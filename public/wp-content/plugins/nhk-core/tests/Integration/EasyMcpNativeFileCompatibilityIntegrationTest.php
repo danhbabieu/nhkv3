@@ -20,22 +20,22 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         if (!class_exists('Easy_MCP_AI\\MCP\\Transport')) self::markTestSkipped('Easy MCP AI is required for the native-file compatibility integration assertion.');
     }
 
-    public function test_descriptor_projection_runs_after_easy_mcp_response_without_adding_tools(): void
+    public function test_final_descriptor_projection_runs_at_wordpress_json_boundary_without_adding_tools(): void
     {
         if (!defined('EASY_MCP_AI_VERSION')) self::markTestSkipped('Easy MCP AI version constant is unavailable.');
 
         $request = new \WP_REST_Request('POST', '/easy-mcp-ai/v1/mcp');
         $request->set_body((string) wp_json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']));
-        $response = new \WP_REST_Response(['result' => ['tools' => [[
+        $data = ['result' => ['tools' => [[
             'name' => 'wp_ability_nhk_v3_capture_ingest',
             'inputSchema' => ['type' => 'object', 'properties' => []],
         ], [
             'name' => 'wp_ability_nhk_v3_media_ingest',
             'inputSchema' => ['type' => 'object'],
-        ]]]]);
+        ]]]];
 
-        $projected = EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, rest_get_server(), $request);
-        $tools = array_column($projected->get_data()['result']['tools'], null, 'name');
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($data, rest_get_server(), $request);
+        $tools = array_column($projected['result']['tools'], null, 'name');
 
         self::assertArrayHasKey('capture_id', $tools['wp_ability_nhk_v3_capture_ingest']['inputSchema']['properties']);
         self::assertSame(['files'], $tools['wp_ability_nhk_v3_capture_ingest']['_meta']['openai/fileParams']);
