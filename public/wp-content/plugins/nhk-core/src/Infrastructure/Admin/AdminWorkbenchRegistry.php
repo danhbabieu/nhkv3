@@ -68,8 +68,8 @@ final class AdminWorkbenchRegistry
             [
                 'id' => 'governance',
                 'slug' => 'nhk-v3-governance',
-                'label' => 'Duyệt thay đổi',
-                'description' => 'Theo dõi Proposal, approval, eligibility, Controlled Apply và read-back.',
+                'label' => 'Duyệt dữ liệu',
+                'description' => 'Duyệt Proposal, eligibility, Controlled Apply và read-back theo hàng đợi.',
                 'owner' => 'Governance',
                 'capability' => 'nhk_view_governance',
                 'href' => 'admin.php?page=nhk-v3-governance',

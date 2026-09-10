@@ -15,6 +15,7 @@ final class AdminWorkbenchPage
     {
         add_action('admin_menu', [self::class, 'registerMenu'], 11);
         add_action('admin_post_nhk_governance_automation_policy', [self::class, 'saveAutomationPolicy']);
+        GovernanceQueueAdminPage::register();
     }
 
     public static function registerMenu(): void
@@ -37,7 +38,7 @@ final class AdminWorkbenchPage
         add_submenu_page('nhk-v3', 'Nội dung', 'Nội dung', 'edit_posts', 'nhk-v3-content', [self::class, 'renderContent']);
         add_submenu_page('nhk-v3', 'Media', 'Media', 'upload_files', 'nhk-v3-media', [self::class, 'renderMedia']);
         add_submenu_page('nhk-v3', 'Tri thức', 'Tri thức', 'nhk_view_governance', 'nhk-v3-knowledge', [self::class, 'renderKnowledge']);
-        add_submenu_page('nhk-v3', 'Duyệt', 'Duyệt', 'nhk_view_governance', 'nhk-v3-governance', [self::class, 'renderGovernance']);
+        add_submenu_page('nhk-v3', 'Duyệt dữ liệu', 'Duyệt dữ liệu', 'nhk_view_governance', 'nhk-v3-governance', [GovernanceQueueAdminPage::class, 'render']);
         add_submenu_page('nhk-v3', 'Hệ thống', 'Hệ thống', 'manage_options', 'nhk-v3-system', [self::class, 'renderSystem']);
         add_submenu_page('nhk-v3', 'Phê duyệt & xuất bản tự động', 'Phê duyệt & xuất bản tự động', 'manage_options', 'nhk-v3-automation-policy', [self::class, 'renderAutomationPolicy']);
         add_submenu_page('nhk-v3', 'Nâng cao', 'Nâng cao', 'manage_options', 'nhk-v3-advanced', [AdminPage::class, 'render']);
@@ -70,7 +71,8 @@ final class AdminWorkbenchPage
     public static function renderContent(): void { self::renderWorkspace('Nội dung', 'Bài viết và Video trong một workbench chung.', 'content'); }
     public static function renderMedia(): void { self::renderWorkspace('Media', 'Media identity, assets, usage và projection theo contract.', 'media'); }
     public static function renderKnowledge(): void { self::renderWorkspace('Tri thức', 'Entity, Claim, Source, Evidence và Relation trong một ô tìm kiếm.', 'knowledge'); }
-    public static function renderGovernance(): void { self::renderWorkspace('Duyệt', 'Hàng đợi governed với diff dễ hiểu và read-back sau mỗi action.', 'governance'); }
+    // Chi tiết kỹ thuật remains available through the existing Nâng cao screen.
+    public static function renderGovernance(): void { GovernanceQueueAdminPage::render(); }
     public static function renderSystem(): void { self::renderWorkspace('Hệ thống', 'Health, readiness và runtime diagnostics read-only.', 'system'); }
 
     public static function renderAutomationPolicy(): void
@@ -126,7 +128,7 @@ final class AdminWorkbenchPage
         if ($workspace === 'content') self::renderContentWorkspace();
         elseif ($workspace === 'media') self::renderMediaWorkspace();
         elseif ($workspace === 'knowledge') self::renderKnowledgeWorkspace();
-        elseif ($workspace === 'governance') self::renderGovernanceWorkspace();
+        elseif ($workspace === 'governance') GovernanceQueueAdminPage::render();
         else self::renderSystemWorkspace();
         echo '</div>';
     }
@@ -155,23 +157,6 @@ final class AdminWorkbenchPage
     private static function renderKnowledgeWorkspace(): void
     {
         echo '<section class="nhk-admin-panel"><h2>Tri thức</h2><form class="nhk-admin-search" data-nhk-search="knowledge"><label for="nhk-knowledge-query">Tìm semantic</label><input id="nhk-knowledge-query" name="q" type="search" minlength="2" placeholder="Tên entity, claim, source hoặc evidence"><select name="tab" aria-label="Loại tri thức"><option value="entity">Thực thể</option><option value="claim">Claim</option><option value="source">Nguồn</option><option value="evidence">Evidence</option><option value="relation">Quan hệ</option></select><button class="button button-primary">Tìm</button></form><div id="nhk-knowledge-results" aria-live="polite"><p class="nhk-admin-empty">Nhập từ khóa semantic để bắt đầu.</p></div></section>';
-    }
-
-    private static function renderGovernanceWorkspace(): void
-    {
-        echo '<section class="nhk-admin-panel"><h2>Hàng đợi Governance</h2><p>Hàng đợi hiển thị thay đổi bằng tiếng Việt. Proposal UUID, fingerprint, dependency và payload chỉ có trong Chi tiết kỹ thuật.</p><div class="nhk-admin-state-list"><div class="nhk-admin-state"><strong>Chờ duyệt</strong><span>Proposal cần Submit/Approve.</span></div><div class="nhk-admin-state"><strong>Sẵn sàng Apply</strong><span>Đã duyệt và qua Eligibility.</span></div><div class="nhk-admin-state"><strong>Đã Apply</strong><span>Đã apply, đang xác minh read-back.</span></div><div class="nhk-admin-state nhk-admin-state--blocked"><strong>Bị chặn</strong><span>Không tự bypass blocker.</span></div></div><div id="nhk-governance-queue" aria-live="polite"><p class="nhk-admin-empty">Chưa có queue reader khả dụng trong runtime hiện tại. Mở Nâng cao để tra cứu proposal kỹ thuật.</p></div><p><a class="button" href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced#governance')) . '">Mở công cụ nâng cao</a></p></section>';
-        global $wpdb;
-        if (!isset($wpdb) || !is_object($wpdb)) return;
-        $proposals = (new \NHK\Core\Infrastructure\Governance\WpdbProposalRepository($wpdb))->listRecent(50);
-        $adapter = new AdminGovernanceAdapter();
-        $rows = [];
-        foreach ($proposals as $proposal) {
-            $row = $adapter->humanize($proposal);
-            $rows[] = ['summary' => $row['summary'], 'operation' => $row['operation'], 'state' => $row['state_label'], 'subject' => $row['subject']];
-        }
-        echo '<section class="nhk-admin-panel"><h2>Thay đổi gần đây</h2>';
-        AdminListTable::render('Governance queue', ['summary' => 'Thay đổi', 'operation' => 'Operation', 'state' => 'Trạng thái', 'subject' => 'Đối tượng'], $rows, ['label' => 'Chưa có proposal trong hàng đợi.']);
-        echo '</section>';
     }
 
     private static function renderSystemWorkspace(): void

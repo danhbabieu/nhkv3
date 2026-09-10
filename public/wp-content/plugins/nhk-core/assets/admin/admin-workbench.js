@@ -184,4 +184,26 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', workspaceSearch);
     else workspaceSearch();
+
+    function governanceQueueControls() {
+        var selectAll = document.querySelector('[data-nhk-select-all]');
+        var form = document.querySelector('[data-nhk-governance-bulk-form]');
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                document.querySelectorAll('[data-nhk-queue-item]').forEach(function (item) { item.checked = selectAll.checked; });
+            });
+        }
+        if (form) {
+            form.addEventListener('submit', function (event) {
+                var action = form.querySelector('[name="bulk_action"]');
+                var selected = form.querySelectorAll('[data-nhk-queue-item]:checked').length;
+                if (!action || !action.value || !selected || !window.confirm('Áp dụng thao tác cho ' + selected + ' Proposal đã chọn?')) event.preventDefault();
+            });
+        }
+        var result = document.querySelector('[data-nhk-governance-result]');
+        if (result) { result.focus(); result.setAttribute('aria-live', 'polite'); }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', governanceQueueControls);
+    else governanceQueueControls();
 }());
