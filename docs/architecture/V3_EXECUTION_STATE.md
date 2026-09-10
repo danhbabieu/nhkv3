@@ -7335,3 +7335,35 @@ build and documentation fingerprints are recorded by the release verification
 packet rather than embedded here, avoiding a self-referential manifest.
 The generated snapshot is not added as a tracked artifact because the
 repository's canonical-docs resource output is ignored.
+
+# Checkpoint — 2026-09-11 — Capture Video Odo 36/8 orchestration boundary
+
+ROOT GAP: The Capture path allowed operator/compliance prose to enter
+`user_claim_candidates`, allowed a YouTube source title to become public Video
+copy, and relied on downstream boundaries to reject sibling Media. The
+resolved subject remained the Variant UUID
+`852da54d-457a-4397-a16d-52d9452ba766` throughout the intended flow.
+
+CODE: `TextInputInterpreter` now separates claim text from instruction and
+compliance context and preserves the runtime facet/scope selected by the
+interpreter through `GovernedCaptureContinuationService`. Video intake now
+passes the resolved subject and Capture editorial/compliance context into the
+editorial generator. Source titles remain provenance/facts only. A bounded
+`PublicClaimCopyPolicy` protects editorial title, summary, SEO, Open Graph,
+VideoObject and route projection from unsupported superiority wording. The
+existing exact-subject Media gate is covered by a regression that rejects a
+high-quality Odo 36/10 sibling before WordPress attachment sync. No Evidence
+is fabricated: an unresolved Video relation remains `NO_SEMANTIC_ATTACHMENT`.
+
+TEST: Focused Capture/Video/Media regression passes 81 tests / 328 assertions.
+Full NHK Unit passes 1,049 tests / 5,352 assertions. Composer lint, PHP lint,
+`git diff --check` and the changed-scope secret review pass. PHPUnit reports
+existing warnings/deprecations only. Integration/live WordPress verification
+was not run in this checkpoint because it requires the unavailable local
+database/runtime; no migration, seed, Article, Media, Knowledge, Graph,
+WordPress, V2, staging or production data was mutated.
+
+STATUS: LOCAL CODE / REGRESSION COMPLETE; Evidence-backed semantic attachment
+and live runtime verification remain contract/environment gates. Publication
+must not be marked complete while `NO_SEMANTIC_ATTACHMENT` or other mandatory
+blockers remain. PUSH STATUS = NOT PUSHED.

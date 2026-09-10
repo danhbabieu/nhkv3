@@ -45,6 +45,39 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_COMPLETE', $result->state);
     }
 
+    public function test_capture_subject_scope_rejects_high_quality_sibling_before_wordpress_sync(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $sibling = $service->create('odo-36-10-front', 'Odo 36/10 front', 'ready', [
+            'metadata' => ['subject_id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df'],
+            'detail_type' => 'WHOLE_FRONT',
+        ]);
+        $service->addAsset($sibling->canonicalId, 'original', 'uploads/odo-36-10.webp', hash('sha256', 'odo-36-10'), 'image/webp', 10, 2400, 1600, 'PUBLIC');
+        $adapter = new class implements WordPressArticleMediaAdapter {
+            public array $syncs = [];
+            public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function synchronize(int $postId, array $result): array { $this->syncs[] = $result; return $this->read($postId); }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { throw new \LogicException('Sibling Media must not reach attachment sync.'); }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter);
+
+        $result = $coordinator->ensureForPost(902, [
+            'capture_id' => 'capture-odo-36-8',
+            'subject_ids' => ['852da54d-457a-4397-a16d-52d9452ba766'],
+            'subject_scope_locked' => true,
+            'allow_scoped_reuse' => true,
+            'allow_unscoped_reuse' => false,
+        ]);
+
+        self::assertNotSame($sibling->canonicalId, $result->slotMedia['featured_primary']);
+        self::assertNotSame($sibling->canonicalId, $result->slotMedia['inline_primary']);
+        self::assertTrue($media->findByCanonicalId($result->slotMedia['featured_primary'])?->isSystemPlaceholder());
+        self::assertTrue($media->findByCanonicalId($result->slotMedia['inline_primary'])?->isSystemPlaceholder());
+        self::assertSame($result->slotMedia['featured_primary'], $adapter->syncs[0]['slot_media']['featured_primary']);
+        self::assertSame($result->slotMedia['inline_primary'], $adapter->syncs[0]['slot_media']['inline_primary']);
+    }
+
     public function test_text_only_capture_without_assets_does_not_adopt_unrelated_media(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

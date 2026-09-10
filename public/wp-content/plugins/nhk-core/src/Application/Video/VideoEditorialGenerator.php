@@ -3,20 +3,30 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
+
 final class VideoEditorialGenerator
 {
     /** @param array<string,mixed> $source @return array<string,mixed> */
-    public function generate(array $source, string $userHint = '', string $instruction = ''): array
+    public function generate(array $source, string $userHint = '', string $instruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = ''): array
     {
         $sourceTitle = trim((string) ($source['source_title'] ?? ''));
         $hint = trim($userHint);
-        $titleSubject = $sourceTitle !== '' ? $sourceTitle : ($hint !== '' ? $this->firstSentence($hint) : 'video đồng hồ cổ');
-        $title = 'Khám phá ' . $this->truncate($titleSubject, 100) . ' cùng NHK';
-        $summary = $hint !== ''
-            ? 'Một video tham chiếu được NHK đặt trong bối cảnh: ' . $this->truncate($hint, 180) . '.'
+        $subjectName = is_array($resolvedSubject) ? trim((string) ($resolvedSubject['name'] ?? '')) : '';
+        $neutralTitle = $subjectName !== '' ? $subjectName . ' — Video tham chiếu NHK' : 'Video tham chiếu NHK';
+        $copyPolicy = new PublicClaimCopyPolicy();
+        // Source title is retained below as provenance only. It is never the
+        // default NHK editorial title because platform titles may contain
+        // unsupported rankings or absolute claims.
+        $requestedTitle = trim($editorialTitle);
+        $title = $copyPolicy->safe($requestedTitle, $neutralTitle);
+        if ($title === '') $title = $neutralTitle;
+        $publicHint = $copyPolicy->containsUnsupportedSuperiority($hint) ? '' : $hint;
+        $summary = $publicHint !== ''
+            ? 'Một video tham chiếu được NHK đặt trong bối cảnh: ' . $this->truncate($publicHint, 180) . '.'
             : 'NHK giới thiệu video này như một điểm bắt đầu để tìm hiểu đồng hồ cổ qua nguồn tham chiếu đã được chuẩn hóa.';
-        $body = $hint !== ''
-            ? 'Video này được chọn để mở rộng việc tìm hiểu ' . $this->truncate($hint, 260) . '. ' . ($instruction !== '' ? 'Định hướng biên tập: ' . $this->truncate($instruction, 180) . '.' : 'Nội dung NHK giữ vai trò giải thích và liên kết ngữ cảnh, không thay thế nguồn video.')
+        $body = $publicHint !== ''
+            ? 'Video này được chọn để mở rộng việc tìm hiểu ' . $this->truncate($publicHint, 260) . '. Nội dung NHK giữ vai trò giải thích và liên kết ngữ cảnh, không thay thế nguồn video.'
             : 'Video này được trình bày như một nguồn tham chiếu bên ngoài trong hệ thống khám phá của NHK. Các nhận định kỹ thuật chỉ được bổ sung khi có nguồn hoặc quan hệ ngữ nghĩa phù hợp.';
         $context = [];
         if ($hint !== '') $context[] = ['text' => $hint, 'provenance' => 'USER_HINT'];
@@ -29,6 +39,7 @@ final class VideoEditorialGenerator
             'context' => $context,
             'facts' => $sourceTitle === '' ? [] : [['text' => $sourceTitle, 'provenance' => 'SOURCE_FACT']],
             'related_knowledge' => [],
+            'compliance_context' => ['note' => trim($complianceNote), 'rewrite_applied' => $requestedTitle !== '' && $title !== $requestedTitle],
         ];
     }
 

@@ -9,6 +9,7 @@ use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, EntityTypeRegist
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureSemanticCoreTest extends TestCase
@@ -181,6 +182,47 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertTrue($interpreted['user_claim_candidates'][4]['review_required']);
     }
 
+    public function test_compliance_instruction_is_context_only_and_not_a_knowledge_candidate(): void
+    {
+        $interpreted = (new TextInputInterpreter())->interpret(
+            "Đồng hồ này có 8 côn đồng nguyên bản.\nKhông coi cụm \"được ưa chuộng nhất\" là fact vì chưa có Evidence.",
+            [],
+            ['852da54d-457a-4397-a16d-52d9452ba766'],
+            ['compliance_note' => 'Không project unsupported superiority claim.'],
+        );
+
+        self::assertCount(1, $interpreted['user_claim_candidates']);
+        self::assertSame('Đồng hồ này có 8 côn đồng nguyên bản.', $interpreted['user_claim_candidates'][0]['text']);
+        self::assertSame('variant', $interpreted['user_claim_candidates'][0]['scope']);
+        self::assertSame('configuration', $interpreted['user_claim_candidates'][0]['facet']);
+        self::assertContains('Không coi cụm "được ưa chuộng nhất" là fact vì chưa có Evidence.', $interpreted['non_semantic_context']['compliance_notes']);
+        self::assertContains('Không project unsupported superiority claim.', $interpreted['non_semantic_context']['compliance_notes']);
+    }
+
+    public function test_governance_preserves_interpreted_scope_and_facet_in_knowledge_payload(): void
+    {
+        $variant = UuidCodec::newV7();
+        $proposal = new \NHK\Core\Domain\Governance\Proposal(UuidCodec::newV7(), $variant, 'ingest', [], 'content', null, 'dependency', \NHK\Core\Domain\Governance\ProposalState::DRAFT, idempotencyKey: 'capture:scope-facet', entityType: 'knowledge');
+        $governance = $this->createMock(\NHK\Core\Contracts\Governance\GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static function (array $arguments): bool {
+            $metadata = $arguments['payload']['provenance']['metadata'] ?? [];
+            return ($metadata['facet'] ?? '') === 'configuration' && ($metadata['scope'] ?? '') === 'variant';
+        }))->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->method('submit')->willReturn($proposal);
+        $service = new \NHK\Core\Application\Capture\GovernedCaptureContinuationService($governance, static fn (string $id): array => [], new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver(['knowledge'], new class implements \NHK\Core\Contracts\Governance\AutomationPolicyStorage { public function read(): array { return []; } public function write(array $policies): void {} }), static fn (string $capability): bool => true);
+
+        $result = $service->execute('capture-scope-facet', 'capture:scope-facet', [
+            'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Có 8 côn đồng nguyên bản.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'scope' => 'variant', 'facet' => 'configuration']]],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+    }
+
     public function test_capture_creates_one_draft_for_multiple_assets_and_retries_without_duplicates(): void
     {
         $repository = new InMemoryCaptureRepository();
@@ -322,7 +364,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
             'video' => ['url' => 'https://www.youtube.com/watch?v=oRfvArkX8NA', 'user_hint' => 'Odo 36/10'],
         ]);
 
-        self::assertSame('READY_FOR_PUBLICATION', $result->stage, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertSame('READY_FOR_PUBLICATION', $result->stage);
         self::assertCount(1, $events);
         self::assertSame($variant, $events[0]['subject_resolution']['primary']);
         self::assertSame($variant['id'], $events[0]['subject_resolution']['primary']['id']);

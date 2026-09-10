@@ -25,7 +25,7 @@ final class VideoIntakeService
     }
 
     /** @param list<array<string,mixed>> $intendedRelations @param array<string,mixed>|null $resolvedSubject */
-    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null): VideoIntakePreview
+    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = ''): VideoIntakePreview
     {
         $resolution = $this->source->resolve($url);
         $snapshot = $resolution->snapshot->toArray();
@@ -66,7 +66,7 @@ final class VideoIntakeService
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];
             $category['categories'] = [$category['primary']];
         }
-        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction);
+        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $resolvedSubject, $editorialTitle, $complianceNote);
         $seoData = ['title' => $editorial['title'], 'description' => $editorial['summary']];
         $package = [
             'intake_version' => 1,

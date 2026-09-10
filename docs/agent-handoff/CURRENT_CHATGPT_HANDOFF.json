@@ -1,0 +1,152 @@
+{
+  "phase_2_probe_correction": {
+    "prior_rest_do_request_probe_invalid_for_post_dispatch": true,
+    "previous_generated_command_superseded": true,
+    "manual_rest_api_init_forbidden": true,
+    "rest_get_server_calls": 1,
+    "adapter_match": "EasyMcpNativeFileCompatibilityAdapter::class",
+    "dispatch_errors": "return sanitized status/error_code/error_message",
+    "required_sequence": [
+      "server->dispatch(request)",
+      "apply_filters(rest_post_dispatch, rest_ensure_response(raw), server, request)"
+    ],
+    "scope": "tools/list only; target wp_ability_nhk_v3_capture_ingest only; hook inspection filtered to NHK adapter"
+  },
+  "task": "Converge canonical nhk.capture.ingest orchestration for the approved Odo 36/10 regression without creating a new semantic owner or mutating live data.",
+  "branch": "main",
+  "head": "301e06808a4c7669d9989c0e4b8f0e76e8704019",
+  "root_causes": [
+    "Capture and MCP/semantic resolution used separate canonical lookup paths.",
+    "Video enrichment ran before Capture subject resolution and broadened Variant Odo 36/10 to Model Odo 36.",
+    "Media reconciliation admitted current/global WordPress usage without persisted subject-scope proof.",
+    "ARTICLE_MEDIA_BLUEPRINT_IS_INVALID_ was classified as FAILED_RETRYABLE instead of a system/contract failure.",
+    "capture_id continuation was already present in catalog/transport and required parity verification, not a second endpoint."
+  ],
+  "changes": [
+    "Shared typed canonical subject-resolution handoff with explicit UUID precedence.",
+    "Video child enrichment consumes the Capture-resolved primary subject and reuses canonical external video identity.",
+    "Historical Media reuse requires locked subject plus persisted scope; stale WordPress usage is rejected.",
+    "Claims are scope/provenance/evidence checked and reused before duplicate proposal creation.",
+    "User knowledge is atomized with EXPLICIT_USER_KNOWLEDGE and subjective/recognition wording remains scoped or review-required.",
+    "Canonical docs updated and projected with composer generate:mcp-docs."
+  ],
+  "tests": {
+    "focused": "PASS: 125 tests, 849 assertions",
+    "unit": "PASS: 962 tests, 4714 assertions; 7 warnings, 2 deprecations, 9 PHPUnit deprecations",
+    "contract": "PASS: 4 tests, 31 assertions",
+    "documentation_contract": "PASS: 44 tests, 544 assertions",
+    "lint": "PASS: composer lint",
+    "diff_check": "PASS: git diff --check",
+    "manifest": "PASS: 29/29 files ACTIVE",
+    "integration": "BLOCKED: WordPress bootstrap Error establishing a database connection",
+    "secret_scan": "PASS: no matching secret patterns"
+  },
+  "documentation_version": "ab2c095b43acd4f162537be13e8f3450592d8a108d8176420094eca71c101e55",
+  "manifest_hash": "d9aac4e064ca8d0ca8a22b3f0ae55008d84f4af406408c728096587ab6acfe81",
+  "build_identity": "NOT_IN_MANIFEST_RUNTIME_COMPUTED",
+  "blockers": [
+    "CHATGPT_BRIDGE_UNAVAILABLE",
+    "Integration DB/runtime unavailable; live Capture/Article/DEMO verification not performed."
+  ],
+  "recommended_next_action": "Review this handoff and committed diff; provision non-destructive nhk_v3_test integration runtime; rerun Integration. Do not deploy, publish, or mutate live data before review and verification."
+  ,"l3_descriptor_investigation": {
+    "scope": "Easy MCP descriptor exposure only; no Capture/Media/Video/Knowledge/Governance changes.",
+    "raw_canonical_schema": {
+      "capture_id": "present; string; format uuid; optional",
+      "files": "present; array; items format binary; native multipart description",
+      "required": ["idempotency_key", "documentation_checkpoint"]
+    },
+    "raw_easy_mcp_before_adapter": {
+      "capture_id": "missing in stripped fixture",
+      "files": "present in stock stripped fixture but without canonical complete schema"
+    },
+    "raw_easy_mcp_after_adapter": {
+      "capture_id": "present",
+      "files": "present as native multipart/file metadata",
+      "required": ["idempotency_key", "documentation_checkpoint"],
+      "annotations": "preserved",
+      "tool_identity": "preserved"
+    },
+    "chatgpt_observed": {
+      "capture_id": "MISSING",
+      "files": "NATIVE_MULTIPART_PRESENT"
+    },
+    "root_cause_status": "NOT_REPRODUCED_IN_NHK_REPO",
+    "can_fix_in_nhk_repo": "NO_EVIDENCE_YET",
+    "local_http_evidence": "localhost Easy MCP endpoint unavailable; WordPress integration DB bootstrap blocked",
+    "remaining_hypotheses": [
+      "live Easy MCP version bypasses supported-version hook",
+      "NHK rest_post_dispatch hook is not registered on live Easy MCP route",
+      "external connector transforms the already projected response"
+    ]
+  },
+  "decision_required": "Do not change code or invoke Capture until live hook/path evidence is available; ChatGPT review is required.",
+  "live_probe": {
+    "easy_mcp_version": "1.7.16",
+    "easy_mcp_status": "active",
+    "nhk_runtime_version": "0.1.0",
+    "nhk_build_identity": "9b20d14d70d43f40b89fab0484556f3ab52e322991d15ab5b9984bc71a1abc20",
+    "documentation_version": "ab2c095b43acd4f162537be13e8f3450592d8a108d8176420094eca71c101e55",
+    "manifest_hash": "d9aac4e064ca8d0ca8a22b3f0ae55008d84f4af406408c728096587ab6acfe81",
+    "canonical_live": "UNAVAILABLE_FROM_SHELL; ChatGPT reports canonical descriptor expected capture_id/files/optional required fields",
+    "hook": {
+      "adapter_class": "NHK\\Core\\Infrastructure\\Mcp\\EasyMcpNativeFileCompatibilityAdapter",
+      "version_gate_source_level": "true for 1.7.16",
+      "hook_registered_live": "UNAVAILABLE_FROM_SHELL",
+      "priority_source_level": 10
+    },
+    "live_easy_mcp_final": {
+      "capture_id": "MISSING",
+      "files": "NATIVE_MULTIPART_PRESENT",
+      "required": "NOT_EXPOSED_IN_CHATGPT_OBSERVATION",
+      "fileParams": "NOT_EXPOSED_IN_CHATGPT_OBSERVATION"
+    },
+    "pre_filter_raw": "UNAVAILABLE_WITHOUT_INSTRUMENTATION",
+    "root_cause_layer": "UNRESOLVED; narrowed to live NHK hook/path or external connector field transformation",
+    "nhk_code_change_required": "UNKNOWN",
+    "connector_refresh_required": "UNKNOWN",
+    "live_mutation": "NONE",
+    "next_action_for_chatgpt": "Provide or authorize one read-only remote descriptor probe returning live catalog, hook registration/priority, and final Easy MCP target tool JSON; otherwise keep Capture blocked."
+  },
+  "in_process_rest_probe": {
+    "can_execute_live": "NO",
+    "reason": "NHK_DEMO_DEPLOY_CONFIG is unset; no authorized live runtime boundary; local WordPress DB unavailable",
+    "source_callback": "NHK\\Core\\Infrastructure\\Mcp\\EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor",
+    "source_priority": 10,
+    "canonical": {
+      "capture_id": "PRESENT; optional UUID",
+      "files": "PRESENT; native multipart binary",
+      "required": ["idempotency_key", "documentation_checkpoint"],
+      "fileParams": ["files"]
+    },
+    "hook": {
+      "easy_mcp_version": "LIVE_REPORTED_1.7.16; source gate true",
+      "adapter": "NHK\\Core\\Infrastructure\\Mcp\\EasyMcpNativeFileCompatibilityAdapter",
+      "callback": "projectToolsListDescriptor",
+      "priority": 10,
+      "registered": "UNAVAILABLE_LIVE"
+    },
+    "final_rest_tools_list": {
+      "tool_found": "UNAVAILABLE_LIVE",
+      "capture_id": "UNAVAILABLE_LIVE",
+      "files": "UNAVAILABLE_LIVE",
+      "required": "UNAVAILABLE_LIVE",
+      "fileParams": "UNAVAILABLE_LIVE"
+    },
+    "pre_filter_raw": "UNAVAILABLE_WITHOUT_INSTRUMENTATION",
+    "root_cause_layer": "UNRESOLVED; narrowed to live NHK hook/path or external connector transformation",
+    "nhk_code_change_required": "UNKNOWN",
+    "connector_refresh_required": "UNKNOWN",
+    "live_mutation": "NONE",
+    "next_action_for_chatgpt": "Owner runs the corrected read-only wp eval command using dispatch() and apply_filters() and returns sanitized RAW_DISPATCH/POST_DISPATCH JSON."
+  },
+  "probe_correction": {
+    "prior_probe_invalid_for_post_filter_observation": true,
+    "required_raw_call": "$server->dispatch($request)",
+    "required_post_call": "apply_filters(rest_post_dispatch, rest_ensure_response($raw), $server, $request)",
+    "can_execute_live": "NO",
+    "pre_filter_raw": "UNAVAILABLE_WITHOUT_INSTRUMENTATION",
+    "owner_run_command": "Supplied in CURRENT_CHATGPT_HANDOFF.md; read-only wp eval; no Capture or mutation.",
+    "next_action": "Owner runs corrected probe and returns sanitized canonical/hook/raw_dispatch/post_dispatch JSON."
+  }
+}

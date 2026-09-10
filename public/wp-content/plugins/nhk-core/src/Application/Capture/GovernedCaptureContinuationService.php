@@ -7,6 +7,7 @@ use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
+use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -102,11 +103,20 @@ final class GovernedCaptureContinuationService
                 : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
             foreach ($candidates as $candidate) {
                 if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
-                if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $variant['id'], 'scope' => 'variant'], $this->retrievedClaims($context)) !== null) continue;
+                $scope = trim((string) ($candidate['scope'] ?? 'variant')) ?: 'variant';
+                $facet = trim((string) ($candidate['facet'] ?? 'identity')) ?: 'identity';
+                try {
+                    new KnowledgeFacetProfile($facet, $scope);
+                } catch (\Throwable) {
+                    // Invalid interpreter output is a bounded review gap. Do
+                    // not silently coerce it into another semantic facet.
+                    continue;
+                }
+                if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $variant['id'], 'scope' => $scope], $this->retrievedClaims($context)) !== null) continue;
                 $payload = [
                     'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $variant['id'], trim((string) $candidate['text'])])),
                     'text' => trim((string) $candidate['text']), 'claim_type' => 'fact',
-                    'provenance' => ['metadata' => ['facet' => 'recognition', 'scope' => 'variant', 'version' => 1, 'subject_id' => $variant['id'], 'subject_type' => 'variant'], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
+                    'provenance' => ['metadata' => ['facet' => $facet, 'scope' => $scope, 'version' => 1, 'subject_id' => $variant['id'], 'subject_type' => 'variant'], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
                 ];
                 $plans[] = $this->arguments('knowledge', 'ingest', (string) $variant['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
             }
@@ -140,7 +150,7 @@ final class GovernedCaptureContinuationService
         $reused = [];
         foreach ((array) ($context['interpretation']['user_claim_candidates'] ?? []) as $candidate) {
             if (!is_array($candidate)) continue;
-            $claim = $this->claimReuse->find(['text' => (string) ($candidate['text'] ?? ''), 'subject_id' => (string) ($variant['id'] ?? ''), 'scope' => 'variant'], $this->retrievedClaims($context));
+            $claim = $this->claimReuse->find(['text' => (string) ($candidate['text'] ?? ''), 'subject_id' => (string) ($variant['id'] ?? ''), 'scope' => (string) ($candidate['scope'] ?? 'variant')], $this->retrievedClaims($context));
             if ($claim !== null) $reused[] = ['claim_id' => $claim['claim_id'] ?? '', 'claim_revision' => $claim['claim_revision'] ?? 1, 'subject_id' => $claim['subject_id'] ?? '', 'scope' => $claim['scope'] ?? ''];
         }
         return $reused;

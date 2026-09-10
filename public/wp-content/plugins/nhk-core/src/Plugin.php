@@ -633,6 +633,8 @@ final class Plugin {
                         $relations,
                         (string) ($video['editorial_instruction'] ?? ''),
                         $primary,
+                        trim((string) ($video['editorial_title'] ?? $context['editorial_title'] ?? '')),
+                        trim((string) ($video['compliance_note'] ?? $context['compliance_note'] ?? '')),
                     );
                     return [
                         'status' => 'verified',

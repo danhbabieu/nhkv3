@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class VideoSeoProjection
@@ -12,21 +13,28 @@ final class VideoSeoProjection
     {
         $urlResult = is_array($watchUrl) ? $watchUrl : (new PublicSeoProjection())->eligibleUrl($watchUrl);
         $watchPath = is_array($urlResult['path'] ?? null) ? '' : (string) ($urlResult['path'] ?? '');
-        $seoProjection = (new PublicSeoProjection())->project($urlResult, ['title' => $package['seo']['title'] ?? $package['editorial']['title'] ?? '', 'description' => $package['seo']['description'] ?? $package['editorial']['summary'] ?? '', 'type' => 'VideoObject']);
         $source = is_array($package['source'] ?? null) ? $package['source'] : [];
         $editorial = is_array($package['editorial'] ?? null) ? $package['editorial'] : [];
         $seo = is_array($package['seo'] ?? null) ? $package['seo'] : [];
+        $subject = is_array($package['subject_resolution_packet'] ?? null) ? trim((string) ($package['subject_resolution_packet']['name'] ?? '')) : '';
+        $safeTitle = $subject !== '' ? $subject . ' — Video tham chiếu NHK' : 'Video tham chiếu NHK';
+        $copyPolicy = new PublicClaimCopyPolicy();
+        $editorialTitle = $copyPolicy->safe((string) ($editorial['title'] ?? ''), $safeTitle);
+        $editorialSummary = $copyPolicy->safe((string) ($editorial['summary'] ?? ''), 'Video tham chiếu được NHK chuẩn hóa từ nguồn bên ngoài.');
+        $seoTitle = $copyPolicy->safe((string) ($seo['title'] ?? ''), $editorialTitle);
+        $seoDescription = $copyPolicy->safe((string) ($seo['description'] ?? ''), $editorialSummary);
+        $seoProjection = (new PublicSeoProjection())->project($urlResult, ['title' => $seoTitle, 'description' => $seoDescription, 'type' => 'VideoObject']);
         $id = (string) ($source['external_video_id'] ?? '');
         $object = [
             '@context' => 'https://schema.org', '@type' => 'VideoObject',
-            'name' => (string) ($editorial['title'] ?? $seo['title'] ?? ''),
-            'description' => (string) ($editorial['summary'] ?? $seo['description'] ?? ''),
+            'name' => $editorialTitle,
+            'description' => $editorialSummary,
             'url' => $watchPath,
             'embedUrl' => preg_match('/^[A-Za-z0-9_-]{11}$/', $id) === 1 ? 'https://www.youtube-nocookie.com/embed/' . $id : null,
         ];
         if (!$seoProjection['indexable']) return [
-            'title' => (string) ($seo['title'] ?? $editorial['title'] ?? ''),
-            'description' => (string) ($seo['description'] ?? $editorial['summary'] ?? ''),
+            'title' => $seoTitle,
+            'description' => $seoDescription,
             'canonical' => null,
             'indexable' => false,
             'open_graph' => [],
@@ -49,8 +57,8 @@ final class VideoSeoProjection
             if ($parts !== []) $object['hasPart'] = $parts;
         }
         return [
-            'title' => (string) ($seo['title'] ?? $editorial['title'] ?? ''),
-            'description' => (string) ($seo['description'] ?? $editorial['summary'] ?? ''),
+            'title' => $seoTitle,
+            'description' => $seoDescription,
             'canonical' => $seoProjection['canonical'],
             'indexable' => $seoProjection['indexable'],
             'open_graph' => [...$seoProjection['open_graph'], 'type' => 'video.other'],

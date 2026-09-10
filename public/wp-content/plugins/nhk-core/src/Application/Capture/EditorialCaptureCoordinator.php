@@ -143,7 +143,7 @@ final class EditorialCaptureCoordinator
                 ];
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
-            $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : []);
+            $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
             $diagnostics['interpretation'] = $this->withoutBody($interpretation);
             $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken);
 
@@ -162,6 +162,8 @@ final class EditorialCaptureCoordinator
                     'video' => $videoInput,
                     'subject_resolution' => $resolution,
                     'raw_input' => $text,
+                    'editorial_title' => trim((string) ($input['title'] ?? '')),
+                    'compliance_note' => trim((string) ((is_array($input['metadata'] ?? null) ? ($input['metadata']['compliance_note'] ?? '') : ''))),
                 ]);
                 $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
                 if ($videoItems !== []) $assets = array_merge($assets, $videoItems);

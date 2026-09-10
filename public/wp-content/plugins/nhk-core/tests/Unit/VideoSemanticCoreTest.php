@@ -326,6 +326,76 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertContains('NO_SEMANTIC_ATTACHMENT', $result->blockers);
     }
 
+    public function test_source_marketing_title_stays_provenance_and_never_becomes_nhk_editorial_copy(): void
+    {
+        $sourceTitle = 'Model X – sản phẩm tốt nhất thị trường';
+        $editorial = (new VideoEditorialGenerator())->generate(
+            ['source_title' => $sourceTitle],
+            '',
+            '',
+            ['id' => UuidCodec::newV7(), 'type' => 'variant', 'name' => 'Đồng hồ Odo 36/8'],
+            'Odo 36/8 – 8 Côn Đồng Nguyên Bản, Chất Âm Mềm Ấm',
+            'Superiority wording is not supported.',
+        );
+
+        self::assertSame($sourceTitle, $editorial['context'][0]['text']);
+        self::assertSame('Odo 36/8 – 8 Côn Đồng Nguyên Bản, Chất Âm Mềm Ấm', $editorial['title']);
+        self::assertStringNotContainsString('tốt nhất thị trường', $editorial['title']);
+        self::assertStringNotContainsString('tốt nhất thị trường', $editorial['summary']);
+        self::assertSame('Odo 36/8 — Video tham chiếu NHK', (new VideoEditorialGenerator())->generate(['source_title' => $sourceTitle], '', '', ['name' => 'Odo 36/8'])['title']);
+    }
+
+    public function test_intake_pipeline_keeps_source_title_provenance_and_safe_public_slug(): void
+    {
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Dòng Được Ưa Chuộng Nhất – Odo 36/8',
+                'availability' => 'available',
+                'embeddable' => true,
+                'fetched_at' => '2026-09-11T01:00:00Z',
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $preview = $service->preview(
+            'https://youtube.com/shorts/LfBwZ5lRiBE?feature=share',
+            '',
+            null,
+            [],
+            '',
+            ['id' => '852da54d-457a-4397-a16d-52d9452ba766', 'type' => 'variant', 'name' => 'Đồng hồ Odo 36/8'],
+            'Odo 36/8 – 8 Côn Đồng Nguyên Bản',
+            'Unsupported superiority is not evidence.',
+        );
+
+        self::assertSame('Dòng Được Ưa Chuộng Nhất – Odo 36/8', $preview->package['source']['source_title']);
+        self::assertSame('Odo 36/8 – 8 Côn Đồng Nguyên Bản', $preview->package['editorial']['title']);
+        self::assertSame($preview->package['editorial']['title'], $preview->package['seo']['title']);
+        self::assertSame($preview->package['editorial']['title'], $preview->package['seo_projection']['title']);
+        self::assertStringNotContainsString('ưa-chuộng-nhất', $preview->package['seo_projection']['canonical'] ?? '');
+        self::assertContains('NO_SEMANTIC_ATTACHMENT', $preview->package['completeness']['blockers']);
+    }
+
+    public function test_video_seo_defensively_rewrites_unsupported_superlative_across_public_surfaces(): void
+    {
+        $projection = (new VideoSeoProjection())->project([
+            'source' => ['external_video_id' => 'dQw4w9WgXcQ'],
+            'subject_resolution_packet' => ['name' => 'Đồng hồ Odo 36/8'],
+            'editorial' => ['title' => 'Model X – sản phẩm tốt nhất thị trường', 'summary' => 'Dòng được ưa chuộng nhất.'],
+            'seo' => ['title' => 'Model X – sản phẩm tốt nhất thị trường', 'description' => 'Dòng được ưa chuộng nhất.'],
+        ], ['path' => '/video/odo-36-8/', 'eligible' => true, 'blockers' => []]);
+
+        $public = json_encode([$projection['title'], $projection['description'], $projection['open_graph'], $projection['video_object']], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString('tốt nhất thị trường', $public);
+        self::assertStringNotContainsString('ưa chuộng nhất', $public);
+        self::assertSame('Đồng hồ Odo 36/8 — Video tham chiếu NHK', $projection['title']);
+    }
+
     public function test_seo_projection_maps_only_canonical_visible_data_and_video_object(): void
     {
         $projection = (new VideoSeoProjection())->project([
