@@ -7089,3 +7089,45 @@ staging or production data was changed.
 
 STATUS: CODE COMPLETE; target-runtime dry-run remains environment-blocked.
 PUSH STATUS = NOT PUSHED.
+
+# Checkpoint — 2026-09-10 — Easy MCP native-file compatibility adapter
+
+ROOT GAP: Official Easy MCP 1.7.16 and 1.7.17 packages were inspected read-only.
+Their `Dynamic_Tool_Registrar` projects Ability input schema and annotations but
+does not preserve arbitrary Ability `_meta`; their `MCP\Transport::handle_post`
+rejects non-`application/json` requests before authentication. No suitable
+plugin-specific descriptor or dispatch hook exists.
+
+CODE / CONTRACT: Added the narrow
+`EasyMcpNativeFileCompatibilityAdapter`. `rest_post_dispatch` patches only an
+already-exposed `wp_ability_nhk_v3_capture_ingest` descriptor from the canonical
+`McpToolCatalog`, including `capture_id`, native `files[]` and
+`_meta.openai/fileParams`. `rest_request_before_callbacks` intercepts only
+`/easy-mcp-ai/v1/mcp`, `tools/call`, the exact Capture Ability name, supported
+Easy MCP versions 1.7.16–1.7.17 and a native PHP file collection. It re-dispatches
+a JSON envelope through the same Easy MCP route, so Easy MCP performs its normal
+authentication, scope and capability checks; the original `$_FILES` remains
+available to the existing NHK Ability callback and canonical `/nhk/v1/mcp`
+transport. Unknown versions and text-only/path/base64 inputs are not intercepted.
+
+TEST: RED was reproduced with 6 adapter tests failing because the adapter did
+not exist. GREEN passes 12 tests / 39 assertions. Full Unit passes 954 tests /
+4,692 assertions; Contract passes 4 tests / 31 assertions. All 750 NHK PHP
+source/test files pass lint and `composer validate --no-check-publish` is valid.
+Easy MCP integration tests remain guarded/skipped because the third-party
+plugin and local WordPress test bootstrap are unavailable. No Capture, Article,
+Media or remote environment was mutated.
+
+STATUS: LOCAL CODE / DOCUMENTATION COMPLETE; commit, push and approved server
+deployment remain required before ChatGPT can verify Layer L3/L4 with the real
+attachment. Article 374 and failed Capture `01a08a3d-328b-79ca-8ec5-ca397006dea1`
+remain untouched.
+PUSH STATUS = NOT PUSHED.
+
+POST-CHECKPOINT VERIFICATION: The adapter/wiring verification passes after the
+native-file detection hardening, and the canonical documentation generator is
+run only after all tracked documentation edits are complete. Final runtime,
+build and documentation fingerprints are recorded by the release verification
+packet rather than embedded here, avoiding a self-referential manifest.
+The generated snapshot is not added as a tracked artifact because the
+repository's canonical-docs resource output is ignored.

@@ -45,6 +45,7 @@ use NHK\Core\Infrastructure\Http\LegacyUrlRedirects;
 use NHK\Core\Infrastructure\Http\PublicKnowledgeRoutes;
 use NHK\Core\Infrastructure\Http\PublicVideoSitemapRoutes;
 use NHK\Core\Infrastructure\Http\McpApi;
+use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Admin\AdminShell;
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
@@ -105,6 +106,7 @@ final class Plugin {
         // its Dynamic_Tool_Registrar.
         add_action('rest_api_init', [McpAbilityRegistration::class, 'bootstrapRegistry'], 0);
         add_action('rest_api_init', [McpAbilityRegistration::class, 'logEasyMcpExportDiagnostics'], PHP_INT_MAX);
+        EasyMcpNativeFileCompatibilityAdapter::register();
         add_action('wp_abilities_api_init', static function (): void {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;

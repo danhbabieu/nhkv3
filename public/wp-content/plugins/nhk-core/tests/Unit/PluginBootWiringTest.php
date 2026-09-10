@@ -60,4 +60,17 @@ final class PluginBootWiringTest extends TestCase
             strpos($plugin, $bootstrap)
         );
     }
+
+    public function test_easy_mcp_native_file_adapter_is_registered_without_changing_the_nhk_entrypoint(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString('EasyMcpNativeFileCompatibilityAdapter::register();', $plugin);
+        self::assertStringContainsString("add_filter('rest_request_before_callbacks'", (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
+        self::assertStringContainsString("add_filter('rest_post_dispatch'", (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
+        self::assertStringContainsString("'/easy-mcp-ai/v1/mcp'", (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
+        self::assertStringContainsString('rest_get_server()->dispatch($proxy)', (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
+        self::assertStringNotContainsString('wp_set_current_user', (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
+        self::assertStringNotContainsString('wp_upload_media', (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
+    }
 }

@@ -130,9 +130,12 @@ Posts, Videos or convenience relations.
 Executable runtime capability and connector/client exposure are separate facts.
 A current connector may expose only a subset of a registered runtime catalog.
 That condition is a `CLIENT_EXPOSURE_GAP`, not evidence that the registered
-runtime capability does not exist. However, the current client must fail closed
-when a required operation is not callable; it must not substitute a generic
-WordPress writer, a historical Ability assumption or a superseded workflow.
+runtime capability does not exist. For the tested Easy MCP 1.7.16–1.7.17
+boundary, NHK may use its version-gated native-file compatibility adapter after
+Easy MCP authentication; unknown versions fail closed. However, the current
+client must fail closed when a required operation is not callable; it must not
+substitute a generic WordPress writer, a historical Ability assumption or a
+superseded workflow.
 Fresh target discovery/read-back controls callability claims.
 
 ### 1.3 Existing-Capture continuation — 2026-09-10
