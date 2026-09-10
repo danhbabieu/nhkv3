@@ -6,11 +6,14 @@ namespace NHK\Core\Infrastructure\Admin;
 use NHK\Core\Domain\Governance\ProposalState;
 use NHK\Core\Infrastructure\Governance\{GovernanceRuntimeFactory, WpdbGovernanceQueueQuery};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Contracts\Governance\GovernanceQueueQuery;
 
 final class GovernanceQueueAdminPage
 {
     private const ACTIONS = ['submit', 'approve', 'reject', 'apply'];
     private const SORTS = ['created', 'updated', 'name', 'id', 'status'];
+    private static $queryFactory;
+    private static $actionServiceFactory;
 
     public static function register(): void
     {
@@ -23,8 +26,13 @@ final class GovernanceQueueAdminPage
         if (!current_user_can('nhk_view_governance')) wp_die('Bạn không có quyền xem hàng đợi dữ liệu.', '', ['response' => 403]);
         global $wpdb;
         if (!isset($wpdb) || !is_object($wpdb)) { GovernanceQueueRenderer::render(['availability' => 'unavailable', 'items' => []]); return; }
-        $query = new WpdbGovernanceQueueQuery($wpdb);
-        GovernanceQueueRenderer::render($query->page(self::filtersFromGet()));
+        $filters = self::filtersFromGet();
+        if (isset($filters['_diagnostic'])) {
+            GovernanceQueueRenderer::render(['availability' => 'blocked', 'diagnostics' => [$filters['_diagnostic']], 'items' => [], 'filters' => $filters]);
+            return;
+        }
+        $query = self::$queryFactory !== null ? (self::$queryFactory)() : new WpdbGovernanceQueueQuery($wpdb);
+        GovernanceQueueRenderer::render($query->page($filters));
     }
 
     public static function handleAction(): void
@@ -54,14 +62,24 @@ final class GovernanceQueueAdminPage
         $selectedIds = isset($_POST['selected_ids']) && is_array($_POST['selected_ids']) ? array_values(array_map(static fn ($id): string => self::cleanText($id), wp_unslash($_POST['selected_ids']))) : [];
         $rawSnapshots = isset($_POST['snapshots']) && is_array($_POST['snapshots']) ? wp_unslash($_POST['snapshots']) : [];
         $items = [];
-        foreach ($selectedIds as $key => $id) {
-            $raw = is_array($rawSnapshots[$id] ?? null) ? $rawSnapshots[$id] : [];
-            if (!is_array($raw)) continue;
+        $invalid = [];
+        foreach ($selectedIds as $id) {
+            $raw = $rawSnapshots[$id] ?? null;
+            if (!is_array($raw)) {
+                $invalid[] = ['ok' => false, 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => 'INVALID_INPUT'];
+                continue;
+            }
             $snapshot = self::snapshot($raw);
-            if (!UuidCodec::isValid($id) || $snapshot === null) { $items[] = ['proposal_id' => $id, 'revision' => 0, 'state' => 'blocked']; continue; }
+            if (!UuidCodec::isValid($id) || $snapshot === null) {
+                $invalid[] = ['ok' => false, 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => 'INVALID_INPUT'];
+                continue;
+            }
             $snapshot['proposal_id'] = $id; $items[] = $snapshot;
         }
-        self::redirect(self::service()->bulk($action, $items));
+        $validResult = self::service()->bulk($action, $items);
+        $results = array_merge($validResult['results'] ?? [], $invalid);
+        $failures = array_values(array_filter($results, static fn (array $result): bool => ($result['ok'] ?? false) !== true));
+        self::redirect(['selected' => count($selectedIds), 'succeeded' => count($selectedIds) - count($failures), 'failed' => count($failures), 'failures' => $failures, 'results' => $results]);
     }
 
     /** @return array<string,mixed> */
@@ -69,10 +87,11 @@ final class GovernanceQueueAdminPage
     {
         $search = sanitize_text_field(wp_unslash((string) ($_GET['search'] ?? '')));
         $status = self::cleanKey($_GET['status'] ?? '');
-        if (!in_array($status, array_map(static fn (ProposalState $state): string => $state->value, ProposalState::cases()), true)) $status = '';
+        if ($status !== '' && !in_array($status, array_map(static fn (ProposalState $state): string => $state->value, ProposalState::cases()), true)) return ['_diagnostic' => 'INVALID_FILTER'];
         $type = self::cleanKey($_GET['type'] ?? '');
-        $orderBy = self::cleanKey($_GET['order_by'] ?? 'updated'); if (!in_array($orderBy, self::SORTS, true)) $orderBy = 'updated';
-        $order = self::cleanKey($_GET['order'] ?? 'desc'); if (!in_array($order, ['asc', 'desc'], true)) $order = 'desc';
+        if ($type !== '' && !WpdbGovernanceQueueQuery::isAllowedType($type)) return ['_diagnostic' => 'INVALID_FILTER'];
+        $orderBy = self::cleanKey($_GET['order_by'] ?? 'updated'); if (!WpdbGovernanceQueueQuery::isAllowedOrderBy($orderBy)) return ['_diagnostic' => 'INVALID_FILTER'];
+        $order = self::cleanKey($_GET['order'] ?? 'desc'); if (!in_array($order, ['asc', 'desc'], true)) return ['_diagnostic' => 'INVALID_FILTER'];
         return ['search' => $search, 'status' => $status, 'type' => $type, 'order_by' => $orderBy, 'order' => $order, 'page' => max(1, absint($_GET['paged'] ?? $_GET['page_number'] ?? 1)), 'per_page' => min(100, max(1, absint($_GET['per_page'] ?? 20)))];
     }
 
@@ -85,10 +104,15 @@ final class GovernanceQueueAdminPage
 
     private static function service(): GovernanceQueueActionService
     {
+        if (self::$actionServiceFactory !== null) return (self::$actionServiceFactory)();
         global $wpdb;
         $runtime = GovernanceRuntimeFactory::fromWordPress($wpdb);
         return new GovernanceQueueActionService(new \NHK\Core\Application\Governance\CanonicalGovernanceActionPort($runtime->proposals, $runtime->governance, $runtime->eligibility, $runtime->controlledApply), static fn (string $capability): bool => current_user_can($capability), static fn (): int => get_current_user_id());
     }
+
+    public static function setTestQuery(GovernanceQueueQuery $query): void { self::$queryFactory = static fn (): GovernanceQueueQuery => $query; }
+    public static function setTestActionService(mixed $service): void { self::$actionServiceFactory = is_callable($service) ? $service : static fn (): GovernanceQueueActionService => $service; }
+    public static function resetTestSeams(): void { self::$queryFactory = null; self::$actionServiceFactory = null; }
 
     private static function capabilityFor(string $action): string { return in_array($action, ['approve', 'reject'], true) ? 'nhk_approve_proposals' : 'nhk_' . $action . '_proposals'; }
     private static function cleanKey(mixed $value): string { return sanitize_key((string) $value); }

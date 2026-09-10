@@ -22,7 +22,7 @@ final class GovernanceQueueRenderer
             echo '<div class="notice notice-error"><p>Hàng đợi hiện không khả dụng. Không thể kết luận rằng không có dữ liệu.</p></div></section>';
             return;
         }
-        if ($availability === 'blocked') echo '<div class="notice notice-warning"><p>Hàng đợi có bản ghi bị chặn; các chẩn đoán được giữ nguyên để rà soát.</p></div>';
+        if ($availability === 'blocked') echo '<div class="notice notice-warning"><p>Hàng đợi bị chặn hoặc có bản ghi cần rà soát: ' . esc_html(implode(', ', array_map('strval', (array) ($page['diagnostics'] ?? [])))) . '</p></div>';
 
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="nhk-governance-bulk-form" data-nhk-governance-bulk-form>';
         echo '<input type="hidden" name="action" value="nhk_governance_queue_bulk">';

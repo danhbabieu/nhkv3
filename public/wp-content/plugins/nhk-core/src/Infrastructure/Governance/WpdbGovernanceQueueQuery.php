@@ -27,6 +27,17 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         $this->compatibility = new ControlledApplyOperationRegistry();
     }
 
+    public static function isAllowedOrderBy(string $value): bool
+    {
+        return isset(self::SORTS[$value]);
+    }
+
+    public static function isAllowedType(string $value): bool
+    {
+        $authorityTypes = array_map(static fn ($definition): string => $definition->type, CanonicalEntityTypeCatalog::definitions());
+        return in_array($value, array_merge($authorityTypes, ['knowledge', 'source', 'evidence', 'media', 'video', 'wp_post', 'relation']), true);
+    }
+
     /** @return array<string,mixed> */
     public function page(array $filters = []): array
     {
@@ -137,12 +148,12 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         }
 
         $type = strtolower(trim((string) ($filters['type'] ?? '')));
-        if (!in_array($type, $this->types(), true)) {
+        if (!self::isAllowedType($type)) {
             $type = '';
         }
 
         $orderBy = strtolower(trim((string) ($filters['order_by'] ?? 'updated')));
-        if (!isset(self::SORTS[$orderBy])) {
+        if (!self::isAllowedOrderBy($orderBy)) {
             $orderBy = 'updated';
         }
 
