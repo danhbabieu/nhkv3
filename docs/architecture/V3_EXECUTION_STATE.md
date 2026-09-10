@@ -1,5 +1,36 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Canonical Capture orchestration convergence
+
+The Capture root cause was a split identity boundary: Capture used the
+Authority exact resolver while semantic/MCP surfaces used separate resolution
+and discovery paths. Video enrichment ran before Capture subject resolution,
+so title matching could broaden Variant Odo 36/10 to Model Odo 36. Media
+reconciliation also admitted current/global WordPress usage without persisted
+subject-scope proof, and the Capture-wide exception handler classified a
+blueprint contract error as `FAILED_RETRYABLE`.
+
+The implementation now carries one typed canonical resolution packet from
+Capture to Claim retrieval, Video enrichment, Media reconciliation, Article
+composition and Governance; explicit UUID wins over prose. Historical Media
+reuse requires a locked subject and persisted scope match. Existing Video and
+Claims are reused before proposal/create where identity, scope, provenance,
+evidence and relevance match. User knowledge remains atomized and attributed
+where required. `capture_id` continuation remains on the existing canonical
+tool boundary with same-key idempotency/conflict behavior.
+
+Changed implementation/test files are the existing Capture, Semantic, Video,
+Media, MCP and Plugin boundaries plus focused resolver, handoff, media, claim,
+video and continuation tests. Documentation changes are projected with the
+canonical `composer generate:mcp-docs` command after this checkpoint. Focused,
+Unit and Contract suites are locally verifiable; Integration remains an
+environment gate if `nhk_v3_test` cannot bootstrap. The canonical projection
+was run with `composer generate:mcp-docs`; its final artifact values are
+recorded in the handoff report. The generator does not place `build_identity`
+in the manifest; runtime computes it from the deployed package. No DEMO, production,
+staging, V2, Capture 355, Article 355 or publication state was mutated; no
+deployment or publish was performed.
+
 # Checkpoint — 2026-09-10 — DEMO deployment/runtime verification blocker
 
 The clean artifact for commit `5cac8e28ad7defc89640c3129e8288d502aa5b44`

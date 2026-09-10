@@ -79,6 +79,14 @@ before any broader title/description/user-hint matching. This is preservation of
 an explicit resolved target, not permission to infer a Variant from Model-only
 text. Multiple conflicting explicit targets remain ambiguous and fail closed.
 
+When Video is a child of `nhk.capture.ingest`, the Capture resolution packet is
+the primary subject handoff. Video enrichment may inspect broader nodes as
+bounded research context, but it must not downgrade a resolved Variant to a
+broader Model because of title or hint matching. Existing Video identity is
+reused by canonical platform plus external video ID before any governed ingest
+proposal. Missing transcript or semantic attachment remains an explicit
+diagnostic/review state and does not authorize an unscoped relation.
+
 Its output is the bounded `knowledge_enrichment` packet with `status`,
 `subject`, `candidates`, `diagnostics`, `proposal_ready` and
 `unresolved_reasons`. Each candidate exposes `classification`, `subject_id`,

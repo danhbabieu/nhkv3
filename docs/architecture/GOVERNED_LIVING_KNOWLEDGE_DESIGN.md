@@ -49,6 +49,15 @@ and an existing canonical claim reused or enriched when applicable. A
 Dictionary definition or repeated wording is never sufficient evidence to mint
 a duplicate Knowledge claim.
 
+Editorial Capture must perform that reuse check after the shared canonical
+subject resolution and bounded Graph retrieval, before creating a new claim
+proposal. Reuse requires the same semantic subject and scope plus compatible
+provenance, supported-within-scope evidence and relevance. User statements are
+atomized with `EXPLICIT_USER_KNOWLEDGE`; specimen/video observations remain
+scoped, evaluations remain attributed, and recognition wording such as
+“nữ hoàng âm thanh” remains attributed or review-required rather than becoming
+an unsupported superiority fact.
+
 ## Read model pipeline
 
 `Canonical Knowledge → Current Truth Resolver → Knowledge Cluster/Facet Read

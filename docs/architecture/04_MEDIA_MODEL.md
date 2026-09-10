@@ -22,6 +22,15 @@ an unscoped/global reusable Media row is never an honest completion fallback.
 If no eligible subject-scoped Media exists, the Article remains missing or
 placeholder and any wrong-variant usage is reconciled away.
 
+Historical Media reuse is permitted only after the Capture subject is locked
+by the shared canonical resolution packet and the persisted Media/Usage scope
+matches that subject. Filename, title similarity, an old Article plan,
+stale representative state or a global row is not semantic scope evidence.
+Final WordPress attachment read-back applies the same check, so stale featured
+or inline usage is rejected rather than silently replaced by another image.
+No eligible Media is a readiness/incomplete outcome; it is not a blueprint
+corruption error and must not be reported as infrastructure retryable failure.
+
 
 Media là semantic entity độc lập. Media identity tách khỏi MediaAsset và
 MediaUsage: cùng một binary có thể dùng cho nhiều Post, entity, gallery Model,

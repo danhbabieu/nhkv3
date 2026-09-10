@@ -195,6 +195,25 @@ relations.
 
 ## Existing-Capture continuation addendum
 
+## Canonical subject handoff — 2026-09-10
+
+Each Capture revision resolves Authority once and carries one immutable typed
+resolution packet (`status`, canonical ID/type, stable key, canonical name,
+revision, match reason/source and ambiguity/missing diagnostics) to Claim
+retrieval, Video enrichment, Media reconciliation, Article composition and
+Governance planning. An explicit canonical UUID takes precedence over prose;
+child coordinators consume the packet and must not reinterpret it into a
+broader Model or another subject. This preserves a resolved Variant as the
+primary Capture subject even when a Video title also matches a Model.
+
+The packet is established before historical Media reuse. Existing Media is
+eligible only when persisted semantic subject scope proves a match; attachment
+filename, title similarity, stale Article plans and global/unscoped fallback
+are not scope proof. Missing scoped Media is an incomplete/placeholder
+readiness state, while an actually invalid/corrupt blueprint remains a
+system/contract failure. Existing Capture continuation uses `capture_id` at
+this same boundary and never creates a second Capture or Article.
+
 The same `nhk.capture.ingest` boundary may receive a text addendum targeted by
 `capture_id`. The original Capture request and fingerprint remain immutable;
 the addendum has its own idempotency key and fingerprint, is recorded as an

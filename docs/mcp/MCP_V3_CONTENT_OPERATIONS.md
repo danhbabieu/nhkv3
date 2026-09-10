@@ -128,6 +128,13 @@ addendum/idempotency key; it cannot create duplicate semantic records. New
 submissions still return review-only semantic candidates until their governed
 workflow is explicitly continued.
 
+The resolved Capture subject is one immutable typed handoff packet for all
+child coordinators. Video, Claim and Media components consume that packet and
+must not independently broaden or reinterpret the primary subject. Historical
+Media selection starts only after subject resolution and requires persisted
+semantic scope proof; an absent eligible Media is an honest incomplete state,
+not permission for global fallback.
+
 The same tool also accepts an optional `capture_id` to continue one existing
 Capture with a text addendum. The original request/fingerprint is immutable;
 the addendum has its own idempotency key, appends an auditable Capture revision,

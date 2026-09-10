@@ -154,6 +154,13 @@ read-back. A pending decision resumes on the same addendum/idempotency key;
 it never creates a duplicate Capture, Article or proposal. Publication remains
 a separate governed owner-publication lifecycle.
 
+The 2026-09-10 orchestration convergence makes the Capture's single typed
+canonical subject-resolution packet the handoff context for Claim retrieval,
+Video enrichment, Media reconciliation, composition and Governance. Historical
+Media is gated by persisted subject scope after resolution; missing scoped
+Media remains incomplete/placeholder rather than retryable infrastructure
+failure. This is an implementation checkpoint, not live DEMO verification.
+
 ## 2. Current boundary snapshot
 
 ### Semantic Claim Projection — 2026-09-08

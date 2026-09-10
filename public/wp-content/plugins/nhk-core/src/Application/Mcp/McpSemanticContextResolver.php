@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Mcp;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver;
-use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Read-only, deterministic context resolution; it never creates or mutates semantic records. */
