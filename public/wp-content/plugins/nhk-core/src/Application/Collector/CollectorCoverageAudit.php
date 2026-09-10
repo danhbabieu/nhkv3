@@ -5,13 +5,11 @@ namespace NHK\Core\Application\Collector;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\AuthorityEntity;
+use NHK\Core\Domain\Knowledge\CollectorFacetRegistry;
 
 /** Read-only coverage report for Collector Profile branches. */
 final class CollectorCoverageAudit
 {
-    /** @var list<string> */
-    private const MATRIX = ['display_form', 'case_styles', 'movement_family', 'running_duration', 'sound', 'music', 'automata', 'night_shutoff', 'materials', 'craft_modes', 'production_scale', 'condition_guidance', 'originality_guidance', 'provenance', 'rarity', 'origin_certification'];
-
     public function __construct(private AuthorityRepository $authority, private CollectorProfileQuery $profiles) {}
 
     /** @return array{summary:array<string,int>,items:list<array<string,mixed>>} */
@@ -38,7 +36,7 @@ final class CollectorCoverageAudit
             $summary['media_count'] += $media;
             $summary['video_count'] += $videos;
             $facetMatrix = [];
-            foreach (self::MATRIX as $facet) {
+            foreach (CollectorFacetRegistry::all() as $facet) {
                 $claims = is_array($profile['facets'][$facet] ?? null) ? $profile['facets'][$facet] : [];
                 $statuses = array_map(static fn (mixed $claim): string => is_array($claim) ? (string) ($claim['status'] ?? 'unresolved') : 'unresolved', $claims);
                 $facetMatrix[$facet] = ['count' => count($claims), 'status' => in_array('verified', $statuses, true) ? 'VERIFIED' : (in_array('partial', $statuses, true) ? 'PARTIAL' : 'UNRESOLVED')];

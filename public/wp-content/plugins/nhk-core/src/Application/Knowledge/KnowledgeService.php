@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Knowledge;
 
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
-use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, KnowledgeException, Source};
+use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, Evidence, KnowledgeClaim, KnowledgeException, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class KnowledgeService
@@ -35,6 +35,35 @@ final class KnowledgeService
         $claim = $this->claims->update(new KnowledgeClaim($current->canonicalId, $current->stableKey, $text, $type, $provenance, $current->active, $current->revision), $revision);
         $this->observe($claim);
         return $claim;
+    }
+
+    /** Update only the governed Collector facet metadata on an existing claim. */
+    public function updateCollectorFacet(string $id, string $facet, int $revision, array $binding): KnowledgeClaim
+    {
+        if (!CollectorFacetRegistry::isValid($facet)) throw new KnowledgeException('COLLECTOR_FACET_INVALID');
+        $current = $this->claims->findByCanonicalId($id);
+        if (!$current) throw new KnowledgeException('COLLECTOR_FACET_TARGET_NOT_FOUND');
+        if ($current->revision !== $revision) throw new KnowledgeException('COLLECTOR_FACET_STALE_REVISION');
+        if ((string) ($binding['knowledge_uuid'] ?? $id) !== $current->canonicalId
+            || (string) ($binding['stable_key'] ?? '') !== $current->stableKey
+            || (string) ($binding['claim_text_sha256'] ?? '') !== hash('sha256', $current->claimText)
+            || (string) ($binding['claim_type'] ?? '') !== $current->claimType
+            || (string) ($binding['provenance_sha256'] ?? '') !== self::fingerprint($current->provenance)) {
+            throw new KnowledgeException('COLLECTOR_FACET_BINDING_MISMATCH');
+        }
+        $metadata = is_array($current->provenance['metadata'] ?? null) ? $current->provenance['metadata'] : [];
+        $scope = (string) ($metadata['scope'] ?? '');
+        if ((string) ($binding['scope'] ?? $scope) !== $scope || !CollectorFacetRegistry::isValidForScope($facet, $scope)) {
+            throw new KnowledgeException('COLLECTOR_FACET_SCOPE_INVALID');
+        }
+        if (CollectorFacetRegistry::resolve($metadata) === $facet) return $current;
+        $provenance = $current->provenance;
+        $provenance['metadata'] = $metadata + [CollectorFacetRegistry::METADATA_KEY => $facet];
+        $provenance['metadata'][CollectorFacetRegistry::METADATA_KEY] = $facet;
+        return $this->claims->update(
+            new KnowledgeClaim($current->canonicalId, $current->stableKey, $current->claimText, $current->claimType, $provenance, $current->active, $current->revision),
+            $revision,
+        );
     }
 
     public function retireClaim(string $id, int $revision): KnowledgeClaim { return $this->changeClaimState($id, $revision, false); }
@@ -107,5 +136,16 @@ final class KnowledgeService
             return;
         }
         DictionaryObservationRegistry::observe('KNOWLEDGE', $claim->canonicalId, $claim->claimText, $context);
+    }
+
+    private static function fingerprint(array $value): string
+    {
+        $sort = static function (mixed $item) use (&$sort): mixed {
+            if (!is_array($item)) return $item;
+            foreach ($item as $key => $child) $item[$key] = $sort($child);
+            if (array_keys($item) !== range(0, count($item) - 1)) ksort($item);
+            return $item;
+        };
+        return hash('sha256', (string) json_encode($sort($value), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 }

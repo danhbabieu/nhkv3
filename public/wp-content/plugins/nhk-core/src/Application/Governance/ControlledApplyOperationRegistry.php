@@ -8,7 +8,7 @@ final class ControlledApplyOperationRegistry implements OperationCompatibility
 {
     /** @var array<string, list<string>> */
     private const ENTITY_OPERATIONS = [
-        'knowledge' => ['create', 'ingest', 'update', 'retire', 'reactivate', 'relation_create', 'relation_retire', 'relation_reactivate'],
+        'knowledge' => ['create', 'ingest', 'update', 'retire', 'reactivate', 'collector_facet_update', 'relation_create', 'relation_retire', 'relation_reactivate'],
         'source' => ['create', 'ingest', 'update', 'retire', 'reactivate'],
         'evidence' => ['create', 'ingest', 'update', 'retire', 'reactivate'],
         'media' => ['ingest', 'relation_create', 'relation_retire', 'relation_reactivate'],

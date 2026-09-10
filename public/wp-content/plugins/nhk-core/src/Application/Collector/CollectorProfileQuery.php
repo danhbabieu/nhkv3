@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Collector;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\AuthorityEntity;
-use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
+use NHK\Core\Domain\Knowledge\{CollectorFacetRegistry, Evidence, KnowledgeClaim, Source};
 
 /**
  * Read-only collector projection for one canonical Classification branch.
@@ -14,15 +14,6 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
  */
 final class CollectorProfileQuery
 {
-    /** @var list<string> */
-    private const GROUPS = [
-        'display_form', 'dimensions', 'dating', 'case_styles', 'motifs',
-        'materials', 'craft_modes', 'production_scale', 'movement_family',
-        'running_duration', 'drive_system', 'functions', 'sound', 'music',
-        'automata', 'night_shutoff', 'condition_guidance', 'originality_guidance',
-        'provenance', 'rarity', 'origin_certification',
-    ];
-
     /** @param callable(string,array<string,mixed>):array<string,mixed>|null $relatedReader */
     /** @param callable(string):array{status:string,claims?:list<KnowledgeClaim>,reason?:string}|null $branchClaimReader */
     public function __construct(
@@ -57,11 +48,11 @@ final class CollectorProfileQuery
         $offset = ($page - 1) * $perPage;
         $pageRecords = array_slice($availableRecords, $offset, $perPage);
         $hasNextPage = ($offset + count($pageRecords)) < count($availableRecords);
-        $facets = array_fill_keys(self::GROUPS, []);
+        $facets = array_fill_keys(CollectorFacetRegistry::all(), []);
         $unresolved = [];
         foreach ($pageRecords as $record) {
             $facet = (string) ($record['facet'] ?? '');
-            if (in_array($facet, self::GROUPS, true)) $facets[$facet][] = $record;
+            if (CollectorFacetRegistry::isValid($facet)) $facets[$facet][] = $record;
             else $unresolved[] = $record;
         }
         foreach ($facets as &$items) usort($items, static fn (array $left, array $right): int => [$left['status'], $left['uuid']] <=> [$right['status'], $right['uuid']]);
@@ -149,21 +140,7 @@ final class CollectorProfileQuery
     /** @param array<string,mixed> $metadata */
     private function facet(array $metadata): string
     {
-        $requested = trim((string) ($metadata['collector_facet'] ?? ''));
-        if ($requested !== '') {
-            if (!in_array($requested, self::GROUPS, true)) return '';
-            if ($requested === 'automata' && !in_array((string) ($metadata['scope'] ?? ''), ['model', 'variant', 'specimen_observation'], true)) return '';
-            return $requested;
-        }
-        return match ((string) ($metadata['facet'] ?? '')) {
-            'chronology' => 'dating',
-            'movement' => 'movement_family',
-            'music' => 'music',
-            'provenance' => 'provenance',
-            'rarity_frequency' => 'rarity',
-            'specimen_observation' => 'condition_guidance',
-            default => '',
-        };
+        return CollectorFacetRegistry::resolve($metadata);
     }
 
     /** @return array{status:string,scope?:string,reason?:string,media?:list<array<string,mixed>>,videos?:list<array<string,mixed>>,articles?:list<array<string,mixed>>,makers?:list<array<string,mixed>>} */

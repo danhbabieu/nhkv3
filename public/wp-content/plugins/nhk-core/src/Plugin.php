@@ -73,6 +73,7 @@ use NHK\Core\Application\Search\SearchSemanticQuery;
 use NHK\Core\Application\Knowledge\KnowledgePageQuery;
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
 use NHK\Core\Application\Governance\CanonicalApplyReadBackVerifier;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
@@ -252,7 +253,28 @@ final class Plugin {
             });
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
             $historicalEvidence = new \NHK\Core\Application\Video\HistoricalVideoRelationEvidenceReconciliation($knowledgeService, $claims, $sources, $evidence, $proposalRepository);
-            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
+            $collectorBranchReader = static function (string $classificationId) use ($authority, $claims, $graphService): array {
+                $classification = $authority->findByCanonicalId($classificationId);
+                if (!$classification instanceof \NHK\Core\Domain\Authority\AuthorityEntity || $classification->entityType !== 'classification' || !$classification->active()) return ['status' => 'unavailable', 'reason' => 'CLASSIFICATION_NOT_AVAILABLE'];
+                $items = []; $after = 0;
+                try {
+                    do {
+                        $page = $graphService->findIncoming(new \NHK\Core\Domain\Graph\NodeReference('classification', $classificationId), 'about', $after, 200, false, 'knowledge');
+                        foreach ((array) ($page['items'] ?? []) as $edge) {
+                            if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive()) continue;
+                            $claim = $claims->findByCanonicalId($edge->source->reference->endpoint_key);
+                            if ($claim !== null && $claim->active && $claim->isPublic()) $items[$claim->canonicalId] = $claim;
+                        }
+                        $next = $page['next_cursor'] ?? null;
+                        if ($next === null) break;
+                        if (!is_int($next) || $next <= $after) return ['status' => 'unavailable', 'reason' => 'BRANCH_KNOWLEDGE_CURSOR_INVALID'];
+                        $after = $next;
+                    } while (true);
+                } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'BRANCH_KNOWLEDGE_UNAVAILABLE']; }
+                return ['status' => 'available', 'claims' => array_values($items), 'classification_revision' => $classification->revision];
+            };
+            $collectorExecutor = new CollectorFacetMaintenanceExecutor($knowledgeService, $collectorBranchReader);
+            $controlledApply = new ControlledApplyService($proposalRepository, new WpdbApplyAttemptRepository($wpdb), $transactionManager, new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor), $governanceAudit, $eligibility, new NoOpApplyExecutionHook(), new WordPressGovernanceAuthorizer(), $canonicalReadBack);
             $articleEditorial = new WpEditorialStateReader();
             $articlePreflight = new ArticleIngestPreflight(
                 $endpoints,

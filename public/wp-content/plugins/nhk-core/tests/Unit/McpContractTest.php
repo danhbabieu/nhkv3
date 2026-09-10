@@ -238,6 +238,7 @@ final class McpContractTest extends TestCase
             'update',
             'retire',
             'reactivate',
+            'collector_facet_update',
             'relation_retire',
             'relation_reactivate',
         ], $tools['nhk.proposal.create']['inputSchema']['properties']['operation']['enum']);

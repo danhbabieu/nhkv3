@@ -347,6 +347,6 @@ final class McpToolCatalog
     /** @return list<string> */
     public static function governedOperations(): array
     {
-        return ['create', 'ingest', 'relation_create', 'rekey', 'merge', 'rename', 'update', 'retire', 'reactivate', 'relation_retire', 'relation_reactivate'];
+        return ['create', 'ingest', 'relation_create', 'rekey', 'merge', 'rename', 'update', 'retire', 'reactivate', 'collector_facet_update', 'relation_retire', 'relation_reactivate'];
     }
 }

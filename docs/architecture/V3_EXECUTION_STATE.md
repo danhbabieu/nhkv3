@@ -6938,3 +6938,30 @@ migration, seed, apply, publish or semantic mutation was performed.
 STATUS: BLOCKED — Article preflight live read-back and DEMO deployment remain
 unverified after `57ca530e`; Collector facet data remains a governed data gap.
 PUSH STATUS = NOT PUSHED.
+
+# Checkpoint — 2026-09-10 — Collector facet registry and governed maintenance path
+
+ROOT GAP: The Collector facet allowlist and existing-data maintenance path were
+previously absent as canonical executable boundaries.
+
+CODE / CONTRACT: Added `CollectorFacetRegistry` with the exact 21 existing
+Collector groups and fail-closed scope/legacy mapping. `CollectorProfileQuery`
+and coverage audit consume the registry. Added the current
+`COLLECTOR_PROFILE_CONTRACT.md`, the `collector_facet_update` Governance
+operation, facet-only KnowledgeService owner, proposal binding, branch-scoped
+executor and dry-run maintenance CLI. The operation cannot create Knowledge,
+Article/Post, Source/Evidence or Graph state.
+
+TEST: Focused Collector/contract tests pass (18 tests / 100 assertions in the
+latest Collector registry + projection run; MCP contract focused run passes 39
+tests / 488 assertions). Composer lint and PHP lint pass. The full Unit suite
+has pre-existing unrelated Capture continuation errors in the dirty worktree;
+those were not changed by this checkpoint.
+
+DRY-RUN / DATA EFFECT: The exact Classification dry-run command reaches
+WordPress bootstrap but the local database connection fails before inventory
+and plan creation. No `--apply` was run; no semantic, Article, Graph, V2,
+staging or production data was changed.
+
+STATUS: CODE COMPLETE; target-runtime dry-run remains environment-blocked.
+PUSH STATUS = NOT PUSHED.
