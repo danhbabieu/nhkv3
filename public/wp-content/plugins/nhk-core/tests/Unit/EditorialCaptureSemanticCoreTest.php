@@ -199,6 +199,50 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertContains('Không project unsupported superiority claim.', $interpreted['non_semantic_context']['compliance_notes']);
     }
 
+    public function test_processing_instruction_wording_is_not_promoted_to_knowledge_candidate(): void
+    {
+        $instruction = "Các từ 'chuẩn mực' và 'sang trọng' chỉ là cảm nhận, không nâng thành fact.";
+        $interpreted = (new TextInputInterpreter())->interpret(
+            "Âm thanh chậm rãi, ngân nga, dễ nghe.\n{$instruction}",
+            [],
+            ['Variant A'],
+        );
+
+        self::assertCount(1, $interpreted['user_claim_candidates']);
+        self::assertSame('Âm thanh chậm rãi, ngân nga, dễ nghe.', $interpreted['user_claim_candidates'][0]['text']);
+        self::assertContains($instruction, $interpreted['non_semantic_context']['compliance_notes']);
+        self::assertNotContains($instruction, array_column($interpreted['user_claim_candidates'], 'text'));
+    }
+
+    public function test_capture_publication_gate_receives_locked_subject_packet(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $seenResolution = null;
+        $variant = ['id' => 'variant-a', 'type' => 'variant', 'stable_key' => 'nhk:variant:a', 'name' => 'Variant A', 'revision' => 3, 'match' => 'uuid_exact'];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 701, 'state_token' => 'token-701', 'post' => ['post_id' => 701]],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => $hint === 'Variant A' ? [$variant] : []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'PLANNED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static function (array $context) use (&$seenResolution): array {
+                $seenResolution = $context['subject_resolution'];
+                return ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']];
+            },
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'capture-subject-publication-handoff', 'text' => 'Variant A.', 'subject_hints' => ['Variant A']]);
+
+        self::assertSame('READY_FOR_PUBLICATION', $result->stage, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertIsArray($seenResolution);
+        self::assertSame($variant, $seenResolution['primary']);
+    }
+
     public function test_governance_preserves_interpreted_scope_and_facet_in_knowledge_payload(): void
     {
         $variant = UuidCodec::newV7();

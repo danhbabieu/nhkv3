@@ -78,6 +78,52 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame($result->slotMedia['inline_primary'], $adapter->syncs[0]['slot_media']['inline_primary']);
     }
 
+    public function test_generic_sibling_fixture_is_rejected_before_ranking_even_when_it_has_more_history(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $variantA = $service->create('variant-a-front', 'Variant A front', 'ready', ['metadata' => ['subject_id' => 'variant-a']]);
+        $variantB = $service->create('variant-b-front', 'Variant B front', 'ready', ['metadata' => ['subject_id' => 'variant-b'], 'detail_type' => 'WHOLE_FRONT']);
+        foreach ([[$variantA, 'variant-a'], [$variantB, 'variant-b']] as [$item, $stem]) {
+            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $stem . '.webp', hash('sha256', $stem), 'image/webp', 10, 2400, 1600, 'PUBLIC');
+        }
+        $service->addUsage($variantA->canonicalId, 'variant', 'variant-a', 'representative');
+        foreach (range(1, 4) as $index) $service->addUsage($variantB->canonicalId, 'wp_post', '1:' . (700 + $index), 'inline_primary', 0, 'Historical sibling use');
+        $service->addUsage($variantB->canonicalId, 'variant', 'variant-b', 'representative');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(777, [
+            'capture_id' => 'capture-generic-a',
+            'subject_ids' => ['variant-a'],
+            'subject_context' => ['subject_ids' => ['variant-a']],
+            'subject_scope_locked' => true,
+            'allow_scoped_reuse' => true,
+            'allow_unscoped_reuse' => false,
+        ]);
+
+        self::assertSame($variantA->canonicalId, $result->slotMedia['featured_primary']);
+        self::assertSame($variantA->canonicalId, $result->slotMedia['inline_primary']);
+        self::assertNotContains($variantB->canonicalId, $result->slotMedia);
+    }
+
+    public function test_generic_parent_scoped_media_is_not_authorized_for_exact_variant(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $parent = $service->create('model-parent-front', 'Model parent front', 'ready', ['metadata' => ['subject_id' => 'model-parent']]);
+        $service->addAsset($parent->canonicalId, 'original', 'uploads/model-parent.webp', hash('sha256', 'model-parent'), 'image/webp', 10, 2400, 1600, 'PUBLIC');
+        $service->addUsage($parent->canonicalId, 'model', 'model-parent', 'representative');
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(778, [
+            'capture_id' => 'capture-generic-child',
+            'subject_ids' => ['variant-child'],
+            'subject_scope_locked' => true,
+            'allow_scoped_reuse' => true,
+            'allow_unscoped_reuse' => false,
+        ]);
+
+        self::assertTrue($result->slots['featured_primary']['placeholder']);
+        self::assertTrue($result->slots['inline_primary']['placeholder']);
+        self::assertNotContains($parent->canonicalId, $result->slotMedia);
+    }
+
     public function test_text_only_capture_without_assets_does_not_adopt_unrelated_media(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

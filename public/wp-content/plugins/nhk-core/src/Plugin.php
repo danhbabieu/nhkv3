@@ -24,7 +24,7 @@ use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
-use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
+use NHK\Core\Application\Capture\{CaptureEditorialWriteGuard, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -179,6 +179,7 @@ final class Plugin {
                 if (isset($sitemaps->registry) && is_object($sitemaps->registry) && method_exists($sitemaps->registry, 'add_provider')) $sitemaps->registry->add_provider('images', new WordPressImageSitemapProvider($articleSeo));
             });
             $reconcilePostMedia = static function (int $postId, \WP_Post $post, bool $update) use ($articleMedia, $attachmentBridge): void {
+                if (CaptureEditorialWriteGuard::active()) return;
                 if ($attachmentBridge->isHandlingWrite()) return;
                 if ($post->post_type !== 'post' || wp_is_post_revision($postId) || wp_is_post_autosave($postId)) return;
                 try {
@@ -595,7 +596,16 @@ final class Plugin {
                         $current = $articleEditorial->read((int) ($context['article_id'] ?? 0));
                         if ($current !== null) $expectedToken = $current->token;
                     }
-                    $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), $expectedToken, ['semantic' => $context['semantic'] ?? [], 'semantic_write_back' => $context['semantic_write_back'] ?? [], 'media' => $context['media'] ?? []], (string) ($context['capture']['capture_id'] ?? '') . ':review');
+                    $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+                    $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+                    $evidence = [
+                        'subject_resolution' => $resolution,
+                        'subject_resolved' => ($resolution['status'] ?? '') === 'resolved' && trim((string) ($primary['id'] ?? '')) !== '',
+                        'semantic' => $context['semantic'] ?? [],
+                        'semantic_write_back' => $context['semantic_write_back'] ?? [],
+                        'media' => $context['media'] ?? [],
+                    ];
+                    $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), $expectedToken, $evidence, (string) ($context['capture']['capture_id'] ?? '') . ':review');
                     $blockers = (array) ($review['blockers'] ?? $review['diagnostics'] ?? []);
                     return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'state_token' => $review['state_token'] ?? $expectedToken];
                 },
@@ -604,7 +614,7 @@ final class Plugin {
                     return $post === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'post' => $post->snapshot()];
                 },
                 static function (array $context) use ($draftGateway): array {
-                    return $draftGateway->update((int) ($context['article_id'] ?? 0), (array) ($context['fields'] ?? []), (string) ($context['expected_state_token'] ?? ''));
+                    return $draftGateway->update((int) ($context['article_id'] ?? 0), (array) ($context['fields'] ?? []), (string) ($context['expected_state_token'] ?? ''), (string) ($context['capture_id'] ?? ''));
                 },
                 static function (array $context) use ($attachmentBridge): array {
                     $mediaId = $attachmentBridge->adoptAttachment((int) ($context['attachment_id'] ?? 0));

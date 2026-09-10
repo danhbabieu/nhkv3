@@ -1,5 +1,60 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-11 — Capture editorial Media write-boundary integrity
+
+ROOT CAUSE: the initial Capture draft was created through
+`EditorialDraftGateway::create()` → `WpEditorialPostStore::createDraft()` →
+`wp_insert_post()`. During that native write, the generic `wp_after_insert_post`
+callback in `Plugin.php` synchronously called `ArticleMediaCoordinator` with
+title-only context. Because no locked subject scope was present, its historical
+reuse path could scan and rank global canonical Media before the Capture subject
+was resolved. The same split existed for the composition update path before the
+new Capture context was passed to `EditorialDraftGateway::update()`.
+
+FIRST BAD BOUNDARY: the anonymous `$reconcilePostMedia` callback in
+`public/wp-content/plugins/nhk-core/src/Plugin.php`, at the call to
+`ArticleMediaCoordinator::ensureForPost()`. It was the first boundary that
+treated an unscoped historical Media candidate as accepted presentation during
+a Capture-owned native Post write. The later subject-aware reconciliation was
+correctly scoped, but cleanup after that write was too late.
+
+FIX: added the test-only-observable, nested
+`CaptureEditorialWriteGuard`. Capture-owned draft create and update writes hold
+the guard; the generic Post media hook returns while it is active. Capture's
+later media reconciliation remains the canonical subject-aware selector and
+materializes only after the locked resolution packet and persisted scope gate.
+The coordinator now also passes the locked subject-resolution packet to the
+publication gate; Plugin derives `subject_resolved` from resolved status plus a
+canonical primary ID. Article taxonomy is not inferred from Video Hub category.
+
+RED/GREEN: the intermediate-write regression failed when the guard was absent,
+and failed again in the negative-control run with the create guard temporarily
+disabled (`EditorialDraftGatewayTest`, sibling attachment observed in the first
+write). With the guard restored it passes for both create and update writes,
+including the no-sibling assertion for every recorded write. Generic Variant A/B
+tests cover sibling-before-ranking rejection, historical usage/representative
+pressure, and fail-closed parent-scoped Media. The exact processing-instruction
+regression remains context-only and is not promoted to a Knowledge candidate.
+
+VERIFICATION: focused Capture/Media/publication/video slice — 109 tests / 404
+assertions, 0 failures (existing warning/deprecation only); NHK Unit — 1,056
+tests / 5,374 assertions, 0 failures (18 warnings, 6 deprecations, 11 PHPUnit
+deprecations); NHK Contract — 4 tests / 31 assertions, 0 failures; Composer
+validation, Composer lint, PHP lint and `git diff --check` pass. The guarded
+NHK Integration command was attempted against `nhk_v3_test` and WordPress
+stopped before PHPUnit with “Error establishing a database connection”; this
+is not a pass. No live MCP probe, deployment, migration, semantic-data change,
+or server edit was performed.
+
+STATUS: local implementation and regression verification complete. The text
+role path is covered and no live Knowledge cleanup was attempted. Publication
+`SUBJECT_UNRESOLVED` stale handoff is repaired locally; `CATEGORY_UNRESOLVED`
+remains an honest Article taxonomy blocker when Article category evidence is
+absent. Video `NO_SEMANTIC_ATTACHMENT` remains enforced because exact subject
+resolution is not Evidence. The supplied live checkpoint hashes differ from
+the current repository checkpoint, so live runtime parity remains unverified.
+PUSH STATUS = PENDING.
+
 # Checkpoint — 2026-09-10 — Easy MCP 1.7.16 final JSON boundary repair
 
 The Easy MCP 1.7.16 source trace is complete. Its ability path is

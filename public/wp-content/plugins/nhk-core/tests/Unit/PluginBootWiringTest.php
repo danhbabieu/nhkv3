@@ -81,4 +81,21 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString("capture_id'] ?? ''", $plugin);
         self::assertStringNotContainsString("'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE']", $plugin);
     }
+
+    public function test_capture_owned_draft_write_suppresses_generic_post_media_hook_until_capture_reconciliation(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        self::assertStringContainsString('CaptureEditorialWriteGuard::active()', $plugin);
+        self::assertLessThan(
+            strpos($plugin, 'if ($attachmentBridge->isHandlingWrite()) return;'),
+            strpos($plugin, 'CaptureEditorialWriteGuard::active()'),
+        );
+    }
+
+    public function test_capture_publication_gate_consumes_locked_subject_resolution_state(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        self::assertStringContainsString("'subject_resolution' => \$context['subject_resolution'] ?? []", $plugin);
+        self::assertStringContainsString("'subject_resolved' =>", $plugin);
+    }
 }

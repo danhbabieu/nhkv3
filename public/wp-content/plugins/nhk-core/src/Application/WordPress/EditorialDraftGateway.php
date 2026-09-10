@@ -9,6 +9,7 @@ use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, Edit
 use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Contracts\Article\{OwnerPublicationService, PublicationPrincipal};
+use NHK\Core\Application\Capture\CaptureEditorialWriteGuard;
 
 final class EditorialDraftGateway
 {
@@ -23,18 +24,31 @@ final class EditorialDraftGateway
         if ($existing !== null) { if (!hash_equals($existing->requestFingerprint, $fingerprint)) return ['ok' => false, 'reason' => 'IDEMPOTENCY_CONFLICT', 'receipt' => $existing->toArray()]; return $this->result($existing, $existing->wpPostId === null ? null : $this->posts->read($existing->wpPostId)); }
         $research = is_array($input['research'] ?? null) ? $input['research'] : [];
         if (($research['ready_for_draft'] ?? true) === false) return ['ok' => false, 'reason' => 'RESEARCH_PREFLIGHT_BLOCKED', 'research' => $research];
-        $state = $this->posts->createDraft(['post_title' => (string) ($input['title'] ?? ''), 'post_content' => (string) ($input['content'] ?? ''), 'post_excerpt' => (string) ($input['excerpt'] ?? ''), 'post_author' => (int) ($input['author'] ?? 0)]);
+        $captureOwned = trim((string) ($input['capture_id'] ?? '')) !== '';
+        if ($captureOwned) CaptureEditorialWriteGuard::enter();
+        try {
+            $state = $this->posts->createDraft(['post_title' => (string) ($input['title'] ?? ''), 'post_content' => (string) ($input['content'] ?? ''), 'post_excerpt' => (string) ($input['excerpt'] ?? ''), 'post_author' => (int) ($input['author'] ?? 0)]);
+        } finally {
+            if ($captureOwned) CaptureEditorialWriteGuard::leave();
+        }
         $receipt = $this->receipts->create(new ArticleOperationReceipt((string) ($input['operation_id'] ?? UuidCodec::newV7()), $key, $fingerprint, 'create', $state->endpointKey, $state->postId, 'draft', ArticleIngestOutcome::GOVERNANCE_PENDING, false, [], [], [], 1, null, null, $state->token, [], [], [], ['publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION'], 'research' => $research]));
         return $this->result($receipt, $state);
     }
 
     /** @param array<string,mixed> $fields */
-    public function update(int $postId, array $fields, string $expectedStateToken): array
+    public function update(int $postId, array $fields, string $expectedStateToken, string $captureId = ''): array
     {
         $current = $this->posts->read($postId); if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
         if (!hash_equals($expectedStateToken, $current->token)) return ['ok' => false, 'reason' => 'EDITORIAL_STATE_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token];
         if ($current->status !== 'draft') return ['ok' => false, 'reason' => 'EDITORIAL_UPDATE_NOT_ELIGIBLE'];
-        $updated = $this->posts->update($postId, $fields); return ['ok' => true, 'post' => $updated->snapshot(), 'state_token' => $updated->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
+        $captureOwned = trim($captureId) !== '';
+        if ($captureOwned) CaptureEditorialWriteGuard::enter();
+        try {
+            $updated = $this->posts->update($postId, $fields);
+        } finally {
+            if ($captureOwned) CaptureEditorialWriteGuard::leave();
+        }
+        return ['ok' => true, 'post' => $updated->snapshot(), 'state_token' => $updated->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
     }
 
     /** Publish only after every cross-boundary verification has been supplied and passed. */
