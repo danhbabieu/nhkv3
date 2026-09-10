@@ -77,10 +77,55 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('01a06d45-aa68-7d08-b6a0-7cccb84ae75b', $result['reused_claims'][0]['claim_id']);
     }
 
-    private function policies(array $types = ['knowledge']): GovernanceAutomationPolicyResolver
+    public function test_auto_publish_applies_new_capture_claim_and_reads_back_canonical_owner(): void
     {
-        return new GovernanceAutomationPolicyResolver($types, new class implements AutomationPolicyStorage {
-            public function read(): array { return []; }
+        $variant = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $variant, 'ingest', [], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:auto:knowledge', entityType: 'knowledge');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->willReturn($proposal);
+        $governance->expects(self::once())->method('submit')->with($proposal->id)->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'], ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->expects(self::once())->method('approve')->with($proposal->id, 'content', 'dependency', self::anything())->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->expects(self::once())->method('eligibility')->with($proposal->id)->willReturn(['ready' => true]);
+        $applied = [];
+        $service = new GovernedCaptureContinuationService($governance, static function (string $id) use (&$applied): array {
+            $applied[] = $id;
+            return ['canonical_id' => 'claim-1', 'canonical_readback' => ['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 1]];
+        }, $this->policies(['knowledge'], ['knowledge' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true);
+
+        $result = $service->execute('capture-1', 'capture-1:semantic', [
+            'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Cấu hình 10 côn.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]],
+            'observations' => [],
+        ]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame([$proposal->id], $applied);
+        self::assertSame(['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 1], $result['writes'][0]['canonical_readback']);
+    }
+
+    public function test_auto_publish_submits_video_proposal_from_capture_asset_without_duplicate_writer(): void
+    {
+        $proposal = new Proposal(UuidCodec::newV7(), 'video-1', 'ingest', [], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:auto:video', entityType: 'video');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static fn (array $args): bool => ($args['entity_type'] ?? '') === 'video' && ($args['operation'] ?? '') === 'ingest'))->willReturn($proposal);
+        $governance->method('submit')->willReturn($proposal);
+        $governance->method('review')->willReturn(['state' => 'draft', 'entity_type' => 'video', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->method('approve')->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+        $service = new GovernedCaptureContinuationService($governance, static fn (string $id): array => ['canonical_id' => 'video-1', 'canonical_readback' => ['canonical_id' => 'video-1', 'entity_type' => 'video', 'active' => true, 'revision' => 1]], $this->policies(['video'], ['video' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true);
+
+        $result = $service->execute('capture-1', 'capture-1:semantic', ['subject_resolution' => ['resolved' => []], 'interpretation' => [], 'observations' => [], 'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['video_id' => 'video-1']]]]]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame('video-1', $result['writes'][0]['canonical_readback']['canonical_id']);
+    }
+
+    private function policies(array $types = ['knowledge'], array $stored = []): GovernanceAutomationPolicyResolver
+    {
+        return new GovernanceAutomationPolicyResolver($types, new class($stored) implements AutomationPolicyStorage {
+            public function __construct(private array $stored) {}
+            public function read(): array { return $this->stored; }
             public function write(array $policies): void {}
         });
     }

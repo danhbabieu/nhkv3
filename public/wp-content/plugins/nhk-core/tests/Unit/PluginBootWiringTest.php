@@ -73,4 +73,12 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringNotContainsString('wp_set_current_user', (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
         self::assertStringNotContainsString('wp_upload_media', (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php'));
     }
+
+    public function test_new_capture_semantic_write_back_uses_capture_governance_policy_boundary(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+        self::assertStringContainsString('$captureGovernance->execute(', $plugin);
+        self::assertStringContainsString("capture_id'] ?? ''", $plugin);
+        self::assertStringNotContainsString("'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE']", $plugin);
+    }
 }

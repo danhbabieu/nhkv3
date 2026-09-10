@@ -93,33 +93,39 @@ final class GovernedCaptureContinuationService
     {
         $resolved = is_array($context['subject_resolution']['resolved'] ?? null) ? $context['subject_resolution']['resolved'] : [];
         $variants = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? '') === 'variant' && UuidCodec::isValid((string) ($item['id'] ?? ''))));
-        if (count($variants) !== 1) return [];
-        $variant = $variants[0];
         $plans = [];
-        $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
-        $candidates = $deltaText !== ''
-            ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]
-            : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
-        foreach ($candidates as $index => $candidate) {
-            if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
-            if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $variant['id'], 'scope' => 'variant'], $this->retrievedClaims($context)) !== null) continue;
-            $payload = [
-                'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $variant['id'], trim((string) $candidate['text'])])),
-                'text' => trim((string) $candidate['text']),
-                'claim_type' => 'fact',
-                'provenance' => [
-                    'metadata' => ['facet' => 'recognition', 'scope' => 'variant', 'version' => 1, 'subject_id' => $variant['id'], 'subject_type' => 'variant'],
-                    'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE'),
-                ],
-            ];
-            $plans[] = $this->arguments('knowledge', 'ingest', (string) $variant['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
+        if (count($variants) === 1) {
+            $variant = $variants[0];
+            $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
+            $candidates = $deltaText !== ''
+                ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]
+                : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
+            foreach ($candidates as $candidate) {
+                if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
+                if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $variant['id'], 'scope' => 'variant'], $this->retrievedClaims($context)) !== null) continue;
+                $payload = [
+                    'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $variant['id'], trim((string) $candidate['text'])])),
+                    'text' => trim((string) $candidate['text']), 'claim_type' => 'fact',
+                    'provenance' => ['metadata' => ['facet' => 'recognition', 'scope' => 'variant', 'version' => 1, 'subject_id' => $variant['id'], 'subject_type' => 'variant'], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
+                ];
+                $plans[] = $this->arguments('knowledge', 'ingest', (string) $variant['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
+            }
+            foreach ((array) ($context['observations'] ?? []) as $observation) {
+                if (!is_array($observation)) continue;
+                $componentId = trim((string) ($observation['component_id'] ?? ''));
+                if (!UuidCodec::isValid($componentId)) continue;
+                $payload = ['source_type' => 'variant', 'source_uuid' => (string) $variant['id'], 'target_type' => 'component', 'target_uuid' => $componentId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'];
+                $plans[] = $this->arguments('relation', 'relation_create', 'relation', $payload, 'capture:' . $captureId . ':component:' . $componentId);
+            }
         }
-        foreach ((array) ($context['observations'] ?? []) as $index => $observation) {
-            if (!is_array($observation)) continue;
-            $componentId = trim((string) ($observation['component_id'] ?? ''));
-            if (!UuidCodec::isValid($componentId)) continue;
-            $payload = ['source_type' => 'variant', 'source_uuid' => (string) $variant['id'], 'target_type' => 'component', 'target_uuid' => $componentId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'];
-            $plans[] = $this->arguments('relation', 'relation_create', 'relation', $payload, 'capture:' . $captureId . ':component:' . $componentId);
+        foreach ((array) ($context['assets'] ?? []) as $index => $asset) {
+            if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
+            $video = $asset['video_proposal'];
+            $entityType = trim((string) ($video['entity_type'] ?? 'video')) ?: 'video';
+            $operation = trim((string) ($video['operation'] ?? 'ingest')) ?: 'ingest';
+            $subjectId = trim((string) ($video['subject_id'] ?? ''));
+            $payload = is_array($video['payload'] ?? null) ? $video['payload'] : $video;
+            $plans[] = $this->arguments($entityType, $operation, $subjectId, $payload, 'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
         }
         return $plans;
     }

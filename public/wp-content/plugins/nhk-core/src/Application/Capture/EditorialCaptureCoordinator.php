@@ -204,7 +204,7 @@ final class EditorialCaptureCoordinator
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
-            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved];
+            $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes];
             $publication = ($this->publicationGate)($publicationContext);
             // A native media/editorial write may rotate the token between the
             // first gate read and review. Refresh once, then continue with the

@@ -539,7 +539,16 @@ final class Plugin {
                         $continuation = $captureGovernance->execute((string) ($context['capture_id'] ?? ''), (string) ($context['continuation_idempotency_key'] ?? ''), $context, is_array($context['governance'] ?? null) ? $context['governance'] : []);
                         return $continuation + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                     }
-                    return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance' => ['required_lifecycle' => ['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY', 'CANONICAL_READ_BACK'], 'status' => 'REVIEW_REQUIRED'], 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
+                    // New submissions and existing-Capture continuations must
+                    // share the same governed lifecycle. The old new-Capture
+                    // branch returned a permanent review placeholder here,
+                    // silently discarding the Admin automation policy.
+                    $governanceResult = $captureGovernance->execute(
+                        (string) ($context['capture_id'] ?? ''),
+                        (string) ($context['capture_id'] ?? '') . ':semantic',
+                        $context + ['retrieval' => $context['retrieval'] ?? []],
+                    );
+                    return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
                 static function (array $context) use ($articleMedia): array {
@@ -574,10 +583,19 @@ final class Plugin {
                     $payload['editorial_state_token'] = $result->editorialStateToken;
                     return $payload;
                 },
-                static function (array $context) use ($draftGateway): array {
-                    $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), ['semantic' => $context['semantic'] ?? [], 'media' => $context['media'] ?? []], (string) ($context['capture']['capture_id'] ?? '') . ':review');
+                static function (array $context) use ($draftGateway, $articleEditorial): array {
+                    // Media/editorial reconciliation can rotate the native
+                    // token after Capture persisted its last receipt. On the
+                    // bounded one-time refresh, re-read the Article owner and
+                    // send that current token to the publication gate.
+                    $expectedToken = (string) ($context['expected_state_token'] ?? '');
+                    if (($context['refresh_current_state'] ?? false) === true) {
+                        $current = $articleEditorial->read((int) ($context['article_id'] ?? 0));
+                        if ($current !== null) $expectedToken = $current->token;
+                    }
+                    $review = $draftGateway->reviewPublication((int) ($context['article_id'] ?? 0), $expectedToken, ['semantic' => $context['semantic'] ?? [], 'semantic_write_back' => $context['semantic_write_back'] ?? [], 'media' => $context['media'] ?? []], (string) ($context['capture']['capture_id'] ?? '') . ':review');
                     $blockers = (array) ($review['blockers'] ?? $review['diagnostics'] ?? []);
-                    return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review];
+                    return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'state_token' => $review['state_token'] ?? $expectedToken];
                 },
                 static function (array $context) use ($articleEditorial): array {
                     $post = $articleEditorial->read((int) ($context['article_id'] ?? 0));

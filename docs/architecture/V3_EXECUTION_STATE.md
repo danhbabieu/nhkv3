@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Capture new-submission automation policy convergence
+
+Investigation of the reported Capture/Article publication stall found that
+the Admin option and shared `GovernanceAutomationPolicyResolver` were wired in
+`Plugin.php`, but the new-submission semantic callback returned a hard-coded
+`REVIEW_REQUIRED` result. Only existing-Capture continuation invoked the
+Capture-owned Governance lifecycle. The minimal fix routes both paths through
+`GovernedCaptureContinuationService`, adds governed Video proposal planning,
+and preserves canonical read-back. Publication refresh now re-reads the
+current native Article state token before retrying the gate, so a token rotated
+by composition/reconciliation is not reused.
+
+Focused automation/Capture tests and NHK Unit pass locally. No DEMO, server,
+database, Article, Video or semantic data was mutated; deployment and publish
+were not performed. Contract/integration availability and final commit
+verification remain open for this checkpoint.
+
 # Checkpoint — 2026-09-10 — Governance Admin Queue boundary verification
 
 The Admin **Duyệt dữ liệu** queue is recorded as an existing-Proposal lifecycle
