@@ -7008,6 +7008,23 @@ STATUS: BLOCKED — Article preflight live read-back and DEMO deployment remain
 unverified after `57ca530e`; Collector facet data remains a governed data gap.
 PUSH STATUS = NOT PUSHED.
 
+# Checkpoint — 2026-09-10 — Collector contract manifest reconciliation
+
+The Collector contract is now an ACTIVE entry in the executable MCP
+documentation registry under `collector-profile`. The canonical snapshot was
+regenerated from the repository docs. Local read-only bootstrap, ACTIVE list
+and keyed get all returned the same `documentation_version` and `manifest_hash`
+and keyed get returned `docs/architecture/COLLECTOR_PROFILE_CONTRACT.md`.
+
+The maintenance CLI now obtains the already-wired Collector maintenance service
+through the Plugin runtime seam. Default execution remains dry-run; explicit
+`--apply --proposal-id=` is bound to the existing Governance Controlled Apply
+service and never calls KnowledgeService directly. No apply, proposal,
+Knowledge, Graph, Article or WordPress mutation was run in this checkpoint.
+
+STATUS: CODE / DOCUMENTATION MANIFEST RECONCILED; live data verification remains
+blocked by unavailable local MySQL and DEMO deployment credentials.
+
 # Checkpoint — 2026-09-10 — Collector facet registry and governed maintenance path
 
 ROOT GAP: The Collector facet allowlist and existing-data maintenance path were

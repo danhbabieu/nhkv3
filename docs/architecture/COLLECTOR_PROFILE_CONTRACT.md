@@ -45,8 +45,8 @@ outside that field, relations and active state are immutable through this
 operation.
 
 The maintenance CLI defaults to a read-only dry-run. `--apply` is never implied;
-an apply requires an already approved proposal and the same optimistic-lock and
-eligibility checks. Existing valid facets and unresolved/ambiguous records are
+an apply requires `--proposal-id` for an already approved proposal and the same
+optimistic-lock and eligibility checks. Existing valid facets and unresolved/ambiguous records are
 no-ops. Batch results are independent, stale records fail closed, and replay of
 an applied proposal is idempotent. The operation cannot create Knowledge,
 Article/Post drafts, Graph edges, Source/Evidence or publication state.

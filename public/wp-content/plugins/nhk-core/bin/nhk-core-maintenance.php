@@ -15,6 +15,7 @@ $sourceRevision = '';
 $classification = '';
 $apply = false;
 $dryRun = false;
+$proposalId = '';
 foreach (array_slice($argv, 1) as $argument) {
     if ($argument === '--json') { $json = true; continue; }
     if (str_starts_with($argument, '--operation=')) { $operation = substr($argument, 12); continue; }
@@ -22,6 +23,7 @@ foreach (array_slice($argv, 1) as $argument) {
     if (str_starts_with($argument, '--run-id=')) { $runId = substr($argument, 9); continue; }
     if (str_starts_with($argument, '--source-revision=')) { $sourceRevision = substr($argument, 18); continue; }
     if (str_starts_with($argument, '--classification=')) { $classification = substr($argument, 16); continue; }
+    if (str_starts_with($argument, '--proposal-id=')) { $proposalId = substr($argument, 14); continue; }
     if ($argument === '--dry-run') { $dryRun = true; continue; }
     if ($argument === '--apply') { $apply = true; continue; }
     fwrite(STDERR, "UNKNOWN_ARGUMENT\n"); exit(64);
@@ -47,40 +49,18 @@ if (!is_readable($wpLoad)) {
 try {
     require_once $wpLoad;
     if ($operation === 'collector-facet-maintenance') {
-        if ($classification === '') throw new \RuntimeException('CLASSIFICATION_UUID_REQUIRED');
-        if ($apply) throw new \RuntimeException('COLLECTOR_FACET_APPLY_REQUIRES_APPROVED_PROPOSAL');
-        global $wpdb;
-        if (!isset($wpdb) || !is_object($wpdb) || empty($wpdb->dbh)) throw new \RuntimeException('DATABASE_UNREACHABLE');
-        $types = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
-        \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($types);
-        $authority = new \NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository($wpdb);
-        $claims = new \NHK\Core\Infrastructure\Knowledge\WpdbKnowledgeRepository($wpdb);
-        $sources = new \NHK\Core\Infrastructure\Knowledge\WpdbSourceRepository($wpdb);
-        $evidence = new \NHK\Core\Infrastructure\Knowledge\WpdbEvidenceRepository($wpdb);
-        $endpoints = new \NHK\Core\Domain\Graph\EndpointTypeRegistry();
-        \NHK\Core\Infrastructure\Graph\CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, new \NHK\Core\Infrastructure\Media\WpdbMediaRepository($wpdb), new \NHK\Core\Infrastructure\Video\WpdbVideoRepository($wpdb), $claims, $sources, $evidence);
-        $graph = new \NHK\Core\Application\Graph\GraphService(new \NHK\Core\Infrastructure\Graph\WpdbGraphRepository($wpdb), $endpoints, new \NHK\Core\Domain\Graph\PredicateRegistry(), new \NHK\Core\Infrastructure\Graph\WpdbAuditSink());
-        $branchReader = static function (string $classificationId) use ($authority, $claims, $graph): array {
-            $entity = $authority->findByCanonicalId($classificationId);
-            if (!$entity instanceof \NHK\Core\Domain\Authority\AuthorityEntity || $entity->entityType !== 'classification' || !$entity->active()) return ['status' => 'unavailable', 'reason' => 'CLASSIFICATION_NOT_AVAILABLE'];
-            $items = []; $after = 0;
-            try {
-                do {
-                    $page = $graph->findIncoming(new \NHK\Core\Domain\Graph\NodeReference('classification', $classificationId), 'about', $after, 200, false, 'knowledge');
-                    foreach ((array) ($page['items'] ?? []) as $edge) if ($edge instanceof \NHK\Core\Domain\Graph\GraphEdge && $edge->isActive()) {
-                        $claim = $claims->findByCanonicalId($edge->source->reference->endpoint_key);
-                        if ($claim !== null && $claim->active && $claim->isPublic()) $items[$claim->canonicalId] = $claim;
-                    }
-                    $next = $page['next_cursor'] ?? null;
-                    if ($next === null) break;
-                    if (!is_int($next) || $next <= $after) return ['status' => 'unavailable', 'reason' => 'BRANCH_KNOWLEDGE_CURSOR_INVALID'];
-                    $after = $next;
-                } while (true);
-            } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'BRANCH_KNOWLEDGE_UNAVAILABLE']; }
-            return ['status' => 'available', 'claims' => array_values($items), 'classification_revision' => $entity->revision];
-        };
-        $payload = (new CollectorFacetMaintenanceService($claims, $branchReader))->plan($classification);
-        $payload['dry_run'] = true;
+        if ($classification === '' && !$apply) throw new \RuntimeException('CLASSIFICATION_UUID_REQUIRED');
+        if ($apply && $proposalId === '') throw new \RuntimeException('APPROVED_PROPOSAL_ID_REQUIRED');
+        do_action('rest_api_init');
+        $service = apply_filters('nhk_v3_collector_facet_maintenance_service', null);
+        if (!$service instanceof CollectorFacetMaintenanceService) throw new \RuntimeException('COLLECTOR_FACET_RUNTIME_UNAVAILABLE');
+        if ($apply) {
+            $results = $service->applyBatch([$proposalId]);
+            $payload = ['status' => (($results[0]['status'] ?? '') === 'applied') ? 'pass' : 'failed', 'apply' => $results, 'proposal_id' => $proposalId];
+        } else {
+            $payload = $service->plan($classification);
+            $payload['dry_run'] = true;
+        }
     } elseif ($operation === 'migration-up') {
         Plugin::runPendingMigrations();
         $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];

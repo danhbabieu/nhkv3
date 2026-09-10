@@ -17,6 +17,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('documentation-status-index', $keys);
         self::assertContains('authority', $keys);
         self::assertContains('knowledge', $keys);
+        self::assertContains('collector-profile', $keys);
         self::assertContains('graph', $keys);
         self::assertContains('governance', $keys);
         self::assertContains('media', $keys);
