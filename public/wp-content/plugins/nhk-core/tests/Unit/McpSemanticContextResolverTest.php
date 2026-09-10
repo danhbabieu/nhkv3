@@ -71,4 +71,29 @@ final class McpSemanticContextResolverTest extends TestCase
         self::assertArrayHasKey('variant', $ambiguous['ambiguities']);
         self::assertArrayNotHasKey('variant', $ambiguous['resolved']);
     }
+
+    public function test_capture_and_semantic_resolution_share_the_same_typed_variant_packet(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $variant = new AuthorityEntity(
+            '95873bfe-d978-4eda-a5a2-ce9ba79625df',
+            'variant',
+            'nhk:variant:odo.36.10',
+            'Đồng hồ Odo 36/10',
+            1,
+            ['aliases' => ['Odo 36/10']],
+            revision: 2,
+        );
+        $repository->create($variant);
+
+        $report = (new McpSemanticContextResolver($repository, $types))->resolve(['variant' => ['name' => 'Odo 36/10']]);
+
+        self::assertSame($variant->canonicalId, $report['resolved']['variant']['id']);
+        self::assertSame($variant->stableKey, $report['resolved']['variant']['stable_key']);
+        self::assertSame($variant->canonicalName, $report['resolved']['variant']['name']);
+        self::assertSame(2, $report['resolved']['variant']['revision']);
+        self::assertSame('exact_name_or_alias', $report['resolved']['variant']['match']);
+    }
 }

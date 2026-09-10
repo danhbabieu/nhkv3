@@ -22,13 +22,7 @@ final class TextInputInterpreter
             }
         }
         $claims = [];
-        foreach ($sentences as $sentence) $claims[] = [
-            'text' => $sentence,
-            'candidate_kind' => 'user_statement',
-            'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
-            'scope' => 'capture',
-            'status' => 'CANDIDATE',
-        ];
+        foreach ($sentences as $sentence) $claims[] = $this->userCandidate($sentence);
         $mediaObservations = [];
         foreach ($assets as $asset) {
             if (!is_array($asset)) continue;
@@ -46,6 +40,27 @@ final class TextInputInterpreter
             'article_intent' => $text,
             'uncertainty' => $text === '' ? ['EMPTY_INPUT'] : [],
             'asset_count' => count($assets),
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function userCandidate(string $sentence): array
+    {
+        $sentence = trim($sentence, " \t\n\r-•*");
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($sentence) : strtolower($sentence);
+        $configuration = str_contains($lower, 'côn') || str_contains($lower, 'tiges') || str_contains($lower, 'búa') || str_contains($lower, 'marteaux') || str_contains($lower, 'cấu hình');
+        $music = str_contains($lower, 'bài nhạc') || str_contains($lower, 'giai điệu') || str_contains($lower, 'chơi 2 bài');
+        $subjective = str_contains($lower, 'nguyên bản') || str_contains($lower, 'âm thanh') || str_contains($lower, 'đánh giá') || str_contains($lower, 'video');
+        $recognition = str_contains($lower, 'yêu thích') || str_contains($lower, 'nữ hoàng') || str_contains($lower, 'cộng đồng') || str_contains($lower, 'nhận xét');
+        return [
+            'text' => $sentence,
+            'candidate_kind' => 'user_statement',
+            'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+            'scope' => $subjective ? 'specimen_observation' : 'variant',
+            'facet' => $configuration ? 'configuration' : ($music ? 'music' : ($recognition || $subjective ? 'recognition' : 'identity')),
+            'attributed' => $recognition || $subjective,
+            'review_required' => str_contains($lower, 'nữ hoàng'),
+            'status' => 'CANDIDATE',
         ];
     }
 }

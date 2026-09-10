@@ -79,6 +79,58 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_PLACEHOLDER', $result->state);
     }
 
+    public function test_capture_without_files_never_reuses_current_wordpress_media_without_persisted_subject_scope(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $stale = $service->create('odo-36-10-stale-unscoped', 'Serial 6421 trên vách máy', 'ready');
+        $service->addAsset($stale->canonicalId, 'original', 'uploads/stale.jpg', hash('sha256', 'stale-unscoped'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $adapter = new class($stale->canonicalId) implements WordPressArticleMediaAdapter {
+            public function __construct(private string $mediaId) {}
+            public function read(int $postId): array { return ['featured_media_id' => $this->mediaId, 'inline_media_ids' => [$this->mediaId], 'state_token' => 'state-355']; }
+            public function synchronize(int $postId, array $result): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'state_token' => 'state-356']; }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter);
+
+        $result = $coordinator->ensureForPost(355, [
+            'subject' => 'Đồng hồ Odo 36/10',
+            'subject_ids' => ['95873bfe-d978-4eda-a5a2-ce9ba79625df'],
+            'capture_has_physical_assets' => false,
+            'allow_unscoped_reuse' => true,
+        ]);
+
+        self::assertNotContains($stale->canonicalId, $result->slotMedia);
+        self::assertTrue($result->slots['featured_primary']['placeholder']);
+        self::assertTrue($result->slots['inline_primary']['placeholder']);
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+    }
+
+    public function test_stale_wordpress_readback_cannot_reintroduce_media_without_subject_scope_proof(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $stale = $service->create('odo-36-10-stale-readback', 'Stale readback', 'ready');
+        $service->addAsset($stale->canonicalId, 'original', 'uploads/stale-readback.jpg', hash('sha256', 'stale-readback'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $adapter = new class($stale->canonicalId) implements WordPressArticleMediaAdapter {
+            public function __construct(private string $mediaId) {}
+            public function read(int $postId): array { return ['featured_media_id' => $this->mediaId, 'inline_media_ids' => [$this->mediaId], 'state_token' => 'state-355']; }
+            public function synchronize(int $postId, array $result): array { return ['featured_media_id' => $this->mediaId, 'inline_media_ids' => [$this->mediaId], 'state_token' => 'state-355']; }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter);
+
+        $result = $coordinator->ensureForPost(355, [
+            'subject' => 'Đồng hồ Odo 36/10',
+            'subject_ids' => ['95873bfe-d978-4eda-a5a2-ce9ba79625df'],
+            'capture_has_physical_assets' => false,
+            'allow_scoped_reuse' => true,
+        ]);
+
+        self::assertNotContains($stale->canonicalId, $result->slotMedia);
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+    }
+
     public function test_capture_subject_scope_replaces_wrong_variant_with_existing_correct_variant_media(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

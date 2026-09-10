@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Semantic;
 
+use NHK\Core\Shared\Uuid\UuidCodec;
+
 /** Canonical subject resolver adapter. Ambiguity and absence remain explicit. */
 final class SubjectResolutionService
 {
@@ -15,7 +17,10 @@ final class SubjectResolutionService
         $resolved = [];
         $candidates = [];
         $unresolved = [];
-        foreach (array_values(array_unique(array_filter(array_map('trim', $hints), static fn (string $hint): bool => $hint !== ''))) as $hint) {
+        $hints = array_values(array_unique(array_filter(array_map('trim', $hints), static fn (string $hint): bool => $hint !== '')));
+        $explicitUuid = array_values(array_filter($hints, static fn (string $hint): bool => UuidCodec::isValid($hint)));
+        if ($explicitUuid !== []) $hints = [$explicitUuid[0]];
+        foreach ($hints as $hint) {
             $matches = ($this->resolver)($hint);
             $matches = is_array($matches) ? array_values(array_filter($matches, 'is_array')) : [];
             if (count($matches) === 1) {

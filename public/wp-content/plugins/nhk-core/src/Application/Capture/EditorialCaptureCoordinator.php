@@ -15,7 +15,7 @@ use NHK\Core\Application\Mcp\McpDocumentationRegistry;
  */
 final class EditorialCaptureCoordinator
 {
-    /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher */
+    /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher @param (callable(array<string,mixed>):array)|null $videoEnrichment */
     public function __construct(
         private CaptureRepository $captures,
         private $physicalIngest,
@@ -32,6 +32,7 @@ final class EditorialCaptureCoordinator
         private $mediaAdoption = null,
         private $publisher = null,
         private ?McpDocumentationRegistry $documentation = null,
+        private $videoEnrichment = null,
     ) {}
 
     /** @param array<string,mixed> $input */
@@ -153,6 +154,21 @@ final class EditorialCaptureCoordinator
             $diagnostics['subjects'] = $resolution;
             $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken);
 
+            $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
+            $hasVideoAsset = array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
+            if (is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
+                $videoManifest = ($this->videoEnrichment)([
+                    'capture_id' => $record->captureId,
+                    'video' => $videoInput,
+                    'subject_resolution' => $resolution,
+                    'raw_input' => $text,
+                ]);
+                $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
+                if ($videoItems !== []) $assets = array_merge($assets, $videoItems);
+                $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
+                $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken);
+            }
+
             $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : []];
             $retrieved = $this->claims->retrieve($semanticContext);
             $diagnostics['claim_retrieval'] = $retrieved;
@@ -222,8 +238,10 @@ final class EditorialCaptureCoordinator
             $status = $published ? 'PUBLISHED' : (($resolution['status'] ?? '') === 'ambiguous' ? 'REVIEW_REQUIRED' : 'PARTIAL');
             return $this->save($record, $stage, $assets, $diagnostics, $receipts, $stage, $record->articleId, $record->articleStateToken, $status);
         } catch (\Throwable $error) {
-            $diagnostics['failure'] = ['code' => $this->failureCode($error), 'message' => $error->getMessage()];
-            return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'FAILED_RETRYABLE', $record->articleId, $record->articleStateToken, 'FAILED_RETRYABLE');
+            $failureCode = $this->failureCode($error);
+            $status = $this->failureStatus($failureCode);
+            $diagnostics['failure'] = ['code' => $failureCode, 'message' => $error->getMessage(), 'classification' => $status];
+            return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $status, $record->articleId, $record->articleStateToken, $status);
         }
     }
 
@@ -285,5 +303,12 @@ final class EditorialCaptureCoordinator
     {
         $message = strtoupper(trim($error->getMessage()));
         return $message !== '' ? preg_replace('/[^A-Z0-9_:-]+/', '_', $message) ?? 'CAPTURE_FAILED' : 'CAPTURE_FAILED';
+    }
+
+    private function failureStatus(string $failureCode): string
+    {
+        if (str_contains($failureCode, 'ARTICLE_MEDIA_BLUEPRINT_IS_INVALID')) return 'SYSTEM_BLOCKED';
+        if (preg_match('/(?:SUBJECT_NOT_FOUND|AMBIGUOUS_SUBJECT|NO_SEMANTIC_ATTACHMENT|TRANSCRIPT_UNAVAILABLE|MEDIA_(?:FEATURED|INLINE)_MISSING|MEDIAUSAGE_INCOMPLETE)/', $failureCode) === 1) return 'PARTIAL';
+        return 'FAILED_RETRYABLE';
     }
 }

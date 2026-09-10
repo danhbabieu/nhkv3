@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
+use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -21,14 +22,16 @@ final class GovernedCaptureContinuationService
         private $apply,
         private GovernanceAutomationPolicyResolver $policies,
         private $can,
+        private ?ClaimReusePolicy $claimReuse = null,
     ) {}
 
     /** @return array<string,mixed> */
     public function execute(string $captureId, string $continuationKey, array $context, array $control = []): array
     {
         $proposalIds = array_values(array_filter(array_map('strval', (array) ($control['proposal_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
+        $reusedClaims = $this->reusedClaims($context);
         $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context);
-        if ($plans === []) return ['status' => 'REVIEW_REQUIRED', 'writes' => [], 'blockers' => ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'], 'governance' => ['lifecycle' => [], 'status' => 'REVIEW_REQUIRED']];
+        if ($plans === []) return ['status' => 'REVIEW_REQUIRED', 'writes' => [], 'reused_claims' => $reusedClaims, 'blockers' => $reusedClaims === [] ? ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'] : [], 'governance' => ['lifecycle' => [], 'status' => 'REVIEW_REQUIRED']];
 
         $writes = [];
         $lifecycle = [];
@@ -82,7 +85,7 @@ final class GovernedCaptureContinuationService
         $blocked = array_values(array_filter($writes, static fn (array $write): bool => ($write['status'] ?? '') === 'SYSTEM_BLOCKED'));
         $applied = array_values(array_filter($writes, static fn (array $write): bool => ($write['status'] ?? '') === 'APPLIED'));
         $status = $blocked !== [] ? 'SYSTEM_BLOCKED' : ($pending !== [] ? 'REVIEW_REQUIRED' : 'APPLIED');
-        return ['status' => $status, 'writes' => $writes, 'blockers' => $blocked !== [] ? array_values(array_unique(array_merge(...array_map(static fn (array $write): array => (array) ($write['blockers'] ?? []), $blocked)))) : ($pending !== [] ? ['GOVERNANCE_APPROVAL_REQUIRED'] : []), 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending)]];
+        return ['status' => $status, 'writes' => $writes, 'reused_claims' => $reusedClaims, 'blockers' => $blocked !== [] ? array_values(array_unique(array_merge(...array_map(static fn (array $write): array => (array) ($write['blockers'] ?? []), $blocked)))) : ($pending !== [] ? ['GOVERNANCE_APPROVAL_REQUIRED'] : []), 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending)]];
     }
 
     /** @return list<array<string,mixed>> */
@@ -99,6 +102,7 @@ final class GovernedCaptureContinuationService
             : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
         foreach ($candidates as $index => $candidate) {
             if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
+            if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $variant['id'], 'scope' => 'variant'], $this->retrievedClaims($context)) !== null) continue;
             $payload = [
                 'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $variant['id'], trim((string) $candidate['text'])])),
                 'text' => trim((string) $candidate['text']),
@@ -118,6 +122,28 @@ final class GovernedCaptureContinuationService
             $plans[] = $this->arguments('relation', 'relation_create', 'relation', $payload, 'capture:' . $captureId . ':component:' . $componentId);
         }
         return $plans;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function reusedClaims(array $context): array
+    {
+        if ($this->claimReuse === null) return [];
+        $resolved = is_array($context['subject_resolution']['resolved'] ?? null) ? $context['subject_resolution']['resolved'] : [];
+        $variant = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? '') === 'variant'))[0] ?? null;
+        if (!is_array($variant)) return [];
+        $reused = [];
+        foreach ((array) ($context['interpretation']['user_claim_candidates'] ?? []) as $candidate) {
+            if (!is_array($candidate)) continue;
+            $claim = $this->claimReuse->find(['text' => (string) ($candidate['text'] ?? ''), 'subject_id' => (string) ($variant['id'] ?? ''), 'scope' => 'variant'], $this->retrievedClaims($context));
+            if ($claim !== null) $reused[] = ['claim_id' => $claim['claim_id'] ?? '', 'claim_revision' => $claim['claim_revision'] ?? 1, 'subject_id' => $claim['subject_id'] ?? '', 'scope' => $claim['scope'] ?? ''];
+        }
+        return $reused;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function retrievedClaims(array $context): array
+    {
+        return is_array($context['retrieval']['selected_claims'] ?? null) ? $context['retrieval']['selected_claims'] : [];
     }
 
     /** @return array<string,mixed> */

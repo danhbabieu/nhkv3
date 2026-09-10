@@ -24,8 +24,8 @@ final class VideoIntakeService
     ) {
     }
 
-    /** @param list<array<string,mixed>> $intendedRelations */
-    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = ''): VideoIntakePreview
+    /** @param list<array<string,mixed>> $intendedRelations @param array<string,mixed>|null $resolvedSubject */
+    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null): VideoIntakePreview
     {
         $resolution = $this->source->resolve($url);
         $snapshot = $resolution->snapshot->toArray();
@@ -34,6 +34,14 @@ final class VideoIntakeService
         $videoId = $existing?->canonicalId ?? UuidCodec::newV7();
         $research = $this->researcher?->research(implode("\n", array_filter([$snapshot['source_title'] ?? '', $snapshot['source_description'] ?? '', $userHint]))) ?? ['resolved' => [], 'ambiguous' => [], 'missing' => []];
         $relations = $intendedRelations;
+        $handoffTarget = null;
+        if (is_array($resolvedSubject) && trim((string) ($resolvedSubject['id'] ?? '')) !== '' && trim((string) ($resolvedSubject['type'] ?? '')) !== '') {
+            $handoffTarget = ['id' => (string) $resolvedSubject['id'], 'type' => (string) $resolvedSubject['type']];
+            $relations = array_values(array_filter($relations, static function (mixed $relation) use ($handoffTarget): bool {
+                if (!is_array($relation) || (string) ($relation['predicate'] ?? 'about') !== 'about') return true;
+                return (string) ($relation['target_id'] ?? '') === $handoffTarget['id'] && (string) ($relation['target_type'] ?? '') === $handoffTarget['type'];
+            }));
+        }
         foreach ($research['resolved'] as $match) {
             if (!is_array($match['evidence_refs'] ?? null) || $match['evidence_refs'] === []) continue;
             $relations[] = [
@@ -49,6 +57,9 @@ final class VideoIntakeService
             static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => ['id' => $candidate->targetId, 'type' => $candidate->targetType],
             array_filter($candidateObjects, static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): bool => $candidate->predicate === 'about' && $candidate->origin === 'EXPLICIT_USER_RELATION'),
         ));
+        if ($handoffTarget !== null) $intendedTargets[] = $handoffTarget;
+        $intendedTargets = array_values(array_unique(array_map(static fn (array $target): string => $target['type'] . ':' . $target['id'], $intendedTargets)));
+        $intendedTargets = array_values(array_map(static function (string $key): array { [$type, $id] = explode(':', $key, 2); return ['id' => $id, 'type' => $type]; }, $intendedTargets));
         $category = $this->classifier->classify(['source_title' => $snapshot['source_title'] ?? '', 'source_description' => $snapshot['source_description'] ?? '', 'tags' => $snapshot['tags'] ?? [], 'user_hint' => $userHint]);
         if ($intendedCategory !== null && isset(VideoHubClassifier::hubs()[$intendedCategory])) {
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];

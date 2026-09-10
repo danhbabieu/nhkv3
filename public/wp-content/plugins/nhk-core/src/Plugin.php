@@ -27,7 +27,7 @@ use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
 use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
-use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\AdminWorkbenchReadApi;
@@ -474,11 +474,13 @@ final class Plugin {
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
+            $captureClaimReuse = new ClaimReusePolicy();
             $captureGovernance = new GovernedCaptureContinuationService(
                 $mcpGovernance,
                 static fn (string $proposalId): array => $mcpGovernance->apply($proposalId),
                 $automationResolver,
                 static fn (string $capability): bool => current_user_can($capability),
+                $captureClaimReuse,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
@@ -515,7 +517,7 @@ final class Plugin {
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
-                static function (array $input) use ($mediaBatchUpload, $videoIntake): array {
+                static function (array $input) use ($mediaBatchUpload): array {
                     $files = is_array($input['files'] ?? null) ? $input['files'] : [];
                     $manifest = ['status' => 'verified', 'items' => [], 'count' => 0];
                     if ($files !== []) {
@@ -526,23 +528,6 @@ final class Plugin {
                             is_array($input['items'] ?? null) ? $input['items'] : [],
                         );
                     }
-                    $video = is_array($input['video'] ?? null) ? $input['video'] : [];
-                    if ($video !== []) {
-                        $preview = $videoIntake->preview(
-                            (string) ($video['url'] ?? ''),
-                            (string) ($video['user_hint'] ?? ''),
-                            isset($video['intended_category']) ? (string) $video['intended_category'] : null,
-                            is_array($video['intended_relations'] ?? null) ? $video['intended_relations'] : [],
-                            (string) ($video['editorial_instruction'] ?? ''),
-                        );
-                        $manifest['items'][] = [
-                            'kind' => 'video',
-                            'video_id' => $preview->videoId,
-                            'video_preview' => $preview->toArray(),
-                            'video_proposal' => $videoIntake->proposalArguments($preview, (string) ($input['idempotency_key'] ?? '') . ':video'),
-                        ];
-                        $manifest['video_preview'] = $preview->toArray();
-                    }
                     $manifest['count'] = count((array) ($manifest['items'] ?? []));
                     return $manifest;
                 },
@@ -550,10 +535,25 @@ final class Plugin {
                 new TextInputInterpreter(),
                 $captureSubjectResolver,
                 $captureClaims,
-                static function (array $context) use ($mcpGovernance, $captureGovernance): array {
+                static function (array $context) use ($mcpGovernance, $captureGovernance, $captureClaimReuse): array {
                     $interpretation = is_array($context['interpretation'] ?? null) ? $context['interpretation'] : [];
+                    $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
+                    $subjectId = trim((string) ($primary['id'] ?? ''));
+                    $defaultScope = (string) ($primary['type'] ?? '');
+                    $retrievedClaims = is_array($context['retrieval']['selected_claims'] ?? null) ? $context['retrieval']['selected_claims'] : [];
                     $candidates = [];
-                    foreach ((array) ($interpretation['user_claim_candidates'] ?? []) as $candidate) if (is_array($candidate)) $candidates[] = ['kind' => 'claim_candidate', 'text' => (string) ($candidate['text'] ?? ''), 'provenance' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE'), 'scope' => (string) ($candidate['scope'] ?? 'capture')];
+                    $reusedClaims = [];
+                    foreach ((array) ($interpretation['user_claim_candidates'] ?? []) as $candidate) {
+                        if (!is_array($candidate)) continue;
+                        $scope = (string) ($candidate['scope'] ?? ($defaultScope !== '' ? $defaultScope : 'variant'));
+                        $candidateForReuse = ['text' => (string) ($candidate['text'] ?? ''), 'subject_id' => $subjectId, 'scope' => $scope];
+                        $reused = $captureClaimReuse->find($candidateForReuse, $retrievedClaims);
+                        if ($reused !== null) {
+                            $reusedClaims[] = ['claim_id' => $reused['claim_id'] ?? '', 'claim_revision' => $reused['claim_revision'] ?? 1, 'subject_id' => $reused['subject_id'] ?? '', 'scope' => $reused['scope'] ?? ''];
+                            continue;
+                        }
+                        $candidates[] = ['kind' => 'claim_candidate', 'text' => (string) ($candidate['text'] ?? ''), 'provenance' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE'), 'scope' => $scope, 'facet' => (string) ($candidate['facet'] ?? 'recognition'), 'attributed' => ($candidate['attributed'] ?? false) === true, 'review_required' => ($candidate['review_required'] ?? false) === true, 'subject_id' => $subjectId, 'subject_type' => (string) ($primary['type'] ?? '')];
+                    }
                     $videoCandidates = [];
                     foreach ((array) ($context['assets'] ?? []) as $asset) {
                         if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
@@ -561,9 +561,9 @@ final class Plugin {
                     }
                     if (($context['existing_capture_continuation'] ?? false) === true) {
                         $continuation = $captureGovernance->execute((string) ($context['capture_id'] ?? ''), (string) ($context['continuation_idempotency_key'] ?? ''), $context, is_array($context['governance'] ?? null) ? $context['governance'] : []);
-                        return $continuation + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
+                        return $continuation + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                     }
-                    return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance' => ['required_lifecycle' => ['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY', 'CANONICAL_READ_BACK'], 'status' => 'REVIEW_REQUIRED'], 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
+                    return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance' => ['required_lifecycle' => ['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY', 'CANONICAL_READ_BACK'], 'status' => 'REVIEW_REQUIRED'], 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
                 static function (array $context) use ($articleMedia): array {
@@ -590,7 +590,8 @@ final class Plugin {
                         'subject_context' => ['subject' => $subject, 'subject_ids' => $mediaSubjectIds],
                         'force_inline_reconcile' => true,
                         'capture_has_physical_assets' => $mediaIds !== [],
-                        'allow_unscoped_reuse' => $mediaSubjectIds !== [],
+                        'allow_unscoped_reuse' => false,
+                        'allow_scoped_reuse' => true,
                     ], $selected, array_slice($mediaIds, 2));
                     $payload = $result->toArray();
                     $payload['force_inline_reconcile'] = true;
@@ -617,6 +618,37 @@ final class Plugin {
                     return $draftGateway->publish((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), (array) ($context['evidence'] ?? []), (string) ($context['idempotency_key'] ?? ''));
                 },
                 new McpDocumentationRegistry(),
+                static function (array $context) use ($videoIntake): array {
+                    $video = is_array($context['video'] ?? null) ? $context['video'] : [];
+                    if (trim((string) ($video['url'] ?? '')) === '') return ['status' => 'unavailable', 'items' => [], 'diagnostics' => ['VIDEO_URL_REQUIRED']];
+                    $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+                    $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : null;
+                    $relations = is_array($video['intended_relations'] ?? null) ? $video['intended_relations'] : [];
+                    if ($primary !== null && trim((string) ($primary['id'] ?? '')) !== '' && trim((string) ($primary['type'] ?? '')) !== '') {
+                        $relations = array_values(array_filter($relations, static function (mixed $relation) use ($primary): bool {
+                            if (!is_array($relation) || (string) ($relation['predicate'] ?? 'about') !== 'about') return true;
+                            return (string) ($relation['target_id'] ?? '') === (string) $primary['id'] && (string) ($relation['target_type'] ?? '') === (string) $primary['type'];
+                        }));
+                    }
+                    $preview = $videoIntake->preview(
+                        (string) $video['url'],
+                        (string) ($video['user_hint'] ?? ''),
+                        isset($video['intended_category']) ? (string) $video['intended_category'] : null,
+                        $relations,
+                        (string) ($video['editorial_instruction'] ?? ''),
+                        $primary,
+                    );
+                    return [
+                        'status' => 'verified',
+                        'items' => [[
+                            'kind' => 'video',
+                            'video_id' => $preview->videoId,
+                            'video_preview' => $preview->toArray(),
+                            'video_proposal' => $videoIntake->proposalArguments($preview, (string) ($context['capture_id'] ?? '') . ':video'),
+                        ]],
+                        'video_preview' => $preview->toArray(),
+                    ];
+                },
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };

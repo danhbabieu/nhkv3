@@ -463,6 +463,44 @@ final class VideoSemanticCoreTest extends TestCase
         )));
     }
 
+    public function test_capture_subject_handoff_keeps_variant_scope_even_without_relation_evidence(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $authority->create(new AuthorityEntity('44444444-4444-4444-8444-444444444444', 'model', 'nhk:model:odo.36', 'Odo 36', 1, ['aliases' => []]));
+        $variantId = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Âm thanh trên Odo 36/10',
+                'description' => 'Video giới thiệu Odo 36/10.',
+                'availability' => 'available',
+                'embeddable' => true,
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+            new VideoInternalSemanticResearcher($authority, $types),
+            new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner()),
+        );
+
+        $preview = $service->preview(
+            'https://youtu.be/oRfvArkX8NA',
+            'Odo 36/10',
+            null,
+            [],
+            '',
+            ['id' => $variantId, 'type' => 'variant', 'name' => 'Đồng hồ Odo 36/10', 'stable_key' => 'nhk:variant:odo.36.10', 'revision' => 2],
+        );
+
+        self::assertSame($variantId, $preview->package['knowledge_enrichment']['subject']['id']);
+        self::assertSame('variant', $preview->package['knowledge_enrichment']['subject']['type']);
+        self::assertSame([], $preview->package['semantic_attachments']);
+    }
+
     public function test_knowledge_enrichment_failure_is_diagnostic_and_preserves_video_intake(): void
     {
         $types = new EntityTypeRegistry();

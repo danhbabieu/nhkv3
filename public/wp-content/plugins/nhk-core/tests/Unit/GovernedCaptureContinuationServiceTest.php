@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
+use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -45,6 +46,35 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertTrue($applied);
         self::assertSame('APPLIED', $result['status']);
         self::assertSame($proposalId, $result['writes'][0]['proposal_id']);
+    }
+
+    public function test_existing_supported_claim_is_reused_before_continuation_proposal_creation(): void
+    {
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::never())->method('createFromArguments');
+        $variant = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
+        $service = new GovernedCaptureContinuationService($governance, static fn (string $id): array => [], $this->policies(), static fn (string $capability): bool => true, new ClaimReusePolicy());
+
+        $result = $service->execute('capture-355', 'addendum-configuration', [
+            'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
+            'interpretation' => ['user_claim_candidates' => [[
+                'text' => 'Cấu hình 10 côn 10 búa, chơi 2 bài nhạc.',
+                'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+            ]]],
+            'retrieval' => ['selected_claims' => [[
+                'claim_id' => '01a06d45-aa68-7d08-b6a0-7cccb84ae75b',
+                'claim_revision' => 2,
+                'text' => 'Một hiện vật được Bibelot & Co mô tả là Odo n°36, serial 4583, có 10 côn/tiges, 10 búa/marteaux và hai giai điệu.',
+                'subject_id' => $variant,
+                'scope' => 'variant',
+                'provenance' => 'CATALOG_SUPPORTED',
+                'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+            ]]],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame([], $result['writes']);
+        self::assertSame('01a06d45-aa68-7d08-b6a0-7cccb84ae75b', $result['reused_claims'][0]['claim_id']);
     }
 
     private function policies(array $types = ['knowledge']): GovernanceAutomationPolicyResolver

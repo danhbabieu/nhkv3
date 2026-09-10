@@ -103,6 +103,63 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame([], $resolver->resolve('Odo 36'));
     }
 
+    public function test_exact_odo_36_10_hint_resolves_the_existing_variant_identity(): void
+    {
+        $repository = new InMemoryAuthorityRepository();
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $variantId = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
+        $repository->create(new AuthorityEntity(
+            $variantId,
+            'variant',
+            'nhk:variant:odo.36.10',
+            'Đồng hồ Odo 36/10',
+            1,
+            ['aliases' => ['Odo 36/10']],
+            revision: 2,
+        ));
+
+        $resolved = (new CanonicalAuthoritySubjectResolver($repository, $types))->resolve('Odo 36/10');
+
+        self::assertCount(1, $resolved);
+        self::assertSame($variantId, $resolved[0]['id']);
+        self::assertSame('variant', $resolved[0]['type']);
+        self::assertSame('nhk:variant:odo.36.10', $resolved[0]['stable_key']);
+        self::assertSame('Đồng hồ Odo 36/10', $resolved[0]['name']);
+        self::assertSame(2, $resolved[0]['revision']);
+    }
+
+    public function test_capture_resolution_gives_explicit_uuid_precedence_over_prose_hints(): void
+    {
+        $variantId = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
+        $resolution = (new SubjectResolutionService(fn (string $hint): array => match ($hint) {
+            $variantId => [['id' => $variantId, 'type' => 'variant', 'name' => 'Đồng hồ Odo 36/10', 'revision' => 2]],
+            'Odo 36' => [['id' => 'c01c109c-5d39-401e-a16e-6d61a0a52f50', 'type' => 'model', 'name' => 'Odo 36', 'revision' => 4]],
+            default => [],
+        }))->resolve([$variantId, 'Odo 36']);
+
+        self::assertSame($variantId, $resolution['primary']['id']);
+        self::assertSame([$variantId], array_column($resolution['subjects'], 'id'));
+    }
+
+    public function test_user_knowledge_is_atomized_and_keeps_scope_and_attribution_diagnostics(): void
+    {
+        $interpreted = (new TextInputInterpreter())->interpret(implode("\n", [
+            'Odo 36/10 là dòng được nhiều người yêu thích.',
+            'Cấu hình 10 côn 10 búa, chơi 2 bài nhạc.',
+            'Chiếc đồng hồ trong video được xác nhận là nguyên bản.',
+            'Người dùng đánh giá âm thanh tốt.',
+            'Cách gọi nữ hoàng âm thanh là nhận xét của cộng đồng.',
+        ]), [], ['Odo 36/10']);
+
+        self::assertCount(5, $interpreted['user_claim_candidates']);
+        self::assertSame('EXPLICIT_USER_KNOWLEDGE', $interpreted['user_claim_candidates'][0]['provenance']);
+        self::assertSame('variant', $interpreted['user_claim_candidates'][1]['scope']);
+        self::assertSame('specimen_observation', $interpreted['user_claim_candidates'][2]['scope']);
+        self::assertTrue($interpreted['user_claim_candidates'][3]['attributed']);
+        self::assertTrue($interpreted['user_claim_candidates'][4]['review_required']);
+    }
+
     public function test_capture_creates_one_draft_for_multiple_assets_and_retries_without_duplicates(): void
     {
         $repository = new InMemoryCaptureRepository();
@@ -161,6 +218,76 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame(58, $result->articleId);
         self::assertSame('video', $seen[0]['kind']);
         self::assertSame('video-1', $seen[0]['video_id']);
+    }
+
+    public function test_video_enrichment_receives_the_capture_resolution_after_subject_lock(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $events = [];
+        $variant = [
+            'id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df',
+            'type' => 'variant',
+            'stable_key' => 'nhk:variant:odo.36.10',
+            'name' => 'Đồng hồ Odo 36/10',
+            'revision' => 2,
+            'match' => 'exact_name_or_alias',
+        ];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 355, 'state_token' => 'token-355', 'post' => ['post_id' => 355]],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(fn (string $hint): array => $hint === 'Odo 36/10' ? [$variant] : []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context): array { return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function (array $context) use (&$events): array {
+                $events[] = $context;
+                return ['items' => [['kind' => 'video', 'video_id' => 'video-odo-36-10', 'video_proposal' => ['entity_type' => 'video']]]];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'capture-odo-36-10-handoff',
+            'text' => 'Odo 36/10 có 10 côn 10 búa và chơi 2 bài nhạc.',
+            'subject_hints' => ['Odo 36/10'],
+            'video' => ['url' => 'https://www.youtube.com/watch?v=oRfvArkX8NA', 'user_hint' => 'Odo 36/10'],
+        ]);
+
+        self::assertSame('READY_FOR_PUBLICATION', $result->stage, json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        self::assertCount(1, $events);
+        self::assertSame($variant, $events[0]['subject_resolution']['primary']);
+        self::assertSame($variant['id'], $events[0]['subject_resolution']['primary']['id']);
+    }
+
+    public function test_invalid_media_blueprint_is_system_blocked_not_retryable(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 355, 'state_token' => 'token-355', 'post' => ['post_id' => 355]],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            new ArticleComposer(),
+            static function (array $context): array { throw new \InvalidArgumentException('Article Media Blueprint is invalid.'); },
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'capture-invalid-blueprint', 'text' => 'Ghi chú.']);
+
+        self::assertSame('SYSTEM_BLOCKED', $result->status);
+        self::assertSame('ARTICLE_MEDIA_BLUEPRINT_IS_INVALID_', $result->diagnostics['failure']['code']);
     }
 
     public function test_multipart_fingerprint_binds_file_content_without_array_cast_warnings(): void

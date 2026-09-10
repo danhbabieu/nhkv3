@@ -45,10 +45,40 @@ final class CanonicalAuthoritySubjectResolver
         return array_values($matches);
     }
 
+    /** @return list<array<string,mixed>> */
+    public function resolveForType(string $type, array $query): array
+    {
+        if (!$this->types->has($type)) return [];
+        $explicit = trim((string) ($query['canonical_uuid'] ?? $query['id'] ?? $query['uuid'] ?? ''));
+        if ($explicit !== '') {
+            if (!UuidCodec::isValid($explicit)) return [];
+            $entity = $this->authority->findByCanonicalId($explicit);
+            return $entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active() ? [$this->packet($entity, 'uuid_exact')] : [];
+        }
+        $stableKey = trim((string) ($query['stable_key'] ?? ''));
+        if ($stableKey !== '') {
+            $entity = $this->authority->findByStableKey($type, $stableKey);
+            if ($entity instanceof AuthorityEntity && $entity->active()) return [$this->packet($entity, 'stable_key_exact')];
+        }
+        return $this->resolveTypedName($type, (string) ($query['name'] ?? $query['value'] ?? ''));
+    }
+
     private function hasAlias(AuthorityEntity $entity, string $needle): bool
     {
         foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) if (is_string($alias) && $this->normalize($alias) === $needle) return true;
         return false;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function resolveTypedName(string $type, string $hint): array
+    {
+        $needle = $this->normalize($hint);
+        if ($needle === '') return [];
+        $matches = [];
+        foreach ($this->authority->listByType($type) as $entity) {
+            if ($this->normalize($entity->canonicalName) === $needle || $this->hasAlias($entity, $needle)) $matches[$entity->canonicalId] = $this->packet($entity, 'exact_name_or_alias');
+        }
+        return array_values($matches);
     }
 
     /** @return array<string,mixed> */
