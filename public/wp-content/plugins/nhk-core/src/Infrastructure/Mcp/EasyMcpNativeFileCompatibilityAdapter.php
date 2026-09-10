@@ -104,10 +104,12 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
         self::$proxyDispatch = true;
         try {
-            // The original request's $_FILES remains available to the NHK
-            // Ability callback during this nested dispatch. Easy MCP performs
-            // its normal authentication, scope and capability checks first.
-            return rest_get_server()->dispatch($proxy);
+            // Easy MCP performs its normal authentication, scope and
+            // capability checks first. Keep the request's native PHP parts
+            // available to the Ability callback during that nested dispatch;
+            // some REST callers populate WP_REST_Request::FILES without
+            // populating the PHP superglobal.
+            return self::withNativeFiles($files, static fn (): mixed => rest_get_server()->dispatch($proxy));
         } finally {
             self::$proxyDispatch = false;
         }
@@ -162,6 +164,24 @@ final class EasyMcpNativeFileCompatibilityAdapter
     {
         if (!is_string($temporaryName) || $temporaryName === '') return false;
         return $error === null || $error === UPLOAD_ERR_OK;
+    }
+
+    /** @param array<string,mixed> $files */
+    private static function withNativeFiles(array $files, callable $callback): mixed
+    {
+        $hadFiles = array_key_exists('_FILES', $GLOBALS);
+        $previousFiles = $GLOBALS['_FILES'] ?? null;
+        $_FILES = $files;
+
+        try {
+            return $callback();
+        } finally {
+            if ($hadFiles) {
+                $_FILES = $previousFiles;
+            } else {
+                unset($GLOBALS['_FILES']);
+            }
+        }
     }
 
     /** @return array<string,mixed>|null */

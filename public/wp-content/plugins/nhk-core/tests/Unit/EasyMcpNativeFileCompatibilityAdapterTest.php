@@ -115,4 +115,26 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $textOnly, [], '1.7.16'));
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $internal, $files, '1.7.16'));
     }
+
+    public function test_native_file_scope_makes_request_files_available_to_ability_and_restores_global_state(): void
+    {
+        $files = ['files' => [
+            'name' => ['fixture.jpg'],
+            'tmp_name' => ['/tmp/fixture.jpg'],
+            'type' => ['image/jpeg'],
+            'size' => [12],
+            'error' => [UPLOAD_ERR_OK],
+        ]];
+        $previous = $_FILES ?? [];
+
+        $reflection = new \ReflectionClass(EasyMcpNativeFileCompatibilityAdapter::class);
+        $method = $reflection->getMethod('withNativeFiles');
+        $method->setAccessible(true);
+        $seen = $method->invoke(null, $files, static function (): array {
+            return $_FILES;
+        });
+
+        self::assertSame($files, $seen);
+        self::assertSame($previous, $_FILES ?? []);
+    }
 }
