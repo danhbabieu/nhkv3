@@ -1,5 +1,24 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Continuation deployment readiness recheck
+
+After the local continuation audit fix commit `17105a33`, the read-only P0
+preflight was rerun with `--expected-head` set to the current HEAD. Six of
+eleven checks passed: Git HEAD, Composer lock/autoload, Symfony UID, NHK
+runtime classes and canonical documentation. Five checks failed closed:
+`wordpress_bootstrap=WORDPRESS_BOOTSTRAP_FAILED`,
+`nhk_core_bootstrap=NHK_CORE_BOOTSTRAP_FAILED`, `schema_migration`,
+`authority_hydration_capability` and `rest_bootstrap`, all due to the
+WordPress/database bootstrap dependency.
+
+The exact Integration run against `nhk_v3_test` likewise emitted
+`Error establishing a database connection`. `NHK_DEMO_DEPLOY_CONFIG` remains
+unset, so the canonical DEMO deployment contract cannot resolve a remote
+deployment target. No deployment, Capture continuation, Governance apply,
+Article 342 reconciliation or publication was attempted. The work remains
+blocked pending real integration DB availability and provisioned deployment
+configuration.
+
 # Checkpoint — 2026-09-10 — Capture continuation audit revision fix
 
 The audit reproduced the continuation lifecycle from the current Capture
