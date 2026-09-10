@@ -719,6 +719,18 @@ decision/audit, state-token CAS, idempotency and native/public read-backs remain
 mandatory. This surface does not expose a low-level WordPress writer and does
 not create a Capture or Article.
 
+The supported local/runtime continuation CLI is
+`public/wp-content/plugins/nhk-core/bin/nhk-core-publication.php`. It accepts
+only an existing Capture ID, its bound Article ID, an idempotency key and a
+canonical publication-evidence JSON file. It reads the current Capture and
+native Article state, bootstraps the runtime documentation checkpoint, and
+delegates `run`, `review`, `approve` or `publish` to the same three MCP Ability
+names above. It cannot accept Article content, allocate an Article slug, create
+semantic records, or call a WordPress writer directly. `run` requires explicit
+`--affirmation="Đăng"` for an owner-review result and reports PASS only after
+the canonical service returns a durable publication receipt and both native
+and rendered-public read-back pass.
+
 ## 17. Article Ingest implementation status
 
 The Article coordinator, durable receipt, deterministic child proposal planner,

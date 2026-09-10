@@ -1,5 +1,21 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Canonical Article publication CLI boundary
+
+Added a thin `nhk-core-publication.php` CLI entrypoint and
+`ArticlePublicationContinuationCommand`. The command reads one existing
+Capture and the current native Article state, validates the bound publication
+evidence and current documentation checkpoint, then invokes only the three
+governed MCP publication Abilities. It contains no WordPress writer and cannot
+create a Capture or Article. `run` follows review → owner confirmation →
+approve (whose canonical service performs the controlled publication) or
+review → publish when the Gate returns PASS. Native and rendered-public
+read-back are required before the command reports PASS.
+
+Focused regression tests and PHP lint pass locally. This checkpoint changes no
+runtime data and has not been deployed; Article #331 remains unmodified and
+its previously recorded SYSTEM_BLOCKED publication state remains unresolved.
+
 # Checkpoint — 2026-09-10 — Deployed publication continuation verification
 
 Commit `522986ca8897802509482ff3ae0f0170ae2a36af` was deployed to the

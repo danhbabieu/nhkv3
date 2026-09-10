@@ -5,9 +5,10 @@ namespace NHK\Tests\Unit;
 
 use DateTimeImmutable;
 use NHK\Core\Application\Article\OwnerPublicationApplicationService;
-use NHK\Core\Contracts\Article\{OwnerPublicationDecisionRepository, PublicationPrincipal};
+use NHK\Core\Contracts\Article\{ArticleOperationReceiptRepository, OwnerPublicationDecisionRepository, PublicationPrincipal};
 use NHK\Core\Contracts\WordPress\EditorialPostStore;
 use NHK\Core\Domain\Article\{ArticlePublicationOutcome, EditorialPostState, OwnerPublicationDecision};
+use NHK\Core\Domain\Article\ArticleOperationReceipt;
 use PHPUnit\Framework\TestCase;
 
 final class OwnerPublicationApplicationServiceTest extends TestCase
@@ -46,6 +47,20 @@ final class OwnerPublicationApplicationServiceTest extends TestCase
         self::assertSame('SYSTEM_BLOCKED', $service->request(1, $posts->rows[1]->token, ownerPublicationEvidence(['public_route_ready' => false]), 'publish-3', new PublicationPrincipal('owner-1', 'mcp', 'turn-3'))['outcome']);
         self::assertSame('SYSTEM_BLOCKED', $service->request(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'publish-4', new PublicationPrincipal('other', 'mcp', 'turn-4'))['outcome']);
     }
+
+    public function test_successful_publication_persists_a_durable_receipt_when_wired(): void
+    {
+        $posts = new OwnerPublicationFakeStore(); $receipts = new OwnerPublicationReceiptRepository();
+        $service = new OwnerPublicationApplicationService($posts, new OwnerPublicationFakeDecisionRepository(), static fn (PublicationPrincipal $principal): bool => true, null, $receipts);
+
+        $result = $service->request(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'receipt-1', new PublicationPrincipal('owner-1', 'cli', 'publication-1'));
+
+        self::assertSame('PASS', $result['outcome']);
+        self::assertSame('COMPLETED', $result['publication_receipt']['outcome']);
+        self::assertCount(1, $receipts->rows);
+        $replay = $service->request(1, $posts->rows[1]->token, ownerPublicationEvidence(), 'receipt-1', new PublicationPrincipal('owner-1', 'cli', 'publication-1'));
+        self::assertSame('COMPLETED', $replay['publication_receipt']['outcome']);
+    }
 }
 
 /** @param array<string,bool> $overrides @return array<string,mixed> */
@@ -75,4 +90,12 @@ final class OwnerPublicationFakeDecisionRepository implements OwnerPublicationDe
     public function findActiveApproval(int $postId, string $token, string $policyVersion, string $blockerFingerprint, string $principalId): ?OwnerPublicationDecision { foreach ($this->rows as $decision) if ($decision->wpPostId === $postId && $decision->editorialStateToken === $token && $decision->policyVersion === $policyVersion && $decision->blockerFingerprint === $blockerFingerprint && $decision->principalId === $principalId) return $decision; return null; }
     public function create(OwnerPublicationDecision $decision): OwnerPublicationDecision { return $this->rows[$decision->idempotencyKey] ??= $decision; }
     public function append(OwnerPublicationDecision $decision): OwnerPublicationDecision { return $this->rows[$decision->idempotencyKey] = $decision; }
+}
+
+final class OwnerPublicationReceiptRepository implements ArticleOperationReceiptRepository
+{
+    /** @var array<string,ArticleOperationReceipt> */ public array $rows = [];
+    public function findByIdempotencyKey(string $key): ?ArticleOperationReceipt { return $this->rows[$key] ?? null; }
+    public function create(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $this->rows[$receipt->idempotencyKey] ??= $receipt; }
+    public function save(ArticleOperationReceipt $receipt): ArticleOperationReceipt { return $this->rows[$receipt->idempotencyKey] = $receipt; }
 }

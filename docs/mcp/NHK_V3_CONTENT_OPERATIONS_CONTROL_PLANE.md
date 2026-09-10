@@ -62,6 +62,14 @@ Easy MCP operator discovery, and delegate to the same canonical MCP transport,
 `OwnerPublicationApplicationService`, publication gate, audit/idempotency and
 read-back chain. They cannot create a Capture/Article or bypass Governance.
 
+For a server-side continuation run, the versioned entrypoint
+`public/wp-content/plugins/nhk-core/bin/nhk-core-publication.php` is the only
+CLI surface. It reads the existing Capture and current Article token, validates
+the canonical evidence/checkpoint packet, and invokes the same MCP Ability
+surface; it is not a second writer. Missing evidence, stale documentation,
+CAS, Governance or public read-back fails closed. The owner affirmation is an
+explicit `--affirmation="Đăng"` argument and is never hard-coded.
+
 ### Entry-point inventory
 
 | Classification | Current surfaces | Rule |
