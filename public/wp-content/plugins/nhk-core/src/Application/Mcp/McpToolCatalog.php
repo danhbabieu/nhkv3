@@ -38,6 +38,14 @@ final class McpToolCatalog
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
                 'publish' => ['type' => 'boolean'],
+                'governance' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'approval_confirmed' => ['type' => 'boolean'],
+                        'proposal_ids' => ['type' => 'array', 'items' => self::uuidField()],
+                    ],
+                    'additionalProperties' => false,
+                ],
                 'documentation_checkpoint' => [
                     'type' => 'object',
                     'properties' => [

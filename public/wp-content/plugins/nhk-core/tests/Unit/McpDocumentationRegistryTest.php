@@ -46,6 +46,7 @@ final class McpDocumentationRegistryTest extends TestCase
     {
         $bootstrap = (new McpDocumentationRegistry())->bootstrap();
         self::assertArrayHasKey('documentation_revision', $bootstrap);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $bootstrap['build_identity']);
         self::assertArrayHasKey('required_reading', $bootstrap);
         self::assertSame(['agents', 'read-first', 'constitution', 'documentation-status-index'], $bootstrap['required_reading']);
         self::assertArrayHasKey('canonical_contract', $bootstrap['truth_model']);

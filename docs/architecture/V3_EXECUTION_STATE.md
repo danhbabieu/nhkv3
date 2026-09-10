@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Existing-Capture Governance continuation boundary
+
+The `nhk.capture.ingest` existing-Capture path now owns a bounded semantic
+continuation lifecycle without exposing a low-level semantic writer. It uses
+the existing Governance lifecycle through `McpGovernanceHandler`:
+proposal → submit → explicit automation/human approval policy → eligibility →
+Controlled Apply → canonical read-back. A pending decision can resume using
+the same addendum/idempotency key and persisted proposal IDs; replay does not
+create another Capture, Article, addendum or proposal. The addendum fingerprint
+and original Capture fingerprint remain immutable, and semantic delta planning
+uses only the new delta rather than replaying the entire accumulated text.
+
+The runtime documentation bootstrap now also exposes the deterministic
+`build_identity` of the deployed plugin package. It hashes the same package
+file set as `RemoteDeploymentAdapter` (excluding tests and forbidden secret
+extensions), allowing deployment receipt and live bootstrap to be compared.
+
+Focused Governance/Capture/MCP tests pass locally; PHP lint is green. The
+implementation is not yet deployed or live-verified at this checkpoint, and
+no Capture, Article, semantic record or WordPress data was mutated.
+
 # Checkpoint — 2026-09-10 — Continuation deployment readiness recheck
 
 After the local continuation audit fix commit `17105a33`, the read-only P0

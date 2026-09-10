@@ -138,7 +138,7 @@ final class McpDocumentationRegistry
             $this->get($manifest['execution_state'], 1, 240),
         ];
         return [
-            'runtime_version' => $manifest['runtime_version'], 'documentation_version' => $manifest['documentation_version'], 'manifest_hash' => $manifest['manifest_hash'], 'generated_at' => $manifest['generated_at'],
+            'runtime_version' => $manifest['runtime_version'], 'documentation_version' => $manifest['documentation_version'], 'manifest_hash' => $manifest['manifest_hash'], 'generated_at' => $manifest['generated_at'], 'build_identity' => $this->buildIdentity(),
             'entry_point' => $manifest['entry_point'], 'status_index' => $manifest['status_index'], 'execution_state' => $manifest['execution_state'],
             'read_first' => $bootstrapDocuments[0]['content'], 'documentation_status_index' => $bootstrapDocuments[1]['content'], 'execution_state_content' => $bootstrapDocuments[2]['content'], 'bootstrap_documents' => $bootstrapDocuments,
             'active_documents' => $this->list('ACTIVE')['files'], 'manifest' => $this->list(),
@@ -270,6 +270,25 @@ final class McpDocumentationRegistry
         if (!is_dir($root . DIRECTORY_SEPARATOR . '.git') && !is_file($root . DIRECTORY_SEPARATOR . '.git')) return null;
         $revision = function_exists('shell_exec') ? shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse HEAD 2>/dev/null') : null; $revision = is_string($revision) ? trim($revision) : '';
         return preg_match('/^[0-9a-f]{40}$/i', $revision) === 1 ? $revision : null;
+    }
+
+    /** The same deterministic runtime-package identity used by DEMO deploy. */
+    private function buildIdentity(): string
+    {
+        $pluginRoot = dirname(__DIR__, 3);
+        $files = [];
+        if (!is_dir($pluginRoot)) return '';
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($pluginRoot, \FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) continue;
+            $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($pluginRoot) + 1));
+            if (str_starts_with($relative, 'tests/') || preg_match('/(^|\/)(?:\.env|.*\.pem)$/i', $relative) === 1) continue;
+            $hash = hash_file('sha256', $file->getPathname());
+            if ($hash === false) return '';
+            $files[$relative] = $hash;
+        }
+        ksort($files);
+        return hash('sha256', self::json($files));
     }
 
     private static function generatedAt(): string { $epoch = getenv('SOURCE_DATE_EPOCH'); return is_string($epoch) && ctype_digit($epoch) ? gmdate('c', (int) $epoch) : gmdate('c'); }

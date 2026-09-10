@@ -40,8 +40,8 @@ It accepts text-only, knowledge-only text, text with one or more multipart
 images, and the registered Video adapter. Each submission creates one Capture
 and one native Article draft by default, then follows
 `physical ingest when applicable → resolve → Graph discovery → Claim retrieval
-→ semantic write-back/review → Article composition → publication gate → final
-read-back`.
+→ governed semantic write-back/apply/read-back → Article composition →
+publication gate → final read-back`.
 
 The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
 Article draft/update/publish, relation and proposal creation are retained only
@@ -120,11 +120,13 @@ The Capture tool is capability-gated by `nhk_ingest_articles`; its optional
 The text-only path is valid and still runs interpretation, subject resolution,
 Claim retrieval and publication checks. User statements and image observations
 remain scoped input/candidate provenance; they do not become universal Claims,
-Evidence or Graph edges implicitly. Semantic write-back currently returns a
-Governance review packet (`SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE`) rather
-than silently applying new semantic records, so the capture can reach
-`READY_FOR_PUBLICATION`/`REVIEW_REQUIRED` but cannot claim publication without
-an explicit eligible owner publication operation and read-back.
+Evidence or Graph edges implicitly. Existing-Capture continuation semantic
+write-back is executed only by the bounded Capture-owned Governance
+orchestrator, which requires proposal lifecycle, approval policy, eligibility,
+Controlled Apply and canonical read-back. Pending review resumes the same
+addendum/idempotency key; it cannot create duplicate semantic records. New
+submissions still return review-only semantic candidates until their governed
+workflow is explicitly continued.
 
 The same tool also accepts an optional `capture_id` to continue one existing
 Capture with a text addendum. The original request/fingerprint is immutable;

@@ -102,7 +102,7 @@ native WordPress draft. The resumable phases are:
 ```text
 Capture received → physical attachments stored/read back → draft created
 → Media adopted → text interpreted → subjects resolved
-→ bounded Claims retrieved → semantic write-back review packet
+→ bounded Claims retrieved → governed semantic proposal/apply/read-back
 → Article composed/updated → MediaUsage reconciled
 → publication gate → final native read-back
 ```
@@ -116,12 +116,13 @@ idempotency conflict. Ambiguous subject resolution, unavailable semantic
 Governance, incomplete MediaUsage or missing publication evidence remain
 machine-readable review/blocker states.
 
-The current code-side semantic write-back phase creates a bounded review
-packet and does not silently apply candidate Claims or relations. Canonical
-semantic mutation still requires the existing Governance lifecycle. The
-coordinator therefore reports `READY_FOR_PUBLICATION` or `REVIEW_REQUIRED`
-until an eligible owner publication operation returns a verified native
-published read-back.
+The current code-side semantic write-back phase creates bounded proposals and
+does not silently apply candidate Claims or relations. Existing-Capture
+continuation uses the Capture-owned Governance lifecycle and requires
+proposal → submit → approval policy → eligibility → Controlled Apply →
+canonical read-back. The coordinator therefore reports `READY_FOR_PUBLICATION`
+or `REVIEW_REQUIRED` until semantic and owner-publication gates return verified
+read-backs.
 
 #### Existing-Capture continuation
 

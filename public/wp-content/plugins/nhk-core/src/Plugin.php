@@ -26,7 +26,7 @@ use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
-use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -474,6 +474,12 @@ final class Plugin {
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
+            $captureGovernance = new GovernedCaptureContinuationService(
+                $mcpGovernance,
+                static fn (string $proposalId): array => $mcpGovernance->apply($proposalId),
+                $automationResolver,
+                static fn (string $capability): bool => current_user_can($capability),
+            );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
@@ -544,7 +550,7 @@ final class Plugin {
                 new TextInputInterpreter(),
                 $captureSubjectResolver,
                 $captureClaims,
-                static function (array $context) use ($mcpGovernance): array {
+                static function (array $context) use ($mcpGovernance, $captureGovernance): array {
                     $interpretation = is_array($context['interpretation'] ?? null) ? $context['interpretation'] : [];
                     $candidates = [];
                     foreach ((array) ($interpretation['user_claim_candidates'] ?? []) as $candidate) if (is_array($candidate)) $candidates[] = ['kind' => 'claim_candidate', 'text' => (string) ($candidate['text'] ?? ''), 'provenance' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE'), 'scope' => (string) ($candidate['scope'] ?? 'capture')];
@@ -552,6 +558,10 @@ final class Plugin {
                     foreach ((array) ($context['assets'] ?? []) as $asset) {
                         if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
                         $videoCandidates[] = ['kind' => 'video_ingest_candidate', 'proposal' => $asset['video_proposal'], 'status' => 'REVIEW_REQUIRED'];
+                    }
+                    if (($context['existing_capture_continuation'] ?? false) === true) {
+                        $continuation = $captureGovernance->execute((string) ($context['capture_id'] ?? ''), (string) ($context['continuation_idempotency_key'] ?? ''), $context, is_array($context['governance'] ?? null) ? $context['governance'] : []);
+                        return $continuation + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                     }
                     return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance' => ['required_lifecycle' => ['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY', 'CANONICAL_READ_BACK'], 'status' => 'REVIEW_REQUIRED'], 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },

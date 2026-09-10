@@ -180,6 +180,26 @@ final class McpTransportIntegrationTest extends TestCase
         );
     }
 
+    public function test_easy_mcp_tools_list_serializes_existing_capture_continuation_schema(): void
+    {
+        if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {
+            self::markTestSkipped('Easy MCP AI is required for the Capture continuation bridge assertion.');
+        }
+
+        $registry = new \Easy_MCP_AI\Tools\Tool_Registry();
+        (new \Easy_MCP_AI\Tools\Dynamic_Tool_Registrar())->register_to($registry);
+        $tools = array_column($registry->get_all_definitions(), null, 'name');
+        $capture = $tools['wp_ability_nhk_v3_capture_ingest'] ?? null;
+
+        self::assertIsArray($capture);
+        self::assertSame('object', $capture['inputSchema']['type']);
+        self::assertArrayHasKey('capture_id', $capture['inputSchema']['properties']);
+        self::assertSame('string', $capture['inputSchema']['properties']['capture_id']['type']);
+        self::assertSame('uuid', $capture['inputSchema']['properties']['capture_id']['format']);
+        self::assertNotContains('capture_id', $capture['inputSchema']['required']);
+        self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
+    }
+
     public function test_easy_mcp_export_diagnostic_is_clean_for_media_and_video(): void
     {
         if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {

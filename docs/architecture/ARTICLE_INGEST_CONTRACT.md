@@ -209,9 +209,9 @@ the wrong-variant usage is removed and the Article remains missing/placeholder.
 Rejected addenda retain only a sanitized audit payload (`text`,
 `subject_hints`, `observations` and `metadata`); file metadata and paths are
 never persisted.
-The bounded semantic resolver, Claim retrieval, Governance review packet and
-Article/MediaUsage reconciliation run again for the existing Capture, followed
-by the same final read-back.
+The bounded semantic resolver, Claim retrieval, Capture-owned Governance
+proposal/apply/read-back and Article/MediaUsage reconciliation run again for
+the existing Capture, followed by the same final read-back.
 
 ## Capture composition and current-state reconciliation — 2026-09-09
 

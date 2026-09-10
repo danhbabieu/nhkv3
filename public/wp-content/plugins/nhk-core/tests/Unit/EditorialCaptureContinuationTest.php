@@ -135,6 +135,25 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame(1, $events['media']);
     }
 
+    public function test_same_addendum_can_resume_governance_without_creating_a_duplicate_addendum(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+        $input = ['capture_id' => $capture->captureId, 'idempotency_key' => 'governance-same-key', 'text' => 'Bổ sung cần duyệt.'];
+
+        $first = $service->execute($input);
+        $resumed = $service->execute($input + ['governance' => ['approval_confirmed' => true]]);
+
+        self::assertSame($first['addendum']['addendum_id'], $resumed['addendum']['addendum_id']);
+        self::assertCount(1, $addenda->records);
+        self::assertSame(2, $events['semantic']);
+        self::assertStringContainsString('Ghi chú ban đầu.', $events['merged_text']);
+    }
+
     public function test_rejected_addendum_retains_sanitized_audit_payload_without_files(): void
     {
         $captures = new ContinuationCaptureRepository();

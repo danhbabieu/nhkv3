@@ -24,6 +24,28 @@ final class EditorialCaptureContinuationService
         $existing = $this->addenda->findByIdempotencyKey($key);
         if ($existing !== null) {
             if (!hash_equals($existing->requestFingerprint, $fingerprint) || $existing->captureId !== $captureId) return $this->conflict($existing, $captureId, $fingerprint);
+            // A governance decision is a continuation of the same addendum,
+            // not a new addendum. Re-run the guarded semantic checkpoint with
+            // the persisted delta while preserving the original idempotency
+            // binding and Capture identity.
+            $control = is_array($input['governance'] ?? null) ? $input['governance'] : [];
+            if ($control !== []) {
+                $capture = $this->captures->findById($captureId);
+                if (!$capture instanceof CaptureRecord) return $this->response(null, $existing);
+                $input['text'] = '';
+                $input['subject_hints'] = (array) ($existing->payload['subject_hints'] ?? []);
+                $input['observations'] = [];
+                $input['existing_capture_continuation'] = true;
+                $input['continuation_idempotency_key'] = $key;
+                $input['continuation_delta_text'] = trim((string) ($existing->payload['text'] ?? ''));
+                try {
+                    $continued = $this->coordinator->continueWithAddendum($capture, $input);
+                    return $this->response($continued, $existing);
+                } catch (\Throwable $error) {
+                    $failed = $this->saveAddendum($existing, 'FAILED', $capture->revision, ['code' => $this->code($error)]);
+                    return $this->response($this->captures->findById($captureId), $failed);
+                }
+            }
             return $this->response($this->captures->findById($captureId), $existing);
         }
 
@@ -42,6 +64,11 @@ final class EditorialCaptureContinuationService
             return $this->response($this->captures->findById($captureId), $addendum);
         }
         try {
+            // This marker is an application-internal continuation context. It
+            // is not part of the addendum payload or its fingerprint.
+            $input['existing_capture_continuation'] = true;
+            $input['continuation_idempotency_key'] = $key;
+            $input['continuation_delta_text'] = trim((string) ($input['text'] ?? $input['content'] ?? ''));
             $continued = $this->coordinator->continueWithAddendum($capture, $input);
             if ($continued->status === 'FAILED_RETRYABLE') {
                 $failed = $this->saveAddendum($addendum, 'FAILED', $continued->revision, ['code' => (string) ($continued->diagnostics['failure']['code'] ?? 'CAPTURE_CONTINUATION_FAILED')]);

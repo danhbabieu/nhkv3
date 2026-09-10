@@ -111,6 +111,9 @@ final class RemoteDeploymentAdapter
             if (preg_match('/(^|\/)(?:\.env|.*\.pem)$/i', $relative) === 1) {
                 return null;
             }
+            if (str_starts_with(str_replace('\\', '/', $relative), 'tests/')) {
+                continue;
+            }
             $files[$relative] = hash_file('sha256', $file->getPathname());
         }
         ksort($files);

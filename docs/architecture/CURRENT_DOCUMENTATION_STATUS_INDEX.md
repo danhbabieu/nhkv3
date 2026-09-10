@@ -83,7 +83,7 @@ All new content submissions use one entry point: `nhk.capture.ingest` and its
 more images, and the registered Video adapter all create one durable Capture
 and one native WordPress draft by default, then share the sequence
 `physical ingest when applicable → resolve → Graph discovery → Claim retrieval
-→ governed semantic write-back/review → Article composition → publication gate
+→ governed semantic write-back/apply/read-back → Article composition → publication gate
 → final read-back`.
 
 Direct Media/Video/Knowledge/Source/Evidence/Article/relation/publication
@@ -144,8 +144,12 @@ has an independent idempotency ledger, audit/revision append and bounded
 semantic rerun. Same-key/same-payload retries are idempotent and changed
 payloads conflict. Addenda reject files and do not create a second Post or
 re-adopt/unscoped-fallback Media; an existing Media is reusable only after
-persisted subject-scope matching. Semantic deltas still stop at the existing
-Governance review boundary until an eligible apply/read-back is completed.
+persisted subject-scope matching. Continuation semantic deltas use a bounded
+Capture-owned Governance orchestrator: proposal → submit → explicit
+review/approval policy → eligibility → controlled apply → canonical
+read-back. A pending decision resumes on the same addendum/idempotency key;
+it never creates a duplicate Capture, Article or proposal. Publication remains
+a separate governed owner-publication lifecycle.
 
 ## 2. Current boundary snapshot
 
