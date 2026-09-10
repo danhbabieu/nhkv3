@@ -349,8 +349,8 @@ final class McpAbilityRegistration
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
                 'permission_callback' => static fn (): bool => self::canGoverned($toolName),
                 'meta' => [
-                    'public' => !SingleEntryPointPolicy::isInternalOnly($toolName),
-                    'show_in_rest' => !SingleEntryPointPolicy::isInternalOnly($toolName),
+                    'public' => !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'show_in_rest' => !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
                     'surface' => SingleEntryPointPolicy::surface($toolName),
                     'annotations' => [
                         'readonly' => false,

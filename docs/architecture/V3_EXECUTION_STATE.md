@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Canonical publication continuation Ability exposure
+
+The existing Capture-owned Article publication lifecycle is now discoverable
+through exactly three WordPress Abilities: `nhk-v3/article-publish-review`,
+`nhk-v3/article-publish-approve` and `nhk-v3/article-publish`. The executable
+tools remain `nhk.article.publish.review`, `nhk.article.publish.approve` and
+`nhk.article.publish`. `SingleEntryPointPolicy` classifies them as
+`governed_publication_continuation`: they are REST-discoverable for an
+authenticated MCP/client, but still require `nhk_internal_content_operations`
+and `nhk_ingest_articles`/the existing publication permission mapping. They are
+not included in the Easy MCP operator allowlist and do not change the canonical
+new-submission entry point `nhk.capture.ingest`.
+
+Ability callbacks remain discoverability adapters into the custom MCP transport,
+then `EditorialDraftGateway` → `OwnerPublicationApplicationService` →
+`ArticlePublicationGate` → native WordPress mutation → durable decision/audit
+and native/public read-back. No low-level writer, Capture, Article or
+Governance shortcut was added. Owner confirmation accepts the exact user
+confirmation `Đăng` as well as the existing punctuated variants. PASS
+publication continuations now persist `APPROVAL_RECORDED`/
+`PUBLISH_ATTEMPTED`/`READBACK_VERIFIED` decision entries and replay the verified
+result by idempotency key without a second native transition.
+
+Regression coverage passes the focused MCP/publication slice at 47 tests / 528
+assertions. The full PHPUnit command still requires the unavailable WordPress
+integration runtime (`NHK_WP_TEST_PATH`); its pre-existing environment errors
+and acceptance failures remain separate from this slice. Runtime Ability
+catalog/read-back and Article #331 publication remain pending fresh deployed
+runtime verification; no Article/Capture data was mutated here.
+
 ## Checkpoint — 2026-09-09 — Capture multipart connector descriptor
 
 The fresh-attachment failure was traced to the exported descriptor boundary,

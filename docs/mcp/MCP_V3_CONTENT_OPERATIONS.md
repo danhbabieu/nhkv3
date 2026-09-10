@@ -691,6 +691,24 @@ Proposal lifecycle Abilities. Those callbacks delegate to the custom MCP
 transport, preserving capability mapping and lifecycle. No Ability name in this
 document authorizes a writer unless it is visible in fresh runtime discovery.
 
+### Article publication continuation Ability surface
+
+For an existing Capture-owned Article that has reached
+`READY_FOR_PUBLICATION`, the bridge exposes exactly these lifecycle continuation
+Abilities for authenticated client discovery:
+
+- `nhk-v3/article-publish-review` → `nhk.article.publish.review`
+- `nhk-v3/article-publish-approve` → `nhk.article.publish.approve`
+- `nhk-v3/article-publish` → `nhk.article.publish`
+
+They remain `nhk_internal_content_operations`-guarded and are not included in
+the Easy MCP operator allowlist for new submissions. Their callbacks delegate to
+the canonical MCP transport, then `EditorialDraftGateway` and
+`OwnerPublicationApplicationService`; the `ArticlePublicationGate`, owner
+decision/audit, state-token CAS, idempotency and native/public read-backs remain
+mandatory. This surface does not expose a low-level WordPress writer and does
+not create a Capture or Article.
+
 ## 17. Article Ingest implementation status
 
 The Article coordinator, durable receipt, deterministic child proposal planner,

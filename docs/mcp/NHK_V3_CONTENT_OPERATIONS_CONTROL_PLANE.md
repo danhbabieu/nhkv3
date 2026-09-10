@@ -54,6 +54,14 @@ They remain available only for explicitly bounded internal/admin lifecycle
 work with `nhk_internal_content_operations`; otherwise the runtime fails closed
 with `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`.
 
+The one lifecycle exception for client discoverability is the existing-Article
+publication continuation surface: `nhk-v3/article-publish-review`,
+`nhk-v3/article-publish-approve` and `nhk-v3/article-publish`. These three
+Abilities remain internal-capability guarded, are not auto-enabled for normal
+Easy MCP operator discovery, and delegate to the same canonical MCP transport,
+`OwnerPublicationApplicationService`, publication gate, audit/idempotency and
+read-back chain. They cannot create a Capture/Article or bypass Governance.
+
 ### Entry-point inventory
 
 | Classification | Current surfaces | Rule |

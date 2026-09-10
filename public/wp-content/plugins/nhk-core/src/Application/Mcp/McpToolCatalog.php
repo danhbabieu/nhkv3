@@ -203,6 +203,8 @@ final class McpToolCatalog
         $surface = SingleEntryPointPolicy::surface($name);
         if ($surface === 'canonical') {
             $description = '[CANONICAL ENTRY POINT] ' . $description;
+        } elseif ($surface === 'governed_publication_continuation') {
+            $description = '[GOVERNED PUBLICATION CONTINUATION] Existing Capture-owned Article only. ' . $description;
         } elseif ($surface === 'internal_admin_only') {
             $description = '[INTERNAL/ADMIN ONLY] New submissions must use nhk.capture.ingest. ' . $description;
         } elseif ($surface === 'deprecated') {

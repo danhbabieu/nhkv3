@@ -164,6 +164,33 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk.article.publish', SingleEntryPointPolicy::internalOnlyTools());
     }
 
+    public function test_publication_continuation_is_the_only_internal_lifecycle_surface_exposed_for_rest_discovery(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        $expectedTools = [
+            'nhk.article.publish.review',
+            'nhk.article.publish.approve',
+            'nhk.article.publish',
+        ];
+
+        self::assertSame($expectedTools, SingleEntryPointPolicy::publicationContinuationTools());
+        $abilityNames = [
+            'nhk.article.publish.review' => 'nhk-v3/article-publish-review',
+            'nhk.article.publish.approve' => 'nhk-v3/article-publish-approve',
+            'nhk.article.publish' => 'nhk-v3/article-publish',
+        ];
+        foreach ($expectedTools as $tool) {
+            self::assertTrue(SingleEntryPointPolicy::isInternalOnly($tool));
+            self::assertTrue(SingleEntryPointPolicy::isPublicationContinuation($tool));
+            self::assertSame('governed_publication_continuation', $tools[$tool]['surface']);
+            self::assertTrue($tools[$tool]['governed']);
+            self::assertSame($abilityNames[$tool], McpAbilityRegistration::abilityNameForTool($tool));
+        }
+
+        self::assertSame('internal_admin_only', $tools['nhk.article.draft.update']['surface']);
+        self::assertNotContains('nhk-v3/article-publish', McpAbilityRegistration::operatorEnabledAbilityAllowlist());
+    }
+
     public function test_direct_writer_fails_closed_without_internal_boundary(): void
     {
         $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'nhk_create_proposals');

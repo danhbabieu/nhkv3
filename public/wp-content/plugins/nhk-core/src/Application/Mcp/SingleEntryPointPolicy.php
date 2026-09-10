@@ -45,6 +45,13 @@ final class SingleEntryPointPolicy
         'nhk.relation.backfill.apply',
     ];
 
+    /** Lifecycle continuation for an existing Capture-owned Article draft. */
+    private const PUBLICATION_CONTINUATION_TOOLS = [
+        'nhk.article.publish.review',
+        'nhk.article.publish.approve',
+        'nhk.article.publish',
+    ];
+
     /** Old names remain callable only as read-only compatibility aliases. */
     private const DEPRECATED_TOOLS = ['nhk.docs.bootstrap', 'nhk.docs.get'];
 
@@ -56,6 +63,17 @@ final class SingleEntryPointPolicy
     public static function isInternalOnly(string $tool): bool
     {
         return in_array($tool, self::INTERNAL_ONLY_TOOLS, true);
+    }
+
+    public static function isPublicationContinuation(string $tool): bool
+    {
+        return in_array($tool, self::PUBLICATION_CONTINUATION_TOOLS, true);
+    }
+
+    /** @return list<string> */
+    public static function publicationContinuationTools(): array
+    {
+        return self::PUBLICATION_CONTINUATION_TOOLS;
     }
 
     public static function isDeprecated(string $tool): bool
@@ -71,7 +89,7 @@ final class SingleEntryPointPolicy
 
     public static function surface(string $tool): string
     {
-        return self::isCanonical($tool) ? 'canonical' : (self::isInternalOnly($tool) ? 'internal_admin_only' : (self::isDeprecated($tool) ? 'deprecated' : 'read_only'));
+        return self::isCanonical($tool) ? 'canonical' : (self::isPublicationContinuation($tool) ? 'governed_publication_continuation' : (self::isInternalOnly($tool) ? 'internal_admin_only' : (self::isDeprecated($tool) ? 'deprecated' : 'read_only')));
     }
 
     /** @param callable(string):bool|null $can */

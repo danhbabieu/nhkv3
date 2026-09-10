@@ -33,16 +33,29 @@ final class OwnerPublicationApplicationService implements OwnerPublicationServic
 
     public function request(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, PublicationPrincipal $principal): array
     {
+        if (trim($idempotencyKey) === '') return $this->blocked('IDEMPOTENCY_KEY_REQUIRED');
+        $completed = $this->decisions->findByIdempotencyKey($idempotencyKey . ':completed');
+        if ($completed !== null && $completed->finalOutcome !== '') {
+            if ($completed->wpPostId !== $postId || $completed->principalId !== $principal->id) return $this->blocked('OWNER_PUBLICATION_IDEMPOTENCY_CONFLICT');
+            return ['outcome' => ArticlePublicationOutcome::PASS->value, 'diagnostics' => $completed->diagnostics, 'policy_version' => $completed->policyVersion, 'blocker_fingerprint' => $completed->blockerFingerprint, 'final_outcome' => $completed->finalOutcome, 'decision_id' => $completed->decisionId, 'post' => $completed->readback, 'public_url' => $completed->readback['permalink'] ?? ''];
+        }
         $review = $this->review($postId, $expectedStateToken, $evidence, $idempotencyKey, $principal);
         if (($review['outcome'] ?? null) !== ArticlePublicationOutcome::PASS->value) return $review;
         $state = $this->posts->read($postId);
         if ($state === null) return $this->blocked('WP_POST_UNAVAILABLE');
-        return $this->publish($state, $evidence, $idempotencyKey, $review);
+        $approved = new OwnerPublicationDecision(UuidCodec::newV7(), $idempotencyKey . ':approved', hash('sha256', $postId . '|' . $state->token . '|' . $review['blocker_fingerprint'] . '|' . $principal->id), $postId, 'APPROVED_WITH_EXCEPTIONS', ArticlePublicationOutcome::PASS, [], [], (string) $review['blocker_fingerprint'], $state->token, PublicationDiagnosticRegistry::policyVersion(), $principal->id, ['channel' => $principal->channel, 'request_reference' => $principal->requestReference], $this->now()->format(DATE_ATOM), $this->now()->modify('+30 minutes')->format(DATE_ATOM), 'APPROVAL_RECORDED', ['status' => 'recorded']);
+        $this->decisions->append($approved);
+        $this->decisions->append(new OwnerPublicationDecision(UuidCodec::newV7(), $idempotencyKey . ':attempted', $approved->requestFingerprint, $approved->wpPostId, $approved->decision, $approved->gateOutcome, $approved->diagnostics, $approved->overriddenDiagnosticCodes, $approved->blockerFingerprint, $approved->editorialStateToken, $approved->policyVersion, $approved->principalId, $approved->approvalProvenance, $approved->approvedAt, $approved->expiresAt, 'PUBLISH_ATTEMPTED', ['status' => 'started']));
+        $result = $this->publish($state, $evidence, $idempotencyKey, $review);
+        if (($result['post']['status'] ?? '') === 'publish') {
+            $this->decisions->append(new OwnerPublicationDecision(UuidCodec::newV7(), $idempotencyKey . ':completed', $approved->requestFingerprint, $approved->wpPostId, $approved->decision, $approved->gateOutcome, $approved->diagnostics, $approved->overriddenDiagnosticCodes, $approved->blockerFingerprint, $approved->editorialStateToken, $approved->policyVersion, $approved->principalId, $approved->approvalProvenance, $approved->approvedAt, $approved->expiresAt, 'READBACK_VERIFIED', ['status' => 'publish'], $result['post'], 'published'));
+        }
+        return $result;
     }
 
     public function approveAndPublish(int $postId, string $expectedStateToken, array $evidence, string $idempotencyKey, string $decisionId, PublicationPrincipal $principal, string $affirmation): array
     {
-        if (!in_array(trim($affirmation), ['Đăng.', 'Vẫn đăng.', 'Publish.'], true)) return $this->blocked('OWNER_AFFIRMATION_REQUIRED');
+        if (!in_array(trim($affirmation), ['Đăng', 'Đăng.', 'Vẫn đăng.', 'Publish.'], true)) return $this->blocked('OWNER_AFFIRMATION_REQUIRED');
         if ($this->can !== null && !(bool) ($this->can)($principal)) return $this->blocked('PUBLICATION_AUTHORIZATION_FAILED');
         $completed = $this->decisions->findByIdempotencyKey($idempotencyKey . ':completed');
         if ($completed !== null && $completed->finalOutcome !== '') return ['outcome' => ArticlePublicationOutcome::PASS->value, 'diagnostics' => $completed->diagnostics, 'policy_version' => $completed->policyVersion, 'blocker_fingerprint' => $completed->blockerFingerprint, 'final_outcome' => $completed->finalOutcome, 'decision_id' => $completed->decisionId, 'post' => $completed->readback, 'public_url' => $completed->readback['permalink'] ?? ''];

@@ -106,6 +106,13 @@ final class McpTransportIntegrationTest extends TestCase
                 self::assertTrue($ability->get_meta_item('public'));
                 self::assertTrue($ability->get_meta_item('show_in_rest'));
                 self::assertSame(['files'], $ability->get_meta_item('_meta')['openai/fileParams']);
+            } elseif (in_array($abilityName, [
+                'nhk-v3/article-publish-review',
+                'nhk-v3/article-publish-approve',
+                'nhk-v3/article-publish',
+            ], true)) {
+                self::assertTrue($ability->get_meta_item('public'));
+                self::assertTrue($ability->get_meta_item('show_in_rest'));
             } else {
                 self::assertFalse($ability->get_meta_item('public'));
                 self::assertFalse($ability->get_meta_item('show_in_rest'));
