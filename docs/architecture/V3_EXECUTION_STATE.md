@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Easy MCP canonical Capture descriptor exposure
+
+The deployed canonical catalog, WordPress Ability registration and custom
+`/nhk/v1/mcp` transport all retained the optional UUID `capture_id` field. The
+live omission was isolated to the Easy MCP response projection: the
+`tools/list` descriptor hook was incorrectly gated by the narrow Easy MCP
+versions needed for the multipart proxy, and it could also return before
+projection when Easy MCP did not expose its RPC envelope through the request
+parameter shape inspected by the adapter.
+
+The compatibility boundary now projects the existing canonical descriptor for
+the exact Easy MCP route and exact `wp_ability_nhk_v3_capture_ingest` tool
+without adding a tool or changing the writer. The multipart proxy remains
+version-gated independently. The projection preserves optional UUID
+`capture_id`, native binary `files` and `_meta.openai/fileParams=["files"]`.
+Regression coverage exercises a trailing-slash route, an unreported/newer
+Easy MCP version shape and an unrelated tool; no subject, Media, Article,
+Video, Capture or database code/data was changed in this slice.
+
+The live target version was not present in the supplied connector payload, so
+the patch deliberately closes both observable early-return conditions rather
+than guessing a version. After deployment, the required raw `tools/list`
+probe must show `capture_id` on the existing canonical tool before any Capture
+continuation is attempted.
+
 # Checkpoint — 2026-09-10 — Capture 36/8 subject/media/video boundary repair
 
 Root-cause tracing of the reported Odo 36/8 loop identified one resolution

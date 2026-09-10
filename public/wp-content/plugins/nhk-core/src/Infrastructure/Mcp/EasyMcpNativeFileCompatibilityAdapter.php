@@ -117,14 +117,19 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
     public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed
     {
-        if (!self::isSupportedInstalledVersion() || !is_object($request) || !method_exists($request, 'get_route') || (string) $request->get_route() !== self::ENDPOINT) return $response;
+        if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
-        if (($rpc['method'] ?? null) !== 'tools/list' || !is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
+        // Descriptor projection is independent of the multipart compatibility
+        // proxy. Do not suppress it merely because the installed Easy MCP
+        // version is newer than the versions that need the file proxy.
+        if ($rpc !== null && ($rpc['method'] ?? null) !== 'tools/list') return $response;
+        if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
 
         $data = $response->get_data();
         if (!is_array($data)) return $response;
         $result = is_array($data['result'] ?? null) ? $data['result'] : [];
         if (!is_array($result['tools'] ?? null)) return $response;
+        if (!array_filter($result['tools'], static fn (mixed $tool): bool => is_array($tool) && (string) ($tool['name'] ?? '') === self::TARGET_TOOL)) return $response;
         $data['result']['tools'] = self::projectTools($result['tools']);
         $response->set_data($data);
         return $response;

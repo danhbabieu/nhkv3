@@ -35,6 +35,33 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame([$tool], EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool]));
     }
 
+    public function test_tools_list_projection_keeps_capture_descriptor_on_newer_or_unreported_easy_mcp_versions(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp/'; }
+            public function get_param(string $key): mixed { return null; }
+            public function get_json_params(): ?array { return null; }
+        };
+        $response = new class {
+            private array $data = ['result' => ['tools' => [[
+                'name' => 'wp_ability_nhk_v3_capture_ingest',
+                'inputSchema' => ['type' => 'object', 'properties' => []],
+            ], [
+                'name' => 'wp_ability_nhk_v3_media_ingest',
+                'inputSchema' => ['type' => 'object'],
+            ]]]];
+            public function get_data(): array { return $this->data; }
+            public function set_data(array $data): void { $this->data = $data; }
+        };
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, null, $request);
+        $tools = array_column($projected->get_data()['result']['tools'], null, 'name');
+
+        self::assertArrayHasKey('capture_id', $tools[self::TARGET]['inputSchema']['properties']);
+        self::assertSame(['files'], $tools[self::TARGET]['_meta']['openai/fileParams']);
+        self::assertArrayNotHasKey('_meta', $tools['wp_ability_nhk_v3_media_ingest']);
+    }
+
     public function test_only_supported_easy_mcp_versions_are_enabled(): void
     {
         self::assertTrue(EasyMcpNativeFileCompatibilityAdapter::isSupportedVersion('1.7.16'));
