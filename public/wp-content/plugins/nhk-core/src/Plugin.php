@@ -220,7 +220,7 @@ final class Plugin {
             $publicRoutes = new PublicRouteResolver($authority, $types, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
             $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($media, $assets, $usages));
-            $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb);
+            $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
             $proposalRepository = $governanceRuntime->proposals;
             $governance = $governanceRuntime->governance;
             $eligibility = $governanceRuntime->eligibility;

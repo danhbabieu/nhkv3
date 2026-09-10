@@ -1,23 +1,5 @@
 # NHK V3 Execution State
 
-# Checkpoint — 2026-09-10 — Governance Admin Queue Task 2 canonical runtime port
-
-Task 2 adds the reusable `GovernanceActionPort` contract and its canonical
-delegating adapter. `GovernanceRuntime` now carries the proposal repository,
-Governance service, eligibility service and Controlled Apply service as readonly
-dependencies. `GovernanceRuntimeFactory::fromWordPress()` owns the existing
-Authority/Graph/Media/Video/Knowledge/dependency/executor/audit/transaction/
-eligibility/canonical-read-back composition, including collector facet,
-historical evidence and all registered apply behavior. Plugin REST bootstrap
-uses the factory result instead of rebuilding those Governance services.
-
-The port contains no SQL or persistence lifecycle decisions. Focused TDD tests
-cover find/submit/approve/reject/eligibility/apply delegation, canonical apply
-result and runtime construction. The Task 2 focused suite passes 38 tests / 114
-assertions; Composer lint, PHP lint and `git diff --check` pass. No UI, queue
-action service, MCP catalog/transport, migration, semantic data or external
-runtime operation was changed.
-
 # Checkpoint — 2026-09-10 — Canonical Capture orchestration convergence
 
 The Capture root cause was a split identity boundary: Capture used the

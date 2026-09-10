@@ -4,11 +4,13 @@ declare(strict_types=1);
 namespace NHKTests\Unit;
 
 use NHK\Core\Application\Governance\{CanonicalGovernanceActionPort, ControlledApplyService, GovernanceService, ProposalEligibilityService};
+use NHK\Core\Application\Media\MediaService;
 use NHK\Core\Contracts\Governance\{ApplyAttemptRepository, DependencyRepository, EligibilityReader};
 use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Domain\Governance\{ApplyAttempt, DependencyGraph, Proposal, ProposalState};
 use NHK\Core\Infrastructure\Governance\GovernanceRuntime;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
+use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge};
 use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -77,6 +79,29 @@ final class GovernanceActionPortTest extends TestCase
         self::assertInstanceOf(GovernanceService::class, $runtime->governance);
         self::assertInstanceOf(ProposalEligibilityService::class, $runtime->eligibility);
         self::assertInstanceOf(ControlledApplyService::class, $runtime->controlledApply);
+    }
+
+    public function test_runtime_factory_uses_the_shared_wordpress_attachment_bridge_for_controlled_apply(): void
+    {
+        $wpdb = new \stdClass();
+        $media = new WpdbMediaRepository($wpdb);
+        $assets = new WpdbMediaAssetRepository($wpdb);
+        $sharedBridge = new WordPressMediaAttachmentBridge($wpdb, new MediaService($media, $assets, new WpdbMediaUsageRepository($wpdb)), $media, $assets);
+
+        $runtime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedBridge);
+        $controlledApply = new \ReflectionObject($runtime->controlledApply);
+        $executorProperty = $controlledApply->getProperty('executor');
+        $executorProperty->setAccessible(true);
+        $executor = $executorProperty->getValue($runtime->controlledApply);
+        $executorReflection = new \ReflectionObject($executor);
+        $gatewayProperty = $executorReflection->getProperty('mediaGateway');
+        $gatewayProperty->setAccessible(true);
+        $gateway = $gatewayProperty->getValue($executor);
+        $gatewayReflection = new \ReflectionObject($gateway);
+        $bridgeProperty = $gatewayReflection->getProperty('wordpress');
+        $bridgeProperty->setAccessible(true);
+
+        self::assertSame($sharedBridge, $bridgeProperty->getValue($gateway));
     }
 
     private function portWithDraftProposal(): CanonicalGovernanceActionPort

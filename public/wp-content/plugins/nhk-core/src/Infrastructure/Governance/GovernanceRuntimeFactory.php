@@ -24,7 +24,7 @@ use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 
 final class GovernanceRuntimeFactory
 {
-    public static function fromWordPress(object $wpdb): GovernanceRuntime
+    public static function fromWordPress(object $wpdb, ?WordPressMediaAttachmentBridge $sharedAttachmentBridge = null): GovernanceRuntime
     {
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
@@ -47,7 +47,7 @@ final class GovernanceRuntimeFactory
         $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
         $authorityService = new AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink($governanceAudit));
         $mediaService = new MediaService($media, $assets, $usages);
-        $attachmentBridge = new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
+        $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
         $merge = new SemanticMergeService($authority, [new SemanticMergeGraphAdapter($graphService)], static function (string $event, object $receipt) use ($governanceAudit): void {
             $governanceAudit->recordEvent($event, 'semantic_merge', (string) ($receipt->idempotencyKey ?? ''), null, $receipt->toArray());
         }, new WpdbSemanticMergeReceiptRepository($wpdb));
