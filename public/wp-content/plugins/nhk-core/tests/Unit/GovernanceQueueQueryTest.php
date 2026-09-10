@@ -26,6 +26,10 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertSame(1, $page['total_items']);
         self::assertStringContainsString('HEX(proposal_uuid)', $this->db->lastPrepared);
         self::assertSame($this->proposalId, $page['items'][0]['proposal_id']);
+        self::assertCount(2, $this->db->preparedStatements);
+        self::assertStringContainsString('HEX(proposal_uuid)', $this->db->preparedStatements[0]['template']);
+        self::assertStringContainsString('HEX(proposal_uuid)', $this->db->preparedStatements[1]['template']);
+        self::assertSame($this->db->preparedStatements[0]['arguments'], array_slice($this->db->preparedStatements[1]['arguments'], 0, -2));
     }
 
     public function test_subject_name_and_status_filters_are_server_side(): void
@@ -49,7 +53,7 @@ final class GovernanceQueueQueryTest extends TestCase
 
     public function test_page_boundaries_and_total_pages_are_database_backed(): void
     {
-        $this->db->count = 5;
+        $this->db->countResult = 5;
 
         $page = $this->query->page(['page' => 3, 'per_page' => 2]);
 
@@ -106,6 +110,44 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertSame([], $page['items']);
         self::assertSame(0, $page['total_items']);
         self::assertSame(0, $page['total_pages']);
+        self::assertCount(1, $this->db->preparedStatements);
+        self::assertStringContainsString('LIMIT', $this->db->preparedStatements[0]['template']);
+    }
+
+    public function test_count_failure_is_an_unavailable_queue_not_an_empty_success(): void
+    {
+        $this->db->countResult = null;
+
+        $page = $this->query->page(['status' => 'submitted']);
+
+        self::assertSame('unavailable', $page['availability']);
+        self::assertSame(['PROPOSAL_QUEUE_STORAGE_UNAVAILABLE'], $page['diagnostics']);
+        self::assertSame([], $page['items']);
+        self::assertCount(0, $this->db->itemQueries);
+    }
+
+    public function test_item_failure_is_an_unavailable_queue_not_an_empty_success(): void
+    {
+        $this->db->resultsResult = false;
+
+        $page = $this->query->page(['status' => 'submitted']);
+
+        self::assertSame('unavailable', $page['availability']);
+        self::assertSame(['PROPOSAL_QUEUE_STORAGE_UNAVAILABLE'], $page['diagnostics']);
+        self::assertSame(1, $page['total_items']);
+        self::assertSame([], $page['items']);
+    }
+
+    public function test_database_error_indicator_blocks_a_zero_count_result(): void
+    {
+        $this->db->countResult = 0;
+        $this->db->countError = 'Table wp_nhk_proposals does not exist';
+
+        $page = $this->query->page(['status' => 'submitted']);
+
+        self::assertSame('unavailable', $page['availability']);
+        self::assertSame(['PROPOSAL_QUEUE_STORAGE_UNAVAILABLE'], $page['diagnostics']);
+        self::assertSame(0, $page['total_items']);
     }
 
     public function test_malformed_payload_returns_a_blocked_diagnostic_instead_of_false_success(): void
@@ -120,6 +162,33 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertSame('blocked', $page['availability']);
         self::assertSame(['PROPOSAL_PAYLOAD_MALFORMED'], $page['diagnostics']);
         self::assertSame(1, $page['total_items']);
+    }
+
+    /** @dataProvider invalidPersistedRows */
+    public function test_invalid_persisted_proposal_rows_are_blocked_and_not_actionable(callable $change, string $diagnostic): void
+    {
+        $this->db = new RecordingProposalDatabase([$change($this->proposalRow())], 1);
+        $this->query = new WpdbGovernanceQueueQuery($this->db);
+
+        $page = $this->query->page(['status' => 'submitted']);
+
+        self::assertSame('blocked', $page['availability']);
+        self::assertSame([$diagnostic], $page['diagnostics']);
+        self::assertSame('blocked', $page['items'][0]['status']);
+        self::assertFalse($page['items'][0]['actionable']);
+    }
+
+    /** @return iterable<string,array{callable,string}> */
+    public static function invalidPersistedRows(): iterable
+    {
+        yield 'state below enum range' => [static fn (array $row): array => array_replace($row, ['state' => 0]), 'PROPOSAL_STATE_INVALID'];
+        yield 'state above enum range' => [static fn (array $row): array => array_replace($row, ['state' => 8]), 'PROPOSAL_STATE_INVALID'];
+        yield 'nil proposal uuid' => [static fn (array $row): array => array_replace($row, ['proposal_uuid' => null]), 'PROPOSAL_IDENTITY_INVALID'];
+        yield 'malformed proposal uuid' => [static fn (array $row): array => array_replace($row, ['proposal_uuid' => 'invalid']), 'PROPOSAL_IDENTITY_INVALID'];
+        yield 'malformed target uuid' => [static fn (array $row): array => array_replace($row, ['target_uuid' => str_repeat("\xff", 16)]), 'PROPOSAL_TARGET_INVALID'];
+        yield 'zero revision' => [static fn (array $row): array => array_replace($row, ['revision' => 0]), 'PROPOSAL_REVISION_INVALID'];
+        yield 'short content fingerprint' => [static fn (array $row): array => array_replace($row, ['fingerprint' => str_repeat('a', 31)]), 'PROPOSAL_FINGERPRINT_INVALID'];
+        yield 'short dependency fingerprint' => [static fn (array $row): array => array_replace($row, ['dependency_fingerprint' => str_repeat('b', 31)]), 'PROPOSAL_FINGERPRINT_INVALID'];
     }
 
     /** @return array<string,mixed> */
@@ -155,6 +224,17 @@ final class RecordingProposalDatabase
     public string $lastPrepared = '';
     /** @var array<string,string> */
     public array $lastFilters = [];
+    /** @var list<array{template:string,arguments:list<mixed>,sql:string}> */
+    public array $preparedStatements = [];
+    /** @var list<string> */
+    public array $countQueries = [];
+    /** @var list<string> */
+    public array $itemQueries = [];
+    public string $last_error = '';
+    public ?string $countError = null;
+    public ?string $itemsError = null;
+    public mixed $countResult;
+    public mixed $resultsResult;
     /** @var list<array<string,mixed>> */
     public array $rows;
 
@@ -162,10 +242,15 @@ final class RecordingProposalDatabase
     public function __construct(array $rows, public int $count)
     {
         $this->rows = $rows;
+        $this->countResult = $count;
+        $this->resultsResult = $rows;
     }
 
     public function prepare(string $query, mixed ...$args): string
     {
+        if (preg_match('/%[dfs]/', $query) !== 1) {
+            throw new \LogicException('wpdb::prepare requires a placeholder.');
+        }
         $argumentIndex = 0;
         $prepared = (string) preg_replace_callback('/%[dfs]/', static function (array $match) use (&$argumentIndex, $args): string {
             $argument = $args[$argumentIndex++] ?? null;
@@ -177,6 +262,7 @@ final class RecordingProposalDatabase
         }, $query);
 
         $this->lastPrepared = $prepared;
+        $this->preparedStatements[] = ['template' => $query, 'arguments' => $args, 'sql' => $prepared];
         $this->lastFilters = [
             'order_by' => str_contains($prepared, 'ORDER BY updated_at') ? 'updated'
                 : (str_contains($prepared, 'ORDER BY created_at') ? 'created'
@@ -187,14 +273,17 @@ final class RecordingProposalDatabase
         return $prepared;
     }
 
-    /** @return list<array<string,mixed>> */
-    public function get_results(string $query, mixed $output): array
+    public function get_results(string $query, mixed $output): mixed
     {
-        return $this->rows;
+        $this->itemQueries[] = $query;
+        $this->last_error = $this->itemsError ?? '';
+        return $this->resultsResult;
     }
 
-    public function get_var(string $query): int
+    public function get_var(string $query): mixed
     {
-        return $this->count;
+        $this->countQueries[] = $query;
+        $this->last_error = $this->countError ?? '';
+        return $this->countResult;
     }
 }

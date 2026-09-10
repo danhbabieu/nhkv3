@@ -32,7 +32,11 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         $whereSql = $where === [] ? '' : ' WHERE ' . implode(' AND ', $where);
 
         $countSql = 'SELECT COUNT(*) FROM ' . $table . $whereSql;
-        $totalItems = (int) $db->get_var($db->prepare($countSql, ...$parameters));
+        $countResult = $db->get_var($parameters === [] ? $countSql : $db->prepare($countSql, ...$parameters));
+        $totalItems = $this->count($countResult);
+        if ($totalItems === null || $this->hasDatabaseError($db)) {
+            return $this->unavailable($filters);
+        }
         $offset = ($filters['page'] - 1) * $filters['per_page'];
         $orderExpression = self::SORTS[$filters['order_by']];
         $direction = strtoupper($filters['order']);
@@ -44,11 +48,19 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
             $direction,
             $direction,
         );
-        $rows = $db->get_results($db->prepare($itemsSql, ...[...$parameters, $filters['per_page'], $offset]), 'ARRAY_A') ?: [];
+        $rows = $db->get_results($db->prepare($itemsSql, ...[...$parameters, $filters['per_page'], $offset]), 'ARRAY_A');
+        if (!is_array($rows) || $this->hasDatabaseError($db)) {
+            return $this->unavailable($filters, $totalItems);
+        }
 
         $items = [];
         $diagnostics = [];
         foreach ($rows as $row) {
+            if (!is_array($row)) {
+                $items[] = $this->blockedItem([], 'PROPOSAL_ROW_INVALID');
+                $diagnostics[] = 'PROPOSAL_ROW_INVALID';
+                continue;
+            }
             $item = $this->item($row);
             $items[] = $item;
             if (isset($item['diagnostic'])) {
@@ -68,6 +80,21 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         ];
     }
 
+    /** @param array{search:string,status:string,type:string,order_by:string,order:string,page:int,per_page:int} $filters @return array<string,mixed> */
+    private function unavailable(array $filters, int $totalItems = 0): array
+    {
+        return [
+            'availability' => 'unavailable',
+            'diagnostics' => ['PROPOSAL_QUEUE_STORAGE_UNAVAILABLE'],
+            'items' => [],
+            'total_items' => $totalItems,
+            'total_pages' => $totalItems === 0 ? 0 : (int) ceil($totalItems / $filters['per_page']),
+            'page' => $filters['page'],
+            'per_page' => $filters['per_page'],
+            'filters' => $filters,
+        ];
+    }
+
     private function db(): object
     {
         global $wpdb;
@@ -77,6 +104,22 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
     private function table(): string
     {
         return $this->db()->prefix . 'nhk_proposals';
+    }
+
+    private function count(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value >= 0 ? $value : null;
+        }
+        if (!is_string($value) || preg_match('/^(?:0|[1-9][0-9]*)$/', $value) !== 1) {
+            return null;
+        }
+        return (int) $value;
+    }
+
+    private function hasDatabaseError(object $database): bool
+    {
+        return property_exists($database, 'last_error') && trim((string) $database->last_error) !== '';
     }
 
     /** @param array<string,mixed> $filters @return array{search:string,status:string,type:string,order_by:string,order:string,page:int,per_page:int} */
@@ -154,13 +197,20 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
     /** @param array<string,mixed> $row @return array<string,mixed> */
     private function item(array $row): array
     {
-        $status = ProposalState::tryFrom($this->stateValue($row['state'] ?? null)) ?? ProposalState::DRAFT;
+        $diagnostic = $this->rowDiagnostic($row);
+        if ($diagnostic !== null) {
+            return $this->blockedItem($row, $diagnostic);
+        }
+
+        $status = $this->state($row['state']);
+        $proposalId = $this->uuid($row['proposal_id'] ?? $row['proposal_uuid']);
+        $targetUuid = $this->targetUuid($row['target_uuid'] ?? null);
         $base = [
-            'proposal_id' => $this->uuid($row['proposal_id'] ?? $row['proposal_uuid'] ?? null),
+            'proposal_id' => $proposalId,
             'entity_type' => (string) ($row['entity_type'] ?? ''),
             'operation' => (string) ($row['operation'] ?? ''),
             'subject_id' => '',
-            'target_uuid' => $this->uuid($row['target_uuid'] ?? null),
+            'target_uuid' => $targetUuid,
             'name' => '',
             'summary' => '',
             'status' => $status->value,
@@ -171,6 +221,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
             'revision' => (int) ($row['revision'] ?? 0),
             'content_fingerprint' => $this->fingerprint($row['content_fingerprint'] ?? $row['fingerprint'] ?? null),
             'dependency_fingerprint' => $this->fingerprint($row['dependency_fingerprint'] ?? null),
+            'actionable' => true,
         ];
 
         try {
@@ -180,6 +231,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
                 'name' => 'Dữ liệu đề xuất không thể đọc',
                 'summary' => 'JSON đề xuất không hợp lệ.',
                 'diagnostic' => 'PROPOSAL_PAYLOAD_MALFORMED',
+                'actionable' => false,
             ]);
         }
         if (!is_array($payload)) {
@@ -187,6 +239,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
                 'name' => 'Dữ liệu đề xuất không thể đọc',
                 'summary' => 'JSON đề xuất không hợp lệ.',
                 'diagnostic' => 'PROPOSAL_PAYLOAD_MALFORMED',
+                'actionable' => false,
             ]);
         }
 
@@ -201,11 +254,39 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         ]);
     }
 
-    private function stateValue(mixed $value): string
+    /** @param array<string,mixed> $row */
+    private function rowDiagnostic(array $row): ?string
     {
+        if ($this->uuid($row['proposal_id'] ?? $row['proposal_uuid'] ?? null) === null) {
+            return 'PROPOSAL_IDENTITY_INVALID';
+        }
+        if ($this->state($row['state'] ?? null) === null) {
+            return 'PROPOSAL_STATE_INVALID';
+        }
+        if (!$this->targetIsValid($row['target_uuid'] ?? null)) {
+            return 'PROPOSAL_TARGET_INVALID';
+        }
+        if (!$this->revisionIsValid($row['revision'] ?? null)) {
+            return 'PROPOSAL_REVISION_INVALID';
+        }
+        if (!$this->fingerprintIsValid($row['fingerprint'] ?? $row['content_fingerprint'] ?? null)
+            || !$this->fingerprintIsValid($row['dependency_fingerprint'] ?? null)) {
+            return 'PROPOSAL_FINGERPRINT_INVALID';
+        }
+        return null;
+    }
+
+    private function state(mixed $value): ?ProposalState
+    {
+        if (is_int($value)) {
+            $ordinal = $value;
+        } elseif (is_string($value) && ctype_digit($value)) {
+            $ordinal = (int) $value;
+        } else {
+            return null;
+        }
         $states = ProposalState::cases();
-        $index = (int) $value - 1;
-        return isset($states[$index]) ? $states[$index]->value : ProposalState::DRAFT->value;
+        return $ordinal >= 1 && $ordinal <= count($states) ? $states[$ordinal - 1] : null;
     }
 
     private function uuid(mixed $value): ?string
@@ -215,16 +296,65 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         }
         try {
             if (strlen($value) === 16) {
-                return UuidCodec::fromBinary($value);
+                $uuid = UuidCodec::fromBinary($value);
+                return UuidCodec::isValid($uuid) ? $uuid : null;
             }
             $hex = strtolower(str_replace('-', '', $value));
             if (preg_match('/^[a-f0-9]{32}$/', $hex) !== 1) {
                 return null;
             }
-            return UuidCodec::fromBinary(hex2bin($hex));
+            $uuid = UuidCodec::fromBinary(hex2bin($hex));
+            return UuidCodec::isValid($uuid) ? $uuid : null;
         } catch (\InvalidArgumentException) {
             return null;
         }
+    }
+
+    private function targetUuid(mixed $value): ?string
+    {
+        if ($value === null || $value === '' || (is_string($value) && strlen($value) === 16 && bin2hex($value) === str_repeat('0', 32))) {
+            return null;
+        }
+        return $this->uuid($value);
+    }
+
+    private function targetIsValid(mixed $value): bool
+    {
+        return $this->targetUuid($value) !== null || $value === null || $value === '' || (is_string($value) && strlen($value) === 16 && bin2hex($value) === str_repeat('0', 32));
+    }
+
+    private function revisionIsValid(mixed $value): bool
+    {
+        return (is_int($value) && $value > 0) || (is_string($value) && preg_match('/^[1-9][0-9]*$/', $value) === 1);
+    }
+
+    private function fingerprintIsValid(mixed $value): bool
+    {
+        return is_string($value) && strlen($value) === 32;
+    }
+
+    /** @param array<string,mixed> $row @return array<string,mixed> */
+    private function blockedItem(array $row, string $diagnostic): array
+    {
+        return [
+            'proposal_id' => $this->uuid($row['proposal_id'] ?? $row['proposal_uuid'] ?? null),
+            'entity_type' => (string) ($row['entity_type'] ?? ''),
+            'operation' => (string) ($row['operation'] ?? ''),
+            'subject_id' => '',
+            'target_uuid' => $this->targetUuid($row['target_uuid'] ?? null),
+            'name' => 'Dữ liệu đề xuất không hợp lệ',
+            'summary' => 'Bản ghi Proposal không đạt điều kiện đọc an toàn.',
+            'status' => 'blocked',
+            'status_label' => 'Dữ liệu bị chặn',
+            'provenance_summary' => '',
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'updated_at' => (string) ($row['updated_at'] ?? ''),
+            'revision' => 0,
+            'content_fingerprint' => '',
+            'dependency_fingerprint' => '',
+            'actionable' => false,
+            'diagnostic' => $diagnostic,
+        ];
     }
 
     private function fingerprint(mixed $value): string
