@@ -45,6 +45,85 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_COMPLETE', $result->state);
     }
 
+    public function test_text_only_capture_without_assets_does_not_adopt_unrelated_media(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $unrelated = $service->create('odo-36-10', 'Odo 36/10', 'ready');
+        $service->addAsset($unrelated->canonicalId, 'original', 'uploads/odo-36-10.jpg', hash('sha256', 'odo-36-10'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(342, ['subject' => 'Odo 30', 'capture_has_physical_assets' => false, 'allow_unscoped_reuse' => false]);
+
+        self::assertNotContains($unrelated->canonicalId, $result->slotMedia);
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+        self::assertNotSame('MEDIA_COMPLETE', $result->state);
+    }
+
+    public function test_text_only_capture_reconciles_stale_wordpress_media_to_placeholders(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $unrelated = $service->create('odo-36-10-stale', 'Odo 36/10 stale', 'ready');
+        $service->addAsset($unrelated->canonicalId, 'original', 'uploads/odo-36-10-stale.jpg', hash('sha256', 'stale'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $adapter = new class($unrelated->canonicalId) implements WordPressArticleMediaAdapter {
+            public function __construct(private string $mediaId) {}
+            public function read(int $postId): array { return ['featured_media_id' => $this->mediaId, 'inline_media_ids' => [$this->mediaId], 'managed_inline_media_id' => 0, 'featured_attachment_id' => 101, 'inline_attachment_ids' => [101], 'content' => '<img src="stale">']; }
+            public function synchronize(int $postId, array $result): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => 0, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter);
+
+        $result = $coordinator->ensureForPost(342, ['subject' => 'Odo 30', 'capture_has_physical_assets' => false, 'allow_unscoped_reuse' => false]);
+
+        self::assertNotContains($unrelated->canonicalId, $result->slotMedia);
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+    }
+
+    public function test_capture_subject_scope_replaces_wrong_variant_with_existing_correct_variant_media(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $wrong = $service->create('odo-36-10-scoped', 'Odo 36/10 image', 'ready', ['metadata' => ['subject_id' => 'variant-36-10']]);
+        $right = $service->create('odo-36-8-scoped', 'Odo 36/8 Westminster image', 'ready', ['metadata' => ['subject_id' => 'variant-36-8']]);
+        $service->addAsset($wrong->canonicalId, 'original', 'uploads/odo-36-10-scoped.jpg', hash('sha256', 'wrong-scoped'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $service->addAsset($right->canonicalId, 'original', 'uploads/odo-36-8-scoped.jpg', hash('sha256', 'right-scoped'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $service->addUsage($wrong->canonicalId, 'wp_post', '1:339', 'featured_primary');
+        $service->addUsage($wrong->canonicalId, 'wp_post', '1:339', 'inline_primary');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(339, [
+            'subject' => 'Odo 36/8 Westminster',
+            'subject_ids' => ['variant-36-8'],
+            'subject_context' => ['subject' => 'Odo 36/8 Westminster', 'subject_ids' => ['variant-36-8']],
+            'allow_unscoped_reuse' => true,
+        ], ['featured_primary' => $wrong->canonicalId, 'inline_primary' => $wrong->canonicalId]);
+
+        self::assertSame($right->canonicalId, $result->slotMedia['featured_primary']);
+        self::assertSame($right->canonicalId, $result->slotMedia['inline_primary']);
+        self::assertNotContains($wrong->canonicalId, array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $usages->listByEndpoint('wp_post', '1:339')));
+        self::assertSame('MEDIA_COMPLETE', $result->state);
+    }
+
+    public function test_capture_subject_scope_keeps_article_missing_when_no_correct_variant_media_exists(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $wrong = $service->create('odo-36-10-only', 'Odo 36/10 only image', 'ready', ['metadata' => ['subject_id' => 'variant-36-10']]);
+        $service->addAsset($wrong->canonicalId, 'original', 'uploads/odo-36-10-only.jpg', hash('sha256', 'wrong-only'), 'image/jpeg', 10, 1200, 800, 'PUBLIC');
+        $service->addUsage($wrong->canonicalId, 'wp_post', '1:339', 'featured_primary');
+        $service->addUsage($wrong->canonicalId, 'wp_post', '1:339', 'inline_primary');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(339, [
+            'subject' => 'Odo 36/8 Westminster',
+            'subject_ids' => ['variant-36-8'],
+            'subject_context' => ['subject' => 'Odo 36/8 Westminster', 'subject_ids' => ['variant-36-8']],
+            'allow_unscoped_reuse' => true,
+        ], ['featured_primary' => $wrong->canonicalId, 'inline_primary' => $wrong->canonicalId]);
+
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+        self::assertNotContains($wrong->canonicalId, $result->slotMedia);
+        self::assertNotContains($wrong->canonicalId, array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $usages->listByEndpoint('wp_post', '1:339')));
+    }
+
     public function test_one_media_identity_can_fill_both_mandatory_article_roles(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

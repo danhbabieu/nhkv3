@@ -59,10 +59,35 @@ final class EditorialCaptureCoordinator
             [
                 'raw_input' => trim((string) ($input['text'] ?? $input['content'] ?? '')),
                 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [],
+                'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [],
+                'title' => trim((string) ($input['title'] ?? '')),
+                'excerpt' => trim((string) ($input['excerpt'] ?? '')),
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
             ],
         ));
+        return $this->run($record, $input);
+    }
+
+    /** Continue an existing Capture without repeating physical or draft creation. */
+    public function continueWithAddendum(CaptureRecord $record, array $input): CaptureRecord
+    {
+        $continuation = is_array($record->context['continuation_state'] ?? null) ? $record->context['continuation_state'] : [];
+        $original = trim((string) ($continuation['raw_input'] ?? $record->context['raw_input'] ?? ''));
+        $addendum = trim((string) ($input['text'] ?? $input['content'] ?? ''));
+        $input['text'] = trim(implode("\n\n", array_values(array_filter([$original, $addendum], static fn (string $value): bool => $value !== ''))));
+        $newSubjectHints = is_array($input['subject_hints'] ?? null) ? array_values(array_filter(array_map('strval', $input['subject_hints']), static fn (string $hint): bool => trim($hint) !== '')) : [];
+        // An explicit continuation subject is a correction/clarification for
+        // this bounded rerun. Do not keep a stale prior variant in the
+        // resolution set and accidentally turn a correction into ambiguity.
+        $input['subject_hints'] = $newSubjectHints !== []
+            ? array_values(array_unique($newSubjectHints))
+            : array_values(array_unique(array_map('strval', is_array($continuation['subject_hints'] ?? null) ? $continuation['subject_hints'] : ($record->context['subject_hints'] ?? []))));
+        $input['observations'] = array_merge(
+            is_array($continuation['observations'] ?? null) ? $continuation['observations'] : (is_array($record->context['observations'] ?? null) ? $record->context['observations'] : []),
+            is_array($input['observations'] ?? null) ? $input['observations'] : [],
+        );
+        if (trim((string) ($input['title'] ?? '')) === '') $input['title'] = (string) ($record->diagnostics['composition']['title'] ?? '');
         return $this->run($record, $input);
     }
 
@@ -138,7 +163,7 @@ final class EditorialCaptureCoordinator
             $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken);
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
-            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? '')]);
+            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot']];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {

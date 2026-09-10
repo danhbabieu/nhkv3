@@ -135,6 +135,18 @@ when a required operation is not callable; it must not substitute a generic
 WordPress writer, a historical Ability assumption or a superseded workflow.
 Fresh target discovery/read-back controls callability claims.
 
+### 1.3 Existing-Capture continuation — 2026-09-10
+
+The canonical `nhk.capture.ingest` boundary now accepts an optional
+`capture_id` for a text addendum to one existing Capture and its existing
+WordPress draft. The original request/fingerprint is immutable; each addendum
+has an independent idempotency ledger, audit/revision append and bounded
+semantic rerun. Same-key/same-payload retries are idempotent and changed
+payloads conflict. Addenda reject files and do not create a second Post or
+re-adopt/unscoped-fallback Media; an existing Media is reusable only after
+persisted subject-scope matching. Semantic deltas still stop at the existing
+Governance review boundary until an eligible apply/read-back is completed.
+
 ## 2. Current boundary snapshot
 
 ### Semantic Claim Projection — 2026-09-08

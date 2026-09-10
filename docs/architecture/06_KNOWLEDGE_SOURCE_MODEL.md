@@ -150,3 +150,12 @@ kept review-only. The system must not broaden the Claim because a Model/Brand or
 other broader node is reachable in Graph. Before any new Claim proposal, the
 current canonical Knowledge set must be searched for reuse/add-Evidence first;
 repeated prose or repeated visual observation never justifies a duplicate Claim.
+
+### Capture addendum provenance — 2026-09-10
+
+An addendum to an existing Capture is still scoped user input. New statements
+must retain `EXPLICIT_USER_KNOWLEDGE` until the normal Proposal → submit/review
+→ approve → eligibility → apply lifecycle succeeds. Duplicate search and
+canonical Claim/revision reuse happen before any new proposal. A bounded
+continuation may update the existing Article draft, but Article prose remains
+editorial output and is never Evidence.

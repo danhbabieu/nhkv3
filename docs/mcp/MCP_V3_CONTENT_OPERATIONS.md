@@ -126,6 +126,16 @@ than silently applying new semantic records, so the capture can reach
 `READY_FOR_PUBLICATION`/`REVIEW_REQUIRED` but cannot claim publication without
 an explicit eligible owner publication operation and read-back.
 
+The same tool also accepts an optional `capture_id` to continue one existing
+Capture with a text addendum. The original request/fingerprint is immutable;
+the addendum has its own idempotency key, appends an auditable Capture revision,
+reuses the same native Post and reruns bounded semantic resolution,
+Governance/review and Article reconciliation. Addenda reject files, never
+create a second Post, and never re-adopt or use unscoped/global Media when no
+new asset is supplied; an existing Media is reusable only when its persisted
+subject scope matches the resolved canonical subject. Same-key/same-payload
+retries are idempotent; same-key payload changes return a conflict.
+
 For a Capture with images, the orchestration unit is
 `Capture → attachments → attachment read-back → canonical Media adoption →
 Media interpretation → subject resolution → bounded Graph/Claim retrieval →

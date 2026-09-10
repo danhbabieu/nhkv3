@@ -70,6 +70,12 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 if (!function_exists('set_post_thumbnail')) throw new \RuntimeException('WORDPRESS_FEATURED_SYNC_UNAVAILABLE');
                 if (!set_post_thumbnail($postId, $attachmentId)) throw new \RuntimeException('WORDPRESS_FEATURED_SYNC_FAILED');
             }
+        } elseif (($slots['featured_primary']['placeholder'] ?? false) && (int) ($current['featured_attachment_id'] ?? 0) > 0) {
+            if (function_exists('delete_post_thumbnail')) {
+                delete_post_thumbnail($postId);
+            } elseif (function_exists('set_post_thumbnail')) {
+                set_post_thumbnail($postId, 0);
+            }
         }
 
         $content = (string) ($current['content'] ?? '');
@@ -92,8 +98,11 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                     $content = rtrim($content) . ($content === '' ? '' : "\n\n") . $this->managedBlock($attachmentId, $image);
                 }
             }
-        } elseif (($slots['inline_primary']['placeholder'] ?? false) && $this->managedInlineAttachmentId($content) > 0) {
-            $content = $this->removeManagedBlock($content);
+        } elseif (($slots['inline_primary']['placeholder'] ?? false) && ($result['force_inline_reconcile'] ?? false) === true) {
+            $managedId = $this->managedInlineAttachmentId($content);
+            $content = $managedId > 0
+                ? $this->removeManagedBlock($content)
+                : $this->removeMappedInlineImages($content, (array) ($current['inline_attachment_ids'] ?? []));
         }
 
         if ($content !== (string) ($current['content'] ?? '')) {
@@ -288,6 +297,23 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     {
         $updated = preg_replace('/\s*<!-- wp:image\b[^>]*nhk-managed-inline-primary[^>]*-->.*?<!-- \/wp:image -->\s*/is', "\n", $content, 1);
         return is_string($updated) ? trim($updated) : $content;
+    }
+
+    /** @param list<int> $attachmentIds */
+    private function removeMappedInlineImages(string $content, array $attachmentIds): string
+    {
+        foreach (array_values(array_filter(array_map('intval', $attachmentIds), static fn (int $id): bool => $id > 0)) as $attachmentId) {
+            $patterns = [
+                '/\s*<!-- wp:image\b[^>]*"id"\s*:\s*' . $attachmentId . '[^>]*-->.*?<!-- \/wp:image -->\s*/is',
+                '/\s*<figure\b[^>]*>.*?(?:wp-image-' . $attachmentId . '|data-id=["\']' . $attachmentId . '["\']).*?<\/figure>\s*/is',
+                '/\s*<img\b[^>]*(?:wp-image-' . $attachmentId . '|data-id=["\']' . $attachmentId . '["\'])[^>]*>\s*/is',
+            ];
+            foreach ($patterns as $pattern) {
+                $updated = preg_replace($pattern, "\n", $content, 1);
+                if (is_string($updated)) $content = $updated;
+            }
+        }
+        return trim($content);
     }
 
     private function replaceFirstImageBlock(string $content, string $image, int $attachmentId): string

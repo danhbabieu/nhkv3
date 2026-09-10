@@ -39,13 +39,15 @@ final class ArticleMediaCoordinator
             }
             foreach (($editorial['unmapped_attachment_ids'] ?? []) as $attachmentId) $diagnostics[] = ['code' => 'WORDPRESS_ATTACHMENT_UNMAPPED', 'attachment_id' => (int) $attachmentId];
         }
+        if (($context['allow_unscoped_reuse'] ?? true) !== true && ($context['capture_has_physical_assets'] ?? false) !== true) $selectedMediaBySlot = [];
         foreach (MediaUsageRoleRegistry::mandatoryArticleRoles() as $slot) {
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
             $candidateId = trim((string) ($selectedMediaBySlot[$slot] ?? ''));
             $candidate = $candidateId !== '' ? $this->usableMedia($candidateId, $blueprint) : null;
-            if ($candidate === null && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint);
-            if ($candidate === null) $candidate = $this->findReusable($blueprint, array_values($slotMedia));
+            $allowUnscopedReuse = ($context['allow_unscoped_reuse'] ?? true) === true;
+            if ($candidate === null && $allowUnscopedReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint);
+            if ($candidate === null && $allowUnscopedReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia));
             if ($candidate === null) $candidate = $this->placeholder($slot);
             $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
@@ -130,6 +132,7 @@ final class ArticleMediaCoordinator
     {
         $media = $this->media->findByCanonicalId($id);
         if ($media === null || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
+        if (!$this->matchesSubjectScope($media, $blueprint)) return null;
         return $this->assets->listByMediaId($media->canonicalId) === [] ? null : $media;
     }
 
@@ -138,10 +141,14 @@ final class ArticleMediaCoordinator
     {
         $best = null; $bestScore = -1;
         foreach ($this->media->list() as $media) {
-            if (in_array($media->canonicalId, $used, true)) continue;
+            // Prefer an unused candidate, but allow one canonical subject image
+            // to satisfy both mandatory editorial roles when it is the only
+            // eligible image. Never broaden this fallback beyond the subject
+            // scope carried by the blueprint.
+            $reusePenalty = in_array($media->canonicalId, $used, true) ? -1 : 0;
             $candidate = $this->usableMedia($media->canonicalId, $blueprint);
             if ($candidate === null) continue;
-            $score = 1;
+            $score = 1 + $reusePenalty;
             $subject = strtolower((string) ($blueprint->subjectContext['subject'] ?? ''));
             if ($subject !== '' && str_contains(strtolower($candidate->canonicalName), $subject)) $score += 4;
             if (($blueprint->preferredView ?? '') !== '' && ($candidate->provenance['detail_type'] ?? '') === $blueprint->preferredView) $score += 3;
@@ -149,6 +156,38 @@ final class ArticleMediaCoordinator
             if ($score > $bestScore || ($score === $bestScore && ($best === null || $candidate->stableKey < $best->stableKey))) { $best = $candidate; $bestScore = $score; }
         }
         return $best;
+    }
+
+    private function matchesSubjectScope(Media $media, MediaSeoBlueprint $blueprint): bool
+    {
+        $expected = [];
+        foreach (['subject_ids', 'canonical_subject_ids'] as $key) {
+            foreach ((array) ($blueprint->subjectContext[$key] ?? []) as $id) {
+                $id = trim((string) $id);
+                if ($id !== '') $expected[$id] = true;
+            }
+        }
+        if ($expected === []) return true;
+
+        $provenance = $media->provenance;
+        $metadata = is_array($provenance['metadata'] ?? null) ? $provenance['metadata'] : [];
+        $actual = [];
+        foreach (['subject_id', 'subject_uuid', 'canonical_subject_id', 'canonical_subject_uuid'] as $key) {
+            foreach ([$provenance[$key] ?? null, $metadata[$key] ?? null] as $value) {
+                $value = trim((string) $value);
+                if ($value !== '') $actual[$value] = true;
+            }
+        }
+        foreach ([(array) ($provenance['subject_ids'] ?? []), (array) ($metadata['subject_ids'] ?? [])] as $ids) {
+            foreach ($ids as $id) {
+                $id = trim((string) $id);
+                if ($id !== '') $actual[$id] = true;
+            }
+        }
+        foreach ($this->usages->listByMediaId($media->canonicalId) as $usage) {
+            if (in_array($usage->endpointType, ['variant', 'authority_variant'], true)) $actual[trim($usage->endpointKey)] = true;
+        }
+        return array_intersect_key($expected, $actual) !== [];
     }
 
     private function placeholder(string $slot): Media

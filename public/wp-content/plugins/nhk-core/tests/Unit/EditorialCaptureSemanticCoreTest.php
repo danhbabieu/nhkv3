@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
-use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Application\Semantic\{ArticleComposer, CanonicalAuthoritySubjectResolver, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
+use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, EntityTypeRegistry, CanonicalEntityTypeCatalog};
+use NHK\Tests\Support\InMemoryAuthorityRepository;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use PHPUnit\Framework\TestCase;
@@ -56,6 +58,49 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertStringNotContainsString('Cấu hình này dùng bộ máy được ghi nhận trong hồ sơ.', $result['content']);
         self::assertSame('claim-1', $result['claim_trace'][0]['claim_id']);
         self::assertSame(2, $result['claim_trace'][0]['claim_revision']);
+    }
+
+    public function test_text_only_capture_does_not_emit_media_observation_prose(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Người dùng ghi nhận cấu hình này thường gặp ở thực địa.',
+            [[
+                'text' => 'Đây là tri thức người dùng cung cấp.',
+                'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+                'media_id' => '',
+            ]],
+            [],
+            ['asset_count' => 0],
+        );
+
+        self::assertStringNotContainsString('Quan sát từ tư liệu gửi kèm cho thấy', $result['content']);
+        self::assertStringContainsString('Người dùng ghi nhận', $result['content']);
+    }
+
+    public function test_capture_subject_resolution_uses_registered_identity_not_unrelated_fallback(): void
+    {
+        $repository = new InMemoryAuthorityRepository();
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $modelId = 'fdf5bfd5-d3f4-4281-a39e-77c9271bcf4a';
+        $repository->create(new AuthorityEntity(
+            $modelId,
+            'model',
+            'nhk:model:odo.30',
+            'Odo 30',
+            1,
+            ['aliases' => ['Máy Odo 30']],
+            AuthorityState::ACTIVE,
+            1,
+        ));
+
+        $resolver = new CanonicalAuthoritySubjectResolver($repository, $types);
+
+        self::assertSame($modelId, $resolver->resolve($modelId)[0]['id']);
+        self::assertSame('uuid_exact', $resolver->resolve($modelId)[0]['match']);
+        self::assertSame($modelId, $resolver->resolve('nhk:model:odo.30')[0]['id']);
+        self::assertSame($modelId, $resolver->resolve('Máy Odo 30')[0]['id']);
+        self::assertSame([], $resolver->resolve('Odo 36'));
     }
 
     public function test_capture_creates_one_draft_for_multiple_assets_and_retries_without_duplicates(): void
@@ -212,6 +257,7 @@ final class InMemoryCaptureRepository implements CaptureRepository
     public array $records = [];
 
     public function findByIdempotencyKey(string $key): ?CaptureRecord { return $this->records[$key] ?? null; }
+    public function findById(string $captureId): ?CaptureRecord { foreach ($this->records as $record) if ($record->captureId === $captureId) return $record; return null; }
     public function create(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] ??= $record; }
     public function save(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] = $record; }
 }

@@ -10,7 +10,7 @@ use NHK\Core\Application\Media\MediaBatchUploadService;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
-use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
@@ -35,6 +35,7 @@ final class McpTransport
         private ?MediaBatchUploadService $mediaBatchUpload = null,
         private ?McpDocumentationRegistry $documentation = null,
         private ?EditorialCaptureCoordinator $capture = null,
+        private ?EditorialCaptureContinuationService $captureContinuation = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -210,6 +211,10 @@ final class McpTransport
         if ($this->capture === null) throw new \RuntimeException('EDITORIAL_CAPTURE_UNAVAILABLE');
         unset($arguments['files']);
         if ($files !== []) $arguments['files'] = $files;
+        if (isset($arguments['capture_id'])) {
+            if ($this->captureContinuation === null) throw new \RuntimeException('EDITORIAL_CAPTURE_CONTINUATION_UNAVAILABLE');
+            return $this->captureContinuation->execute($arguments);
+        }
         return $this->capture->execute($arguments)->toArray();
     }
 

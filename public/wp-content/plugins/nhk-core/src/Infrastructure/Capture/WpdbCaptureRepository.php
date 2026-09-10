@@ -17,6 +17,13 @@ final class WpdbCaptureRepository implements CaptureRepository
         return is_array($row) ? $this->hydrate($row) : null;
     }
 
+    public function findById(string $captureId): ?CaptureRecord
+    {
+        try { $binary = UuidCodec::toBinary($captureId); } catch (\Throwable) { return null; }
+        $row = $this->wpdb->get_row($this->wpdb->prepare('SELECT * FROM ' . $this->table() . ' WHERE capture_uuid=%s', $binary), ARRAY_A);
+        return is_array($row) ? $this->hydrate($row) : null;
+    }
+
     public function create(CaptureRecord $record): CaptureRecord
     {
         $now = $record->createdAt ?? gmdate('Y-m-d H:i:s.u');

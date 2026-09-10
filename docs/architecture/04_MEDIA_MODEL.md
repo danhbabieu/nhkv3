@@ -14,6 +14,14 @@ it never creates a second Media store. Standalone Media upload/ingest remains
 internal/admin compatibility or lifecycle tooling only and is not the normal
 operator path.
 
+An existing-Capture continuation is text-only: it may reconcile the current
+Capture's existing MediaUsage state, but it does not upload or re-adopt a file.
+When no physical asset is present, Media selection may reuse an existing Media
+only when its persisted subject scope matches the resolved canonical subject;
+an unscoped/global reusable Media row is never an honest completion fallback.
+If no eligible subject-scoped Media exists, the Article remains missing or
+placeholder and any wrong-variant usage is reconciled away.
+
 
 Media là semantic entity độc lập. Media identity tách khỏi MediaAsset và
 MediaUsage: cùng một binary có thể dùng cho nhiều Post, entity, gallery Model,

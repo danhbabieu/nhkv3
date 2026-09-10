@@ -193,6 +193,22 @@ Media/MediaAsset/MediaUsage for image state, Video for external-reference state,
 Knowledge/Source/Evidence for factual state, and Graph only for registered typed
 relations.
 
+## Existing-Capture continuation addendum
+
+The same `nhk.capture.ingest` boundary may receive a text addendum targeted by
+`capture_id`. The original Capture request and fingerprint remain immutable;
+the addendum has its own idempotency key and fingerprint, is recorded as an
+audit/revision event, and reuses the existing Capture and native Post. A
+changed payload under the same addendum key conflicts, while an unchanged
+retry is idempotent. Addenda do not accept files, create a second Post or
+re-adopt Media; text-only continuation may reuse an existing Media only when
+its persisted subject scope matches the resolved canonical subject and cannot
+use unscoped/global Media as a readiness fallback. If no eligible Media exists,
+the wrong-variant usage is removed and the Article remains missing/placeholder.
+The bounded semantic resolver, Claim retrieval, Governance review packet and
+Article/MediaUsage reconciliation run again for the existing Capture, followed
+by the same final read-back.
+
 ## Capture composition and current-state reconciliation — 2026-09-09
 
 Một Capture mặc định tạo một Article draft; N assets tạo N canonical Media/

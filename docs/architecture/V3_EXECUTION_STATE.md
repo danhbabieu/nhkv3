@@ -1,5 +1,93 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Deployed publication continuation verification
+
+Commit `522986ca8897802509482ff3ae0f0170ae2a36af` was deployed to the
+allowlisted DEMO plugin destination using a clean artifact, without deploying
+uncommitted worktree changes. Remote artifact fingerprint:
+`d04003fe16ae99f5c0dc23a731a34b0e369e8399f058d9a1e5dca97ebc1c095b`.
+Remote health, inventory and canonical inventory returned PASS.
+
+Deployed runtime reports `runtime_version=0.1.0`,
+`documentation_version=d1db2e826a00737f123fa0f2f4a467094fe9af5f573d4d206b3a53e401276a5d`
+and `manifest_hash=5e4382eccb4e564e2a220b27cb818c6c0fd98dc004b3f58310d258e7b71a4903`.
+The three publication continuation Abilities are registered and REST-visible
+with surface `governed_publication_continuation`; authenticated capability
+checks pass and unauthenticated invocation fails closed.
+
+Read-only runtime inspection found Capture
+`01a08663-6d6b-77f0-b05c-b66ced29e606` at `READY_FOR_PUBLICATION` / `PARTIAL`,
+bound to Article `331`, revision `10`, with its historical documentation
+checkpoint `4cbd29361989e2d67169e3f0d3f1d9e3686d22b238a64bfb93029cffe5ad387d` /
+`1aee215d7597427e8f0fc2277a330b78a69ec9f4c6fac163c12d5ca993c21184`. The
+checkpoint differs from the deployed snapshot; no re-ingest or addendum was
+used because publication continuation does not authorize changing the
+Capture-owned editorial content.
+
+Canonical `article-publish-review` invocation with the persisted evidence and
+current Article token returned `SYSTEM_BLOCKED`. Root blockers include invalid
+canonical public identity (`slug` empty and permalink `?p=331`), missing
+research/category/semantic/compliance/SEO/route/rendered-public gate evidence,
+and the persisted semantic write-back state remains
+`SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE`. Article #331 remains `draft`; its
+token and Capture token remain identical, and no Article/Capture mutation or
+duplicate was created. Approve and publish were not called. Completion remains
+blocked pending governed identity/evidence resolution and fresh public
+read-back.
+
+# Checkpoint — 2026-09-10 — Capture 342 bugfix and existing-Capture addendum boundary
+
+Root-cause tracing for Capture `01a08873-c885-7e6f-ba8a-91c1125e5258` / Post
+342 found three independent code defects. Article Media reusable selection was
+global and could choose ready Media outside the Capture subject; stale
+WordPress featured/inline state was also treated as a valid selection for a
+text-only Capture. Article composition emitted media-observation prose for any
+observation without requiring `OBSERVED_FROM_MEDIA`, a real Media UUID and a
+matching physical asset. Capture wiring used a separate exact-name/stable-key
+closure that ignored a valid canonical UUID, while the existing typed MCP
+resolver already enforced UUID → stable key → exact canonical name/alias. The
+existing changed-payload idempotency conflict remains correct and unchanged.
+
+The minimal production fix adds the registered canonical Authority resolver to
+Capture, filters media-observation prose to verified media observations, and
+forces text-only Capture reconciliation to scoped placeholders/missing state
+instead of stale or global Media. The current one-Media-can-fill-both-roles
+representative selection behavior is preserved, while persisted subject-scope
+matching admits only the correct variant and the WordPress bridge removes stale
+featured/inline projections when no eligible Media exists.
+
+An existing-Capture continuation contract was added at the same
+`nhk.capture.ingest` boundary. Optional `capture_id` targets one existing
+Capture/Post; the original request/fingerprint is immutable; addenda have an
+independent UUID/fingerprint ledger, optimistic revision/audit append and
+same-key idempotency/conflict behavior. Addenda are text-only, skip completed
+physical/draft phases, rerun bounded semantic/reconciliation stages and retain
+the existing Governance review boundary. Migration 018 creates the additive
+addendum ledger. No direct writer, second Article, second Capture or semantic
+owner was added. Canonical Article/Media/Knowledge/MCP docs plus the design and
+implementation plan were updated; the immutable documentation snapshot was
+regenerated locally.
+
+TDD evidence: the initial RED tests failed with unrelated Media adoption and
+false observation prose; the UUID resolver test initially failed because the
+resolver boundary was absent. After the minimal fixes, focused Capture/Media/
+continuation/MCP tests pass 71 tests / 595 assertions. Fresh complete NHK Unit
+passes 887 tests / 4,415 assertions with 7 existing warnings, 1 deprecation and
+6 PHPUnit deprecations. NHK Contract passes 4 tests / 31 assertions. Full
+plugin PHP lint and `git diff --check` pass. The guarded Integration suite was
+attempted with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`, but the
+local WordPress bootstrap stops at `Error establishing a database connection`;
+no test database mutation occurred.
+
+The canonical DEMO cutover command was attempted with the approved target and
+failed closed at `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; no remote transfer or
+DEMO mutation occurred. A read-only authenticated DEMO preview of Post 342
+still shows the old revision: draft content contains `Quan sát từ tư liệu gửi
+kèm cho thấy` and its image URLs are for Odo 36/10. Therefore DEMO read-back
+cannot yet prove the fix, and Capture 342, the requested governed semantic
+delta and Article cleanup remain deployment/runtime-gated. No claim, Graph
+edge, Media, Capture or Post data was mutated, and the Post was not published.
+
 # Checkpoint — 2026-09-10 — Canonical publication continuation Ability exposure
 
 The existing Capture-owned Article publication lifecycle is now discoverable

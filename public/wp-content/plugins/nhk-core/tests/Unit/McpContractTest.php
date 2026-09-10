@@ -512,6 +512,9 @@ final class McpContractTest extends TestCase
         self::assertSame('mutation', $tool['kind']);
         self::assertTrue($tool['governed']);
         self::assertSame(['idempotency_key', 'documentation_checkpoint'], $tool['inputSchema']['required']);
+        self::assertArrayHasKey('capture_id', $tool['inputSchema']['properties']);
+        self::assertSame('string', $tool['inputSchema']['properties']['capture_id']['type']);
+        self::assertSame('uuid', $tool['inputSchema']['properties']['capture_id']['format']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
         self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
         self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));

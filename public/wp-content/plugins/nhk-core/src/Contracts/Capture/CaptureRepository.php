@@ -8,6 +8,7 @@ use NHK\Core\Domain\Capture\CaptureRecord;
 interface CaptureRepository
 {
     public function findByIdempotencyKey(string $key): ?CaptureRecord;
+    public function findById(string $captureId): ?CaptureRecord;
     public function create(CaptureRecord $record): CaptureRecord;
     public function save(CaptureRecord $record): CaptureRecord;
 }

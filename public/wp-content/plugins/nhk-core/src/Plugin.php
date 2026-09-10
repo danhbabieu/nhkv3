@@ -19,14 +19,14 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
-use NHK\Core\Infrastructure\Migration\EditorialCaptureMigration017;
+use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceCapabilities, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Governance\ControlledApplyService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
-use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -76,14 +76,14 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Governance\CanonicalApplyReadBackVerifier;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
-use NHK\Core\Infrastructure\Capture\WpdbCaptureRepository;
+use NHK\Core\Infrastructure\Capture\{WpdbCaptureAddendumRepository, WpdbCaptureRepository};
 
 final class Plugin {
     private const REWRITE_VERSION = '10';
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', EditorialCaptureMigration017::VERSION, false);
+        update_option('nhk_core_migration_target', EditorialCaptureAddendumMigration018::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
@@ -456,23 +456,8 @@ final class Plugin {
             $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'));
             $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
             $captureRepository = new WpdbCaptureRepository($wpdb);
-            $captureSubjectResolver = new SubjectResolutionService(static function (string $hint) use ($authority, $types): array {
-                $needle = function_exists('mb_strtolower') ? mb_strtolower(trim($hint)) : strtolower(trim($hint));
-                if ($needle === '') return [];
-                $matches = [];
-                foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) {
-                    $names = [$entity->canonicalName, $entity->stableKey];
-                    foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) $names[] = (string) $alias;
-                    foreach ($names as $name) {
-                        $normalized = function_exists('mb_strtolower') ? mb_strtolower(trim((string) $name)) : strtolower(trim((string) $name));
-                        if ($normalized !== '' && $normalized === $needle) {
-                            $matches[$entity->canonicalId] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'revision' => $entity->revision];
-                            break;
-                        }
-                    }
-                }
-                return array_values($matches);
-            });
+            $captureAddendumRepository = new WpdbCaptureAddendumRepository($wpdb);
+            $captureSubjectResolver = new SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types));
             $captureNeighborhood = $mcpNeighborhood;
             $captureClaims = new ClaimRetrievalEngine(
                 static function (array $subject) use ($captureNeighborhood): array {
@@ -544,12 +529,16 @@ final class Plugin {
                         if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video' || !is_array($asset['video_proposal'] ?? null)) continue;
                         $videoCandidates[] = ['kind' => 'video_ingest_candidate', 'proposal' => $asset['video_proposal'], 'status' => 'REVIEW_REQUIRED'];
                     }
-                    return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
+                    return ['status' => 'REVIEW_REQUIRED', 'writes' => array_merge($candidates, $videoCandidates), 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance' => ['required_lifecycle' => ['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY', 'CANONICAL_READ_BACK'], 'status' => 'REVIEW_REQUIRED'], 'blockers' => ['SEMANTIC_WRITE_BACK_REQUIRES_GOVERNANCE'], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
                 static function (array $context) use ($articleMedia): array {
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
+                    $resolved = is_array($context['capture']['diagnostics']['subjects']['resolved'] ?? null) ? $context['capture']['diagnostics']['subjects']['resolved'] : [];
+                    $variantSubjects = array_values(array_filter($resolved, static fn (mixed $subject): bool => is_array($subject) && (string) ($subject['type'] ?? '') === 'variant' && trim((string) ($subject['id'] ?? '')) !== ''));
+                    $mediaSubjectIds = array_values(array_unique(array_map(static fn (array $subject): string => trim((string) $subject['id']), $variantSubjects)));
+                    $subject = (string) (($variantSubjects[0]['name'] ?? '') ?: ($resolved[0]['name'] ?? ''));
                     $selected = [];
                     if (isset($mediaIds[0])) {
                         $selected['featured_primary'] = $mediaIds[0];
@@ -560,9 +549,17 @@ final class Plugin {
                         if (!isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[0];
                     }
                     if (isset($mediaIds[1])) $selected['inline_primary'] = $mediaIds[1];
-                    $result = $articleMedia->ensureForPost((int) ($context['article_id'] ?? 0), ['capture_id' => (string) (($context['capture']['capture_id'] ?? '')), 'force_inline_reconcile' => isset($selected['inline_primary'])], $selected, array_slice($mediaIds, 2));
+                    $result = $articleMedia->ensureForPost((int) ($context['article_id'] ?? 0), [
+                        'capture_id' => (string) (($context['capture']['capture_id'] ?? '')),
+                        'subject' => $subject,
+                        'subject_ids' => $mediaSubjectIds,
+                        'subject_context' => ['subject' => $subject, 'subject_ids' => $mediaSubjectIds],
+                        'force_inline_reconcile' => true,
+                        'capture_has_physical_assets' => $mediaIds !== [],
+                        'allow_unscoped_reuse' => $mediaSubjectIds !== [],
+                    ], $selected, array_slice($mediaIds, 2));
                     $payload = $result->toArray();
-                    $payload['force_inline_reconcile'] = isset($selected['inline_primary']);
+                    $payload['force_inline_reconcile'] = true;
                     $payload['editorial_state_token'] = $result->editorialStateToken;
                     return $payload;
                 },
@@ -587,11 +584,12 @@ final class Plugin {
                 },
                 new McpDocumentationRegistry(),
             );
+            $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, new \NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository($wpdb)))->service();
             $documentation = new McpDocumentationRegistry();
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
@@ -671,12 +669,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < DictionaryMigration015::VERSION || !DictionaryMigration015::schemaReady($wpdb)) (new DictionaryMigration015())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < ClaimProjectionMigration016::VERSION || !ClaimProjectionMigration016::schemaReady($wpdb)) (new ClaimProjectionMigration016())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureMigration017::VERSION || !EditorialCaptureMigration017::schemaReady($wpdb)) (new EditorialCaptureMigration017())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureAddendumMigration018::VERSION || !EditorialCaptureAddendumMigration018::schemaReady($wpdb)) (new EditorialCaptureAddendumMigration018())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', EditorialCaptureMigration017::VERSION, '', false);
+        add_option('nhk_core_migration_target', EditorialCaptureAddendumMigration018::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

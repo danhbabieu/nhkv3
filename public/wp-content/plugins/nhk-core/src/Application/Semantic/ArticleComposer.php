@@ -15,6 +15,12 @@ final class ArticleComposer
         $paragraphs = [];
         if ($userInput !== '') $paragraphs[] = $userInput;
         foreach ($observations as $observation) {
+            if (!is_array($observation)) continue;
+            if (($context['asset_count'] ?? null) === 0) continue;
+            if (($observation['provenance'] ?? '') !== 'OBSERVED_FROM_MEDIA') continue;
+            $mediaId = trim((string) ($observation['media_id'] ?? ''));
+            if ($mediaId === '') continue;
+            if (isset($context['assets']) && !$this->hasAsset((array) $context['assets'], $mediaId)) continue;
             $text = trim((string) ($observation['observation'] ?? $observation['text'] ?? ''));
             if ($text !== '') $paragraphs[] = 'Quan sát từ tư liệu gửi kèm cho thấy ' . rtrim($text, '.!?') . '.';
         }
@@ -66,5 +72,12 @@ final class ArticleComposer
         // Keep the source boundary explicit so a Claim is synthesized rather
         // than dumped verbatim into editorial prose.
         return $text . ' [trong phạm vi đã kiểm chứng]';
+    }
+
+    /** @param list<array<string,mixed>> $assets */
+    private function hasAsset(array $assets, string $mediaId): bool
+    {
+        foreach ($assets as $asset) if (is_array($asset) && trim((string) ($asset['media_id'] ?? '')) === $mediaId) return true;
+        return false;
     }
 }

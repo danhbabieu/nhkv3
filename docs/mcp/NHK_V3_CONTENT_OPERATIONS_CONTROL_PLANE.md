@@ -115,6 +115,20 @@ coordinator therefore reports `READY_FOR_PUBLICATION` or `REVIEW_REQUIRED`
 until an eligible owner publication operation returns a verified native
 published read-back.
 
+#### Existing-Capture continuation
+
+`nhk.capture.ingest` also supports a text-only addendum when `capture_id` is
+present. This is a continuation of the existing lifecycle, not a second
+writer: the original request remains immutable, the addendum uses a separate
+idempotency key, and the same Capture/Post receives an audit and revision
+append. Files are rejected on this path. The coordinator reruns bounded
+subject/Claim resolution, returns the existing Governance review boundary and
+reconciles the existing Article; without new files it must not adopt unrelated
+or unscoped Media. An existing Media may be reused only after persisted
+subject-scope matching; otherwise the wrong-variant usage is removed and the
+Article remains missing/placeholder. Same addendum payloads replay
+idempotently, while changed payloads conflict.
+
 #### Claim selection, trace and connector-exposure rule — 2026-09-09
 
 Graph reachability is discovery only. A relation path may make a Claim a
