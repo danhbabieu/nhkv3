@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — DEMO deployment/runtime verification blocker
+
+The clean artifact for commit `5cac8e28ad7defc89640c3129e8288d502aa5b44`
+was sent through the canonical `nhk-demo-cutover` procedure with the
+allowlisted `demo.1945.vn` target. The deployment procedure then failed closed
+at remote health with `REMOTE_RUNTIME_EXECUTION_FAILED`; a second read-only
+health call through `RemoteRuntimeAdapter` returned the same code and no
+runtime receipt. Therefore deployed catalog discovery, invocation, Governance
+enforcement, Capture read-back and build-identity comparison are not claimed.
+No semantic apply, Capture/Article mutation or publication was attempted.
+
+Full PHPUnit in the local sandbox reports 1,039 tests / 4,578 assertions with
+4 WordPress-bootstrap errors and 14 integration failures caused by the missing
+`NHK_WP_TEST_PATH`/database runtime; the focused continuation/MCP/docs slice
+and PHP lint pass. The exact external blocker remains provisioned DEMO runtime
+health/receipt availability.
+
 # Checkpoint — 2026-09-10 — Existing-Capture Governance continuation boundary
 
 The `nhk.capture.ingest` existing-Capture path now owns a bounded semantic
