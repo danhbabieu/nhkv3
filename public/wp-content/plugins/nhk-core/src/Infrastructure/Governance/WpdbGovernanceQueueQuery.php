@@ -238,7 +238,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
             'revision' => (int) ($row['revision'] ?? 0),
             'content_fingerprint' => $this->fingerprint($row['content_fingerprint'] ?? $row['fingerprint'] ?? null),
             'dependency_fingerprint' => $this->fingerprint($row['dependency_fingerprint'] ?? null),
-            'actionable' => true,
+            'actionable' => in_array($status->value, [ProposalState::DRAFT->value, ProposalState::SUBMITTED->value, ProposalState::APPROVED->value], true),
         ];
 
         try {
@@ -439,8 +439,8 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
     private function statusLabel(ProposalState $state): string
     {
         return match ($state) {
-            ProposalState::DRAFT => 'Bản nháp',
-            ProposalState::SUBMITTED => 'Đã gửi duyệt',
+            ProposalState::DRAFT => 'Chờ kiểm tra',
+            ProposalState::SUBMITTED => 'Chờ phê duyệt',
             ProposalState::APPROVED => 'Đã phê duyệt',
             ProposalState::REJECTED => 'Đã từ chối',
             ProposalState::CANCELLED => 'Đã hủy',

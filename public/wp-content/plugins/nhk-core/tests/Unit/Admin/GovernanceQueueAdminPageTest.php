@@ -145,6 +145,36 @@ final class GovernanceQueueAdminPageTest extends TestCase
         self::assertStringContainsString('INVALID_REJECT_REASON', $redirect);
     }
 
+    public function test_post_redirect_preserves_search_status_type_order_direction_page_and_page_size(): void
+    {
+        GovernanceQueueAdminPage::setTestActionService($this->serviceMock());
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST = [
+            'queue_action' => 'submit', 'proposal_id' => self::ID, 'revision' => 1, 'state' => 'draft',
+            'search' => 'vertical', 'status' => 'draft', 'type' => 'brand', 'order_by' => 'name', 'order' => 'asc', 'paged' => 3, 'per_page' => 10,
+        ];
+        $location = $this->captureLocation(static function (): void { GovernanceQueueAdminPage::handleAction(); });
+        self::assertStringContainsString('search=vertical', $location);
+        self::assertStringContainsString('status=draft', $location);
+        self::assertStringContainsString('type=brand', $location);
+        self::assertStringContainsString('order_by=name', $location);
+        self::assertStringContainsString('order=asc', $location);
+        self::assertStringContainsString('paged=3', $location);
+        self::assertStringContainsString('per_page=10', $location);
+    }
+
+    public function test_bulk_without_selection_is_reported_as_a_failure(): void
+    {
+        GovernanceQueueAdminPage::setTestActionService($this->serviceMock());
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_POST = ['bulk_action' => 'apply'];
+        $redirect = $this->captureRedirect(static function (): void { GovernanceQueueAdminPage::handleBulk(); });
+
+        self::assertStringContainsString('"selected":0', $redirect);
+        self::assertStringContainsString('"failed":1', $redirect);
+        self::assertStringContainsString('NO_SELECTION', $redirect);
+    }
+
     private function serviceMock(): GovernanceQueueActionService
     {
         $port = new class implements GovernanceActionPort {
@@ -160,9 +190,15 @@ final class GovernanceQueueAdminPageTest extends TestCase
 
     private function captureRedirect(callable $callback): string
     {
+        $location = $this->captureLocation($callback);
+        parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+        return (string) json_encode(json_decode(base64_decode(strtr((string) ($query['nhk_queue_result'] ?? ''), '-_', '+/'), true), true));
+    }
+
+    private function captureLocation(callable $callback): string
+    {
         try { $callback(); } catch (Redirected $redirect) {
-            parse_str((string) parse_url($redirect->getMessage(), PHP_URL_QUERY), $query);
-            return (string) json_encode(json_decode(base64_decode(strtr((string) ($query['nhk_queue_result'] ?? ''), '-_', '+/'), true), true));
+            return $redirect->getMessage();
         }
         self::fail('expected redirect');
     }
@@ -192,9 +228,11 @@ final class GovernanceQueueAdminPageTest extends TestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__, 3) . '/src/Infrastructure/Admin/GovernanceQueueAdminPage.php') . (string) file_get_contents(dirname(__DIR__, 3) . '/src/Infrastructure/Admin/GovernanceQueueRenderer.php');
         foreach (['draft', 'submitted', 'approved', 'rejected', 'cancelled', 'superseded', 'applied'] as $state) self::assertStringContainsString($state, $source);
-        self::assertStringContainsString('Gửi duyệt', $source);
+        self::assertStringContainsString('Kiểm tra', $source);
+        self::assertStringContainsString('Phê duyệt', $source);
         self::assertStringContainsString('Từ chối', $source);
-        self::assertStringContainsString('Apply', $source);
+        self::assertStringContainsString('Áp dụng', $source);
+        self::assertStringNotContainsString('Áp dụng cho trang hiện tại', $source);
     }
 }
 

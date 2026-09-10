@@ -147,6 +147,23 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertStringContainsString('LIMIT 100 OFFSET 0', $this->db->lastPrepared);
     }
 
+    public function test_queue_marks_only_nonterminal_states_as_selectable_and_localizes_workflow_statuses(): void
+    {
+        $rows = [];
+        foreach ([1, 2, 3, 7] as $state) {
+            $row = $this->proposalRow();
+            $row['state'] = $state;
+            $rows[] = $row;
+        }
+        $this->db = new RecordingProposalDatabase($rows, 4);
+        $this->query = new WpdbGovernanceQueueQuery($this->db);
+
+        $items = $this->query->page()['items'];
+
+        self::assertSame([true, true, true, false], array_column($items, 'actionable'));
+        self::assertSame(['Chờ kiểm tra', 'Chờ phê duyệt', 'Đã phê duyệt', 'Đã áp dụng'], array_column($items, 'status_label'));
+    }
+
     /** @dataProvider canonicalBindingRows */
     public function test_canonical_binding_errors_are_blocked_but_supported_exceptions_remain_actionable(callable $change, bool $actionable, ?string $diagnostic): void
     {

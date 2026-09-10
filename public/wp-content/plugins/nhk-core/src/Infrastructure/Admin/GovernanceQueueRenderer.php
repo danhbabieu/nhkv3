@@ -24,12 +24,14 @@ final class GovernanceQueueRenderer
         }
         if ($availability === 'blocked') echo '<div class="notice notice-warning"><p>Hàng đợi bị chặn hoặc có bản ghi cần rà soát: ' . esc_html(implode(', ', array_map('strval', (array) ($page['diagnostics'] ?? [])))) . '</p></div>';
 
+        $items = is_array($page['items'] ?? null) ? $page['items'] : [];
+        foreach ($items as $item) if (is_array($item)) self::renderRowActionForms($item, $filters);
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="nhk-governance-bulk-form" data-nhk-governance-bulk-form>';
         echo '<input type="hidden" name="action" value="nhk_governance_queue_bulk">';
         wp_nonce_field('nhk_governance_queue_action');
-        echo '<label for="nhk-governance-bulk-action">Thao tác đã chọn</label><select id="nhk-governance-bulk-action" name="bulk_action"><option value="">Chọn thao tác</option><option value="submit">Gửi duyệt</option><option value="approve">Approve</option><option value="reject">Từ chối</option><option value="apply">Apply</option></select> <button class="button" type="submit">Áp dụng cho trang hiện tại</button>';
-        echo '<table class="widefat striped"><thead><tr><th scope="col" class="check-column"><input type="checkbox" id="select-all" data-nhk-select-all aria-label="Chọn tất cả trang hiện tại"></th><th>proposal_id</th><th>Loại</th><th>Chủ thể / tên</th><th>Tóm tắt</th><th>Trạng thái</th><th>Nguồn</th><th>Ngày tạo</th><th>Cập nhật</th><th>Thao tác</th></tr></thead><tbody>';
-        $items = is_array($page['items'] ?? null) ? $page['items'] : [];
+        self::renderFilterInputs($filters);
+        echo '<label for="nhk-governance-bulk-action">Thao tác cho bản ghi đã chọn</label><select id="nhk-governance-bulk-action" name="bulk_action"><option value="">Chọn thao tác</option><option value="submit">Kiểm tra</option><option value="approve">Phê duyệt</option><option value="reject">Từ chối</option><option value="apply">Áp dụng</option></select> <button class="button" type="submit">Thực hiện thao tác đã chọn</button>';
+        echo '<table class="widefat striped"><thead><tr><th scope="col" class="check-column"><input type="checkbox" id="select-all" data-nhk-select-all aria-label="Chọn tất cả bản ghi đủ điều kiện trên trang này"></th><th>proposal_id</th><th>Loại</th><th>Chủ thể / tên</th><th>Tóm tắt</th><th>Trạng thái</th><th>Nguồn</th><th>Ngày tạo</th><th>Cập nhật</th><th>Thao tác</th></tr></thead><tbody>';
         if ($items === []) echo '<tr><td colspan="10">Chưa có Proposal phù hợp.</td></tr>';
         foreach ($items as $item) self::renderRow(is_array($item) ? $item : []);
         echo '</tbody></table></form>';
@@ -40,14 +42,16 @@ final class GovernanceQueueRenderer
     /** @param array<string,mixed> $result */
     public static function renderNotice(array $result): void
     {
+        $skipped = (int) ($result['skipped'] ?? 0);
         $failed = (int) ($result['failed'] ?? 0);
-        $class = $failed > 0 ? 'notice-warning' : 'notice-success';
-        echo '<div class="notice ' . esc_attr($class) . '" role="status" tabindex="-1" data-nhk-governance-result><p>Đã chọn <strong>' . esc_html((string) ($result['selected'] ?? 0)) . '</strong>; thành công <strong>' . esc_html((string) ($result['succeeded'] ?? 0)) . '</strong>; thất bại <strong>' . esc_html((string) $failed) . '</strong>.</p>';
-        if ($failed > 0) {
+        $class = ($failed > 0 || $skipped > 0) ? 'notice-warning' : 'notice-success';
+        echo '<div class="notice ' . esc_attr($class) . '" role="status" tabindex="-1" data-nhk-governance-result><p>Đã chọn <strong>' . esc_html((string) ($result['selected'] ?? 0)) . '</strong>; thành công <strong>' . esc_html((string) ($result['succeeded'] ?? 0)) . '</strong>; bỏ qua <strong>' . esc_html((string) $skipped) . '</strong>; thất bại <strong>' . esc_html((string) $failed) . '</strong>.</p>';
+        if ($skipped > 0 || $failed > 0) {
             echo '<ul>';
+            foreach ((array) ($result['skipped_items'] ?? []) as $skippedItem) self::renderResultItem($skippedItem, 'Bỏ qua');
             foreach ((array) ($result['failures'] ?? []) as $failure) {
                 if (!is_array($failure)) continue;
-                echo '<li>' . esc_html((string) ($failure['proposal_id'] ?? '')) . ': ' . esc_html(self::failureReason($failure['reason'] ?? 'OPERATION_FAILED')) . '</li>';
+                self::renderResultItem($failure, 'Thất bại');
             }
             echo '</ul>';
         }
@@ -74,31 +78,35 @@ final class GovernanceQueueRenderer
     {
         $id = (string) ($item['proposal_id'] ?? '');
         $status = (string) ($item['status'] ?? 'blocked');
-        $actionable = ($item['actionable'] ?? true) === true;
+        $actionable = ($item['actionable'] ?? true) === true && in_array($status, ['draft', 'submitted', 'approved'], true);
         $bulkFields = '<input type="hidden" name="snapshots[' . esc_attr($id) . '][revision]" value="' . esc_attr((string) ($item['revision'] ?? 0)) . '"><input type="hidden" name="snapshots[' . esc_attr($id) . '][state]" value="' . esc_attr($status) . '"><input type="hidden" name="snapshots[' . esc_attr($id) . '][content_fingerprint]" value="' . esc_attr((string) ($item['content_fingerprint'] ?? '')) . '"><input type="hidden" name="snapshots[' . esc_attr($id) . '][dependency_fingerprint]" value="' . esc_attr((string) ($item['dependency_fingerprint'] ?? '')) . '">';
         echo '<tr><td class="check-column">' . ($actionable ? '<input type="checkbox" name="selected_ids[]" value="' . esc_attr($id) . '" data-nhk-queue-item>' . $bulkFields : '') . '</td><td><code>' . esc_html($id) . '</code></td><td>' . esc_html((string) ($item['entity_type'] ?? '')) . '</td><td>' . esc_html((string) ($item['name'] ?? ($item['subject_id'] ?? 'Không khả dụng'))) . '<br><small>' . esc_html((string) ($item['subject_id'] ?? '')) . '</small></td><td>' . esc_html((string) ($item['summary'] ?? '')) . '</td><td>' . esc_html((string) ($item['status_label'] ?? $status)) . '</td><td>' . esc_html((string) ($item['provenance_summary'] ?? 'Chưa có')) . '</td><td>' . esc_html((string) ($item['created_at'] ?? '')) . '</td><td>' . esc_html((string) ($item['updated_at'] ?? '')) . '</td><td>';
-        echo '<a href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced&proposal=' . rawurlencode($id) . '#governance')) . '">Xem chi tiết / Review</a>';
+        echo '<a href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced&proposal=' . rawurlencode($id) . '#governance')) . '">Xem chi tiết</a>';
         if ($actionable) {
-            foreach (self::actionsFor($status) as $action => $label) self::renderActionForm($action, $label, $item);
+            foreach (self::actionsFor($status) as $action => $label) echo ' <button class="button-link" type="submit" form="' . esc_attr(self::rowFormId($id, $action)) . '">' . esc_html($label) . '</button>';
         }
         echo '</td></tr>';
     }
 
     /** @param array<string,mixed> $item */
-    private static function renderActionForm(string $action, string $label, array $item): void
+    private static function renderRowActionForms(array $item, array $filters): void
     {
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="nhk-governance-row-action"><input type="hidden" name="action" value="nhk_governance_queue_action"><input type="hidden" name="queue_action" value="' . esc_attr($action) . '"><input type="hidden" name="proposal_id" value="' . esc_attr((string) ($item['proposal_id'] ?? '')) . '"><input type="hidden" name="revision" value="' . esc_attr((string) ($item['revision'] ?? 0)) . '"><input type="hidden" name="state" value="' . esc_attr((string) ($item['status'] ?? '')) . '"><input type="hidden" name="content_fingerprint" value="' . esc_attr((string) ($item['content_fingerprint'] ?? '')) . '"><input type="hidden" name="dependency_fingerprint" value="' . esc_attr((string) ($item['dependency_fingerprint'] ?? '')) . '">';
-        wp_nonce_field('nhk_governance_queue_action');
-        echo '<button class="button-link" type="submit">' . esc_html($label) . '</button></form>';
+        $id = (string) ($item['proposal_id'] ?? '');
+        foreach (self::actionsFor((string) ($item['status'] ?? '')) as $action => $label) {
+            echo '<form id="' . esc_attr(self::rowFormId($id, $action)) . '" method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="nhk-governance-row-action"><input type="hidden" name="action" value="nhk_governance_queue_action"><input type="hidden" name="queue_action" value="' . esc_attr($action) . '"><input type="hidden" name="proposal_id" value="' . esc_attr($id) . '"><input type="hidden" name="revision" value="' . esc_attr((string) ($item['revision'] ?? 0)) . '"><input type="hidden" name="state" value="' . esc_attr((string) ($item['status'] ?? '')) . '"><input type="hidden" name="content_fingerprint" value="' . esc_attr((string) ($item['content_fingerprint'] ?? '')) . '"><input type="hidden" name="dependency_fingerprint" value="' . esc_attr((string) ($item['dependency_fingerprint'] ?? '')) . '">';
+            self::renderFilterInputs($filters);
+            wp_nonce_field('nhk_governance_queue_action');
+            echo '</form>';
+        }
     }
 
     /** @return array<string,string> */
     private static function actionsFor(string $status): array
     {
         return match ($status) {
-            'draft' => ['submit' => 'Gửi duyệt', 'approve' => 'Approve', 'reject' => 'Từ chối'],
-            'submitted' => ['approve' => 'Approve', 'reject' => 'Từ chối'],
-            'approved' => ['apply' => 'Apply'],
+            'draft' => ['submit' => 'Kiểm tra'],
+            'submitted' => ['approve' => 'Phê duyệt', 'reject' => 'Từ chối'],
+            'approved' => ['apply' => 'Áp dụng'],
             default => [],
         };
     }
@@ -110,7 +118,7 @@ final class GovernanceQueueRenderer
         if ($total < 2) return;
         echo '<nav class="tablenav bottom" aria-label="Phân trang">';
         for ($number = 1; $number <= $total; $number++) {
-            $args = array_merge(['page' => 'nhk-v3-governance', 'paged' => $number], $filters);
+            $args = ['page' => 'nhk-v3-governance', 'paged' => $number, 'search' => (string) ($filters['search'] ?? ''), 'status' => (string) ($filters['status'] ?? ''), 'type' => (string) ($filters['type'] ?? ''), 'order_by' => (string) ($filters['order_by'] ?? 'updated'), 'order' => (string) ($filters['order'] ?? 'desc'), 'per_page' => (int) ($filters['per_page'] ?? 20)];
             echo $number === $current ? '<span class="page-numbers current">' . esc_html((string) $number) . '</span> ' : '<a class="page-numbers" href="' . esc_url(add_query_arg($args, admin_url('admin.php'))) . '">' . esc_html((string) $number) . '</a> ';
         }
         echo '</nav>';
@@ -127,12 +135,50 @@ final class GovernanceQueueRenderer
 
     private static function statusLabel(ProposalState $state): string
     {
-        return ['draft' => 'Bản nháp', 'submitted' => 'Đã gửi duyệt', 'approved' => 'Đã duyệt', 'rejected' => 'Từ chối', 'cancelled' => 'Đã hủy', 'superseded' => 'Đã thay thế', 'applied' => 'Đã áp dụng'][$state->value] ?? $state->value;
+        return ['draft' => 'Chờ kiểm tra', 'submitted' => 'Chờ phê duyệt', 'approved' => 'Đã phê duyệt', 'rejected' => 'Từ chối', 'cancelled' => 'Đã hủy', 'superseded' => 'Đã thay thế', 'applied' => 'Đã áp dụng'][$state->value] ?? $state->value;
     }
 
     private static function failureReason(mixed $reason): string
     {
-        if (is_array($reason)) return implode(', ', array_map('strval', $reason));
-        return (string) $reason;
+        if (is_array($reason)) return implode(', ', array_map(static fn ($code): string => self::reasonLabel((string) $code), $reason));
+        return self::reasonLabel((string) $reason);
+    }
+
+    private static function reasonLabel(string $reason): string
+    {
+        $labels = [
+            'NO_SELECTION' => 'Chưa chọn bản ghi',
+            'INVALID_ACTION' => 'Thao tác không hợp lệ',
+            'INVALID_INPUT' => 'Dữ liệu gửi lên không hợp lệ',
+            'INVALID_LIFECYCLE_ACTION' => 'Bản ghi chưa đến bước của thao tác này',
+            'APPROVAL_MISSING' => 'Chưa có phê duyệt hợp lệ',
+            'NOT_APPROVED' => 'Chưa đủ điều kiện phê duyệt',
+            'STALE_SNAPSHOT' => 'Bản ghi đã thay đổi, cần tải lại',
+            'STALE_BINDING' => 'Ràng buộc dữ liệu đã thay đổi',
+            'TARGET_REVISION_CHANGED' => 'Revision đích đã thay đổi',
+            'DEPENDENCY_NOT_APPLIED' => 'Phụ thuộc chưa được áp dụng',
+            'PROPOSAL_NOT_FOUND' => 'Không tìm thấy Proposal',
+            'CAPABILITY_DENIED' => 'Không đủ quyền',
+        ];
+        return isset($labels[$reason]) ? $labels[$reason] . ' (' . $reason . ')' : $reason;
+    }
+
+    /** @param array<string,mixed> $item */
+    private static function renderResultItem(mixed $item, string $label): void
+    {
+        if (!is_array($item)) return;
+        echo '<li>' . esc_html($label . ': ' . (string) ($item['proposal_id'] ?? '') . ' — ' . self::failureReason($item['reason'] ?? 'OPERATION_FAILED')) . '</li>';
+    }
+
+    /** @param array<string,mixed> $filters */
+    private static function renderFilterInputs(array $filters): void
+    {
+        foreach (['search', 'status', 'type', 'order_by', 'order'] as $key) echo '<input type="hidden" name="' . esc_attr($key) . '" value="' . esc_attr((string) ($filters[$key] ?? '')) . '">';
+        echo '<input type="hidden" name="paged" value="' . esc_attr((string) ($filters['page'] ?? $filters['paged'] ?? 1)) . '"><input type="hidden" name="per_page" value="' . esc_attr((string) ($filters['per_page'] ?? 20)) . '">';
+    }
+
+    private static function rowFormId(string $id, string $action): string
+    {
+        return 'nhk-governance-row-' . preg_replace('/[^a-zA-Z0-9_-]/', '', $id) . '-' . $action;
     }
 }

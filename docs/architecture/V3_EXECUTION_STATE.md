@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Governance queue sequential workflow enforcement
+
+The Admin **Duyệt dữ liệu** queue now presents only the next valid Vietnamese
+action for each persisted Proposal state: `draft` → **Kiểm tra**, `submitted`
+→ **Phê duyệt/Từ chối**, `approved` → **Áp dụng**, and `applied` → detail only.
+The POST action adapter enforces the same state gate server-side, so forged
+requests cannot approve/reject draft records or apply submitted/applied
+records. Bulk execution remains per-item and reports `succeeded`, `skipped`
+and `failed` results with reason codes; ineligible lifecycle states are
+skipped, while stale/invalid/runtime failures remain failures.
+
+The queue renderer no longer nests per-row forms inside the bulk form. Row
+forms are associated explicitly, bulk selection carries revision/fingerprint
+snapshots, and single/bulk redirects preserve search, status, type, sort,
+direction, page and page size. Pagination links use the requested page instead
+of overwriting it with the current internal filter map. No semantic-table SQL
+writer, proposal-creation path, MCP tool or production data path was added.
+
+Verification evidence: Governance queue filter — 95 tests / 648 assertions,
+0 failures; NHK Unit — 1,043 tests / 5,316 assertions, 0 failures; PHP lint —
+pass; `git diff --check` — pass; targeted changed-file secret scan — no
+credentials. The full default suite still includes the repository's existing
+WordPress/integration bootstrap errors and environment-gated P4/Collector
+failures when `NHK_WP_TEST_PATH` is not configured; no production, staging,
+V2 or live database was touched.
+
 # Checkpoint — 2026-09-10 — Easy MCP canonical Capture descriptor exposure
 
 The deployed canonical catalog, WordPress Ability registration and custom

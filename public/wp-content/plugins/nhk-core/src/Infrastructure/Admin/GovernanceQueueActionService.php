@@ -28,7 +28,7 @@ final class GovernanceQueueActionService
     /** @return array<string, mixed> */
     public function execute(string $action, string $id, array $snapshot = []): array
     {
-        $base = ['ok' => false, 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => null];
+        $base = ['ok' => false, 'outcome' => 'failed', 'proposal_id' => $id, 'action' => $action, 'state' => null, 'reason' => null];
         if (!isset(self::CAPABILITIES[$action])) return array_merge($base, ['reason' => 'INVALID_ACTION']);
         if (!UuidCodec::isValid($id)) return array_merge($base, ['reason' => 'INVALID_PROPOSAL_ID']);
         if (!$this->validMutationSnapshot($action, $snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
@@ -42,15 +42,21 @@ final class GovernanceQueueActionService
             if ($proposal === null) return array_merge($base, ['reason' => 'PROPOSAL_NOT_FOUND']);
             $base['state'] = $proposal->state->value;
             if (!$this->matchesSnapshot($action, $proposal, $snapshot)) return array_merge($base, ['reason' => 'STALE_SNAPSHOT']);
-            if (!$this->allows($action, $proposal->state)) return array_merge($base, ['reason' => 'INVALID_LIFECYCLE_ACTION']);
+            if (!$this->allows($action, $proposal->state)) return array_merge($base, [
+                'outcome' => 'skipped',
+                'reason' => 'INVALID_LIFECYCLE_ACTION',
+            ]);
 
             if ($action === 'apply') {
                 $eligibility = $this->port->eligibility($id);
                 if (!$eligibility->ready && !$this->isIdempotentEligibility($eligibility)) {
-                    return array_merge($base, ['reason' => $this->reason($eligibility->reasons)]);
+                    return array_merge($base, [
+                        'outcome' => 'skipped',
+                        'reason' => $this->reason($eligibility->reasons),
+                    ]);
                 }
                 $result = $this->port->apply($id);
-                return ['ok' => true, 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'result' => $result];
+                return ['ok' => true, 'outcome' => 'success', 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'result' => $result];
             }
 
             $result = match ($action) {
@@ -58,7 +64,7 @@ final class GovernanceQueueActionService
                 'approve' => $this->port->approve($id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, (string) (($this->actor)())),
                 'reject' => $this->port->reject($id, (string) (($this->actor)())),
             };
-            return ['ok' => true, 'proposal_id' => $id, 'action' => $action, 'state' => $result->state->value, 'reason' => null];
+            return ['ok' => true, 'outcome' => 'success', 'proposal_id' => $id, 'action' => $action, 'state' => $result->state->value, 'reason' => null];
         } catch (\Throwable $error) {
             return array_merge($base, ['reason' => $this->exceptionReason($error), 'message' => $this->exceptionMessage($error)]);
         }
@@ -67,17 +73,31 @@ final class GovernanceQueueActionService
     /** @param array<int, mixed> $items @return array<string, mixed> */
     public function bulk(string $action, array $items): array
     {
+        if ($items === []) {
+            $empty = ['ok' => false, 'outcome' => 'failed', 'proposal_id' => '', 'action' => $action, 'state' => null, 'reason' => 'NO_SELECTION'];
+            return ['selected' => 0, 'succeeded' => 0, 'skipped' => 0, 'failed' => 1, 'failures' => [$empty], 'skipped_items' => [], 'results' => [$empty]];
+        }
         $results = [];
         $failures = [];
+        $skipped = [];
         foreach ($items as $item) {
             $snapshot = is_array($item) ? $item : [];
             $id = is_array($item) ? (string) ($item['proposal_id'] ?? '') : '';
             $result = $this->execute($action, $id, $snapshot);
             $results[] = $result;
             if ($result['ok'] !== true) $failures[] = $result;
+            if (($result['outcome'] ?? 'failed') === 'skipped') $skipped[] = $result;
         }
         $selected = count($items);
-        return ['selected' => $selected, 'succeeded' => $selected - count($failures), 'failed' => count($failures), 'failures' => $failures, 'results' => $results];
+        return [
+            'selected' => $selected,
+            'succeeded' => count(array_filter($results, static fn (array $result): bool => ($result['outcome'] ?? 'failed') === 'success')),
+            'skipped' => count($skipped),
+            'failed' => count($failures) - count($skipped),
+            'failures' => array_values(array_filter($failures, static fn (array $result): bool => ($result['outcome'] ?? 'failed') !== 'skipped')),
+            'skipped_items' => $skipped,
+            'results' => $results,
+        ];
     }
 
     private function matchesSnapshot(string $action, Proposal $proposal, array $snapshot): bool
@@ -114,8 +134,8 @@ final class GovernanceQueueActionService
     {
         return match ($action) {
             'submit' => $state === ProposalState::DRAFT,
-            'approve', 'reject' => in_array($state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true),
-            'apply' => in_array($state, [ProposalState::APPROVED, ProposalState::APPLIED], true),
+            'approve', 'reject' => $state === ProposalState::SUBMITTED,
+            'apply' => $state === ProposalState::APPROVED,
             default => false,
         };
     }

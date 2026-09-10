@@ -12,6 +12,8 @@ final class GovernanceQueueActionServiceTest extends TestCase
 {
     private const FIRST = '018f2f1e-7b2c-7abc-8def-0123456789ab';
     private const SECOND = '018f2f1e-7b2c-7abc-8def-0123456789ac';
+    private const THIRD = '018f2f1e-7b2c-7abc-8def-0123456789ad';
+    private const FOURTH = '018f2f1e-7b2c-7abc-8def-0123456789ae';
 
     private RecordingGovernanceActionPort $port;
     private GovernanceQueueActionService $service;
@@ -54,9 +56,10 @@ final class GovernanceQueueActionServiceTest extends TestCase
         ]);
 
         self::assertSame(1, $result['succeeded']);
-        self::assertSame(1, $result['failed']);
-        self::assertSame(self::FIRST, $result['failures'][0]['proposal_id']);
-        self::assertSame('NOT_APPROVED', $result['failures'][0]['reason']);
+        self::assertSame(1, $result['skipped']);
+        self::assertSame(0, $result['failed']);
+        self::assertSame(self::FIRST, $result['skipped_items'][0]['proposal_id']);
+        self::assertSame('NOT_APPROVED', $result['skipped_items'][0]['reason']);
         self::assertSame(['eligibility', 'apply'], $this->port->callsFor(self::SECOND));
         self::assertSame(['eligibility'], $this->port->callsFor(self::FIRST));
     }
@@ -71,6 +74,32 @@ final class GovernanceQueueActionServiceTest extends TestCase
         self::assertFalse($result['ok']);
         self::assertSame(['TARGET_NOT_FOUND', 'DEPENDENCY_NOT_APPLIED'], $result['reason']);
         self::assertSame(['eligibility'], $this->port->callsFor(self::SECOND));
+    }
+
+    public function test_bulk_apply_mixed_statuses_processes_only_eligible_next_step(): void
+    {
+        $this->port->proposals = [
+            self::FIRST => $this->proposal(self::FIRST, ProposalState::DRAFT),
+            self::SECOND => $this->proposal(self::SECOND, ProposalState::SUBMITTED),
+            self::THIRD => $this->proposal(self::THIRD, ProposalState::APPROVED),
+            self::FOURTH => $this->proposal(self::FOURTH, ProposalState::APPLIED),
+        ];
+
+        $result = $this->service->bulk('apply', [
+            $this->snapshot(self::FIRST, ProposalState::DRAFT),
+            $this->snapshot(self::SECOND, ProposalState::SUBMITTED),
+            $this->snapshot(self::THIRD, ProposalState::APPROVED),
+            $this->snapshot(self::FOURTH, ProposalState::APPLIED),
+        ]);
+
+        self::assertSame(4, $result['selected']);
+        self::assertSame(1, $result['succeeded']);
+        self::assertSame(3, $result['skipped']);
+        self::assertSame(0, $result['failed']);
+        self::assertSame(['eligibility', 'apply'], $this->port->callsFor(self::THIRD));
+        self::assertSame([], $this->port->callsFor(self::FIRST));
+        self::assertSame([], $this->port->callsFor(self::SECOND));
+        self::assertSame([], $this->port->callsFor(self::FOURTH));
     }
 
     public function test_single_action_returns_canonical_state_and_apply_result(): void
@@ -92,9 +121,10 @@ final class GovernanceQueueActionServiceTest extends TestCase
 
         $result = $this->service->execute('apply', self::SECOND, $this->snapshot(self::SECOND, ProposalState::APPLIED));
 
-        self::assertTrue($result['ok']);
-        self::assertTrue($result['result']['idempotent']);
-        self::assertSame(['eligibility', 'apply'], $this->port->callsFor(self::SECOND));
+        self::assertFalse($result['ok']);
+        self::assertSame('skipped', $result['outcome']);
+        self::assertSame('INVALID_LIFECYCLE_ACTION', $result['reason']);
+        self::assertSame([], $this->port->callsFor(self::SECOND));
     }
 
     public function test_stale_revision_fingerprint_and_state_fail_closed(): void
@@ -212,6 +242,31 @@ final class GovernanceQueueActionServiceTest extends TestCase
         self::assertSame(['submit', 'reject', 'approve'], $this->port->callsFor(self::FIRST));
         self::assertSame(['nhk_submit_proposals', 'nhk_approve_proposals', 'nhk_approve_proposals'], $this->seenCapabilities);
         self::assertSame('7', $this->port->actors[1]);
+    }
+
+    /** @dataProvider sequentialLifecycleActions */
+    public function test_each_action_is_allowed_only_at_the_next_sequential_state(ProposalState $state, string $action, string $outcome): void
+    {
+        $this->port->proposals[self::FIRST] = $this->proposal(self::FIRST, $state);
+        $result = $this->service->execute($action, self::FIRST, $this->snapshot(self::FIRST, $state));
+
+        self::assertSame($outcome, $result['outcome']);
+        self::assertSame($outcome === 'success', $result['ok']);
+        if ($outcome === 'skipped') self::assertSame('INVALID_LIFECYCLE_ACTION', $result['reason']);
+    }
+
+    /** @return iterable<string,array{ProposalState,string,string}> */
+    public static function sequentialLifecycleActions(): iterable
+    {
+        yield 'draft can only be checked' => [ProposalState::DRAFT, 'submit', 'success'];
+        yield 'draft cannot be approved directly' => [ProposalState::DRAFT, 'approve', 'skipped'];
+        yield 'draft cannot be rejected before review' => [ProposalState::DRAFT, 'reject', 'skipped'];
+        yield 'submitted can be approved' => [ProposalState::SUBMITTED, 'approve', 'success'];
+        yield 'submitted can be rejected' => [ProposalState::SUBMITTED, 'reject', 'success'];
+        yield 'submitted cannot be checked again' => [ProposalState::SUBMITTED, 'submit', 'skipped'];
+        yield 'approved can only be applied' => [ProposalState::APPROVED, 'apply', 'success'];
+        yield 'approved cannot be approved again' => [ProposalState::APPROVED, 'approve', 'skipped'];
+        yield 'applied has no next action' => [ProposalState::APPLIED, 'apply', 'skipped'];
     }
 
     /** @return array<string, mixed> */
