@@ -199,7 +199,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $media = ($this->mediaReconcile)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'composition' => $this->withoutBody($composition)]);
+            $media = ($this->mediaReconcile)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'composition' => $this->withoutBody($composition)]);
             $diagnostics['media_usage'] = $this->withoutBody($media);
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);

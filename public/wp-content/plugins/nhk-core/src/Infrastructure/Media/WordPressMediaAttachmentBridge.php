@@ -98,6 +98,14 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                     $content = rtrim($content) . ($content === '' ? '' : "\n\n") . $this->managedBlock($attachmentId, $image);
                 }
             }
+            if (($result['force_inline_reconcile'] ?? false) === true) {
+                // Capture reconciliation owns the mandatory inline slot. Once
+                // the canonical target is known, every other mapped inline
+                // attachment is stale for this Article and must not survive
+                // merely because it was already present in post_content.
+                $content = $this->removeMappedInlineImagesExcept($content, array_merge((array) ($current['inline_attachment_ids'] ?? []), $this->inlineAttachmentIds($content)), [$attachmentId]);
+                $content = $this->removeInlineImagesExcept($content, $attachmentId);
+            }
         } elseif (($slots['inline_primary']['placeholder'] ?? false) && ($result['force_inline_reconcile'] ?? false) === true) {
             $managedId = $this->managedInlineAttachmentId($content);
             $content = $managedId > 0
@@ -314,6 +322,25 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             }
         }
         return trim($content);
+    }
+
+    /** @param list<int|string> $attachmentIds @param list<int|string> $keep */
+    private function removeMappedInlineImagesExcept(string $content, array $attachmentIds, array $keep): string
+    {
+        $keep = array_values(array_unique(array_filter(array_map('intval', $keep), static fn (int $id): bool => $id > 0)));
+        $remove = array_values(array_filter(array_map('intval', $attachmentIds), static fn (int $id): bool => $id > 0 && !in_array($id, $keep, true)));
+        return $this->removeMappedInlineImages($content, $remove);
+    }
+
+    private function removeInlineImagesExcept(string $content, int $attachmentId): string
+    {
+        $token = '(?:"id"\s*:\s*|wp-image-|data-id=["\'])' . preg_quote((string) $attachmentId, '/') . '(?:["\']|\b)';
+        $updated = preg_replace_callback('/<!-- wp:image\b.*?<!-- \/wp:image -->/is', static fn (array $match): string => preg_match('/' . $token . '/i', $match[0]) === 1 ? $match[0] : '', $content);
+        $content = is_string($updated) ? $updated : $content;
+        $updated = preg_replace_callback('/<figure\b[^>]*>.*?<\/figure>/is', static fn (array $match): string => preg_match('/' . $token . '/i', $match[0]) === 1 ? $match[0] : '', $content);
+        $content = is_string($updated) ? $updated : $content;
+        $updated = preg_replace_callback('/<img\b[^>]*>/i', static fn (array $match): string => preg_match('/' . $token . '/i', $match[0]) === 1 ? $match[0] : '', $content);
+        return is_string($updated) ? trim($updated) : trim($content);
     }
 
     private function replaceFirstImageBlock(string $content, string $image, int $attachmentId): string

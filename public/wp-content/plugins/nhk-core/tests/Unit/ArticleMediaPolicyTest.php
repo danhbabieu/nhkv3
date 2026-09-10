@@ -176,6 +176,30 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertNotContains($wrong->canonicalId, array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $usages->listByEndpoint('wp_post', '1:339')));
     }
 
+    public function test_capture_with_physical_assets_cannot_adopt_historical_media_from_parent_or_sibling_variant(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $historical = $service->create('odo-36-10-historical', 'Mặt trước Odo 36/10', 'ready', ['metadata' => ['subject_id' => '852da54d-457a-4397-a16d-52d9452ba766-wrong']]);
+        $service->addAsset($historical->canonicalId, 'original', 'uploads/odo-36-10-historical.webp', hash('sha256', 'odo-36-10-historical'), 'image/webp', 10, 1200, 800, 'PUBLIC');
+        $service->addUsage($historical->canonicalId, 'wp_post', '1:408', 'featured_primary');
+        $service->addUsage($historical->canonicalId, 'wp_post', '1:408', 'inline_primary');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(408, [
+            'capture_id' => '01a08bfa-6933-772b-b312-215837539f4a',
+            'subject' => 'Đồng hồ Odo 36/8',
+            'subject_ids' => ['852da54d-457a-4397-a16d-52d9452ba766'],
+            'subject_scope_locked' => true,
+            'capture_has_physical_assets' => true,
+            'capture_owned_media_ids' => ['new-capture-media-36-8'],
+            'allow_scoped_reuse' => true,
+        ], ['featured_primary' => $historical->canonicalId, 'inline_primary' => $historical->canonicalId]);
+
+        self::assertNotContains($historical->canonicalId, $result->slotMedia);
+        self::assertNotContains($historical->canonicalId, array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $usages->listByEndpoint('wp_post', '1:408')));
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+    }
+
     public function test_one_media_identity_can_fill_both_mandatory_article_roles(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

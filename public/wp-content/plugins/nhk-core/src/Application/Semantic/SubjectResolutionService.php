@@ -26,22 +26,58 @@ final class SubjectResolutionService
             if (count($matches) === 1) {
                 $item = $matches[0];
                 $key = (string) (($item['type'] ?? '') . ':' . ($item['id'] ?? ''));
-                if (($item['type'] ?? '') !== '' && ($item['id'] ?? '') !== '' && !isset($resolved[$key])) $resolved[$key] = $item;
+                if (($item['type'] ?? '') !== '' && ($item['id'] ?? '') !== '') {
+                    if (!isset($resolved[$key]) || $this->matchRank($item) > $this->matchRank($resolved[$key])) $resolved[$key] = $item;
+                }
             } elseif (count($matches) > 1) {
                 $candidates[$hint] = $matches;
             } else {
                 $unresolved[] = $hint;
             }
         }
-        $status = $candidates !== [] ? 'ambiguous' : ($resolved !== [] ? 'resolved' : 'unresolved');
+        $ordered = array_values($resolved);
+        usort($ordered, function (array $left, array $right): int {
+            $score = $this->primaryRank($right) <=> $this->primaryRank($left);
+            return $score !== 0 ? $score : strcmp((string) ($left['id'] ?? ''), (string) ($right['id'] ?? ''));
+        });
+        $status = $candidates !== [] ? 'ambiguous' : ($ordered !== [] ? 'resolved' : 'unresolved');
         return [
             'status' => $status,
-            'primary' => array_values($resolved)[0] ?? null,
-            'subjects' => array_values($resolved),
-            'resolved' => array_values($resolved),
+            'primary' => $ordered[0] ?? null,
+            'subjects' => $ordered,
+            'resolved' => $ordered,
             'candidates' => $candidates,
             'unresolved' => $unresolved,
             'diagnostics' => $candidates !== [] ? ['AMBIGUOUS_SUBJECT_REVIEW'] : ($unresolved !== [] ? ['SUBJECT_NOT_FOUND'] : []),
         ];
+    }
+
+    private function primaryRank(array $subject): int
+    {
+        $matchRank = match ((string) ($subject['match'] ?? '')) {
+            'uuid_exact' => 10000,
+            'stable_key_exact' => 9000,
+            'exact_variant_reference', 'exact_variant_name_reference' => 1200,
+            'exact_name_or_alias' => 1000,
+            default => 0,
+        };
+        $typeRank = match ((string) ($subject['type'] ?? '')) {
+            'specimen' => 500,
+            'variant' => 400,
+            'model' => 300,
+            'movement' => 200,
+            'brand' => 100,
+            default => 0,
+        };
+        return $matchRank + $typeRank;
+    }
+
+    private function matchRank(array $subject): int
+    {
+        return match ((string) ($subject['match'] ?? '')) {
+            'uuid_exact' => 3,
+            'stable_key_exact' => 2,
+            default => 1,
+        };
     }
 }

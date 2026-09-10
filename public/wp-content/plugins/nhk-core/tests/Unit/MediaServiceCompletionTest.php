@@ -26,6 +26,20 @@ final class MediaServiceCompletionTest extends TestCase
         self::assertStringNotContainsString("'state_token' => \$this->stateToken(", $bridge);
     }
 
+    public function test_forced_inline_reconcile_removes_unmapped_legacy_images_except_canonical_target(): void
+    {
+        $bridge = (new \ReflectionClass(\NHK\Core\Infrastructure\Media\WordPressMediaAttachmentBridge::class))->newInstanceWithoutConstructor();
+        $method = (new \ReflectionClass($bridge))->getMethod('removeInlineImagesExcept');
+        $method->setAccessible(true);
+        $content = '<!-- wp:image {"id":10} --><img src="https://demo.1945.vn/anh/mat-truoc-odo-36-10-thung-kinh-qua-chuong-dep.webp" class="wp-image-10"><!-- /wp:image -->' .
+            '<figure><img src="https://cdn.example.test/odo-36-8.webp" class="wp-image-20"></figure>';
+
+        $result = $method->invoke($bridge, $content, 20);
+
+        self::assertStringNotContainsString('mat-truoc-odo-36-10', $result);
+        self::assertStringContainsString('wp-image-20', $result);
+    }
+
     public function test_staged_media_completion_promotes_primary_asset_and_preserves_dimensions(): void
     {
         [$media, $assets, $service] = $this->stores();

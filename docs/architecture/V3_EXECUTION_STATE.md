@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Capture 36/8 subject/media/video boundary repair
+
+Root-cause tracing of the reported Odo 36/8 loop identified one resolution
+boundary defect and one scope boundary defect, with downstream symptoms in
+Video, MediaUsage and Article composition. Canonical subject resolution now
+recognizes a qualified Variant reference (`36/8`) and qualified Variant name
+phrase (`Odo 36/8`) without fuzzy Model matching, then ranks the immutable
+resolution set so an exact Variant beats the generic parent Model. The full
+resolution packet is passed directly from Capture to Media reconciliation and
+the Video handoff; downstream code no longer re-reads a weaker diagnostic
+projection to choose the subject.
+
+Capture Media selection now distinguishes current-Capture-owned Media from
+historical Media. Physical assets do not grant permission to adopt a stale
+WordPress or global Media identity: historical reuse requires the locked
+resolved subject and persisted scope compatibility. Supporting Media and
+WordPress read-back use the same gate. Forced inline reconciliation removes
+other mapped inline image blocks after selecting the canonical target, so an
+old sibling image cannot remain in `post_content` through placeholder/usage
+reconciliation. Video relation research is constrained to the Capture handoff
+target when that packet exists, and the packet is retained in the Video
+proposal metadata.
+
+Regression evidence: focused Capture/Media/Video/MCP/continuation slice — 127
+tests / 819 assertions, 0 failures; NHK Unit — 1,026 tests / 5,241
+assertions, 0 failures; NHK Contract — 4 tests / 31 assertions, 0 failures;
+PHP lint and `git diff --check` pass. Integration execution was attempted but
+the local WordPress runtime is unavailable (`update_option()` bootstrap error;
+the guarded DB suite also requires `NHK_WP_TEST_PATH` and `nhk_v3_test`). No
+production, DEMO, staging, V2, Article 408, Capture 36/8, Video, database or
+publication state was mutated. Local MCP catalog/transport already exposes
+optional `capture_id`, native binary `files`, and `_meta.openai/fileParams`;
+live connector verification remains an external deployment check and is not
+claimed here.
+
 # Checkpoint — 2026-09-10 — Capture new-submission automation policy convergence
 
 Investigation of the reported Capture/Article publication stall found that

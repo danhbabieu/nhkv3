@@ -40,7 +40,8 @@ final class CanonicalAuthoritySubjectResolver
         if ($needle === '') return [];
         $matches = [];
         foreach ($this->types->all() as $definition) foreach ($this->authority->listByType($definition->type) as $entity) {
-            if ($this->normalize($entity->canonicalName) === $needle || $this->hasAlias($entity, $needle)) $matches[$entity->canonicalId] = $this->packet($entity, 'exact_name_or_alias');
+            $match = $this->matchName($entity, $needle);
+            if ($match !== null) $matches[$entity->canonicalId] = $this->packet($entity, $match);
         }
         return array_values($matches);
     }
@@ -76,9 +77,26 @@ final class CanonicalAuthoritySubjectResolver
         if ($needle === '') return [];
         $matches = [];
         foreach ($this->authority->listByType($type) as $entity) {
-            if ($this->normalize($entity->canonicalName) === $needle || $this->hasAlias($entity, $needle)) $matches[$entity->canonicalId] = $this->packet($entity, 'exact_name_or_alias');
+            $match = $this->matchName($entity, $needle);
+            if ($match !== null) $matches[$entity->canonicalId] = $this->packet($entity, $match);
         }
         return array_values($matches);
+    }
+
+    private function matchName(AuthorityEntity $entity, string $needle): ?string
+    {
+        if ($this->normalize($entity->canonicalName) === $needle || $this->hasAlias($entity, $needle)) return 'exact_name_or_alias';
+
+        // A qualified reference such as "36/8" may match the canonical
+        // Variant name "Đồng hồ Odo 36/8". This remains an identity match,
+        // not generic fuzzy text search, so a parent Model cannot win it.
+        if ($entity->entityType === 'variant') {
+            $reference = $this->normalize((string) ($entity->payload['reference'] ?? ''));
+            if ($reference !== '' && $reference === $needle) return 'exact_variant_reference';
+            if (str_contains($needle, '/') && str_contains($this->normalize($entity->canonicalName), $needle)) return 'exact_variant_name_reference';
+        }
+
+        return null;
     }
 
     /** @return array<string,mixed> */
@@ -90,6 +108,9 @@ final class CanonicalAuthoritySubjectResolver
     private function normalize(string $value): string
     {
         $value = trim($value);
+        $value = str_replace(['⁄', '∕'], '/', $value);
+        $value = preg_replace('/\s*\/\s*/u', '/', $value) ?? $value;
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
         return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
     }
 }

@@ -43,6 +43,7 @@ final class VideoIntakeService
             }));
         }
         foreach ($research['resolved'] as $match) {
+            if ($handoffTarget !== null && ((string) ($match['id'] ?? '') !== $handoffTarget['id'] || (string) ($match['type'] ?? '') !== $handoffTarget['type'])) continue;
             if (!is_array($match['evidence_refs'] ?? null) || $match['evidence_refs'] === []) continue;
             $relations[] = [
                 'target_id' => $match['id'], 'target_type' => $match['type'], 'predicate' => 'about',
@@ -74,6 +75,7 @@ final class VideoIntakeService
             'editorial' => $editorial,
             'category' => $category,
             'semantic_attachments' => $candidatePayloads,
+            'subject_resolution_packet' => $resolvedSubject,
             'seo' => $seoData,
             'embed_url' => 'https://www.youtube-nocookie.com/embed/' . $snapshot['external_video_id'],
             'provenance' => ['source_url' => $snapshot['canonical_source_url'], 'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null],

@@ -554,10 +554,10 @@ final class Plugin {
                 static function (array $context) use ($articleMedia): array {
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
-                    $resolved = is_array($context['capture']['diagnostics']['subjects']['resolved'] ?? null) ? $context['capture']['diagnostics']['subjects']['resolved'] : [];
-                    $variantSubjects = array_values(array_filter($resolved, static fn (mixed $subject): bool => is_array($subject) && (string) ($subject['type'] ?? '') === 'variant' && trim((string) ($subject['id'] ?? '')) !== ''));
-                    $mediaSubjectIds = array_values(array_unique(array_map(static fn (array $subject): string => trim((string) $subject['id']), $variantSubjects)));
-                    $subject = (string) (($variantSubjects[0]['name'] ?? '') ?: ($resolved[0]['name'] ?? ''));
+                    $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+                    $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : null;
+                    $mediaSubjectIds = $primary !== null && trim((string) ($primary['id'] ?? '')) !== '' && ($resolution['status'] ?? '') === 'resolved' ? [trim((string) $primary['id'])] : [];
+                    $subject = (string) ($primary['name'] ?? '');
                     $selected = [];
                     if (isset($mediaIds[0])) {
                         $selected['featured_primary'] = $mediaIds[0];
@@ -575,6 +575,8 @@ final class Plugin {
                         'subject_context' => ['subject' => $subject, 'subject_ids' => $mediaSubjectIds],
                         'force_inline_reconcile' => true,
                         'capture_has_physical_assets' => $mediaIds !== [],
+                        'capture_owned_media_ids' => $mediaIds,
+                        'subject_scope_locked' => $mediaSubjectIds !== [],
                         'allow_unscoped_reuse' => false,
                         'allow_scoped_reuse' => true,
                     ], $selected, array_slice($mediaIds, 2));

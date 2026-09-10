@@ -129,6 +129,27 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame(2, $resolved[0]['revision']);
     }
 
+    public function test_exact_variant_reference_beats_generic_parent_model_for_odo_36_8(): void
+    {
+        $repository = new InMemoryAuthorityRepository();
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $modelId = 'c01c109c-5d39-401e-a16e-6d61a0a52f50';
+        $variantId = '852da54d-457a-4397-a16d-52d9452ba766';
+        $repository->create(new AuthorityEntity($modelId, 'model', 'nhk:model:odo.36', 'Odo 36', 1, ['aliases' => []]));
+        $repository->create(new AuthorityEntity($variantId, 'variant', 'nhk:variant:odo.36.8', 'Đồng hồ Odo 36/8', 1, ['reference' => '36/8', 'aliases' => []]));
+
+        $resolver = new CanonicalAuthoritySubjectResolver($repository, $types);
+        $resolution = (new SubjectResolutionService($resolver))->resolve(['Odo 36', 'Odo 36/8', '36/8']);
+
+        self::assertSame('resolved', $resolution['status']);
+        self::assertSame($variantId, $resolution['primary']['id']);
+        self::assertSame('nhk:variant:odo.36.8', $resolution['primary']['stable_key']);
+        self::assertSame([], $resolution['unresolved']);
+        self::assertSame([$variantId, $modelId], array_column($resolution['subjects'], 'id'));
+        self::assertSame($variantId, $resolver->resolve('36/8')[0]['id']);
+    }
+
     public function test_capture_resolution_gives_explicit_uuid_precedence_over_prose_hints(): void
     {
         $variantId = '95873bfe-d978-4eda-a5a2-ce9ba79625df';
@@ -194,6 +215,45 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertContains('OWNER_PUBLICATION_REQUIRED', $first->diagnostics['publication']['blockers']);
     }
 
+    public function test_same_capture_retry_does_not_duplicate_article_video_or_claim_work(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $counts = ['draft' => 0, 'video' => 0, 'claims' => 0, 'semantic' => 0];
+        $variant = ['id' => '852da54d-457a-4397-a16d-52d9452ba766', 'type' => 'variant', 'stable_key' => 'nhk:variant:odo.36.8', 'name' => 'Đồng hồ Odo 36/8', 'revision' => 1, 'match' => 'exact_variant_name_reference'];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static function (array $input) use (&$counts): array { $counts['draft']++; return ['post_id' => 408, 'state_token' => 'token-408', 'post' => ['post_id' => 408]]; },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => $hint === 'Odo 36/8' ? [$variant] : []),
+            new ClaimRetrievalEngine(
+                static function (array $subject) use (&$counts): array { $counts['claims']++; return ['status' => 'available', 'items' => []]; },
+                static function (array $subject, array $neighborhood) use (&$counts): array { $counts['claims']++; return []; },
+            ),
+            static function (array $context) use (&$counts): array { $counts['semantic']++; return ['status' => 'PLANNED', 'writes' => []]; },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function (array $context) use (&$counts): array {
+                $counts['video']++;
+                return ['items' => [['kind' => 'video', 'video_id' => 'X7QFsESWIvY', 'video_proposal' => ['entity_type' => 'video']]]];
+            },
+        );
+        $input = ['idempotency_key' => 'capture-odo-36-8-replay', 'text' => 'Đồng hồ Odo 36/8.', 'subject_hints' => ['Odo 36/8'], 'video' => ['url' => 'https://www.youtube.com/watch?v=X7QFsESWIvY']];
+
+        $first = $coordinator->execute($input);
+        $replay = $coordinator->execute($input);
+
+        self::assertSame($first->captureId, $replay->captureId);
+        self::assertSame(408, $replay->articleId);
+        self::assertSame(['draft' => 1, 'video' => 1, 'claims' => 2, 'semantic' => 1], $counts);
+    }
+
     public function test_video_input_uses_capture_and_preserves_distinct_video_owner_context(): void
     {
         $repository = new InMemoryCaptureRepository();
@@ -224,6 +284,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
     {
         $repository = new InMemoryCaptureRepository();
         $events = [];
+        $mediaContexts = [];
         $variant = [
             'id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df',
             'type' => 'variant',
@@ -241,7 +302,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
             static function (array $context): array { return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
             new ArticleComposer(),
-            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static function (array $context) use (&$mediaContexts): array { $mediaContexts[] = $context; return ['status' => 'RECONCILED']; },
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
             static fn (array $context): array => ['status' => 'verified'],
             null,
@@ -265,6 +326,8 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertCount(1, $events);
         self::assertSame($variant, $events[0]['subject_resolution']['primary']);
         self::assertSame($variant['id'], $events[0]['subject_resolution']['primary']['id']);
+        self::assertSame($variant, $mediaContexts[0]['subject_resolution']['primary']);
+        self::assertSame($variant, $mediaContexts[0]['subject_resolution_packet']);
     }
 
     public function test_invalid_media_blueprint_is_system_blocked_not_retryable(): void

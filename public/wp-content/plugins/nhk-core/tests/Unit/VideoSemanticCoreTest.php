@@ -499,6 +499,8 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame($variantId, $preview->package['knowledge_enrichment']['subject']['id']);
         self::assertSame('variant', $preview->package['knowledge_enrichment']['subject']['type']);
         self::assertSame([], $preview->package['semantic_attachments']);
+        self::assertSame($variantId, $preview->package['subject_resolution_packet']['id']);
+        self::assertSame('variant', $preview->package['subject_resolution_packet']['type']);
     }
 
     public function test_knowledge_enrichment_failure_is_diagnostic_and_preserves_video_intake(): void
