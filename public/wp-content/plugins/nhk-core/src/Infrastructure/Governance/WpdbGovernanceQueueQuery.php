@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Governance;
 
 use JsonException;
+use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
 use NHK\Core\Contracts\Governance\GovernanceQueueQuery;
 use NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog;
 use NHK\Core\Domain\Governance\ProposalState;
@@ -11,6 +12,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
 {
+    private ControlledApplyOperationRegistry $compatibility;
     /** @var array<string,string> */
     private const SORTS = [
         'created' => 'created_at',
@@ -20,7 +22,10 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         'status' => 'state',
     ];
 
-    public function __construct(private ?object $database = null) {}
+    public function __construct(private ?object $database = null)
+    {
+        $this->compatibility = new ControlledApplyOperationRegistry();
+    }
 
     /** @return array<string,mixed> */
     public function page(array $filters = []): array
@@ -285,11 +290,11 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
     {
         $entityType = trim((string) ($row['entity_type'] ?? ''));
         $operation = trim((string) ($row['operation'] ?? ''));
-        if ($entityType === '' || $operation === '') return false;
+        if ($entityType === '' || $operation === '' || !in_array($entityType, $this->types(), true) || !$this->compatibility->supports($entityType, $operation)) return false;
 
         $expected = $row['expected_revision'] ?? null;
         $isTargetlessCreate = in_array($operation, ['create', 'ingest'], true) && $this->targetUuid($row['target_uuid'] ?? null) === null;
-        if ($operation === 'relation_create') return $entityType === 'relation';
+        if ($operation === 'relation_create') return $expected === null || $expected === '' || (string) $expected === '0';
         if ($isTargetlessCreate && ($expected === null || $expected === '' || (string) $expected === '0')) return true;
         return $this->revisionIsValid($expected);
     }

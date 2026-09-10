@@ -45,6 +45,30 @@ final class GovernanceQueueQueryTest extends TestCase
         self::assertSame('Vertical Brand', $page['items'][0]['name']);
     }
 
+    public function test_uuid_and_status_filters_change_items_and_count_consistently(): void
+    {
+        $other = $this->proposalRow();
+        $other['id'] = 45;
+        $other['proposal_uuid'] = hex2bin(str_replace('-', '', '0198f8d5-1d55-7a12-8d4e-5f0d9d8d0003'));
+        $other['entity_type'] = 'knowledge';
+        $other['state'] = 1;
+        $other['command_json'] = json_encode(['name' => 'Other record', 'subject_id' => 'other'], JSON_THROW_ON_ERROR);
+        $this->db = new RecordingProposalDatabase([$this->proposalRow(), $other], 2, true);
+        $this->query = new WpdbGovernanceQueueQuery($this->db);
+
+        $matching = $this->query->page(['search' => $this->proposalId, 'status' => 'submitted']);
+        $targetMatching = $this->query->page(['search' => $this->targetId, 'status' => 'submitted']);
+        $nonMatching = $this->query->page(['search' => '0198f8d5-1d55-7a13', 'status' => 'draft']);
+
+        self::assertSame(1, $matching['total_items']);
+        self::assertCount(1, $matching['items']);
+        self::assertSame($this->proposalId, $matching['items'][0]['proposal_id']);
+        self::assertSame(1, $targetMatching['total_items']);
+        self::assertSame($this->proposalId, $targetMatching['items'][0]['proposal_id']);
+        self::assertSame(0, $nonMatching['total_items']);
+        self::assertCount(0, $nonMatching['items']);
+    }
+
     public function test_invalid_sort_falls_back_to_updated_desc_with_internal_id_tiebreaker(): void
     {
         $this->query->page(['order_by' => 'drop_table', 'order' => 'sideways']);
@@ -99,7 +123,10 @@ final class GovernanceQueueQueryTest extends TestCase
         yield 'zero expected revision on rename' => [static fn (array $row): array => array_replace($row, ['expected_revision' => 0]), false, 'PROPOSAL_BINDING_INVALID'];
         yield 'empty operation' => [static fn (array $row): array => array_replace($row, ['operation' => '']), false, 'PROPOSAL_BINDING_INVALID'];
         yield 'empty entity type' => [static fn (array $row): array => array_replace($row, ['entity_type' => '']), false, 'PROPOSAL_BINDING_INVALID'];
+        yield 'unsupported authority operation' => [static fn (array $row): array => array_replace($row, ['operation' => 'bogus_operation']), false, 'PROPOSAL_BINDING_INVALID'];
+        yield 'unknown entity type' => [static fn (array $row): array => array_replace($row, ['entity_type' => 'unknown_type']), false, 'PROPOSAL_BINDING_INVALID'];
         yield 'relation create normalizes expected revision' => [static fn (array $row): array => array_replace($row, ['entity_type' => 'relation', 'operation' => 'relation_create', 'expected_revision' => 0, 'command_json' => json_encode(['source_uuid' => '0198f8d5-1d55-7a10-8d4e-5f0d9d8d0001'])]), true, null];
+        yield 'positive relation create expected revision is invalid' => [static fn (array $row): array => array_replace($row, ['entity_type' => 'relation', 'operation' => 'relation_create', 'expected_revision' => 1, 'command_json' => json_encode(['source_uuid' => '0198f8d5-1d55-7a10-8d4e-5f0d9d8d0001'])]), false, 'PROPOSAL_BINDING_INVALID'];
         yield 'targetless create accepts zero expected revision' => [static fn (array $row): array => array_replace($row, ['operation' => 'create', 'target_uuid' => null, 'expected_revision' => 0]), true, null];
     }
 
@@ -265,7 +292,7 @@ final class RecordingProposalDatabase
     public array $rows;
 
     /** @param list<array<string,mixed>> $rows */
-    public function __construct(array $rows, public int $count)
+    public function __construct(array $rows, public int $count, private bool $behavioral = false)
     {
         $this->rows = $rows;
         $this->countResult = $count;
@@ -303,13 +330,37 @@ final class RecordingProposalDatabase
     {
         $this->itemQueries[] = $query;
         $this->last_error = $this->itemsError ?? '';
-        return $this->resultsResult;
+        if (!$this->behavioral || !is_array($this->resultsResult)) return $this->resultsResult;
+        $rows = $this->matchingRows($query);
+        preg_match('/LIMIT (\d+) OFFSET (\d+)/', $query, $paging);
+        return array_slice($rows, (int) ($paging[2] ?? 0), (int) ($paging[1] ?? count($rows)));
     }
 
     public function get_var(string $query): mixed
     {
         $this->countQueries[] = $query;
         $this->last_error = $this->countError ?? '';
-        return $this->countResult;
+        return $this->behavioral ? count($this->matchingRows($query)) : $this->countResult;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function matchingRows(string $query): array
+    {
+        $rows = $this->rows;
+        preg_match_all("/LIKE '([^']*)'/", $query, $likes);
+        if (count($likes[1]) >= 4) {
+            $search = strtolower($likes[1][0]);
+            $rows = array_values(array_filter($rows, static function (array $row) use ($search): bool {
+                $json = strtolower((string) ($row['command_json'] ?? ''));
+                $proposal = strtolower(bin2hex((string) ($row['proposal_uuid'] ?? '')));
+                $target = strtolower(bin2hex((string) ($row['target_uuid'] ?? '')));
+                return str_contains($proposal, trim($search, '%')) || str_contains($target, trim($search, '%'))
+                    || str_contains(strtolower((string) ($row['entity_type'] ?? '')), trim($search, '%'))
+                    || str_contains($json, trim($search, '%'));
+            }));
+        }
+        if (preg_match('/state = (\d+)/', $query, $state)) $rows = array_values(array_filter($rows, static fn (array $row): bool => (int) $row['state'] === (int) $state[1]));
+        if (preg_match("/entity_type = '([^']*)'/", $query, $type)) $rows = array_values(array_filter($rows, static fn (array $row): bool => (string) $row['entity_type'] === $type[1]));
+        return $rows;
     }
 }
