@@ -88,6 +88,85 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertStringContainsString('Bổ sung A.', $second['capture']['context']['continuation_state']['raw_input']);
     }
 
+    public function test_second_addendum_persists_both_audit_entries_in_order(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $first = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'addendum-a', 'text' => 'Bổ sung A.']);
+        $second = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'addendum-b', 'text' => 'Bổ sung B.']);
+        $audit = $second['capture']['context']['continuations'];
+
+        self::assertSame($capture->captureId, $second['capture']['capture_id']);
+        self::assertSame(342, $second['capture']['article_id']);
+        self::assertSame($capture->requestFingerprint, $second['capture']['request_fingerprint']);
+        self::assertCount(2, $audit);
+        self::assertNotSame($audit[0]['addendum_id'], $audit[1]['addendum_id']);
+        self::assertSame(['addendum-a', 'addendum-b'], array_column($audit, 'idempotency_key'));
+        self::assertTrue($audit[0]['capture_revision'] < $audit[1]['capture_revision']);
+        self::assertSame($second['capture']['revision'], $audit[1]['capture_revision']);
+        self::assertSame($second['addendum']['capture_revision'], $audit[1]['capture_revision']);
+        self::assertTrue($first['capture']['revision'] < $second['capture']['revision']);
+    }
+
+    public function test_replaying_completed_addendum_does_not_append_duplicate_audit_or_revision(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+        $input = ['capture_id' => $capture->captureId, 'idempotency_key' => 'addendum-replay', 'text' => 'Bổ sung chỉ một lần.'];
+
+        $first = $service->execute($input);
+        $afterFirst = $captures->findById($capture->captureId);
+        $replay = $service->execute($input);
+        $afterReplay = $captures->findById($capture->captureId);
+
+        self::assertSame($first['addendum']['addendum_id'], $replay['addendum']['addendum_id']);
+        self::assertSame(1, count($afterReplay?->context['continuations'] ?? []));
+        self::assertSame($afterFirst?->revision, $afterReplay?->revision);
+        self::assertSame(1, $events['semantic']);
+        self::assertSame(1, $events['media']);
+    }
+
+    public function test_rejected_addendum_retains_sanitized_audit_payload_without_files(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+        $input = [
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'addendum-rejected',
+            'text' => 'Nội dung cần audit.',
+            'subject_hints' => ['Odo 30'],
+            'observations' => [['kind' => 'field-note', 'value' => '6 côn 8 búa']],
+            'metadata' => ['source' => 'user'],
+            'files' => [['name' => 'private.jpg', 'tmp_name' => '/private/tmp/private.jpg', 'size' => 123]],
+        ];
+
+        $result = $service->execute($input);
+
+        self::assertSame('FAILED', $result['addendum']['status']);
+        self::assertSame('CAPTURE_ADDENDUM_FILES_NOT_ALLOWED', $result['addendum']['diagnostics']['code']);
+        self::assertSame([
+            'text' => 'Nội dung cần audit.',
+            'subject_hints' => ['Odo 30'],
+            'observations' => [['kind' => 'field-note', 'value' => '6 côn 8 búa']],
+            'metadata' => ['source' => 'user'],
+        ], $result['addendum']['payload']);
+        self::assertArrayNotHasKey('files', $result['addendum']['payload']);
+        self::assertArrayNotHasKey('tmp_name', $result['addendum']['payload']);
+    }
+
     public function test_governance_apply_readback_is_consumed_by_capture_continuation_without_publication(): void
     {
         $captures = new ContinuationCaptureRepository();

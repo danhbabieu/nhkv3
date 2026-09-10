@@ -129,7 +129,10 @@ published read-back.
 present. This is a continuation of the existing lifecycle, not a second
 writer: the original request remains immutable, the addendum uses a separate
 idempotency key, and the same Capture/Post receives an audit and revision
-append. Files are rejected on this path. The coordinator reruns bounded
+append. The audit's `capture_revision` is the resulting Capture revision after
+that append. Rejected requests retain only a sanitized audit payload (`text`,
+`subject_hints`, `observations`, `metadata`); file metadata and paths are never
+persisted. Files are rejected on this path. The coordinator reruns bounded
 subject/Claim resolution, returns the existing Governance review boundary and
 reconciles the existing Article; without new files it must not adopt unrelated
 or unscoped Media. An existing Media may be reused only after persisted

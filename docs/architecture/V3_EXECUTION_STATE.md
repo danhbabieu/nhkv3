@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-10 — Capture continuation audit revision fix
+
+The audit reproduced the continuation lifecycle from the current Capture
+boundary. The `continuations` union concern is already resolved in the
+approved `217c897b` slice: the current service explicitly assigns the appended
+list, and the new two-addendum regression preserves both entries in order. No
+duplicate production change was made for that already-fixed defect.
+
+The remaining root cause was revision timing. `EditorialCaptureCoordinator`
+returns the rerun record at revision N; the continuation service then persists
+the audit-bearing Capture at N+1. The audit event previously recorded N while
+the addendum ledger recorded the saved N+1. The minimal fix computes one
+`resultingRevision` and uses it for the audit event, Capture save and addendum
+ledger. Rejected addenda now retain only the sanitized text, subject hints,
+observations and metadata payload; file metadata and paths are excluded.
+
+TDD RED evidence: the fresh focused run failed 2 tests / 44 assertions. The
+revision assertion observed audit revision `14` versus saved Capture revision
+`15`; the rejected-payload assertion observed an empty payload instead of the
+sanitized fields. After the fix, focused `EditorialCaptureContinuationTest`
+passes 8 tests / 48 assertions; the combined relevant filter passes 74 tests /
+615 assertions; NHK Unit passes 907 tests / 4,510 assertions with 7 warnings,
+1 deprecation and 6 PHPUnit deprecations; NHK Contract passes 4 tests / 31
+assertions. `composer lint`, `composer validate --no-check-publish` and
+`git diff --check` pass. Canonical documentation was regenerated with manifest
+hash `afcd844cc8af38da2fe22aad055362cc1d0c888e203336c8260d2285c1db64de`.
+
+The guarded Integration command
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit
+--configuration phpunit.xml.dist --testsuite 'NHK Integration'` reached the
+WordPress bootstrap and emitted the exact error `Error establishing a database
+connection`; no integration PASS is claimed and no database mutation occurred.
+DEMO deployment was not attempted before this verification checkpoint.
+
 # Checkpoint — 2026-09-10 — Canonical Article publication CLI boundary
 
 Added a thin `nhk-core-publication.php` CLI entrypoint and

@@ -198,13 +198,17 @@ relations.
 The same `nhk.capture.ingest` boundary may receive a text addendum targeted by
 `capture_id`. The original Capture request and fingerprint remain immutable;
 the addendum has its own idempotency key and fingerprint, is recorded as an
-audit/revision event, and reuses the existing Capture and native Post. A
+audit/revision event whose `capture_revision` is the resulting Capture
+revision after the append, and reuses the existing Capture and native Post. A
 changed payload under the same addendum key conflicts, while an unchanged
 retry is idempotent. Addenda do not accept files, create a second Post or
 re-adopt Media; text-only continuation may reuse an existing Media only when
 its persisted subject scope matches the resolved canonical subject and cannot
 use unscoped/global Media as a readiness fallback. If no eligible Media exists,
 the wrong-variant usage is removed and the Article remains missing/placeholder.
+Rejected addenda retain only a sanitized audit payload (`text`,
+`subject_hints`, `observations` and `metadata`); file metadata and paths are
+never persisted.
 The bounded semantic resolver, Claim retrieval, Governance review packet and
 Article/MediaUsage reconciliation run again for the existing Capture, followed
 by the same final read-back.

@@ -34,12 +34,16 @@ Governance proposal lifecycle.
 ## Idempotency and failure
 
 `nhk_editorial_capture_addenda` stores the addendum identity, target Capture,
-request fingerprint, lifecycle status, audit payload and resulting Capture
-revision. Same addendum key plus the same payload returns the recorded result;
-the same key plus a changed payload returns `IDEMPOTENCY_CONFLICT`. A Capture
-target that is missing, published, or unavailable fails closed. Addenda with
-files are rejected so physical assets cannot be re-uploaded or re-adopted by
-the continuation path.
+request fingerprint, lifecycle status, sanitized audit payload and resulting
+Capture revision. The completed audit event in the Capture context points to
+that same resulting revision, after the audit append is saved. Same addendum
+key plus the same payload returns the recorded result; the same key plus a
+changed payload returns `IDEMPOTENCY_CONFLICT`. A Capture target that is
+missing, published, or unavailable fails closed. Rejected addenda retain only
+the bounded `text`, `subject_hints`, `observations` and `metadata` payload for
+audit; file metadata and paths are never persisted. Addenda with files are
+rejected so physical assets cannot be re-uploaded or re-adopted by the
+continuation path.
 
 ## Data and governance invariants
 

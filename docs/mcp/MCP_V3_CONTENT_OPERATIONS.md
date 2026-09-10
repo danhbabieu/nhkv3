@@ -129,7 +129,10 @@ an explicit eligible owner publication operation and read-back.
 The same tool also accepts an optional `capture_id` to continue one existing
 Capture with a text addendum. The original request/fingerprint is immutable;
 the addendum has its own idempotency key, appends an auditable Capture revision,
-reuses the same native Post and reruns bounded semantic resolution,
+and records the resulting Capture revision in both the audit event and addendum
+ledger. Rejected addenda retain only sanitized text/subject hints/observations/
+metadata; file metadata and paths are never persisted. The addendum reuses the
+same native Post and reruns bounded semantic resolution,
 Governance/review and Article reconciliation. Addenda reject files, never
 create a second Post, and never re-adopt or use unscoped/global Media when no
 new asset is supplied; an existing Media is reusable only when its persisted

@@ -28,11 +28,11 @@ final class EditorialCaptureContinuationService
         }
 
         $capture = $this->captures->findById($captureId);
-        if (!$capture instanceof CaptureRecord) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_NOT_FOUND');
-        if ($capture->stage === CaptureStage::PUBLISHED->value) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_CONTINUATION_NOT_ALLOWED_AFTER_PUBLICATION');
-        if (isset($input['files']) && (array) $input['files'] !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_FILES_NOT_ALLOWED');
+        if (!$capture instanceof CaptureRecord) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_NOT_FOUND', $input);
+        if ($capture->stage === CaptureStage::PUBLISHED->value) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_CONTINUATION_NOT_ALLOWED_AFTER_PUBLICATION', $input);
+        if (isset($input['files']) && (array) $input['files'] !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_FILES_NOT_ALLOWED', $input);
         foreach (['video' => 'CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED', 'items' => 'CAPTURE_ADDENDUM_ITEMS_NOT_ALLOWED'] as $field => $code) {
-            if (isset($input[$field]) && (array) $input[$field] !== []) return $this->failed($captureId, $key, $fingerprint, $code);
+            if (isset($input[$field]) && (array) $input[$field] !== []) return $this->failed($captureId, $key, $fingerprint, $code, $input);
         }
 
         $pending = new CaptureAddendumRecord(UuidCodec::newV7(), $captureId, $key, $fingerprint, 'IN_PROGRESS', $this->payload($input), $capture->revision);
@@ -50,7 +50,8 @@ final class EditorialCaptureContinuationService
             $context = $continued->context;
             $audit = is_array($context['continuations'] ?? null) ? $context['continuations'] : [];
             $payload = $addendum->payload;
-            $audit[] = ['addendum_id' => $addendum->addendumId, 'idempotency_key' => $key, 'request_fingerprint' => $fingerprint, 'payload' => $payload, 'capture_revision' => $continued->revision, 'status' => 'COMPLETED', 'at' => gmdate('c')];
+            $resultingRevision = $continued->revision + 1;
+            $audit[] = ['addendum_id' => $addendum->addendumId, 'idempotency_key' => $key, 'request_fingerprint' => $fingerprint, 'payload' => $payload, 'capture_revision' => $resultingRevision, 'status' => 'COMPLETED', 'at' => gmdate('c')];
             $continuationState = [
                 'raw_input' => trim((string) ($continued->context['continuation_state']['raw_input'] ?? $continued->context['raw_input'] ?? '')),
                 'subject_hints' => is_array($continued->context['continuation_state']['subject_hints'] ?? null) ? $continued->context['continuation_state']['subject_hints'] : (array) ($continued->context['subject_hints'] ?? []),
@@ -62,7 +63,7 @@ final class EditorialCaptureContinuationService
             $updatedContext = $context;
             $updatedContext['continuations'] = $audit;
             $updatedContext['continuation_state'] = $continuationState;
-            $updated = $this->captures->save(new CaptureRecord($continued->captureId, $continued->idempotencyKey, $continued->requestFingerprint, $continued->stage, $continued->status, $continued->articleId, $continued->articleStateToken, $continued->assets, $updatedContext, $continued->diagnostics, $continued->phaseReceipts, $continued->revision + 1, $continued->createdAt, gmdate('Y-m-d H:i:s.u')));
+            $updated = $this->captures->save(new CaptureRecord($continued->captureId, $continued->idempotencyKey, $continued->requestFingerprint, $continued->stage, $continued->status, $continued->articleId, $continued->articleStateToken, $continued->assets, $updatedContext, $continued->diagnostics, $continued->phaseReceipts, $resultingRevision, $continued->createdAt, gmdate('Y-m-d H:i:s.u')));
             $completed = $this->saveAddendum($addendum, 'COMPLETED', $updated->revision, []);
             return $this->response($updated, $completed);
         } catch (\Throwable $error) {
@@ -101,9 +102,9 @@ final class EditorialCaptureContinuationService
     }
 
     /** @return array{capture:array<string,mixed>,addendum:array<string,mixed>} */
-    private function failed(string $captureId, string $key, string $fingerprint, string $code): array
+    private function failed(string $captureId, string $key, string $fingerprint, string $code, array $input = []): array
     {
-        $record = $this->addenda->create(new CaptureAddendumRecord(UuidCodec::newV7(), $captureId, $key, $fingerprint, 'FAILED', $this->payload([]), null, ['code' => $code]));
+        $record = $this->addenda->create(new CaptureAddendumRecord(UuidCodec::newV7(), $captureId, $key, $fingerprint, 'FAILED', $this->payload($input), null, ['code' => $code]));
         return $this->response($this->captures->findById($captureId), $record);
     }
 
