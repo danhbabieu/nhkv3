@@ -23,24 +23,100 @@ final class GovernedAuthorityPlanExecutor
         $selected = array_values(array_filter($approvedCandidateIds, static fn (mixed $id): bool => isset($byId[(string) $id])));
         foreach ($selected as $candidateId) foreach ((array) ($byId[(string) $candidateId]['dependencies'] ?? []) as $dependency) if (!in_array((string) $dependency, $selected, true)) return ['status' => 'APPROVED_DEPENDENCY_MISSING', 'code' => 'APPROVED_DEPENDENCY_MISSING', 'candidate_id' => (string) $candidateId, 'dependency_id' => (string) $dependency, 'proposal_ids' => [], 'approved_candidate_ids' => $selected];
 
-        $proposalIds = []; $pendingIds = []; $bindings = [];
+        $proposalIds = [];
+        $applyResults = [];
+        $authorityProposalIds = [];
+        $authorityProposalCandidates = [];
+        $relationCandidates = [];
         foreach ($selected as $candidateId) {
             $candidate = $byId[(string) $candidateId];
             if (strtoupper((string) ($candidate['action'] ?? '')) === 'REUSE') continue;
-            $proposal = $this->governance->createFromArguments($this->proposalArguments($candidate, $approvedFingerprint, $actor));
-            if ($proposal->state === ProposalState::DRAFT) $proposal = $this->governance->submit($proposal->id);
-            $proposalIds[] = $proposal->id;
-            if ($proposal->state !== ProposalState::APPLIED) { $pendingIds[] = $proposal->id; $bindings[$proposal->id] = [$proposal->contentFingerprint, $proposal->dependencyFingerprint, $proposal->state]; }
-        }
-        $applyResults = [];
-        if ($policy === ConversationalAuthorityPolicy::AUTO_APPROVE_AFTER_OWNER_CONFIRMATION) {
-            foreach ($pendingIds as $proposalId) {
-                [$contentFingerprint, $dependencyFingerprint, $state] = $bindings[$proposalId];
-                if ($state === ProposalState::SUBMITTED) $this->governance->approve($proposalId, $contentFingerprint, $dependencyFingerprint, $actor);
+            if ($this->isRelation($candidate)) {
+                $relationCandidates[] = $candidate;
+                continue;
             }
-            $applyResults = $this->governance->applyMany($pendingIds);
+            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor);
+            $proposalIds[] = $proposal->id;
+            $authorityProposalIds[] = $proposal->id;
+            $authorityProposalCandidates[$proposal->id] = $candidate;
         }
+
+        if ($policy === ConversationalAuthorityPolicy::AUTO_APPROVE_AFTER_OWNER_CONFIRMATION) {
+            $applyResults = $this->approveAndApply($authorityProposalIds, $actor);
+            $resolved = $this->canonicalEndpoints($applyResults, $authorityProposalCandidates);
+        } else {
+            $resolved = [];
+        }
+
+        $relationProposalIds = [];
+        foreach ($relationCandidates as $candidate) {
+            try {
+                $candidate = $this->bindCreatedEndpoints($candidate, $resolved);
+            } catch (\InvalidArgumentException $error) {
+                if ($policy === ConversationalAuthorityPolicy::REVIEW_REQUIRED) return [
+                    'status' => 'REVIEW_REQUIRED', 'proposal_ids' => $proposalIds,
+                    'approved_candidate_ids' => $selected, 'apply_results' => $applyResults,
+                    'blockers' => [['code' => 'RELATION_DEPENDENCY_CANONICAL_READBACK_REQUIRED', 'candidate_id' => $candidate['candidate_id'] ?? null]],
+                    'idempotent' => false,
+                ];
+                throw $error;
+            }
+            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor);
+            $proposalIds[] = $proposal->id;
+            $relationProposalIds[] = $proposal->id;
+        }
+
+        if ($policy === ConversationalAuthorityPolicy::AUTO_APPROVE_AFTER_OWNER_CONFIRMATION) $applyResults = array_merge($applyResults, $this->approveAndApply($relationProposalIds, $actor));
         return ['status' => $policy === ConversationalAuthorityPolicy::REVIEW_REQUIRED ? 'REVIEW_REQUIRED' : 'APPLIED', 'proposal_ids' => $proposalIds, 'approved_candidate_ids' => $selected, 'apply_results' => $applyResults, 'idempotent' => false];
+    }
+
+    private function isRelation(array $candidate): bool
+    {
+        return isset($candidate['predicate']) || isset($candidate['source_type']);
+    }
+
+    private function createAndSubmit(array $candidate, string $fingerprint, string $actor): \NHK\Core\Domain\Governance\Proposal
+    {
+        $proposal = $this->governance->createFromArguments($this->proposalArguments($candidate, $fingerprint, $actor));
+        return $proposal->state === ProposalState::DRAFT ? $this->governance->submit($proposal->id) : $proposal;
+    }
+
+    /** @param list<string> $proposalIds @return list<array<string,mixed>> */
+    private function approveAndApply(array $proposalIds, string $actor): array
+    {
+        if ($proposalIds === []) return [];
+        foreach ($proposalIds as $proposalId) {
+            $proposal = $this->governance->review($proposalId);
+            if (($proposal['state'] ?? '') === ProposalState::SUBMITTED->value) $this->governance->approve($proposalId, (string) $proposal['content_fingerprint'], (string) $proposal['dependency_fingerprint'], $actor);
+        }
+        return $this->governance->applyMany($proposalIds);
+    }
+
+    /** @param list<array<string,mixed>> $results @param array<string,array<string,mixed>> $candidates @return array<string,array{uuid:string,revision:int}> */
+    private function canonicalEndpoints(array $results, array $candidates): array
+    {
+        $resolved = [];
+        foreach ($results as $result) {
+            $candidate = $candidates[(string) ($result['proposal_id'] ?? '')] ?? null;
+            $candidateId = is_array($candidate) ? (string) ($candidate['candidate_id'] ?? '') : '';
+            $uuid = trim((string) ($result['result_entity_uuid'] ?? ''));
+            if ($candidateId === '' || $uuid === '') continue;
+            $resolved[$candidateId] = ['uuid' => $uuid, 'revision' => max(1, (int) ($result['canonical_readback']['revision'] ?? 1))];
+        }
+        return $resolved;
+    }
+
+    /** @param array<string,mixed> $candidate @param array<string,array{uuid:string,revision:int}> $resolved @return array<string,mixed> */
+    private function bindCreatedEndpoints(array $candidate, array $resolved): array
+    {
+        foreach (['source', 'target'] as $side) {
+            $candidateKey = trim((string) ($candidate[$side . '_candidate_id'] ?? ''));
+            if ($candidateKey === '') continue;
+            if (!isset($resolved[$candidateKey])) throw new \InvalidArgumentException('RELATION_DEPENDENCY_CANONICAL_READBACK_REQUIRED');
+            $candidate[$side . '_uuid'] = $resolved[$candidateKey]['uuid'];
+            $candidate[$side . '_revision'] = $resolved[$candidateKey]['revision'];
+        }
+        return $candidate;
     }
 
     /** @return list<array<string,mixed>> */

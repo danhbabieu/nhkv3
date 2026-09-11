@@ -153,6 +153,63 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame([], $plan['create_candidates']);
     }
 
+    public function test_core_plan_exposes_authority_relation_and_article_sections(): void
+    {
+        $repository = new PlannerAuthorityRepository([
+            $this->entity('classification', 'nhk:classification:clock-type.table-clock', 'Đồng hồ để bàn', ['family' => 'clock-type']),
+            $this->entity('classification', 'nhk:classification:clock-type.mantel-clock', 'Mantel Clock', ['family' => 'clock-type']),
+        ]);
+
+        $plan = (new AuthorityIntentPlanner($repository, $this->types))->plan(
+            ['text' => 'Tạo Mantel Clock nằm dưới Đồng hồ để bàn.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertArrayHasKey('create_authorities', $plan);
+        self::assertArrayHasKey('create_relations', $plan);
+        self::assertArrayHasKey('article', $plan);
+        self::assertCount(1, $plan['create_relations']);
+        self::assertSame('subtype_of', $plan['create_relations'][0]['predicate']);
+    }
+
+    public function test_brand_plus_article_is_planned_as_mixed_without_polluting_brand_name(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Tạo thương hiệu Hermle và một bài giới thiệu.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertSame('Hermle', $plan['create_authorities'][0]['name']);
+        self::assertTrue($plan['article']['requested']);
+        self::assertSame('MIXED', $plan['article']['mode']);
+    }
+
+    public function test_non_article_plan_uses_null_article_section(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Tạo thương hiệu Hermle.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertNull($plan['article']);
+    }
+
+    public function test_new_hierarchy_endpoints_are_dependencies_of_one_relation_candidate(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Tạo loại Mantel Clock nằm dưới Đồng hồ để bàn.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertSame(['Mantel Clock', 'Đồng hồ để bàn'], array_column($plan['create_candidates'], 'proposed_canonical_name'));
+        self::assertCount(1, $plan['relation_candidates']);
+        self::assertSame('subtype_of', $plan['relation_candidates'][0]['predicate']);
+        self::assertSame(
+            array_column($plan['create_candidates'], 'candidate_id'),
+            $plan['relation_candidates'][0]['dependencies'],
+        );
+    }
+
     private function entity(string $type, string $key, string $name, array $payload = []): AuthorityEntity
     {
         return new AuthorityEntity(UuidCodec::newV7(), $type, $key, $name, 1, $payload, AuthorityState::ACTIVE, 1);

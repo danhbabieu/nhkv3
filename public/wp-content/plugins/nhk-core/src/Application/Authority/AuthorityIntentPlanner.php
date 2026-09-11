@@ -23,6 +23,13 @@ final class AuthorityIntentPlanner
         $this->relationRequests($text, $plan);
         if ($this->contains($text, 'đồng hồ để bàn') && $this->contains($text, 'pháp')) $plan['rejected_or_composed_facets'][] = ['reason' => 'COMPOSED_FACETS_NOT_NEW_IDENTITY', 'requested' => 'Đồng hồ để bàn Pháp', 'components' => ['table-clock', 'origin.france']];
         if ($this->contains($text, 'ly úp') || $this->contains($text, 'glass dome')) $plan['ambiguities'][] = ['code' => 'GLASS_DOME_SEMANTIC_REVIEW_REQUIRED', 'text' => 'Ly úp / glass dome phải được phân loại theo vocabulary/evidence; không tự tạo type, model hoặc subtype.'];
+        $plan['create_authorities'] = array_map(static function (array $candidate): array {
+            $candidate['name'] = (string) ($candidate['proposed_canonical_name'] ?? '');
+            return $candidate;
+        }, $plan['create_candidates']);
+        $plan['create_relations'] = array_values($plan['relation_candidates']);
+        $hasArticle = preg_match('/\b(?:bài|bài viết|bài giới thiệu|article)\b/iu', $text) === 1;
+        $plan['article'] = $hasArticle ? ['requested' => true, 'mode' => ($plan['reuse'] !== [] || $plan['create_candidates'] !== []) ? 'MIXED' : 'EDITORIAL'] : null;
         $plan['plan_fingerprint'] = AuthorityPlanFingerprint::compute((string) ($captureContext['capture_id'] ?? ''), max(1, (int) ($captureContext['capture_revision'] ?? 1)), $plan, is_array($captureContext['contract'] ?? null) ? $captureContext['contract'] : (is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : []));
         return $plan;
     }
@@ -33,8 +40,8 @@ final class AuthorityIntentPlanner
         $queryOnly = preg_match('/(?:đã\s+có\s+chưa|có\s+cần\s+tạo|có\s+phải\s+tạo|đã\s+tồn\s+tại|có\s+không)/iu', $text) === 1;
         $allowCreate = !$queryOnly && preg_match('/\b(?:tạo|thêm|create|new)\b/iu', $text) === 1;
         $requests = [];
-        if (preg_match('/tạo\s+thương hiệu\s+(.+?)(?:[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'brand', 'name' => trim($match[1]), 'allow_create' => true];
-        if (preg_match('/tạo\s+loại\s+(.+?)(?:[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'classification', 'name' => trim($match[1]), 'family' => 'clock-type', 'allow_create' => true];
+        if (preg_match('/tạo\s+thương hiệu\s+(.+?)(?:\s+(?:và|rồi)\s+(?:một\s+)?bài\b|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'brand', 'name' => trim($match[1]), 'allow_create' => true];
+        if (preg_match('/tạo\s+loại\s+(.+?)(?:\s+(?:thuộc|nằm\s+dưới)\s+|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'classification', 'name' => trim($match[1]), 'family' => 'clock-type', 'allow_create' => true];
         if ($this->contains($text, 'đồng hồ để bàn')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ để bàn', 'family' => 'clock-type', 'allow_create' => $allowCreate];
         if ($this->contains($text, 'đồng hồ cúc cu')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ cúc cu', 'family' => 'clock-type', 'allow_create' => $allowCreate];
         if ($this->contains($text, 'mantel clock')) $requests[] = ['type' => 'classification', 'name' => 'Mantel Clock', 'family' => 'clock-type', 'allow_create' => $allowCreate];
@@ -90,7 +97,8 @@ final class AuthorityIntentPlanner
     private function relationRequests(string $text, array &$plan): void
     {
         if (preg_match('/(.+?)\s+(?:thuộc|nằm\s+dưới)\s+(.+?)(?:[.!?]|$)/iu', $text, $match) !== 1) return;
-        $sourceName = trim($match[1]); $targetName = trim($match[2]);
+        $sourceName = trim((string) preg_replace('/^(?:tạo|thêm|create)\s+(?:loại\s+)?/iu', '', trim($match[1])));
+        $targetName = trim((string) preg_replace('/^(?:loại)\s+/iu', '', trim($match[2])));
         $source = $this->plannedEntity($plan, $sourceName); $target = $this->plannedEntity($plan, $targetName);
         if ($source === null || $target === null) {
             $plan['blockers'][] = ['code' => 'CLASSIFICATION_HIERARCHY_ENDPOINT_UNRESOLVED', 'source' => $sourceName, 'target' => $targetName];
@@ -100,17 +108,17 @@ final class AuthorityIntentPlanner
             $plan['blockers'][] = ['code' => 'CLASSIFICATION_HIERARCHY_ENDPOINT_INVALID', 'source' => $sourceName, 'target' => $targetName];
             return;
         }
-        if (($source['action'] ?? '') === 'CREATE' || ($target['action'] ?? '') === 'CREATE') {
-            $plan['blockers'][] = ['code' => 'RELATION_DEPENDENCY_CANONICAL_READBACK_REQUIRED', 'source' => $sourceName, 'target' => $targetName];
-            return;
-        }
         $dependencies = [];
         foreach ([$source, $target] as $endpoint) if (($endpoint['action'] ?? '') === 'CREATE') $dependencies[] = (string) $endpoint['candidate_id'];
+        $sourceReference = (string) ($source['canonical_uuid'] ?? $source['candidate_id'] ?? '');
+        $targetReference = (string) ($target['canonical_uuid'] ?? $target['candidate_id'] ?? '');
         $plan['relation_candidates'][] = [
-            'candidate_id' => $this->candidateId('RELATION', 'subtype_of', (string) $source['canonical_uuid'] . '|' . (string) $target['canonical_uuid']),
+            'candidate_id' => $this->candidateId('RELATION', 'subtype_of', $sourceReference . '|' . $targetReference),
             'action' => 'CREATE', 'predicate' => 'subtype_of',
             'source_type' => 'classification', 'source_uuid' => $source['canonical_uuid'] ?? null,
             'target_type' => 'classification', 'target_uuid' => $target['canonical_uuid'] ?? null,
+            'source_candidate_id' => ($source['action'] ?? '') === 'CREATE' ? (string) $source['candidate_id'] : null,
+            'target_candidate_id' => ($target['action'] ?? '') === 'CREATE' ? (string) $target['candidate_id'] : null,
             'source_revision' => (int) ($source['canonical_revision'] ?? 0), 'target_revision' => (int) ($target['canonical_revision'] ?? 0),
             'scope' => 'classification', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'dependencies' => $dependencies,
             'review_diagnostics' => [],
