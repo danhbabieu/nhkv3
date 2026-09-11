@@ -55,6 +55,34 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame('COMPOSED_FACETS_NOT_NEW_IDENTITY', $plan['rejected_or_composed_facets'][0]['reason']);
     }
 
+    public function test_missing_public_clock_is_planned_as_one_clock_type_create(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Tạo loại Đồng hồ công cộng.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertCount(1, $plan['create_candidates']);
+        self::assertSame('classification', $plan['create_candidates'][0]['entity_type']);
+        self::assertSame('clock-type', $plan['create_candidates'][0]['family']);
+        self::assertSame('Đồng hồ công cộng', $plan['create_candidates'][0]['proposed_canonical_name']);
+    }
+
+    public function test_existing_public_clock_is_reused_without_create(): void
+    {
+        $repository = new PlannerAuthorityRepository([
+            $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock-type']),
+        ]);
+        $plan = (new AuthorityIntentPlanner($repository, $this->types))->plan(
+            ['text' => 'Tạo loại Đồng hồ công cộng.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame('nhk:classification:clock-type.public-clock', $plan['reuse'][0]['stable_key']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
     public function test_glass_dome_is_reviewed_without_model_type_or_subtype_creation(): void
     {
         $planner = new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types);
