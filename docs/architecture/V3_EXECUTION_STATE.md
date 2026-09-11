@@ -7495,3 +7495,52 @@ STATUS: LOCAL CODE / REGRESSION COMPLETE; Evidence-backed semantic attachment
 and live runtime verification remain contract/environment gates. Publication
 must not be marked complete while `NO_SEMANTIC_ATTACHMENT` or other mandatory
 blockers remain. PUSH STATUS = NOT PUSHED.
+
+# Checkpoint — 2026-09-11 — ROOT repair: Video eligibility and Governance Queue reconciliation
+
+ROOT GAP: Live Queue Apply allowed approved Video proposals to report
+`proposal-eligibility.ready=true` while persisted semantic completeness still
+contained `NO_SEMANTIC_ATTACHMENT`; Controlled Apply then failed and the Admin
+collapsed domain failures to `OPERATION_FAILED`. Five approved backlog records
+also had stale approval bindings, including legacy `USER_HINT` evidence shapes.
+
+CODE: Added the read-only `VideoProposalEligibilityEvaluator` to the same
+pre-apply boundary as Proposal eligibility. Video ingest is now blocked with
+canonical reasons for missing semantic attachments, non-canonical Evidence,
+unavailable Source/Claim/Evidence closure, inactive/mismatched target scope,
+unresolved subject and duplicate external identity. Controlled Apply retains
+its second validation. Queue exceptions preserve domain reason codes and
+renders Vietnamese reason text; per-item statuses distinguish `APPLIED`,
+`REBUILT_AND_APPLIED`, `REUSED_CANONICAL`, `SUPERSEDED`, `BLOCKED` and
+`FAILED`.
+
+RECONCILIATION: Extracted the existing `CaptureVideoProvenancePlanner` into
+the bounded `VideoProposalReconciliationService` path for approved existing
+Video proposals. It searches/reuses the canonical external Video, resolves the
+current exact subject, creates only missing Source → Claim → Evidence governed
+dependencies, reads them back, builds a fresh proposal with current
+fingerprints/revisions and canonical `{"evidence_id":"UUID"}` attachment,
+approves according to the current policy, applies, reads back Video/Graph and
+hands off public identity. The approved proposal is never edited and its old
+approval fingerprint is never copied. The 36/8 planner regression confirms
+Variant Odo `852da54d-457a-4397-a16d-52d9452ba766` can be selected from the
+exact source title without broadening to Brand; external Video reuse remains
+platform + external ID keyed.
+
+TEST: Focused ROOT repair suite passes 51 tests / 230 assertions. Full tracked
+Unit suite (excluding the concurrently untracked Visual Support test) passes
+1,077 tests / 5,460 assertions with existing warnings/deprecations.
+`composer lint`, `composer validate --no-check-publish`, PHP lint and
+`git diff --check` pass. The complete Composer PHPUnit command is not green in
+this worktree because it also discovers untracked Visual Support tests whose
+implementation is absent, plus guarded WordPress/MySQL Integration bootstrap
+errors and the existing environment-dependent Collector contract failure.
+
+DB / LIVE EFFECT: No migration, seed, import, Article, Video, Graph, Source,
+Claim, Evidence, public identity, DEMO, staging, production or V2 data was
+mutated. Live 16-proposal reconciliation and Video/Graph/Public Identity
+read-back remain pending because DEMO deployment/runtime credentials are not
+available.
+
+STATUS: LOCAL ROOT REPAIR CODE / REGRESSION COMPLETE; exact commit deployment
+and live read-back remain environment-gated. PUSH STATUS = NOT PUSHED.

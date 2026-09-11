@@ -159,6 +159,13 @@ final class GovernanceQueueRenderer
             'DEPENDENCY_NOT_APPLIED' => 'Phụ thuộc chưa được áp dụng',
             'PROPOSAL_NOT_FOUND' => 'Không tìm thấy Proposal',
             'CAPABILITY_DENIED' => 'Không đủ quyền',
+            'NO_SEMANTIC_ATTACHMENT' => 'Thiếu quan hệ semantic bắt buộc cho Video',
+            'EVIDENCE_REQUIRED' => 'Thiếu Evidence cho quan hệ Video',
+            'CANONICAL_EVIDENCE_REQUIRED' => 'Thiếu Evidence canonical cho quan hệ Video',
+            'SOURCE_UNAVAILABLE' => 'Source của Evidence không khả dụng',
+            'SUBJECT_UNRESOLVED' => 'Chưa xác định được chủ thể chính xác',
+            'SUBJECT_SCOPE_MISMATCH' => 'Chủ thể không đúng phạm vi đã khóa',
+            'DUPLICATE_CANONICAL_VIDEO' => 'Video trùng external ID, cần dùng lại identity canonical',
         ];
         return isset($labels[$reason]) ? $labels[$reason] . ' (' . $reason . ')' : $reason;
     }
@@ -167,7 +174,9 @@ final class GovernanceQueueRenderer
     private static function renderResultItem(mixed $item, string $label): void
     {
         if (!is_array($item)) return;
-        echo '<li>' . esc_html($label . ': ' . (string) ($item['proposal_id'] ?? '') . ' — ' . self::failureReason($item['reason'] ?? 'OPERATION_FAILED')) . '</li>';
+        $status = trim((string) ($item['status'] ?? ''));
+        $statusLabel = ['APPLIED' => 'Đã áp dụng', 'REBUILT_AND_APPLIED' => 'Đã dựng lại và áp dụng', 'REUSED_CANONICAL' => 'Đã dùng lại canonical', 'SUPERSEDED' => 'Đã thay thế', 'BLOCKED' => 'Bị chặn', 'FAILED' => 'Thất bại'][$status] ?? $label;
+        echo '<li>' . esc_html($statusLabel . ': ' . (string) ($item['proposal_id'] ?? '') . ' — ' . self::failureReason($item['reason'] ?? 'OPERATION_FAILED')) . '</li>';
     }
 
     /** @param array<string,mixed> $filters */

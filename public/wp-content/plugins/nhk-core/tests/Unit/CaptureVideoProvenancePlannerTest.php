@@ -129,6 +129,18 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame('READY', $plan['status']);
     }
 
+    public function test_exact_variant_reference_in_source_title_can_confirm_current_variant_without_brand_fallback(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-odo-36-8',
+            $this->videoProposal('odo36eight1'),
+            $this->snapshot('odo36eight1', 'Số 67 – Ô-đô 36/8 Nguyên Bản – Đời Máy Ba Vách Bệt Đáng Sưu Tầm'),
+            ['id' => '852da54d-457a-4397-a16d-52d9452ba766', 'type' => 'variant', 'name' => 'Odo 36/8'],
+        );
+
+        self::assertSame('READY', $plan['status']);
+    }
+
     public function test_marketing_and_conflicting_classification_are_never_promoted(): void
     {
         $planner = new CaptureVideoProvenancePlanner();

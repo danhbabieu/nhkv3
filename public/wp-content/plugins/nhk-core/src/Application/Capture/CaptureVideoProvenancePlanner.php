@@ -157,6 +157,7 @@ final class CaptureVideoProvenancePlanner
     {
         $title = $this->normalize($title);
         if ($title === '') return false;
+        if (($subject['type'] ?? '') === 'variant' && $this->variantReferenceIdentifies($title, $subject)) return true;
         $terms = array_merge(
             [(string) ($subject['name'] ?? '')],
             array_map('strval', (array) ($subject['aliases'] ?? [])),
@@ -167,6 +168,14 @@ final class CaptureVideoProvenancePlanner
             if ($term !== '' && str_contains($title, $term)) return true;
         }
         return false;
+    }
+
+    private function variantReferenceIdentifies(string $title, array $subject): bool
+    {
+        $reference = (string) ($subject['reference'] ?? '');
+        if ($reference === '' && preg_match('/\b\d+\s*\/\s*\d+\b/u', (string) ($subject['name'] ?? ''), $match) === 1) $reference = $match[0];
+        $reference = $this->normalize($reference);
+        return $reference !== '' && str_contains($title, $reference);
     }
 
     /** @return list<string> */

@@ -3,9 +3,10 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Admin;
 
-use NHK\Core\Contracts\Governance\GovernanceActionPort;
+use NHK\Core\Contracts\Governance\{GovernanceActionPort, VideoProposalReconciliationPort};
 use NHK\Core\Domain\Governance\{EligibilityResult, Proposal, ProposalState};
 use NHK\Core\Governance\Exception\{GovernancePermissionDenied, InvalidProposalTransition, ProposalBindingConflict, ProposalNotFound};
+use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class GovernanceQueueActionService
@@ -23,6 +24,7 @@ final class GovernanceQueueActionService
         private GovernanceActionPort $port,
         private $can,
         private $actor,
+        private ?VideoProposalReconciliationPort $videoReconciliation = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -49,14 +51,20 @@ final class GovernanceQueueActionService
 
             if ($action === 'apply') {
                 $eligibility = $this->port->eligibility($id);
+                if ($this->videoReconciliation !== null && $proposal->entityType === 'video' && $proposal->operation === 'ingest' && $proposal->state === ProposalState::APPROVED && !$eligibility->ready && !$this->isIdempotentEligibility($eligibility)) {
+                    $reconciled = $this->videoReconciliation->reconcile($id);
+                    $success = in_array((string) ($reconciled['status'] ?? ''), ['APPLIED', 'REBUILT_AND_APPLIED', 'REUSED_CANONICAL', 'SUPERSEDED'], true);
+                    return ['ok' => $success, 'outcome' => $success ? 'success' : (($reconciled['status'] ?? '') === 'BLOCKED' ? 'skipped' : 'failed'), 'status' => $reconciled['status'] ?? ($success ? 'APPLIED' : 'FAILED'), 'proposal_id' => $id, 'action' => $action, 'state' => $success ? ProposalState::APPLIED->value : $proposal->state->value, 'reason' => $reconciled['reason'] ?? ($reconciled['blockers'][0] ?? null), 'result' => $reconciled];
+                }
                 if (!$eligibility->ready && !$this->isIdempotentEligibility($eligibility)) {
                     return array_merge($base, [
                         'outcome' => 'skipped',
+                        'status' => 'BLOCKED',
                         'reason' => $this->reason($eligibility->reasons),
                     ]);
                 }
                 $result = $this->port->apply($id);
-                return ['ok' => true, 'outcome' => 'success', 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'result' => $result];
+                return ['ok' => true, 'outcome' => 'success', 'status' => 'APPLIED', 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'result' => $result];
             }
 
             $result = match ($action) {
@@ -66,7 +74,7 @@ final class GovernanceQueueActionService
             };
             return ['ok' => true, 'outcome' => 'success', 'proposal_id' => $id, 'action' => $action, 'state' => $result->state->value, 'reason' => null];
         } catch (\Throwable $error) {
-            return array_merge($base, ['reason' => $this->exceptionReason($error), 'message' => $this->exceptionMessage($error)]);
+            return array_merge($base, ['status' => 'FAILED', 'reason' => $this->exceptionReason($error), 'message' => $this->exceptionMessage($error)]);
         }
     }
 
@@ -158,8 +166,18 @@ final class GovernanceQueueActionService
             $error instanceof GovernancePermissionDenied => 'CAPABILITY_DENIED',
             $error instanceof ProposalBindingConflict => 'STALE_BINDING',
             $error instanceof InvalidProposalTransition => 'INVALID_LIFECYCLE_ACTION',
-            default => 'OPERATION_FAILED',
+            $error instanceof DependencyValidationException => $error->errorCode,
+            default => $this->embeddedDomainCode($error) ?? 'OPERATION_FAILED',
         };
+    }
+
+    private function embeddedDomainCode(\Throwable $error): ?string
+    {
+        $numeric = (string) $error->getCode();
+        if (preg_match('/^[A-Z][A-Z0-9_]{2,63}$/', $numeric) === 1) return $numeric;
+        $message = trim($error->getMessage());
+        if (preg_match('/(?:^|:)([A-Z][A-Z0-9_]{2,63})$/', $message, $match) === 1) return $match[1];
+        return null;
     }
 
     private function exceptionMessage(\Throwable $error): string

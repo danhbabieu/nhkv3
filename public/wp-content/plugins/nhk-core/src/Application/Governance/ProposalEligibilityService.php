@@ -8,7 +8,7 @@ use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalStat
 
 final class ProposalEligibilityService
 {
-    public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader) {}
+    public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null) {}
 
     public function check(string $proposalId): EligibilityResult
     {
@@ -49,6 +49,7 @@ final class ProposalEligibilityService
                 if ($this->reader->targetRevision($dependencyUuid) !== $expectedRevision) $reasons[] = 'DEPENDENCY_REVISION_CHANGED';
             }
         }
+        if ($this->video !== null) $reasons = array_merge($reasons, $this->video->evaluate($proposal));
         foreach ($this->dependencies->closure($proposalId) as $dependency) if (!$this->reader->isApplied($dependency)) $reasons[] = 'DEPENDENCY_NOT_APPLIED';
         return $reasons ? EligibilityResult::blocked(...$reasons) : EligibilityResult::ready();
     }

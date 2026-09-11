@@ -61,6 +61,23 @@ final class GovernanceQueueRendererTest extends TestCase
         self::assertStringContainsString('Bản ghi đã thay đổi, cần tải lại (STALE_SNAPSHOT)', $html);
     }
 
+    public function test_reconciliation_statuses_and_domain_message_are_rendered(): void
+    {
+        ob_start();
+        GovernanceQueueRenderer::renderNotice([
+            'selected' => 2, 'succeeded' => 1, 'skipped' => 0, 'failed' => 1,
+            'failures' => [
+                ['proposal_id' => 'video-1', 'status' => 'REBUILT_AND_APPLIED', 'reason' => 'NO_SEMANTIC_ATTACHMENT'],
+                ['proposal_id' => 'video-2', 'status' => 'BLOCKED', 'reason' => 'EVIDENCE_REQUIRED'],
+            ],
+        ]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Đã dựng lại và áp dụng', $html);
+        self::assertStringContainsString('Thiếu quan hệ semantic bắt buộc cho Video (NO_SEMANTIC_ATTACHMENT)', $html);
+        self::assertStringContainsString('Thiếu Evidence cho quan hệ Video (EVIDENCE_REQUIRED)', $html);
+    }
+
     public function test_payload_names_are_escaped_and_terminal_rows_have_no_mutation_form(): void
     {
         $page = $this->pageWithTwoItems();

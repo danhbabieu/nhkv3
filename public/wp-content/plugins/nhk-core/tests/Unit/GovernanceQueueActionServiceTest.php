@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHKTests\Unit;
 
 use NHK\Core\Contracts\Governance\GovernanceActionPort;
+use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
 use NHK\Core\Domain\Governance\{EligibilityResult, Proposal, ProposalState};
 use NHK\Core\Infrastructure\Admin\GovernanceQueueActionService;
 use PHPUnit\Framework\TestCase;
@@ -219,6 +220,51 @@ final class GovernanceQueueActionServiceTest extends TestCase
         self::assertStringNotContainsString('secret', $result['message']);
     }
 
+    public function test_apply_preserves_domain_code_from_video_executor_failure(): void
+    {
+        $this->port->proposals[self::FIRST] = $this->proposal(self::FIRST, ProposalState::APPROVED);
+        $this->port->throwOn['apply'] = new \RuntimeException('VIDEO_COMPLETENESS_BLOCKED:NO_SEMANTIC_ATTACHMENT');
+
+        $result = $this->service->execute('apply', self::FIRST, $this->snapshot(self::FIRST, ProposalState::APPROVED));
+
+        self::assertFalse($result['ok']);
+        self::assertSame('NO_SEMANTIC_ATTACHMENT', $result['reason']);
+        self::assertSame('failed', $result['outcome']);
+    }
+
+    public function test_approved_video_apply_rebuilds_when_current_eligibility_is_not_ready(): void
+    {
+        $this->port->proposals[self::FIRST] = new Proposal(self::FIRST, 'video-subject', 'ingest', ['canonical_id' => self::FIRST], 'content-' . self::FIRST, 1, 'dependency-' . self::FIRST, ProposalState::APPROVED, idempotencyKey: 'video-' . self::FIRST, entityType: 'video');
+        $this->port->eligibility[self::FIRST] = EligibilityResult::blocked('APPROVAL_BINDING_MISMATCH');
+        $reconciliation = new class implements VideoProposalReconciliationPort {
+            public array $ids = [];
+            public function reconcile(string $proposalId): array { $this->ids[] = $proposalId; return ['status' => 'REBUILT_AND_APPLIED', 'canonical_id' => '018f2f1e-7b2c-7abc-8def-0123456789ac']; }
+        };
+        $service = new GovernanceQueueActionService($this->port, static fn (string $capability): bool => true, static fn (): string => '7', $reconciliation);
+
+        $result = $service->execute('apply', self::FIRST, $this->snapshot(self::FIRST, ProposalState::APPROVED));
+
+        self::assertTrue($result['ok']);
+        self::assertSame('REBUILT_AND_APPLIED', $result['status']);
+        self::assertSame([self::FIRST], $reconciliation->ids);
+        self::assertSame(['eligibility'], $this->port->callsFor(self::FIRST));
+    }
+
+    public function test_approved_video_apply_uses_direct_apply_when_current_eligibility_is_ready(): void
+    {
+        $this->port->proposals[self::FIRST] = new Proposal(self::FIRST, 'video-subject', 'ingest', ['canonical_id' => self::FIRST], 'content-' . self::FIRST, 1, 'dependency-' . self::FIRST, ProposalState::APPROVED, idempotencyKey: 'video-' . self::FIRST, entityType: 'video');
+        $reconciliation = new class implements VideoProposalReconciliationPort {
+            public function reconcile(string $proposalId): array { throw new \LogicException('READY_VIDEO_MUST_NOT_REBUILD'); }
+        };
+        $service = new GovernanceQueueActionService($this->port, static fn (string $capability): bool => true, static fn (): string => '7', $reconciliation);
+
+        $result = $service->execute('apply', self::FIRST, $this->snapshot(self::FIRST, ProposalState::APPROVED));
+
+        self::assertTrue($result['ok']);
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame(['eligibility', 'apply'], $this->port->callsFor(self::FIRST));
+    }
+
     public function test_invalid_action_identifier_missing_capability_and_lifecycle_fail_closed(): void
     {
         self::assertSame('INVALID_ACTION', $this->service->execute('publish', self::FIRST)['reason']);
@@ -309,7 +355,7 @@ final class RecordingGovernanceActionPort implements GovernanceActionPort
     public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { if (isset($this->throwOn['approve'])) throw $this->throwOn['approve']; $this->calls[] = ['action' => 'approve', 'id' => $id]; $this->actors[] = $actor; return $this->proposals[$id]->transition(ProposalState::APPROVED, $actor); }
     public function reject(string $id, string $actor): Proposal { $this->calls[] = ['action' => 'reject', 'id' => $id]; $this->actors[] = $actor; return $this->proposals[$id]->transition(ProposalState::REJECTED, $actor); }
     public function eligibility(string $id): EligibilityResult { $this->calls[] = ['action' => 'eligibility', 'id' => $id]; return $this->eligibility[$id] ?? EligibilityResult::ready(); }
-    public function apply(string $id): array { $this->calls[] = ['action' => 'apply', 'id' => $id]; return ['proposal_id' => $id, 'idempotent' => $this->proposals[$id]->state === ProposalState::APPLIED]; }
+    public function apply(string $id): array { if (isset($this->throwOn['apply'])) throw $this->throwOn['apply']; $this->calls[] = ['action' => 'apply', 'id' => $id]; return ['proposal_id' => $id, 'idempotent' => $this->proposals[$id]->state === ProposalState::APPLIED]; }
 
     /** @return list<string> */
     public function callsFor(string $id): array { return array_column(array_values(array_filter($this->calls, static fn (array $call): bool => $call['id'] === $id && $call['action'] !== 'find')), 'action'); }

@@ -109,7 +109,7 @@ final class GovernanceQueueAdminPage
         if (self::$actionServiceFactory !== null) return (self::$actionServiceFactory)();
         global $wpdb;
         $runtime = GovernanceRuntimeFactory::fromWordPress($wpdb);
-        return new GovernanceQueueActionService(new \NHK\Core\Application\Governance\CanonicalGovernanceActionPort($runtime->proposals, $runtime->governance, $runtime->eligibility, $runtime->controlledApply), static fn (string $capability): bool => current_user_can($capability), static fn (): int => get_current_user_id());
+        return new GovernanceQueueActionService(new \NHK\Core\Application\Governance\CanonicalGovernanceActionPort($runtime->proposals, $runtime->governance, $runtime->eligibility, $runtime->controlledApply), static fn (string $capability): bool => current_user_can($capability), static fn (): int => get_current_user_id(), $runtime->videoReconciliation);
     }
 
     public static function setTestQuery(GovernanceQueueQuery $query): void { self::$queryFactory = static fn (): GovernanceQueueQuery => $query; }

@@ -5,11 +5,12 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Authority\{AuthorityService, SemanticMergeService};
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
-use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceService, ProposalEligibilityService, WordPressGovernanceAuthorizer};
+use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceService, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
+use NHK\Core\Application\Semantic\{CanonicalAuthoritySubjectResolver, SubjectResolutionService};
 use NHK\Core\Contracts\Governance\ProposalRepository;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
@@ -21,6 +22,8 @@ use NHK\Core\Infrastructure\Governance\WpdbAuditSink as GovernanceAuditSink;
 use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepository, WpdbSourceRepository};
 use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
+use NHK\Core\Application\PublicIdentity\PublicIdentityService;
+use NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository;
 
 final class GovernanceRuntimeFactory
 {
@@ -44,7 +47,14 @@ final class GovernanceRuntimeFactory
         $governanceAudit = new GovernanceAuditSink($wpdb);
         $transactionManager = new WpdbTransactionManager($wpdb);
         $governance = new GovernanceService($proposalRepository, $governanceAudit, $transactionManager, new WordPressGovernanceAuthorizer());
-        $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence));
+        $targetActive = static function (string $type, string $id) use ($authority, $types, $media, $videos, $claims, $sources, $evidence): bool {
+            $record = $types->has($type) ? $authority->findByCanonicalId($id) : match ($type) {
+                'media' => $media->findByCanonicalId($id), 'video' => $videos->findByCanonicalId($id), 'knowledge' => $claims->findByCanonicalId($id), 'source' => $sources->findByCanonicalId($id), 'evidence' => $evidence->findByCanonicalId($id), default => null,
+            };
+            if ($record === null) return false;
+            return method_exists($record, 'active') ? (bool) $record->active() : (bool) ($record->active ?? false);
+        };
+        $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence), new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), new SubjectResolutionService(new CanonicalAuthoritySubjectResolver($authority, $types)), $targetActive));
         $authorityService = new AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink($governanceAudit));
         $mediaService = new MediaService($media, $assets, $usages);
         $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
@@ -103,6 +113,29 @@ final class GovernanceRuntimeFactory
             $canonicalReadBack,
         );
 
-        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply);
+        $reconciliationPolicies = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver(['video'], new WpOptionAutomationPolicyStorage(['video']));
+        $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
+        $publicIdentityService = new PublicIdentityService($publicIdentityRepository, static fn (string $slug): bool => false);
+        $videoReconciliation = new \NHK\Core\Application\Video\VideoProposalReconciliationService(
+            $proposalRepository,
+            new \NHK\Core\Application\Governance\CanonicalGovernedLifecycleAdapter($governance, $eligibility),
+            $governance,
+            $eligibility,
+            static fn (string $id): array => $controlledApply->apply($id),
+            $videos,
+            $sources,
+            $claims,
+            $evidence,
+            new \NHK\Core\Application\Capture\CaptureVideoProvenancePlanner(),
+            new SubjectResolutionService(new CanonicalAuthoritySubjectResolver($authority, $types)),
+            $reconciliationPolicies,
+            static fn (string $capability): bool => !function_exists('current_user_can') || current_user_can($capability),
+            static fn (): string => function_exists('get_current_user_id') ? (string) get_current_user_id() : 'video-reconciler',
+            null,
+            $publicIdentityService,
+            $publicIdentityRepository,
+        );
+
+        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation);
     }
 }
