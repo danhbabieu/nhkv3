@@ -7527,7 +7527,7 @@ Variant Odo `852da54d-457a-4397-a16d-52d9452ba766` can be selected from the
 exact source title without broadening to Brand; external Video reuse remains
 platform + external ID keyed.
 
-TEST: Focused ROOT repair suite passes 51 tests / 230 assertions. Full tracked
+TEST: Focused ROOT repair suite passes 51 tests / 232 assertions. Full tracked
 Unit suite (excluding the concurrently untracked Visual Support test) passes
 1,077 tests / 5,460 assertions with existing warnings/deprecations.
 `composer lint`, `composer validate --no-check-publish`, PHP lint and
@@ -7544,3 +7544,24 @@ available.
 
 STATUS: LOCAL ROOT REPAIR CODE / REGRESSION COMPLETE; exact commit deployment
 and live read-back remain environment-gated. PUSH STATUS = NOT PUSHED.
+
+# Checkpoint — 2026-09-11 — ROOT repair push and DEMO cutover gate
+
+PUSH: Verified commit `56f10d6f` after post-commit focused regression and
+successfully pushed `bd385ad5..56f10d6f` to `origin/main`.
+
+DEMO DEPLOYMENT: The canonical command
+`./scripts/nhk-demo-cutover --target=demo.1945.vn --pack=odo --json` was
+attempted for that exact commit. It failed closed with
+`status=blocked`, `reason_code=REMOTE_DEPLOYMENT_CONFIG_REQUIRED`. No remote
+deployment receipt, live build identity, documentation fingerprint or
+authenticated Admin session was available.
+
+LIVE EFFECT: The exact 16 Proposal Queue Reconciler run was not attempted
+because the target artifact was not verified. No DEMO, staging, production,
+V2, local database or semantic record was mutated. Video/Graph/Public Identity
+read-back and documentation bootstrap remain pending the authorized remote
+deployment configuration and authenticated live runtime boundary.
+
+STATUS: ROOT REPAIR COMMIT PUSHED; DEMO DEPLOYMENT AND LIVE RECONCILIATION
+BLOCKED BY `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`. Do not mark live repair complete.
