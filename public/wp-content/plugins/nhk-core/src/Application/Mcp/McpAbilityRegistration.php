@@ -378,16 +378,21 @@ final class McpAbilityRegistration
     {
         $request = new \WP_REST_Request('POST', '/nhk/v1/mcp');
         $request->set_header('Content-Type', 'application/json');
-        if (in_array($tool, ['nhk.media.upload-batch', 'nhk.capture.ingest'], true) && isset($_FILES) && is_array($_FILES)) {
+        $files = isset($_FILES) && is_array($_FILES) ? $_FILES : [];
+        if (self::requiresNativeTransportFiles($tool, $input, $files)) {
+            return new \WP_Error('nhk_native_file_required', 'Native multipart file parts are required when files are supplied.', ['status' => 422]);
+        }
+        if (in_array($tool, ['nhk.media.upload-batch', 'nhk.capture.ingest'], true) && $files !== []) {
             // Preserve connector multipart parts while delegating to the
             // canonical custom transport; bytes never enter Ability JSON.
-            $request->set_file_params($_FILES);
+            $request->set_file_params($files);
         }
+        $arguments = self::canonicalTransportArguments($tool, $input);
         $request->set_body((string) wp_json_encode([
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/call',
-            'params' => ['name' => $tool, 'arguments' => is_array($input) ? $input : []],
+            'params' => ['name' => $tool, 'arguments' => $arguments],
         ]));
         $response = rest_do_request($request);
         if (is_wp_error($response)) return $response;
@@ -402,6 +407,41 @@ final class McpAbilityRegistration
             return new \WP_Error('nhk_mcp_' . strtolower($code), (string) (($result['content'][0]['text'] ?? 'NHK V3 MCP call failed.')), ['status' => 422, 'reason_code' => $code, 'diagnostic' => $diagnostic]);
         }
         return $result['structuredContent'] ?? null;
+    }
+
+    /** @return array<string,mixed> */
+    public static function canonicalTransportArguments(string $tool, mixed $input): array
+    {
+        $arguments = is_array($input) ? $input : [];
+        if (in_array($tool, ['nhk.media.upload-batch', 'nhk.capture.ingest'], true)) unset($arguments['files']);
+        return $arguments;
+    }
+
+    /** @param array<string,mixed> $files */
+    public static function requiresNativeTransportFiles(string $tool, mixed $input, array $files): bool
+    {
+        if (!in_array($tool, ['nhk.media.upload-batch', 'nhk.capture.ingest'], true) || !is_array($input) || !array_key_exists('files', $input)) return false;
+        if (!is_array($input['files']) || $input['files'] === []) return false;
+
+        return !self::containsNativeUploadedFile($files['files'] ?? null);
+    }
+
+    private static function containsNativeUploadedFile(mixed $value): bool
+    {
+        if (!is_array($value)) return false;
+        if (array_key_exists('tmp_name', $value)) {
+            $temporaryNames = $value['tmp_name'];
+            $errors = $value['error'] ?? null;
+            if (is_string($temporaryNames)) return $temporaryNames !== '' && ($errors === null || $errors === UPLOAD_ERR_OK);
+            if (!is_array($temporaryNames)) return false;
+            foreach ($temporaryNames as $index => $temporaryName) {
+                $error = is_array($errors) ? ($errors[$index] ?? null) : $errors;
+                if (is_string($temporaryName) && $temporaryName !== '' && ($error === null || $error === UPLOAD_ERR_OK)) return true;
+            }
+            return false;
+        }
+        foreach ($value as $nested) if (self::containsNativeUploadedFile($nested)) return true;
+        return false;
     }
 
     private static function executeGoverned(string $tool, mixed $input): mixed

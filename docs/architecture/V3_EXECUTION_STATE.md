@@ -1,5 +1,49 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-11 — Easy MCP native Capture validation-boundary repair
+
+WHAT: Repaired the narrow Easy MCP compatibility boundary for native Capture
+files. During the supported Easy MCP nested proxy dispatch, the adapter now
+uses the `wp_ability_normalize_input` boundary to flatten the native PHP
+`$_FILES['files']` collection into the Ability validation representation before
+`WP_Ability::validate_input()`. `McpAbilityRegistration` then removes the
+validation-only `files` descriptors from the JSON envelope while preserving
+the native file bag for `/nhk/v1/mcp`. No validator was weakened, no binary was
+encoded, and no direct Media/WordPress writer was added.
+
+ROOT CAUSE: Easy MCP 1.7.16's Dynamic Tool executor passes JSON arguments
+directly to `WP_Ability::execute()` and has no native multipart injection.
+Ability normalization/validation therefore ran before the existing callback
+could transfer `$_FILES`, producing `input[files][0] is not of type object`.
+The upstream Gemini schema sanitizer preserves `files.items` as an object and
+`format=binary`; the missing `_meta` is a separate Easy MCP serializer loss.
+The adapter projects canonical `_meta[openai/fileParams]` at both REST response
+boundaries, while the client-side `string[]` conversion still requires fresh
+live `tools/list` evidence to attribute definitively.
+
+FILES: `EasyMcpNativeFileCompatibilityAdapter.php` adds exact target/version
+normalization and native descriptor flattening; `McpAbilityRegistration.php`
+keeps file bytes out of canonical JSON arguments and rejects non-empty file
+input when no native file collection exists; focused adapter, wiring and
+transport tests cover the boundary.
+
+VERIFICATION: focused adapter/wiring slice passes 22 tests / 76 assertions;
+NHK Unit passes 1,158 tests / 5,738 assertions (warnings/deprecations are
+pre-existing suite notices); changed-file PHP lint and `git diff --check` pass.
+The guarded Easy MCP integration test reached local WordPress but stopped at
+the database bootstrap (`Error establishing a database connection`). No
+Capture, Article, attachment, Media, or semantic mutation was performed.
+
+DOC GATE: repository canonical snapshot remains
+`documentation_version=fbf1c1065f6b2924cac786d551d94d957c43e2e3653ef7cd13c04f29b1b3af17`,
+`manifest_hash=9471a2f61b7d0c440eeae7ff7497171def59447b569e02c9066edb7e58adf13f`;
+the supplied live checkpoint is
+`8647e1eb83799902845a80047c3ec8fb01e099b5a0065ec0848451d7550a5bcf` /
+`109c5f0dce7d1e877cd749769cc1970e1895cd9dfca1124a43d2a6bf3521965c`.
+This mismatch remains fail-closed and blocks live acceptance/deploy claims.
+
+STATUS: IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING.
+
 # Checkpoint — 2026-09-11 — Easy MCP Capture schema exposure repair
 
 WHAT: Repaired the Easy MCP compatibility boundary for the canonical

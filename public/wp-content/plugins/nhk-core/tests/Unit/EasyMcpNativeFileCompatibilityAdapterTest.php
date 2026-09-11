@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
 use NHK\Core\Application\Mcp\McpToolCatalog;
+use NHK\Core\Application\Mcp\McpAbilityRegistration;
 use PHPUnit\Framework\TestCase;
 
 final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
@@ -252,6 +253,65 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
 
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $textOnly, [], '1.7.16'));
         self::assertFalse(EasyMcpNativeFileCompatibilityAdapter::shouldHandle('/easy-mcp-ai/v1/mcp', $internal, $files, '1.7.16'));
+    }
+
+    public function test_native_capture_files_are_normalized_before_ability_validation(): void
+    {
+        $input = [
+            'idempotency_key' => 'capture-native-file-test',
+            'documentation_checkpoint' => ['documentation_version' => 'doc', 'manifest_hash' => 'hash'],
+            'files' => ['file_000000009f0082119bfda7a3663e9084'],
+        ];
+        $files = ['files' => [
+            'name' => ['camera.jpg'],
+            'type' => ['image/jpeg'],
+            'tmp_name' => ['/tmp/php-native-camera'],
+            'error' => [UPLOAD_ERR_OK],
+            'size' => [1234],
+        ]];
+
+        $normalized = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput(
+            $input,
+            'nhk-v3/capture-ingest',
+            $files,
+            '1.7.16'
+        );
+
+        self::assertSame([
+            [
+                'name' => 'camera.jpg',
+                'type' => 'image/jpeg',
+                'tmp_name' => '/tmp/php-native-camera',
+                'error' => UPLOAD_ERR_OK,
+                'size' => 1234,
+            ],
+        ], $normalized['files']);
+        self::assertNotSame(['file_000000009f0082119bfda7a3663e9084'], $normalized['files']);
+    }
+
+    public function test_native_capture_files_are_not_put_into_canonical_json_arguments(): void
+    {
+        $arguments = McpAbilityRegistration::canonicalTransportArguments('nhk.capture.ingest', [
+            'text' => 'caption',
+            'files' => [[
+                'name' => 'camera.jpg',
+                'tmp_name' => '/tmp/php-native-camera',
+                'type' => 'image/jpeg',
+                'error' => UPLOAD_ERR_OK,
+                'size' => 1234,
+            ]],
+        ]);
+
+        self::assertSame(['text' => 'caption'], $arguments);
+    }
+
+    public function test_nonempty_file_input_requires_native_transport_parts(): void
+    {
+        self::assertTrue(McpAbilityRegistration::requiresNativeTransportFiles('nhk.capture.ingest', [
+            'files' => [['name' => 'camera.jpg', 'tmp_name' => '/tmp/not-a-wire-part']],
+        ], []));
+        self::assertFalse(McpAbilityRegistration::requiresNativeTransportFiles('nhk.capture.ingest', ['files' => []], []));
+        self::assertFalse(McpAbilityRegistration::requiresNativeTransportFiles('nhk.capture.ingest', ['text' => 'caption'], []));
     }
 
     public function test_native_file_scope_makes_request_files_available_to_ability_and_restores_global_state(): void

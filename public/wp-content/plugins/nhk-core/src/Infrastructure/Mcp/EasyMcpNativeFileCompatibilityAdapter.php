@@ -30,6 +30,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (self::$registered || !function_exists('add_filter')) return;
         self::$registered = true;
         add_filter('rest_request_before_callbacks', [self::class, 'interceptMultipartCapture'], 10, 3);
+        add_filter('wp_ability_normalize_input', [self::class, 'normalizeAbilityInput'], 10, 3);
         // Easy MCP versions differ in whether their Streamable HTTP response
         // is finalized before or after WordPress serializes the REST response.
         // Project at both canonical WordPress boundaries so the connector
@@ -101,6 +102,34 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
         $batch = $files['files'] ?? null;
         return is_array($batch) && self::containsNativeFile($batch);
+    }
+
+    /**
+     * Normalize native multipart files before WP Ability validation.
+     *
+     * Easy MCP executes the Ability directly with JSON arguments and does not
+     * know about WP_REST_Request file params. The native PHP file bag therefore
+     * has to be represented in the Ability's validation shape at this boundary;
+     * the callback later removes it from JSON and reuses the native file bag.
+     */
+    public static function normalizeAbilityInput(mixed $input, string $abilityName, mixed $ability): mixed
+    {
+        if (!self::$proxyDispatch || !self::isSupportedInstalledVersion()) return $input;
+        $files = isset($_FILES) && is_array($_FILES) ? $_FILES : [];
+
+        return self::normalizeNativeFileInput($input, $abilityName, $files, self::installedVersion());
+    }
+
+    /** @param array<string,mixed> $files @return mixed */
+    public static function normalizeNativeFileInput(mixed $input, string $abilityName, array $files, string $version): mixed
+    {
+        if ($abilityName !== 'nhk-v3/capture-ingest' || !is_array($input) || !self::isSupportedVersion($version)) return $input;
+
+        $nativeFiles = self::nativeFileDescriptors($files['files'] ?? null);
+        if ($nativeFiles === []) return $input;
+
+        $input['files'] = $nativeFiles;
+        return $input;
     }
 
     public static function interceptMultipartCapture(mixed $response, mixed $handler, mixed $request): mixed
@@ -189,6 +218,52 @@ final class EasyMcpNativeFileCompatibilityAdapter
     {
         if (!is_string($temporaryName) || $temporaryName === '') return false;
         return $error === null || $error === UPLOAD_ERR_OK;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function nativeFileDescriptors(mixed $value): array
+    {
+        if (!is_array($value)) return [];
+
+        if (array_key_exists('tmp_name', $value)) {
+            $temporaryNames = $value['tmp_name'];
+            $descriptors = [];
+            if (is_array($temporaryNames)) {
+                foreach ($temporaryNames as $index => $temporaryName) {
+                    $error = is_array($value['error'] ?? null) ? ($value['error'][$index] ?? UPLOAD_ERR_OK) : ($value['error'] ?? UPLOAD_ERR_OK);
+                    $descriptor = self::nativeFileDescriptor($value, $index, $temporaryName, $error);
+                    if ($descriptor !== null) $descriptors[] = $descriptor;
+                }
+            } else {
+                $descriptor = self::nativeFileDescriptor($value, null, $temporaryNames, $value['error'] ?? UPLOAD_ERR_OK);
+                if ($descriptor !== null) $descriptors[] = $descriptor;
+            }
+            return $descriptors;
+        }
+
+        $descriptors = [];
+        foreach ($value as $nested) {
+            foreach (self::nativeFileDescriptors($nested) as $descriptor) $descriptors[] = $descriptor;
+        }
+        return $descriptors;
+    }
+
+    /** @param array<string,mixed> $file @return array<string,mixed>|null */
+    private static function nativeFileDescriptor(array $file, int|string|null $index, mixed $temporaryName, mixed $error): ?array
+    {
+        if (!self::isSuccessfulUpload($temporaryName, $error)) return null;
+        $value = static function (string $key) use ($file, $index): mixed {
+            $candidate = $file[$key] ?? '';
+            return $index !== null && is_array($candidate) ? ($candidate[$index] ?? '') : $candidate;
+        };
+
+        return [
+            'name' => (string) $value('name'),
+            'type' => (string) $value('type'),
+            'tmp_name' => (string) $temporaryName,
+            'error' => is_int($error) ? $error : (int) $error,
+            'size' => (int) $value('size'),
+        ];
     }
 
     /** @param array<string,mixed> $files */
