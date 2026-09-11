@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-11 — Easy MCP Capture schema exposure repair
+
+WHAT: Repaired the Easy MCP compatibility boundary for the canonical
+`nhk.capture.ingest` descriptor. The adapter now projects the catalog-owned
+schema at both WordPress REST response boundaries used by Easy MCP:
+`rest_post_dispatch` and `rest_pre_echo_response`. This preserves
+`capture_id`, typed `purpose`, `authority_intent` and approval fields together
+with native multipart `files[]` metadata without adding a schema owner or
+changing Capture/Authority/Graph/Governance/Article dispatch.
+
+ROOT CAUSE: The previous implementation only registered the final echo hook.
+Easy MCP materializes its `WP_REST_Response` from the dynamic Ability tool
+registry, so a response path that completed at `rest_post_dispatch` could
+return the stale Ability projection before the final projection hook ran.
+The fix restores the earlier response-object projection and keeps the final
+echo projection as a compatibility guard; both use `McpToolCatalog`.
+
+VERIFICATION: Unit exposure tests pass 56 tests / 544 assertions across the
+adapter, Plugin wiring, Capture MCP contract and conversational-authority MCP
+contract selection. The new regression proves the response-object path
+restores `capture_id`, `EDITORIAL/AUTHORITY/MIXED`, `PLAN/APPLY_APPROVED_PLAN`,
+approval fields and `_meta["openai/fileParams"]`. The repository does not
+contain the Easy MCP package, so WordPress/Easy MCP integration remains
+environment-gated and must be re-run after deployment. No `capture.ingest`
+call, live mutation or deployment was performed.
+
+SOURCE STATUS: Local HEAD remains the owner-provided implementation commit
+`4017c21ea6b6714ad99071e9f48e89e585ab1ccb`; this checkpoint is the bounded
+exposure repair on top of it.
+
 # Checkpoint — 2026-09-11 — Governed Conversational Authority implementation
 
 WHAT: Implemented typed Capture purposes, planning-only Authority intent

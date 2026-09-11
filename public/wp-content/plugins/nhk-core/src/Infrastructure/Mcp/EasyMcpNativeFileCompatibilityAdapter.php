@@ -30,6 +30,11 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (self::$registered || !function_exists('add_filter')) return;
         self::$registered = true;
         add_filter('rest_request_before_callbacks', [self::class, 'interceptMultipartCapture'], 10, 3);
+        // Easy MCP versions differ in whether their Streamable HTTP response
+        // is finalized before or after WordPress serializes the REST response.
+        // Project at both canonical WordPress boundaries so the connector
+        // cannot receive the stale Ability schema from either path.
+        add_filter('rest_post_dispatch', [self::class, 'projectToolsListDescriptor'], 10, 3);
         // WordPress applies rest_post_dispatch before it converts the response
         // object to the data that is actually JSON-encoded. Project at the
         // final echo boundary so Easy MCP/WordPress cannot serve a descriptor
@@ -70,6 +75,20 @@ final class EasyMcpNativeFileCompatibilityAdapter
         }
 
         return $tools;
+    }
+
+    public static function projectToolsListDescriptor(mixed $response, mixed $server, mixed $request): mixed
+    {
+        if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
+        $rpc = self::requestRpc($request);
+        if ($rpc !== null && ($rpc['method'] ?? null) !== 'tools/list') return $response;
+        if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
+
+        $data = $response->get_data();
+        if (!is_array($data)) return $response;
+        $projected = self::projectToolsListData($data);
+        if ($projected !== $data) $response->set_data($projected);
+        return $response;
     }
 
     /** @param array<string,mixed> $rpc @param array<string,mixed> $files */

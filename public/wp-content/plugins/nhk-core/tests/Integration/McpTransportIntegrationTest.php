@@ -106,6 +106,13 @@ final class McpTransportIntegrationTest extends TestCase
                 self::assertTrue($ability->get_meta_item('public'));
                 self::assertTrue($ability->get_meta_item('show_in_rest'));
                 self::assertSame(['files'], $ability->get_meta_item('_meta')['openai/fileParams']);
+                $captureSchema = $ability->get_input_schema();
+                self::assertSame(['EDITORIAL', 'AUTHORITY', 'MIXED'], $captureSchema['properties']['purpose']['enum']);
+                self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $captureSchema['properties']['authority_intent']['properties']['mode']['enum']);
+                self::assertArrayHasKey('approved_plan_fingerprint', $captureSchema['properties']['authority_intent']['properties']);
+                self::assertArrayHasKey('approved_candidate_ids', $captureSchema['properties']['authority_intent']['properties']);
+                self::assertArrayHasKey('title', $captureSchema['properties']);
+                self::assertArrayHasKey('excerpt', $captureSchema['properties']);
             } elseif (in_array($abilityName, [
                 'nhk-v3/article-publish-review',
                 'nhk-v3/article-publish-approve',

@@ -86,6 +86,43 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame($easyMcpTools[1], $tools['wp_ability_nhk_v3_media_ingest']);
     }
 
+    public function test_rest_post_dispatch_projects_capture_schema_before_final_echo(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']; }
+        };
+        $response = new class {
+            /** @var array<string,mixed> */
+            private array $data = ['result' => ['tools' => [[
+                'name' => 'wp_ability_nhk_v3_capture_ingest',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'idempotency_key' => ['type' => 'string'],
+                    'documentation_checkpoint' => ['type' => 'object'],
+                    'text' => ['type' => 'string'],
+                    'files' => ['type' => 'array'],
+                ], 'required' => ['idempotency_key', 'documentation_checkpoint']],
+            ]]]];
+
+            /** @return array<string,mixed> */
+            public function get_data(): array { return $this->data; }
+
+            /** @param array<string,mixed> $data */
+            public function set_data(array $data): void { $this->data = $data; }
+        };
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectToolsListDescriptor($response, null, $request);
+        $capture = $projected->get_data()['result']['tools'][0];
+        $properties = $capture['inputSchema']['properties'];
+
+        self::assertArrayHasKey('capture_id', $properties);
+        self::assertSame(['EDITORIAL', 'AUTHORITY', 'MIXED'], $properties['purpose']['enum']);
+        self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $properties['authority_intent']['properties']['mode']['enum']);
+        self::assertArrayHasKey('approved_plan_fingerprint', $properties['authority_intent']['properties']);
+        self::assertArrayHasKey('approved_candidate_ids', $properties['authority_intent']['properties']);
+        self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
+    }
+
     /**
      * Minimal executable model of Easy MCP 1.7.16's ability registration,
      * definition materialization, tools/list sanitization, and JSON-RPC
