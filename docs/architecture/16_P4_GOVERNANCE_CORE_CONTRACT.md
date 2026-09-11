@@ -44,6 +44,16 @@ while `AUTO_PUBLISH` must also prove projection and frontend availability before
 reporting publication success. Automated actions use the existing system actor
 convention and are auditable separately from human actions.
 
+Conversational Authority adds the bounded setting `OFF`, `REVIEW_REQUIRED` or
+`AUTO_APPROVE_AFTER_OWNER_CONFIRMATION`. Its effective mode is the stricter of
+the generic Governance policy and this setting: Authority `OFF` blocks apply;
+generic review or Authority review remains review-required even if the other
+side is automatic. Owner confirmation authorizes only the exact candidate IDs
+and plan fingerprint; it never bypasses authentication, capability,
+Governance, eligibility, registry or revision checks. Automatic Authority
+creation still executes Proposal → Submit → Approve → Eligibility → Controlled
+Apply → canonical read-back.
+
 Media file adoption is not a parallel governance bypass: adapters submit to the
 canonical governed Media V3 boundary, where idempotency, payload validation,
 source-original PRIVATE retention, derivative visibility and cleanup of partial

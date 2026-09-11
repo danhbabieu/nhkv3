@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-11 — Governed Conversational Authority implementation
+
+WHAT: Implemented typed Capture purposes, planning-only Authority intent
+resolution, server-owned stable-key previews, facet decomposition, registered
+`subtype_of`/`classified_as` Graph policy, exact plan approval binding,
+strictest Governance policy resolution, Authority Capture continuation and
+shared Controlled Apply batch orchestration. Authority-only Capture has no
+WordPress Post; MIXED owns at most one Post and continues on the same Capture.
+
+VERIFICATION: Focused conversational-authority/MCP/Graph/Governance/Admin
+selection passes 34 tests / 105 assertions. The full NHK Unit suite passes
+1,141 tests / 5,660 assertions. Full Composer suite remains
+environment-blocked by missing WordPress/database bootstrap and pre-existing
+contract failures; see final implementation report for exact counts. Composer
+PHP lint passes for the repository. No live/demo semantic data or deployment
+was performed.
+
+RUNTIME STATUS: Local catalog/transport dispatch was exercised for PLAN and
+same-Capture APPLY_APPROVED_PLAN. Final documentation bootstrap identities are
+reported from the post-generation verification command. Live connector
+tools/list and deployed read-back remain pending the post-push deployment
+environment.
+
+MIGRATION STATUS: Capture purpose/plan state uses the existing bounded
+`context_json` contract; Classification family is audited and unresolved rows
+fail closed before hierarchy apply. No legacy backfill or data mutation was
+run.
+
+DEPLOYMENT STATUS: NOT_PERFORMED. Push is a source handoff only.
+
 # Checkpoint — 2026-09-11 — Visual Support Requirement implementation closeout
 
 WHAT: Completed the approved application-level `VisualSupportRequirement`

@@ -37,6 +37,7 @@ final readonly class CaptureRecord
     {
         return [
             'capture_id' => $this->captureId,
+            'purpose' => (string) ($this->context['purpose'] ?? CapturePurpose::EDITORIAL->value),
             'idempotency_key' => $this->idempotencyKey,
             'request_fingerprint' => $this->requestFingerprint,
             'stage' => $this->stage,
@@ -45,6 +46,9 @@ final readonly class CaptureRecord
             'article_state_token' => $this->articleStateToken,
             'assets' => $this->assets,
             'context' => $this->context,
+            'authority_plan' => $this->context['authority_plan'] ?? null,
+            'plan_fingerprint' => $this->context['plan_fingerprint'] ?? null,
+            'authority_intent' => $this->context['authority_intent'] ?? null,
             'diagnostics' => $this->diagnostics,
             'phase_receipts' => $this->phaseReceipts,
             'revision' => $this->revision,

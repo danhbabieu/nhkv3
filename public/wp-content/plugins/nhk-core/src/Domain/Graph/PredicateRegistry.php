@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace NHK\Core\Domain\Graph;
 use NHK\Core\Graph\Exception\UnknownPredicate;
 final class PredicateRegistry {
+    public const VERSION = '1.0.0';
     /** @var array<string,PredicateDefinition> */ private array $definitions = [];
     public function __construct() {
         $all=['wp_post','brand','model','variant','movement','music','component','classification','specimen','product','knowledge','source','media','video','evidence'];
@@ -14,6 +15,8 @@ final class PredicateRegistry {
         $this->register(new PredicateDefinition('supports_music',['movement'],['music']));
         $this->register(new PredicateDefinition('configured_with_music',['variant'],['music']));
         $this->register(new PredicateDefinition('observed_playing_music',['specimen'],['music']));
+        $this->register(new PredicateDefinition('subtype_of',['classification'],['classification'],'ONE','MANY'));
+        $this->register(new PredicateDefinition('classified_as',['model','variant','specimen','product'],['classification']));
     }
     public function register(PredicateDefinition $definition): void { $this->definitions[$definition->key]=$definition; }
     public function get(string $key): PredicateDefinition { if (!isset($this->definitions[$key])) throw new UnknownPredicate('Unknown predicate: '.$key); return $this->definitions[$key]; }

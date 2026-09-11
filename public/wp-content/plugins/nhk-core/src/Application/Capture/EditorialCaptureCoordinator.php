@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
+use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 
@@ -39,6 +40,7 @@ final class EditorialCaptureCoordinator
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
     {
+        if (CapturePurposePolicy::resolve($input) !== CapturePurpose::EDITORIAL) throw new \InvalidArgumentException('AUTHORITY_CAPTURE_REQUIRES_AUTHORITY_OWNER');
         $key = trim((string) ($input['idempotency_key'] ?? ''));
         if ($key === '') throw new \InvalidArgumentException('Capture idempotency key is required.');
         $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
@@ -60,6 +62,7 @@ final class EditorialCaptureCoordinator
             [],
             [
                 'raw_input' => trim((string) ($input['text'] ?? $input['content'] ?? '')),
+                'purpose' => CapturePurpose::EDITORIAL->value,
                 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [],
                 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [],
                 'title' => trim((string) ($input['title'] ?? '')),

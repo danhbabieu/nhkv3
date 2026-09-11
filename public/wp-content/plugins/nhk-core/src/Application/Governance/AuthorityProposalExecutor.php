@@ -7,6 +7,7 @@ use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Application\Graph\ClassifiedAsPolicy;
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
@@ -150,6 +151,13 @@ final class AuthorityProposalExecutor
             $targetKey = (string) ($proposal->payload['target_uuid'] ?? $proposal->payload['target_key'] ?? '');
             if ($sourceType === '' || $sourceKey === '' || $targetType === '' || $targetKey === '') {
                 throw new \InvalidArgumentException('Relation endpoint identity is required.');
+            }
+            if ((string) ($proposal->payload['predicate'] ?? '') === 'classified_as') {
+                (new ClassifiedAsPolicy())->assertCandidate([
+                    'source_type' => $sourceType,
+                    'scope' => (string) ($proposal->payload['scope'] ?? $sourceType),
+                    'provenance' => (string) ($proposal->payload['provenance'] ?? ''),
+                ]);
             }
             return $this->graph->create(
                 new NodeReference($sourceType, $sourceKey),

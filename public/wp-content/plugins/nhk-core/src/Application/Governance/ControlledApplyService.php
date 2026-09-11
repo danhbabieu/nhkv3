@@ -44,5 +44,58 @@ final class ControlledApplyService implements ArticleApplyService
             throw $error;
         }
     }
+
+    /** Apply a plan as one transaction when all canonical stores share this manager. */
+    public function applyMany(array $proposalIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('strval', $proposalIds))));
+        if ($ids === []) return [];
+        $this->authorizer?->require('nhk_apply_proposals');
+        $started = gmdate('Y-m-d H:i:s.u');
+        try {
+            return $this->transactions->transactional(function () use ($ids, $started): array {
+                $results = [];
+                foreach ($ids as $proposalId) $results[] = $this->applyWithinTransaction($proposalId, $started);
+                $this->hook?->beforeCommit();
+                return $results;
+            });
+        } catch (\Throwable $error) {
+            // The shared transaction has rolled back. Preserve durable failure
+            // diagnostics after rollback for every proposal in the batch.
+            try {
+                $this->transactions->transactional(function () use ($ids, $started, $error): void {
+                    foreach ($ids as $proposalId) {
+                        if ($this->proposals->findForUpdate($proposalId) === null) continue;
+                        $number = $this->attempts->nextAttemptNumberLocked($proposalId);
+                        $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposalId, $number, 'failed', null, substr((string) $error->getCode(), 0, 64), substr($error->getMessage(), 0, 2000), $started, gmdate('Y-m-d H:i:s.u'));
+                        $this->attempts->persistFailed($attempt);
+                        $this->auditEvent('ApplyFailed', $proposalId, null, ['attempt_no' => $number, 'error_code' => $attempt->errorCode, 'batch' => true]);
+                    }
+                });
+            } catch (\Throwable $failure) { $error->addSuppressed($failure); }
+            throw $error;
+        }
+    }
+
+    /** @return array{proposal_id:string,attempt_no:int,result_entity_uuid:?string,canonical_id:?string,canonical_readback:?array,idempotent:bool} */
+    private function applyWithinTransaction(string $proposalId, string $started): array
+    {
+        $proposal = $this->proposals->findForUpdate($proposalId) ?? throw new ProposalNotFound('Proposal not found.');
+        if ($proposal->state === ProposalState::APPLIED) {
+            $success = $this->attempts->findSuccessful($proposalId); $resultId = $success?->resultEntityUuid;
+            return ['proposal_id' => $proposalId, 'attempt_no' => $success?->number ?? 0, 'result_entity_uuid' => $resultId, 'canonical_id' => $resultId, 'canonical_readback' => $this->readBack?->verify($proposal, (string) $resultId), 'idempotent' => true];
+        }
+        if ($proposal->state !== ProposalState::APPROVED) throw new InvalidProposalTransition('Only approved proposals can be applied.');
+        if ($this->eligibility && !($this->eligibility->check($proposalId))->ready) throw new InvalidProposalTransition('Proposal is not eligible for apply.');
+        $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposalId, $this->attempts->nextAttemptNumberLocked($proposalId), 'running', null, null, null, $started);
+        $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted();
+        $this->auditEvent('ApplyStarted', $proposalId, $proposal->actor !== null ? (int) $proposal->actor : null, ['attempt_no' => $attempt->number, 'batch' => true]);
+        $result = ($this->executor)($proposal);
+        $resultId = is_string($result) ? $result : (is_object($result) && property_exists($result, 'canonicalId') ? $result->canonicalId : (is_object($result) && property_exists($result, 'edge_uuid') ? $result->edge_uuid : (is_object($result) && property_exists($result, 'targetUuid') ? $result->targetUuid : null)));
+        $readBack = $this->readBack?->verify($proposal, (string) $resultId);
+        $this->hook?->afterAuthorityMutation(); $this->attempts->markSucceeded($attempt->id, $resultId); $this->hook?->beforeProposalApplied();
+        $this->proposals->save($proposal->transition(ProposalState::APPLIED, $proposal->decisionActor, gmdate('Y-m-d H:i:s.u'))); $this->auditEvent('ApplySucceeded', $proposalId, $proposal->actor !== null ? (int) $proposal->actor : null, ['attempt_no' => $attempt->number, 'result_entity_uuid' => $resultId, 'batch' => true]);
+        return ['proposal_id' => $proposalId, 'attempt_no' => $attempt->number, 'result_entity_uuid' => $resultId, 'canonical_id' => $resultId, 'canonical_readback' => $readBack, 'idempotent' => false];
+    }
     private function auditEvent(string $event,string $id,?int $actor,array $context):void { $this->audit?->recordEvent($event,'proposal',$id,$actor,$context); }
 }

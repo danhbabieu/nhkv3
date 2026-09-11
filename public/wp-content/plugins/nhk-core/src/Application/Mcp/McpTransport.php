@@ -10,7 +10,7 @@ use NHK\Core\Application\Media\MediaBatchUploadService;
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
-use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
@@ -36,6 +36,7 @@ final class McpTransport
         private ?McpDocumentationRegistry $documentation = null,
         private ?EditorialCaptureCoordinator $capture = null,
         private ?EditorialCaptureContinuationService $captureContinuation = null,
+        private ?AuthorityCaptureService $authorityCapture = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -84,6 +85,7 @@ final class McpTransport
                 'content' => [['type' => 'text', 'text' => $error->reasonCode]],
             ]]];
         } catch (\InvalidArgumentException $error) {
+            if (in_array($error->getMessage(), ['PLAN_REAPPROVAL_REQUIRED', 'APPROVED_CANDIDATE_UNKNOWN', 'APPROVED_DEPENDENCY_MISSING', 'AUTHORITY_PURPOSE_REQUIRED', 'AUTHORITY_PURPOSE_CONFLICT', 'AUTHORITY_APPROVAL_PACKET_REQUIRED', 'AUTHORITY_APPROVAL_PACKET_INVALID'], true)) return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => ['code' => $error->getMessage()]], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
             return $this->error($id, -32602, $error->getMessage(), 400);
         } catch (DependencyValidationException $error) {
             return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => ['isError' => true, 'structuredContent' => ['error' => $error->toStructuredError()], 'content' => [['type' => 'text', 'text' => $error->getMessage()]]]]];
@@ -208,9 +210,17 @@ final class McpTransport
     private function captureIngest(array $arguments, array $files): array
     {
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
-        if ($this->capture === null) throw new \RuntimeException('EDITORIAL_CAPTURE_UNAVAILABLE');
         unset($arguments['files']);
         if ($files !== []) $arguments['files'] = $files;
+        $intent = is_array($arguments['authority_intent'] ?? null) ? $arguments['authority_intent'] : [];
+        $declaredPurpose = strtoupper(trim((string) ($arguments['purpose'] ?? '')));
+        $authorityPacket = in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true) || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true);
+        if ($authorityPacket) {
+            if ($this->authorityCapture === null) throw new \RuntimeException('AUTHORITY_CAPTURE_UNAVAILABLE');
+            if (isset($arguments['capture_id'])) return $this->authorityCapture->continueWithApproval((string) $arguments['capture_id'], $arguments)->toArray();
+            return $this->authorityCapture->execute($arguments)->toArray();
+        }
+        if ($this->capture === null) throw new \RuntimeException('EDITORIAL_CAPTURE_UNAVAILABLE');
         if (isset($arguments['capture_id'])) {
             if ($this->captureContinuation === null) throw new \RuntimeException('EDITORIAL_CAPTURE_CONTINUATION_UNAVAILABLE');
             return $this->captureContinuation->execute($arguments);

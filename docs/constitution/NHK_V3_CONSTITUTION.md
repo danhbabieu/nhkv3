@@ -217,6 +217,51 @@ their explicit guarded boundaries.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-09.
 
+## Amendment record — 2026-09-11 — Governed Conversational Authority Capture Modes
+
+**WHY:** Authority planning and owner-approved canonical creation require the
+same Capture operator boundary as editorial intake, while Authority-only work
+must not manufacture a WordPress Post or create a parallel semantic writer.
+
+**WHAT LAW CHANGES:** Capture has a typed purpose: `EDITORIAL`, `AUTHORITY` or
+`MIXED`. `EDITORIAL` preserves the existing one-Capture/one-native-draft
+behavior. `AUTHORITY` plans and applies only registered Authority/Graph work
+and creates no WordPress Post. `MIXED` permits one submission to contain
+editorial content and Authority intent: it owns at most one native Article/Post,
+keeps the Authority plan as a dependency of semantic reconciliation, and
+continues on the same Capture after canonical Authority read-back. It never
+creates a second Capture or Post.
+
+Every Authority conversation is planning-first and reuse-first. A mutation
+requires explicit owner approval bound to the exact plan fingerprint and then
+passes the normal Proposal → Submit → Approval policy → Eligibility →
+Controlled Apply → canonical read-back sequence. Conversational Authority
+automation may be `OFF`, `REVIEW_REQUIRED` or
+`AUTO_APPROVE_AFTER_OWNER_CONFIRMATION`, but its effective mode is never less
+restrictive than generic Governance. Owner confirmation cannot override
+authentication, capability, registry, eligibility, revision or fingerprint
+binding.
+
+`subtype_of` is the registered Graph owner for true same-family Classification
+hierarchy; `classified_as` is registered only for Model, Variant, Specimen and
+Product sources to Classification targets. Brand and Movement are excluded.
+Facet composition (for example Table Clock + France) is not a combined
+Classification identity. Component/feature observations such as glass dome
+remain review-scoped until registry/evidence establishes their semantic scope.
+
+**AFFECTED SUBSYSTEMS:** Capture, Authority, Graph, Governance, Knowledge,
+WordPress editorial orchestration, MCP transport/catalog, Admin policy and
+read-model projections.
+
+**COMPATIBILITY AND ROLLOUT:** A missing purpose remains `EDITORIAL` for legacy
+editorial clients. Authority-only Capture is an explicit constitutional
+contract amendment and is not an implementation-only optimization. Existing
+classification family data must be audited before hierarchy apply; unresolved
+family fails closed. No legacy semantic data, Article body or live/demo record
+is populated by this amendment.
+
+**DECISION OWNER / DATE:** NHK V3 Owner decision, 2026-09-11.
+
 ## Amendment record — 2026-09-02 — Article Ingest Boundary
 
 **WHY:** A V3 knowledge Article request may cross the editorial and semantic

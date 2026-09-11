@@ -30,6 +30,17 @@ final class McpToolCatalog
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture with a text addendum; preserve one native draft, resolve bounded semantic context, reconcile MediaUsage and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'capture_id' => self::uuidField(),
+                'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
+                'authority_intent' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'mode' => ['type' => 'string', 'enum' => ['PLAN', 'APPLY_APPROVED_PLAN']],
+                        'approved_plan_fingerprint' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'],
+                        'approved_candidate_ids' => ['type' => 'array', 'minItems' => 1, 'items' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191]],
+                    ],
+                    'required' => ['mode'],
+                    'additionalProperties' => false,
+                ],
                 'text' => ['type' => 'string', 'maxLength' => 20000],
                 'title' => ['type' => 'string', 'maxLength' => 500],
                 'excerpt' => ['type' => 'string', 'maxLength' => 1000],

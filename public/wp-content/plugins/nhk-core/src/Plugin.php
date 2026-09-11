@@ -241,7 +241,7 @@ final class Plugin {
             (new ReadApi($media, $assets, $usages, $videos, $claims, $sources, $evidence, new MigrationStatus()))->register();
             $types = new EntityTypeRegistry();
             CanonicalEntityTypeCatalog::registerInto($types);
-            $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink());
+            $endpoints = new EndpointTypeRegistry(); CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence); $graphRepository = new WpdbGraphRepository($wpdb); $predicates = new PredicateRegistry(); $graphService = new GraphService($graphRepository, $endpoints, $predicates, new WpdbAuditSink(), new \NHK\Core\Application\Graph\ClassificationHierarchyPolicy($authority, $graphRepository), new \NHK\Core\Application\Graph\ClassifiedAsPolicy());
             $publicStatus = new MigrationStatus();
             $publicContexts = new StructuralContextQuery($graphService, $authority);
             $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
@@ -482,6 +482,7 @@ final class Plugin {
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
+            $captureRepository = new WpdbCaptureRepository($wpdb);
             $captureClaimReuse = new ClaimReusePolicy();
             $captureGovernance = new GovernedCaptureContinuationService(
                 $mcpGovernance,
@@ -496,7 +497,55 @@ final class Plugin {
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
             $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'), null, $articleReceipts);
             $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
-            $captureRepository = new WpdbCaptureRepository($wpdb);
+            $documentation = new McpDocumentationRegistry();
+            $authorityPolicyStorage = new \NHK\Core\Infrastructure\Governance\WpOptionConversationalAuthorityPolicyStorage();
+            // Bound by reference because the same Capture must first finish
+            // Authority read-back and then resume the already-created
+            // editorial draft through the canonical coordinator.
+            $capture = null;
+            $authorityCapture = new \NHK\Core\Application\Capture\AuthorityCaptureService(
+                $captureRepository,
+                static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($authority, $types, $documentation, $automationResolver, $authorityPolicyStorage): array {
+                    $checkpoint = $documentation->bootstrap();
+                    $generic = \NHK\Core\Domain\Governance\AutomationMode::REVIEW_REQUIRED;
+                    foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $type) if (in_array($automationResolver->resolve($type), [\NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE, \NHK\Core\Domain\Governance\AutomationMode::AUTO_PUBLISH], true)) $generic = \NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE;
+                    $effective = \NHK\Core\Application\Governance\ConversationalAuthorityPolicyResolver::effective($generic, $authorityPolicyStorage->read());
+                    $predicateRegistry = new \NHK\Core\Domain\Graph\PredicateRegistry();
+                    $contract = array_merge($checkpoint, is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [], [
+                        'stable_key_policy_version' => \NHK\Core\Application\Authority\CanonicalAuthorityStableKeyPolicy::VERSION,
+                        'authority_registry_version' => \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::VERSION,
+                        'predicate_registry_version' => \NHK\Core\Domain\Graph\PredicateRegistry::VERSION,
+                        'conversational_authority_policy_version' => \NHK\Core\Domain\Governance\ConversationalAuthorityPolicy::VERSION,
+                        'generic_governance_policy_version' => '1.0.0',
+                        'effective_governance_policy' => $effective->value,
+                        'authority_registry_fingerprint' => hash('sha256', json_encode(array_map(static fn ($definition): array => [$definition->type, $definition->schemaVersion, $definition->allowedFields, $definition->requiredFields], $types->all()), JSON_THROW_ON_ERROR)),
+                        'predicate_registry_fingerprint' => hash('sha256', json_encode(array_map(static fn ($definition): array => [$definition->key, $definition->allowed_source_types, $definition->allowed_target_types, $definition->outbound_cardinality, $definition->inbound_cardinality], $predicateRegistry->all()), JSON_THROW_ON_ERROR)),
+                        'semantic_contract_version' => 'authority-graph-2026-09-11',
+                    ]);
+                    return (new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types))->plan($input, ['capture_id' => $capture->captureId, 'capture_revision' => (int) ($capture->context['planning_revision'] ?? $capture->revision), 'contract' => $contract]);
+                },
+                static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($draftGateway): array {
+                    return $draftGateway->create(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->captureId . ':article', 'title' => (string) ($input['title'] ?? ''), 'content' => (string) ($input['text'] ?? $input['content'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? '')]);
+                },
+                static function (\NHK\Core\Domain\Capture\CaptureRecord $capture, array $plan, array $ids) use ($mcpGovernance, $automationResolver, $authorityPolicyStorage): array {
+                    $generic = \NHK\Core\Domain\Governance\AutomationMode::REVIEW_REQUIRED;
+                    foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $type) {
+                        if (in_array($automationResolver->resolve($type), [\NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE, \NHK\Core\Domain\Governance\AutomationMode::AUTO_PUBLISH], true)) $generic = \NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE;
+                    }
+                    $effective = \NHK\Core\Application\Governance\ConversationalAuthorityPolicyResolver::effective($generic, $authorityPolicyStorage->read());
+                    return (new \NHK\Core\Application\Governance\GovernedAuthorityPlanExecutor($mcpGovernance))->execute($plan, (string) ($plan['plan_fingerprint'] ?? ''), (string) ($plan['plan_fingerprint'] ?? ''), $ids, $effective, function_exists('get_current_user_id') ? (string) get_current_user_id() : '0');
+                },
+                static function (\NHK\Core\Domain\Capture\CaptureRecord $record, array $result) use (&$capture): array {
+                    if (!$capture instanceof \NHK\Core\Application\Capture\EditorialCaptureCoordinator) return ['status' => 'RECONCILIATION_PENDING', 'code' => 'EDITORIAL_RECONCILIATION_UNAVAILABLE', 'capture_id' => $record->captureId];
+                    $continued = $capture->continueWithAddendum($record, [
+                        'text' => '',
+                        'subject_hints' => (array) ($record->context['subject_hints'] ?? []),
+                        'observations' => (array) ($record->context['observations'] ?? []),
+                        'metadata' => (array) ($record->context['metadata'] ?? []),
+                    ]);
+                    return ['status' => 'RECONCILED', 'capture_id' => $continued->captureId, 'article_id' => $continued->articleId, 'capture_status' => $continued->status, 'capture_stage' => $continued->stage, 'diagnostics' => $continued->diagnostics, 'capture_record' => $continued];
+                },
+            );
             $captureAddendumRepository = new WpdbCaptureAddendumRepository($wpdb);
             $captureSubjectResolver = new SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types));
             $captureNeighborhood = $mcpNeighborhood;
@@ -733,8 +782,7 @@ final class Plugin {
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
-            $documentation = new McpDocumentationRegistry();
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture)))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

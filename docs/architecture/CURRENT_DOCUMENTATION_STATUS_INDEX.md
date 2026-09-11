@@ -28,6 +28,29 @@ closed as `DOCUMENTATION_CHECKPOINT_STALE`. Code-side discovery is covered;
 target-runtime connector discovery/read-back remains an environment gate until
 freshly verified.
 
+## 0.1 Governed Conversational Authority — 2026-09-11
+
+The current Capture boundary now has typed purposes `EDITORIAL`, `AUTHORITY`
+and `MIXED`. Legacy packets remain Editorial; Authority-only packets store a
+Capture-owned planning state and do not create a WordPress Post. Mixed packets
+own at most one native Post and continue Authority-dependent semantic
+reconciliation on the same Capture after canonical read-back.
+
+`AuthorityIntentPlanner`, the server-owned stable-key policy and the registered
+Authority/Graph services provide planning-only, reuse-first decomposition.
+Resolution order is UUID → scoped stable key → exact canonical name → alias →
+bounded lexical review. `subtype_of` owns true same-family Classification
+hierarchy; `classified_as` is limited to Model/Variant/Specimen/Product sources.
+Origin and geography are facet filters, and glass-dome observations remain
+review-scoped. No combined classification, Model inference, taxonomy or
+generic writer fallback is permitted.
+
+Owner approval is structured and binds exact candidate IDs plus a closure
+fingerprint containing Capture/revisions, registries, documentation/build,
+policy and effective Governance state. Changed dependencies require
+`PLAN_REAPPROVAL_REQUIRED` before Proposal creation. The existing Governance
+queue and Controlled Apply remain the only semantic mutation owners.
+
 ## 1. Authority and read order
 
 Use this precedence when deciding current behavior:
@@ -224,7 +247,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the only normal one-Capture/one-draft submission boundary for text/image/Video/knowledge-only input |
 | Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
-| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`; governed relation commands now preserve explicit endpoint UUIDs, bounded direct/inverse reads and a read-only semantic-neighborhood MCP seam exist; Graph reachability only discovers candidate Claims and never overrides Claim scope/provenance/evidence/relevance; `classified_as` remains a documented `REGISTRY_GAP` pending approved Authority vocabulary, and physical row completeness/backfill is a separate runtime/data question |
+| Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`, `subtype_of` and `classified_as`; hierarchy is ACTIVE/same-family/cycle-free and membership is scope-bound; physical row completeness/family audit remains a separate runtime/data question |
 | Public Entity Dossier | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`; detail-only read model over existing canonical owners | shared dossier seam is wired through `nhk_v3_entity_detail_projection`; Brand is the first complete typed path-recipe projection; direct subject Knowledge remains subject-scoped, deep Brand context keeps origin path, archives stay outside the heavy dossier path, and no display shortcut relation is persisted |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |
 | Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates, while guarded migration/data allocation/current-route durable consumer parity and live re-projection remain runtime-unverified |

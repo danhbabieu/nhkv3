@@ -6,7 +6,7 @@ namespace NHK\Core\Infrastructure\Governance;
 use NHK\Core\Application\Authority\{AuthorityService, SemanticMergeService};
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
 use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceService, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
-use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
@@ -42,7 +42,8 @@ final class GovernanceRuntimeFactory
         $endpoints = new EndpointTypeRegistry();
         CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
         $graphRepository = new WpdbGraphRepository($wpdb);
-        $graphService = new GraphService($graphRepository, $endpoints, new PredicateRegistry(), new GraphAuditSink());
+        $predicates = new PredicateRegistry();
+        $graphService = new GraphService($graphRepository, $endpoints, $predicates, new GraphAuditSink(), new ClassificationHierarchyPolicy($authority, $graphRepository), new ClassifiedAsPolicy());
         $proposalRepository = new WpdbProposalRepository($wpdb);
         $governanceAudit = new GovernanceAuditSink($wpdb);
         $transactionManager = new WpdbTransactionManager($wpdb);

@@ -5,6 +5,7 @@ namespace NHK\Core\Domain\Authority;
 
 final class CanonicalEntityTypeCatalog
 {
+    public const VERSION = '1.0.0';
     /** @return list<EntityTypeDefinition> */
     public static function definitions(): array
     {

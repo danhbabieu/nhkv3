@@ -51,6 +51,42 @@ for internal/admin compatibility or lifecycle operations. They are marked
 `USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
 not fall back to one of these writers when Capture is unavailable.
 
+### Governed Conversational Authority — 2026-09-11
+
+`nhk.capture.ingest` is also the sole normal operator boundary for Authority
+intent. Its typed `purpose` is `EDITORIAL`, `AUTHORITY` or `MIXED`; an omitted
+purpose remains legacy `EDITORIAL`. `AUTHORITY` persists one Capture-owned plan
+and creates no WordPress Post. `MIXED` permits at most one native Post and
+holds editorial/Knowledge reconciliation on the same Capture until Authority
+canonical read-back. It never creates a second Capture or Post.
+
+With `authority_intent.mode=PLAN`, the server-owned
+`AuthorityIntentPlanner` returns machine-readable `reuse`, create/update/
+relation candidates, composed facets, ambiguities, blockers and an exact plan
+fingerprint. Resolution is UUID → scoped stable key → exact canonical name →
+registered alias → bounded lexical review. Existing active Authority is reused;
+fuzzy matches, retired identities and unsupported scope remain review/blocker
+diagnostics. A description such as “glass dome” is not automatically a Model,
+clock type or subtype.
+
+With `authority_intent.mode=APPLY_APPROVED_PLAN`, the packet must carry the
+exact `approved_plan_fingerprint` and `approved_candidate_ids`, plus the
+existing `capture_id`. The server replans and refuses any changed dependency
+with `PLAN_REAPPROVAL_REQUIRED` before Proposal creation. Partial approval is
+allowed only for the exact selected candidates and their dependency closure.
+Apply remains Proposal → Submit → Approval policy → Eligibility → Controlled
+Apply → Authority/Graph canonical read-back → duplicate verification. The
+Authority policy (`OFF`, `REVIEW_REQUIRED`,
+`AUTO_APPROVE_AFTER_OWNER_CONFIRMATION`) is intersected with generic Governance
+at the stricter mode; owner confirmation never bypasses Governance.
+
+Classification hierarchy uses Graph-owned `subtype_of` only for ACTIVE,
+same-family, cycle-free Classification endpoints. Classification membership
+uses `classified_as` only from Model, Variant, Specimen or Product to
+Classification; Brand and Movement are excluded. “Table Clock + France” is a
+facet composition, not a combined Classification identity. Legacy family data
+is audited before hierarchy apply and unresolved family fails closed.
+
 ## 1. MCP architecture
 
 The endpoint is `/wp-json/nhk/v1/mcp`, using JSON-RPC 2.0 and Streamable HTTP.

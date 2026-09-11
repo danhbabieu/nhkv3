@@ -122,6 +122,13 @@ final class McpGovernanceHandler implements GovernedLifecycle
         return $this->apply->apply($id);
     }
 
+    /** @param list<string> $ids @return list<array<string,mixed>> */
+    public function applyMany(array $ids): array
+    {
+        if (!$this->apply || !method_exists($this->apply, 'applyMany')) throw new \RuntimeException('Controlled Apply batch service is not configured.');
+        return $this->apply->applyMany($ids);
+    }
+
     /** @param list<array<string,mixed>> $candidates @return array<string,mixed> */
     public function relationBatchApply(array $candidates, bool $approvalConfirmed): array
     {

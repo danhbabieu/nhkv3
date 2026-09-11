@@ -81,6 +81,8 @@ final class AdminWorkbenchPage
         $types = self::automationTypes();
         $storage = new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage(array_keys($types));
         $resolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver(array_keys($types), $storage);
+        $authorityPolicyStorage = new \NHK\Core\Infrastructure\Governance\WpOptionConversationalAuthorityPolicyStorage();
+        $authorityPolicy = $authorityPolicyStorage->read();
         echo '<div class="wrap nhk-admin-workbench"><header class="nhk-admin-hero"><div><p class="nhk-admin-eyebrow">NHK V3 · Hệ thống</p><h1>Phê duyệt &amp; xuất bản tự động</h1><p class="nhk-admin-lead">Cấu hình cách dữ liệu từ MCP đi qua Governance. Human review is configurable; Governance gates are not.</p></div></header>';
         if (isset($_GET['saved'])) echo '<div class="notice notice-success is-dismissible"><p>Đã lưu chính sách tự động.</p></div>';
         if (isset($_GET['error'])) echo '<div class="notice notice-error"><p>Không thể lưu chính sách tự động. Kiểm tra quyền và giá trị đã chọn.</p></div>';
@@ -99,7 +101,9 @@ final class AdminWorkbenchPage
             if ($mode === 'AUTO_PUBLISH') echo '<br><strong>Cảnh báo:</strong> Dữ liệu hợp lệ từ MCP sẽ được tự động phê duyệt, Apply và xuất bản mà không cần thao tác thủ công.';
             echo '</td></tr>';
         }
-        echo '</tbody></table><p><button class="button button-primary" type="submit">Lưu</button></p></form></div>';
+        echo '</tbody></table><h2>Conversational Authority Creation</h2><p>AI luôn phải preview và owner phải xác nhận. Chế độ này không tạo semantic writer riêng và không vượt qua Governance tổng thể.</p><p><label for="nhk-conversational-authority-policy">Chế độ tạo Authority qua hội thoại</label> <select id="nhk-conversational-authority-policy" name="conversational_authority_policy">';
+        foreach (['OFF' => 'Tắt', 'REVIEW_REQUIRED' => 'Cần review', 'AUTO_APPROVE_AFTER_OWNER_CONFIRMATION' => 'Tự động sau owner xác nhận'] as $value => $label) echo '<option value="' . esc_attr($value) . '"' . selected($authorityPolicy->value, $value, false) . '>' . esc_html($label) . '</option>';
+        echo '</select></p><p><button class="button button-primary" type="submit">Lưu</button></p></form></div>';
     }
 
     public static function saveAutomationPolicy(): void
@@ -111,7 +115,10 @@ final class AdminWorkbenchPage
             $raw = isset($_POST['policies']) && is_array($_POST['policies']) ? wp_unslash($_POST['policies']) : [];
             $policies = [];
             foreach ($raw as $type => $mode) $policies[(string) $type] = (string) $mode;
+            $authorityPolicy = \NHK\Core\Domain\Governance\ConversationalAuthorityPolicy::tryFrom((string) ($_POST['conversational_authority_policy'] ?? ''));
+            if ($authorityPolicy === null) throw new \InvalidArgumentException('Invalid conversational Authority policy.');
             (new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage(array_keys($types)))->write($policies);
+            (new \NHK\Core\Infrastructure\Governance\WpOptionConversationalAuthorityPolicyStorage())->write($authorityPolicy);
             wp_safe_redirect(add_query_arg(['page' => 'nhk-v3-automation-policy', 'saved' => '1'], admin_url('admin.php')));
         } catch (\Throwable) {
             wp_safe_redirect(add_query_arg(['page' => 'nhk-v3-automation-policy', 'error' => '1'], admin_url('admin.php')));

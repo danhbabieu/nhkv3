@@ -18,6 +18,26 @@
 → MCP and Admin adapters
 ```
 
+### Governed Conversational Authority — 2026-09-11
+
+Capture is the operator entry point for Authority planning as well as
+editorial intake. `purpose=EDITORIAL` preserves the legacy one-Capture/one-draft
+contract; `purpose=AUTHORITY` stores a plan and creates no Post; `purpose=MIXED`
+owns at most one Post and resumes semantic reconciliation on the same Capture
+after Authority read-back. Missing purpose remains Editorial for legacy
+clients. `capture_id`, `purpose`, `authority_intent` and multipart `files[]`
+are part of the canonical MCP schema.
+
+The planner is planning-only and reuse-first. It decomposes facets such as
+Table Clock + France instead of minting a combined identity, and treats glass
+dome as vocabulary/evidence review rather than an automatic Model, clock type
+or subtype. Exact approval binds the selected candidate IDs and complete plan
+fingerprint (Capture revision, canonical/relation/dependency revisions,
+documentation/manifest/build, registries, policy versions and effective
+Governance mode). A changed fingerprint returns `PLAN_REAPPROVAL_REQUIRED`
+before Proposal creation. All selected mutations still use the existing
+Governance queue and Controlled Apply; no parallel writer or queue is created.
+
 ### Canonical documentation checkpoint
 
 The MCP documentation layer is a read-only runtime projection of repository

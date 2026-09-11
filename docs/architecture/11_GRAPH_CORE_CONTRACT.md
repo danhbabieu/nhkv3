@@ -41,9 +41,29 @@ thêm `EndpointRevisionReader::revision()` để trả revision hiện tại; pr
 binder đọc revision của cả source và target tại thời điểm tạo. Nếu revision
 không đọc được thì fail-closed, tuyệt đối không mặc định `1`.
 
-`PredicateRegistry` seed tối thiểu `about` và `depicts`. Predicate có source/target
-allow-list, outbound/inbound cardinality (`ONE`/`MANY`), self-relation và active.
+`PredicateRegistry` hiện đăng ký `about`, `depicts`, các quan hệ cấu trúc hiện
+hành và hai quan hệ Authority conversational đã được phê duyệt là
+`subtype_of` và `classified_as`. Predicate có source/target allow-list,
+outbound/inbound cardinality (`ONE`/`MANY`), self-relation và active.
 Không cho nhập predicate tùy ý và không lưu rule mutable JSON trong DB.
+
+### Conversational Authority hierarchy and classification membership
+
+`subtype_of` là Graph-owned, governed, revision-bound và canonical-read-back
+relation từ Classification tới Classification, outbound ONE/inbound MANY.
+Endpoints phải ACTIVE và có `family` persisted; family thiếu hoặc không tương
+thích, self-relation và mọi cycle đều fail closed. `classified_as` là governed
+membership từ Model, Variant, Specimen hoặc Product tới Classification, MANY →
+MANY. Brand và Movement không được dùng predicate này; Movement cần contract
+extension riêng.
+
+`subtype_of` chỉ biểu diễn subtype thật trong cùng family. Origin, geography,
+case style hoặc feature là facet/filter hoặc component khi registry/evidence
+chứng minh như vậy; không dùng `about` hay combined stable key để mô phỏng cây.
+Legacy Classification rows phải qua inventory audit và explicit idempotent
+backfill plan trước hierarchy apply; không dùng stable-key prefix làm semantic
+truth duy nhất. Nếu family không xác định, apply trả
+`CLASSIFICATION_FAMILY_UNRESOLVED` trước khi Graph mutation.
 
 Post-to-Knowledge links remain Graph relations and must be applied through
 Governance/Controlled Apply when part of Article Ingest. A direct mutation path
