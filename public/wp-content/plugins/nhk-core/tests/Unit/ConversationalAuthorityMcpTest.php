@@ -67,6 +67,25 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame($captureId, $apply['body']['result']['structuredContent']['capture_id']);
     }
 
+    public function test_unauthorized_authority_plan_is_blocked_before_dispatch(): void
+    {
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())),
+            static fn (string $capability): bool => false,
+            documentation: $documentation,
+        );
+
+        $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+            'idempotency_key' => 'unauthorized-authority-plan', 'purpose' => 'AUTHORITY', 'text' => 'Tạo thương hiệu Hermle.', 'authority_intent' => ['mode' => 'PLAN'], 'documentation_checkpoint' => ['documentation_version' => $checkpoint['documentation_version'], 'manifest_hash' => $checkpoint['manifest_hash']],
+        ]]], []);
+
+        self::assertSame(403, $result['status']);
+        self::assertSame(-32003, $result['body']['error']['code']);
+    }
+
     private function readHandler(): McpReadHandler
     {
         return new McpReadHandler($this->createMock(AuthorityRepository::class), new EntityTypeRegistry(), $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class), $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class), $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class), null, $this->createMock(SourceRepository::class));
