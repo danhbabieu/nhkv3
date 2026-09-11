@@ -19,7 +19,7 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
-use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017};
+use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
@@ -80,8 +80,33 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', EditorialCaptureAddendumMigration018::VERSION, false);
+        update_option('nhk_core_migration_target', VisualSupportRequirementMigration019::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
+        add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
+            global $wpdb;
+            if (!isset($wpdb) || !is_object($wpdb)) return;
+            try {
+                $mediaRepository = new WpdbMediaRepository($wpdb);
+                $assetRepository = new WpdbMediaAssetRepository($wpdb);
+                $usageRepository = new WpdbMediaUsageRepository($wpdb);
+                $mediaService = new MediaService($mediaRepository, $assetRepository, $usageRepository);
+                $dependencyIndex = new \NHK\Core\Infrastructure\Projection\WpdbProjectionDependencyIndex($wpdb);
+                $projectionInvalidation = new \NHK\Core\Application\Projection\ProjectionInvalidationService($dependencyIndex, new \NHK\Core\Infrastructure\Projection\WpdbProjectionRevisionStore($wpdb));
+                $reconciler = new \NHK\Core\Application\Media\VisualSupportReverseReconciliationService(
+                    new \NHK\Core\Infrastructure\Media\WpdbVisualSupportRequirementRepository($wpdb),
+                    new \NHK\Core\Application\Media\VisualSupportMediaSuitability(),
+                    static function (string $mediaId, array $consumer) use ($mediaService): void {
+                        $mediaService->addUsage($mediaId, (string) $consumer['endpoint_type'], (string) $consumer['endpoint_key'], (string) $consumer['role']);
+                    },
+                    static function (string $requirementId, int $revision) use ($projectionInvalidation): void {
+                        $projectionInvalidation->invalidate('visual_support_requirement', $requirementId, $revision);
+                    },
+                );
+                $reconciler->reconcile($media, $assets, $contexts !== [] ? $contexts : null);
+            } catch (\Throwable $error) {
+                do_action('nhk_v3_visual_support_reconciliation_failure', $media->canonicalId, $error->getMessage());
+            }
+        }, 20, 3);
         if ((string) get_option('nhk_core_rewrite_version', '') !== self::REWRITE_VERSION) { update_option('nhk_core_rewrite_version', self::REWRITE_VERSION, false); add_action('init', static function (): void { flush_rewrite_rules(false); }, 99); }
         // Register capabilities on every load so existing installations and
         // upgrades do not need a deactivate/activate cycle to authorize P4.
@@ -790,12 +815,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < ClaimProjectionMigration016::VERSION || !ClaimProjectionMigration016::schemaReady($wpdb)) (new ClaimProjectionMigration016())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureMigration017::VERSION || !EditorialCaptureMigration017::schemaReady($wpdb)) (new EditorialCaptureMigration017())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureAddendumMigration018::VERSION || !EditorialCaptureAddendumMigration018::schemaReady($wpdb)) (new EditorialCaptureAddendumMigration018())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < VisualSupportRequirementMigration019::VERSION || !VisualSupportRequirementMigration019::schemaReady($wpdb)) (new VisualSupportRequirementMigration019())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', EditorialCaptureAddendumMigration018::VERSION, '', false);
+        add_option('nhk_core_migration_target', VisualSupportRequirementMigration019::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

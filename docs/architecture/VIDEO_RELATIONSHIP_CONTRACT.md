@@ -61,3 +61,10 @@ The relation candidate retains one explicit provenance class:
 `evidence_refs`; it records how the candidate was sourced. User input, source
 metadata and visual observation do not become universal facts or relation
 evidence without support at the exact subject and scope.
+
+Visual support is a contextual illustration dependency, not a relationship or
+Evidence reference. A thumbnail, source image or visual match is not a
+technical fact unless the separate Source/Evidence and Governance contracts
+pass. Video consumers bind the same canonical Media through MediaUsage and
+receive changes through projection invalidation; they do not duplicate Media
+or paste image URLs into semantic notes.

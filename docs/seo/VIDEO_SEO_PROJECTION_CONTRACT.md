@@ -43,3 +43,9 @@ frontend destination. SEO/readiness must distinguish `Canonical Applied`,
 `Projection Available`, `Frontend Available` and `Frontend Blocked`; a
 successful Apply without canonical route/read-back is not a publishable watch
 page.
+
+Video SEO may project a resolved feature visual only when exact
+subject/scope/facet/feature/intent and public Media eligibility pass. A
+thumbnail or source URL alone does not satisfy technical visual support;
+missing/private/review Media is omitted and a later Capture Media read-back
+invalidates the affected projection.

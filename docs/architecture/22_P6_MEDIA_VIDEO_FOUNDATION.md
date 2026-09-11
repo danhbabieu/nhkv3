@@ -30,7 +30,7 @@ every justified useful registered relation → final read-back. Upload transport
 preview, partial success or proposal creation is not `COMPLETE`.
 
 Media additionally runs semantic enrichment and representative reconciliation.
-Every directly related node missing an image is inspected; the best currently
+Every directly related node missing a representative image is inspected; the best currently
 available suitable image may be a temporary representative. Selection is
 ordered by exact subject specificity, visual coverage, technical relevance,
 image quality/resolution, provenance confidence and current representative
@@ -350,3 +350,13 @@ collision, HTTP read-back and rollback contract.
 | Corrupt/fake image fail-closed with no orphan | Implemented at adapter boundary | Focused contract coverage | Guarded real-file negative cases still required |
 | UUID → stable key → exact name/alias Article subject resolution | Implemented locally | Verified by focused tests | Integration preflight verification still required |
 | Real file → attachment → Media → assets/usages → projection → preflight | Wiring present locally | Partial focused evidence | **RUNTIME VERIFICATION STILL REQUIRED** |
+
+### Feature-level visual support — 2026-09-11
+
+P6 Media coverage has two separate outcomes: representative coverage for a
+whole node and `VisualSupportRequirement` coverage for a named technical or
+recognition detail. The latter is durable even while missing, is resolved only
+by exact semantic/context matching, and is reverse-reconciled after canonical
+Media read-back through Capture. A canonical Media is reused across valid
+contexts; MediaUsage records contextual placement. This does not promote an
+image observation to Evidence/Claim or expose a PRIVATE/review Media publicly.

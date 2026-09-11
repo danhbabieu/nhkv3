@@ -160,3 +160,12 @@ over Governance and the existing application services, never a semantic writer.
 For Video, “Xem trên web” opens `/video/{slug}/` only when the canonical public
 projection is eligible; “Mở nguồn gốc” opens the external source. No external
 URL fallback is allowed for the first action.
+
+### Visual support operator read model — 2026-09-11
+
+Admin diagnostics may expose MISSING/REVIEW_REQUIRED requirements with subject,
+scope, facet, feature/detail, intent, candidate/resolved Media, reason and
+affected consumers. This is a read model over the application ledger and
+MediaUsage, not a new writer or a raw UUID/fingerprint/JSON workflow. A node
+missing representative media must remain visibly distinct from a semantic
+feature missing technical/contextual illustration.

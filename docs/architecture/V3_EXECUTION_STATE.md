@@ -1,5 +1,54 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-11 — Visual Support Requirement implementation closeout
+
+WHAT: Completed the approved application-level `VisualSupportRequirement`
+ledger vertical slice. The ledger is not Authority, Knowledge Claim,
+Source/Evidence, Graph, Media identity or Article/Video body storage. Canonical
+Media ingest/read-back now emits bounded reverse-reconciliation context,
+including later asset semantic enrichment; exact suitability can resolve or
+retain `MISSING`/`REVIEW_REQUIRED`, bind existing Media through MediaUsage and
+invalidate affected projections.
+
+WHY: A visually explainable semantic feature needs durable, reusable support
+state distinct from node-level representative-image coverage. A later Capture
+must satisfy an older missing requirement without duplicate Media or manual
+Article body edits, while private/review Media remains excluded from public
+projection and visual support never promotes a Claim, Evidence or broadens a
+specimen observation.
+
+FILES: Active contracts and router/index/Constitution amendments; new
+`VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md`; domain registries and ledger;
+application suitability/reconciliation/public projection; additive migration
+019 and bounded WPDB repository; canonical Media read-back wiring; focused
+Visual Support and documentation tests. Existing unrelated governance-queue
+and deployment-verifier worktree changes remain unstaged.
+
+TESTS: Focused Visual Support/documentation selection passes 27 tests / 122
+assertions. The Unit suite passes 1,105 tests / 5,552 assertions;
+the full Composer suite remains environment-blocked by WordPress/database
+bootstrap and pre-existing contract failures. PHP lint, documentation
+generation and diff checks pass for the committed Visual Support slice.
+
+CODE STATUS: IMPLEMENTED_CODE_SIDE. Migration 019 is additive UP-only and
+guarded; no legacy backfill, production/staging/V2 mutation, direct MCP
+requirement writer or fake semantic data was used.
+
+RUNTIME STATUS: Local source and generated documentation projection verified;
+WordPress integration is unavailable in this environment, so live runtime
+read-back is not claimed.
+
+DEPLOYMENT STATUS: NOT_PERFORMED. The canonical `nhk-demo-cutover` path
+requires `NHK_DEMO_DEPLOY_CONFIG` and target credentials, which are not
+present in this session. Push does not equal deployment.
+
+REMAINING GAP: Run the repository's authorized
+`./scripts/nhk-demo-cutover --target=demo.1945.vn --pack=<id> --json` path on
+the target, then verify target MCP `documentation-bootstrap` and
+`documentation-get(visual-support-requirement)` return the new version/hash
+and ACTIVE law. Until then report
+`IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING`.
+
 # Checkpoint — 2026-09-11 — Capture Video source-specific provenance dependency chain
 
 ROOT CAUSE: the Capture Video branch stopped at the Video adapter's planning

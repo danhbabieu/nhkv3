@@ -22,6 +22,7 @@ final class McpDocumentationRegistry
         'article-research-preflight' => ['path' => 'docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'article'],
         'article-seo' => ['path' => 'docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'article'],
         'media' => ['path' => 'docs/architecture/04_MEDIA_MODEL.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'media'],
+        'visual-support-requirement' => ['path' => 'docs/architecture/VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'media'],
         'media-video-foundation' => ['path' => 'docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'media'],
         'admin-media-guidance' => ['path' => 'docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'admin'],
         'video' => ['path' => 'docs/architecture/VIDEO_SEMANTIC_INGEST_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'video'],

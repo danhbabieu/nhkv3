@@ -83,6 +83,10 @@ final class MediaService
             }
             $existingUsages[] = $this->usages->create($candidate);
         }
+        // Canonical read-back is the only handoff to reverse semantic visual
+        // reconciliation. Capture remains the intake boundary; this event is
+        // deliberately not an MCP writer or a second Media identity path.
+        $this->emitCanonicalReadback($media);
         return $media;
     }
 
@@ -90,7 +94,9 @@ final class MediaService
     {
         $current = $this->media->findByCanonicalId($id);
         if (!$current) throw new MediaException('Media not found.');
-        return $this->media->update(new Media($current->canonicalId, $current->stableKey, $name, $readiness, $provenance, $current->active, $current->revision), $revision);
+        $updated = $this->media->update(new Media($current->canonicalId, $current->stableKey, $name, $readiness, $provenance, $current->active, $current->revision), $revision);
+        $this->emitCanonicalReadback($updated);
+        return $updated;
     }
 
     public function retire(string $id, int $revision): Media
@@ -115,7 +121,9 @@ final class MediaService
             if ($this->sameAsset($existing, $candidate)) return $existing;
             throw new MediaException('Media asset storage key is already bound to different content.');
         }
-        return $this->assets->create($candidate);
+        $created = $this->assets->create($candidate);
+        $this->emitCanonicalReadback($parent);
+        return $created;
     }
 
     /**
@@ -199,6 +207,18 @@ final class MediaService
         if (!$current) throw new MediaException('Media not found.');
         if ($current->active === $active) return $current;
         return $this->media->update(new Media($current->canonicalId, $current->stableKey, $current->canonicalName, $current->readiness, $current->provenance, $active, $current->revision), $revision);
+    }
+
+    private function emitCanonicalReadback(Media $media): void
+    {
+        if (!function_exists('do_action')) return;
+        $assets = $this->assets->listByMediaId($media->canonicalId);
+        $contexts = is_array($media->provenance['visual_support_contexts'] ?? null) ? $media->provenance['visual_support_contexts'] : [];
+        foreach ($assets as $asset) {
+            $context = $asset->metadata['visual_support_context'] ?? $asset->metadata['visual_context'] ?? null;
+            if (is_array($context)) $contexts[] = $context;
+        }
+        do_action('nhk_v3_media_canonical_readback', $media, $assets, array_values($contexts));
     }
 
     /** @param array<string,mixed> $spec @param array<string,mixed> $provenance @return array<string,mixed> */

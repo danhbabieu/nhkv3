@@ -43,3 +43,9 @@ After every MCP Media ingest, the Media semantic enrichment and representative
 reconciliation required by Constitution §20.1 must complete before the Media
 operation is `COMPLETE`; SEO projection consumes the final read-back and does
 not create relations or select an image from upload recency alone.
+
+Technical/contextual visual support is resolved through the application
+VisualSupportRequirement ledger, not by the representative-image rule. A
+binding may serve many consumers through one canonical Media, while public
+SEO selects only an eligible derivative and never exposes the internal ledger
+or treats MediaUsage as Evidence.

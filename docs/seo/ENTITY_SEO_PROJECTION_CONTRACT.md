@@ -35,3 +35,8 @@ Indexability requires active canonical identity, resolvable Public Identity and
 route, unambiguous canonical subject, sufficient differentiated visible content,
 compliance and no canonical conflict. Failure returns a shared status and
 deterministic reason codes; no SEO fallback writer is permitted.
+
+Entity SEO distinguishes representative coverage from a semantic feature's
+VisualSupportRequirement. Only a resolved, public-safe derivative may be
+projected; a missing or private visual remains an honest incomplete dependency
+and is never replaced by a near match or placeholder.

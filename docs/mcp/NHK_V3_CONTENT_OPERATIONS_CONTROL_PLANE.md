@@ -365,3 +365,10 @@ The Admin page is therefore a lifecycle workspace for existing records, not a
 new content-entry surface. New content remains Capture-only through
 `nhk.capture.ingest`; the MCP catalog, operator Ability allowlist and internal
 proposal tools are unchanged, with no queue/Admin MCP tool or writer.
+
+Visual Support Requirement diagnostics are read-only application state for
+operators: MISSING/review requirement, subject/scope/facet/feature/intent,
+candidate/resolved Media, reason and affected consumers. Capture remains the
+normal intake. Media read-back performs the bounded reverse reconciliation;
+the control plane does not accept raw requirement UUID/fingerprint/JSON writes
+and does not treat MediaUsage as Evidence or Claim.

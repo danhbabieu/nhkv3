@@ -277,3 +277,14 @@ Article preflight subject resolution`.
 The chain is accepted only when each boundary is proven with the real
 integration runtime. Focused unit tests may prove local behavior but cannot be
 reported as runtime acceptance or as completion of an unrun WordPress test.
+
+### Visual support composition — 2026-09-11
+
+Article composition may reference resolved visual support for a semantic
+feature, but the requirement/binding is not copied into `wp_posts` as a
+second factual store. Node-level representative coverage and feature-level
+technical/contextual illustration are separate diagnostics. A missing visual
+remains an honest `MISSING`/review dependency and is not infrastructure or
+blueprint corruption when the Article content is otherwise valid. Publication
+policy distinguishes `REQUIRED_FOR_PUBLICATION` from
+`OPTIONAL_VISUAL_SUPPORT` when the owning contract declares both.

@@ -78,3 +78,10 @@ duplicate writer or report Apply PASS as frontend success.
 Frontend state is reported separately as `Canonical Applied`, `Projection
 Available`, `Frontend Available` or `Frontend Blocked`. The last state becomes
 Available only after canonical route resolution and read-back succeed.
+
+Visual Support Requirement ledger writes and MediaUsage bindings are
+application orchestration, not a new semantic truth writer. They must use the
+existing owner services and read-back; a visual relation that would alter
+semantic Claim/Source/Evidence/Graph state still requires its normal Proposal,
+Governance and eligibility gates. No visual binding may be exposed as Evidence
+or Claim merely because its suitability review passed.

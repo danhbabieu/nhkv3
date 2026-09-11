@@ -243,3 +243,12 @@ projection even when its raw Source/Evidence is PRIVATE. The projection must
 be allowlisted (`text`, `type`, `facet`, `scope`, or exact registered
 equivalents) and must not carry raw private excerpts, metadata or canonical
 private IDs. Graph/public relation eligibility is evaluated separately.
+
+### Feature visual support — 2026-09-11
+
+An entity dossier distinguishes missing representative image coverage from a
+missing feature-level VisualSupportRequirement. Resolved semantic bindings
+are read dynamically and may serve multiple dossiers/sections through one
+canonical Media identity. Public dossier output selects only an eligible
+public-safe derivative; missing, PRIVATE, review, placeholder or unavailable
+Media is omitted. The binding is not Evidence, Claim or Graph truth.

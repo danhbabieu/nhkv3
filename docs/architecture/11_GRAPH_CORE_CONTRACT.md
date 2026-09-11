@@ -166,3 +166,12 @@ Article body, Claim copy, generated prose, Media caption/OCR payload or Capture
 receipt. Generated editorial copy and Media observations remain outside Graph
 and do not become Evidence or relation truth merely because they were reached
 through a neighborhood query.
+
+### Visual support boundary — 2026-09-11
+
+VisualSupportRequirement is not a Graph predicate or edge. It is an indexed
+application ledger keyed by the already-resolved subject/scope/facet/feature;
+its consumer invalidation uses the existing Projection Dependency Index. A
+MediaUsage binding says only that a Media is suitable to illustrate that
+feature in context. It does not assert `depicts`, `about`, Evidence or Claim,
+and it cannot broaden a specimen-scoped observation to a parent node.

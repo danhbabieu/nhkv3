@@ -73,3 +73,10 @@ source/provenance/embed references only. Persisted source data under
 `metadata.source` is normalized in the query/application layer alongside any
 approved compatibility shape; no second source record or semantic writer is
 created. “Xem trên web” and “Mở nguồn gốc” remain separate Admin actions.
+
+When a Video note names a visually explainable feature, the workflow records a
+VisualSupportRequirement through existing application orchestration. Normal
+input remains `nhk.capture.ingest`; no direct requirement writer is exposed.
+Canonical Media read-back performs bounded reverse reconciliation and
+invalidates affected Video/Knowledge/Article projections. Thumbnail/source
+identity alone never satisfies technical visual support or creates Evidence.

@@ -123,3 +123,12 @@ appended.
 After an actual Article save/update, the Dictionary observation boundary may
 persist lexical Mention/Candidate state idempotently. That post-write lexical
 observation is non-semantic and must not rewrite the stored Article body.
+
+### Visual dependency preflight — 2026-09-11
+
+Preflight may report a semantic feature's VisualSupportRequirement separately
+from missing node representative media. Composition may consume a resolved
+binding dynamically, while an optional missing visual does not corrupt the
+Article media blueprint or turn the content into an infrastructure failure.
+The requirement remains subject/scope/facet/feature exact and does not become a
+Claim, Evidence or factual Article field.

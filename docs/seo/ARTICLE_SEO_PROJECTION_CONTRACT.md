@@ -54,3 +54,9 @@ objects and technical routes are never emitted.
 Public promotional/commercial claims use the shared
 `PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` gate. Generated text is not
 Evidence.
+
+Feature-level VisualSupportRequirement is a separate dependency from an
+Article/node representative image. SEO may consume a resolved public-safe
+visual binding after projection invalidation, but it must omit missing,
+private, review, placeholder or ineligible Media and never infer a technical
+fact from visual similarity.

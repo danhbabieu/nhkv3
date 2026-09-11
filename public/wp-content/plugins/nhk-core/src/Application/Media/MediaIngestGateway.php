@@ -13,11 +13,19 @@ final class MediaIngestGateway
     /** @param array<string,mixed> $packet */
     public function ingest(array $packet): Media
     {
+        $provenance = is_array($packet['provenance'] ?? null) ? $packet['provenance'] : [];
+        $visualContexts = is_array($provenance['visual_support_contexts'] ?? null) ? $provenance['visual_support_contexts'] : [];
+        foreach ((array) ($packet['assets'] ?? []) as $asset) {
+            if (!is_array($asset) || !is_array($asset['metadata'] ?? null)) continue;
+            $context = $asset['metadata']['visual_support_context'] ?? $asset['metadata']['visual_context'] ?? null;
+            if (is_array($context)) $visualContexts[] = $context;
+        }
+        if ($visualContexts !== []) $provenance['visual_support_contexts'] = array_values($visualContexts);
         $media = $this->service->ingest(
             (string) ($packet['stable_key'] ?? ''),
             (string) ($packet['name'] ?? ''),
             (string) ($packet['readiness'] ?? 'draft'),
-            is_array($packet['provenance'] ?? null) ? $packet['provenance'] : [],
+            $provenance,
             is_array($packet['assets'] ?? null) ? $packet['assets'] : [],
             is_array($packet['usages'] ?? null) ? $packet['usages'] : [],
         );

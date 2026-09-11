@@ -159,3 +159,15 @@ must retain `EXPLICIT_USER_KNOWLEDGE` until the normal Proposal → submit/revie
 canonical Claim/revision reuse happen before any new proposal. A bounded
 continuation may update the existing Article draft, but Article prose remains
 editorial output and is never Evidence.
+
+### Knowledge facet visual dependency — 2026-09-11
+
+A Knowledge note/facet may declare a `VisualSupportRequirement` for a
+registered feature/detail. That dependency is a presentation/work requirement,
+not a Claim, Source, Evidence or Graph edge, and a Claim is never duplicated
+just to carry an image. The ledger persists `MISSING` until exact Media arrives;
+reverse Media reconciliation may resolve it later. Media remains subject and
+scope exact, so a specimen observation cannot broaden a Knowledge Claim to
+Variant, Model or Brand. Public Knowledge projection resolves only public-safe
+Media derivatives and may omit a missing/private visual without treating the
+Knowledge content itself as invalid.

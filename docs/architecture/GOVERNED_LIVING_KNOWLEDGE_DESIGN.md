@@ -259,3 +259,12 @@ Knowledge semantic acceptance, and vice versa.
 Durable public identity remains a separately reported storage/runtime concern
 unless additive storage is verified in the target environment. No bulk slug
 migration is part of this feature.
+
+### Visual dependency is not Living Knowledge — 2026-09-11
+
+A Living Knowledge facet/note can consume a `VisualSupportRequirement` without
+making that requirement a Claim or adding a duplicate Claim. Projection
+dependency input must include the visual requirement binding and revision when
+the section consumes it, so a later Media reverse reconciliation invalidates
+the affected read model. `RESOLVED` is semantic/internal only; public output
+still applies MediaAsset eligibility and never leaks private or review Media.

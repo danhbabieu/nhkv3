@@ -619,3 +619,21 @@ guarded suite now passes 120 tests / 1,016 assertions on two consecutive
 runs, with 4 canonical skips, 1 warning and 1 deprecation. Editorial Capture
 runtime and repository acceptance are both verified; Collector remains
 separately gated by its missing approved canonical fixture.
+## Active cross-domain law — Visual Support Requirement — 2026-09-11
+
+`docs/architecture/VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md` is ACTIVE and is
+required reading for Media, Knowledge, Article, Video, Media annotation and
+public projection work involving a visually explainable feature. It defines
+the application-level persistent ledger, exact subject/scope/facet/feature
+matching, `MISSING → RESOLVED/REVIEW_REQUIRED`, canonical Media reuse through
+MediaUsage, bounded reverse reconciliation after Capture Media read-back,
+projection invalidation and public fail-closed behavior. It explicitly keeps
+feature technical/contextual illustration separate from node representative
+image coverage and from Claim/Source/Evidence/Graph truth.
+
+The code-side vertical slice adds migration 019, domain registries, ledger
+repository, exact suitability, reverse reconciliation and the canonical Media
+read-back event. Local tests cover the required missing/later-Media/reuse/
+replay/private/scope/evidence cases. Target deployment and live MCP
+bootstrap/get remain externally gated until the authorized deployment
+procedure runs and reads back the new documentation identity.

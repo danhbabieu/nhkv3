@@ -83,7 +83,7 @@ limits, dependency closure và Governance; không tạo weak/speculative edge.
 
 Một Media có thể được reuse bởi nhiều MediaUsage hoặc quan hệ tới nhiều node
 khi từng context có căn cứ. Sau ingest phải tìm các node trực tiếp liên quan
-đang thiếu ảnh và đánh giá ảnh tốt nhất hiện có làm representative tạm thời.
+đang thiếu representative image và đánh giá ảnh tốt nhất hiện có làm representative tạm thời.
 Representative là `BEST CURRENTLY AVAILABLE`, không immutable. Suitability
 được ưu tiên theo exact subject specificity → visual coverage → technical
 relevance → image quality/resolution → provenance confidence → current
@@ -204,3 +204,17 @@ Admin guided flows resolve/reuse canonical Media through the application
 boundary and Governance. Normal forms do not require proposal UUID, Evidence
 UUID, fingerprint, expected revision or raw JSON; technical identifiers belong
 under Kỹ thuật/Nâng cao.
+
+### Visual Support Requirement — 2026-09-11
+
+`VisualSupportRequirement` is the application-level ledger for a semantic
+feature that needs an exact illustration. It is distinct from the rule that a
+node lacks a representative image. It stores missing/review/resolved state,
+subject/scope/facet/detail/intent, provenance, revision and optional Media;
+MediaUsage remains the contextual binding. A later canonical Media read-back
+performs an indexed, bounded reverse lookup and can satisfy an older missing
+requirement without rewriting every Article or Video. Exact subject, scope,
+facet, feature and context are mandatory; same brand/model, filename,
+keyword, gallery, checksum or near visual match is not enough. Visual support
+does not create Evidence, Claim or Graph truth, and public projections omit
+private, review, placeholder, unavailable or ineligible Media.

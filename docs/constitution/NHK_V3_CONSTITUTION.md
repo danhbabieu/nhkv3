@@ -135,7 +135,7 @@ outcome and must hand off to the governed Media ingest/reconciliation boundary.
 
 Media ingest additionally performs semantic enrichment and may attach one
 Media to multiple directly related canonical nodes when each use is justified.
-After each Media ingest, directly related nodes missing an image are inspected;
+After each Media ingest, directly related nodes missing a representative image are inspected;
 the best currently available suitable image may become a temporary
 representative. Representative status is a presentation choice, not an
 immutable relation. A better candidate is compared by exact subject
@@ -643,6 +643,61 @@ allocation, Graph write or visibility change.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-07.
 
+## Amendment record — 2026-09-11 — Visual Support Requirement law
+
+**WHY:** A node-level representative image rule is insufficient when a
+Knowledge note, Article, Video, Media annotation or public projection names a
+specific technical/recognition feature that needs its own illustration. The
+system must retain that missing need and let a later canonical Capture Media
+resolve it without rewriting every consumer.
+
+**WHAT LAW CHANGES:** `VisualSupportRequirement` is an application-level
+persistent requirement ledger, not an Authority entity, Knowledge Claim,
+Source/Evidence, Graph edge, Media identity or Article/Video page. It stores
+exact subject/scope/facet/registered feature and visual intent with
+`MISSING`, `RESOLVED` or `REVIEW_REQUIRED` state, provenance/context,
+idempotency, revision and optional Media binding. `MediaUsage` owns the
+contextual usage after binding; one canonical Media may serve many valid
+requirements and consumers.
+
+When the requirement is created, the application resolves the canonical
+subject, searches indexed canonical Media/MediaUsage and validates exact
+scope, facet, feature and context before reporting missing. Filename, keyword,
+same brand/model, gallery, checksum or visual similarity is not sufficient.
+After every canonical Media ingest/read-back, including Capture, a bounded
+reverse lookup searches missing/review requirements, validates exact context,
+ranks suitability, binds/reconciles MediaUsage, invokes existing projection
+invalidation and performs final read-back. A better candidate may replace an
+older binding only with optimistic revision and retained provenance history.
+
+Visual support only says that a Media is suitable to illustrate a detail in a
+context. It never promotes an observation to Claim/Evidence or creates a
+Graph edge, and a specimen-scoped observation never broadens to Variant,
+Model or Brand. `RESOLVED` is independent of public eligibility: private,
+review, placeholder, unavailable or ineligible Media are omitted from public
+projection and no placeholder may pretend to satisfy the requirement.
+
+Representative image coverage and semantic feature technical/contextual
+illustration are separate diagnostics. WordPress `wp_posts` remains the
+editorial body owner; projections resolve visual bindings dynamically and do
+not copy image URLs into every Article body.
+
+**AFFECTED SUBSYSTEMS:** Media, Knowledge, Article, Video, Source/Evidence,
+Graph, Projection, Public Dossier, SEO, MCP, Capture, Governance and Admin.
+
+**COMPATIBILITY:** Existing representative roles, MediaUsage, Knowledge
+facets/scopes, Media detail registry and Projection Dependency Index remain
+owners. The new ledger is additive and does not add a Graph predicate or
+semantic entity type. Existing missing-representative diagnostics remain valid
+but must not be interpreted as feature-level visual support.
+
+**DATA, MIGRATION AND ROLLOUT:** Migration 019 is UP-only and creates an
+indexed `nhk_visual_support_requirements` ledger. No legacy backfill or live
+semantic mutation is authorized by this amendment. Capture is the only normal
+intake boundary; no direct MCP writer exists.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-11.
+
 ## 2. Ranh giới trách nhiệm tối cao
 
 Mỗi subsystem chỉ sở hữu trách nhiệm được nêu dưới đây:
@@ -717,6 +772,9 @@ route identity cũ có redirect policy riêng.
   của observation đó; không tự promotion thành fact của Variant hoặc Model.
 - **WordPress Post:** nội dung biên tập native, có thể liên hệ semantic object
   nhưng không trở thành nơi chứa duplicate semantic truth.
+- **VisualSupportRequirement:** application-level ledger for an exact semantic
+  subject/scope/facet/feature visual need; it is not semantic truth, Claim,
+  Evidence, Graph, Media identity or a public image record.
 
 ### 3.4 Visibility, mutation và projection
 
@@ -1225,8 +1283,8 @@ neighborhood. Một Media có thể có nhiều MediaUsage và relation tới nh
 khi từng relation/usage có căn cứ riêng; không tạo edge chỉ vì cùng ảnh có thể
 dùng tiện lợi ở nhiều trang.
 
-Mọi node trực tiếp liên quan đang thiếu ảnh phải được đưa vào representative
-review. Ảnh tốt nhất hiện có chỉ được dùng làm representative tạm thời khi
+Mọi node trực tiếp liên quan đang thiếu representative image phải được đưa vào
+representative review. Ảnh tốt nhất hiện có chỉ được dùng làm representative tạm thời khi
 vẫn đạt representative relevance; đây là lựa chọn `BEST CURRENTLY AVAILABLE`,
 không phải immutable relation. Khi có ảnh phù hợp hơn, hệ thống phải compare
 suitability, promote ảnh mới và demote ảnh cũ về gallery,
@@ -1778,7 +1836,9 @@ merge.
 Với Knowledge hoặc user input, reconciliation phải xem xét các target đã đăng
 ký gồm Brand, Model, Variant, Movement, Component, Classification, Media,
 Source, Evidence và Knowledge liên quan. Với Media, phải chạy semantic
-enrichment và representative-media reconciliation theo §13.1.1. Với Video,
+enrichment, representative-media reconciliation và reverse reconciliation của
+`VisualSupportRequirement` theo §13.1.1 và
+`VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md`. Với Video,
 Knowledge enrichment planning vẫn phải giữ scope/provenance và chỉ apply qua
 Governance riêng; preview không phải canonical completion.
 
@@ -2042,7 +2102,7 @@ editorial, semantic and verification stages.
 82. “Maximize relations” chỉ là maximize justified useful relations; weak/speculative/convenience-only edges không được tạo.
 83. MCP ingest không được báo `COMPLETE` nếu chỉ ingest thành công; completion cần canonical read-back, duplicate check, semantic research, relation reconciliation, representative-media reconciliation khi áp dụng và final verification.
 84. Media ingest phải semantic-enrich; một Media có thể có nhiều usage/relation tới nhiều node khi từng quan hệ được chứng minh hợp lý.
-85. Sau Media ingest, node trực tiếp liên quan thiếu ảnh phải được representative-reconcile; ảnh tốt nhất hiện có có thể làm representative tạm thời khi đủ relevance.
+85. Sau Media ingest, node trực tiếp liên quan thiếu representative image phải được representative-reconcile; visual feature thiếu technical/contextual support phải được reconcile qua VisualSupportRequirement ledger riêng.
 86. Representative là `BEST CURRENTLY AVAILABLE`, không immutable; ảnh phù hợp hơn có thể promote và ảnh cũ có thể demote nếu còn phù hợp, không xóa Media hoặc provenance.
 87. Representative selection ưu tiên exact subject specificity → visual coverage → technical relevance → image quality/resolution → provenance confidence → current representative quality; Variant image không lấp Brand/Model rộng hơn nếu thiếu representative relevance.
 88. Knowledge và user input phải relation-reconcile với các target canonical liên quan đã registered, gồm Authority types, Media, Source, Evidence và Knowledge.
@@ -2054,6 +2114,13 @@ editorial, semantic and verification stages.
 94. Direct mutation bị block phải trả `DIRECT_WRITE_BLOCKED` và `USE_CANONICAL_CAPTURE_FLOW`, không tạo partial semantic/editorial side effect.
 95. Một submission mới mặc định tạo đúng một Capture và một native Article draft; physical Media/Video identities vẫn do owner riêng sở hữu.
 96. Publication là chặng cuối của Capture; direct publish không phải entry point cho submission mới.
+97. Một visually explainable semantic feature có requirement exact, và requirement thiếu ảnh được giữ durable ở `MISSING` hoặc `REVIEW_REQUIRED`.
+98. Feature-level technical/contextual visual support không bị đồng nhất với node-level representative image.
+99. Canonical Media read-back chạy bounded reverse lookup để có thể resolve requirement cũ; query không scan toàn database.
+100. Visual support không tự tạo Claim, Source/Evidence hoặc Graph edge, và không broaden specimen observation lên scope cha.
+101. Một Media identity có thể được reuse cho nhiều requirement/consumer hợp lệ qua MediaUsage; replay không duplicate requirement/usage.
+102. Semantic `RESOLVED` không đồng nghĩa public displayed; public projection chỉ chọn public-safe derivative và fail closed với missing/private/review/placeholder/ineligible.
+103. Projection dependency/revision của visual binding được invalidated/rebuilt khi binding thay đổi; Article body không trở thành semantic store.
 
 ---
 

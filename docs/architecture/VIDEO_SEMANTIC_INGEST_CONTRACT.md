@@ -185,3 +185,13 @@ the external YouTube URL is never a frontend destination. Query/projection code
 normalizes the current persisted source under `metadata.source` and approved
 compatibility shapes in one application layer. It does not duplicate source
 records or infer a second semantic identity.
+
+### Video visual support — 2026-09-11
+
+Video editorial or Knowledge notes may consume a VisualSupportRequirement for
+an exact technical/recognition feature. A thumbnail or external video source
+does not satisfy a technical-detail requirement unless its declared visual
+context proves the exact subject, scope, facet, feature and intent. Missing
+visual support is retained independently of Video identity and is resolved by
+later canonical Media Capture/reconciliation; it is not Claim/Evidence and
+does not broaden scope.

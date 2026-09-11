@@ -21,6 +21,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('graph', $keys);
         self::assertContains('governance', $keys);
         self::assertContains('media', $keys);
+        self::assertContains('visual-support-requirement', $keys);
         self::assertContains('mcp', $keys);
     }
 
@@ -33,6 +34,16 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $document['document_hash']);
         self::assertArrayNotHasKey('absolute_path', $document);
         self::assertArrayNotHasKey('filesystem_path', $document);
+    }
+
+    public function test_visual_support_contract_is_active_and_readable(): void
+    {
+        $document = (new McpDocumentationRegistry())->get('visual-support-requirement');
+        self::assertSame('ACTIVE', $document['status']);
+        self::assertSame('media', $document['domain']);
+        self::assertStringContainsString('VisualSupportRequirement', $document['content']);
+        self::assertStringContainsString('MISSING', $document['content']);
+        self::assertStringContainsString('Evidence', $document['content']);
     }
 
     public function test_arbitrary_and_traversal_keys_fail_closed(): void
@@ -82,6 +93,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertStringContainsString('Mandatory Read-First Router', $bootstrap['read_first']);
         self::assertStringContainsString('Current Documentation Status Index', $bootstrap['documentation_status_index']);
         self::assertStringContainsString('NHK V3 Execution State', $bootstrap['execution_state_content']);
+        self::assertContains('docs/architecture/VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md', array_column($bootstrap['active_documents'], 'path'));
     }
 
     public function test_manifest_runtime_mismatch_and_checkpoint_fail_closed(): void

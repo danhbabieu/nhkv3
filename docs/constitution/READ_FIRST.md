@@ -202,3 +202,10 @@ Open Graph, structured promotional copy, cards or comparison copy — also read
 `docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md` before
 implementation or publication. This requirement is cross-cutting; no public
 channel may bypass the same claim/evidence compliance policy.
+
+For any Media, Knowledge/note, Article, Video, Media annotation or public
+projection work that names a visually explainable technical or recognition
+feature, also read `docs/architecture/VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md`.
+This ACTIVE contract governs the application-level requirement ledger, exact
+Media reuse, bounded reverse reconciliation, public fail-closed rules and the
+separation between feature illustration and representative coverage.

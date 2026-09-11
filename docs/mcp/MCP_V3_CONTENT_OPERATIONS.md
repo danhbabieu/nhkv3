@@ -798,3 +798,14 @@ provenance and embed references only. Public-safe knowledge may be returned
 when its canonical projection passes policy and contains only the registered
 safe fields; raw PRIVATE Source/Evidence and private metadata/IDs remain
 excluded. Relations still require Graph/public eligibility independently.
+
+### Visual support post-ingest sequence — 2026-09-11
+
+After canonical Media ingest/read-back, Capture's existing application
+boundary invokes bounded reverse reconciliation of indexed MISSING and
+REVIEW_REQUIRED VisualSupportRequirement rows. It validates exact
+subject/scope/facet/feature/intent, reuses one canonical Media through
+MediaUsage, invalidates affected projection dependencies and performs final
+read-back. This is not a new MCP writer. Missing feature illustration is
+distinct from missing representative image; visual suitability never promotes
+Evidence/Claim and public output omits private/review/ineligible Media.

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Integration;
 
-use NHK\Core\Infrastructure\Migration\{ClaimProjectionMigration016, DictionaryMigration015, EditorialCaptureAddendumMigration018, PublicIdentityMigration014};
+use NHK\Core\Infrastructure\Migration\{ClaimProjectionMigration016, DictionaryMigration015, EditorialCaptureAddendumMigration018, PublicIdentityMigration014, VisualSupportRequirementMigration019};
 use NHK\Core\Plugin;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
@@ -38,18 +38,19 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
         update_option('nhk_core_migration_target', $this->previousTarget, false);
     }
 
-    public function test_pending_runner_moves_15_to_18_with_the_projection_and_capture_schema_contract(): void
+    public function test_pending_runner_moves_15_to_19_with_the_projection_capture_and_visual_support_schema_contract(): void
     {
         global $wpdb;
         $before = $this->canonicalCounts();
 
         Plugin::runPendingMigrations();
 
-        self::assertSame(18, (int) get_option('nhk_core_migration_current', 0));
-        self::assertSame(18, (int) get_option('nhk_core_migration_target', 0));
+        self::assertSame(19, (int) get_option('nhk_core_migration_current', 0));
+        self::assertSame(19, (int) get_option('nhk_core_migration_target', 0));
         self::assertTrue(ClaimProjectionMigration016::schemaReady($wpdb));
         self::assertTrue(\NHK\Core\Infrastructure\Migration\EditorialCaptureMigration017::schemaReady($wpdb));
         self::assertTrue(EditorialCaptureAddendumMigration018::schemaReady($wpdb));
+        self::assertTrue(VisualSupportRequirementMigration019::schemaReady($wpdb));
         self::assertSame([
             'PRIMARY',
             'projection_node_revision',
@@ -74,8 +75,8 @@ final class MaintenanceMigrationIntegrationTest extends TestCase
 
         Plugin::runPendingMigrations();
 
-        self::assertSame(18, (int) get_option('nhk_core_migration_current', 0));
-        self::assertSame(18, (int) get_option('nhk_core_migration_target', 0));
+        self::assertSame(19, (int) get_option('nhk_core_migration_current', 0));
+        self::assertSame(19, (int) get_option('nhk_core_migration_target', 0));
         self::assertSame($firstSchema, $this->createStatements());
         self::assertSame($firstCounts, $this->canonicalCounts());
     }
