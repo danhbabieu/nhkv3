@@ -24,6 +24,47 @@ then run the registry-wide parity, REST and visitor-facing read smokes. Never
 reset, clean, overwrite, delete or commit the unrelated server
 `public/error_log`.
 
+### Fail-closed documentation deployment wrapper
+
+The repository wrapper for the allowlisted DEMO target is:
+
+```bash
+NHK_DEMO_DEPLOY_CONFIG=/absolute/path/to/deploy.ini \
+./scripts/nhk-deploy-verify \
+  --target=demo.1945.vn \
+  --base-url=https://demo.1945.vn \
+  --expected-head="$(git rev-parse HEAD)" \
+  --json
+```
+
+When the checkout is clean and the operator explicitly wants a fast-forward
+from `origin/main`, use `--pull` and omit `--expected-head`:
+
+```bash
+NHK_DEMO_DEPLOY_CONFIG=/absolute/path/to/deploy.ini \
+./scripts/nhk-deploy-verify \
+  --target=demo.1945.vn \
+  --base-url=https://demo.1945.vn \
+  --pull \
+  --json
+```
+
+The wrapper runs `composer install`, then `composer generate:mcp-docs`,
+validates the generated `resources/canonical-docs/manifest.json`, transfers
+the plugin through `RemoteDeploymentAdapter`, and probes the direct target
+endpoint `/wp-json/nhk/v1/mcp`. The probe checks MCP initialization,
+`tools/list`, `nhk.documentation.bootstrap` and `nhk.documentation.list`, then
+compares `documentation_version`, `manifest_hash`, `build_identity` and every
+manifest file SHA-256. It exits non-zero on `DOC_BUILD_FAILED`,
+`DOC_MANIFEST_MISMATCH`, `MCP_BOOTSTRAP_UNAVAILABLE` or
+`DEPLOYMENT_NOT_ACTIVE`; an rsync success alone is never a release success.
+
+The wrapper does not guess a cache flush, PHP-FPM reload or OPcache command.
+Those actions are hosting-specific and are not required by the canonical file
+reader. If the target still returns an old identity, the wrapper reports
+`DEPLOYMENT_NOT_ACTIVE` and stops for an operator to inspect the active host
+configuration before rerunning the verification.
+
 The preflight does not import SQL, restore data, seed entities, repair Graph
 edges or change database state. A successful `git pull` alone is not release
 evidence.

@@ -79,6 +79,76 @@ the target, then verify target MCP `documentation-bootstrap` and
 and ACTIVE law. Until then report
 `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING`.
 
+# Checkpoint — 2026-09-11 — Fail-closed documentation deployment verifier
+
+WHAT: Added `scripts/nhk-deploy-verify` and `tools/nhk-deploy-verify.php`, plus
+`RemoteMcpDocumentationVerifier`. The wrapper generates the immutable
+`resources/canonical-docs/` snapshot before the existing SSH/rsync adapter,
+then probes the direct `/wp-json/nhk/v1/mcp` endpoint and compares
+`documentation_version`, `manifest_hash`, `build_identity` and every document
+SHA-256. It never guesses cache flush, PHP-FPM reload or OPcache commands.
+
+VERIFICATION: `composer generate:mcp-docs` ran successfully with 30 documents;
+the exact generated identities are emitted by the wrapper and manifest file.
+The focused verifier/CLI/documentation contract selection passes 49 tests / 535
+assertions. Composer validation passes with the repository's existing missing
+license warning; full Composer PHP lint passes; `git diff --check` passes.
+The full `composer test` suite is environment/concurrent-worktree blocked at
+1,265 tests with 35 WordPress/integration errors and 15 failures, including
+the existing missing `NHK_WP_TEST_PATH`/database bootstrap failures; those are
+not downgraded to a pass.
+
+TARGET READ-BACK: The current target MCP connector returned 29 documents with
+`documentation_version=61ac928a84b5637c7fc36c471d19dcca1f40bf0f9d9957220526e41c2ee6a361`,
+`manifest_hash=ce549d8787e67d8bd1a94b676e6c7f266fef8a637fc249027aa5674c3045c4bc`
+and `build_identity=3213e26b582b30c95d0884676a1ff9c51c349109edd629ed8917116a8ea21f33`.
+The current local source generates 30 documents; the exact local identities
+must be read from the freshly generated manifest for each release. The target
+is therefore stale: the wrapper reports `DEPLOYMENT_NOT_ACTIVE` when the old
+build identity is returned, and `DOC_MANIFEST_MISMATCH` for a documentation
+identity/hash mismatch without a stale build identity. No deployment, push, cache mutation, restart or
+semantic/WordPress data mutation was performed.
+
+# Checkpoint — 2026-09-11 — Visual Support Requirement application ledger
+
+WHAT: Added the canonical VisualSupportRequirement application-level ledger,
+closed intent/state registries, additive migration 019, indexed WPDB
+repository, exact suitability evaluator, bounded reverse reconciliation after
+canonical Media read-back, MediaUsage consumer binding and public fail-closed
+projection guard. Updated the Constitution amendment and ACTIVE
+Media/Knowledge/Article/Video/Graph/Governance/MCP/SEO/dossier/admin contracts,
+router and documentation status index.
+
+WHY: A semantic technical/recognition feature needs its own visual support
+requirement, distinct from node-level representative image coverage. A later
+Capture Media must be able to resolve an older MISSING requirement without
+duplicating Media or rewriting Article bodies, while visual support remains
+separate from Claim/Source/Evidence/Graph truth.
+
+FILES: `VISUAL_SUPPORT_REQUIREMENT_CONTRACT.md`, domain/application/repository
+classes under `public/wp-content/plugins/nhk-core/src`, migration 019, focused
+Visual Support tests, `McpDocumentationRegistry`, Constitution, READ_FIRST,
+CURRENT_DOCUMENTATION_STATUS_INDEX and all affected ACTIVE contracts.
+
+TESTS: Focused Visual Support slice currently passes 17 tests / 50 assertions;
+documentation registry currently passes 8 tests / 57 assertions. Full
+regression, generated documentation projection, lint and final diff/secret
+review remain in this checkpoint sequence.
+
+CODE STATUS: IMPLEMENTED_CODE_SIDE in progress; no legacy backfill and no
+production/staging/V2 mutation. Runtime event is wired from canonical Media
+read-back to bounded reconciliation and existing projection invalidation.
+
+RUNTIME STATUS: Local unit verification only so far. WordPress integration and
+target MCP read-back have not been run.
+
+DEPLOYMENT STATUS: NOT_PERFORMED; push pending final verification and policy.
+
+REMAINING GAP: Run Composer documentation generator and full relevant tests,
+then determine whether the repository's configured human-controlled DEMO
+deployment can be authorized. Do not report LIVE_VERIFIED until target MCP
+bootstrap/get returns the new documentation version/hash and law content.
+
 # Checkpoint — 2026-09-11 — Capture Video source-specific provenance dependency chain
 
 ROOT CAUSE: the Capture Video branch stopped at the Video adapter's planning
