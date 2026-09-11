@@ -21,7 +21,7 @@ final class BrandAggregationQuery
     /** @return array<string,list<array<string,mixed>>> */
     public function forBrand(string $brandId): array
     {
-        $result = array_fill_keys(['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'knowledge', 'media', 'videos', 'sources', 'evidence'], []);
+        $result = array_fill_keys(['models', 'variants', 'movements', 'music', 'components', 'classifications', 'clock_types', 'specimens', 'products', 'knowledge', 'media', 'videos', 'sources', 'evidence'], []);
         $brand = $this->authority->findByCanonicalId($brandId);
         if (!$brand || !$brand->active() || $brand->entityType !== 'brand') return $result;
 
@@ -30,6 +30,7 @@ final class BrandAggregationQuery
             $model = $this->entity($modelEdge->source->reference->endpoint_type, $modelEdge->source->reference->endpoint_key);
             if (!$model || $model->entityType !== 'model' || !$model->active()) continue;
             $this->add($buckets, $model, 'DIRECT', ['model_of']);
+            $this->addClassifiedClockTypes($buckets, $model, ['model_of']);
 
             foreach ($this->edges('model', $model->canonicalId, false, 'variant_of') as $variantEdge) {
                 $variant = $this->entity($variantEdge->source->reference->endpoint_type, $variantEdge->source->reference->endpoint_key);
@@ -38,6 +39,7 @@ final class BrandAggregationQuery
                 // Public dossiers describe the path from the Brand reading
                 // perspective, not the storage edge direction.
                 $this->add($buckets, $variant, 'DERIVED', $variantPath);
+                $this->addClassifiedClockTypes($buckets, $variant, $variantPath);
 
                 foreach ($this->edges('variant', $variant->canonicalId, true, 'uses_movement') as $movementEdge) {
                     $movement = $this->entity($movementEdge->target->reference->endpoint_type, $movementEdge->target->reference->endpoint_key);
@@ -110,6 +112,20 @@ final class BrandAggregationQuery
         $existing = $buckets[$group][$entity->canonicalId] ?? null;
         if ($existing !== null && !$this->isBetter($candidate, $existing)) return;
         $buckets[$group][$entity->canonicalId] = $candidate;
+    }
+
+    /** Add only valid clock-type memberships; Brand remains a derived reader projection. */
+    private function addClassifiedClockTypes(array &$buckets, AuthorityEntity $source, array $path): void
+    {
+        foreach ($this->edges($source->entityType, $source->canonicalId, true, 'classified_as') as $edge) {
+            $classification = $this->entity($edge->target->reference->endpoint_type, $edge->target->reference->endpoint_key);
+            if ($classification === null || $classification->entityType !== 'classification' || (string) ($classification->payload['family'] ?? '') !== 'clock-type') continue;
+            $membershipPath = [...$path, 'classified_as'];
+            $this->add($buckets, $classification, 'DERIVED', $membershipPath);
+            $candidate = $this->item($classification, 'DERIVED', $membershipPath);
+            $existing = $buckets['clock_types'][$classification->canonicalId] ?? null;
+            if ($existing === null || $this->isBetter($candidate, $existing)) $buckets['clock_types'][$classification->canonicalId] = $candidate;
+        }
     }
 
     /** @param array<string,mixed> $candidate @param array<string,mixed> $existing */

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
-use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService};
+use NHK\Core\Application\Graph\{BrandAggregationQuery, ClassifiedAsPolicy, GraphService};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
@@ -28,7 +28,7 @@ final class BrandAggregationQueryTest extends TestCase
             $ids = array_values(array_map(static fn ($entity): string => $entity->canonicalId, array_filter($authority->listByType($type), static fn ($entity): bool => $entity->entityType === $type)));
             $endpoints->register($type, new FakeEndpointResolver($type, $ids));
         }
-        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
         foreach ([$movement, $music, $component, $classification] as $entity) {
             $graph->create(new NodeReference('brand', $brand->canonicalId), 'about', new NodeReference($entity->entityType, $entity->canonicalId));
         }
@@ -135,5 +135,30 @@ final class BrandAggregationQueryTest extends TestCase
         self::assertArrayNotHasKey('id', $result['variants'][0]);
         self::assertSame(['model_of', 'variant_of'], $result['variants'][0]['origin']['path']);
         self::assertSame([], $result['movements']);
+    }
+
+    public function test_clock_types_encountered_are_derived_from_classified_model_path(): void
+    {
+        $types = new EntityTypeRegistry(); CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository(); $service = new AuthorityService($authority, $types);
+        $brand = $service->create('brand', 'maker', 'Maker');
+        $model = $service->create('model', 'model-1', 'Model 1');
+        $table = $service->create('classification', 'nhk:classification:clock-type.table-clock', 'Đồng hồ để bàn', ['family' => 'clock-type']);
+        $origin = $service->create('classification', 'nhk:classification:origin.france', 'Pháp', ['family' => 'origin']);
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId]));
+        $endpoints->register('model', new FakeEndpointResolver('model', [$model->canonicalId]));
+        $endpoints->register('classification', new FakeEndpointResolver('classification', [$table->canonicalId, $origin->canonicalId]));
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
+        $graph->create(new NodeReference('model', $model->canonicalId), 'model_of', new NodeReference('brand', $brand->canonicalId));
+        $graph->create(new NodeReference('model', $model->canonicalId), 'classified_as', new NodeReference('classification', $table->canonicalId));
+        $graph->create(new NodeReference('model', $model->canonicalId), 'classified_as', new NodeReference('classification', $origin->canonicalId));
+
+        $result = (new BrandAggregationQuery($graph, $authority, $types))->forBrand($brand->canonicalId);
+
+        self::assertSame(['Đồng hồ để bàn'], array_column($result['clock_types'], 'name'));
+        self::assertSame(['model_of', 'classified_as'], $result['clock_types'][0]['origin']['path']);
+        self::assertSame(['Đồng hồ để bàn'], array_column($result['classifications'], 'name'));
+        self::assertNotContains('Pháp', array_column($result['clock_types'], 'name'));
     }
 }
