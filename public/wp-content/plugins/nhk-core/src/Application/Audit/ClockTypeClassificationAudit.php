@@ -246,7 +246,7 @@ final class ClockTypeClassificationAudit
             $tier = strtoupper(trim((string) ($record['tier'] ?? '')));
             if (!in_array($evidenceStatus, self::SUPPORTED_EVIDENCE, true)) $blockers[] = 'EVIDENCE_NOT_SUPPORTED';
             if ($provenance === '' || $provenance === 'SYSTEM_INFERENCE') $blockers[] = 'PROVENANCE_NOT_ACCEPTABLE';
-            if (!in_array($tier, ['A', 'B', 'C'], true)) $blockers[] = 'EVIDENCE_TIER_NOT_REVIEW_ELIGIBLE';
+            if (!in_array($tier, ['B', 'C', 'D'], true)) $blockers[] = 'EVIDENCE_TIER_NOT_REVIEW_ELIGIBLE';
             if ($blockers !== []) return $this->result(self::INSUFFICIENT_EVIDENCE, $base, array_values(array_unique($blockers)));
             $target = $item['target'];
             $packet = array_merge($base, ['target_uuid' => $target->canonicalId, 'target_revision' => $target->revision, 'target_name' => $target->canonicalName, 'target_family' => 'clock_type', 'resolution_basis' => (string) ($record['basis'] ?? 'EXACT_CANONICAL_EVIDENCE'), 'provenance_class' => $provenance, 'supporting_canonical_ids' => $this->safeIds($record['supporting_canonical_ids'] ?? []), 'claim_uuid' => $record['claim_uuid'] ?? null, 'claim_revision' => $record['claim_revision'] ?? null, 'support_summary' => is_array($record['support_summary'] ?? null) ? $record['support_summary'] : [], 'status' => self::READY_FOR_OWNER_REVIEW]);

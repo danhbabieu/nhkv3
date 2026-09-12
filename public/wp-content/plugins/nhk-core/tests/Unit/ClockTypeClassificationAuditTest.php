@@ -31,6 +31,15 @@ final class ClockTypeClassificationAuditTest extends TestCase
         self::assertCount(1, $report->samples[ClockTypeClassificationAudit::READY_FOR_OWNER_REVIEW]);
     }
 
+    public function test_exact_approved_structured_tier_d_evidence_is_ready_for_owner_review(): void
+    {
+        $source = $this->entity('model', 'Model D', '00000000-0000-4000-8000-000000000003');
+        $target = $this->entity('classification', 'Đồng hồ D', '00000000-0000-4000-8000-000000000004', ['family' => 'clock_type']);
+        [$audit] = $this->audit([$source, $target], new FixtureEvidenceReader([$source->canonicalId => [$this->evidence($source, $target, 'D')]]));
+
+        self::assertSame(ClockTypeClassificationAudit::READY_FOR_OWNER_REVIEW, $audit->audit()->results[0]['status']);
+    }
+
     public function test_brandless_specimen_is_a_valid_review_candidate(): void
     {
         $source = $this->entity('specimen', 'Specimen không rõ hãng', '00000000-0000-4000-8000-000000000011');
