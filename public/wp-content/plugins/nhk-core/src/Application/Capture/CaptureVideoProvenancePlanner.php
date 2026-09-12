@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
+use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
  * Plans the source-specific provenance dependencies for a Capture-owned Video.
@@ -18,6 +19,14 @@ final class CaptureVideoProvenancePlanner
         $video = is_array($videoProposal['payload'] ?? null) ? $videoProposal : ['payload' => $videoProposal];
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        // A resumed child is rehydrated from the immutable Capture asset. The
+        // adapter/source snapshot is therefore authoritative when present,
+        // with the original proposal's stored source packet as a lossless
+        // fallback. This keeps dependency materialization independent from
+        // reparsing an empty addendum.
+        $storedSource = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
+        $sourceSnapshot = array_merge($storedSource, $sourceSnapshot);
+        $resolvedSubject = $this->lockedSubject($resolvedSubject, $metadata, (bool) ($context['preserve_original_subject'] ?? false));
         $sourceTitle = trim((string) ($sourceSnapshot['source_title'] ?? $sourceSnapshot['title'] ?? ''));
         $subjectId = trim((string) ($resolvedSubject['id'] ?? ''));
         $subjectType = trim((string) ($resolvedSubject['type'] ?? ''));
@@ -165,6 +174,27 @@ final class CaptureVideoProvenancePlanner
         $plan['dependencies'] = $dependencies;
         $plan['evidence'] = $evidence;
         return $plan;
+    }
+
+    /** @return array<string,mixed> */
+    private function lockedSubject(array $resolvedSubject, array $metadata, bool $preserveOriginal): array
+    {
+        $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
+        $about = [];
+        foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
+            if (!is_array($attachment) || strtolower(trim((string) ($attachment['predicate'] ?? 'about'))) !== 'about') continue;
+            $id = trim((string) ($attachment['target_uuid'] ?? $attachment['target_id'] ?? ''));
+            $type = strtolower(trim((string) ($attachment['target_type'] ?? '')));
+            if (UuidCodec::isValid($id) && $type !== '') $about[$type . ':' . strtolower($id)] = ['id' => $id, 'type' => $type];
+        }
+        $candidates = [];
+        foreach ([$packet, count($about) === 1 ? array_values($about)[0] : []] as $candidate) {
+            if (!is_array($candidate) || !UuidCodec::isValid((string) ($candidate['id'] ?? '')) || trim((string) ($candidate['type'] ?? '')) === '') continue;
+            $candidates[] = $candidate;
+        }
+        if ($preserveOriginal && $candidates !== []) return $candidates[0];
+        if (UuidCodec::isValid((string) ($resolvedSubject['id'] ?? '')) && trim((string) ($resolvedSubject['type'] ?? '')) !== '') return $resolvedSubject;
+        return $candidates[0] ?? $resolvedSubject;
     }
 
     /** @return array<string,mixed> */

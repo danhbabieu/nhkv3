@@ -174,6 +174,18 @@ final class EditorialCaptureCoordinator
                 (array) ($interpretation['primary_subject_hints'] ?? []),
                 (array) ($interpretation['secondary_subject_hints'] ?? []),
             ))));
+            if ($this->isVideoOnlyResume($input)) {
+                $locked = is_array($record->diagnostics['subjects'] ?? null) ? $record->diagnostics['subjects'] : [];
+                $lockedPrimary = is_array($locked['primary'] ?? null) ? $locked['primary'] : [];
+                if (UuidCodec::isValid((string) ($lockedPrimary['id'] ?? '')) && trim((string) ($lockedPrimary['type'] ?? '')) !== '') {
+                    $resolution = $locked + [
+                        'status' => 'resolved',
+                        'primary' => $lockedPrimary,
+                        'subjects' => [$lockedPrimary],
+                        'resolved' => [$lockedPrimary],
+                    ];
+                }
+            }
             $diagnostics['subjects'] = $resolution;
             $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken);
 
@@ -333,6 +345,15 @@ final class EditorialCaptureCoordinator
     {
         $order = array_flip(array_map(static fn (CaptureStage $item): string => $item->value, CaptureStage::cases()));
         return isset($order[$record->stage], $order[$stage->value]) && $order[$record->stage] >= $order[$stage->value];
+    }
+
+    /** @param array<string,mixed> $input */
+    private function isVideoOnlyResume(array $input): bool
+    {
+        if (($input['existing_capture_continuation'] ?? false) !== true) return false;
+        $governance = is_array($input['governance'] ?? null) ? $input['governance'] : [];
+        $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($governance['resume_children'] ?? [])))));
+        return $children === ['video'];
     }
 
     /** @param array<string,mixed> $input */

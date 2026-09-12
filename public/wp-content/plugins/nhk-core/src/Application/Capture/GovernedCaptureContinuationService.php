@@ -135,6 +135,15 @@ final class GovernedCaptureContinuationService
     private function plans(string $captureId, string $continuationKey, array $context, bool $includeSemanticChildren = true): array
     {
         $resolved = is_array($context['subject_resolution']['resolved'] ?? null) ? $context['subject_resolution']['resolved'] : [];
+        // Explicit child resume is bound to the original Capture subject. A
+        // text-only reparse may legitimately resolve nothing, so preserve the
+        // canonical subject packet recorded before the failed child rather
+        // than turning a valid resume into a semantic-delta error.
+        if (!$includeSemanticChildren) {
+            $priorSubjects = is_array($context['prior_diagnostics']['subjects'] ?? null) ? $context['prior_diagnostics']['subjects'] : [];
+            $priorResolved = is_array($priorSubjects['resolved'] ?? null) ? $priorSubjects['resolved'] : (is_array($priorSubjects['subjects'] ?? null) ? $priorSubjects['subjects'] : []);
+            if ($priorResolved !== []) $resolved = $priorResolved;
+        }
         $variants = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? '') === 'variant' && UuidCodec::isValid((string) ($item['id'] ?? ''))));
         $plans = [];
         if ($includeSemanticChildren && count($variants) === 1) {
@@ -185,7 +194,7 @@ final class GovernedCaptureContinuationService
                     $primary = $resolvedVariants[0] ?? [];
                 }
                 $hint = is_array($payload['metadata']['provenance']['user_hint'] ?? null) ? (string) ($payload['metadata']['provenance']['user_hint']['value'] ?? '') : '';
-                $plans[] = ['capture_video_provenance' => $this->videoProvenance->plan($captureId, $video, $source, $primary, ['user_hint' => $hint])];
+                $plans[] = ['capture_video_provenance' => $this->videoProvenance->plan($captureId, $video, $source, $primary, ['user_hint' => $hint, 'preserve_original_subject' => !$includeSemanticChildren])];
                 continue;
             }
             $plans[] = $this->arguments($entityType, $operation, $subjectId, $payload, 'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));

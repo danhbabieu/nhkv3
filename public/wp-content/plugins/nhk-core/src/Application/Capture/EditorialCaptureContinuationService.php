@@ -31,6 +31,10 @@ final class EditorialCaptureContinuationService
             $control = is_array($input['governance'] ?? null) ? $input['governance'] : [];
             $requestedChildren = is_array($existing->payload['resume_children'] ?? null) ? $existing->payload['resume_children'] : [];
             if ($requestedChildren !== []) $control['resume_children'] = $requestedChildren;
+            // Replayed addenda must carry the persisted child-selection
+            // control back into the coordinator. Without this, a stored
+            // video-only resume is reduced to an empty semantic continuation.
+            if ($control !== []) $input['governance'] = $control;
             if ($control !== []) {
                 $capture = $this->captures->findById($captureId);
                 if (!$capture instanceof CaptureRecord) return $this->response(null, $existing);

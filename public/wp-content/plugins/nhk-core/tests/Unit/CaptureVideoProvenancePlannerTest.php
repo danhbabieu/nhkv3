@@ -149,6 +149,41 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame('READY', $plan['status']);
     }
 
+    public function test_video_only_resume_rehydrates_locked_subject_from_original_video_packet(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-resume',
+            [
+                'operation' => 'ingest',
+                'entity_type' => 'video',
+                'payload' => [
+                    'canonical_id' => UuidCodec::newV7(),
+                    'metadata' => [
+                        'source' => [
+                            'platform' => 'youtube',
+                            'external_video_id' => '4NmkQFrNeWQ',
+                            'canonical_source_url' => 'https://www.youtube.com/watch?v=4NmkQFrNeWQ',
+                            'source_title' => 'Odo 36/8 source snapshot',
+                        ],
+                        'subject_resolution_packet' => [
+                            'id' => '852da54d-457a-4397-a16d-52d9452ba766',
+                            'type' => 'variant',
+                            'name' => 'Odo 36/8',
+                        ],
+                    ],
+                ],
+            ],
+            [],
+            ['id' => UuidCodec::newV7(), 'type' => 'variant', 'name' => 'Wrong reparse'],
+            ['preserve_original_subject' => true],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame('852da54d-457a-4397-a16d-52d9452ba766', $plan['relation']['target_uuid']);
+        self::assertSame('4NmkQFrNeWQ', $plan['dependencies'][0]['payload']['metadata']['external_video_id']);
+        self::assertSame('4NmkQFrNeWQ', $plan['dependencies'][1]['payload']['provenance']['metadata']['external_video_id']);
+    }
+
     public function test_marketing_and_conflicting_classification_are_never_promoted(): void
     {
         $planner = new CaptureVideoProvenancePlanner();
@@ -295,10 +330,29 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         $result = $service->execute('01a09370-effb-7ebc-bf11-5f9fbd62c529', 'capture:450:resume-video', [
             'existing_capture_continuation' => true,
             'continuation_delta_text' => '',
-            'subject_resolution' => ['primary' => ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'], 'resolved' => [['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A']]],
+            // The resumed Capture must not depend on reparsing the empty
+            // addendum. The original immutable Video packet carries the
+            // exact subject handoff instead.
+            'subject_resolution' => ['primary' => null, 'resolved' => []],
             'interpretation' => ['user_claim_candidates' => array_map(static fn (int $index): array => ['text' => 'Completed claim ' . $index, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE'], range(1, 7))],
             'observations' => [],
-            'assets' => [['kind' => 'video', 'video_proposal' => ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $videoId, 'payload' => ['canonical_id' => $videoId, 'url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot'], 'semantic_attachments' => []]]]]],
+            'assets' => [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'operation' => 'ingest',
+                    'entity_type' => 'video',
+                    'subject_id' => $videoId,
+                    'payload' => [
+                        'canonical_id' => $videoId,
+                        'url' => 'https://www.youtube.com/watch?v=abcdefghijk',
+                        'metadata' => [
+                            'source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot'],
+                            'subject_resolution_packet' => ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'],
+                            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'evidence_refs' => [['kind' => 'USER_HINT', 'value' => 'legacy']]]],
+                        ],
+                    ],
+                ],
+            ]],
         ], ['approval_confirmed' => true, 'resume_children' => ['video']]);
 
         self::assertSame('APPLIED', $result['status']);
@@ -311,6 +365,7 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame($ids[1], $result['writes'][3]['evidence_handoff']['claim_id']);
         self::assertSame($ids[2], $result['writes'][3]['evidence_handoff']['evidence_id']);
         self::assertSame([['evidence_id' => $ids[2]]], $result['writes'][3]['evidence_handoff']['relation_evidence_refs']);
+        self::assertNotContains('SEMANTIC_SUBJECT_OR_DELTA_REQUIRED', $result['blockers']);
     }
 
     private function videoProposal(string $externalId): array
