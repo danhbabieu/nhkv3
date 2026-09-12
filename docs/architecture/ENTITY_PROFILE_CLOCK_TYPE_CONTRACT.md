@@ -466,3 +466,34 @@ PR6.1 code đã được deploy và target expose đúng read surface/checkpoint
 `demo.1945.vn` staging hiện tại, nếu bridge chưa được deploy hoặc connector
 không expose audit API thì trạng thái là `LIVE_AUDIT_SURFACE_NOT_EXPOSED`; không
 dùng mutation tool thay thế.
+
+## 18. Organization closure — 2026-09-13
+
+The organization closure keeps the final profile split explicit:
+
+```text
+Brand      = entity_type: brand,          profile: brand
+Clock Type = entity_type: classification, family: clock_type, profile: clock_type
+```
+
+`EntityProfileRegistry` is the only profile-resolution seam for these two
+profiles. Other Classification families do not inherit Clock-Type
+capabilities. The admin card is a read-only projection and preserves section
+states instead of turning unavailable owners into empty lists.
+
+The root route foundation reads Public Identity ownership and registered
+WordPress/frontend owners for collision decisions. It does not allocate a
+slug, reproject an existing identity, migrate redirects or change sitemap
+state. Route type comes from persisted identity/profile read-back, never from
+the slug.
+
+The individual operator lifecycle is Search/Reuse first, then an Authority
+PLAN with `entity_type=classification`, `family=clock_type`, provenance,
+ambiguities, blockers and a proposed `nhk:classification:clock-type.*` stable
+key. Approval, eligibility, Controlled Apply and canonical read-back remain
+Governance-owned. No combined facet identity is created, and `subtype_of`
+remains limited to active, same-family, cycle-free Clock-Type hierarchy.
+
+Local code and regression verification are complete. Fresh target audit
+verification remains `LIVE_AUDIT_SURFACE_NOT_EXPOSED`; no live semantic
+mutation, legacy bulk apply/backfill or PR7 was performed.

@@ -74,6 +74,14 @@ final class EntityProfileAdminProjectionTest extends TestCase
         self::assertStringNotContainsString("methods' => 'POST'", $source);
     }
 
+    public function test_plugin_exposes_the_clock_type_lifecycle_as_the_single_composition_seam(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');
+
+        self::assertStringContainsString('nhk_v3_clock_type_creation_lifecycle', $source);
+        self::assertStringContainsString('ClockTypeCreationLifecycle', $source);
+    }
+
     private function entity(string $type, string $name, array $payload): AuthorityEntity
     {
         return new AuthorityEntity(UuidCodec::newV7(), $type, 'nhk:' . $type . ':projection', $name, 1, $payload, AuthorityState::ACTIVE, 1);

@@ -490,6 +490,12 @@ final class Plugin {
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
+            $clockTypeLifecycle = new \NHK\Core\Application\Authority\ClockTypeCreationLifecycle(
+                new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types),
+                new \NHK\Core\Application\Governance\GovernedAuthorityPlanExecutor($mcpGovernance),
+                $authority,
+            );
+            add_filter('nhk_v3_clock_type_creation_lifecycle', fn (mixed $current): mixed => $current ?? $clockTypeLifecycle, 10, 1);
             $captureRepository = new WpdbCaptureRepository($wpdb);
             $captureClaimReuse = new ClaimReusePolicy();
             $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection());

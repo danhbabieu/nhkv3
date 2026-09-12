@@ -8903,3 +8903,43 @@ missing WordPress functions), 15 guarded acceptance failures requiring
 PR6.1 test failure was observed. No staging data, Graph edge, Authority row,
 Claim, Evidence, Source, Proposal, Governance record, Media, Video, Article,
 Public Identity or route was mutated. PR7 remains NOT READY.
+
+# Checkpoint — 2026-09-13 — Clock Type organization closure
+
+IMPLEMENTED: The approved Clock Type organization is complete at the local
+code/read-model level. `EntityProfileRegistry` is the central Brand and Clock
+Type profile seam. Canonical Clock Type remains `classification` with exact
+`family=clock_type`; legacy `clock-type` is compatibility-read only, and the
+`nhk:classification:clock-type.*` stable-key convention is never used to infer
+family. No new entity type, intersection identity, predicate or ontology term
+was added.
+
+READ FOUNDATIONS: PR6.1 audit analysis now depends only on Authority inventory,
+Classification target inventory, Graph read and audit evidence ports. Target
+family buckets and source pages are bounded/cursor-based; evidence is resolved
+through Claim → Evidence → Source with safe summaries. Root route ownership
+has a centralized registration/collision reader foundation, while Public
+Identity allocation/reprojection and live route migration remain untouched.
+
+OPERATOR FOUNDATION: The read-only admin Clock-Type card exposes profile,
+family, UUID, stable key, revision/state, aliases/description, relation groups,
+Public Identity, SEO and diagnostics with explicit available/empty/unavailable/
+blocked states. The individual creation lifecycle is Search/Reuse → Authority
+PLAN → approval → eligibility/Controlled Apply → canonical read-back and
+duplicate verification. Video `about`, Media `depicts` and Knowledge subject/
+reachability semantics remain unchanged.
+
+VERIFICATION: Full Unit passes `1,427 tests / 6,826 assertions`; Contract passes
+`4 tests / 31 assertions`. Focused audit, profile, route, admin and lifecycle
+tests pass; PHP lint and `git diff --check` pass. Relevant guarded Integration
+was invoked with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` and was
+blocked at the local WordPress boundary by `Error establishing a database
+connection`; no non-test database was touched.
+
+LIVE MUTATION GATE: No Clock Type was created. No Authority, Graph, Knowledge,
+Evidence, Source, Media, Video, Article, Public Identity, route or sitemap was
+mutated. No SQL, generic WordPress writer, Governance apply, legacy bulk
+apply/backfill or PR7 operation was used. Fresh target runtime verification
+remains typed `LIVE_AUDIT_SURFACE_NOT_EXPOSED`, so the overall closure status
+is `ORGANIZATION_BLOCKED` pending sanctioned production/read-surface exposure
+and guarded integration infrastructure.

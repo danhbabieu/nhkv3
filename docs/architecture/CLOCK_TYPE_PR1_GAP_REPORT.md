@@ -460,3 +460,36 @@ revalidate owner approval.
 PR3 đã hoàn tất ở mức local additive/read-side foundation. PR4 chỉ bắt đầu sau
 review PR3; không claim implementation/live/deploy readiness từ contract
 snapshot hoặc in-memory golden tests.
+
+## ORGANIZATION CLOSURE — 2026-09-13
+
+Local organization closure is implemented without changing the ontology:
+
+- `EntityProfileRegistry` is the central Brand/Clock Type seam. Clock Type is
+  `classification + family=clock_type`; `clock-type` remains compatibility
+  read only and stable keys do not determine family.
+- `ClockTypeClassificationAudit` is pure analysis over read-only inventory,
+  target-inventory, Graph and evidence ports. Target pagination uses bounded
+  canonical cursors and exact family buckets.
+- Root route ownership now has a collision/read registry foundation only. No
+  root slug was allocated, reprojected, redirected or added to a sitemap.
+- Admin Clock-Type output is a read-only profile projection with explicit
+  `AVAILABLE_WITH_ITEMS`, `AVAILABLE_EMPTY`,
+  `UNAVAILABLE_IMPLEMENTATION_GAP` and `BLOCKED` states.
+- Individual creation is Search/Reuse → Authority PLAN → owner approval →
+  governed eligibility/Controlled Apply → canonical read-back and duplicate
+  verification. No bulk apply/backfill or PR7 was introduced.
+
+LOCAL VERIFICATION: Unit `1427 tests / 6826 assertions` passed with existing
+warnings/deprecations; Contract `4 tests / 31 assertions` passed; focused
+Clock-Type, route, admin and lifecycle regressions passed. Relevant guarded
+Integration was invoked against `nhk_v3_test` but stopped at the local
+WordPress boundary with `Error establishing a database connection`.
+
+LIVE VERIFICATION: `LIVE_AUDIT_SURFACE_NOT_EXPOSED` remains the typed target
+gap. No SQL workaround, writer, Governance apply, Public Identity allocation,
+semantic mutation, legacy backfill or PR7 operation was used. Therefore the
+repository code organization is complete, but the overall architecture gate
+remains `ORGANIZATION_BLOCKED` until a sanctioned production/read runtime
+exposes the fresh audit surface and guarded integration infrastructure is
+available.
