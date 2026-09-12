@@ -5,6 +5,7 @@ namespace NHK\Core\Infrastructure\Admin;
 
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
+use NHK\Core\Application\Entity\EntityProfileAdminProjection;
 use NHK\Core\Infrastructure\Governance\{WpdbApplyAttemptRepository, WpdbDependencyRepository, WpdbProposalRepository};
 use NHK\Core\Shared\Health\HealthCheck;
 use NHK\Core\Shared\Migration\MigrationStatus;
@@ -129,6 +130,17 @@ final class AdminPage
         $repo = new WpdbAuthorityRepository(); $canonicalUuid = self::canonicalUuid($key); $entity = $canonicalUuid !== null ? $repo->findByCanonicalId($canonicalUuid) : $repo->findByStableKey($type, $key);
         if (!$entity || $entity->entityType !== $type) { echo '<p class="notice notice-info">Không tìm thấy entity.</p>'; return; }
         echo '<table class="widefat striped"><tbody><tr><th>Type</th><td>' . esc_html($entity->entityType) . '</td></tr><tr><th>Name</th><td>' . esc_html($entity->canonicalName) . '</td></tr><tr><th>Stable key</th><td><code>' . esc_html($entity->stableKey) . '</code></td></tr><tr><th>Canonical UUID</th><td><code>' . esc_html($entity->canonicalId) . '</code></td></tr><tr><th>Revision</th><td>' . esc_html((string) $entity->revision) . '</td></tr><tr><th>State</th><td>' . esc_html($entity->active() ? 'active' : 'retired') . '</td></tr><tr><th>Payload</th><td><pre>' . esc_html((string) wp_json_encode($entity->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) . '</pre></td></tr></tbody></table>';
+        if ($type === 'classification') self::renderClockTypeProjection($entity);
+    }
+
+    private static function renderClockTypeProjection(\NHK\Core\Domain\Authority\AuthorityEntity $entity): void
+    {
+        $card = (new EntityProfileAdminProjection())->forEntity($entity);
+        if (($card['status'] ?? '') === 'UNAVAILABLE' || (($card['profile']['profile_key'] ?? '') !== 'clock_type')) return;
+        echo '<h3 id="nhk-clock-type-projection-heading">' . esc_html((string) ($card['profile']['admin_badge'] ?? '[LOẠI ĐỒNG HỒ]')) . ' — read-only projection</h3><table class="widefat striped" aria-labelledby="nhk-clock-type-projection-heading"><tbody>';
+        echo '<tr><th>Profile</th><td>' . esc_html((string) ($card['identity']['profile'] ?? '')) . '</td></tr><tr><th>Family</th><td><code>' . esc_html((string) ($card['identity']['family'] ?? '')) . '</code></td></tr><tr><th>Aliases</th><td>' . esc_html(implode(', ', (array) ($card['aliases'] ?? []))) . '</td></tr>';
+        foreach ((array) ($card['sections'] ?? []) as $key => $section) echo '<tr><th>' . esc_html((string) $key) . '</th><td>' . esc_html((string) ($section['state'] ?? 'UNAVAILABLE_IMPLEMENTATION_GAP')) . ' (' . esc_html((string) ($section['count'] ?? 0)) . ')</td></tr>';
+        echo '</tbody></table><p class="description">Projection chỉ đọc; mọi semantic mutation phải qua Authority PLAN và Governance.</p>';
     }
 
     private static function renderProposalLookup(MigrationStatus $status): void

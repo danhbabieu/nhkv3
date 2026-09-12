@@ -11,6 +11,7 @@ use NHK\Core\Contracts\Knowledge\EvidenceRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Application\Governance\ProposalEligibilityService;
+use NHK\Core\Application\Entity\EntityProfileAdminProjection;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Domain\Graph\NodeReference;
@@ -34,6 +35,7 @@ final class AdminWorkbenchReadApi
         private ?ProposalEligibilityService $eligibility = null,
         private ?MediaAssetRepository $assets = null,
         private ?MediaUsageRepository $usages = null,
+        private ?EntityProfileAdminProjection $entityProjection = null,
     ) {}
 
     public function register(): void
@@ -41,6 +43,7 @@ final class AdminWorkbenchReadApi
         register_rest_route('nhk/v1', '/admin/workbench/search', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'args' => ['q' => ['required' => true], 'domain' => ['default' => 'all']], 'callback' => fn (\WP_REST_Request $request) => $this->search($request)]);
         register_rest_route('nhk/v1', '/admin/workbench/video/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->video((string) $request['id'])]);
         register_rest_route('nhk/v1', '/admin/workbench/media/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->media((string) $request['id'])]);
+        register_rest_route('nhk/v1', '/admin/workbench/entity/(?P<id>[0-9A-Fa-f-]{36})', ['methods' => 'GET', 'permission_callback' => fn (): bool => current_user_can('nhk_view_governance') || current_user_can('manage_options'), 'callback' => fn (\WP_REST_Request $request) => $this->entity((string) $request['id'])]);
     }
 
     private function search(\WP_REST_Request $request): array|\WP_Error
@@ -106,6 +109,14 @@ final class AdminWorkbenchReadApi
 
         $frontendProjection = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
         return (new AdminVideoAdapter([$video]))->detail($video, $relations, $evidence, $governance, $frontendProjection);
+    }
+
+    private function entity(string $id): array|\WP_Error
+    {
+        $entity = $this->authority->findByCanonicalId($id);
+        if (!$entity instanceof AuthorityEntity) return new \WP_Error('nhk_admin_entity_not_found', 'Không tìm thấy Authority canonical.', ['status' => 404]);
+        if (!$this->entityProjection instanceof EntityProfileAdminProjection) return new \WP_Error('nhk_admin_entity_projection_unavailable', 'Projection Entity chưa sẵn sàng.', ['status' => 503]);
+        return $this->entityProjection->forEntity($entity);
     }
 
     /** @return array<string,mixed> */
