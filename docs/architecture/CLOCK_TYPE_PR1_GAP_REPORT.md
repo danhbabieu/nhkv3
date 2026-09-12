@@ -395,17 +395,19 @@ revalidate owner approval.
   claim text or raw/private excerpts.
 - Authority inventory: **IMPLEMENTED_IN_PR6.1**. `CursorAuthorityInventoryReader`
   is implemented by the canonical WPDB Authority repository using stable
-  canonical-UUID ordering, bounded pages and resumable cursors. The audit uses
-  this interface when available and retains the prior snapshot fallback only
-  for test/readers without cursor capability.
+  canonical-UUID ordering, bounded pages and resumable cursors. The audit
+  constructor requires this read-only interface; there is no snapshot fallback
+  or raw SQL bypass.
 - Audit composition: **IMPLEMENTED_IN_PR6.1_LOCALLY** through
   `WpdbClockTypeClassificationAuditFactory`; the factory composes existing
   Graph/Authority/Knowledge/Evidence/Source owners and has no write service
   dependency.
-- Real dry-run: **LIVE_AUDIT_SURFACE_NOT_EXPOSED**. The current target is
-  `https://demo.1945.vn` (`staging`), but the checked-out PR6.1 code is not
-  deployed there and no approved audit read endpoint/connector is exposed.
-  No live counts are substituted with fixture counts.
+- Real dry-run: **LIVE_AUDIT_SURFACE_NOT_EXPOSED**. Fresh read-only checks on
+  `https://demo.1945.vn` (`staging`) succeeded for MCP initialize, health,
+  canonical inventory and Graph inventory, but live `tools/list` does not
+  expose the PR6.1 audit operation. The checked-out PR6.1 code is not proven
+  deployed there and no configured operator transport can invoke it. No live
+  audit counts or samples are substituted with fixture counts.
 
 ## PR6.1 GAP CLASSIFICATION
 
@@ -435,9 +437,12 @@ revalidate owner approval.
 
 ### DATA_GAP
 
-- Real target source/target/candidate counts remain unverified. The dated
-  staging Graph fact is still `classified_as total=0, active=0`; it is not a
-  production assumption.
+- Fresh live read counts are Model `31`, Variant `42`, Specimen `0`, Product
+  `0`, Classification `188`, and Graph `classified_as total=0, active=0`.
+  Candidate status counts remain unverified because the PR6.1 audit surface is
+  not exposed. The documentation bootstrap was rejected by the target with
+  `Capability required: read`; supplied historical hashes are not treated as
+  fresh evidence.
 
 ### PUBLIC_PROJECTION_GAP
 
@@ -446,8 +451,9 @@ revalidate owner approval.
 ### LIVE_VERIFICATION_GAP
 
 - Documentation checkpoint can be regenerated locally, but code-side
-  implementation does not prove deployment. No real dry-run or staging
-  mutation was executed; PR7 remains not ready.
+  implementation does not prove deployment. Fresh target documentation match
+  remains unverified due the read capability boundary. No real dry-run or
+  staging mutation was executed; PR7 remains not ready.
 
 ## Review gate
 
