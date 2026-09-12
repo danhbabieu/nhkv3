@@ -16,7 +16,7 @@ runtime example configuration.
 
 VERIFICATION: Snapshot contract 13 tests / 25 assertions PASS; related
 maintenance contract tests 21 tests / 54 assertions PASS; NHK Unit 1,229 tests
-/ 5,982 assertions PASS; NHK Contract 4 tests / 31 assertions PASS; Composer
+/ 5,983 assertions PASS; NHK Contract 4 tests / 31 assertions PASS; Composer
 PHP lint and `git diff --check` PASS. NHK Integration remains environment
 blocked because `NHK_WP_TEST_PATH=public`/WordPress bootstrap and MySQL are not
 available. No source export, snapshot import, runtime provisioning, staging
