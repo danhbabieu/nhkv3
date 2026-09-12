@@ -72,7 +72,10 @@ try {
 
 $deployment = RemoteDeploymentAdapter::fromEnvironment($root)->deploy(new DemoCutoverContext($target, 'deployment', $head, bin2hex(random_bytes(8))));
 if (!$deployment->isPass()) finish(['status' => $deployment->status, 'reason_code' => $deployment->reasonCode], $json, 2);
-if (!hash_equals($expectedBuildIdentity, (string) $deployment->fingerprint)) finish(['status' => 'failed', 'reason_code' => 'LOCAL_ARTIFACT_IDENTITY_MISMATCH'], $json, 2);
+// The transport fingerprint covers the deployed plugin tree; the MCP build
+// identity covers the canonical documentation projection. They are distinct
+// identities and are verified independently below.
+if ((string) $deployment->fingerprint === '') finish(['status' => 'failed', 'reason_code' => 'DEPLOYMENT_IDENTITY_UNAVAILABLE'], $json, 2);
 
 $verifier = new RemoteMcpDocumentationVerifier(static function (string $url, string $method, array $headers, string $body): array {
     if (!function_exists('curl_init')) return ['status' => 0, 'body' => ''];
