@@ -174,6 +174,50 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame(['source_title'], $plan['diagnostics']['identity_matches']);
     }
 
+    public function test_locked_model_identity_algorithm_is_generic_for_unrelated_model_alias_components(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-unrelated-model-alias-split',
+            $this->videoProposal('genericmod1'),
+            [
+                ...$this->snapshot('genericmodel1', 'Zenith archival record'),
+                'source_description' => 'Chronomaster model documentation from the official archive.',
+                'channel_title' => 'Official archive',
+            ],
+            [
+                'id' => '91515de5-efe5-48e1-aec5-34130509a4dc',
+                'type' => 'model',
+                'name' => 'Zenith Defy',
+                'aliases' => ['Zenith Chronomaster'],
+            ],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame(['source_title', 'source_description'], $plan['diagnostics']['identity_matches']);
+    }
+
+    public function test_locked_model_identity_fails_without_discriminator_or_for_wrong_model_under_same_brand(): void
+    {
+        $planner = new CaptureVideoProvenancePlanner();
+        $subject = ['id' => '91515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model', 'name' => 'Zenith Defy'];
+
+        foreach ([
+            ['Zenith official archive record', 'Generic model documentation.'],
+            ['Zenith Elite official archive record', 'A different model under the same brand.'],
+        ] as [$title, $description]) {
+            $plan = $planner->plan(
+                'capture-unrelated-model-negative',
+                $this->videoProposal('genericmod1'),
+                $this->snapshot('genericmodel1', $title) + ['source_description' => $description, 'channel_title' => 'Official archive'],
+                $subject,
+            );
+
+            self::assertSame('REVIEW_REQUIRED', $plan['status']);
+            self::assertContains('SOURCE_SUBJECT_IDENTITY_UNCONFIRMED', $plan['blockers']);
+            self::assertSame([], $plan['dependencies']);
+        }
+    }
+
     /** @dataProvider unconfirmedOdoIdentityCases */
     public function test_locked_model_identity_fails_closed_without_all_canonical_components(array $source, array $context = []): void
     {

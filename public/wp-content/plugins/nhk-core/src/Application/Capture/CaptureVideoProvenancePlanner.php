@@ -369,10 +369,10 @@ final class CaptureVideoProvenancePlanner
         if (count($termTerms) > 1) return $this->fieldContainsPhrase($field, $termTerms);
         if (in_array($termTerms[0], $fieldTerms, true)) return true;
 
-        // Bounded display-alias normalization: a canonical single token such
-        // as "Odo" may be displayed as the adjacent Vietnamese tokens
-        // "Ô Đô". Only contiguous 2–3 token runs are compacted, and only an
-        // exact canonical token can match; no edit-distance/fuzzy matching.
+        // Bounded display-alias normalization: a canonical single token may
+        // be displayed as adjacent localized tokens. Only contiguous 2–3
+        // token runs are compacted, and only an exact canonical token can
+        // match; no edit-distance/fuzzy matching.
         $compactTerm = str_replace(' ', '', $termTerms[0]);
         if (strlen($compactTerm) < 3) return false;
         for ($size = 2; $size <= 3; ++$size) {
