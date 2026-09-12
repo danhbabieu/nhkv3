@@ -1,4 +1,4 @@
-# Clock Type PR1/PR2/PR3 Gap Report và PR4–PR6 Plan
+# Clock Type PR1–PR4 Gap Report và PR5–PR6 Plan
 
 Date: 2026-09-12
 Scope: contract/read-only foundation only; no semantic mutation
@@ -8,9 +8,9 @@ Mutation authority: none
 
 Giá trị được cập nhật sau khi canonical documentation snapshot được regenerate:
 
-- `documentation_version`: `7802f026569d74ec0f36336352a221bde5738722a3dd41c2afd4a2355bc38786`.
-- `manifest_hash`: `c96bae977e18736c4a91e8ef96246629aa5256cbff5abb082040d4b0f822a32f`.
-- `build_identity`: `f002fe96e9e8584aa660ba3a2ce1cd31cd4eba0574b0a6086bea1178b98f7c8e`.
+- `documentation_version`: `22b30cd7dd9283478027bc3c5ac370c8ab198d92fbe256896c88b7a3995d0800`.
+- `manifest_hash`: `696ab741e72efcc38dac8e7d3695b4e131eedda1ed90230be896e06daaa28f88`.
+- `build_identity`: `d9fedecc168309c74f18bfb8c88461a090e4d79fb1c85368fb7cb8bb69ffbc3e`.
 - `runtime_version`: `0.1.0`. Đây là local package/runtime identity; không
   phải live/deploy evidence.
 
@@ -45,6 +45,21 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
   brandless dossier, Entity/Page/reserved/registered-route collisions và
   `/video/{slug}/` non-interception đã có regression coverage.
 
+## IMPLEMENTED_IN_PR4
+
+- `ClockTypeShadowClassifier` consume Capture's already-resolved one-primary-
+  subject context and returns transient typed candidates/diagnostics only.
+- Evidence order is explicit canonical identity → exact scoped context →
+  existing canonical membership reader → explicit user statement → weak
+  lexical/media review. Brand never supplies Clock-Type evidence.
+- Canonical `clock_type`, legacy `clock-type`, `case_form`, unknown family,
+  brandless input, multiple candidates, weak title input and existing
+  `classified_as` membership are covered by read-only unit tests.
+- No shadow result is persisted and the packet exposes no writer/proposal/apply
+  field. Video/Media/Knowledge context is ignored for mutation and the primary
+  subject packet is retained unchanged.
+- Local verification: 13 tests / 49 assertions for the shadow classifier.
+
 ## ALREADY_SUPPORTED
 
 - `EntityTypeRegistry`/`CanonicalEntityTypeCatalog` có `brand` và
@@ -73,6 +88,11 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
   `family=clock-type`; the new resolver now exposes this only as
   `COMPATIBILITY_READ` and does not normalize stored data. Existing Brand
   aggregation convergence remains a later seam.
+- The existing production Capture coordinator is not yet injected with the
+  shadow classifier in this checkpoint. The new service is a safe application
+  seam and is exercised directly; wiring its transient diagnostic into the
+  coordinator requires a separate scoped change that must preserve the
+  concurrent Capture continuation work.
 
 ## CONTRACT_GAP
 
@@ -100,6 +120,8 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
   Classification ở `/phan-loai/{slug}/` và Brand behavior hiện hành.
 - Endpoint/predicate registry hiện hành đủ để không invent type/predicate mới,
   nhưng chưa biểu diễn profile-specific traversal recipe/collision namespace.
+- The read-only `ClockTypeCanonicalMembershipReader` contract is only an
+  adapter seam; a production Graph-backed implementation is not registered.
 
 ## CLIENT_EXPOSURE_GAP
 
@@ -142,19 +164,36 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
   SQL/taxonomy/title fallback hoặc shortcut persistence.
 - Live frontend/root-route verification: **NOT_RUN / ENVIRONMENT_GATED**.
 
+## PR4 STATUS / SHADOW_CLASSIFICATION
+
+- Shadow classifier: **IMPLEMENTED_IN_PR4 / LOCAL_UNIT_PROVEN**; no live Capture
+  run was performed.
+- Canonical `clock_type`: resolved only from existing active Classification
+  rows through explicit/scoped evidence or an injected canonical membership
+  reader.
+- Legacy `clock-type`: **COMPATIBILITY_READ_ONLY** with retained
+  `DATA_COMPATIBILITY_GAP`; no normalization or UUID/stable-key change.
+- Actual `classified_as` inventory: **NOT_VERIFIED**; PR4 did not read or
+  mutate live Graph data.
+- Brand↔Clock Type reverse traversal: **IMPLEMENTATION_GAP**; PR4 does not
+  provide a SQL/taxonomy/title fallback or shortcut edge.
+- Capture runtime diagnostic persistence: **IMPLEMENTATION_GAP**; shadow result
+  remains transient until a separately scoped coordinator adapter is approved.
+- Root route/live frontend readiness: **NOT_LIVE_PROVEN**; PR4 does not
+  allocate, reproject, redirect or enable root routes.
+
 ## Explicit no-mutation verification
 
-PR1–PR3 chỉ thay đổi application read seams, contract/documentation registry và
+PR1–PR4 chỉ thay đổi application read seams, contract/documentation registry và
 test in-memory. Không có database migration, entity/claim/source/evidence
 insert/update/delete, Graph apply/backfill, public slug allocation/reprojection,
 Article publish, Video, Media hoặc Knowledge rewrite. Không tạo entity `Odo vai
 bò`, Unknown Brand hay Brand↔Clock Type shortcut.
 
-## PR4–PR6 implementation seams
+## PR5–PR6 implementation seams
 
 | Phase | Chỉ trong scope phase | Không được gộp |
 |---|---|---|
-| PR4 | Capture one-primary-subject handoff, shadow classification diagnostics/candidates | no `classified_as` apply |
 | PR5 | new-data governed `classified_as`, scope/evidence/revision/idempotency, shared Brand↔Type derived query | no legacy apply, no shortcut edge |
 | PR6 | legacy inventory, evidence-aware dry-run, owner-review packet and canonical read-back plan | no live apply, no title/token-only inference |
 

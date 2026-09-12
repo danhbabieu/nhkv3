@@ -1,6 +1,6 @@
 # NHK V3 Entity Profile — Brand và Clock Type Contract
 
-> **ACTIVE contract — PR1 + PR2 + PR3, 2026-09-12.** Contract này nằm dưới
+> **ACTIVE contract — PR1 + PR2 + PR3 + PR4, 2026-09-12.** Contract này nằm dưới
 > `docs/constitution/NHK_V3_CONSTITUTION.md`. Nó khóa read/profile seams và
 > regression boundary; không cấp quyền tạo semantic data, ghi Graph, cấp slug,
 > migrate/backfill dữ liệu hoặc triển khai Clock Type write-path.
@@ -293,3 +293,33 @@ traversal chưa có trong shared engine thì public section báo
 `UNAVAILABLE_IMPLEMENTATION_GAP`, không biến gap thành empty success giả.
 Legacy `family=clock-type` vẫn là `COMPATIBILITY_READ` với
 `DATA_COMPATIBILITY_GAP`; route rendering không phải normalization.
+
+## 12. PR4 Capture shadow classification
+
+PR4 bổ sung một read-only `ClockTypeShadowClassifier` làm seam cho Capture
+semantic context. Classifier consume một `subject_resolution.primary` packet đã
+được resolve và không được tạo primary subject thứ hai. Kết quả transient
+`ClockTypeShadowResolution` chỉ là diagnostics/review packet; nó không phải
+Graph truth, Evidence, Knowledge, Authority identity, Video attachment hoặc
+Public Identity.
+
+Resolution basis có thứ tự: explicit canonical UUID/stable key, exact scoped
+Clock-Type context, existing canonical Graph membership, explicit user
+statement, rồi lexical/media review. Tier cuối cùng chỉ trả
+`REVIEW_CANDIDATE`; title, slug, filename, alt, OCR, caption, Brand hoặc visual
+similarity không được promote membership. Nhiều candidate giữ
+`AMBIGUOUS`/review và không chọn ngẫu nhiên. Brand chỉ là context; Brandless
+Capture vẫn hợp lệ.
+
+Các trạng thái shadow tối thiểu là `RESOLVED_CANONICAL`,
+`RESOLVED_EXPLICIT`, `REVIEW_CANDIDATE`, `AMBIGUOUS`, `NONE` và
+`UNAVAILABLE`. Entity có `family=clock-type` chỉ được đọc qua
+`COMPATIBILITY_READ` và giữ `DATA_COMPATIBILITY_GAP`; classifier không rename,
+normalize hoặc ghi lại family. Không có proposal/apply, `classified_as` write,
+Classification create/update, Graph edge, Knowledge claim, Media relation,
+Video `about`, Article, Capture revision hay slug allocation trong PR4.
+
+Shadow output không được persist vào Capture semantic truth store. Nếu current
+Capture coordinator chưa được inject seam này, kết quả vẫn transient và việc
+wire production diagnostics là implementation gap riêng; không invent audit
+store để lấp gap.
