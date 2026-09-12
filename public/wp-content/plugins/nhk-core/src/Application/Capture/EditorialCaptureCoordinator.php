@@ -170,9 +170,11 @@ final class EditorialCaptureCoordinator
             $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken);
 
             $this->beginPhase('SUBJECTS_RESOLVED');
+            $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
             $resolution = $this->subjects->resolve(array_values(array_unique(array_merge(
                 (array) ($interpretation['primary_subject_hints'] ?? []),
                 (array) ($interpretation['secondary_subject_hints'] ?? []),
+                $this->videoSubjectHints($videoInput),
             ))));
             if ($this->isVideoOnlyResume($input)) {
                 $locked = is_array($record->diagnostics['subjects'] ?? null) ? $record->diagnostics['subjects'] : [];
@@ -189,7 +191,6 @@ final class EditorialCaptureCoordinator
             $diagnostics['subjects'] = $resolution;
             $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'SUBJECTS_RESOLVED', $record->articleId, $record->articleStateToken);
 
-            $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
             $hasVideoAsset = array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
             if (is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
                 $this->beginPhase('VIDEO_ENRICHED');
@@ -207,6 +208,11 @@ final class EditorialCaptureCoordinator
                 ]);
                 $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
                 if ($videoItems !== []) $assets = array_merge($assets, $videoItems);
+                $handoff = $this->videoSubjectHandoff($resolution, $videoManifest, $videoItems);
+                if ($handoff !== null) {
+                    $resolution = $handoff;
+                    $diagnostics['subjects'] = $resolution;
+                }
                 $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
                 $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken);
             }
@@ -458,6 +464,52 @@ final class EditorialCaptureCoordinator
         if ($failureCode === VideoRelationEvidenceRequired::ERROR_CODE) return 'REVIEW_REQUIRED';
         if (preg_match('/(?:SUBJECT_NOT_FOUND|AMBIGUOUS_SUBJECT|NO_SEMANTIC_ATTACHMENT|TRANSCRIPT_UNAVAILABLE|MEDIA_(?:FEATURED|INLINE)_MISSING|MEDIAUSAGE_INCOMPLETE)/', $failureCode) === 1) return 'PARTIAL';
         return 'FAILED_RETRYABLE';
+    }
+
+    /** @param array<string,mixed> $video @return list<string> */
+    private function videoSubjectHints(array $video): array
+    {
+        $packet = is_array($video['metadata']['subject_resolution_packet'] ?? null) ? $video['metadata']['subject_resolution_packet'] : [];
+        if (UuidCodec::isValid((string) ($packet['id'] ?? '')) && trim((string) ($packet['type'] ?? '')) !== '') return [(string) $packet['id']];
+
+        $targets = [];
+        foreach ((array) ($video['intended_relations'] ?? []) as $relation) {
+            if (!is_array($relation) || strtolower(trim((string) ($relation['predicate'] ?? 'about'))) !== 'about') continue;
+            $id = trim((string) ($relation['target_id'] ?? ''));
+            $type = trim((string) ($relation['target_type'] ?? ''));
+            if (UuidCodec::isValid($id) && $type !== '') $targets[strtolower($id)] = $id;
+        }
+        if (count($targets) === 1) return [array_values($targets)[0]];
+
+        $hint = trim((string) ($video['user_hint'] ?? ''));
+        return $hint === '' ? [] : [$hint];
+    }
+
+    /** @param array<string,mixed> $resolution @param array<string,mixed> $manifest @param list<array<string,mixed>> $items @return array<string,mixed>|null */
+    private function videoSubjectHandoff(array $resolution, array $manifest, array $items): ?array
+    {
+        $previewWasReturned = array_key_exists('video_preview', $manifest) || isset($items[0]['video_preview']);
+        $preview = is_array($manifest['video_preview']['package']['subject_resolution_packet'] ?? null)
+            ? $manifest['video_preview']['package']['subject_resolution_packet']
+            : [];
+        $proposal = is_array($items[0]['video_proposal']['payload']['metadata']['subject_resolution_packet'] ?? null)
+            ? $items[0]['video_proposal']['payload']['metadata']['subject_resolution_packet']
+            : [];
+        $packet = $preview !== [] ? $preview : $proposal;
+        if ($packet === []) {
+            if ($previewWasReturned && is_array($resolution['primary'] ?? null) && UuidCodec::isValid((string) ($resolution['primary']['id'] ?? ''))) throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
+            return null;
+        }
+        $packetId = trim((string) ($packet['id'] ?? ''));
+        $packetType = strtolower(trim((string) ($packet['type'] ?? '')));
+        if (!UuidCodec::isValid($packetId) || $packetType === '') throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
+
+        $current = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        if ($current !== [] && (strtolower((string) ($current['id'] ?? '')) !== strtolower($packetId) || strtolower((string) ($current['type'] ?? '')) !== $packetType)) {
+            throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
+        }
+        if ($current !== []) return $resolution;
+        return ['status' => 'resolved', 'primary' => $packet, 'subjects' => [$packet], 'resolved' => [$packet], 'candidates' => [], 'unresolved' => [], 'diagnostics' => []];
     }
 
     /** @return list<array<string,mixed>> */

@@ -8006,3 +8006,38 @@ mutation was run in this checkpoint.
 
 STATUS: LOCAL VIDEO PROVENANCE ROOT-CAUSE FIX / REGRESSION VERIFIED;
 worktree is ready for a review/commit checkpoint. No live retry was performed.
+
+# Checkpoint — 2026-09-12 — Fresh/resume subject handoff convergence
+
+RUNTIME TRACE: Fresh read-only discovery through `@V3-1209` does not expose a
+Capture diagnostics/asset reader, SEMANTICS_RECONCILED input/result, or
+relation-candidate read-back. It does expose canonical owner inventories. Case
+#450 has the exact Variant `852da54d-457a-4397-a16d-52d9452ba766` in persisted
+Knowledge `subject_id`, but no Source/Claim/Evidence matching YouTube
+`4NmkQFrNeWQ`; Case #453 has the exact Variant in provenance Claim/Evidence
+and a separate Source snapshot for `V18Me9TdnkU`, but no canonical Video.
+Therefore the live evidence disproves one shared proven first divergence and
+does not justify claiming a live method-level handoff loss.
+
+SOURCE TRACE: `EditorialCaptureCoordinator` previously resolved only top-level
+`subject_hints`, while the Video adapter resolved `video.user_hint` and
+explicit `intended_relations` independently. The coordinator then passed an
+empty subject resolution into the Video preview and semantic reconciliation.
+The patch routes exact Video packet/`about` target/user hint through the same
+registered Capture resolver, promotes the resulting packet into the persisted
+Video proposal, and raises `VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED` on packet
+loss or mismatch. `VideoIntakeService` also promotes its bounded, narrowest
+research result to the existing `subject_resolution_packet`; no new semantic
+owner or store is introduced.
+
+REGRESSION: Fresh user-hint handoff, explicit mismatch failure, and research
+packet promotion pass alongside the existing explicit video-only resume,
+provenance Source → Claim → Evidence read-back, Evidence-gated relation and
+no-unrelated-Knowledge-replay tests. Focused slice passes 101 tests / 458
+assertions; full NHK Unit passes 1,199 tests / 5,909 assertions; MCP/schema
+contracts pass 66 tests / 602 assertions. No live mutation or retry was run.
+
+STATUS: LOCAL FRESH/RESUME SUBJECT HANDOFF PATCH / REGRESSION VERIFIED;
+live acceptance remains blocked until the deployed runtime exposes or otherwise
+returns the internal Capture handoff diagnostics needed for method-level
+read-back. No migration, deployment or push was performed.

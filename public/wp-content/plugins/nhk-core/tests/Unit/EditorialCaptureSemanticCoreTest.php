@@ -429,6 +429,93 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame($variant, $mediaContexts[0]['subject_resolution_packet']);
     }
 
+    public function test_fresh_video_user_hint_becomes_one_subject_handoff_before_semantic_reconciliation(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $variant = [
+            'id' => '852da54d-457a-4397-a16d-52d9452ba766',
+            'type' => 'variant',
+            'stable_key' => 'nhk:variant:odo.36.8',
+            'name' => 'Đồng hồ Odo 36/8',
+            'revision' => 1,
+            'match' => 'exact_name_or_alias',
+        ];
+        $seen = [];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 453, 'state_token' => 'state-453'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$seen): array {
+                $seen['semantic'] = $context['subject_resolution'];
+                $seen['assets'] = $context['assets'];
+                return ['status' => 'REVIEW_REQUIRED', 'writes' => []];
+            },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function (array $context) use ($variant): array {
+                $packet = $variant;
+                return ['status' => 'verified', 'video_preview' => ['package' => ['subject_resolution_packet' => $packet]], 'items' => [[
+                    'kind' => 'video',
+                    'video_id' => 'video-fresh-handoff',
+                    'video_preview' => ['package' => ['subject_resolution_packet' => $packet]],
+                    'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['metadata' => ['subject_resolution_packet' => $packet]]],
+                ]]];
+            },
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'capture-video-fresh-subject-handoff',
+            'text' => 'Bản ghi từ video.',
+            'video' => ['url' => 'https://youtu.be/fresh-handoff', 'user_hint' => 'Video ghi lại Đồng hồ Odo 36/8 đang chạy.'],
+        ]);
+
+        self::assertSame('READY_FOR_PUBLICATION', $result->stage);
+        self::assertSame($variant['id'], $seen['semantic']['primary']['id']);
+        self::assertSame($variant['id'], $seen['assets'][0]['video_proposal']['payload']['metadata']['subject_resolution_packet']['id']);
+        self::assertSame($variant['id'], $result->diagnostics['subjects']['primary']['id']);
+    }
+
+    public function test_fresh_video_subject_handoff_mismatch_fails_explicitly(): void
+    {
+        $repository = new InMemoryCaptureRepository();
+        $variant = ['id' => '852da54d-457a-4397-a16d-52d9452ba766', 'type' => 'variant', 'name' => 'Odo 36/8'];
+        $other = ['id' => '95873bfe-d978-4eda-a5a2-ce9ba79625df', 'type' => 'variant', 'name' => 'Odo 36/10'];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 454, 'state_token' => 'state-454'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => $hint === 'Odo 36/8' ? [$variant] : []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function () use ($other): array {
+                return ['status' => 'verified', 'video_preview' => ['package' => ['subject_resolution_packet' => $other]], 'items' => []];
+            },
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'capture-video-handoff-mismatch', 'text' => 'Bản ghi.', 'video' => ['url' => 'https://youtu.be/abcDEF12346', 'user_hint' => 'Odo 36/8']]);
+
+        self::assertSame('FAILED_RETRYABLE', $result->status);
+        self::assertStringContainsString('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED', $result->diagnostics['failure']['code']);
+    }
+
     public function test_invalid_media_blueprint_is_system_blocked_not_retryable(): void
     {
         $repository = new InMemoryCaptureRepository();

@@ -615,6 +615,37 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertSame('variant', $preview->package['subject_resolution_packet']['type']);
     }
 
+    public function test_video_research_subject_is_promoted_to_the_same_handoff_packet_when_capture_has_no_top_level_hint(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $variantId = '852da54d-457a-4397-a16d-52d9452ba766';
+        $authority->create(new AuthorityEntity($variantId, 'variant', 'nhk:variant:odo.36.8', 'Đồng hồ Odo 36/8', 1, ['reference' => '36/8', 'aliases' => []]));
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Đồng hồ Odo 36/8 trong video',
+                'description' => 'Ghi lại cấu hình Odo 36/8.',
+                'availability' => 'available',
+                'embeddable' => true,
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+            new VideoInternalSemanticResearcher($authority, $types),
+            new VideoKnowledgeEnrichmentPlanner($this->knowledgePlanner()),
+        );
+
+        $preview = $service->preview('https://youtu.be/abcDEF12345', 'Odo 36/8');
+
+        self::assertSame($variantId, $preview->package['knowledge_enrichment']['subject']['id']);
+        self::assertSame($variantId, $preview->package['subject_resolution_packet']['id']);
+        self::assertSame('variant', $preview->package['subject_resolution_packet']['type']);
+    }
+
     public function test_knowledge_enrichment_failure_is_diagnostic_and_preserves_video_intake(): void
     {
         $types = new EntityTypeRegistry();

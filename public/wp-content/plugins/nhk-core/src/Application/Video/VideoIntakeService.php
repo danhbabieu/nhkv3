@@ -33,10 +33,11 @@ final class VideoIntakeService
         $existing = $this->videos->findByExternalReference($snapshot['platform'], $snapshot['external_video_id']);
         $videoId = $existing?->canonicalId ?? UuidCodec::newV7();
         $research = $this->researcher?->research(implode("\n", array_filter([$snapshot['source_title'] ?? '', $snapshot['source_description'] ?? '', $userHint]))) ?? ['resolved' => [], 'ambiguous' => [], 'missing' => []];
+        $effectiveSubject = $resolvedSubject ?? $this->researchSubject($research, $intendedRelations);
         $relations = $intendedRelations;
         $handoffTarget = null;
-        if (is_array($resolvedSubject) && trim((string) ($resolvedSubject['id'] ?? '')) !== '' && trim((string) ($resolvedSubject['type'] ?? '')) !== '') {
-            $handoffTarget = ['id' => (string) $resolvedSubject['id'], 'type' => (string) $resolvedSubject['type']];
+        if (is_array($effectiveSubject) && trim((string) ($effectiveSubject['id'] ?? '')) !== '' && trim((string) ($effectiveSubject['type'] ?? '')) !== '') {
+            $handoffTarget = ['id' => (string) $effectiveSubject['id'], 'type' => (string) $effectiveSubject['type']];
             $relations = array_values(array_filter($relations, static function (mixed $relation) use ($handoffTarget): bool {
                 if (!is_array($relation) || (string) ($relation['predicate'] ?? 'about') !== 'about') return true;
                 return (string) ($relation['target_id'] ?? '') === $handoffTarget['id'] && (string) ($relation['target_type'] ?? '') === $handoffTarget['type'];
@@ -66,7 +67,7 @@ final class VideoIntakeService
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];
             $category['categories'] = [$category['primary']];
         }
-        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $resolvedSubject, $editorialTitle, $complianceNote);
+        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $effectiveSubject, $editorialTitle, $complianceNote);
         $seoData = ['title' => $editorial['title'], 'description' => $editorial['summary']];
         $package = [
             'intake_version' => 1,
@@ -75,7 +76,7 @@ final class VideoIntakeService
             'editorial' => $editorial,
             'category' => $category,
             'semantic_attachments' => $candidatePayloads,
-            'subject_resolution_packet' => $resolvedSubject,
+            'subject_resolution_packet' => $effectiveSubject,
             'seo' => $seoData,
             'embed_url' => 'https://www.youtube-nocookie.com/embed/' . $snapshot['external_video_id'],
             'provenance' => ['source_url' => $snapshot['canonical_source_url'], 'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null],
@@ -114,6 +115,30 @@ final class VideoIntakeService
     }
 
     private function lower(string $value): string { return function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value); }
+
+    /** @param array<string,mixed> $research @param list<array<string,mixed>> $relations @return array<string,mixed>|null */
+    private function researchSubject(array $research, array $relations): ?array
+    {
+        $explicit = [];
+        foreach ($relations as $relation) {
+            if (!is_array($relation) || strtolower(trim((string) ($relation['predicate'] ?? 'about'))) !== 'about') continue;
+            $id = trim((string) ($relation['target_id'] ?? ''));
+            $type = strtolower(trim((string) ($relation['target_type'] ?? '')));
+            if (UuidCodec::isValid($id) && $type !== '') $explicit[$type . ':' . strtolower($id)] = ['id' => $id, 'type' => $type];
+        }
+        if (count($explicit) === 1) return array_values($explicit)[0];
+        if (count($explicit) > 1) return null;
+
+        $resolved = array_values(array_filter((array) ($research['resolved'] ?? []), static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== ''));
+        foreach (['specimen', 'variant', 'model', 'movement', 'brand'] as $type) {
+            $ambiguousMatches = array_values(array_filter((array) ($research['ambiguous'] ?? []), static fn (mixed $item): bool => is_array($item) && strtolower(trim((string) ($item['type'] ?? ''))) === $type));
+            if ($ambiguousMatches !== []) return null;
+            $matches = array_values(array_filter($resolved, static fn (array $item): bool => strtolower((string) ($item['type'] ?? '')) === $type));
+            if (count($matches) === 1) return $matches[0];
+            if (count($matches) > 1) return null;
+        }
+        return null;
+    }
 
     /** @return array<string,mixed> */
     private function knowledgeEnrichmentPacket(array $research, array $snapshot, VideoSourceResolution $resolution, string $userHint, array $intendedTargets = []): array
