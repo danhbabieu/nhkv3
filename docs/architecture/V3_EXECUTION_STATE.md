@@ -1,5 +1,78 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — files[] provided-reference bridge remains fail-closed
+
+ROOT_CAUSE: The current ChatGPT connector sends the declared
+`files?: string[]` as JSON references but does not provide native
+`$_FILES['files']` bytes. Easy MCP 1.7.17 invokes the Ability with those
+strings; `WP_Ability::execute()` runs `wp_ability_normalize_input` and then
+strict JSON-schema validation, so `input[files][0] is not of type object`
+occurs before `McpAbilityRegistration::executeMcp()` and before
+`nhk.capture.ingest`. The existing
+`EasyMcpNativeFileCompatibilityAdapter` remains correct for native multipart
+on direct and proxy paths.
+
+CALL_PATH: ChatGPT descriptor → Easy MCP `tools/list` →
+`_meta["openai/fileParams"]=["files"]` → model-facing JSON `string[]` → Easy
+MCP Ability → `EasyMcpNativeFileCompatibilityAdapter::normalizeAbilityInput()`
+→ `wp_ability_normalize_input` → `WP_Ability::validate_input()` → failure;
+native file bag and Capture are not reached. Native multipart continues through
+the existing normalization and canonical Capture/MCP path, preserving order,
+cardinality and one-Capture batch semantics.
+
+DECISION: No compatibility materializer was added. No Easy MCP 1.7.17 source
+or canonical trusted-file resolver is available in this workspace/cache, and
+the observed inputs are opaque IDs or local paths. A generic URL downloader
+would be an unbounded transport/SSRF and URL-import risk, would not resolve
+opaque IDs, and would violate the fail-closed contract. No base64, path
+fallback, direct Media writer, Capture owner, or semantic workflow changed.
+
+VERIFICATION: Focused Capture/Media/MCP/Video selection passes 96 tests / 716
+assertions. PHP lint for both files[] PHP boundaries, JSON handoff validation,
+`git diff --check`, and changed-scope secret review pass. Existing native
+one-file, ordered multi-file, alignment, limits, text-only, addendum rejection,
+idempotency and Video-resume coverage remains green. Live provided-file
+acceptance is not runnable from this workspace.
+
+STATUS: `READY_FOR_LIVE_ONE_FILE = NO`.
+REMAINING_BLOCKER: `PROVIDED_FILE_REFERENCE_UNRESOLVABLE` — the connector or
+Easy MCP runtime must expose native multipart bytes or an authenticated
+canonical trusted-file resolver/reference before a transport-only materializer
+can be implemented and tested.
+
+# Checkpoint — 2026-09-12 — PR2 Entity Profile Registry + Clock-Type read foundation
+
+WHAT: Added the application-level `EntityProfileRegistry` with independent
+`brand` and `clock_type` profiles, canonical metadata matching, legacy family
+read aliases and profile-specific read/query metadata. Added the shared
+`EntityProfileResolver`, typed `PROFILE_UNRESOLVED`/compatibility outcomes and
+the read-only `EntityProfileReadFoundation` adapter over the existing dossier
+reader. `SemanticDossierQuery` now implements the read-only dossier interface;
+its Brand/Video/Media/Knowledge behavior and output were not refactored.
+
+COMPATIBILITY: Exact persisted `family=clock_type` resolves canonically;
+`family=clock-type` resolves only as `COMPATIBILITY_READ` with
+`DATA_COMPATIBILITY_GAP`. No value is normalized, no stable key/UUID changes,
+and `case_form`, unknown or missing families remain unresolved. Registry
+metadata does not duplicate Graph predicate legality or Public Identity truth.
+
+VERIFICATION: PR2 profile/read-foundation suite passes 9 tests / 60 assertions;
+PR1 golden + documentation registry passes 15 tests / 96 assertions; relevant
+Authority/Graph/Dossier/Video/Public Identity suites pass 104 tests / 493
+assertions. Full NHK Unit passes 1,246 tests / 6,086 assertions; NHK Contract
+passes 4 tests / 31 assertions. Composer PHP lint passes. PHPUnit reports
+existing warnings/deprecations only. Documentation checkpoint values are
+recorded in the PR2 gap report after final snapshot regeneration; they are
+local package identities, not live/deploy evidence.
+
+NO MUTATION: No semantic entity/claim/source/evidence write, Graph apply or
+backfill, family normalization, Public Identity allocation/reprojection,
+Capture ingest, Media/Video/Knowledge write, Article publication, migration or
+live/staging/production action was performed.
+
+STATUS: PR2_READ_FOUNDATION_IMPLEMENTED / PR3_REVIEW_GATE_OPEN /
+LIVE_DEPLOYMENT_NOT_CLAIMED.
+
 # Checkpoint — 2026-09-12 — Easy MCP files[] current-head verification
 
 CURRENT HEAD and `origin/main` are both

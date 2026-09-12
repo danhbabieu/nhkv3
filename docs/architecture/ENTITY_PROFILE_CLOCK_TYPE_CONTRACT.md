@@ -1,6 +1,6 @@
 # NHK V3 Entity Profile — Brand và Clock Type Contract
 
-> **ACTIVE contract — PR1, 2026-09-12.** Contract này nằm dưới
+> **ACTIVE contract — PR1 + PR2, 2026-09-12.** Contract này nằm dưới
 > `docs/constitution/NHK_V3_CONSTITUTION.md`. Nó khóa read/profile seams và
 > regression boundary; không cấp quyền tạo semantic data, ghi Graph, cấp slug,
 > migrate/backfill dữ liệu hoặc triển khai Clock Type write-path.
@@ -121,9 +121,10 @@ Identity → Public Identity → Knowledge → Media → Video
 
 Profile-specific relation/query recipe quyết định predicate và scope; không
 được rải logic theo kiểu `if brand ... if classification ...` khi một registry
-hoặc capability matrix biểu diễn được khác biệt đó. Tuy nhiên PR1 không refactor
-Brand aggregation đang production-safe và không claim EntityProfileRegistry đã
-được implement.
+hoặc capability matrix biểu diễn được khác biệt đó. PR1 không refactor Brand
+aggregation đang production-safe. PR2 bổ sung `EntityProfileRegistry`,
+`EntityProfileResolver` và read-only dossier seam song song; chưa wire public
+route/frontend.
 
 Direct Knowledge vẫn exact subject-scoped. Related Knowledge, Media, Video,
 Article/Post và descendant context giữ origin/path; reachable không đồng nghĩa

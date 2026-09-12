@@ -2,6 +2,68 @@
 
 Updated: 2026-09-12
 
+## Current files[] bridge investigation — 2026-09-12
+
+CURRENT_HEAD: `cd2103db4f1ed84b9d5287d7d747c890b3f89808`
+
+ORIGIN_MAIN: `f754c59900e886949040da9ab37bcccd1f6207a0`
+
+ROOT_CAUSE: ChatGPT's current wire request contains `files?: string[]` in
+JSON, while no native `$_FILES['files']` bag is present. Easy MCP 1.7.17
+therefore reaches the registered Ability with strings; `WP_Ability::execute()`
+calls `normalize_input()` and then strict JSON-schema validation, which rejects
+`input[files][0]` before `McpAbilityRegistration::executeMcp()` or the Capture
+callback can run. The existing adapter correctly handles native multipart on
+both direct and proxy paths, but cannot manufacture bytes from an opaque ID or
+local path.
+
+CALL_PATH: ChatGPT descriptor → Easy MCP `tools/list` →
+`_meta["openai/fileParams"]=["files"]` → model-facing JSON `string[]` → Easy
+MCP Ability execution → `EasyMcpNativeFileCompatibilityAdapter::normalizeAbilityInput()`
+→ `wp_ability_normalize_input` → `WP_Ability::validate_input()` → validation
+failure; native bag and `nhk.capture.ingest` are never reached. Native requests
+continue through the existing normalization → `McpAbilityRegistration` →
+`/nhk/v1/mcp` → one Capture pipeline.
+
+CHATGPT_WIRE_SHAPE: `files?: string[]` in JSON; current live evidence shows
+opaque references/local paths and no native multipart bytes.
+
+MATERIALIZATION_POINT: `wp_ability_normalize_input`, before JSON-schema
+validation. No Easy MCP 1.7.17 source or canonical trusted-file resolver is
+available in this workspace/cache, so no compliant materializer was added.
+
+FILES_CHANGED: `none` in code; only this handoff and the execution-state
+checkpoint are documentation updates. No URL downloader, base64 fallback,
+filesystem-path fallback, Media writer, or domain-owner change was introduced.
+
+ONE_FILE_TEST: `PASS` for the existing local native one-file path; live
+provided-file path is `NOT_RUN` because the connector supplies no resolvable
+bytes.
+
+MULTI_FILE_TEST: `PASS` for the existing local ordered native multi-file path;
+live provided-file path is `NOT_RUN` for the same reason.
+
+SECURITY_TESTS: `PASS` for existing fail-closed opaque/path/base64 and native
+multipart-required coverage. URL materialization security tests were not added
+because there is no canonical resolver contract to exercise.
+
+REGRESSION_TESTS: `PASS` — text-only, addendum+files rejection, idempotency,
+limits, cleanup/partial-success and Video resume selections remain green.
+
+TOTAL_TESTS: `96 tests / 716 assertions PASS` (one PHPUnit deprecation).
+
+READY_FOR_LIVE_ONE_FILE: `NO`
+
+REMAINING_BLOCKER: `PROVIDED_FILE_REFERENCE_UNRESOLVABLE` — the current
+connector/runtime must provide native multipart bytes or an authenticated,
+canonical trusted-file resolver/reference. An arbitrary URL fetcher would
+violate the transport boundary and is not a safe fix.
+
+NEXT_ACTION_FOR_CHATGPT: Provide a connector/runtime file-param bridge that
+resolves declared `files[]` references to bytes, or expose native multipart;
+then rerun one-file and ordered multi-file acceptance. Keep opaque IDs and
+local paths fail-closed until that bridge exists.
+
 ## Fresh files[] status — current HEAD/origin
 
 CURRENT_HEAD: `0634c14454fb602979c8dfc2acf7f050e0e8daf7`

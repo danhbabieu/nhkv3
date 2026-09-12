@@ -1,18 +1,32 @@
-# Clock Type PR1 Gap Report và PR2–PR6 Plan
+# Clock Type PR1/PR2 Gap Report và PR3–PR6 Plan
 
 Date: 2026-09-12
-Scope: contract/read-only regression only
+Scope: contract/read-only foundation only; no semantic mutation
 Mutation authority: none
 
 ## Canonical checkpoint
 
 Giá trị được cập nhật sau khi canonical documentation snapshot được regenerate:
 
-- `documentation_version`: `ed8012a761f267c925a7c5b2142335e6ae281f740c1e85aa2cc278afd7498f12`.
-- `manifest_hash`: `d782c90bb45e8dcbe7fee4abab9e963b85904834e6fb5bb4a3c5114b19cb6c31`.
-- `build_identity`: `714134b37edf08be023f221b2084269bc473d1d9e395e1f6bd6c793dda0c2cf3`.
+- `documentation_version`: `95c14c17cc433cafbaae07f75e14b678bff2b017ec7366269d560f667a56ba3c`.
+- `manifest_hash`: `d8f437ac9bb126d77bbe3e00fe6050aa32058e0c0202b46163dbebf23791572b`.
+- `build_identity`: `50019f1355917fbdad3e0da4a5b9998ed168489798cf7683f3f6ac8c8c00b6d1`.
 - `runtime_version`: `0.1.0`. Đây là local package/runtime identity; không
   phải live/deploy evidence.
+
+## IMPLEMENTED_IN_PR2
+
+- `EntityProfileRegistry` là application-level registry với đúng hai profile:
+  `brand` và `clock_type`; không thêm Authority type, endpoint hoặc predicate.
+- `EntityProfileResolver` resolve duy nhất từ `entity_type` và persisted
+  `payload.family`: canonical `clock_type`, legacy read-compatible
+  `clock-type`, còn family khác/missing/unknown là `PROFILE_UNRESOLVED`.
+- `EntityProfileReadFoundation` bọc `EntityDossierReader` hiện hành để trả
+  profile-aware read packet; không tạo datastore, route, slug hoặc writer mới.
+- `SemanticDossierQuery` chỉ implement read-only `EntityDossierReader`; Brand
+  aggregation/frontend path hiện hành không bị refactor.
+- Target groups và capabilities trong registry là projection metadata; predicate
+  legality vẫn thuộc Graph registry/policy.
 
 ## ALREADY_SUPPORTED
 
@@ -33,15 +47,15 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
 
 ## IMPLEMENTATION_GAP
 
-- Chưa có `EntityProfileRegistry` hoặc capability matrix cho `brand` và
-  `clock_type`; profile behavior còn rải ở Brand-specific aggregation và
-  generic dossier seams.
+- Profile-aware foundation chưa được wired vào frontend/controller public flow;
+  PR3 mới đánh giá Classification dossier/public projection integration.
 - Shared reverse Brand↔Clock Type recipe chưa hoàn tất. Current generic
   `RelatedSemanticQuery` bound là 2 hops, trong khi recipe Brand đọc qua
   Variant cần 3 edge; không được nâng bound trong PR1.
-- Current Brand clock-type projection recognizes legacy `family=clock-type`,
-  chưa canonical `family=clock_type`. PR2 phải tạo read normalization/compat
-  seam fail-closed, PR5 mới xem xét governed new-data path.
+- Current Brand clock-type projection still recognizes legacy
+  `family=clock-type`; the new resolver now exposes this only as
+  `COMPATIBILITY_READ` and does not normalize stored data. Existing Brand
+  aggregation convergence remains a later seam.
 
 ## CONTRACT_GAP
 
@@ -56,12 +70,17 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
 - PR1 không inventory/mutate live semantic data để lấp gap. Các Classification
   fixture/pack hiện hành dùng legacy hyphen family và không được coi là proof
   của canonical underscore data.
+- Actual `classified_as` data count: **NOT_VERIFIED**. PR2 không đọc live/
+  integration inventory và không đưa ra count suy đoán.
 - Legacy Classification family/Graph membership coverage cần audit riêng; không
   suy classification từ title/token matching đơn thuần.
 
 ## REGISTRY_GAP
 
-- Không có runtime registry riêng cho Entity Profile/capability/recipe.
+- Entity Profile/capability/recipe registry gap đã được đóng ở mức application
+  read foundation; predicate/endpoint legality vẫn không thuộc registry này.
+- Public Identity collision namespace và route consumer parity vẫn là gap của
+  PR3, không được giải quyết trong PR2.
 - Endpoint/predicate registry hiện hành đủ để không invent type/predicate mới,
   nhưng chưa biểu diễn profile-specific traversal recipe/collision namespace.
 
@@ -71,6 +90,8 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
   Classification hiện được đọc qua generic/entity/collector surfaces khi runtime
   dependency và public eligibility sẵn sàng; client-specific availability phải
   được xác nhận bằng fresh discovery, không suy ra từ code catalog.
+- Clock-Type dossier foundation hiện chỉ là application read seam; frontend/
+  client availability chưa được wire hoặc live-proven.
 
 ## PUBLIC_PROJECTION_GAP
 
@@ -81,6 +102,8 @@ Giá trị được cập nhật sau khi canonical documentation snapshot đư�
   collision scope, current-route consumer parity và target-runtime read-back
   chưa live-proven cho Clock Type. Brand/Classification root collision phải fail
   closed hoặc governed resolution, không `foo-2` ngầm.
+- Clock-Type dossier frontend readiness: `LOCAL_FOUNDATION_ONLY`; PR3 mới xử lý
+  public dossier/root-route consumer foundation.
 
 ## Explicit no-mutation verification
 
@@ -90,11 +113,10 @@ apply/backfill, public slug allocation/reprojection, Article publish, Video,
 Media hoặc Knowledge rewrite. Không tạo entity `Odo vai bò`, Unknown Brand hay
 Brand↔Clock Type shortcut.
 
-## PR2–PR6 implementation seams
+## PR3–PR6 implementation seams
 
 | Phase | Chỉ trong scope phase | Không được gộp |
 |---|---|---|
-| PR2 | `EntityProfileRegistry`, capability matrix, exact family read foundation, shared bounded recipe API, registry tests | no writes, no slug allocation, no backfill |
 | PR3 | Classification dossier/profile read projection, Public Identity root-route collision/read resolver, SEO/read-only acceptance | no silent URL reproject, no semantic mutation |
 | PR4 | Capture one-primary-subject handoff, shadow classification diagnostics/candidates | no `classified_as` apply |
 | PR5 | new-data governed `classified_as`, scope/evidence/revision/idempotency, shared Brand↔Type derived query | no legacy apply, no shortcut edge |
@@ -102,5 +124,6 @@ Brand↔Clock Type shortcut.
 
 ## Review gate
 
-Chỉ bắt đầu PR2 sau khi PR1 được review. Không claim implementation/live/deploy
-readiness từ contract snapshot hoặc in-memory golden tests.
+PR2 đã hoàn tất ở mức local additive/read-side foundation. Chỉ bắt đầu PR3 sau
+khi PR2 được review. Không claim implementation/live/deploy readiness từ
+contract snapshot hoặc in-memory golden tests.

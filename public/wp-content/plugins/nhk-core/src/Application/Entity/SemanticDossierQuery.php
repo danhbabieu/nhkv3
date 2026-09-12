@@ -9,6 +9,7 @@ use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Entity\EntityDossierReader;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
@@ -21,7 +22,7 @@ use NHK\Core\Domain\Video\Video;
  * Detail-only read model. It assembles public projections without becoming a
  * semantic store or changing the legacy RelatedContentQuery contract.
  */
-final class SemanticDossierQuery
+final class SemanticDossierQuery implements EntityDossierReader
 {
     /** @var array<string,string> */
     private const GROUPS = [
