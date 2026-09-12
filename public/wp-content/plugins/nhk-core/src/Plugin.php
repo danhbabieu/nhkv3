@@ -76,6 +76,7 @@ use NHK\Core\Application\Collector\{CollectorFacetMaintenanceExecutor, Collector
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Infrastructure\WordPress\{WpCategoryStore, WpEditorialPostStore};
 use NHK\Core\Infrastructure\Capture\{WpdbCaptureAddendumRepository, WpdbCaptureRepository};
+use NHK\Core\Infrastructure\Snapshot\SnapshotRuntimeComposition;
 
 final class Plugin {
     private const REWRITE_VERSION = '10';
@@ -159,6 +160,7 @@ final class Plugin {
         (new PublicEditorialRoutes())->register();
         LegacyUrlRedirects::register();
         global $wpdb;
+        if (isset($wpdb) && is_object($wpdb)) SnapshotRuntimeComposition::register($wpdb);
         $sharedAttachmentBridge = null;
         $claimOwnerUrl = static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $claim): ?string => null;
         if (isset($wpdb) && is_object($wpdb)) {

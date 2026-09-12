@@ -67,9 +67,7 @@ final class ChatGptMcpGateway
 
         try {
             $materialized = self::materializeReferences($arguments['files']);
-            $proxyRpc = $rpc;
-            $proxyRpc['params']['arguments'] = $arguments;
-            unset($proxyRpc['params']['arguments']['files']);
+            $proxyRpc = self::proxyRpcWithoutFiles($rpc);
 
             if (!function_exists('rest_get_server') || !class_exists('WP_REST_Request')) {
                 throw new \RuntimeException('CHATGPT_FILE_GATEWAY_RUNTIME_UNAVAILABLE');
@@ -97,7 +95,7 @@ final class ChatGptMcpGateway
                 self::$proxyDispatch = false;
             }
         } catch (ChatGptMcpGatewayException $error) {
-            return self::error($error->reasonCode(), $error->getMessage());
+            return self::error($error->reasonCode(), $error->getMessage(), $error->host());
         } catch (\Throwable $error) {
             return self::error('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be materialized.');
         } finally {
@@ -167,15 +165,26 @@ final class ChatGptMcpGateway
         }
     }
 
+    /** @param array<string,mixed> $rpc @return array<string,mixed> */
+    public static function proxyRpcWithoutFiles(array $rpc): array
+    {
+        $params = is_array($rpc['params'] ?? null) ? $rpc['params'] : [];
+        $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
+        $params['arguments'] = $arguments;
+        unset($params['arguments']['files']);
+        $rpc['params'] = $params;
+        return $rpc;
+    }
+
     private static function validateUrl(string $url, ?callable $hostPolicy = null): string
     {
         $parts = parse_url($url);
         if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) || isset($parts['port']) && (int) $parts['port'] !== 443) {
             throw new ChatGptMcpGatewayException('CHATGPT_FILE_URL_REJECTED', 'Only trusted HTTPS file references are accepted.');
         }
-        $host = strtolower((string) $parts['host']);
+        $host = rtrim(strtolower(trim((string) $parts['host'], '[]')), '.');
         $trusted = $hostPolicy !== null ? (bool) $hostPolicy($host, $url) : self::defaultHostPolicy($host, $url);
-        if (!$trusted || !self::isPublicHost($host)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_HOST_NOT_TRUSTED', 'The uploaded file host is not trusted.');
+        if (!$trusted || !self::isPublicHost($host)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_HOST_NOT_ALLOWED', 'CHATGPT_FILE_HOST_NOT_ALLOWED host=' . $host, $host);
         if (function_exists('wp_http_validate_url') && wp_http_validate_url($url) === false) throw new ChatGptMcpGatewayException('CHATGPT_FILE_URL_REJECTED', 'The uploaded file URL failed URL safety validation.');
         return $url;
     }
@@ -222,7 +231,7 @@ final class ChatGptMcpGateway
             if (in_array($status, [301, 302, 303, 307, 308], true)) {
                 $location = function_exists('wp_remote_retrieve_header') ? (string) wp_remote_retrieve_header($response, 'location') : '';
                 if ($location === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.');
-                $current = self::resolveRedirect($current, $location);
+                $current = self::validateRedirectTarget($current, $location, $hostPolicy);
                 continue;
             }
             return ['status' => $status];
@@ -230,13 +239,16 @@ final class ChatGptMcpGateway
         throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect chain is too long.');
     }
 
-    private static function resolveRedirect(string $base, string $location): string
+    public static function validateRedirectTarget(string $base, string $location, ?callable $hostPolicy = null): string
     {
-        if (str_starts_with($location, 'https://')) return $location;
+        $locationParts = parse_url($location);
+        if (is_array($locationParts) && strtolower((string) ($locationParts['scheme'] ?? '')) === 'https' && !empty($locationParts['host'])) {
+            return self::validateUrl($location, $hostPolicy);
+        }
         $baseParts = parse_url($base);
         if (!is_array($baseParts) || empty($baseParts['scheme']) || empty($baseParts['host'])) throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.');
-        if (str_starts_with($location, '//')) return 'https:' . $location;
-        if (str_starts_with($location, '/')) return 'https://' . $baseParts['host'] . $location;
+        if (str_starts_with($location, '//')) return self::validateUrl('https:' . $location, $hostPolicy);
+        if (str_starts_with($location, '/')) return self::validateUrl('https://' . $baseParts['host'] . $location, $hostPolicy);
         throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.');
     }
 
@@ -264,9 +276,11 @@ final class ChatGptMcpGateway
         return substr($name, 0, 180);
     }
 
-    private static function error(string $reasonCode, string $message): mixed
+    private static function error(string $reasonCode, string $message, ?string $host = null): mixed
     {
-        if (class_exists('WP_Error')) return new \WP_Error('nhk_chatgpt_file_gateway', $message, ['status' => 422, 'reason_code' => $reasonCode, 'field' => 'files']);
+        $data = ['status' => 422, 'reason_code' => $reasonCode, 'field' => 'files'];
+        if ($host !== null && $host !== '') $data['host'] = $host;
+        if (class_exists('WP_Error')) return new \WP_Error('nhk_chatgpt_file_gateway', $message, $data);
         return $message;
     }
 
@@ -301,7 +315,7 @@ final class ChatGptMcpGateway
 
 final class ChatGptMcpGatewayException extends \RuntimeException
 {
-    public function __construct(private string $reasonCode, string $message)
+    public function __construct(private string $reasonCode, string $message, private ?string $host = null)
     {
         parent::__construct($message);
     }
@@ -309,5 +323,10 @@ final class ChatGptMcpGatewayException extends \RuntimeException
     public function reasonCode(): string
     {
         return $this->reasonCode;
+    }
+
+    public function host(): ?string
+    {
+        return $this->host;
     }
 }

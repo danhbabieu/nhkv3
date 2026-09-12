@@ -522,8 +522,7 @@ final class McpContractTest extends TestCase
         $tool = array_column(McpToolCatalog::tools(), null, 'name')['nhk.media.upload-batch'];
         self::assertArrayHasKey('files', $tool['inputSchema']['properties']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
-        self::assertSame(['download_url', 'file_id'], $tool['inputSchema']['properties']['files']['items']['required']);
-        self::assertSame(['download_url', 'file_id', 'mime_type', 'file_name'], array_keys($tool['inputSchema']['properties']['files']['items']['properties']));
+        self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
     }
 
     public function test_editorial_capture_is_governed_and_accepts_text_only_or_multipart_input(): void
@@ -543,7 +542,8 @@ final class McpContractTest extends TestCase
             'items' => ['type' => 'string', 'enum' => ['video']],
         ], $tool['inputSchema']['properties']['resume_children']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
-        self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
+        self::assertSame(['download_url', 'file_id'], $tool['inputSchema']['properties']['files']['items']['required']);
+        self::assertSame(['download_url', 'file_id', 'mime_type', 'file_name'], array_keys($tool['inputSchema']['properties']['files']['items']['properties']));
         self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
     }
 
