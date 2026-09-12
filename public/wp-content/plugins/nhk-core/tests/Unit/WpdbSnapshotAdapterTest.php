@@ -30,6 +30,20 @@ final class WpdbSnapshotAdapterTest extends TestCase
         self::assertSame('852da54d-457a-4397-a16d-52d9452ba766', $first->collections['graph_edges'][0]['target_uuid']);
     }
 
+    public function test_addendum_identity_uses_addendum_uuid_before_capture_uuid(): void
+    {
+        $source = new WpdbCanonicalSnapshotSource($this->sourceDb(), $this->sourceEnvironment());
+        $addendum = '66666666-6666-4666-8666-666666666666';
+        $capture = '77777777-7777-4777-8777-777777777777';
+
+        $row = $source->normalizeRow(
+            ['capture_uuid' => $capture, 'addendum_uuid' => $addendum],
+            ['capture_uuid' => ['Type' => 'varchar(36)'], 'addendum_uuid' => ['Type' => 'varchar(36)']],
+        );
+
+        self::assertSame($addendum, $row['uuid']);
+    }
+
     public function test_source_to_recovery_writer_round_trip_preserves_golden_identity(): void
     {
         $snapshot = (new CanonicalSnapshotExportService())->export(new WpdbCanonicalSnapshotSource($this->sourceDb(), $this->sourceEnvironment(), null, null, static fn (): array => ['current' => 20, 'target' => 20]), '2026-09-12T00:00:00+00:00');

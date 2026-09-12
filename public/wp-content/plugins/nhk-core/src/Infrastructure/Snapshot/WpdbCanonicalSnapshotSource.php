@@ -247,7 +247,7 @@ final class WpdbCanonicalSnapshotSource implements CanonicalSnapshotSource
                 $row[$name] = $this->canonicalJson($row[$name], $name);
             }
         }
-        foreach (['canonical_uuid', 'capture_uuid', 'addendum_uuid', 'proposal_uuid', 'approval_uuid', 'attempt_uuid', 'event_uuid', 'evidence_uuid', 'asset_uuid', 'usage_uuid', 'edge_uuid', 'identity_uuid'] as $identityColumn) {
+        foreach (['addendum_uuid', 'approval_uuid', 'attempt_uuid', 'event_uuid', 'evidence_uuid', 'asset_uuid', 'usage_uuid', 'edge_uuid', 'identity_uuid', 'canonical_uuid', 'capture_uuid', 'proposal_uuid'] as $identityColumn) {
             if (isset($row[$identityColumn]) && !isset($row['uuid'])) { $row['uuid'] = $row[$identityColumn]; break; }
         }
         return $row;
