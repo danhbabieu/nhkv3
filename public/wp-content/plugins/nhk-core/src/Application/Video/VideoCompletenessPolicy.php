@@ -7,6 +7,22 @@ use NHK\Core\Domain\Video\{VideoCompletenessResult, VideoSourceRights};
 
 final class VideoCompletenessPolicy
 {
+    /**
+     * Re-evaluate the current projection from attachment state that has
+     * already passed canonical Graph/Evidence read-back.
+     *
+     * Intake completeness is a preview. Its blockers must not be carried
+     * forward when the governed apply has proved the current attachment.
+     *
+     * @param array<string,mixed> $package
+     * @param list<array<string,mixed>> $canonicalAttachments
+     */
+    public function evaluateAfterCanonicalReadBack(array $package, array $canonicalAttachments): VideoCompletenessResult
+    {
+        $package['semantic_attachments'] = array_values($canonicalAttachments);
+        return $this->evaluate($package);
+    }
+
     /** @param array<string,mixed> $package */
     public function evaluate(array $package): VideoCompletenessResult
     {

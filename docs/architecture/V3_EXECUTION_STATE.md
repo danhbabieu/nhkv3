@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint 2026-09-12 — canonical Video completeness projection reconciliation
+
+ROOT_CAUSE: Video intake persisted preview `completeness` metadata before the
+governed `about` relation existed. Controlled Apply materialized and validated
+the canonical Graph edge plus Evidence dependencies, but left that preview
+blocker in the stored derived projection.
+
+FIX: After Graph create and active-edge read-back, the existing governed Video
+executor recalculates completeness from the verified current attachments and
+updates only the derived completeness packet on the existing Video owner. An
+empty or unverified canonical attachment set still yields
+`NO_SEMANTIC_ATTACHMENT`; no relation, Evidence, Governance or identity rule
+changed.
+
+VERIFICATION: Focused Video/Capture tests pass 17 tests / 57 assertions; full
+NHK Unit passes 1,313 tests / 6,346 assertions with existing warnings and
+deprecations; NHK Contract passes 4 tests / 31 assertions; affected WordPress
+integration selection is environment-skipped because `NHK_WP_TEST_PATH` is
+unset; PHP lint and `git diff --check` pass.
+
+NO MUTATION: No database, live runtime or publication action was performed.
+
+STATUS: VIDEO_COMPLETENESS_PROJECTION_RECONCILIATION_IMPLEMENTED /
+INTEGRATION_ENVIRONMENT_BLOCKED
+
 # Checkpoint 2026-09-12: adapters done; no staging mutation
 
 # Checkpoint — 2026-09-12 — files[] provided-reference bridge remains fail-closed

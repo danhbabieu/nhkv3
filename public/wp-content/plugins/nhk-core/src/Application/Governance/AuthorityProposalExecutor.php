@@ -61,6 +61,7 @@ final class AuthorityProposalExecutor
                 false,
             );
             $attachments = $this->materializeVideoAttachments($proposal, $video);
+            $video = $this->reconcileVideoCompleteness($video, $attachments);
             $this->assertVideoCompleteness($video, $attachments);
             return $this->video->activateAfterSemanticAttachments($video);
         }
@@ -73,7 +74,10 @@ final class AuthorityProposalExecutor
                 'retire' => $this->video->retire($target, $proposal->expectedRevision),
                 'reactivate' => $this->video->reactivate($target, $proposal->expectedRevision),
             };
-            if ($proposal->operation === 'update') $this->materializeVideoAttachments($proposal, $video);
+            if ($proposal->operation === 'update') {
+                $attachments = $this->materializeVideoAttachments($proposal, $video);
+                $video = $this->reconcileVideoCompleteness($video, $attachments);
+            }
             return $video;
         }
         if (in_array($proposal->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) {
@@ -215,8 +219,29 @@ final class AuthorityProposalExecutor
                 (string) ($attachment['predicate'] ?? ''),
                 new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? '')),
             );
+            $readBack = $this->graph->findEdge(
+                new NodeReference('video', $video->canonicalId),
+                (string) ($attachment['predicate'] ?? ''),
+                new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? '')),
+            );
+            if ($readBack === null || !$readBack->isActive()) throw new \RuntimeException('VIDEO_RELATION_READBACK_FAILED');
         }
         return $attachments;
+    }
+
+    /** @param list<array<string,mixed>> $attachments */
+    private function reconcileVideoCompleteness(Video $video, array $attachments): Video
+    {
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $result = ($this->completeness ?? new VideoCompletenessPolicy())->evaluateAfterCanonicalReadBack($metadata, $attachments);
+        $metadata['semantic_attachments'] = array_values($attachments);
+        $metadata['completeness'] = [
+            'publishable' => $result->publishable,
+            'blockers' => $result->blockers,
+            'warnings' => $result->warnings,
+        ];
+        if ($metadata === $video->metadata) return $video;
+        return $this->video?->update($video->canonicalId, $video->title, $metadata, $video->thumbnailMediaId, $video->revision) ?? $video;
     }
 
     private function assertVideoCompleteness(Video $video, array $attachments = []): void

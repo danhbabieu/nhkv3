@@ -154,6 +154,7 @@ final class VideoRelationLifecycleTest extends TestCase
         self::assertFalse((bool) $endpointStateAtCreate);
         self::assertTrue($video->active);
         self::assertSame($videoId, $videos->findByCanonicalId($videoId)?->canonicalId);
+        self::assertSame([], $video->metadata['completeness']['blockers']);
     }
 
     public function test_historical_video_proposal_discovers_approved_bound_relation(): void
@@ -236,5 +237,8 @@ final class VideoRelationLifecycleTest extends TestCase
         ], 'video-fingerprint', null, 'deps', ProposalState::APPROVED, entityType: 'video'));
         self::assertTrue($replayed->active);
         self::assertCount(2, $graphRepo->allEdges());
+        self::assertCount(1, $videos->list(true));
+        self::assertSame($video->revision, $replayed->revision);
+        self::assertSame([], $replayed->metadata['completeness']['blockers']);
     }
 }

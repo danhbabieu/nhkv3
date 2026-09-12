@@ -165,6 +165,15 @@ final class ChatGptMcpGatewayTest extends TestCase
         }
     }
 
+    public function test_runtime_allowlist_is_exact_and_rejects_siblings_and_subdomains(): void
+    {
+        $method = new \ReflectionMethod(ChatGptMcpGateway::class, 'isExactAllowlistedHost');
+        self::assertTrue($method->invoke(null, 'sdmntpraustraliaeast.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
+        self::assertFalse($method->invoke(null, 'sdmntpraustraliaeast2.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
+        self::assertFalse($method->invoke(null, 'child.sdmntpraustraliaeast.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
+        self::assertFalse($method->invoke(null, 'oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
+    }
+
     public function test_total_size_limit_and_actual_mime_sniff_are_enforced(): void
     {
         try {

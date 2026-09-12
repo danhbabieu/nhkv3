@@ -193,9 +193,15 @@ final class ChatGptMcpGateway
     {
         $allowed = function_exists('apply_filters') ? apply_filters('nhk_chatgpt_file_allowed_hosts', []) : [];
         if (!is_array($allowed) || $allowed === []) return false;
+        return self::isExactAllowlistedHost($host, $allowed);
+    }
+
+    /** @param list<mixed> $allowed */
+    private static function isExactAllowlistedHost(string $host, array $allowed): bool
+    {
         foreach ($allowed as $candidate) {
             $candidate = strtolower(ltrim(trim((string) $candidate), '.'));
-            if ($candidate !== '' && ($host === $candidate || str_ends_with($host, '.' . $candidate))) return true;
+            if ($candidate !== '' && $host === $candidate) return true;
         }
         return false;
     }

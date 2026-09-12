@@ -95,6 +95,30 @@ final class VideoEditorialEnrichmentTest extends TestCase
         self::assertNotContains('NO_SEMANTIC_ATTACHMENT', $result->blockers);
     }
 
+    public function test_canonical_completeness_reconciliation_requires_verified_current_attachment(): void
+    {
+        $policy = new VideoCompletenessPolicy();
+        $package = [
+            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'Video', 'summary' => 'Tóm tắt', 'body' => 'Nội dung'],
+            'category' => ['primary' => ['key' => '01']],
+            'completeness' => ['blockers' => ['NO_SEMANTIC_ATTACHMENT']],
+            'embed_url' => 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            'seo' => ['title' => 'Video', 'description' => 'Tóm tắt'],
+        ];
+
+        $withoutRelation = $policy->evaluateAfterCanonicalReadBack($package, []);
+        self::assertContains('NO_SEMANTIC_ATTACHMENT', $withoutRelation->blockers);
+
+        $withRelation = $policy->evaluateAfterCanonicalReadBack($package, [[
+            'predicate' => 'about',
+            'target_uuid' => self::VARIANT,
+            'evidence_refs' => [['evidence_id' => self::KNOWLEDGE]],
+        ]]);
+        self::assertNotContains('NO_SEMANTIC_ATTACHMENT', $withRelation->blockers);
+    }
+
     public function test_video_completeness_requires_explicit_content_complete_status(): void
     {
         $result = (new VideoCompletenessPolicy())->evaluate([

@@ -70,8 +70,9 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $source = $this->runGoverned($governance, $apply, 'source', ['stable_key' => $this->prefix . '-source', 'title' => 'Independent catalogue', 'source_type' => 'catalog', 'locator' => 'https://example.test/source']);
         $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-claim', 'text' => 'The variant uses a spring-driven movement.', 'claim_type' => 'technical', 'provenance' => ['test' => $this->prefix]]);
         $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Spring-driven movement', 'relation' => 'supports', 'locator' => 'https://example.test/source#movement', 'metadata' => ['visibility' => 'PUBLIC']]);
+        $externalVideoId = substr(bin2hex(random_bytes(8)), 0, 11);
         $video = $this->runGoverned($governance, $apply, 'video', [
-            'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
+            'url' => 'https://youtu.be/' . $externalVideoId,
             'title' => 'Governed test video',
             'metadata' => $this->videoMetadata([[
                 'target_type' => 'variant', 'target_key' => $variant->canonicalId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION',
@@ -87,6 +88,14 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         self::assertNotNull($edge);
         self::assertNotSame($source['proposal_id'], $source['canonical_id']);
         self::assertTrue($video['canonical_readback']['active']);
+        $videoReadBack = (new WpdbVideoRepository($GLOBALS['wpdb']))->findByCanonicalId($video['canonical_id']);
+        self::assertNotNull($videoReadBack);
+        self::assertSame([], $videoReadBack->metadata['completeness']['blockers']);
+        self::assertNotContains('NO_SEMANTIC_ATTACHMENT', $videoReadBack->metadata['completeness']['blockers']);
+        self::assertSame(1, (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . $GLOBALS['wpdb']->prefix . 'nhk_sources WHERE stable_key=%s', $this->prefix . '-source')));
+        self::assertSame(1, (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . $GLOBALS['wpdb']->prefix . 'nhk_knowledge_claims WHERE stable_key=%s', $this->prefix . '-claim')));
+        self::assertCount(1, (new WpdbEvidenceRepository($GLOBALS['wpdb']))->listByClaim($claim['canonical_id'], true));
+        self::assertSame(1, (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . $GLOBALS['wpdb']->prefix . 'nhk_videos WHERE external_video_id=%s', $externalVideoId)));
     }
 
     public function test_knowledge_relation_preserves_source_uuid_through_governance_and_graph_readback(): void
