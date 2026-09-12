@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, CapturePurpose, CaptureStage};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
@@ -15,7 +16,9 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 final class AuthorityCaptureService
 {
     /** @param callable(array<string,mixed>,CaptureRecord):array<string,mixed> $planner @param (callable(array<string,mixed>,CaptureRecord):array<string,mixed>)|null $mixedEditorial @param (callable(CaptureRecord,array<string,mixed>,array<string>):array<string,mixed>)|null $applyPlan @param (callable(CaptureRecord,array<string,mixed>):array<string,mixed>)|null $mixedContinuation */
-    public function __construct(private CaptureRepository $captures, private $planner, private $mixedEditorial = null, private $applyPlan = null, private $mixedContinuation = null) {}
+    public function __construct(private CaptureRepository $captures, private $planner, private $mixedEditorial = null, private $applyPlan = null, private $mixedContinuation = null, ?CompletionCoordinator $completion = null) { $this->completion = $completion ?? new CompletionCoordinator(); }
+
+    private CompletionCoordinator $completion;
 
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
@@ -96,6 +99,7 @@ final class AuthorityCaptureService
         if ($currentFingerprint === '' || !hash_equals($approvedFingerprint, $currentFingerprint)) throw new \InvalidArgumentException('PLAN_REAPPROVAL_REQUIRED');
         if (!is_callable($this->applyPlan)) throw new \RuntimeException('AUTHORITY_PLAN_EXECUTOR_UNAVAILABLE');
         $result = ($this->applyPlan)($record, $plan, $approvedIds);
+        $result['completion'] = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($plan, $approvedIds, $result));
         $context = $record->context;
         $saveBase = $record;
         $context['authority_result'] = ['approved_plan_fingerprint' => $approvedFingerprint, 'approved_candidate_ids' => $approvedIds, 'result' => $result];
@@ -127,6 +131,41 @@ final class AuthorityCaptureService
     {
         $left = array_values(array_unique(array_map('strval', $left))); $right = array_values(array_unique(array_map('strval', $right)));
         sort($left, SORT_STRING); sort($right, SORT_STRING); return $left === $right;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function completionChildren(array $plan, array $approvedIds, array $result): array
+    {
+        $candidates = [];
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates'] as $bucket) {
+            foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
+                if (is_array($candidate)) $candidates[(string) ($candidate['candidate_id'] ?? '')] = $candidate;
+            }
+        }
+        $children = [];
+        $applyCursor = 0;
+        foreach ($approvedIds as $candidateId) {
+            $candidate = $candidates[(string) $candidateId] ?? [];
+            if (!is_array($candidate)) continue;
+            $type = strtolower(trim((string) ($candidate['entity_type'] ?? 'relation')));
+            $canonicalId = trim((string) ($candidate['canonical_uuid'] ?? ''));
+            $apply = null;
+            if (strtoupper((string) ($candidate['action'] ?? 'REUSE')) !== 'REUSE') {
+                $applyRows = (array) ($result['apply_results'] ?? []);
+                $apply = is_array($applyRows[$applyCursor] ?? null) ? $applyRows[$applyCursor] : [];
+                ++$applyCursor;
+            }
+            if (is_array($apply)) $canonicalId = trim((string) ($apply['canonical_id'] ?? $apply['result_entity_uuid'] ?? ($apply['canonical_readback']['canonical_id'] ?? $canonicalId)));
+            $children[] = [
+                'owner_type' => $type,
+                'owner_id' => $canonicalId,
+                'canonical_readback' => $canonicalId !== '' ? ['canonical_id' => $canonicalId] : null,
+                'dependency_state' => is_array($apply) && is_array($apply['canonical_readback'] ?? null) ? 'COMPLETE' : 'PARTIAL',
+                'relation_or_usage_state' => $type === 'relation' ? 'COMPLETE' : 'NOT_APPLICABLE',
+                'blockers' => $canonicalId === '' ? ['AUTHORITY_CANONICAL_READBACK_UNAVAILABLE'] : [],
+            ];
+        }
+        return $children;
     }
 
     /** @param array<string,mixed> $input */

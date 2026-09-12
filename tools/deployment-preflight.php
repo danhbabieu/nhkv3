@@ -59,7 +59,9 @@ if ($wpLoaded) {
     global $wpdb;
     $migration = new NHK\Core\Shared\Migration\MigrationStatus();
     $state = $migration->status();
-    $check('schema_migration', $state['current'] >= $state['target'], 'MIGRATION_REQUIRED');
+    $schemaReady = $state['current'] >= $state['target'];
+    if ($schemaReady && method_exists($migration, 'runtimeSchemaReady')) $schemaReady = $migration->runtimeSchemaReady();
+    $check('schema_migration', $schemaReady, $state['current'] < $state['target'] ? 'MIGRATION_REQUIRED' : 'MIGRATION_SCHEMA_NOT_READY');
     $hydrationOk = false;
     if (isset($wpdb) && is_object($wpdb)) {
         $types = new NHK\Core\Domain\Authority\EntityTypeRegistry();

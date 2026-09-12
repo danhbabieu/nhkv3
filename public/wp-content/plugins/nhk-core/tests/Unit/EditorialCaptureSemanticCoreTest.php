@@ -61,6 +61,19 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame(2, $result['claim_trace'][0]['claim_revision']);
     }
 
+    public function test_explicit_title_and_excerpt_survive_text_continuation(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Text continuation begins with a different sentence.',
+            [],
+            [],
+            ['title' => 'Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp', 'excerpt' => 'Tóm tắt đã được duyệt từ bản gốc.'],
+        );
+
+        self::assertSame('Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp', $result['title']);
+        self::assertSame('Tóm tắt đã được duyệt từ bản gốc.', $result['excerpt']);
+    }
+
     public function test_text_only_capture_does_not_emit_media_observation_prose(): void
     {
         $result = (new ArticleComposer())->compose(

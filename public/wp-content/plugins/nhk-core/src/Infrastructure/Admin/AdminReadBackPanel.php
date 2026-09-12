@@ -16,6 +16,22 @@ final class AdminReadBackPanel
         echo '</div></section>';
     }
 
+    /** Render the derived owner-completion packet without collapsing it into ProposalState. */
+    public static function renderCompletion(array $packet): void
+    {
+        $proposal = strtolower(trim((string) ($packet['proposal_state'] ?? '')));
+        $layers = [];
+        if ($proposal !== '') $layers['proposal'] = ['label' => 'Proposal', 'state' => $proposal === 'applied' ? 'applied' : $proposal, 'reason' => 'Lifecycle Governance'];
+        $layers['canonical'] = ['label' => 'Canonical owner', 'state' => strtolower((string) ($packet['canonical_state'] ?? 'unavailable'))];
+        $layers['dependencies'] = ['label' => 'Dependencies', 'state' => strtolower((string) ($packet['dependency_state'] ?? 'unavailable'))];
+        $layers['relations'] = ['label' => 'Relations / MediaUsage', 'state' => strtolower((string) ($packet['relation_or_usage_state'] ?? 'unavailable'))];
+        $layers['public'] = ['label' => 'Public projection', 'state' => strtolower((string) ($packet['public_state'] ?? 'unavailable'))];
+        $layers['frontend'] = ['label' => 'Frontend', 'state' => strtolower((string) ($packet['frontend_state'] ?? 'unavailable'))];
+        self::render($layers);
+        $blockers = array_values(array_filter(array_map('strval', (array) ($packet['blockers'] ?? []))));
+        if ($blockers !== []) echo '<p class="nhk-admin-readback__blockers"><strong>Blockers:</strong> ' . htmlspecialchars(implode(', ', $blockers), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>';
+    }
+
     private static function item(string $label, string $state, ?string $reason): void
     {
         echo '<div class="nhk-admin-readback__item">';

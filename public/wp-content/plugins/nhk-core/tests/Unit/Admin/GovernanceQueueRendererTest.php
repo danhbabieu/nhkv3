@@ -122,6 +122,21 @@ final class GovernanceQueueRendererTest extends TestCase
         self::assertStringNotContainsString('nhk-governance-row-action', substr($html, (int) $bulkStart, (int) $bulkEnd - (int) $bulkStart));
     }
 
+    public function test_applied_row_does_not_collapse_resource_completion_into_proposal_label(): void
+    {
+        $page = $this->pageWithTwoItems();
+        $page['items'] = [array_replace($page['items'][0], ['status' => 'applied', 'status_label' => 'Đã áp dụng'])];
+        ob_start();
+        GovernanceQueueRenderer::render($page);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Đã áp dụng', $html);
+        self::assertStringContainsString('Resource completion', $html);
+        self::assertStringContainsString('Canonical owner: Chưa đọc lại', $html);
+        self::assertStringContainsString('Public projection: Chưa kiểm tra', $html);
+        self::assertStringContainsString('Frontend: Chưa kiểm tra', $html);
+    }
+
     public function test_pagination_uses_requested_page_and_preserves_all_filters(): void
     {
         $page = $this->pageWithTwoItems();

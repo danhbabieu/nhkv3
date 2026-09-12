@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Admin;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 
 final class AdminMediaAdapter
@@ -35,7 +36,7 @@ final class AdminMediaAdapter
             if ($query !== '' && !str_contains($haystack, $query)) continue;
             $assets = $this->assets($item->canonicalId);
             $usages = $this->usages($item->canonicalId);
-            $rows[] = ['id' => $item->canonicalId, 'title' => $item->canonicalName, 'stable_key' => $item->stableKey, 'readiness' => $item->readiness, 'active' => $item->active, 'dimensions' => $this->dimensions($assets), 'semantic_role' => $usages[0]->role ?? null, 'primary_entity' => $this->primaryEntity($usages), 'usage_count' => count($usages), 'public_state' => $this->publicState($item, $assets), 'frontend_state' => 'entity_or_gallery_projection', 'evidence_state' => $this->evidenceState($usages), 'revision' => $item->revision, 'placeholder' => $item->isSystemPlaceholder()];
+            $rows[] = ['id' => $item->canonicalId, 'title' => $item->canonicalName, 'stable_key' => $item->stableKey, 'readiness' => $item->readiness, 'active' => $item->active, 'dimensions' => $this->dimensions($assets), 'semantic_role' => $usages[0]->role ?? null, 'primary_entity' => $this->primaryEntity($usages), 'usage_count' => count($usages), 'public_state' => $this->publicState($item, $assets), 'frontend_state' => 'entity_or_gallery_projection', 'completion' => $this->completion($item, $assets, $usages), 'evidence_state' => $this->evidenceState($usages), 'revision' => $item->revision, 'placeholder' => $item->isSystemPlaceholder()];
         }
         return $rows;
     }
@@ -56,6 +57,7 @@ final class AdminMediaAdapter
             'usage_count' => count($usages),
             'provenance' => $media->provenance,
             'frontend_state' => $media->active && $media->readiness === 'ready' && $publicAssets !== [] ? 'available' : 'missing',
+            'completion' => $this->completion($media, $assets, $usages),
         ];
     }
 
@@ -71,4 +73,22 @@ final class AdminMediaAdapter
     private function publicState(Media $media, array $assets): string { if (!$media->active || $media->readiness !== 'ready') return 'private_or_not_ready'; foreach ($assets as $asset) if ($asset->visibility === 'PUBLIC') return 'public'; return 'missing_public_asset'; }
     /** @param list<MediaUsage> $usages */
     private function evidenceState(array $usages): string { foreach ($usages as $usage) if (in_array($usage->role, ['evidence', 'technical_detail'], true)) return 'present'; return 'missing'; }
+
+    /** @param list<MediaAsset> $assets @param list<MediaUsage> $usages @return array<string,mixed> */
+    private function completion(Media $media, array $assets, array $usages): array
+    {
+        $privateOriginal = false; $publicDerivative = false;
+        foreach ($assets as $asset) {
+            $privateOriginal = $privateOriginal || ($asset->kind === 'original' && $asset->visibility === 'PRIVATE');
+            $publicDerivative = $publicDerivative || ($asset->kind === 'derivative' && $asset->visibility === 'PUBLIC');
+        }
+        return (new CompletionCoordinator())->finalize('media', $media->canonicalId, [
+            'canonical_readback' => ['canonical_id' => $media->canonicalId],
+            'dependency_state' => $privateOriginal ? 'COMPLETE' : 'PARTIAL',
+            'relation_or_usage_state' => $usages === [] ? 'NOT_APPLICABLE' : 'COMPLETE',
+            'public_eligible' => $media->active && $media->readiness === 'ready' && $publicDerivative,
+            'frontend_state' => 'BLOCKED',
+            'blockers' => $media->active && $media->readiness === 'ready' && $publicDerivative ? ['MEDIA_FRONTEND_READBACK_REQUIRED'] : ['MEDIA_PUBLIC_DERIVATIVE_REQUIRED'],
+        ]);
+    }
 }

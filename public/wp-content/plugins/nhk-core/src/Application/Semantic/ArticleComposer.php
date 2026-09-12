@@ -41,9 +41,10 @@ final class ArticleComposer
             'evidence_status' => (string) ($claim['evidence_status'] ?? ''),
             'composition_reason' => (string) ($claim['reason'] ?? 'bounded relevant canonical knowledge'),
         ];
+        $explicitExcerpt = trim((string) ($context['excerpt'] ?? ''));
         return [
             'title' => $title,
-            'excerpt' => $this->excerpt($paragraphs[0]),
+            'excerpt' => $explicitExcerpt !== '' ? $explicitExcerpt : $this->excerpt($paragraphs[0]),
             'content' => implode("\n\n", $paragraphs),
             'claim_trace' => $trace,
             'research_snapshot' => ['claims' => array_map(static fn (array $item): array => ['claim_id' => $item['claim_id'], 'revision' => $item['claim_revision']], $trace), 'composer_revision' => 1],

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
@@ -21,6 +22,7 @@ final class EditorialCaptureCoordinator
     /** @var array<string,float> */
     private array $phaseStartedAt = [];
     private ?string $activeReceiptPhase = null;
+    private CompletionCoordinator $completion;
 
     /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher @param (callable(array<string,mixed>):array)|null $videoEnrichment @param (callable(array<string,mixed>):array)|null $videoPublicationVerifier */
     public function __construct(
@@ -41,7 +43,8 @@ final class EditorialCaptureCoordinator
         private ?McpDocumentationRegistry $documentation = null,
         private $videoEnrichment = null,
         private $videoPublicationVerifier = null,
-    ) {}
+        ?CompletionCoordinator $completion = null,
+    ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
     public function execute(array $input): CaptureRecord
@@ -98,7 +101,12 @@ final class EditorialCaptureCoordinator
             is_array($continuation['observations'] ?? null) ? $continuation['observations'] : (is_array($record->context['observations'] ?? null) ? $record->context['observations'] : []),
             is_array($input['observations'] ?? null) ? $input['observations'] : [],
         );
-        if (trim((string) ($input['title'] ?? '')) === '') $input['title'] = (string) ($record->diagnostics['composition']['title'] ?? '');
+        if (trim((string) ($input['title'] ?? '')) === '') {
+            $input['title'] = trim((string) ($record->context['title'] ?? '')) !== ''
+                ? (string) $record->context['title']
+                : (string) ($record->diagnostics['composition']['title'] ?? '');
+        }
+        if (trim((string) ($input['excerpt'] ?? '')) === '') $input['excerpt'] = (string) ($record->context['excerpt'] ?? ($record->diagnostics['article_draft']['excerpt'] ?? ''));
         return $this->run($record, $input);
     }
 
@@ -228,7 +236,7 @@ final class EditorialCaptureCoordinator
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');
-            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets]);
+            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot']];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {
@@ -297,13 +305,16 @@ final class EditorialCaptureCoordinator
             $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'video_publication' => $videoPublication, 'semantic_write_back' => $writes, 'published' => $published]);
             $diagnostics['final_read_back'] = $this->withoutBody($final);
             if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
+            $children = $this->completionChildren($record, $writes, $media, $videoPublication, $publication, $final, $published);
+            $completion = $this->completion->aggregateCapture($record->captureId, $children, ['canonical_state' => 'COMPLETE']);
+            $diagnostics['completion'] = $completion;
             $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'FINAL_READBACK', $record->articleId, $record->articleStateToken, $record->status, 'VERIFIED');
             $assets = $record->assets;
             $diagnostics = $record->diagnostics;
             $receipts = $record->phaseReceipts;
             $stage = $published ? CaptureStage::PUBLISHED->value : CaptureStage::READY_FOR_PUBLICATION->value;
             $status = $published ? 'PUBLISHED' : (($resolution['status'] ?? '') === 'ambiguous' ? 'REVIEW_REQUIRED' : 'PARTIAL');
-            return $this->save($record, $stage, $assets, $diagnostics, $receipts, $stage, $record->articleId, $record->articleStateToken, $status);
+            return $this->save($record, $stage, $assets, $diagnostics, $receipts, $stage, $record->articleId, $record->articleStateToken, $completion['complete'] === true ? $status : 'PARTIAL');
         } catch (\Throwable $error) {
             $latest = $this->captures->findById($record->captureId);
             if ($latest !== null) {
@@ -426,5 +437,39 @@ final class EditorialCaptureCoordinator
         if ($failureCode === VideoRelationEvidenceRequired::ERROR_CODE) return 'REVIEW_REQUIRED';
         if (preg_match('/(?:SUBJECT_NOT_FOUND|AMBIGUOUS_SUBJECT|NO_SEMANTIC_ATTACHMENT|TRANSCRIPT_UNAVAILABLE|MEDIA_(?:FEATURED|INLINE)_MISSING|MEDIAUSAGE_INCOMPLETE)/', $failureCode) === 1) return 'PARTIAL';
         return 'FAILED_RETRYABLE';
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function completionChildren(CaptureRecord $record, array $writes, array $media, array $videoPublication, array $publication, array $final, bool $published): array
+    {
+        $children = [];
+        $articleId = $record->articleId;
+        if ($articleId !== null) {
+            $articleBlockers = $published ? [] : ['ARTICLE_NOT_PUBLISHED'];
+            $renderedVerified = ($final['frontend_verified'] ?? false) === true
+                || ($final['rendered_public_verification'] ?? false) === true
+                || ($final['rendered_public_verification_status'] ?? '') === 'verified';
+            if ($published && !$renderedVerified) $articleBlockers[] = 'ARTICLE_FRONTEND_READBACK_REQUIRED';
+            $children[] = [
+                'owner_type' => 'wp_post', 'owner_id' => (string) $articleId,
+                'canonical_readback' => ($final['status'] ?? '') === 'verified' ? ['id' => $articleId] : null,
+                'dependency_state' => ($publication['eligible'] ?? false) === true ? 'COMPLETE' : 'PARTIAL',
+                'relation_or_usage_state' => ($media['status'] ?? '') === 'RECONCILED' ? 'COMPLETE' : 'PARTIAL',
+                'public_eligible' => $published && ($publication['eligible'] ?? false) === true,
+                'frontend_verified' => $published && ($final['status'] ?? '') === 'verified' && $renderedVerified,
+                'blockers' => array_merge($articleBlockers, array_values(array_map('strval', (array) ($publication['blockers'] ?? [])))),
+            ];
+        }
+        foreach ($writes as $write) {
+            if (!is_array($write) || !isset($write['completion']) && trim((string) ($write['canonical_id'] ?? '')) === '') continue;
+            $type = trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge';
+            $children[] = is_array($write['completion'] ?? null)
+                ? ['completion' => $write['completion']]
+                : ['owner_type' => $type, 'owner_id' => (string) ($write['canonical_id'] ?? ''), 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
+        }
+        foreach ((array) ($videoPublication['items'] ?? []) as $video) if (is_array($video) && is_array($video['completion'] ?? null)) $children[] = ['completion' => $video['completion']];
+        $mediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
+        if ($mediaId !== '') $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => ($media['status'] ?? '') === 'RECONCILED' ? ['id' => $mediaId] : null, 'relation_or_usage_state' => ($media['status'] ?? '') === 'RECONCILED' ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true, 'frontend_verified' => ($media['frontend_verified'] ?? null), 'blockers' => (array) ($media['blockers'] ?? [])];
+        return $children;
     }
 }

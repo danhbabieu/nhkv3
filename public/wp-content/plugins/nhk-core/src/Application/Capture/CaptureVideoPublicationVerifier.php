@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry, PublicIdentityService};
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
@@ -19,9 +20,15 @@ final class CaptureVideoPublicationVerifier
         private ?CanonicalDependencyValidator $dependencies = null,
         /** @var callable(string,string,string):bool|null */
         private $aboutReadback = null,
+        /** @var callable(string,string):bool|null */
+        private $frontendReadback = null,
+        ?CompletionCoordinator $completion = null,
     ) {
         PublicIdentityReadRegistry::register($identityRepository);
+        $this->completion = $completion ?? new CompletionCoordinator();
     }
+
+    private CompletionCoordinator $completion;
 
     /** @return array<string,mixed> */
     public function verify(array $context): array
@@ -37,6 +44,20 @@ final class CaptureVideoPublicationVerifier
             if (!$video instanceof Video) {
                 $blockers[] = 'VIDEO_CANONICAL_READBACK_UNAVAILABLE';
                 continue;
+            }
+            $source = is_array($payload['metadata']['source'] ?? null) ? $payload['metadata']['source'] : (is_array($payload['metadata']['source_snapshot'] ?? null) ? $payload['metadata']['source_snapshot'] : []);
+            $expectedPlatform = trim((string) ($asset['platform'] ?? $source['platform'] ?? ''));
+            $expectedExternalId = trim((string) ($asset['external_id'] ?? $asset['external_video_id'] ?? $source['external_video_id'] ?? ''));
+            if (($expectedPlatform !== '' && $expectedPlatform !== $video->platform) || ($expectedExternalId !== '' && $expectedExternalId !== $video->externalVideoId)) {
+                $blockers[] = 'VIDEO_EXTERNAL_IDENTITY_READBACK_INVALID';
+                continue;
+            }
+            if ($expectedPlatform !== '' && $expectedExternalId !== '') {
+                $exact = $this->videos->findByExternalReference($expectedPlatform, $expectedExternalId);
+                if (!$exact instanceof Video || $exact->canonicalId !== $video->canonicalId) {
+                    $blockers[] = 'VIDEO_EXTERNAL_IDENTITY_NOT_RESOLVABLE';
+                    continue;
+                }
             }
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
@@ -101,9 +122,27 @@ final class CaptureVideoPublicationVerifier
                 $blockers[] = 'PUBLIC_IDENTITY_NOT_PERSISTED';
                 continue;
             }
-            $items[] = ['video_id' => $video->canonicalId, 'external_video_id' => $video->externalVideoId, 'status' => 'verified', 'public_identity' => ['identity_id' => $identity['identity_id'] ?? null, 'slug' => $identity['current_slug'], 'path' => $identity['current_path']]];
+            $path = (string) ($identity['current_path'] ?? '');
+            $frontendVerified = null;
+            if (is_callable($this->frontendReadback)) {
+                try { $frontendVerified = (bool) ($this->frontendReadback)($video->canonicalId, $path); }
+                catch (\Throwable) { $frontendVerified = false; }
+                if ($frontendVerified !== true) $blockers[] = 'VIDEO_FRONTEND_READBACK_FAILED';
+            }
+            $completion = $this->completion->finalize('video', $video->canonicalId, [
+                'canonical_readback' => ['canonical_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId],
+                'dependency_state' => 'COMPLETE',
+                'relation_or_usage_state' => 'COMPLETE',
+                'public_eligible' => true,
+                'frontend_verified' => $frontendVerified,
+                'blockers' => $frontendVerified === false ? ['VIDEO_FRONTEND_READBACK_FAILED'] : [],
+            ]);
+            $items[] = ['video_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'external_video_id' => $video->externalVideoId, 'status' => 'verified', 'completion' => $completion, 'public_identity' => ['identity_id' => $identity['identity_id'] ?? null, 'slug' => $identity['current_slug'], 'path' => $path]];
         }
-        if ($items === [] && $blockers === []) return ['status' => 'not_requested', 'items' => [], 'blockers' => []];
-        return ['status' => $blockers === [] ? 'verified' : 'REVIEW_REQUIRED', 'items' => $items, 'blockers' => array_values(array_unique($blockers))];
+        if ($items === [] && $blockers === []) return ['status' => 'not_requested', 'items' => [], 'blockers' => [], 'completion' => $this->completion->finalize('video', '', ['canonical_state' => 'BLOCKED', 'blockers' => ['VIDEO_NOT_REQUESTED']])];
+        $completion = count($items) === 1
+            ? $items[0]['completion']
+            : $this->completion->finalize('video', '', ['canonical_state' => 'BLOCKED', 'blockers' => $blockers !== [] ? $blockers : ['VIDEO_FRONTEND_READBACK_REQUIRED']]);
+        return ['status' => $blockers === [] ? 'verified' : 'REVIEW_REQUIRED', 'items' => $items, 'blockers' => array_values(array_unique($blockers)), 'completion' => $completion];
     }
 }

@@ -44,4 +44,21 @@ final class AdminSharedPresentationTest extends TestCase
         self::assertStringContainsString('Chi tiết Video', $html);
         self::assertStringContainsString('Nội dung', $html);
     }
+
+    public function test_completion_panel_separates_proposal_from_public_and_frontend_state(): void
+    {
+        ob_start();
+        AdminReadBackPanel::renderCompletion([
+            'proposal_state' => 'applied', 'canonical_state' => 'COMPLETE', 'dependency_state' => 'COMPLETE',
+            'relation_or_usage_state' => 'PARTIAL', 'public_state' => 'BLOCKED', 'frontend_state' => 'BLOCKED',
+            'blockers' => ['MEDIAUSAGE_INCOMPLETE'],
+        ]);
+        $html = (string) ob_get_clean();
+
+        self::assertStringContainsString('Proposal', $html);
+        self::assertStringContainsString('Đã áp dụng', $html);
+        self::assertStringContainsString('Public projection', $html);
+        self::assertStringContainsString('Bị chặn', $html);
+        self::assertStringContainsString('MEDIAUSAGE_INCOMPLETE', $html);
+    }
 }

@@ -3,12 +3,15 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Governance;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Contracts\Governance\GovernanceAuditSink;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
 use NHK\Core\Domain\Governance\AutomationMode;
 
 final class GovernedSemanticIngestOrchestrator
 {
+    private CompletionCoordinator $completion;
+    private string $currentOwnerType = '';
     /** @param callable(array<string,mixed>):bool $approvalPolicy
      *  @param callable(string):array<string,mixed> $apply */
     public function __construct(
@@ -18,7 +21,8 @@ final class GovernedSemanticIngestOrchestrator
         private ?GovernanceAutomationPolicyResolver $policyResolver = null,
         private $projection = null,
         private ?GovernanceAuditSink $audit = null,
-    ) {}
+        ?CompletionCoordinator $completion = null,
+    ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param list<array<string,mixed>> $nodes @return list<array<string,mixed>> */
     public function run(array $nodes): array
@@ -26,6 +30,7 @@ final class GovernedSemanticIngestOrchestrator
         $results = [];
         $verified = [];
         foreach ($nodes as $node) {
+            $this->currentOwnerType = strtolower(trim((string) ($node['entity_type'] ?? '')));
             foreach ((array) ($node['dependency_ids'] ?? []) as $dependencyId) {
                 if (!isset($verified[(string) $dependencyId])) throw new \RuntimeException('DEPENDENCY_NOT_VERIFIED');
             }
@@ -109,6 +114,13 @@ final class GovernedSemanticIngestOrchestrator
         $result = ['status' => $status, 'mode' => $mode?->value ?? 'LEGACY', 'gate_reached' => $gate, 'proposal_id' => $proposalId, 'proposal_state' => $state, 'blockers' => []];
         if ($apply !== []) $result += ['canonical_id' => $apply['canonical_readback']['canonical_id'] ?? null, 'canonical_readback' => $apply['canonical_readback'], 'apply' => $apply];
         if ($frontend !== []) $result['frontend'] = $frontend;
+        $result['completion'] = $this->completion->finalize($this->currentOwnerType, (string) ($result['canonical_id'] ?? ''), [
+            'proposal_state' => $state,
+            'canonical_readback' => $result['canonical_readback'] ?? null,
+            'public_eligible' => ($frontend['public_eligible'] ?? $frontend['eligible'] ?? $frontend['frontend_available'] ?? null),
+            'frontend_verified' => ($frontend['frontend_available'] ?? null),
+            'blockers' => $result['blockers'],
+        ]);
         return $result;
     }
 
@@ -117,6 +129,13 @@ final class GovernedSemanticIngestOrchestrator
     {
         $result = $this->result($proposalId, $mode, 'blocked', $gate, $state, $apply, $frontend);
         $result['blockers'] = $blockers;
+        $result['completion'] = $this->completion->finalize($this->currentOwnerType, (string) ($result['canonical_id'] ?? ''), [
+            'proposal_state' => $state,
+            'canonical_readback' => $result['canonical_readback'] ?? null,
+            'public_eligible' => ($frontend['public_eligible'] ?? $frontend['eligible'] ?? $frontend['frontend_available'] ?? null),
+            'frontend_verified' => ($frontend['frontend_available'] ?? null),
+            'blockers' => $blockers,
+        ]);
         return $result;
     }
 }

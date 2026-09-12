@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Cross-domain completion convergence
+
+WHAT: Added one derived application-level completion packet to distinguish
+ProposalState::APPLIED from canonical owner completion, public eligibility and
+frontend verification. The packet is not persisted as a semantic owner and
+does not replace Governance, Authority, Knowledge, Evidence, Graph, Media or
+WordPress ownership.
+
+DOMAINS: Video publication verification now independently read-backs exact
+platform/external identity, Evidence-backed about state, Public Identity and
+the existing `/video/{slug}/` reader. Knowledge, Media, Article and Authority
+continuations expose the same derived layers; Source/Evidence remain valid
+internal dependencies without a public route. Media admin projections expose
+asset/usage/public-derivative blockers without inventing a Media detail page.
+Capture aggregates child packets and remains PARTIAL when any requested child
+is incomplete. Governance queue rows now show Proposal and Resource completion
+separately.
+
+CONTINUATION: `resume_children:["video"]` explicitly re-enters the original
+Video child using the same Capture/Post/external identity boundary. Ordinary
+text addenda still skip unchanged Video work. Explicit Article title and
+excerpt context outrank generated continuation text.
+
+DEPLOYMENT GATE: Runtime writes now fail closed when the migration ledger is
+behind or when required current-schema tables/columns are absent, covering the
+Migration018 addendum failure class without adding a migration in this pass.
+
+VERIFICATION: Focused convergence tests pass 87 tests / 404 assertions in the
+latest domain run; MCP contract tests pass 34 / 460; full NHK Unit passes 1,192
+tests / 5,870 assertions. Composer PHP lint and git diff --check pass. The
+guarded NHK Integration suite is BLOCKED in this environment before the
+WordPress/MySQL bootstrap (`update_option()` unavailable and
+`NHK_WP_TEST_PATH=public` is not configured); no integration result is claimed.
+
+STATUS: IMPLEMENTED_CODE_SIDE / FRONTEND_AND_INTEGRATION_RUNTIME_EVIDENCE_PENDING.
+
 # Checkpoint — 2026-09-12 — Capture/Governance convergence implementation
 
 WHAT: Implemented the shared Proposal subject-binding repair and bounded

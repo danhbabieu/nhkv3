@@ -37,6 +37,8 @@ final class McpTransport
         private ?EditorialCaptureCoordinator $capture = null,
         private ?EditorialCaptureContinuationService $captureContinuation = null,
         private ?AuthorityCaptureService $authorityCapture = null,
+        /** @var callable():bool|null */
+        private $runtimeWriteReady = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -209,6 +211,7 @@ final class McpTransport
 
     private function captureIngest(array $arguments, array $files): array
     {
+        if (is_callable($this->runtimeWriteReady) && !(bool) ($this->runtimeWriteReady)()) throw new \RuntimeException('REQUIRED_SCHEMA_NOT_READY');
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
         unset($arguments['files']);
         if ($files !== []) $arguments['files'] = $files;

@@ -66,6 +66,8 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame('representative', $row['semantic_role']);
         self::assertSame(1, $row['usage_count']);
         self::assertSame('variant', $row['primary_entity']['type']);
+        self::assertArrayHasKey('completion', $row);
+        self::assertFalse($row['completion']['complete']);
     }
 
     public function test_media_detail_is_a_usable_readback_projection_with_assets_roles_usage_and_provenance(): void
@@ -82,6 +84,8 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame('representative', $detail['usages'][0]['role']);
         self::assertSame('variant', $detail['usages'][0]['endpoint_type']);
         self::assertSame('available', $detail['frontend_state']);
+        self::assertArrayHasKey('completion', $detail);
+        self::assertSame('BLOCKED', $detail['completion']['frontend_state']);
     }
 
     public function test_content_adapter_has_only_editorial_and_video_tabs(): void

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Capture;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Contracts\Governance\GovernedLifecycle;
@@ -22,7 +23,9 @@ use NHK\Core\Shared\Uuid\UuidCodec;
  */
 final class GovernedCaptureContinuationService
 {
-    /** @param callable(string):array<string,mixed> $apply @param callable(string):bool $can */
+    private string $currentCaptureId = '';
+    private CompletionCoordinator $completion;
+
     public function __construct(
         private GovernedLifecycle $governance,
         private $apply,
@@ -36,8 +39,10 @@ final class GovernedCaptureContinuationService
         private ?CaptureOrchestrationBudget $budget = null,
         /** @var callable(string,string,array<string,mixed>):void|null */
         private $phaseReceipt = null,
-    ) {}
-    private string $currentCaptureId = '';
+        ?CompletionCoordinator $completion = null,
+    ) {
+        $this->completion = $completion ?? new CompletionCoordinator();
+    }
 
     /** @return array<string,mixed> */
     public function execute(string $captureId, string $continuationKey, array $context, array $control = []): array
@@ -49,9 +54,10 @@ final class GovernedCaptureContinuationService
         $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context);
         $skippedVideoChildren = [];
         $videoChildren = [];
+        $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($control['resume_children'] ?? [])))));
         if ($proposalIds === [] && ($context['existing_capture_continuation'] ?? false) === true) {
             $previousChildren = $this->previousVideoChildren($context);
-            $plans = array_values(array_filter($plans, function (array $plan) use (&$skippedVideoChildren, &$videoChildren, $previousChildren, $context): bool {
+            $plans = array_values(array_filter($plans, function (array $plan) use (&$skippedVideoChildren, &$videoChildren, $previousChildren, $context, $resumeChildren): bool {
                 $isVideo = isset($plan['capture_video_provenance']) || (($plan['entity_type'] ?? '') === 'video');
                 if (!$isVideo) return true;
                 $fingerprint = $this->videoPlanFingerprint($plan, $context);
@@ -62,13 +68,17 @@ final class GovernedCaptureContinuationService
                 $unchanged = $previousChildren === [] || ($previous !== null && ($previous['fingerprint'] ?? '') === $fingerprint);
                 $previousStatus = (string) ($previous['status'] ?? 'FAILED_RETRYABLE');
                 if (!$unchanged || !in_array($previousStatus, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED', 'APPLIED', 'REUSED_VERIFIED', 'SKIPPED_UNCHANGED'], true)) return true;
+                if (in_array('video', $resumeChildren, true)) return true;
                 $reason = in_array($previousStatus, ['APPLIED', 'REUSED_VERIFIED'], true) ? 'VIDEO_CHILD_ALREADY_VERIFIED' : 'VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM';
                 $skippedVideoChildren[] = ['status' => 'SKIPPED_UNCHANGED', 'reason' => $reason, 'fingerprint' => $fingerprint];
                 $videoChildren[] = ['fingerprint' => $fingerprint, 'status' => $previousStatus === 'APPLIED' ? 'REUSED_VERIFIED' : 'SKIPPED_UNCHANGED', 'reason' => $reason];
                 return false;
             }));
         }
-        if ($plans === []) return ['status' => 'REVIEW_REQUIRED', 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($reusedClaims === [] ? ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'] : []), 'governance' => ['lifecycle' => [], 'status' => 'REVIEW_REQUIRED', 'skipped_video_children' => count($skippedVideoChildren)]];
+        if ($plans === []) {
+            $blockers = $skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : ($reusedClaims === [] ? ['SEMANTIC_SUBJECT_OR_DELTA_REQUIRED'] : []);
+            return ['status' => 'REVIEW_REQUIRED', 'writes' => $skippedVideoChildren, 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $blockers, 'governance' => ['lifecycle' => [], 'status' => 'REVIEW_REQUIRED', 'skipped_video_children' => count($skippedVideoChildren)], 'completion' => $this->completion->aggregateCapture($this->currentCaptureId, [], ['canonical_state' => 'COMPLETE', 'blockers' => $blockers])];
+        }
 
         $writes = [];
         $lifecycle = [];
@@ -108,7 +118,12 @@ final class GovernedCaptureContinuationService
         $status = $blocked !== [] ? 'SYSTEM_BLOCKED' : ($retryable !== [] ? 'FAILED_RETRYABLE' : ($pending !== [] ? 'REVIEW_REQUIRED' : 'APPLIED'));
         $failureWrites = $blocked !== [] ? $blocked : $retryable;
         $failureBlockers = $failureWrites !== [] ? array_values(array_unique(array_merge(...array_map(static fn (array $write): array => (array) ($write['blockers'] ?? []), $failureWrites)))) : ($pending !== [] ? ['GOVERNANCE_APPROVAL_REQUIRED'] : ($skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : []));
-        return ['status' => $status, 'writes' => array_merge($skippedVideoChildren, $writes), 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $failureBlockers, 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending), 'retryable_count' => count($retryable), 'skipped_video_children' => count($skippedVideoChildren)]];
+        $result = ['status' => $status, 'writes' => array_merge($skippedVideoChildren, $writes), 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $failureBlockers, 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending), 'retryable_count' => count($retryable), 'skipped_video_children' => count($skippedVideoChildren)]];
+        $result['completion'] = $this->completion->aggregateCapture($this->currentCaptureId, $this->completionChildren($writes), [
+            'canonical_state' => 'COMPLETE',
+            'blockers' => $failureBlockers,
+        ]);
+        return $result;
     }
 
     /** @return list<array<string,mixed>> */
@@ -473,7 +488,22 @@ final class GovernedCaptureContinuationService
     private function applied(Proposal $proposal, array $applied): array
     {
         if (!is_array($applied['canonical_readback'] ?? null)) throw new \RuntimeException('CANONICAL_READBACK_VERIFICATION_FAILED');
-        return ['proposal_id' => $proposal->id, 'status' => 'APPLIED', 'canonical_id' => $applied['canonical_id'] ?? null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false)];
+        $canonicalId = (string) ($applied['canonical_id'] ?? $applied['result_entity_uuid'] ?? ($applied['canonical_readback']['canonical_id'] ?? ''));
+        return ['proposal_id' => $proposal->id, 'status' => 'APPLIED', 'canonical_id' => $canonicalId !== '' ? $canonicalId : null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false), 'completion' => $this->completion->finalize($proposal->entityType, $canonicalId, ['proposal_state' => 'applied', 'canonical_readback' => $applied['canonical_readback']])];
+    }
+
+    /** @param list<array<string,mixed>> $writes @return list<array<string,mixed>> */
+    private function completionChildren(array $writes): array
+    {
+        $children = [];
+        foreach ($writes as $write) {
+            if (!is_array($write)) continue;
+            if (is_array($write['completion'] ?? null)) { $children[] = ['completion' => $write['completion']]; continue; }
+            $ownerId = trim((string) ($write['canonical_id'] ?? $write['result_entity_uuid'] ?? ''));
+            if ($ownerId === '') continue;
+            $children[] = ['owner_type' => trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge', 'owner_id' => $ownerId, 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
+        }
+        return $children;
     }
 
     private function actor(): string { return function_exists('get_current_user_id') ? (string) get_current_user_id() : 'capture-continuation'; }

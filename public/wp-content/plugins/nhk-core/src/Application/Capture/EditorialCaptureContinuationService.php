@@ -29,6 +29,8 @@ final class EditorialCaptureContinuationService
             // the persisted delta while preserving the original idempotency
             // binding and Capture identity.
             $control = is_array($input['governance'] ?? null) ? $input['governance'] : [];
+            $requestedChildren = is_array($existing->payload['resume_children'] ?? null) ? $existing->payload['resume_children'] : [];
+            if ($requestedChildren !== []) $control['resume_children'] = $requestedChildren;
             if ($control !== []) {
                 $capture = $this->captures->findById($captureId);
                 if (!$capture instanceof CaptureRecord) return $this->response(null, $existing);
@@ -56,6 +58,10 @@ final class EditorialCaptureContinuationService
         foreach (['video' => 'CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED', 'items' => 'CAPTURE_ADDENDUM_ITEMS_NOT_ALLOWED'] as $field => $code) {
             if (isset($input[$field]) && (array) $input[$field] !== []) return $this->failed($captureId, $key, $fingerprint, $code, $input);
         }
+        $resumeChildren = $input['resume_children'] ?? [];
+        if ($resumeChildren !== [] && !is_array($resumeChildren)) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_RESUME_CHILDREN_INVALID', $input);
+        $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) $resumeChildren))));
+        if (array_diff($resumeChildren, ['video']) !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_RESUME_CHILD_NOT_SUPPORTED', $input);
 
         $pending = new CaptureAddendumRecord(UuidCodec::newV7(), $captureId, $key, $fingerprint, 'IN_PROGRESS', $this->payload($input), $capture->revision);
         $addendum = $this->addenda->create($pending);
@@ -69,6 +75,7 @@ final class EditorialCaptureContinuationService
             $input['existing_capture_continuation'] = true;
             $input['continuation_idempotency_key'] = $key;
             $input['continuation_delta_text'] = trim((string) ($input['text'] ?? $input['content'] ?? ''));
+            if ($resumeChildren !== []) $input['governance'] = ['resume_children' => $resumeChildren] + (is_array($input['governance'] ?? null) ? $input['governance'] : []);
             $continued = $this->coordinator->continueWithAddendum($capture, $input);
             if (in_array($continued->status, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
                 $failed = $this->saveAddendum($addendum, 'FAILED', $continued->revision, ['code' => (string) ($continued->diagnostics['failure']['code'] ?? 'CAPTURE_CONTINUATION_FAILED')]);
@@ -102,7 +109,10 @@ final class EditorialCaptureContinuationService
     /** @return array<string,mixed> */
     private function payload(array $input): array
     {
-        return ['text' => trim((string) ($input['text'] ?? $input['content'] ?? '')), 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : []];
+        $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
+        $payload = ['text' => trim((string) ($input['text'] ?? $input['content'] ?? '')), 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : []];
+        if ($resumeChildren !== []) $payload['resume_children'] = $resumeChildren;
+        return $payload;
     }
 
     private function fingerprint(array $input): string

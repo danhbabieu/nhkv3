@@ -112,7 +112,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $governance = $this->createMock(GovernedLifecycle::class);
         $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static fn (array $args): bool => ($args['entity_type'] ?? '') === 'video' && ($args['operation'] ?? '') === 'ingest'))->willReturn($proposal);
         $governance->method('submit')->willReturn($proposal);
-        $governance->method('review')->willReturn(['state' => 'draft', 'entity_type' => 'video', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(['state' => 'draft', 'entity_type' => 'video', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'], ['state' => 'submitted', 'entity_type' => 'video', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
         $governance->method('approve')->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
         $governance->method('eligibility')->willReturn(['ready' => true]);
         $service = new GovernedCaptureContinuationService($governance, static function (string $id) use ($videoId): array { return ['canonical_id' => $videoId, 'canonical_readback' => ['canonical_id' => $videoId, 'entity_type' => 'video', 'active' => true, 'revision' => 1]]; }, $this->policies(['video'], ['video' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true);
@@ -148,6 +148,29 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $result['status']);
         self::assertSame('SKIPPED_UNCHANGED', $result['writes'][0]['status']);
         self::assertSame('VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM', $result['blockers'][0]);
+    }
+
+    public function test_explicit_video_resume_reenters_original_child_without_new_video_payload(): void
+    {
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $videoId = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:resume:video', entityType: 'video');
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static fn (array $args): bool => ($args['entity_type'] ?? '') === 'video' && ($args['payload']['canonical_id'] ?? '') === $videoId))->willReturn($proposal);
+        $governance->method('submit')->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(['state' => 'draft', 'entity_type' => 'video', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'], ['state' => 'submitted', 'entity_type' => 'video', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->method('approve')->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+        $service = new GovernedCaptureContinuationService($governance, static fn (string $id): array => ['canonical_id' => $videoId, 'canonical_readback' => ['canonical_id' => $videoId]], $this->policies(['video'], ['video' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true);
+
+        $result = $service->execute('capture-resume', 'resume-video', [
+            'existing_capture_continuation' => true,
+            'continuation_delta_text' => 'Bổ sung lý do cần đọc lại Video.',
+            'subject_resolution' => ['resolved' => []], 'interpretation' => [], 'observations' => [],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]],
+        ], ['resume_children' => ['video']]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame($videoId, $result['writes'][0]['canonical_id']);
     }
 
     public function test_invalid_hydrated_video_subject_uses_governed_replacement_boundary(): void

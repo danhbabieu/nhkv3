@@ -80,7 +80,18 @@ final class GovernanceQueueRenderer
         $status = (string) ($item['status'] ?? 'blocked');
         $actionable = ($item['actionable'] ?? true) === true && in_array($status, ['draft', 'submitted', 'approved'], true);
         $bulkFields = '<input type="hidden" name="snapshots[' . esc_attr($id) . '][revision]" value="' . esc_attr((string) ($item['revision'] ?? 0)) . '"><input type="hidden" name="snapshots[' . esc_attr($id) . '][state]" value="' . esc_attr($status) . '"><input type="hidden" name="snapshots[' . esc_attr($id) . '][content_fingerprint]" value="' . esc_attr((string) ($item['content_fingerprint'] ?? '')) . '"><input type="hidden" name="snapshots[' . esc_attr($id) . '][dependency_fingerprint]" value="' . esc_attr((string) ($item['dependency_fingerprint'] ?? '')) . '">';
-        echo '<tr><td class="check-column">' . ($actionable ? '<input type="checkbox" name="selected_ids[]" value="' . esc_attr($id) . '" data-nhk-queue-item>' . $bulkFields : '') . '</td><td><code>' . esc_html($id) . '</code></td><td>' . esc_html((string) ($item['entity_type'] ?? '')) . '</td><td>' . esc_html((string) ($item['name'] ?? ($item['subject_id'] ?? 'Không khả dụng'))) . '<br><small>' . esc_html((string) ($item['subject_id'] ?? '')) . '</small></td><td>' . esc_html((string) ($item['summary'] ?? '')) . '</td><td>' . esc_html((string) ($item['status_label'] ?? $status)) . '</td><td>' . esc_html((string) ($item['provenance_summary'] ?? 'Chưa có')) . '</td><td>' . esc_html((string) ($item['created_at'] ?? '')) . '</td><td>' . esc_html((string) ($item['updated_at'] ?? '')) . '</td><td>';
+        $completion = is_array($item['completion'] ?? null) ? $item['completion'] : null;
+        echo '<tr><td class="check-column">' . ($actionable ? '<input type="checkbox" name="selected_ids[]" value="' . esc_attr($id) . '" data-nhk-queue-item>' . $bulkFields : '') . '</td><td><code>' . esc_html($id) . '</code></td><td>' . esc_html((string) ($item['entity_type'] ?? '')) . '</td><td>' . esc_html((string) ($item['name'] ?? ($item['subject_id'] ?? 'Không khả dụng'))) . '<br><small>' . esc_html((string) ($item['subject_id'] ?? '')) . '</small></td><td>' . esc_html((string) ($item['summary'] ?? '')) . '</td><td>' . esc_html((string) ($item['status_label'] ?? $status));
+        if ($status === 'applied' || $completion !== null) {
+            echo '<div class="nhk-governance-resource-completion"><small>Resource completion</small>';
+            if ($completion !== null) {
+                AdminReadBackPanel::renderCompletion($completion);
+            } else {
+                echo '<br><small>Canonical owner: Chưa đọc lại<br>Public projection: Chưa kiểm tra<br>Frontend: Chưa kiểm tra</small>';
+            }
+            echo '</div>';
+        }
+        echo '</td><td>' . esc_html((string) ($item['provenance_summary'] ?? 'Chưa có')) . '</td><td>' . esc_html((string) ($item['created_at'] ?? '')) . '</td><td>' . esc_html((string) ($item['updated_at'] ?? '')) . '</td><td>';
         echo '<a href="' . esc_url(admin_url('admin.php?page=nhk-v3-advanced&proposal=' . rawurlencode($id) . '#governance')) . '">Xem chi tiết</a>';
         if ($actionable) {
             foreach (self::actionsFor($status) as $action => $label) echo ' <button class="button-link" type="submit" form="' . esc_attr(self::rowFormId($id, $action)) . '">' . esc_html($label) . '</button>';

@@ -606,6 +606,7 @@ final class Plugin {
             $youtubeClient = static fn (object $identity): array => (new YouTubeDataApiClient(null, null, $youtubeConfiguration))->fetch($identity);
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
             $videoIntake = new VideoIntakeService(new YouTubeSourceAdapter($youtubeClient), $videos, new VideoHubClassifier(), new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies), new VideoEditorialGenerator(), new VideoCompletenessPolicy(), new VideoSeoProjection(), new VideoInternalSemanticResearcher($authority, $types), new VideoKnowledgeEnrichmentPlanner(new \NHK\Core\Application\Knowledge\KnowledgeEnrichmentPlanner($claims, $evidence, $sources)));
+            $videoFrontendReader = new MediaVideoPageQuery($media, $assets, $usages, $videos, new MigrationStatus(), null, null, null, $claims, $evidence, $sources);
             $videoPublicationVerifier = new CaptureVideoPublicationVerifier(
                 $videos,
                 $publicIdentityService,
@@ -622,6 +623,10 @@ final class Plugin {
                     } catch (\Throwable) {
                         throw new \RuntimeException('VIDEO_ABOUT_RELATION_READBACK_UNAVAILABLE');
                     }
+                },
+                static function (string $videoId, string $path) use ($videoFrontendReader): bool {
+                    if (!preg_match('#^/video/([^/]+)/$#', $path, $matches)) return false;
+                    return $videoFrontendReader->videoBySlug(rawurldecode((string) $matches[1])) !== null;
                 },
             );
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
@@ -815,7 +820,7 @@ final class Plugin {
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture)))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); })))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);

@@ -152,6 +152,25 @@ final class McpContractTest extends TestCase
         self::assertSame('DOCUMENTATION_CHECKPOINT_STALE', $response['body']['result']['structuredContent']['error']['code']);
     }
 
+    public function test_capture_writes_fail_closed_when_required_runtime_schema_is_stale(): void
+    {
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+            runtimeWriteReady: static fn (): bool => false,
+        );
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 8, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+            'idempotency_key' => 'stale-schema',
+            'text' => 'Không được ghi khi schema chưa sẵn sàng.',
+            'documentation_checkpoint' => ['manifest_hash' => str_repeat('a', 64), 'documentation_version' => str_repeat('b', 64)],
+        ]] ]);
+
+        self::assertSame(200, $response['status']);
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('REQUIRED_SCHEMA_NOT_READY', $response['body']['result']['content'][0]['text']);
+    }
+
     public function test_new_submission_has_one_canonical_entry_point_and_direct_writers_are_internal_only(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');

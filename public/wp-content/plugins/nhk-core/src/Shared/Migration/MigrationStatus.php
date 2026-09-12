@@ -6,6 +6,19 @@ final class MigrationStatus {
     public function status(): array {
         return ['current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 20)];
     }
+    /** Runtime writes fail closed when the ledger is current but a required table/column is missing. */
+    public function runtimeSchemaReady(): bool {
+        global $wpdb;
+        $state = $this->status();
+        if (!isset($wpdb) || !is_object($wpdb) || $state['current'] < $state['target']) return false;
+        foreach (['nhk_proposals', 'nhk_editorial_captures', 'nhk_editorial_capture_addenda'] as $table) {
+            if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->prefix . $table)) !== $wpdb->prefix . $table) return false;
+        }
+        return (int) $wpdb->get_var($wpdb->prepare(
+            'SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=%s AND column_name=%s',
+            $wpdb->prefix . 'nhk_proposals', 'subject_id',
+        )) === 1;
+    }
     public function graphStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $prefix=$wpdb->prefix; foreach (["nhk_graph_nodes","nhk_graph_predicates","nhk_graph_edges"] as $table) if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s",$prefix.$table)) !== $prefix.$table) return false; return true; }
     public function authorityStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; $name=$wpdb->prefix."nhk_entities"; return $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s",$name)) === $name; }
     public function governanceStorageReady(): bool { global $wpdb; if (!isset($wpdb) || !is_object($wpdb)) return false; foreach (['nhk_proposals','nhk_proposal_dependencies','nhk_proposal_approvals','nhk_apply_attempts','nhk_audit_events'] as $table) if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s',$wpdb->prefix.$table)) !== $wpdb->prefix.$table) return false; return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=%s AND column_name=%s',$wpdb->prefix.'nhk_proposals','subject_id')) === 1; }

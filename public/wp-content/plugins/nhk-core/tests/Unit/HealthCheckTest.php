@@ -26,4 +26,24 @@ final class HealthCheckTest extends TestCase {
         self::assertSame(['configured' => true, 'source' => 'environment'], $result['youtube_api']);
         self::assertTrue($result['layers']['hydration']['ok']);
     }
+
+    public function test_health_fails_closed_when_runtime_schema_is_not_ready(): void {
+        $migrations = new class {
+            public function status(): array { return ['current' => 20, 'target' => 20]; }
+            public function runtimeSchemaReady(): bool { return false; }
+            public function graphStorageReady(): bool { return true; }
+            public function authorityStorageReady(): bool { return true; }
+            public function governanceStorageReady(): bool { return false; }
+            public function mediaStorageReady(): bool { return true; }
+            public function videoStorageReady(): bool { return true; }
+            public function knowledgeStorageReady(): bool { return true; }
+        };
+
+        $health = new HealthCheck($migrations, static fn (): array => ['status' => 'EMPTY_VALID']);
+        $result = $health->read();
+
+        self::assertFalse($result['migration_schema_ready']);
+        self::assertTrue($result['migration_required']);
+        self::assertSame('DATABASE_UNREACHABLE', $result['layers']['storage']['reason_code']);
+    }
 }

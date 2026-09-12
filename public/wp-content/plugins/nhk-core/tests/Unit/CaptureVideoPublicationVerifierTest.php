@@ -84,6 +84,38 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
         self::assertContains('VIDEO_ABOUT_RELATION_READBACK_MISSING', $result['blockers']);
         self::assertNull($identityRepository->ownerId);
     }
+
+    public function test_exact_video_identity_and_actual_frontend_reader_are_independent_from_knowledge_text(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Video chính xác', [
+            'editorial' => ['title' => 'Video chính xác', 'summary' => 'Tóm tắt'],
+            'hub' => ['primary' => ['key' => '01']],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->willReturn($video);
+        $videos->expects(self::once())->method('findByExternalReference')->with('youtube', '4NmkQFrNeWQ')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $service = new CaptureVideoPublicationVerifier(
+            $videos,
+            new PublicIdentityService($identityRepository, static fn (string $slug): bool => false),
+            $identityRepository,
+            null,
+            null,
+            static fn (string $id, string $path): bool => $id === $videoId && $path === '/video/video-chinh-xac/',
+        );
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [[
+            'kind' => 'video', 'video_id' => $videoId, 'platform' => 'youtube', 'external_id' => '4NmkQFrNeWQ',
+            'video_proposal' => ['operation' => 'ingest'],
+        ]]]);
+
+        self::assertSame('verified', $result['status']);
+        self::assertSame('4NmkQFrNeWQ', $result['items'][0]['external_id']);
+        self::assertTrue($result['completion']['complete']);
+    }
 }
 
 final class InMemoryCaptureIdentityRepository implements PublicIdentityRepository

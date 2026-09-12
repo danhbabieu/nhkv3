@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Admin;
 
+use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Contracts\Governance\{GovernanceActionPort, VideoProposalReconciliationPort};
 use NHK\Core\Domain\Governance\{EligibilityResult, Proposal, ProposalState};
 use NHK\Core\Governance\Exception\{GovernancePermissionDenied, InvalidProposalTransition, ProposalBindingConflict, ProposalNotFound};
@@ -25,6 +26,7 @@ final class GovernanceQueueActionService
         private $can,
         private $actor,
         private ?VideoProposalReconciliationPort $videoReconciliation = null,
+        private ?CompletionCoordinator $completion = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -64,7 +66,14 @@ final class GovernanceQueueActionService
                     ]);
                 }
                 $result = $this->port->apply($id);
-                return ['ok' => true, 'outcome' => 'success', 'status' => 'APPLIED', 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'result' => $result];
+                $packet = is_array($result['completion'] ?? null) ? $result['completion'] : ($this->completion ?? new CompletionCoordinator())->finalize($proposal->entityType, (string) ($result['canonical_id'] ?? $result['result_entity_uuid'] ?? $proposal->targetUuid ?? $proposal->subjectId), [
+                    'proposal_state' => ProposalState::APPLIED->value,
+                    'canonical_readback' => $result['canonical_readback'] ?? null,
+                    'public_eligible' => $result['public_eligible'] ?? null,
+                    'frontend_verified' => $result['frontend_verified'] ?? null,
+                    'blockers' => (array) ($result['blockers'] ?? []),
+                ]);
+                return ['ok' => true, 'outcome' => 'success', 'status' => 'APPLIED', 'proposal_id' => $id, 'action' => $action, 'state' => ProposalState::APPLIED->value, 'reason' => null, 'completion' => $packet, 'result' => $result];
             }
 
             $result = match ($action) {

@@ -18,7 +18,8 @@ final class HealthCheck {
         global $wpdb;
         $migration = $this->migrations->status();
         $database = isset($wpdb) && is_object($wpdb) && !empty($wpdb->dbh);
-        $storage = ['ok' => $database && $migration['current'] >= $migration['target'], 'reason_code' => !$database ? 'DATABASE_UNREACHABLE' : ($migration['current'] < $migration['target'] ? 'MIGRATION_REQUIRED' : null)];
+        $schemaReady = !method_exists($this->migrations, 'runtimeSchemaReady') || (bool) $this->migrations->runtimeSchemaReady();
+        $storage = ['ok' => $database && $migration['current'] >= $migration['target'] && $schemaReady, 'reason_code' => !$database ? 'DATABASE_UNREACHABLE' : ($migration['current'] < $migration['target'] ? 'MIGRATION_REQUIRED' : (!$schemaReady ? 'MIGRATION_SCHEMA_NOT_READY' : null))];
         $runtime = $this->runtimeLayer();
         $hydration = $this->hydrationLayer();
         $application = ['ok' => $hydration['ok'], 'reason_code' => $hydration['ok'] ? null : $hydration['reason_code']];
@@ -27,7 +28,8 @@ final class HealthCheck {
             'plugin_version' => defined('NHK_CORE_VERSION') ? NHK_CORE_VERSION : 'unknown', 'api_version' => defined('NHK_CORE_API_VERSION') ? NHK_CORE_API_VERSION : 'unknown',
             'database_reachable' => $database,
             'migration_current' => $migration['current'], 'migration_target' => $migration['target'],
-            'migration_required' => $migration['current'] < $migration['target'],
+            'migration_required' => $migration['current'] < $migration['target'] || !$schemaReady,
+            'migration_schema_ready' => $schemaReady,
             'youtube_api' => ($this->youtubeApi ?? new YouTubeApiConfiguration())->diagnostic(),
             'graph_storage_ready' => $this->migrations->graphStorageReady(),
             'authority_storage_ready' => $this->migrations->authorityStorageReady(),
