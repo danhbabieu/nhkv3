@@ -52,6 +52,7 @@ final class WpdbCanonicalSnapshotSource implements CanonicalSnapshotSource
         private ?McpDocumentationRegistry $documentation = null,
         private ?MigrationStatus $migrations = null,
         private ?\Closure $migrationReader = null,
+        private ?array $graphPredicateKeys = null,
     ) {}
 
     public function environment(): SnapshotEnvironment { return $this->runtime; }
@@ -100,6 +101,7 @@ final class WpdbCanonicalSnapshotSource implements CanonicalSnapshotSource
                 'editorial_posts' => $this->readTable('posts', $posts),
                 'editorial_post_meta' => $this->readTable('postmeta', $posts, 'post_id'),
                 'post_taxonomy' => $this->readTaxonomy($posts),
+                'graph_predicates' => $this->readGraphPredicates(),
                 'graph_nodes' => $this->readGraphNodes(),
                 'graph_edges' => $this->readGraphEdges(),
                 'completion_state' => $this->completionState(),
@@ -169,6 +171,15 @@ final class WpdbCanonicalSnapshotSource implements CanonicalSnapshotSource
             $row['uuid'] = (string) ($row['endpoint_key'] ?? '');
             return $row;
         }, $this->readTable('nhk_graph_nodes'));
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function readGraphPredicates(): array
+    {
+        $rows = $this->readTable('nhk_graph_predicates');
+        if ($this->graphPredicateKeys === null) return $rows;
+        $allowed = array_fill_keys(array_map('strval', $this->graphPredicateKeys), true);
+        return array_values(array_filter($rows, static fn (array $row): bool => isset($allowed[(string) ($row['predicate_key'] ?? '')])));
     }
 
     /** @return list<array<string,mixed>> */
