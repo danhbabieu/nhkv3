@@ -1,16 +1,17 @@
-# Clock Type PR1–PR4.1 Gap Report và PR5–PR6 Plan
+# Clock Type PR1–PR5 Gap Report và PR6 Plan
 
 Date: 2026-09-12
-Scope: contract/read-only foundation only; no semantic mutation
-Mutation authority: none
+Scope: contract, read foundation và locally governed new-data write path; không
+live semantic mutation
+Mutation authority: existing Governance + Controlled Apply only
 
 ## Canonical checkpoint
 
 Giá trị được cập nhật sau khi canonical documentation snapshot được regenerate:
 
-- `documentation_version`: `4abd0cf104baa2040625bef12932d40744a46596ad8d8725f0f41e67d05a8e2e`.
-- `manifest_hash`: `e2b817f110d124f104a2fff6c1f18e89f7628710d596f1010bfbae54a4029225`.
-- `build_identity`: `64d7ac7b06499e9096d5062877da4a6d578ee9083c18e7be462bf93e4b735704`.
+- `documentation_version`: `b4b04a5946df851c23c539f9f003f9473040a919804ed25cac868877cf873893`.
+- `manifest_hash`: `f9775da4604f82619bb4b951a92100ac6d92025cd17444843ca95ca6f13de39c`.
+- `build_identity`: `e13bee7cc325fab8afae457c83ca87cfb49c82d94dbdc7644f32b09797420577`.
 - `runtime_version`: `0.1.0`. Đây là local package/runtime identity; không
   phải live/deploy evidence.
 
@@ -211,6 +212,83 @@ test in-memory. Không có database migration, entity/claim/source/evidence
 insert/update/delete, Graph apply/backfill, public slug allocation/reprojection,
 Article publish, Video, Media hoặc Knowledge rewrite. Không tạo entity `Odo vai
 bò`, Unknown Brand hay Brand↔Clock Type shortcut.
+
+## PR5 STATUS / GOVERNED_NEW_DATA_MEMBERSHIP
+
+- Membership planner: **IMPLEMENTED_IN_PR5**. Chỉ `RESOLVED_EXPLICIT` một
+  candidate duy nhất mới qualified; `RESOLVED_CANONICAL` là no-op khi exact
+  edge đã active. Ambiguous/review/unavailable/compatibility states fail closed.
+- Allowed sources: **model, variant, specimen, product**. Brand và Movement bị
+  từ chối; target phải active `classification` với canonical
+  `family=clock_type`.
+- Governance lifecycle: **IMPLEMENTED_LOCALLY** qua Proposal/Submit,
+  Approval, Eligibility và existing Controlled Apply. Không có direct Capture
+  → Graph writer hoặc hidden apply toggle.
+- Exact read-back: **IMPLEMENTED_LOCALLY**; sau Controlled Apply phải đọc đúng
+  active source–`classified_as`–target triple. Không có read-back thì không
+  report thành công.
+- Legacy `family=clock-type`: **COMPATIBILITY_READ_ONLY** và blocker cho new
+  membership; không rename/normalize.
+- Brandless source: **SUPPORTED_LOCALLY**; Brand resolution không phải
+  prerequisite.
+- Derived Brand↔Clock Type: **IMPLEMENTED_IN_PR5_LOCALLY** bằng registered
+  model/variant paths, bounded tối đa 3 edges, giữ path explanation và không
+  lưu shortcut edge/store. Product/Specimen reverse recipes ngoài fixture
+  hiện là implementation gap nếu chưa có registered path owner.
+- Video/Media/Knowledge: **UNCHANGED**; membership không rewrite subject,
+  `about`, `depicts`, MediaUsage hoặc claim/evidence.
+- Live staging inventory: owner-provided read-only evidence cho
+  `https://demo.1945.vn` (`staging`) là `classified_as active=0`; không dùng
+  làm count cho môi trường khác và không có live apply.
+
+## PR5 GAP CLASSIFICATION
+
+### ALREADY_SUPPORTED
+
+- Predicate `classified_as`, source scope policy, Graph mutation owner,
+  proposal approval/eligibility/Controlled Apply và existing revision binding
+  đã có trong runtime; PR5 reuses chúng.
+
+### IMPLEMENTED_IN_PR5
+
+- Typed membership candidate/planner, governed lifecycle adapter, exact
+  relation read-back và bounded derived Brand↔Clock Type recipe.
+
+### IMPLEMENTATION_GAP
+
+- Product/Specimen derived Brand↔Clock-Type paths chưa có fixture/recipe đầy
+  đủ ngoài các canonical paths được registered.
+- Live Capture-to-proposal operator wiring chưa bật; PR5 không tự động biến
+  mọi Capture thành mutation.
+
+### REGISTRY_GAP
+
+- Không có global profile-specific recipe registry cho bounded reverse recipe;
+  PR5 dùng class seam cục bộ, không thay đổi global `RelatedSemanticQuery` hop
+  bound.
+
+### DATA_GAP
+
+- Actual `classified_as` inventory ngoài staging không được suy đoán. Legacy
+  family normalization và legacy backfill dành cho PR6/PR7+.
+
+### PUBLIC_PROJECTION_GAP
+
+- Root Public Identity allocation/reprojection, `/odo/` hoặc `/vai-bo/`, vẫn
+  chưa được bật; derived read không cấp slug và không đổi route.
+
+### LIVE_VERIFICATION_GAP
+
+- Chưa có deployed PR5 build/runtime identity, live Capture diagnostic,
+  Proposal/Apply hoặc canonical live read-back. Staging mutation **NOT RUN**.
+
+## PR5 NO-MUTATION BOUNDARY
+
+PR5 local tests dùng in-memory Authority/Graph/Proposal fixtures. Không có
+Classification create/update, family normalization, backfill, Capture ingest,
+Public Identity allocation, Article publication, Video/Media/Knowledge write
+ngoài explicit local Controlled Apply test fixture; fixture không liên quan
+staging/live database.
 
 ## PR5–PR6 implementation seams
 

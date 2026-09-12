@@ -1,9 +1,10 @@
 # NHK V3 Entity Profile — Brand và Clock Type Contract
 
-> **ACTIVE contract — PR1 + PR2 + PR3 + PR4, 2026-09-12.** Contract này nằm dưới
+> **ACTIVE contract — PR1 + PR2 + PR3 + PR4 + PR5, 2026-09-13.** Contract này nằm dưới
 > `docs/constitution/NHK_V3_CONSTITUTION.md`. Nó khóa read/profile seams và
-> regression boundary; không cấp quyền tạo semantic data, ghi Graph, cấp slug,
-> migrate/backfill dữ liệu hoặc triển khai Clock Type write-path.
+> regression boundary; PR5 chỉ cho phép new-data membership qua Governance và
+> Controlled Apply ở local/test scope, không cấp quyền live mutation, backfill,
+> cấp slug hoặc legacy normalization.
 
 ## 1. Quyết định kiến trúc
 
@@ -354,3 +355,50 @@ Production wiring local đã được kiểm thử ở orchestration level. Chư
 deployment/read-back evidence; do đó PR4.1 không claim live readiness. Đây vẫn
 là shadow-only phase: shadow result không phải Graph truth, Evidence,
 Knowledge, Video attachment hay Authority create.
+
+## 14. PR5 governed new-data membership
+
+PR5 là write-path đầu tiên của Clock Type nhưng chỉ tạo typed candidate và
+proposal cho dữ liệu mới; shadow result không tự cấp quyền ghi. Lifecycle bắt
+buộc là:
+
+```text
+Capture → shadow → membership candidate → Proposal → Submit → Approval
+→ Eligibility → Controlled Apply → canonical Graph read-back
+```
+
+`classified_as` chỉ nhận `model`, `variant`, `specimen` hoặc `product` làm
+source và target phải là Authority `classification` đang active với
+`family=clock_type`. Brand, Movement, Media, Video, Knowledge và Article
+không được làm source. Brandless Specimen/Product vẫn hợp lệ; không tạo
+`Unknown Brand`.
+
+`ClockTypeMembershipCandidate` bind source/target UUID, source/target
+revision, scope, predicate, provenance, support status và Capture context.
+Planner kiểm tra exact active edge trước Proposal: edge đang active là
+`ALREADY_CANONICAL`, edge retired không tự resurrect. `clock-type` chỉ được
+đọc compatibility và là `DATA_COMPATIBILITY_GAP`, không phải target cho write
+mới. Candidate mơ hồ, review-only, unavailable hoặc thiếu evidence bị block;
+title/token/OCR/filename/visual similarity không tự đủ cho membership truth.
+
+Proposal relation payload được gửi qua Governance hiện hành. `ControlledApply`
+là writer duy nhất; eligibility ngay trước apply revalidate state, type,
+family, predicate, scope, revisions và duplicate. Apply thành công chỉ được
+coi là hoàn tất sau exact Graph read-back của cùng source–`classified_as`–target.
+Shadow result, candidate và Proposal không phải Knowledge Claim, Evidence,
+Video attachment, Media scope hoặc Authority identity.
+
+## 15. Derived Brand ↔ Clock-Type projection
+
+Brand↔Clock Type là read-only derived association từ các registered paths như
+`Model → model_of → Brand`, `Variant → variant_of → Model` và
+`Variant → classified_as → Classification`. PR5 recipe được bounded riêng
+theo path tối đa ba Graph edges, giữ `relationship_class=DERIVED`,
+`best_path` và `alternative_paths`; không tăng global hop bound, không tạo
+`BrandTypeQuery`, không persist `Brand → Clock Type`, `Clock Type → Brand`,
+`brand.types[]`, `type.brands[]` hoặc entity giao điểm. Nếu path/query owner
+không đủ dữ liệu, kết quả phải là gap/empty theo typed query contract, không
+fallback SQL/taxonomy/title matching.
+
+PR5 chỉ được kiểm thử locally. `https://demo.1945.vn` là `staging`; không có
+live Proposal/Approval/Controlled Apply/Graph mutation trong checkpoint này.
