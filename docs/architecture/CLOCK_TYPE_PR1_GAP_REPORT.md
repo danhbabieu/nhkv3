@@ -1,17 +1,18 @@
 # Clock Type PR1 Gap Report và PR2–PR6 Plan
 
-Date: 2026-09-12  
-Scope: contract/read-only regression only  
+Date: 2026-09-12
+Scope: contract/read-only regression only
 Mutation authority: none
 
 ## Canonical checkpoint
 
 Giá trị được cập nhật sau khi canonical documentation snapshot được regenerate:
 
-- `documentation_version`: ghi sau lần generate snapshot cuối cùng.
-- `manifest_hash`: ghi sau lần generate snapshot cuối cùng.
-- `build/runtime identity`: PR1 chỉ ghi nhận local package/runtime identity;
-  không phải live/deploy evidence.
+- `documentation_version`: `ed8012a761f267c925a7c5b2142335e6ae281f740c1e85aa2cc278afd7498f12`.
+- `manifest_hash`: `d782c90bb45e8dcbe7fee4abab9e963b85904834e6fb5bb4a3c5114b19cb6c31`.
+- `build_identity`: `714134b37edf08be023f221b2084269bc473d1d9e395e1f6bd6c793dda0c2cf3`.
+- `runtime_version`: `0.1.0`. Đây là local package/runtime identity; không
+  phải live/deploy evidence.
 
 ## ALREADY_SUPPORTED
 

@@ -4,11 +4,11 @@
 
 `READY_FOR_FIRST_RECOVERY_WAVE: NO`.
 
-The repository has a safe local WordPress bootstrap and guarded integration
-database, but it does not currently contain a provisioned, data-bearing,
-non-staging canonical runtime or a live snapshot source/writer adapter. The
-governed V3 semantic snapshot export/import boundary is now implemented in
-code and documented in `V3_SNAPSHOT_RECOVERY_RUNTIME.md`.
+The repository now has a real isolated local WordPress/NHK Core runtime on
+`nhk_v3_video_recovery`, with migration marker `20/20`, but it is an empty
+bootstrap rather than a data-bearing restore. The governed V3 semantic
+snapshot export/import boundary is implemented in code and documented in
+`V3_SNAPSHOT_RECOVERY_RUNTIME.md`.
 The Demo target remains read-only. No staging mutation, export, import,
 deployment or push was performed in this phase.
 
@@ -23,11 +23,11 @@ isolated database and the golden identity checks pass.
 | WordPress runtime | root `wp-config.php` + `config/application.php` | Environment-driven DB/site configuration; secrets are external to Git |
 | Development DB | `nhk_v3` | Schema/runtime smoke target; not a backlog substitute and not a recovery write target |
 | Integration isolation | `NHK_WP_TEST_DB=nhk_v3_test` + `TestDatabaseGuard` | Exact destructive-test guard exists; current DB is not a restored Video dataset |
-| Schema safety | `MigrationDatabaseGuard` + `nhk-core-maintenance.php --operation=migration-up` | UP-only runtime guard exists; no DOWN/drop/reset permitted |
+| Schema safety | `MigrationDatabaseGuard` + `nhk-core-maintenance.php --operation=migration-up` | UP-only recovery allow-list is live for `nhk_v3_video_recovery`; no DOWN/drop/reset permitted |
 | Remote maintenance | `RemoteRuntimeAdapter` | Allowlisted maintenance operations include `backup/snapshot`, `read-back` and `controlled-apply`, but current adapter is Demo-target-specific and connector exposure is read-only |
 | Deployment | `RemoteDeploymentAdapter` / `nhk-deploy-verify` | Hardcoded `demo.1945.vn` allowlist; not an isolated recovery deployment path |
 | V2 restore | `tools/v2-restore-normalize.php` | V2-only migration evidence; forbidden as a Video backlog snapshot mechanism |
-| Semantic V3 snapshot import | `Application/Snapshot` export/import services and typed source/writer ports | `CODE_IMPLEMENTED`; a data-bearing runtime adapter is still required; no direct SQL or generic writer may fill that gap |
+| Semantic V3 snapshot import | `Application/Snapshot` export/import services and typed source/writer ports | `CODE_IMPLEMENTED`; local writer/source filters are not registered, so no direct SQL or generic writer may fill that gap |
 
 ## Required isolated configuration
 
@@ -49,9 +49,27 @@ not written to an environment file:
 
 The recovery import guard now rejects `staging`, `production`, `test`,
 `demo.1945.vn`, the Demo database identity and missing snapshot proof. A
-dedicated runtime still has to register the proposed name/database and bind a
-canonical source/writer adapter before any runtime write. This does not broaden
+dedicated runtime still has to bind a canonical source/writer adapter before
+any snapshot write. The migration guard has an explicit recovery-only branch
+for the exact allow-listed DB and rejects the same recovery runtime when it is
+pointed at `nhk_v3`, staging, production or another DB. This does not broaden
 the existing Demo staging allowance.
+
+## Provisioning evidence — 2026-09-12
+
+| Check | Result |
+|---|---|
+| Database | `nhk_v3_video_recovery` exists on the local MySQL instance; no tables existed before bootstrap |
+| WordPress | Core installed on isolated local site `http://127.0.0.1:8090` |
+| NHK Core | Plugin active; recovery runtime markers read back as `v3-video-recovery-1309` / `recovery` |
+| Migrations | `nhk_core_migration_current=20`, `nhk_core_migration_target=20` |
+| Frontend boot | Root route HTTP 200; golden route HTTP 404 as expected for the empty runtime |
+| MCP discovery | Local `/wp-json/nhk/v1/mcp` tools/list HTTP 200; authenticated tool-call connector not registered |
+| Staging | No staging write, deployment or semantic mutation performed |
+
+The local bootstrap is infrastructure provisioning evidence only. It is not a
+backlog snapshot and must not be used as a substitute for the actual Demo
+dataset.
 
 ## Snapshot/restore plan
 
@@ -84,9 +102,13 @@ The restore sequence is:
 7. Read back counts and dependency closure, then run the golden acceptance
    below before granting the recovery write capability.
 
-No approved governed V3 snapshot artifact or live source/writer adapter is
-present in this workspace. The plan is therefore not an executed restore and
-cannot be used to claim that the local runtime contains the historical backlog.
+The implemented maintenance export was invoked read-only and returned
+`SNAPSHOT_SOURCE_ADAPTER_UNAVAILABLE`; no artifact was generated. The actual
+Demo source adapter is not registered in the deployed source runtime, and this
+workspace has no approved read-only source deployment configuration or
+authenticated export connector. The plan is therefore not an executed restore
+and cannot be used to claim that the local runtime contains the historical
+backlog.
 
 ## Golden acceptance gate
 
@@ -105,7 +127,10 @@ following unchanged:
 | Warning | `TRANSCRIPT_UNAVAILABLE` only; it is not a blocker under the current contract |
 
 Any mismatch is `GOLDEN_IDENTITY_MISMATCH` and stops the workflow. The local
-empty databases cannot pass this gate, so no first-wave Apply was attempted.
+local runtime currently returns HTTP 200 for its root and MCP discovery
+surface, but the golden Video route returns 404 because the source snapshot has
+not been imported. It therefore cannot pass this gate, and no first-wave Apply
+was attempted.
 
 ## Content enrichment architecture
 
@@ -155,7 +180,7 @@ may proceed.
 
 | Requirement | Status |
 |---|---|
-| Isolated runtime plan/config proven | `NO` — no provisioned data-bearing runtime or live source/writer adapter |
+| Isolated runtime plan/config proven | `PARTIAL` — real empty local runtime is booted at `20/20`; no data-bearing restore |
 | Golden #372 in isolated runtime | `NOT RUN` — local targets do not contain the source dataset |
 | Enrichment implementation | `PASS` — immutable context, bounded service and quality policy added |
 | Enrichment regression tests | `PASS` — focused suite 54 tests / 208 assertions |
@@ -166,7 +191,8 @@ may proceed.
 
 ## Next external prerequisite
 
-Provide or provision the isolated non-staging canonical runtime and a governed
-V3 snapshot/export-import boundary with credentials outside Git. Then run the
-golden gate and migration/readiness preflight. Only a PASS on that gate permits
-the first five-item recovery wave.
+Provide the source-side read-only adapter deployment path/credentials for
+`demo.1945.vn` (or an approved generated `v3-semantic-snapshot/1` artifact) and
+register a recovery writer plus the dedicated `@V3-Recovery` connector against
+the isolated recovery site. Then run the golden gate and migration/readiness
+preflight. Only a PASS on that gate permits the first five-item recovery wave.

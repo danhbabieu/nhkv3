@@ -2,6 +2,34 @@
 
 Updated: 2026-09-12
 
+## Fresh files[] status — current HEAD/origin
+
+CURRENT_HEAD: `0634c14454fb602979c8dfc2acf7f050e0e8daf7`
+
+ORIGIN_MAIN: `0634c14454fb602979c8dfc2acf7f050e0e8daf7`
+
+FILES_FIX_PRESENT_IN_HEAD: `YES`
+
+FILES_FIX_PRESENT_ON_ORIGIN: `YES`
+
+FOCUSED_TESTS: `PASS — 96 tests / 716 assertions`
+
+DEPLOYED_COMMIT: `NOT_DEPLOYED`
+
+DEPLOY_RESULT: `BLOCKED — REMOTE_DEPLOYMENT_PREREQUISITES_UNAVAILABLE: NHK_DEMO_DEPLOY_CONFIG is unset and the canonical wrapper requires a clean checkout; unrelated local changes are preserved.`
+
+DOCUMENTATION_VERSION: `NOT_VERIFIED`
+
+MANIFEST_HASH: `NOT_VERIFIED`
+
+CAPTURE_FILES_SCHEMA: `CODE PRESENT ON CURRENT HEAD/ORIGIN; LIVE tools/list NOT VERIFIED`
+
+LIVE_ACCEPTANCE_READY: `NO`
+
+ONE_BLOCKER: `REMOTE_DEPLOYMENT_PREREQUISITES_UNAVAILABLE`
+
+NEXT_ACTION_FOR_CHATGPT: `Load the approved NHK_DEMO_DEPLOY_CONFIG and provide a clean checkout, then run the canonical deployment wrapper for CURRENT_HEAD; after deployment run live one-file acceptance.`
+
 ## Commit checkpoint — files[] fix
 
 COMMIT_SHA: `a66c7eae918c6eccad61121fa95e36348f53fe6b`
@@ -26,7 +54,7 @@ CAPTURE_FILES_SCHEMA: `NOT_VERIFIED — no target tools/list was called`
 
 LIVE_ACCEPTANCE_READY: `NO`
 
-NEXT_ACTION_FOR_CHATGPT: `deploy this commit to demo.1945.vn, fresh bootstrap/discovery, then test one real chat attachment and a multi-file submission`
+NEXT_ACTION_FOR_CHATGPT: `Load the approved NHK_DEMO_DEPLOY_CONFIG and provide a clean checkout, then run the canonical deployment wrapper for CURRENT_HEAD; after deployment run live one-file acceptance.`
 
 This commit contains only the seven files listed in the files[] checkpoint.
 Video and other concurrent changes are not in the commit.

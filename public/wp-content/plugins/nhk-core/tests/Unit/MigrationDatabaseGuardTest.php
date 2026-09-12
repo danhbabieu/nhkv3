@@ -39,4 +39,32 @@ final class MigrationDatabaseGuardTest extends TestCase
     {
         self::assertFalse(MigrationDatabaseGuard::isUpAllowed('erourxcg_nhkv3', 'erourxcg_nhkv3', 'demo', 'production'));
     }
+
+    public function test_explicit_recovery_database_is_allowed_only_in_non_staging_runtime(): void
+    {
+        self::assertTrue(MigrationDatabaseGuard::isUpAllowed(
+            'nhk_v3_video_recovery',
+            'nhk_v3_video_recovery',
+            'recovery',
+            'development'
+        ));
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed(
+            'nhk_v3_video_recovery',
+            'nhk_v3_video_recovery',
+            'recovery',
+            'staging'
+        ));
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed(
+            'other_db',
+            'nhk_v3_video_recovery',
+            'recovery',
+            'development'
+        ));
+        self::assertFalse(MigrationDatabaseGuard::isUpAllowed(
+            'nhk_v3',
+            'nhk_v3_video_recovery',
+            'recovery',
+            'development'
+        ));
+    }
 }

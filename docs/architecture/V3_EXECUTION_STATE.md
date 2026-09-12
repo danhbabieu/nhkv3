@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Easy MCP files[] current-head verification
+
+CURRENT HEAD and `origin/main` are both
+`0634c14454fb602979c8dfc2acf7f050e0e8daf7`. The target fix commit is not an
+ancestor, but the current code content retains the files[] fix: direct and
+proxy paths normalize native descriptors before Ability validation, the native
+file bag remains out-of-band, JSON arguments strip files, malformed/bare input
+fails closed with the typed native-multipart diagnostic, and order/cardinality
+regressions remain covered by the focused tests.
+
+VERIFICATION: Focused files[]/Capture/Media selection passes 96 tests / 716
+assertions; PHP lint and `git diff --check` pass. The four fix files have no
+content diff from the target fix commit. `HEAD == origin/main`, so the fix is
+present on origin. No Capture, upload or live mutation was performed.
+
+DEPLOYMENT: `LIVE_ACCEPTANCE_READY=NO`. The canonical wrapper was not run because
+`NHK_DEMO_DEPLOY_CONFIG` is unset and the worktree contains unrelated changes
+that must remain preserved; live tools/list/documentation identity remain
+unverified.
+
 # Checkpoint — 2026-09-12 — PR1 Brand/Clock-Type contract lock
 
 WHAT: Added the ACTIVE `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md`, its
@@ -10,10 +30,10 @@ independent optional profile, preserves the existing `classified_as` matrix,
 and forbids shortcut Brand↔Clock-Type edges, `Odo vai bò`, Unknown Brand,
 write-path, backfill and URL reprojection.
 
-REGRESSION: New PR1 golden suite passes 16 tests / 99 assertions after the
+REGRESSION: New PR1 golden suite passes 15 tests / 96 assertions after the
 Brand-only empty-result case was added. Relevant existing Authority/Graph/
 Dossier/Video/Public Identity/SEO suites pass 104 tests / 493 assertions.
-Full NHK Unit passes 1,236 tests / 6,022 assertions; NHK Contract passes 4
+Full NHK Unit passes 1,237 tests / 6,025 assertions; NHK Contract passes 4
 tests / 31 assertions. PHPUnit reports existing warnings/deprecations only.
 
 DOCUMENTATION CHECKPOINT: local runtime `0.1.0`; final documentation_version,
@@ -8293,3 +8313,36 @@ The worktree is intentionally uncommitted and ready for review/commit.
 
 STATUS: P0 REPAIR_APPLIED_PROPOSAL_FORBIDDEN FALSE-POSITIVE FIX / REGRESSION
 VERIFIED; READY_FOR_COMMIT.
+
+# Checkpoint — 2026-09-12 — Isolated Video recovery runtime live bootstrap
+
+PROVISIONING: A dedicated local MySQL database `nhk_v3_video_recovery` was
+created without touching `nhk_v3`, `nhk_v3_test` or Demo staging. WordPress
+was installed on an isolated local site `http://127.0.0.1:8090`; NHK Core was
+activated through the recovery-only migration allow-list with runtime markers
+`v3-video-recovery-1309` / `recovery`. Read-back reports
+`nhk_core_migration_current=20` and `nhk_core_migration_target=20`.
+
+GUARD: `MigrationDatabaseGuard` now requires the exact authorized recovery DB
+when `NHK_MIGRATION_RUNTIME=recovery`, and rejects staging, production, test,
+the development DB and any other database in that mode. Existing Demo staging
+authorization remains unchanged. Focused guard and snapshot contract tests
+pass 20 tests / 37 assertions; Composer lint, PHP lint and diff check pass.
+
+SNAPSHOT: The implemented export boundary was exercised read-only and returned
+`SNAPSHOT_SOURCE_ADAPTER_UNAVAILABLE`. No live Demo snapshot manifest or
+artifact exists. The checkout has no registered source adapter for the actual
+Demo canonical repositories, no approved source-side deployment configuration
+or authenticated export connector, and no registered recovery writer.
+
+RUNTIME READ-BACK: Local root route and MCP tools/list boot successfully; the
+golden #372 route returns 404 because this is intentionally an empty bootstrap,
+not a backlog substitute. No import, semantic mutation, Video recovery,
+Article publication, deployment, push or staging write was performed.
+
+STATUS: REAL EMPTY RECOVERY BOOTSTRAP / SNAPSHOT SOURCE AND CONNECTOR
+BLOCKED; READY_FOR_FIRST_RECOVERY_WAVE: NO. Exact next prerequisite is a
+read-only source adapter deployment/credential path (or approved snapshot
+artifact), a governed recovery writer binding, and registration of
+`@V3-Recovery` to the isolated runtime. The golden #372 gate must pass after
+restore before any backlog wave.

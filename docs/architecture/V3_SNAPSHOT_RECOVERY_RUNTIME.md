@@ -1,6 +1,6 @@
 # V3 Snapshot Recovery Runtime
 
-Status: `CODE_IMPLEMENTED / RUNTIME_NOT_PROVISIONED / READY_FOR_FIRST_RECOVERY_WAVE: NO`
+Status: `CODE_IMPLEMENTED / LOCAL_RUNTIME_PROVISIONED / SNAPSHOT_NOT_IMPORTED / READY_FOR_FIRST_RECOVERY_WAVE: NO`
 
 This document defines the isolated restore boundary for the historical Video
 backlog. `https://demo.1945.vn` is a staging source and remains read-only. It
@@ -109,9 +109,14 @@ The intended isolated deployment is:
 | Migrations | normal UP migrations only, current repository level 20 |
 
 Provisioning requires infrastructure credentials outside Git and a running
-WordPress/MySQL service. The local MySQL endpoint is currently unreachable,
-and no approved snapshot artifact or connector has been provided. Consequently
-the runtime is specified but not claimed provisioned.
+WordPress/MySQL service. The local MySQL endpoint is available and the
+dedicated database `nhk_v3_video_recovery` has been provisioned. WordPress and
+NHK Core boot on an isolated local site at `http://127.0.0.1:8090`; NHK Core is
+active and the guarded UP migration marker is `20/20`. This is a real empty
+bootstrap only: no historical data was copied into it. No approved snapshot
+artifact, live source adapter, recovery writer adapter or registered
+`@V3-Recovery` connector has been provided, so this local runtime cannot pass
+the golden gate yet.
 
 Raw DB backup/restore may be used by infrastructure solely to provision the
 isolated database, subject to its own backup controls. It does not replace the

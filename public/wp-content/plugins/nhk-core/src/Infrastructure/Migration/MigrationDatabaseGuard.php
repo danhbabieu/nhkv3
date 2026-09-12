@@ -12,6 +12,21 @@ final class MigrationDatabaseGuard
         ?string $environment
     ): bool {
         if ($environment === 'production') return false;
+
+        // Recovery is an explicitly isolated, non-staging migration lane. It
+        // is allow-listed by database identity and cannot be enabled merely by
+        // naming a runtime "recovery" on staging or production.
+        if ($runtime === 'recovery') {
+            if (in_array($environment, ['staging', 'production', 'test'], true)
+                || $authorizedDatabase === null
+                || $authorizedDatabase === ''
+            ) {
+                return false;
+            }
+
+            return hash_equals($authorizedDatabase, $database);
+        }
+
         if (in_array($database, ['nhk_v3', 'nhk_v3_test'], true)) return true;
 
         return $environment === 'staging'
