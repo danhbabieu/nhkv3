@@ -5,7 +5,8 @@ namespace NHK\Core\Application\Snapshot;
 
 final class SnapshotIntegrityVerifier
 {
-    public static function assertValid(CanonicalSnapshot $snapshot): void
+    /** @return list<array<string,mixed>> */
+    public static function assertValid(CanonicalSnapshot $snapshot): array
     {
         $manifest = $snapshot->manifest;
         $hashInput = $manifest;
@@ -19,7 +20,9 @@ final class SnapshotIntegrityVerifier
             if (!hash_equals((string) ($manifest['content_hashes'][$name] ?? ''), SnapshotCanonicalizer::hashRecords($rows))) throw new \RuntimeException('SNAPSHOT_CONTENT_HASH_MISMATCH:' . $name);
             self::assertUniqueIdentities($name, $rows);
         }
-        self::assertReferences($snapshot->collections);
+        $historicalConflicts = SnapshotHistoricalConflictPolicy::validate($snapshot->collections, $manifest['historical_conflicts'] ?? []);
+        self::assertReferences($snapshot->collections, $historicalConflicts);
+        return $historicalConflicts;
     }
 
     /** @param list<array<string,mixed>> $rows */
@@ -35,7 +38,8 @@ final class SnapshotIntegrityVerifier
     }
 
     /** @param array<string,list<array<string,mixed>>> $collections */
-    private static function assertReferences(array $collections): void
+    /** @param list<array<string,mixed>> $historicalConflicts */
+    private static function assertReferences(array $collections, array $historicalConflicts): void
     {
         $index = [];
         foreach ($collections as $collection => $rows) foreach ($rows as $row) {
@@ -52,8 +56,15 @@ final class SnapshotIntegrityVerifier
             'graph_edges' => ['source_id', 'source_uuid', 'target_id', 'target_uuid'],
             'public_identities' => ['owner_id', 'owner_uuid'],
         ];
+        $accepted = [];
+        foreach ($historicalConflicts as $conflict) $accepted[(string) $conflict['proposal_id'] . '|target_uuid|' . (string) $conflict['missing_uuid']] = true;
         foreach ($rules as $collection => $keys) foreach ($collections[$collection] as $row) foreach ($keys as $key) {
             if (isset($row[$key]) && (string) $row[$key] !== '' && !isset($index[(string) $row[$key]])) {
+                if ($collection === 'proposals' && $key === 'target_uuid') {
+                    $proposalId = (string) ($row['uuid'] ?? $row['proposal_uuid'] ?? $row['canonical_id'] ?? $row['id'] ?? '');
+                    $conflictKey = $proposalId . '|target_uuid|' . (string) $row[$key];
+                    if (isset($accepted[$conflictKey])) continue;
+                }
                 throw new \RuntimeException('SNAPSHOT_REFERENCE_MISSING:' . $collection . ':' . $key . ':' . $row[$key]);
             }
         }

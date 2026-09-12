@@ -139,6 +139,99 @@ final class SnapshotRecoveryContractTest extends TestCase
         self::assertSame('/video/so-372-odo-36-8-con-nguyen-ban-am-thanh-hay/', $writer->collections['public_identities'][0]['path']);
     }
 
+    public function test_historical_missing_submitted_proposal_is_preserved_and_non_executable(): void
+    {
+        $collections = $this->historicalConflictCollections();
+        $snapshot = $this->export($collections);
+        self::assertCount(1, $snapshot->manifest['historical_conflicts']);
+        self::assertSame('HISTORICAL_REFERENCE_MISSING', $snapshot->manifest['historical_conflicts'][0]['conflict_type']);
+        $writer = new SnapshotTestWriter($this->target());
+        $receipt = (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($snapshot, $writer, true);
+        self::assertCount(1, $receipt['accepted_historical_conflicts']);
+        self::assertSame(
+            \NHK\Core\Application\Snapshot\SnapshotCanonicalizer::records([$collections['proposals'][0]]),
+            \NHK\Core\Application\Snapshot\SnapshotCanonicalizer::records([$writer->collections['proposals'][0]]),
+        );
+        self::assertSame('2', $writer->collections['proposals'][0]['state']);
+        self::assertSame(0, count($writer->collections['proposal_approvals']));
+        self::assertSame(0, count($writer->collections['apply_attempts']));
+    }
+
+    public function test_missing_target_without_historical_conflict_metadata_is_rejected(): void
+    {
+        $snapshot = $this->export($this->historicalConflictCollections());
+        $tampered = $this->withManifest($snapshot, ['historical_conflicts' => []]);
+        $this->expectExceptionMessage('SNAPSHOT_HISTORICAL_CONFLICT_SET_MISMATCH');
+        (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($tampered, new SnapshotTestWriter($this->target()), true);
+    }
+
+    public function test_applied_missing_target_is_rejected_even_with_no_conflict_metadata(): void
+    {
+        $collections = $this->historicalConflictCollections();
+        $collections['proposals'][0]['state'] = '7';
+        $snapshot = $this->export($collections);
+        self::assertSame([], $snapshot->manifest['historical_conflicts']);
+        $this->expectExceptionMessage('SNAPSHOT_REFERENCE_MISSING:proposals:target_uuid');
+        (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($snapshot, new SnapshotTestWriter($this->target()), true);
+    }
+
+    public function test_approval_or_apply_attempt_prevents_historical_exception(): void
+    {
+        foreach (['proposal_approvals', 'apply_attempts'] as $collection) {
+            $collections = $this->historicalConflictCollections();
+            $collections[$collection] = [['uuid' => $collection . '-1', 'proposal_id' => $collections['proposals'][0]['uuid']]];
+            $snapshot = $this->export($collections);
+            self::assertSame([], $snapshot->manifest['historical_conflicts']);
+            try {
+                (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($snapshot, new SnapshotTestWriter($this->target()), true);
+                self::fail('Expected historical conflict with ' . $collection . ' to be rejected.');
+            } catch (\RuntimeException $error) {
+                self::assertStringStartsWith('SNAPSHOT_REFERENCE_MISSING:proposals:target_uuid', $error->getMessage());
+            }
+        }
+    }
+
+    public function test_conflict_missing_uuid_must_match_proposal_target(): void
+    {
+        $snapshot = $this->export($this->historicalConflictCollections());
+        $conflict = $snapshot->manifest['historical_conflicts'][0];
+        $conflict['missing_uuid'] = '01a07ea9-e914-7dff-8c34-19cb27064988';
+        $tampered = $this->withManifest($snapshot, ['historical_conflicts' => [$conflict]]);
+        $this->expectExceptionMessage('SNAPSHOT_HISTORICAL_CONFLICT_UNDECLARED');
+        (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($tampered, new SnapshotTestWriter($this->target()), true);
+    }
+
+    public function test_conflict_expected_type_must_match_proposal_payload(): void
+    {
+        $collections = $this->historicalConflictCollections();
+        $collections['proposals'][0]['command_json']['target_type'] = 'variant';
+        $snapshot = $this->export($collections);
+        self::assertSame([], $snapshot->manifest['historical_conflicts']);
+        $this->expectExceptionMessage('SNAPSHOT_REFERENCE_MISSING:proposals:target_uuid');
+        (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($snapshot, new SnapshotTestWriter($this->target()), true);
+    }
+
+    public function test_conflict_cannot_downgrade_dangling_evidence_graph_or_identity(): void
+    {
+        $collections = $this->historicalConflictCollections();
+        $collections['evidence'] = [['uuid' => 'evidence-missing', 'source_id' => 'missing-source', 'claim_id' => 'claim-1']];
+        $snapshot = $this->export($collections);
+        $this->expectExceptionMessage('SNAPSHOT_REFERENCE_MISSING:evidence:source_id');
+        (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($snapshot, new SnapshotTestWriter($this->target()), true);
+    }
+
+    public function test_proposal_audit_and_fingerprints_survive_historical_round_trip(): void
+    {
+        $collections = $this->historicalConflictCollections();
+        $collections['proposals'][0]['fingerprint'] = str_repeat('a', 64);
+        $collections['proposal_audit_history'] = [['uuid' => 'event-missing', 'proposal_id' => $collections['proposals'][0]['uuid'], 'event_type' => 'ProposalSubmitted', 'created_at' => '2026-09-10 17:27:04']];
+        $snapshot = $this->export($collections);
+        $writer = new SnapshotTestWriter($this->target());
+        (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard(['nhk_v3_recovery'])))->import($snapshot, $writer, true);
+        self::assertSame(str_repeat('a', 64), $writer->collections['proposals'][0]['fingerprint']);
+        self::assertSame('2026-09-10 17:27:04', $writer->collections['proposal_audit_history'][0]['created_at']);
+    }
+
     private function export(array $collections): \NHK\Core\Application\Snapshot\CanonicalSnapshot
     {
         $source = new class($collections) implements CanonicalSnapshotSource {
@@ -159,6 +252,35 @@ final class SnapshotRecoveryContractTest extends TestCase
     private function target(): SnapshotEnvironment
     {
         return new SnapshotEnvironment('v3-video-recovery-1309', 'https://video-recovery.local', 'nhk_v3_recovery', 'recovery');
+    }
+
+    /** @return array<string,list<array<string,mixed>>> */
+    private function historicalConflictCollections(): array
+    {
+        $collections = $this->goldenCollections();
+        $collections['proposals'] = [[
+            'uuid' => '01a07ea9-e914-7d6b-8c34-19cb26496b79',
+            'state' => '2',
+            'revision' => 2,
+            'target_uuid' => '01a07ea9-e914-7dff-8c34-19cb27064987',
+            'command_json' => [
+                'source_type' => 'knowledge',
+                'source_uuid' => 'knowledge-source',
+                'target_type' => 'model',
+                'target_uuid' => '01a07ea9-e914-7dff-8c34-19cb27064987',
+                'predicate' => 'about',
+            ],
+        ]];
+        return $collections;
+    }
+
+    private function withManifest(CanonicalSnapshot $snapshot, array $changes): CanonicalSnapshot
+    {
+        $manifest = array_replace($snapshot->manifest, $changes, ['manifest_hash' => '']);
+        $hashInput = $manifest;
+        unset($hashInput['manifest_hash'], $hashInput['exported_at']);
+        $manifest['manifest_hash'] = hash('sha256', \NHK\Core\Application\Snapshot\SnapshotCanonicalizer::encode($hashInput));
+        return new CanonicalSnapshot($manifest, $snapshot->collections);
     }
 
     /** @return array<string,list<array<string,mixed>>> */

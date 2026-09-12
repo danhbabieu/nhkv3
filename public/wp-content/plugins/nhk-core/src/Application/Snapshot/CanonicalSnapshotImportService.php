@@ -9,10 +9,10 @@ final class CanonicalSnapshotImportService
 {
     public function __construct(private readonly RecoveryRuntimeGuard $guard) {}
 
-    /** @return array{status:string,manifest_hash:string,collections_imported:int} */
+    /** @return array{status:string,manifest_hash:string,collections_imported:int,accepted_historical_conflicts:list<array<string,mixed>>} */
     public function import(CanonicalSnapshot $snapshot, CanonicalSnapshotWriter $writer, bool $explicitRecoveryMode): array
     {
-        SnapshotIntegrityVerifier::assertValid($snapshot);
+        $historicalConflicts = SnapshotIntegrityVerifier::assertValid($snapshot);
         $source = new SnapshotEnvironment(
             (string) $snapshot->manifest['source_environment'], (string) $snapshot->manifest['source_site'],
             (string) $snapshot->manifest['source_database_identity'], (string) ($snapshot->manifest['runtime_mode'] ?? 'unknown'),
@@ -24,7 +24,7 @@ final class CanonicalSnapshotImportService
         if ($existing !== null) {
             if (hash_equals($existing, $manifestHash)) {
                 self::assertReadBack($snapshot, $writer, $manifestHash);
-                return ['status' => 'already_imported', 'manifest_hash' => $manifestHash, 'collections_imported' => 0];
+                return ['status' => 'already_imported', 'manifest_hash' => $manifestHash, 'collections_imported' => 0, 'accepted_historical_conflicts' => $historicalConflicts];
             }
             throw new \RuntimeException('SNAPSHOT_TARGET_ALREADY_RESTORED');
         }
@@ -42,7 +42,7 @@ final class CanonicalSnapshotImportService
             throw $error;
         }
         self::assertReadBack($snapshot, $writer, $manifestHash);
-        return ['status' => 'imported', 'manifest_hash' => $manifestHash, 'collections_imported' => $count];
+        return ['status' => 'imported', 'manifest_hash' => $manifestHash, 'collections_imported' => $count, 'accepted_historical_conflicts' => $historicalConflicts];
     }
 
     private static function assertReadBack(CanonicalSnapshot $snapshot, CanonicalSnapshotWriter $writer, string $manifestHash): void

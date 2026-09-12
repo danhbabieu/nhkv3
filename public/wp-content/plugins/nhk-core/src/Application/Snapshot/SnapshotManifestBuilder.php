@@ -14,6 +14,7 @@ final class SnapshotManifestBuilder
         array $repositoryInventory,
         array $collections,
         string $exportedAt,
+        array $historicalConflicts = [],
     ): array {
         $inventory = [];
         foreach (SnapshotCollectionRegistry::COLLECTIONS as $name) {
@@ -34,6 +35,7 @@ final class SnapshotManifestBuilder
             'object_counts' => array_map(static fn (array $item): int => $item['count'], $inventory),
             'content_hashes' => array_map(static fn (array $item): string => $item['sha256'], $inventory),
             'repositories' => SnapshotCanonicalizer::sanitize($repositoryInventory),
+            'historical_conflicts' => SnapshotCanonicalizer::sanitize($historicalConflicts),
         ];
         $hashInput = $manifest;
         unset($hashInput['manifest_hash'], $hashInput['exported_at']);
