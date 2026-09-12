@@ -59,7 +59,7 @@ final class CoreCreationE2ETest extends TestCase
         $candidate = $plan['context']['authority_plan']['create_authorities'][0];
 
         self::assertSame('classification', $candidate['entity_type']);
-        self::assertSame('clock-type', $candidate['family']);
+        self::assertSame('clock_type', $candidate['family']);
 
         $applied = $this->dispatch($runtime, '', 'clock-type-apply', 'AUTHORITY', [
             'mode' => 'APPLY_APPROVED_PLAN',
@@ -69,7 +69,7 @@ final class CoreCreationE2ETest extends TestCase
         $readBack = $applied['context']['authority_result']['result']['apply_results'][0]['canonical_readback'];
 
         self::assertSame('classification', $readBack['entity_type']);
-        self::assertSame('clock-type', $readBack['snapshot']['payload']['family']);
+        self::assertSame('clock_type', $readBack['snapshot']['payload']['family']);
         self::assertSame(1, count($runtime['authority']->list('classification')));
 
         $reuse = $runtime['planner']->plan(['text' => 'Tạo loại Test Clock Type.', 'authority_intent' => ['mode' => 'PLAN']], ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1]);

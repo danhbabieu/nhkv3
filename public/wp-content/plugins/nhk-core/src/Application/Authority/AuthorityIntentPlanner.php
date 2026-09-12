@@ -5,13 +5,14 @@ namespace NHK\Core\Application\Authority;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Planning-only interpreter and canonical inventory resolver. */
 final class AuthorityIntentPlanner
 {
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private CanonicalAuthorityStableKeyPolicy $stableKeys = new CanonicalAuthorityStableKeyPolicy()) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private CanonicalAuthorityStableKeyPolicy $stableKeys = new CanonicalAuthorityStableKeyPolicy(), private EntityProfileResolver $profiles = new EntityProfileResolver()) {}
 
     /** @param array<string,mixed> $input @param array<string,mixed> $captureContext @return array<string,mixed> */
     public function plan(array $input, array $captureContext = []): array
@@ -41,13 +42,13 @@ final class AuthorityIntentPlanner
         $allowCreate = !$queryOnly && preg_match('/\b(?:tạo|thêm|create|new)\b/iu', $text) === 1;
         $requests = [];
         if (preg_match('/tạo\s+thương hiệu\s+(.+?)(?:\s+(?:và|rồi)\s+(?:một\s+)?bài\b|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'brand', 'name' => trim($match[1]), 'allow_create' => true];
-        if (preg_match('/tạo\s+loại\s+(.+?)(?:\s+(?:thuộc|nằm\s+dưới)\s+|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'classification', 'name' => trim($match[1]), 'family' => 'clock-type', 'allow_create' => true];
-        if ($this->contains($text, 'đồng hồ để bàn')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ để bàn', 'family' => 'clock-type', 'allow_create' => $allowCreate];
-        if ($this->contains($text, 'đồng hồ cúc cu')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ cúc cu', 'family' => 'clock-type', 'allow_create' => $allowCreate];
-        if ($this->contains($text, 'mantel clock')) $requests[] = ['type' => 'classification', 'name' => 'Mantel Clock', 'family' => 'clock-type', 'allow_create' => $allowCreate];
+        if (preg_match('/(?:tạo|thêm)\s+loại\s+(.+?)(?:\s+(?:thuộc|nằm\s+dưới)\s+|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'classification', 'name' => trim($match[1]), 'family' => 'clock_type', 'allow_create' => true];
+        if ($this->contains($text, 'đồng hồ để bàn')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ để bàn', 'family' => 'clock_type', 'allow_create' => $allowCreate];
+        if ($this->contains($text, 'đồng hồ cúc cu')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ cúc cu', 'family' => 'clock_type', 'allow_create' => $allowCreate];
+        if ($this->contains($text, 'mantel clock')) $requests[] = ['type' => 'classification', 'name' => 'Mantel Clock', 'family' => 'clock_type', 'allow_create' => $allowCreate];
         if ($this->contains($text, 'pháp') || $this->contains($text, 'france')) $requests[] = ['type' => 'classification', 'name' => 'Pháp', 'family' => 'origin', 'allow_create' => $allowCreate];
         if ($this->contains($text, 'hermle') && !array_filter($requests, static fn (array $item): bool => $item['type'] === 'brand' && strtolower($item['name']) === 'hermle')) $requests[] = ['type' => 'brand', 'name' => 'Hermle', 'allow_create' => $allowCreate];
-        foreach ((array) ($input['subject_hints'] ?? []) as $hint) if (is_string($hint) && trim($hint) !== '') $requests[] = ['type' => 'classification', 'name' => trim($hint), 'family' => 'clock-type', 'allow_create' => $allowCreate];
+        foreach ((array) ($input['subject_hints'] ?? []) as $hint) if (is_string($hint) && trim($hint) !== '') $requests[] = ['type' => 'classification', 'name' => trim($hint), 'family' => 'clock_type', 'allow_create' => $allowCreate];
         return $this->uniqueRequests($requests);
     }
 
@@ -69,11 +70,13 @@ final class AuthorityIntentPlanner
         // Stable keys for CREATE are always derived by the server policy. A
         // caller can identify an existing record by UUID/name/alias, but can
         // never supply the identity that a new canonical record will use.
-        $stableKey = $this->stableKeys->preview($type, $name, ['family' => $family]);
+        $stableKeyFamily = $family === 'clock_type' ? 'clock-type' : $family;
+        $stableKey = $this->stableKeys->preview($type, $name, ['family' => $stableKeyFamily]);
         $matches = [];
-        if (UuidCodec::isValid((string) ($request['canonical_uuid'] ?? ''))) { $entity = $this->authority->findByCanonicalId((string) $request['canonical_uuid']); if ($entity instanceof AuthorityEntity && $entity->entityType === $type && $entity->active()) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'uuid_exact']; }
-        $entity = $this->authority->findByStableKey($type, $stableKey); if ($entity instanceof AuthorityEntity && $entity->active()) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'stable_key_exact'];
+        if (UuidCodec::isValid((string) ($request['canonical_uuid'] ?? ''))) { $entity = $this->authority->findByCanonicalId((string) $request['canonical_uuid']); if ($this->eligibleMatch($entity, $type, $family)) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'uuid_exact']; }
+        $entity = $this->authority->findByStableKey($type, $stableKey); if ($this->eligibleMatch($entity, $type, $family)) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'stable_key_exact'];
         foreach ($this->authority->listByType($type) as $candidate) {
+            if (!$this->eligibleMatch($candidate, $type, $family)) continue;
             if ($this->normalize($candidate->canonicalName) === $this->normalize($name)) $matches[$candidate->canonicalId] = ['entity' => $candidate, 'match' => 'exact_canonical_name'];
             foreach ((array) ($candidate->payload['aliases'] ?? []) as $alias) if (is_string($alias) && $this->normalize($alias) === $this->normalize($name)) $matches[$candidate->canonicalId] = ['entity' => $candidate, 'match' => 'exact_alias'];
         }
@@ -84,7 +87,15 @@ final class AuthorityIntentPlanner
         $lexical = $this->boundedLexical($type, $name);
         if ($lexical !== []) { $plan['ambiguities'][] = ['code' => 'IDENTITY_CONFLICT', 'entity_type' => $type, 'name' => $name, 'review_only' => true, 'candidates' => $lexical]; return; }
         if (($request['allow_create'] ?? false) !== true) { $plan['ambiguities'][] = ['code' => 'CANONICAL_NOT_FOUND', 'entity_type' => $type, 'name' => $name, 'review_only' => true]; return; }
-        $plan['create_candidates'][] = ['candidate_id' => $this->candidateId('CREATE', $type, $stableKey), 'action' => 'CREATE', 'entity_type' => $type, 'family' => $family !== '' ? $family : null, 'proposed_canonical_name' => $name, 'stable_key_preview' => $stableKey, 'scope' => 'capture', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'dependencies' => [], 'review_diagnostics' => []];
+        $plan['create_candidates'][] = ['candidate_id' => $this->candidateId('CREATE', $type, $stableKey), 'action' => 'CREATE', 'entity_type' => $type, 'family' => $family !== '' ? $family : null, 'proposed_canonical_name' => $name, 'name' => $name, 'aliases' => [], 'description' => '', 'stable_key_preview' => $stableKey, 'proposed_stable_key' => $stableKey, 'scope' => 'capture', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'ambiguities' => [], 'blockers' => [], 'dependencies' => [], 'review_diagnostics' => []];
+    }
+
+    private function eligibleMatch(?AuthorityEntity $entity, string $type, string $requestedFamily): bool
+    {
+        if (!$entity instanceof AuthorityEntity || $entity->entityType !== $type || !$entity->active()) return false;
+        if ($type !== 'classification' || $requestedFamily !== 'clock_type') return true;
+        $resolution = $this->profiles->resolveProfile($entity);
+        return $resolution->resolved() && $resolution->profileKey === 'clock_type';
     }
 
     /** @param array<string,mixed> $plan */

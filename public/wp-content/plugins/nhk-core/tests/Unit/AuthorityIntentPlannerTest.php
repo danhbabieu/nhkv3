@@ -64,8 +64,23 @@ final class AuthorityIntentPlannerTest extends TestCase
 
         self::assertCount(1, $plan['create_candidates']);
         self::assertSame('classification', $plan['create_candidates'][0]['entity_type']);
-        self::assertSame('clock-type', $plan['create_candidates'][0]['family']);
+        self::assertSame('clock_type', $plan['create_candidates'][0]['family']);
         self::assertSame('Đồng hồ công cộng', $plan['create_candidates'][0]['proposed_canonical_name']);
+    }
+
+    public function test_add_clock_type_uses_canonical_family_and_complete_review_candidate_shape(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Thêm loại Đồng hồ công cộng.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertCount(1, $plan['create_candidates']);
+        $candidate = $plan['create_candidates'][0];
+        self::assertSame('classification', $candidate['entity_type']);
+        self::assertSame('clock_type', $candidate['family']);
+        foreach (['name', 'aliases', 'description', 'proposed_stable_key', 'provenance', 'ambiguities', 'blockers'] as $field) self::assertArrayHasKey($field, $candidate);
+        self::assertStringStartsWith('nhk:classification:clock-type.', $candidate['proposed_stable_key']);
     }
 
     public function test_existing_public_clock_is_reused_without_create(): void

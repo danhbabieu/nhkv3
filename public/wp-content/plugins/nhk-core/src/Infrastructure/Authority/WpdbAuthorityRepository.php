@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Authority;
-use NHK\Core\Contracts\Authority\{AuthorityRepository, AuthorityInventoryReader, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader};
+use NHK\Core\Contracts\Authority\{AuthorityCanonicalReader, AuthorityRepository, AuthorityInventoryReader, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader};
 use NHK\Core\Domain\Authority\{AuthorityEntity,AuthorityState};
 use NHK\Core\Authority\Exception\{AuthorityRevisionConflict,StableKeyCollision};
 use NHK\Core\Shared\Uuid\UuidCodec;
-final class WpdbAuthorityRepository implements AuthorityRepository, AuthorityInventoryReader, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader {
+final class WpdbAuthorityRepository implements AuthorityRepository, AuthorityCanonicalReader, AuthorityInventoryReader, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader {
  private AuthorityRowHydrator $hydrator;
  /** @param callable(string, string|null, array|null): void|null $rowErrorSink */
  public function __construct(mixed $hydrator=null, private $rowErrorSink=null){$this->hydrator=$hydrator instanceof AuthorityRowHydrator?$hydrator:new AuthorityRowHydrator();}

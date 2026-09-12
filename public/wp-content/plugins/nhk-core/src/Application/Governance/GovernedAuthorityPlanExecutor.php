@@ -4,10 +4,11 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Application\Mcp\McpGovernanceHandler;
+use NHK\Core\Contracts\Governance\GovernedAuthorityPlanApplier;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, ConversationalAuthorityPolicy, ProposalState};
 
 /** Materializes only the exact, owner-approved plan through Governance. */
-final class GovernedAuthorityPlanExecutor
+final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplier
 {
     public function __construct(private McpGovernanceHandler $governance) {}
 
@@ -136,7 +137,7 @@ final class GovernedAuthorityPlanExecutor
         $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
         $payload = $candidate;
         $payload['candidate_id'] = (string) ($candidate['candidate_id'] ?? '');
-        if (!$isRelation) $payload = ['candidate_id' => $payload['candidate_id'], 'stable_key' => (string) ($candidate['stable_key_preview'] ?? ''), 'name' => (string) ($candidate['proposed_canonical_name'] ?? ''), 'entity_payload' => array_filter(['family' => $candidate['family'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '')];
+        if (!$isRelation) $payload = ['candidate_id' => $payload['candidate_id'], 'stable_key' => (string) ($candidate['proposed_stable_key'] ?? $candidate['stable_key_preview'] ?? ''), 'name' => (string) ($candidate['name'] ?? $candidate['proposed_canonical_name'] ?? ''), 'entity_payload' => array_filter(['family' => $candidate['family'] ?? null, 'aliases' => $candidate['aliases'] ?? null, 'description' => $candidate['description'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== [])];
         $contentFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
         $dependencyIds = array_values(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? []))));
         return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? ''), 'actor' => $actor];
