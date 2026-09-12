@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint 2026-09-12 — ChatGPT file transport gateway handoff
+
+WHAT: The NHK ChatGPT file gateway materializes only the official OpenAI file
+object fields (`download_url`, `file_id`, optional `mime_type` and `file_name`)
+at the Easy MCP connector boundary, then reuses the existing native file bag,
+Ability bridge and `/nhk/v1/mcp` Capture path. Text-only calls remain unchanged.
+
+SECURITY: `nhk_chatgpt_file_allowed_hosts` is the sole host allowlist mechanism;
+an empty allowlist fails closed. URL validation requires HTTPS, public host
+resolution, per-hop redirect revalidation, timeout and bounded streaming. Host
+rejection is typed as `CHATGPT_FILE_HOST_NOT_ALLOWED` and exposes only the
+normalized hostname; signed URLs and query material are never logged or stored.
+
+VERIFICATION: Focused gateway suite passes 74 tests / 598 assertions. PHP lint
+and `git diff --check` pass. WP-backed verification remains environment-blocked
+when the exact `public` WordPress runtime cannot connect to `nhk_v3_test`; no
+development, staging or production data was mutated.
+
+STATUS: `GATEWAY_TRANSPORT_IMPLEMENTED / LIVE_HOST_ALLOWLIST_REQUIRED /
+WP_INTEGRATION_RUNTIME_BLOCKED`.
+
 # Checkpoint 2026-09-12: adapters done; no staging mutation
 
 # Checkpoint — 2026-09-12 — files[] provided-reference bridge remains fail-closed

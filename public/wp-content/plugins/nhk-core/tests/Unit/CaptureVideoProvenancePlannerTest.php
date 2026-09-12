@@ -219,6 +219,8 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             'source_description' => 'Đồng hồ Pháp với cơ cấu chuông chuyển động.',
             'channel_title' => 'NHK official archive',
             'tags' => ['Odo Jacquemart'],
+            'title' => 'Odo Jacquemart',
+            'description' => 'Odo Jacquemart',
         ], []];
     }
 

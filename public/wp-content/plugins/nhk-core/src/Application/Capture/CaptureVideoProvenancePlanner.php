@@ -27,7 +27,7 @@ final class CaptureVideoProvenancePlanner
         $storedSource = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
         $sourceSnapshot = array_merge($storedSource, $sourceSnapshot);
         $resolvedSubject = $this->lockedSubject($resolvedSubject, $metadata, (bool) ($context['preserve_original_subject'] ?? false));
-        $sourceTitle = trim((string) ($sourceSnapshot['source_title'] ?? $sourceSnapshot['title'] ?? ''));
+        $sourceTitle = trim((string) ($sourceSnapshot['source_title'] ?? ''));
         $subjectId = trim((string) ($resolvedSubject['id'] ?? ''));
         $subjectType = trim((string) ($resolvedSubject['type'] ?? ''));
         $subjectName = trim((string) ($resolvedSubject['name'] ?? ''));
@@ -233,8 +233,8 @@ final class CaptureVideoProvenancePlanner
     {
         $fields = [];
         foreach ([
-            'source_title' => $snapshot['source_title'] ?? $snapshot['title'] ?? '',
-            'source_description' => $snapshot['source_description'] ?? $snapshot['description'] ?? '',
+            'source_title' => $snapshot['source_title'] ?? '',
+            'source_description' => $snapshot['source_description'] ?? '',
             'channel_title' => $snapshot['channel_title'] ?? '',
         ] as $field => $value) {
             $value = trim((string) $value);
