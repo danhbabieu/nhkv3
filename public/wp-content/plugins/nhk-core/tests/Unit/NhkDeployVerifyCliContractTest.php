@@ -30,7 +30,7 @@ final class NhkDeployVerifyCliContractTest extends TestCase
         self::assertStringContainsString('DEPLOYMENT_TARGET_NOT_ALLOWLISTED', implode("\n", $output));
     }
 
-    public function test_dirty_checkout_fails_closed_before_composer_or_transfer(): void
+    public function test_checkout_or_missing_config_fails_closed_before_composer_or_transfer(): void
     {
         $path = dirname(__DIR__, 6) . '/scripts/nhk-deploy-verify';
         $output = [];
@@ -38,7 +38,11 @@ final class NhkDeployVerifyCliContractTest extends TestCase
         exec(escapeshellarg($path) . ' --target=demo.1945.vn --json 2>&1', $output, $status);
 
         self::assertNotSame(0, $status);
-        self::assertStringContainsString('WORKTREE_NOT_CLEAN', implode("\n", $output));
+        $receipt = implode("\n", $output);
+        self::assertTrue(
+            str_contains($receipt, 'WORKTREE_NOT_CLEAN') || str_contains($receipt, 'REMOTE_DEPLOYMENT_CONFIG_REQUIRED'),
+            $receipt,
+        );
     }
 
     public function test_plugin_header_reader_accepts_wordpress_comment_format(): void

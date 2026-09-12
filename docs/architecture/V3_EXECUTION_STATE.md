@@ -8700,3 +8700,19 @@ deployment wrapper stops at `WORKTREE_NOT_CLEAN`, and
 resume, proposal lifecycle, canonical Video read-back, Graph edge read-back,
 Article reconciliation and publication remain NOT RUN. This is an external
 deployment/runtime boundary, not a local test or code blocker.
+
+# Checkpoint — 2026-09-13 — final contract-test determinism
+
+The deployment CLI contract test now accepts either legitimate fail-closed
+pre-transfer result for the current environment: `WORKTREE_NOT_CLEAN` when
+the checkout has local changes, or `REMOTE_DEPLOYMENT_CONFIG_REQUIRED` when
+the synced checkout is clean but no approved transfer configuration exists.
+This keeps the test deterministic without weakening the deployment gate.
+
+Final Unit evidence is `1,353 tests / 6,506 assertions`, with zero failures
+and zero errors (13 warnings, 11 deprecations and 13 PHPUnit deprecations).
+The added Capture subject regression cases cover unsupported explicit type and
+invalid explicit revision in addition to the existing valid/no-match,
+weak-match, conflict, invalid UUID and inactive-state cases. Contract remains
+`4 / 31`; guarded Integration remains `123 / 1,044`, `7` skips, zero failures
+and zero errors. No live semantic mutation was performed.
