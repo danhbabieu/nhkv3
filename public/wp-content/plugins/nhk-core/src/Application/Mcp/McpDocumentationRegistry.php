@@ -7,7 +7,7 @@ namespace NHK\Core\Application\Mcp;
 final class McpDocumentationRegistry
 {
     public const MANIFEST_SCHEMA_VERSION = 1;
-    public const MAX_DOCUMENT_BYTES = 524288;
+    public const MAX_DOCUMENT_BYTES = 1048576;
     public const MAX_LINE_COUNT = 500;
 
     /** @var array<string,array{path:string,classification:string,status:string,domain:string}> */
