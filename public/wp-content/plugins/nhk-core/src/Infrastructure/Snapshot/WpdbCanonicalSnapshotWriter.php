@@ -16,6 +16,8 @@ final class WpdbCanonicalSnapshotWriter implements CanonicalSnapshotWriter
     private ?WpdbCanonicalSnapshotSource $readModel = null;
     /** @var list<string>|null */
     private ?array $graphPredicateKeys = null;
+    /** @var array<string,list<array<string,mixed>>> */
+    private array $reconcileRows = [];
 
     public function __construct(private object $database, private SnapshotEnvironment $runtime, private array $allowedDatabases = [])
     {
@@ -70,6 +72,22 @@ final class WpdbCanonicalSnapshotWriter implements CanonicalSnapshotWriter
                 continue;
             }
             $this->insert($table, $record);
+        }
+    }
+
+    public function reconcileCollection(string $collection, array $records): void
+    {
+        if (!$this->transaction) throw new \RuntimeException('SNAPSHOT_TRANSACTION_REQUIRED');
+        if (!in_array($collection, SnapshotCollectionRegistry::COLLECTIONS, true)) throw new \RuntimeException('SNAPSHOT_COLLECTION_UNSUPPORTED:' . $collection);
+        if (in_array($collection, ['claims', 'completion_state', 'idempotency_state'], true)) return;
+        foreach ($records as $record) {
+            if (!is_array($record)) throw new \RuntimeException('SNAPSHOT_RECORD_MUST_BE_OBJECT');
+            $table = (string) ($record['_physical_table'] ?? (WpdbCanonicalSnapshotSource::TABLES[$collection][0] ?? ''));
+            if ($table === '' || !in_array($table, WpdbCanonicalSnapshotSource::physicalTables(), true)) throw new \RuntimeException('SNAPSHOT_TABLE_NOT_ALLOWLISTED');
+            unset($record['_physical_table']);
+            if ($collection === 'graph_predicates') { $this->importPredicate($record); continue; }
+            if ($this->isWordPressContextTable($table)) { $this->importWordPressContext($table, $record); continue; }
+            $this->reconcileRecord($table, $record);
         }
     }
     public function commit(string $manifestHash): void
@@ -210,6 +228,44 @@ final class WpdbCanonicalSnapshotWriter implements CanonicalSnapshotWriter
                 $where[] = '`' . $name . '` IS NULL';
                 continue;
             }
+            $where[] = '`' . $name . '`=%s';
+            $values[] = $this->storageValue($value, (string) ($columns[$name]['Type'] ?? ''));
+        }
+        $query = 'UPDATE ' . $this->source()->table($table) . ' SET ' . implode(',', $fields) . ' WHERE ' . implode(' AND ', $where);
+        if ($this->database->query($this->database->prepare($query, ...$values)) === false) throw new \RuntimeException('SNAPSHOT_IMPORT_WRITE_FAILED:' . $table);
+    }
+
+    /** @param array<string,mixed> $record */
+    private function reconcileRecord(string $table, array $record): void
+    {
+        $columns = $this->source()->columns($table);
+        $identityFields = array_keys(array_filter($columns, static fn (array $column): bool => (string) ($column['Key'] ?? '') === 'PRI'));
+        if ($identityFields === []) throw new \RuntimeException('SNAPSHOT_RECORD_IDENTITY_REQUIRED:' . $table);
+        $identity = [];
+        foreach ($identityFields as $field) {
+            if (!array_key_exists($field, $record)) throw new \RuntimeException('SNAPSHOT_RECORD_IDENTITY_REQUIRED:' . $table);
+            $identity[$field] = $record[$field];
+        }
+        $existing = null;
+        $rows = $this->reconcileRows[$table] ??= $this->source()->rowsForTable($table);
+        foreach ($rows as $row) {
+            $matches = true;
+            foreach ($identity as $field => $value) if ((string) ($row[$field] ?? '') !== (string) $value) { $matches = false; break; }
+            if ($matches) { $existing = $row; break; }
+        }
+        if ($existing === null) { $this->insert($table, $record); return; }
+        $fields = [];
+        $values = [];
+        foreach ($columns as $name => $column) {
+            if (!array_key_exists($name, $record) || array_key_exists($name, $identity)) continue;
+            if ($record[$name] === null) { $fields[] = '`' . $name . '`=NULL'; continue; }
+            $fields[] = '`' . $name . '`=%s';
+            $values[] = $this->storageValue($record[$name], (string) ($column['Type'] ?? ''));
+        }
+        if ($fields === []) return;
+        $where = [];
+        foreach ($identity as $name => $value) {
+            if ($value === null) { $where[] = '`' . $name . '` IS NULL'; continue; }
             $where[] = '`' . $name . '`=%s';
             $values[] = $this->storageValue($value, (string) ($columns[$name]['Type'] ?? ''));
         }

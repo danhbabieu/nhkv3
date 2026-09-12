@@ -23,7 +23,19 @@ final class CanonicalSnapshotImportService
         $existing = $writer->existingManifestHash();
         if ($existing !== null) {
             if (hash_equals($existing, $manifestHash)) {
-                self::assertReadBack($snapshot, $writer, $manifestHash);
+                try {
+                    self::assertReadBack($snapshot, $writer, $manifestHash);
+                } catch (\RuntimeException $error) {
+                    $writer->begin();
+                    try {
+                        foreach (SnapshotCollectionRegistry::importOrder() as $collection) $writer->reconcileCollection($collection, $snapshot->collections[$collection]);
+                        $writer->commit($manifestHash);
+                    } catch (\Throwable $reconciliationError) {
+                        $writer->rollback();
+                        throw $error;
+                    }
+                    self::assertReadBack($snapshot, $writer, $manifestHash);
+                }
                 return ['status' => 'already_imported', 'manifest_hash' => $manifestHash, 'collections_imported' => 0, 'accepted_historical_conflicts' => $historicalConflicts];
             }
             throw new \RuntimeException('SNAPSHOT_TARGET_ALREADY_RESTORED');

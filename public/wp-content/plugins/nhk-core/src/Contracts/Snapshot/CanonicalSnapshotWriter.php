@@ -32,6 +32,9 @@ interface CanonicalSnapshotWriter
     /** @param list<array<string,mixed>> $records */
     public function importCollection(string $collection, array $records): void;
 
+    /** @param list<array<string,mixed>> $records */
+    public function reconcileCollection(string $collection, array $records): void;
+
     public function commit(string $manifestHash): void;
 
     public function rollback(): void;

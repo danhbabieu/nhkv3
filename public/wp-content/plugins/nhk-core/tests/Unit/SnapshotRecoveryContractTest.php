@@ -320,6 +320,7 @@ final class SnapshotTestWriter implements CanonicalSnapshotWriter
     public function isEmpty(): bool { return $this->collections === []; }
     public function begin(): void { $this->inTransaction = true; }
     public function importCollection(string $collection, array $records): void { if (!$this->inTransaction) throw new \RuntimeException('TRANSACTION_REQUIRED'); $this->collections[$collection] = $records; }
+    public function reconcileCollection(string $collection, array $records): void { if (!$this->inTransaction) throw new \RuntimeException('TRANSACTION_REQUIRED'); $this->collections[$collection] = $records; }
     public function commit(string $manifestHash): void { $this->existing = $manifestHash; $this->inTransaction = false; }
     public function rollback(): void { $this->collections = []; $this->inTransaction = false; }
 }
