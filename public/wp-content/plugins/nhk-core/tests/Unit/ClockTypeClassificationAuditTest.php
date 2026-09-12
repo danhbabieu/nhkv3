@@ -136,7 +136,7 @@ final class ClockTypeClassificationAuditTest extends TestCase
         $counts = $audit->audit()->targetInventory['counts'];
         self::assertSame(1, $counts['CANONICAL_CLOCK_TYPE']);
         self::assertSame(1, $counts['LEGACY_CLOCK_TYPE']);
-        self::assertSame(1, $counts['OTHER_FAMILY']);
+        self::assertSame(1, $counts['OTHER_CLASSIFICATION_FAMILY']);
         self::assertSame(1, $counts['FAMILY_MISSING']);
         self::assertSame(1, $counts['INACTIVE']);
     }
@@ -287,6 +287,11 @@ class AuditAuthorityRepository implements AuthorityRepository, CursorAuthorityIn
     public function rekey(AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): AuthorityEntity { $this->writes++; throw new \LogicException('Audit must not write Authority.'); }
     public function listByType(string $type, bool $includeRetired = false): array { return array_values(array_filter($this->entities, static fn (AuthorityEntity $entity): bool => $entity->entityType === $type && ($includeRetired || $entity->active()))); }
     public function pageByType(string $type, int $limit = 100, ?string $after = null, bool $includeRetired = false): array { $this->pages++; $this->pagesByType[$type] = ($this->pagesByType[$type] ?? 0) + 1; $items = $this->listByType($type, $includeRetired); usort($items, static fn (AuthorityEntity $a, AuthorityEntity $b): int => strcmp($a->canonicalId, $b->canonicalId)); if ($after !== null) $items = array_values(array_filter($items, static fn (AuthorityEntity $entity): bool => $entity->canonicalId > $after)); $page = array_slice($items, 0, $limit); return ['items' => $page, 'next_cursor' => count($items) > $limit && $page !== [] ? $page[count($page) - 1]->canonicalId : null]; }
+
+    public function pageClassifications(int $limit = 100, ?string $after = null, bool $includeRetired = false): array
+    {
+        return $this->pageByType('classification', $limit, $after, $includeRetired);
+    }
 }
 
 final class CallbackEvidenceReader implements ClockTypeAuditEvidenceReader
@@ -302,8 +307,4 @@ final class FailingAuditAuthorityRepository extends AuditAuthorityRepository
         throw new \RuntimeException('AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE');
     }
 
-    public function pageClassifications(int $limit = 100, ?string $after = null, bool $includeRetired = false): array
-    {
-        return $this->pageByType('classification', $limit, $after, $includeRetired);
-    }
 }
