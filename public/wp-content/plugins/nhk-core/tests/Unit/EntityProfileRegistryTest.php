@@ -32,6 +32,27 @@ final class EntityProfileRegistryTest extends TestCase
         self::assertNotContains('classified_as', $registry->get('clock_type')->capabilities);
     }
 
+    public function test_registry_serializes_the_central_profile_organization_shape(): void
+    {
+        $registry = new EntityProfileRegistry();
+
+        foreach (['brand', 'clock_type'] as $key) {
+            $definition = $registry->get($key);
+            self::assertNotNull($definition);
+            $serialized = $definition->toArray();
+            foreach (['profile_key', 'matching_rule', 'capabilities', 'dossier_recipe', 'related_query_recipe', 'public_route_intent', 'archive_intent', 'presentation', 'admin_badge'] as $field) {
+                self::assertArrayHasKey($field, $serialized, $key . ':' . $field);
+            }
+            self::assertSame($key, $serialized['profile_key']);
+        }
+
+        $clockType = $registry->get('clock_type')->toArray();
+        self::assertSame('classification', $clockType['matching_rule']['entity_type']);
+        self::assertSame('clock_type', $clockType['matching_rule']['family']);
+        self::assertSame('[LOẠI ĐỒNG HỒ]', $clockType['admin_badge']);
+        self::assertSame('clock-type-entity-hub-v1', $clockType['related_query_recipe']['key']);
+    }
+
     public function test_brand_resolves_from_canonical_entity_type_only(): void
     {
         $entity = $this->entity('brand', 'Đồng hồ vai bò', ['description' => 'not a classification']);

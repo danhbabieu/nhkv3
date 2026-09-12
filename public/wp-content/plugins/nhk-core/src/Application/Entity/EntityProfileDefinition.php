@@ -36,17 +36,38 @@ final readonly class EntityProfileDefinition
     {
         return [
             'key' => $this->key,
+            'profile_key' => $this->key,
             'visitor_label' => $this->visitorLabel,
             'admin_label' => $this->adminLabel,
+            'admin_badge' => $this->adminBadge(),
             'matching_rule' => $this->matchingRule,
             'supported_dossier_sections' => $this->supportedDossierSections,
+            'dossier_recipe' => [
+                'key' => $this->key . '-dossier-v1',
+                'sections' => $this->supportedDossierSections,
+            ],
             'relation_query_recipe' => $this->relationQueryRecipe,
             'relation_target_groups' => $this->relationTargetGroups,
+            'related_query_recipe' => [
+                'key' => $this->relationQueryRecipe,
+                'target_groups' => $this->relationTargetGroups,
+            ],
             'read_family_aliases' => $this->readFamilyAliases,
             'archive_navigation_intent' => $this->archiveNavigationIntent,
+            'archive_intent' => $this->archiveNavigationIntent,
             'root_detail_route_intent' => $this->rootDetailRouteIntent,
+            'public_route_intent' => $this->rootDetailRouteIntent,
             'capabilities' => $this->capabilities,
             'presentation' => $this->presentation,
         ];
+    }
+
+    private function adminBadge(): string
+    {
+        return match ($this->key) {
+            'brand' => '[THƯƠNG HIỆU]',
+            'clock_type' => '[LOẠI ĐỒNG HỒ]',
+            default => '[' . mb_strtoupper($this->adminLabel) . ']',
+        };
     }
 }
