@@ -240,15 +240,13 @@ final class CaptureVideoProvenancePlanner
             $value = trim((string) $value);
             if ($value !== '') $fields[$field] = $value;
         }
-        $tags = array_values(array_filter(array_map('strval', (array) ($snapshot['tags'] ?? [])), static fn (string $tag): bool => trim($tag) !== ''));
-        if ($tags !== []) $fields['tags'] = implode(' ', $tags);
         return $fields;
     }
 
     /**
      * Official source metadata may confirm the locked subject. This identity
      * check is intentionally separate from Evidence creation: matching a
-     * title, description, channel or tag never becomes an Evidence reference.
+     * trusted source identity field never becomes an Evidence reference.
      *
      * @param array<string,string> $fields @return list<string>
      */
@@ -260,23 +258,129 @@ final class CaptureVideoProvenancePlanner
             if ($normalized !== '') $normalizedFields[$field] = $normalized;
         }
         if ($normalizedFields === []) return [];
-        $terms = array_merge(
-            [(string) ($subject['name'] ?? ''), (string) ($subject['label'] ?? ''), (string) ($subject['display_name'] ?? ''), (string) ($subject['canonical_name'] ?? '')],
-            array_map('strval', (array) ($subject['aliases'] ?? [])),
-            $this->stableKeyIdentityTerms($subject),
-        );
-        $matches = [];
-        foreach ($terms as $term) {
-            $term = $this->normalize($term);
-            if ($term === '') continue;
-            foreach ($normalizedFields as $field => $value) {
-                if (str_contains($value, $term)) $matches[] = $field;
+
+        $identityPhrases = $this->identityPhrases($subject);
+        $subjectType = strtolower(trim((string) ($subject['type'] ?? '')));
+        if ($subjectType === 'model') {
+            // A model may be named by a parent/brand component and a model
+            // discriminator. They may be split across trusted fields, but
+            // every component of one already-authorized canonical phrase must
+            // be present. This is deliberately not a token-bag search.
+            foreach ($identityPhrases as $phrase) {
+                if (count($phrase) < 2) continue;
+                $matches = $this->fieldsCoveringTerms($normalizedFields, $phrase);
+                if ($matches !== []) return $matches;
+            }
+        } else {
+            foreach ($identityPhrases as $phrase) {
+                if (count($phrase) !== 1) {
+                    $matches = $this->fieldsCoveringPhrase($normalizedFields, $phrase);
+                    if ($matches !== []) return $matches;
+                } elseif (($field = $this->fieldContainingTerm($normalizedFields, $phrase[0])) !== null) {
+                    return [$field];
+                }
             }
         }
-        if (($subject['type'] ?? '') === 'variant') {
-            foreach ($normalizedFields as $field => $value) if ($this->variantReferenceIdentifies($value, $subject)) $matches[] = $field;
+
+        if ($subjectType === 'variant') {
+            foreach ($normalizedFields as $field => $value) if ($this->variantReferenceIdentifies($value, $subject)) return [$field];
+        }
+        return [];
+    }
+
+    /** @return list<list<string>> */
+    private function identityPhrases(array $subject): array
+    {
+        $values = [
+            (string) ($subject['canonical_name'] ?? ''),
+            (string) ($subject['name'] ?? ''),
+            (string) ($subject['display_name'] ?? ''),
+            (string) ($subject['label'] ?? ''),
+        ];
+        foreach ((array) ($subject['aliases'] ?? []) as $alias) if (is_string($alias)) $values[] = $alias;
+        foreach ($this->stableKeyIdentityTerms($subject) as $term) $values[] = $term;
+
+        $phrases = [];
+        foreach ($values as $value) {
+            $terms = $this->identityTerms($value);
+            if ($terms === []) continue;
+            $key = implode('|', $terms);
+            $phrases[$key] = $terms;
+        }
+        return array_values($phrases);
+    }
+
+    /** @return list<string> */
+    private function identityTerms(string $value): array
+    {
+        $normalized = $this->normalize($value);
+        if ($normalized === '') return [];
+        return array_values(array_unique(array_filter(
+            preg_split('/\s+/u', $normalized) ?: [],
+            static fn (string $term): bool => $term !== '',
+        )));
+    }
+
+    /** @param array<string,string> $fields @param list<string> $terms @return list<string> */
+    private function fieldsCoveringTerms(array $fields, array $terms): array
+    {
+        $matches = [];
+        foreach ($terms as $term) {
+            $field = $this->fieldContainingTerm($fields, $term);
+            if ($field === null) return [];
+            $matches[] = $field;
         }
         return array_values(array_unique($matches));
+    }
+
+    /** @param array<string,string> $fields @param list<string> $terms @return list<string> */
+    private function fieldsCoveringPhrase(array $fields, array $terms): array
+    {
+        foreach ($fields as $field => $value) if ($this->fieldContainsPhrase($value, $terms)) return [$field];
+        return [];
+    }
+
+    /** @param array<string,string> $fields */
+    private function fieldContainingTerm(array $fields, string $term): ?string
+    {
+        foreach ($fields as $field => $value) if ($this->fieldContainsTerm($value, $term)) return $field;
+        return null;
+    }
+
+    /** @param list<string> $terms */
+    private function fieldContainsPhrase(string $field, array $terms): bool
+    {
+        if (count($terms) === 1) return $this->fieldContainsTerm($field, $terms[0]);
+        $fieldTerms = $this->identityTerms($field);
+        $size = count($terms);
+        for ($offset = 0, $limit = count($fieldTerms) - $size; $offset <= $limit; ++$offset) {
+            if (array_slice($fieldTerms, $offset, $size) === $terms) return true;
+        }
+        return false;
+    }
+
+    private function fieldContainsTerm(string $field, string $term): bool
+    {
+        $term = $this->normalize($term);
+        if ($term === '') return false;
+        $fieldTerms = $this->identityTerms($field);
+        $termTerms = $this->identityTerms($term);
+        if ($termTerms === []) return false;
+        if (count($termTerms) > 1) return $this->fieldContainsPhrase($field, $termTerms);
+        if (in_array($termTerms[0], $fieldTerms, true)) return true;
+
+        // Bounded display-alias normalization: a canonical single token such
+        // as "Odo" may be displayed as the adjacent Vietnamese tokens
+        // "Ô Đô". Only contiguous 2–3 token runs are compacted, and only an
+        // exact canonical token can match; no edit-distance/fuzzy matching.
+        $compactTerm = str_replace(' ', '', $termTerms[0]);
+        if (strlen($compactTerm) < 3) return false;
+        for ($size = 2; $size <= 3; ++$size) {
+            for ($offset = 0, $limit = count($fieldTerms) - $size; $offset <= $limit; ++$offset) {
+                if (str_replace(' ', '', implode(' ', array_slice($fieldTerms, $offset, $size))) === $compactTerm) return true;
+            }
+        }
+        return false;
     }
 
     private function variantReferenceIdentifies(string $title, array $subject): bool
@@ -310,6 +414,7 @@ final class CaptureVideoProvenancePlanner
 
     private function normalize(string $value): string
     {
+        if (class_exists('Normalizer')) $value = (string) \Normalizer::normalize($value, \Normalizer::FORM_KD);
         $value = function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value);
         if (function_exists('remove_accents')) $value = (string) remove_accents($value);
         elseif (function_exists('transliterator_transliterate')) $value = (string) transliterator_transliterate('Any-Latin; Latin-ASCII', $value);

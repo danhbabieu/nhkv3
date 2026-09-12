@@ -141,6 +141,87 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertStringNotContainsString('Official description identifies', $plan['evidence']['excerpt']);
     }
 
+    public function test_locked_model_identity_can_be_confirmed_across_trusted_youtube_fields(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-odo-jacquemart-split',
+            $this->videoProposal('gsjfYNH2r6M'),
+            [
+                ...$this->snapshot('gsjfYNH2r6M', 'Ô Đô “ông Tây đánh chuông” – một thiết kế rất thú vị của đồng hồ Pháp.'),
+                'source_description' => 'Điểm đặc biệt là hình người Jacquemart cầm búa chuyển động để gõ trực tiếp vào chiếc chuông phía trên mặt số mỗi khi đồng hồ điểm.',
+                'channel_title' => 'NHK official archive',
+            ],
+            $this->odoJacquemartSubject(),
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame(['source_title', 'source_description'], $plan['diagnostics']['identity_matches']);
+    }
+
+    public function test_locked_model_identity_can_be_confirmed_when_components_share_one_trusted_field(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-odo-jacquemart-one-field',
+            $this->videoProposal('gsjfYNH2r6M'),
+            [
+                ...$this->snapshot('gsjfYNH2r6M', 'Official Odo Jacquemart archival record'),
+                'channel_title' => 'NHK official archive',
+            ],
+            $this->odoJacquemartSubject(),
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame(['source_title'], $plan['diagnostics']['identity_matches']);
+    }
+
+    /** @dataProvider unconfirmedOdoIdentityCases */
+    public function test_locked_model_identity_fails_closed_without_all_canonical_components(array $source, array $context = []): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-odo-jacquemart-negative',
+            $this->videoProposal('gsjfYNH2r6M'),
+            [...$this->snapshot('gsjfYNH2r6M', (string) ($source['source_title'] ?? '')), ...$source],
+            $this->odoJacquemartSubject(),
+            $context,
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SOURCE_SUBJECT_IDENTITY_UNCONFIRMED', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+        self::assertSame([], $plan['video_proposal']['payload']['metadata']['semantic_attachments']);
+    }
+
+    /** @return iterable<string,array{0:array<string,mixed>,1:array<string,string>}> */
+    public static function unconfirmedOdoIdentityCases(): iterable
+    {
+        yield 'Odo without Jacquemart' => [[
+            'source_title' => 'Ô Đô “ông Tây đánh chuông” – một thiết kế rất thú vị của đồng hồ Pháp.',
+            'source_description' => 'Generic official description of a mechanical French clock.',
+            'channel_title' => 'NHK official archive',
+        ], []];
+        yield 'Jacquemart without Odo' => [[
+            'source_title' => 'A mechanical clock archival record',
+            'source_description' => 'Jacquemart is the animated bell striker in this clock.',
+            'channel_title' => 'NHK official archive',
+        ], []];
+        yield 'user hint is not source identity' => [[
+            'source_title' => 'Official archive record',
+            'source_description' => 'Generic official description with no locked subject identity.',
+            'channel_title' => 'NHK official archive',
+        ], ['user_hint' => 'Odo Jacquemart']];
+        yield 'Odo with a different model' => [[
+            'source_title' => 'Ô Đô 36 – một mẫu đồng hồ khác',
+            'source_description' => 'Official description of another model.',
+            'channel_title' => 'NHK official archive',
+        ], []];
+        yield 'generic French clock wording' => [[
+            'source_title' => 'Ông Tây đánh chuông – đồng hồ Pháp cổ',
+            'source_description' => 'Đồng hồ Pháp với cơ cấu chuông chuyển động.',
+            'channel_title' => 'NHK official archive',
+            'tags' => ['Odo Jacquemart'],
+        ], []];
+    }
+
     public function test_source_metadata_not_identifying_locked_subject_fails_closed_even_with_user_hint(): void
     {
         $plan = (new CaptureVideoProvenancePlanner())->plan(
@@ -350,8 +431,8 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         $state = ['source' => null, 'claim' => null, 'evidence' => []];
         $createdCanonical = ['source' => 0, 'claim' => 0, 'evidence' => 0, 'video' => 0];
         $officialSnapshot = (new YouTubeSourceAdapter(static fn (object $identity): array => [
-            'source_title' => 'Official archive record',
-            'source_description' => 'Official description identifies Odo Jacquemart.',
+            'source_title' => 'Ô Đô “ông Tây đánh chuông” – một thiết kế rất thú vị của đồng hồ Pháp.',
+            'source_description' => 'Điểm đặc biệt là hình người Jacquemart cầm búa chuyển động để gõ trực tiếp vào chiếc chuông phía trên mặt số mỗi khi đồng hồ điểm.',
             'channel_title' => 'NHK official archive',
         ]))->resolve('https://www.youtube.com/watch?v=gsjfYNH2r6M')->snapshot->toArray();
         $apply = function (string $proposalId) use (&$state, &$createdCanonical, $governance, $canonicalIds, $videoId): array {
@@ -524,5 +605,11 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
     private function snapshot(string $externalId, string $title = 'Variant A – source snapshot'): array
     {
         return ['platform' => 'youtube', 'external_video_id' => $externalId, 'canonical_source_url' => 'https://www.youtube.com/watch?v=' . $externalId, 'source_title' => $title];
+    }
+
+    /** @return array{id:string,type:string,stable_key:string,name:string} */
+    private function odoJacquemartSubject(): array
+    {
+        return ['id' => '30515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model', 'stable_key' => 'nhk:model:odo.jacquemar', 'name' => 'Odo Jacquemart'];
     }
 }
