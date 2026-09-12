@@ -54,7 +54,26 @@ after the Constitution.
 
 - Do not migrate, import, parse or populate legacy article bodies under the
   current Constitution scope.
-- Do not mutate V2, production or staging data.
+- Do not mutate V2 or production data.
+- Staging semantic mutation is normally forbidden, except for an explicitly user-approved, bounded NHK V3 live acceptance on existing objects.
+- A staging acceptance mutation is allowed only when all of the following are true:
+  - fresh documentation bootstrap passes;
+  - the deployed build identity has been verified;
+  - exact existing object IDs are supplied;
+  - a duplicate/read-only audit is completed first;
+  - only canonical NHK V3 governed workflows are used;
+  - no generic WordPress writer, direct database write, or Governance bypass is used;
+  - the operation is idempotent and canonical read-back is performed after mutation;
+  - if runtime state differs from the approved scope, stop fail-closed.
+- Current approved staging acceptance scope:
+  - Capture: 01a096c0-97cc-7192-acf2-4735f9bf6582
+  - Article: 467
+  - Variant: 7301f50c-ef0d-4e95-a581-39e5063d4648
+  - External Video: VwP1AH9E3HA
+  - Allowed operation: resume the existing Video child through nhk.capture.ingest and complete the governed Proposal → Approval → Eligibility → Controlled Apply → canonical read-back lifecycle.
+
+
+
 - Development database is nhk_v3; integration database is nhk_v3_test.
 - nhk_v3 permits health, smoke checks, schema inspection, non-destructive
   additions and UP migrations only. Never run DOWN, DROP, TRUNCATE or reset
