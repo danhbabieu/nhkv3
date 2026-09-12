@@ -24,6 +24,8 @@ final class EntityProfileRegistryTest extends TestCase
         self::assertContains('brands', $registry->get('clock_type')->relationTargetGroups);
         self::assertContains('specimens', $registry->get('clock_type')->relationTargetGroups);
         self::assertFalse($registry->get('clock_type')->rootDetailRouteIntent['enabled']);
+        self::assertSame('read_foundation', $registry->get('clock_type')->rootDetailRouteIntent['resolution']);
+        self::assertSame('governed_only', $registry->get('clock_type')->rootDetailRouteIntent['allocation']);
         self::assertContains('knowledge', $registry->get('clock_type')->supportedDossierSections);
         self::assertContains('video', $registry->get('clock_type')->supportedDossierSections);
         self::assertNotContains('brand_has_clock_type', $registry->get('clock_type')->capabilities);

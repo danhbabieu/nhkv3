@@ -2,11 +2,11 @@
 declare(strict_types=1);
 namespace NHK\Core\Infrastructure\PublicIdentity;
 
-use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Contracts\PublicIdentity\{PublicIdentityRepository, RootPublicIdentityReader};
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-final class WpdbPublicIdentityRepository implements PublicIdentityRepository
+final class WpdbPublicIdentityRepository implements PublicIdentityRepository, RootPublicIdentityReader
 {
     public function __construct(private object $wpdb) {}
     private function currentTable(): string { return $this->wpdb->prefix . 'nhk_public_identities'; }
@@ -60,6 +60,25 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository
         if ($ownerKind === '' || $routeType === '' || !UuidCodec::isValid($ownerId) || !PublicIdentityMigration014::schemaReady($this->wpdb)) return null;
         $row = $this->wpdb->get_row($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE owner_kind=%s AND owner_uuid=%s AND route_type=%s', $ownerKind, UuidCodec::toBinary($ownerId), $routeType), ARRAY_A);
         return is_array($row) ? $this->hydrate($row) : null;
+    }
+
+    /**
+     * Root read support currently covers the persisted root Brand route. A
+     * future root Classification allocation needs its separately governed
+     * route-policy/storage extension; it is not inferred from a namespaced
+     * Classification row.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function findCurrentByRootSlug(string $slug): array
+    {
+        if ($slug === '' || $slug !== \NHK\Core\Application\Entity\PublicRouteResolver::slug($slug) || !PublicIdentityMigration014::schemaReady($this->wpdb)) return [];
+        $rows = $this->wpdb->get_results($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE owner_kind=%s AND route_type=%s AND collision_scope=%s AND current_slug=%s', 'authority', 'brand', 'root', $slug), ARRAY_A) ?: [];
+        $result = [];
+        foreach ($rows as $row) if (is_array($row)) {
+            try { $result[] = $this->hydrate($row); } catch (\Throwable) { return []; }
+        }
+        return $result;
     }
 
     public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool

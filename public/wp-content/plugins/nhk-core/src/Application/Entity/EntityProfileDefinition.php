@@ -14,6 +14,7 @@ final readonly class EntityProfileDefinition
      * @param array<string,mixed> $archiveNavigationIntent
      * @param array<string,mixed> $rootDetailRouteIntent
      * @param list<string> $capabilities
+     * @param array<string,mixed> $presentation
      */
     public function __construct(
         public string $key,
@@ -27,6 +28,7 @@ final readonly class EntityProfileDefinition
         public array $archiveNavigationIntent,
         public array $rootDetailRouteIntent,
         public array $capabilities,
+        public array $presentation = [],
     ) {}
 
     /** @return array<string,mixed> */
@@ -44,6 +46,7 @@ final readonly class EntityProfileDefinition
             'archive_navigation_intent' => $this->archiveNavigationIntent,
             'root_detail_route_intent' => $this->rootDetailRouteIntent,
             'capabilities' => $this->capabilities,
+            'presentation' => $this->presentation,
         ];
     }
 }

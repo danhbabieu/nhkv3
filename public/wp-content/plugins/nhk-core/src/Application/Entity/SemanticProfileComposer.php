@@ -18,6 +18,7 @@ final class SemanticProfileComposer
         ],
         'movement' => ['identity', 'parent_context', 'related_movements', 'technical_configuration', 'music', 'components', 'recognition', 'variants', 'knowledge', 'evidence_context', 'media_gallery', 'videos', 'articles', 'navigation'],
         'variant' => ['identity', 'parent_context', 'configuration', 'music', 'components', 'recognition', 'evidence_context', 'nearby_variants', 'media_gallery', 'videos', 'articles', 'navigation'],
+        'clock_type' => ['identity', 'knowledge', 'classifications', 'brands', 'models', 'variants', 'specimens', 'products', 'media_gallery', 'videos', 'articles', 'navigation'],
     ];
 
     /** @return array<string,mixed> */

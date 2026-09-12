@@ -141,7 +141,7 @@ final class PublicRouteResolverTest extends TestCase
 
         self::assertSame('/thuong-hieu/', $resolver->archivePath('brand'));
         self::assertSame('/mau/', $resolver->archivePath('model'));
-        foreach (['thuong-hieu', 'mau', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai', 'tri-thuc', 'hien-vat', 'san-pham', 'video', 'so-sanh', 'goc-chia-se', 'wp-admin', 'wp-json', 'feed', 'search', 'sitemap'] as $root) {
+        foreach (['thuong-hieu', 'mau', 'bo-may', 'ban-nhac', 'linh-kien', 'phan-loai', 'tri-thuc', 'hien-vat', 'san-pham', 'video', 'anh', 'loai-dong-ho', 'so-sanh', 'goc-chia-se', 'wp-admin', 'wp-json', 'feed', 'search', 'sitemap'] as $root) {
             self::assertContains($root, PublicRouteResolver::reservedRoots());
         }
     }

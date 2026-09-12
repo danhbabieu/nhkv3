@@ -25,8 +25,9 @@ final class EntityProfileRegistry
                 ['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'],
                 [],
                 ['archive_path' => '/thuong-hieu/', 'navigation_label' => 'Thương hiệu'],
-                ['kind' => 'root_public_identity', 'enabled' => false, 'route_owner' => 'public_identity'],
+                ['kind' => 'root_public_identity', 'enabled' => false, 'route_owner' => 'public_identity', 'resolution' => 'read_foundation', 'allocation' => 'governed_only'],
                 ['dossier_read', 'related_read', 'knowledge_read', 'media_read', 'video_read', 'seo_read'],
+                ['section_order' => ['identity', 'knowledge', 'models', 'variants', 'media', 'video', 'articles'], 'section_labels' => ['knowledge' => 'Tri thức'], 'empty_state' => 'Chưa có nội dung công khai phù hợp.'],
             ),
             'clock_type' => new EntityProfileDefinition(
                 'clock_type',
@@ -38,8 +39,9 @@ final class EntityProfileRegistry
                 ['knowledge', 'media', 'video', 'models', 'variants', 'specimens', 'products', 'brands', 'classifications'],
                 ['clock-type'],
                 ['archive_path' => '/loai-dong-ho/', 'navigation_label' => 'Loại đồng hồ'],
-                ['kind' => 'root_public_identity', 'enabled' => false, 'route_owner' => 'public_identity'],
+                ['kind' => 'root_public_identity', 'enabled' => false, 'route_owner' => 'public_identity', 'resolution' => 'read_foundation', 'allocation' => 'governed_only'],
                 ['dossier_read', 'related_read', 'knowledge_read', 'media_read', 'video_read', 'specimen_read', 'product_read', 'brand_derived_read', 'subtype_read', 'seo_read'],
+                ['section_order' => ['identity', 'knowledge', 'classifications', 'brands', 'models', 'variants', 'specimens', 'products', 'media', 'video', 'articles'], 'section_labels' => ['knowledge' => 'Tri thức', 'brands' => 'Thương hiệu liên quan'], 'empty_state' => 'Chưa có nội dung công khai cho loại đồng hồ này.'],
             ),
         ];
     }

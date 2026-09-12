@@ -40,6 +40,29 @@ Easy MCP runtime must expose native multipart bytes or an authenticated
 canonical trusted-file resolver/reference before a transport-only materializer
 can be implemented and tested.
 
+# Checkpoint — 2026-09-12 — PR3 Dossier + root foundation
+
+WHAT: Added shared public-dossier section readiness/presentation metadata and
+read-only root Public Identity resolution/collision seams. Root resolution
+requires an existing persisted root identity, canonical owner metadata and an
+available route-ownership reader; missing/namespaced identity and collisions
+fail closed. Existing routes remain unchanged; no root identity was allocated.
+
+COMPATIBILITY: `clock_type` is canonical; `clock-type` is compatibility-read
+only with `DATA_COMPATIBILITY_GAP`. Brandless dossiers remain valid. Reverse
+Brand↔Clock Type is an explicit implementation gap when two-hop traversal is
+insufficient. Video, Media, Knowledge, Brand and WordPress route behavior was
+not refactored.
+
+VERIFICATION: PR3 11/52; focused 77/453; full Unit 1,257/6,142; Contract 4/31;
+lint and `git diff --check` pass. Values are local.
+
+NO MUTATION: No semantic write, Graph apply/backfill, family normalization,
+Public Identity allocation, Capture, Media/Video/Knowledge write,
+Article publication, migration or live action.
+
+STATUS: PR3_READ_FOUNDATION_IMPLEMENTED / PR4_REVIEW_GATE_OPEN / LIVE_NOT_CLAIMED.
+
 # Checkpoint — 2026-09-12 — PR2 Entity Profile Registry + Clock-Type read foundation
 
 WHAT: Added the application-level `EntityProfileRegistry` with independent

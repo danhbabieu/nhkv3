@@ -1,6 +1,6 @@
 # NHK V3 Entity Profile — Brand và Clock Type Contract
 
-> **ACTIVE contract — PR1 + PR2, 2026-09-12.** Contract này nằm dưới
+> **ACTIVE contract — PR1 + PR2 + PR3, 2026-09-12.** Contract này nằm dưới
 > `docs/constitution/NHK_V3_CONSTITUTION.md`. Nó khóa read/profile seams và
 > regression boundary; không cấp quyền tạo semantic data, ghi Graph, cấp slug,
 > migrate/backfill dữ liệu hoặc triển khai Clock Type write-path.
@@ -228,8 +228,9 @@ Các phase là additive, tách biệt và không gộp thành một migration l�
    capability matrix, canonical `clock_type` read normalization và shared
    query seams; vẫn read-only.
 3. **PR3 — Classification public dossier + root-route support:** dossier/profile
-   projection, Public Identity collision policy và route read-back; không đổi
-   URL hiện có âm thầm.
+   projection, Public Identity collision policy và route read-back; chỉ resolve
+   root khi persisted root identity và route-owner reader đều xác nhận; không
+   allocate, reproject hoặc đổi URL hiện có âm thầm.
 4. **PR4 — Capture shadow classification:** interpret/resolve context một lần,
    shadow-only candidate và diagnostics; không apply `classified_as`.
 5. **PR5 — Governed new-data membership + derived projection:** chỉ data mới,
@@ -254,3 +255,41 @@ Graph/runtime failure không bị đổi thành empty success.
 PR1 không claim live/deploy readiness. Runtime checkpoint, documentation
 manifest/build identity và changed-file test evidence phải được ghi trong gap
 report/execution state sau checkpoint.
+
+## 11. PR3 public dossier và root-route foundation
+
+PR3 dùng chung `EntityProfileRegistry`, `EntityProfileResolver` và dossier
+reader để bổ sung một public-dossier adapter. Adapter chỉ thêm section
+readiness/presentation descriptors vào packet hiện hành; không sao chép dữ liệu
+sang store mới và template không query Graph trực tiếp. Mỗi section giữ phân
+biệt `AVAILABLE_WITH_ITEMS`, `AVAILABLE_EMPTY`,
+`UNAVAILABLE_IMPLEMENTATION_GAP` và `BLOCKED_PUBLIC_ELIGIBILITY`.
+
+Root detail resolution tách khỏi allocation:
+
+```text
+/{slug}/
+  → existing root Public Identity
+  → canonical owner UUID/type
+  → EntityProfileResolver
+  → shared Entity Dossier
+```
+
+Read path không gọi `PublicIdentityService`, không fallback canonical name hoặc
+`PublicRouteResolver::slug()`, không tự sinh `foo-2`, không cấp root slug cho
+Classification đang chỉ có `/phan-loai/{slug}/`. Identity thiếu hoặc còn
+namespaced không được implicit reproject thành root.
+
+Root collision policy đọc toàn bộ owner namespace được đăng ký: Entity Public
+Identity, WordPress Page/Post, asset `/anh/`, Video `/video/`, archive,
+API/admin/feed/search và first-party route registry. Collision trả
+`PUBLIC_SLUG_CONFLICT`; thiếu central registry trả
+`ROOT_ROUTE_REGISTRY_UNAVAILABLE` và fail closed. `PublicRouteResolver` vẫn là
+compatibility route owner; PR3 không đổi route consumer hiện tại.
+
+Clock-Type dossier không phụ thuộc Brand. Brandless state có thể có
+`relation_sections.brands=[]` và vẫn `AVAILABLE`; nếu reverse Brand↔Clock Type
+traversal chưa có trong shared engine thì public section báo
+`UNAVAILABLE_IMPLEMENTATION_GAP`, không biến gap thành empty success giả.
+Legacy `family=clock-type` vẫn là `COMPATIBILITY_READ` với
+`DATA_COMPATIBILITY_GAP`; route rendering không phải normalization.
