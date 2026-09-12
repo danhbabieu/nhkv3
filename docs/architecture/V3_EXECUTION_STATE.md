@@ -8723,9 +8723,10 @@ PR5 LOCAL CONVERGENCE: The Capture completion boundary now declares required
 owner branches by Content Intent, requires canonical owner read-back even when
 an upstream phase reports `COMPLETE`, and records missing branches and bounded
 child resume hints. A successful owner followed by a dependent reconciliation
-failure remains `PARTIAL`. The PR5 E2E-focused slice passes `3 tests / 21
-assertions`; the full relevant Capture/Video/Article slice passes `94 tests /
-437 assertions`. Full Unit passes `1,358 tests / 6,534 assertions`; Contract
+failure remains `PARTIAL`. The PR5 E2E-focused slice passes `4 tests / 25
+assertions`; the full relevant Capture/Video/Article/Visual Support slice
+passes `107 tests / 470 assertions`. Full Unit passes `1,359 tests / 6,538
+assertions`; Contract
 passes `4 / 31`; Composer lint, PHP lint, documentation generation and
 `git diff --check` pass.
 
