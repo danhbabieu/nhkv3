@@ -54,6 +54,7 @@ use NHK\Core\Infrastructure\Knowledge\{WpdbEvidenceRepository, WpdbKnowledgeRepo
 use NHK\Core\Infrastructure\Article\{WpEditorialStateReader, WpdbArticleOperationReceiptRepository, WpdbOwnerPublicationDecisionRepository};
 use NHK\Core\Contracts\Article\PublicationPrincipal;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery};
 use NHK\Core\Application\Graph\{LegacyRelationPlanner, RelationBackfillCandidate, RelationBackfillService};
@@ -492,7 +493,7 @@ final class Plugin {
                 $captureClaimReuse,
                 new CaptureVideoProvenancePlanner(),
                 $governanceRuntime->videoReconciliation,
-                static function (array $plan) use ($sources, $claims, $evidence): array {
+                static function (array $plan) use ($sources, $claims, $evidence, $proposalRepository): array {
                     $provenance = is_array($plan['capture_video_provenance'] ?? null) ? $plan['capture_video_provenance'] : $plan;
                     $dependencies = (array) ($provenance['dependencies'] ?? []);
                     $sourcePayload = is_array(($dependencies[0]['payload'] ?? null)) ? $dependencies[0]['payload'] : [];
@@ -500,11 +501,27 @@ final class Plugin {
                     $source = trim((string) ($sourcePayload['stable_key'] ?? '')) !== '' ? $sources->findByStableKey((string) $sourcePayload['stable_key']) : null;
                     $claim = trim((string) ($claimPayload['stable_key'] ?? '')) !== '' ? $claims->findByStableKey((string) $claimPayload['stable_key']) : null;
                     $evidenceRows = $claim !== null ? $evidence->listByClaim($claim->canonicalId) : [];
+                    $proposal = null;
+                    $key = trim((string) ($provenance['video_proposal']['idempotency_key'] ?? ''));
+                    if ($key !== '') $proposal = $proposalRepository->findByIdempotencyKey($key);
+                    $about = is_array($provenance['relation'] ?? null) ? $provenance['relation'] : [];
                     return [
+                        'subject' => isset($about['target_uuid']) ? ['id' => (string) $about['target_uuid'], 'type' => (string) ($about['target_type'] ?? '')] : null,
                         'source' => $source === null ? null : [$source->canonicalId, $source->revision, $source->active],
                         'claim' => $claim === null ? null : [$claim->canonicalId, $claim->revision, $claim->active],
                         'evidence' => array_map(static fn ($item): array => [$item->canonicalId, $item->revision, $item->sourceId, $item->active], $evidenceRows),
+                        'proposal' => $proposal === null ? null : [$proposal->id, $proposal->revision, $proposal->state->value, $proposal->subjectId],
                     ];
+                },
+                new \NHK\Core\Application\Capture\CaptureOrchestrationBudget(5000),
+                static function (string $ignoredCaptureId, string $phase, array $receipt) use ($captureRepository): void {
+                    $captureId = trim($ignoredCaptureId);
+                    if ($captureId === '') return;
+                    $record = $captureRepository->findById($captureId);
+                    if (!$record instanceof CaptureRecord) return;
+                    $receipts = $record->phaseReceipts;
+                    $receipts[$phase] = $receipt;
+                    $captureRepository->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $record->assets, $record->context, $record->diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
                 },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);

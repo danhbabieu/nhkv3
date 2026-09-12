@@ -10,6 +10,9 @@ use NHK\Core\Contracts\Governance\VideoProposalReconciliationPort;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
 use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
 use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
+use NHK\Core\Domain\Knowledge\DependencyValidationException;
+use NHK\Core\Domain\Video\VideoException;
+use NHK\Core\Governance\Exception\{GovernanceException, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -30,26 +33,32 @@ final class GovernedCaptureContinuationService
         private ?VideoProposalReconciliationPort $videoReconciliation = null,
         /** @var callable(array<string,mixed>):array<string,mixed>|string|null */
         private $videoDependencyState = null,
+        private ?CaptureOrchestrationBudget $budget = null,
+        /** @var callable(string,string,array<string,mixed>):void|null */
+        private $phaseReceipt = null,
     ) {}
+    private string $currentCaptureId = '';
 
     /** @return array<string,mixed> */
     public function execute(string $captureId, string $continuationKey, array $context, array $control = []): array
     {
+        $this->currentCaptureId = $captureId;
+        $this->budget?->begin();
         $proposalIds = array_values(array_filter(array_map('strval', (array) ($control['proposal_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
         $reusedClaims = $this->reusedClaims($context);
         $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context);
         $skippedVideoChildren = [];
         $videoChildren = [];
-        if ($proposalIds === [] && ($context['existing_capture_continuation'] ?? false) === true && ($context['resume_video'] ?? false) !== true) {
+        if ($proposalIds === [] && ($context['existing_capture_continuation'] ?? false) === true) {
             $previousChildren = $this->previousVideoChildren($context);
             $plans = array_values(array_filter($plans, function (array $plan) use (&$skippedVideoChildren, &$videoChildren, $previousChildren, $context): bool {
                 $isVideo = isset($plan['capture_video_provenance']) || (($plan['entity_type'] ?? '') === 'video');
                 if (!$isVideo) return true;
                 $fingerprint = $this->videoPlanFingerprint($plan, $context);
                 $previous = $previousChildren[$fingerprint] ?? null;
-                // Old Captures may predate the fingerprint receipt. They are
-                // safe to skip on text-only continuation, but an explicit
-                // resume_video control is required to retry that child.
+                // Old Captures may predate the fingerprint receipt. Persisting
+                // this fingerprint makes the next continuation state-driven:
+                // unchanged work skips, changed dependency state resumes.
                 $unchanged = $previousChildren === [] || ($previous !== null && ($previous['fingerprint'] ?? '') === $fingerprint);
                 $previousStatus = (string) ($previous['status'] ?? 'FAILED_RETRYABLE');
                 if (!$unchanged || !in_array($previousStatus, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED', 'APPLIED', 'REUSED_VERIFIED', 'SKIPPED_UNCHANGED'], true)) return true;
@@ -64,12 +73,23 @@ final class GovernedCaptureContinuationService
         $writes = [];
         $lifecycle = [];
         foreach ($plans as $plan) {
+            try {
+                $this->budget?->check('VIDEO_CHILD_OR_GOVERNANCE');
+            } catch (\Throwable $error) {
+                $writes[] = $this->classifiedFailure($plan, $error);
+                break;
+            }
             if (isset($plan['capture_video_provenance']) && is_array($plan['capture_video_provenance'])) {
                 $before = count($writes);
                 $this->executeVideoProvenancePlan($plan['capture_video_provenance'], $control, $writes, $lifecycle);
                 $childWrites = array_slice($writes, $before);
                 $last = $childWrites === [] ? ['status' => 'FAILED_RETRYABLE', 'blockers' => ['VIDEO_CHILD_NO_RESULT']] : $childWrites[array_key_last($childWrites)];
                 $videoChildren[] = ['fingerprint' => $this->videoPlanFingerprint($plan, $context), 'status' => (string) ($last['status'] ?? 'FAILED_RETRYABLE'), 'blockers' => (array) ($last['blockers'] ?? [])];
+                continue;
+            }
+            if (($plan['entity_type'] ?? '') === 'video') {
+                $writes[] = $this->runGovernedChild($plan, $control, $lifecycle, 'VIDEO_GOVERNANCE');
+                $videoChildren[] = ['fingerprint' => $this->videoPlanFingerprint($plan, $context), 'status' => (string) ($writes[array_key_last($writes)]['status'] ?? 'FAILED_RETRYABLE'), 'blockers' => (array) ($writes[array_key_last($writes)]['blockers'] ?? [])];
                 continue;
             }
             try {
@@ -164,10 +184,12 @@ final class GovernedCaptureContinuationService
         $canonicalIds = [];
         foreach (array_slice((array) ($provenancePlan['dependencies'] ?? []), 0, 2) as $dependency) {
             try {
-                $write = $this->runGovernedPlan($dependency, $control, $lifecycle);
+                $this->budget?->check('VIDEO_PROVENANCE_DEPENDENCY');
             } catch (\Throwable $error) {
-                $write = $this->classifiedFailure($dependency, $error);
+                $writes[] = $this->classifiedFailure($dependency, $error);
+                return;
             }
+            $write = $this->runGovernedChild($dependency, $control, $lifecycle, count($dependencyWrites) === 0 ? 'VIDEO_SOURCE_GOVERNANCE' : 'VIDEO_CLAIM_GOVERNANCE');
             $dependencyWrites[] = $write;
             if (($write['status'] ?? '') !== 'APPLIED') {
                 array_push($writes, ...$dependencyWrites);
@@ -191,10 +213,12 @@ final class GovernedCaptureContinuationService
         }
         $evidenceArguments = (array) ($withEvidence['dependencies'][2] ?? []);
         try {
-            $evidenceWrite = $this->runGovernedPlan($evidenceArguments, $control, $lifecycle);
+            $this->budget?->check('VIDEO_PROVENANCE_EVIDENCE');
         } catch (\Throwable $error) {
-            $evidenceWrite = $this->classifiedFailure($evidenceArguments, $error);
+            $writes[] = $this->classifiedFailure($evidenceArguments, $error);
+            return;
         }
+        $evidenceWrite = $this->runGovernedChild($evidenceArguments, $control, $lifecycle, 'VIDEO_EVIDENCE_GOVERNANCE');
         $allWrites = array_merge($dependencyWrites, [$evidenceWrite]);
         if (($evidenceWrite['status'] ?? '') !== 'APPLIED') {
             array_push($writes, ...$allWrites);
@@ -207,11 +231,36 @@ final class GovernedCaptureContinuationService
         }
         $complete = $this->videoProvenance->attachEvidence($provenancePlan, $canonicalIds[0], $canonicalIds[1], $evidenceId);
         try {
-            $videoWrite = $this->runGovernedPlan((array) ($complete['video_proposal'] ?? []), $control, $lifecycle);
+            $this->budget?->check('VIDEO_PROPOSAL_GOVERNANCE');
         } catch (\Throwable $error) {
-            $videoWrite = $this->classifiedFailure((array) ($complete['video_proposal'] ?? []), $error);
+            $writes[] = $this->classifiedFailure((array) ($complete['video_proposal'] ?? []), $error);
+            return;
         }
+        $videoWrite = $this->runGovernedChild((array) ($complete['video_proposal'] ?? []), $control, $lifecycle, 'VIDEO_GOVERNANCE');
         array_push($writes, ...array_merge($allWrites, [$videoWrite]));
+    }
+
+    /** @return array<string,mixed> */
+    private function runGovernedChild(array $plan, array $control, array &$lifecycle, string $phase): array
+    {
+        $started = microtime(true);
+        $this->emitPhaseReceipt($phase, ['status' => 'STARTED', 'result' => 'IN_PROGRESS', 'started_at' => gmdate('c')]);
+        try {
+            $write = $this->runGovernedPlan($plan, $control, $lifecycle);
+            $this->emitPhaseReceipt($phase, ['status' => 'COMPLETED', 'result' => (string) ($write['status'] ?? 'UNKNOWN'), 'started_at' => gmdate('c', (int) $started), 'completed_at' => gmdate('c'), 'elapsed_ms' => max(0, (int) ((microtime(true) - $started) * 1000))]);
+            return $write;
+        } catch (\Throwable $error) {
+            $write = $this->classifiedFailure($plan, $error);
+            $this->emitPhaseReceipt($phase, ['status' => 'FAILED', 'result' => (string) ($write['status'] ?? 'FAILED_RETRYABLE'), 'failure_code' => (string) (($write['blockers'][0] ?? 'CAPTURE_GOVERNANCE_FAILED')), 'started_at' => gmdate('c', (int) $started), 'completed_at' => gmdate('c'), 'elapsed_ms' => max(0, (int) ((microtime(true) - $started) * 1000))]);
+            return $write;
+        }
+    }
+
+    /** @param array<string,mixed> $receipt */
+    private function emitPhaseReceipt(string $phase, array $receipt): void
+    {
+        if ($this->phaseReceipt === null) return;
+        try { ($this->phaseReceipt)($this->currentCaptureId, $phase, $receipt); } catch (\Throwable) { /* diagnostics must not change semantic outcome */ }
     }
 
     /** @param array<string,mixed> $write */
@@ -283,6 +332,24 @@ final class GovernedCaptureContinuationService
     /** @return array<string,mixed> */
     private function classifiedFailure(array $plan, \Throwable $error): array
     {
+        // Domain exception classes are authoritative. Message/code matching
+        // below exists only for legacy adapters that still throw strings.
+        if ($error instanceof ProposalSubjectBindingInvalid || $error instanceof ProposalBindingConflict || $error instanceof ProposalIdempotencyConflict || $error instanceof ProposalIdempotencyStaleBinding || $error instanceof GovernanceException) {
+            $reason = match (true) {
+                $error instanceof ProposalSubjectBindingInvalid => 'PROPOSAL_SUBJECT_BINDING_INVALID',
+                $error instanceof ProposalIdempotencyConflict => 'PROPOSAL_IDEMPOTENCY_CONFLICT',
+                $error instanceof ProposalIdempotencyStaleBinding => 'IDEMPOTENCY_STALE_BINDING',
+                $error instanceof ProposalBindingConflict => 'PROPOSAL_BINDING_CONFLICT',
+                default => 'PROPOSAL_GOVERNANCE_CONTRACT_INVALID',
+            };
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => [$reason]];
+        }
+        if ($error instanceof CaptureOrchestrationBudgetExceeded || $error instanceof VideoException) {
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'FAILED_RETRYABLE', 'blockers' => [$error instanceof CaptureOrchestrationBudgetExceeded ? 'CAPTURE_ORCHESTRATION_BUDGET_EXCEEDED' : 'VIDEO_EXTERNAL_TRANSIENT_FAILURE']];
+        }
+        if ($error instanceof DependencyValidationException) {
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'REVIEW_REQUIRED', 'blockers' => [$error->errorCode]];
+        }
         $code = strtoupper(trim((string) $error->getCode()));
         if ($code === '' || preg_match('/^[A-Z][A-Z0-9_]{2,63}$/', $code) !== 1) {
             $message = strtoupper(trim($error->getMessage()));
@@ -312,7 +379,57 @@ final class GovernedCaptureContinuationService
         if ($this->videoDependencyState !== null) {
             try { $state = ($this->videoDependencyState)($plan); } catch (\Throwable) { $state = 'DEPENDENCY_STATE_UNAVAILABLE'; }
         }
-        return hash('sha256', CommandCanonicalizer::canonicalize([$plan, $state]));
+        $provenance = is_array($plan['capture_video_provenance'] ?? null) ? $plan['capture_video_provenance'] : $plan;
+        $video = is_array($provenance['video_proposal'] ?? null) ? $provenance['video_proposal'] : $plan;
+        $payload = is_array($video['payload'] ?? null) ? $video['payload'] : (is_array($provenance['payload'] ?? null) ? $provenance['payload'] : []);
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
+        if ($source === [] && is_array(($provenance['dependencies'][0]['payload'] ?? null))) $source = (array) $provenance['dependencies'][0]['payload'];
+        $relation = is_array($provenance['relation'] ?? null) ? $provenance['relation'] : [];
+        $stableSource = array_intersect_key($source, array_flip(['platform', 'external_video_id', 'canonical_source_url', 'source_snapshot_hash', 'source_revision', 'source_id']));
+        $stableState = is_array($state) ? $state : [];
+        $packet = [
+            'external' => [strtolower((string) ($source['platform'] ?? '')), (string) ($source['external_video_id'] ?? '')],
+            'source_snapshot' => $stableSource,
+            'subject' => $this->stableRecord($stableState['subject'] ?? ($metadata['subject_resolution_packet'] ?? ($relation === [] ? null : ['id' => $relation['target_uuid'] ?? null, 'type' => $relation['target_type'] ?? null]))),
+            'source_dependency' => $this->stableRecord($stableState['source'] ?? null),
+            'claim_dependency' => $this->stableRecord($stableState['claim'] ?? null),
+            'evidence_dependency' => $this->stableEvidence($stableState['evidence'] ?? ($metadata['evidence_refs'] ?? [])),
+            'proposal' => $this->stableRecord($stableState['proposal'] ?? null),
+            'about' => $this->stableAbout($metadata['semantic_attachments'] ?? ($payload['semantic_attachments'] ?? (isset($relation['target_uuid']) ? [['predicate' => 'about', 'target_type' => $relation['target_type'] ?? '', 'target_uuid' => $relation['target_uuid'] ?? '']] : []))),
+        ];
+        return hash('sha256', CommandCanonicalizer::canonicalize($packet));
+    }
+
+    /** @return list<mixed> */
+    private function stableEvidence(mixed $evidence): array
+    {
+        $rows = is_array($evidence) ? array_values(array_map(fn (mixed $row): mixed => $this->stableRecord($row), $evidence)) : [];
+        usort($rows, static fn (mixed $a, mixed $b): int => strcmp(CommandCanonicalizer::canonicalize($a), CommandCanonicalizer::canonicalize($b)));
+        return $rows;
+    }
+
+    private function stableRecord(mixed $record): mixed
+    {
+        if (!is_array($record) || array_is_list($record)) return $record;
+        return array_intersect_key($record, array_flip(['id', 'canonical_id', 'uuid', 'revision', 'state', 'active', 'source_id', 'type', 'subject_id']));
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function stableAbout(mixed $attachments): array
+    {
+        $rows = [];
+        foreach (is_array($attachments) ? $attachments : [] as $attachment) {
+            if (!is_array($attachment) || strtolower((string) ($attachment['predicate'] ?? '')) !== 'about') continue;
+            $row = array_intersect_key($attachment, array_flip(['predicate', 'target_type', 'target_uuid', 'evidence_refs', 'evidence_ids']));
+            if (is_array($row['evidence_refs'] ?? null)) {
+                usort($row['evidence_refs'], static fn (mixed $a, mixed $b): int => strcmp(CommandCanonicalizer::canonicalize($a), CommandCanonicalizer::canonicalize($b)));
+            }
+            if (is_array($row['evidence_ids'] ?? null)) sort($row['evidence_ids'], SORT_STRING);
+            $rows[] = $row;
+        }
+        usort($rows, static fn (array $a, array $b): int => strcmp(CommandCanonicalizer::canonicalize($a), CommandCanonicalizer::canonicalize($b)));
+        return $rows;
     }
 
     /** @return list<array<string,mixed>> */

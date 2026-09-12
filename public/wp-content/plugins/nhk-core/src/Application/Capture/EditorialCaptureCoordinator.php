@@ -9,6 +9,7 @@ use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
+use NHK\Core\Governance\Exception\{GovernanceException, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 
 /**
  * Shared Capture orchestration. Input/media adapters are injected at the edge;
@@ -18,6 +19,7 @@ final class EditorialCaptureCoordinator
 {
     /** @var array<string,float> */
     private array $phaseStartedAt = [];
+    private ?string $activeReceiptPhase = null;
 
     /** @param callable(array<string,mixed>):array $physicalIngest @param callable(array<string,mixed>):array $draftCreator @param callable(array<string,mixed>):array $semanticWriteBack @param callable(array<string,mixed>):array $mediaReconcile @param callable(array<string,mixed>):array $publicationGate @param callable(array<string,mixed>):array $finalReadBack @param (callable(array<string,mixed>):array)|null $draftUpdater @param (callable(array<string,mixed>):array)|null $mediaAdoption @param (callable(array<string,mixed>):array)|null $publisher @param (callable(array<string,mixed>):array)|null $videoEnrichment @param (callable(array<string,mixed>):array)|null $videoPublicationVerifier */
     public function __construct(
@@ -170,6 +172,10 @@ final class EditorialCaptureCoordinator
             $hasVideoAsset = array_filter($assets, static fn (mixed $asset): bool => is_array($asset) && ($asset['kind'] ?? '') === 'video') !== [];
             if (is_callable($this->videoEnrichment) && $videoInput !== [] && !$hasVideoAsset) {
                 $this->beginPhase('VIDEO_ENRICHED');
+                $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED');
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
                 $videoManifest = ($this->videoEnrichment)([
                     'capture_id' => $record->captureId,
                     'video' => $videoInput,
@@ -191,7 +197,19 @@ final class EditorialCaptureCoordinator
             $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken);
 
             $this->beginPhase('SEMANTICS_RECONCILED');
+            $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED');
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             $writes = ($this->semanticWriteBack)($semanticContext + ['retrieval' => $retrieved]);
+            // Child Governance receipts are persisted by the continuation
+            // service through the same Capture repository. Refresh the
+            // optimistic revision before the coordinator writes its result.
+            $latest = $this->captures->findById($record->captureId);
+            if ($latest !== null) {
+                $record = $latest;
+                $receipts = $record->phaseReceipts;
+            }
             $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
             $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken);
             if (in_array((string) ($writes['status'] ?? ''), ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
@@ -230,6 +248,11 @@ final class EditorialCaptureCoordinator
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
+            $this->beginPhase('PUBLICATION');
+            $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'PUBLICATION');
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             $publicationContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'media' => $media, 'semantic' => $retrieved, 'semantic_write_back' => $writes, 'subject_resolution' => $resolution];
             $publication = ($this->publicationGate)($publicationContext);
             // A native media/editorial write may rotate the token between the
@@ -243,6 +266,10 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $publication['state_token']);
             }
             $diagnostics['publication'] = $publication;
+            $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'PUBLICATION', $record->articleId, $record->articleStateToken);
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             $eligible = ($publication['eligible'] ?? false) === true;
             $published = false;
             if ($eligible && ($input['publish'] ?? false) === true && is_callable($this->publisher)) {
@@ -257,6 +284,11 @@ final class EditorialCaptureCoordinator
                 $diagnostics['publication_write'] = $this->withoutBody($publishedResult);
                 if (!$published) throw new \RuntimeException((string) ($publishedResult['reason'] ?? 'PUBLICATION_RESULT_UNCERTAIN'));
             }
+            $this->beginPhase('FINAL_READBACK');
+            $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'FINAL_READBACK');
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'video_publication' => $videoPublication, 'semantic_write_back' => $writes, 'published' => $published]);
             $diagnostics['final_read_back'] = $this->withoutBody($final);
             if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
@@ -264,10 +296,16 @@ final class EditorialCaptureCoordinator
             $status = $published ? 'PUBLISHED' : (($resolution['status'] ?? '') === 'ambiguous' ? 'REVIEW_REQUIRED' : 'PARTIAL');
             return $this->save($record, $stage, $assets, $diagnostics, $receipts, $stage, $record->articleId, $record->articleStateToken, $status);
         } catch (\Throwable $error) {
+            $latest = $this->captures->findById($record->captureId);
+            if ($latest !== null) {
+                $record = $latest;
+                $assets = $record->assets;
+                $receipts = $record->phaseReceipts;
+            }
             $failureCode = $this->failureCode($error);
             $status = $this->failureStatus($failureCode);
             $diagnostics['failure'] = ['code' => $failureCode, 'message' => $error->getMessage(), 'classification' => $status];
-            return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $status, $record->articleId, $record->articleStateToken, $status);
+            return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status);
         }
     }
 
@@ -318,10 +356,13 @@ final class EditorialCaptureCoordinator
         $startedEpoch = $this->phaseStartedAt[$receiptStage] ?? $completedAt;
         $startedAt = gmdate('c', (int) $startedEpoch);
         unset($this->phaseStartedAt[$receiptStage]);
+        if ($this->activeReceiptPhase === $receiptStage) $this->activeReceiptPhase = null;
+        $prior = is_array($receipts[$receiptStage] ?? null) ? $receipts[$receiptStage] : [];
         $receipts[$receiptStage] = [
-            'status' => 'VERIFIED',
+            'status' => in_array($status, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true) ? 'FAILED' : 'COMPLETED',
             'result' => $status,
-            'started_at' => $startedAt,
+            'started_at' => (string) ($prior['started_at'] ?? $startedAt),
+            'completed_at' => gmdate('c'),
             'elapsed_ms' => $startedEpoch === false ? 0 : max(0, (int) (($completedAt - (float) $startedEpoch) * 1000)),
             'at' => gmdate('c'),
         ];
@@ -333,6 +374,15 @@ final class EditorialCaptureCoordinator
         $this->phaseStartedAt[$phase] = microtime(true);
     }
 
+    /** Persist the STARTED marker before entering a long external/governed phase. */
+    private function startReceipt(CaptureRecord $record, array $assets, array $diagnostics, array $receipts, string $phase): CaptureRecord
+    {
+        $now = gmdate('c');
+        $this->activeReceiptPhase = $phase;
+        $receipts[$phase] = ['status' => 'STARTED', 'result' => 'IN_PROGRESS', 'started_at' => $now, 'completed_at' => null, 'elapsed_ms' => null];
+        return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $assets, $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+    }
+
     /** @param array<string,mixed> $value @return array<string,mixed> */
     private function withoutBody(array $value): array
     {
@@ -342,6 +392,10 @@ final class EditorialCaptureCoordinator
 
     private function failureCode(\Throwable $error): string
     {
+        if ($error instanceof ProposalSubjectBindingInvalid) return 'PROPOSAL_SUBJECT_BINDING_INVALID';
+        if ($error instanceof ProposalIdempotencyConflict) return 'PROPOSAL_IDEMPOTENCY_CONFLICT';
+        if ($error instanceof ProposalIdempotencyStaleBinding) return 'IDEMPOTENCY_STALE_BINDING';
+        if ($error instanceof GovernanceException) return 'CAPTURE_GOVERNANCE_CONTRACT_FAILURE';
         $message = strtoupper(trim($error->getMessage()));
         return $message !== '' ? preg_replace('/[^A-Z0-9_:-]+/', '_', $message) ?? 'CAPTURE_FAILED' : 'CAPTURE_FAILED';
     }

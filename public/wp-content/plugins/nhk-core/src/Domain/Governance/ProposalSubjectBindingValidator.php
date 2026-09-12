@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Domain\Governance;
 
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid;
 
 /**
  * Keeps UUID-bound Proposal subjects distinct from the entity type label.
@@ -17,7 +18,7 @@ final class ProposalSubjectBindingValidator
     public static function assertValid(Proposal $proposal): void
     {
         if (self::isValid($proposal)) return;
-        throw new \InvalidArgumentException('PROPOSAL_SUBJECT_BINDING_INVALID');
+        throw new ProposalSubjectBindingInvalid('PROPOSAL_SUBJECT_BINDING_INVALID');
     }
 
     public static function isValid(Proposal $proposal): bool

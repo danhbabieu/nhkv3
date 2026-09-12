@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
+use NHK\Core\Application\Capture\CaptureOrchestrationBudget;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, VideoProposalReconciliationPort};
@@ -168,6 +169,62 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('APPLIED', $result['status']);
         self::assertSame($videoId, $result['writes'][0]['canonical_readback']['canonical_id']);
         self::assertSame('REBUILT_AND_APPLIED', $result['writes'][0]['repair']['status']);
+    }
+
+    public function test_legacy_video_skip_reenters_when_dependency_fingerprint_changes(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'ingest', ['canonical_id' => $videoId], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'legacy-progress', entityType: 'video');
+        $state = ['revision' => 1];
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->method('createFromArguments')->willReturn($proposal);
+        $governance->method('review')->willReturn(['state' => 'approved', 'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => ['canonical_id' => $videoId], 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+        $service = new GovernedCaptureContinuationService($governance, static fn (string $id): array => ['canonical_id' => $videoId, 'canonical_readback' => ['canonical_id' => $videoId, 'active' => true]], $this->policies(['video'], ['video' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true, null, null, null, static function (array $plan) use (&$state): array { return ['source' => ['source-1', $state['revision'], true]]; });
+        $context = ['existing_capture_continuation' => true, 'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]]];
+        $first = $service->execute('legacy', 'addendum-1', $context);
+        self::assertSame('SKIPPED_UNCHANGED', $first['writes'][0]['status']);
+        $context['prior_diagnostics'] = ['semantic_write_back' => ['video_children' => $first['video_children']]];
+        $second = $service->execute('legacy', 'addendum-2', $context);
+        self::assertSame('SKIPPED_UNCHANGED', $second['writes'][0]['status']);
+        $state['revision'] = 2;
+        $third = $service->execute('legacy', 'addendum-3', $context);
+        self::assertSame('APPLIED', $third['status']);
+        self::assertNotSame('SKIPPED_UNCHANGED', $third['writes'][0]['status']);
+    }
+
+    public function test_video_child_fingerprint_ignores_timestamps_and_evidence_order_but_tracks_semantic_revisions(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $method = new \ReflectionMethod($service, 'videoPlanFingerprint');
+        $method->setAccessible(true);
+        $video = UuidCodec::newV7();
+        $plan = ['capture_video_provenance' => ['relation' => ['target_type' => 'variant', 'target_uuid' => $video], 'dependencies' => [['payload' => ['metadata' => ['platform' => 'youtube', 'external_video_id' => 'abc']]]]]];
+        $base = ['subject' => ['id' => $video, 'revision' => 3], 'source' => ['source-1', 2, true], 'claim' => ['claim-1', 4, true], 'evidence' => [['e-2', 1, 'source-1', true], ['e-1', 1, 'source-1', true]], 'proposal' => ['p-1', 2, 'approved']];
+        $same = $base; $same['evidence'] = array_reverse($same['evidence']); $same['fetched_at'] = 'different';
+        self::assertSame($method->invoke($service, $plan, ['video_dependency_fingerprint' => $base]), $method->invoke($service, $plan, ['video_dependency_fingerprint' => $same]));
+        $changed = $base; $changed['evidence'][0][1] = 2;
+        self::assertNotSame($method->invoke($service, $plan, ['video_dependency_fingerprint' => $base]), $method->invoke($service, $plan, ['video_dependency_fingerprint' => $changed]));
+        $changedSubject = $base; $changedSubject['subject']['revision'] = 4;
+        self::assertNotSame($method->invoke($service, $plan, ['video_dependency_fingerprint' => $base]), $method->invoke($service, $plan, ['video_dependency_fingerprint' => $changedSubject]));
+    }
+
+    public function test_budget_stops_before_next_expensive_phase(): void
+    {
+        $now = 100.0;
+        $budget = new CaptureOrchestrationBudget(10, static function () use (&$now): float { return $now; });
+        $budget->begin(); $now = 110.0;
+        $this->expectException(\NHK\Core\Application\Capture\CaptureOrchestrationBudgetExceeded::class);
+        $budget->check('NEXT_PHASE');
+    }
+
+    public function test_typed_binding_failure_is_blocked_even_when_exception_wording_changes(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $method = new \ReflectionMethod($service, 'classifiedFailure');
+        $method->setAccessible(true);
+        $result = $method->invoke($service, ['entity_type' => 'video'], new \NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid('changed diagnostic wording'));
+        self::assertSame('SYSTEM_BLOCKED', $result['status']);
     }
 
     private function policies(array $types = ['knowledge'], array $stored = []): GovernanceAutomationPolicyResolver

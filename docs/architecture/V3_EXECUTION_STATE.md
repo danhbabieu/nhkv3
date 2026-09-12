@@ -7875,3 +7875,19 @@ deployment configuration and authenticated live runtime boundary.
 
 STATUS: ROOT REPAIR COMMIT PUSHED; DEMO DEPLOYMENT AND LIVE RECONCILIATION
 BLOCKED BY `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`. Do not mark live repair complete.
+
+# Checkpoint — 2026-09-12 — Capture/Governance convergence hardening
+
+The local hardening pass adds state-driven legacy Capture recovery, a bounded
+monotonic continuation budget, stable semantic Video-child fingerprints,
+durable STARTED/terminal receipts for long coordinator and child Governance
+phases, typed Proposal
+subject-binding classification, strict `about` subject fallback, and a
+WordPress-style supersession/idempotency regression. Migration020 remains
+forward-only and deliberately does not infer historical `subject_id` values
+from `entity_type`; malformed historical rows remain repair candidates.
+
+The canonical documentation projection was regenerated after this checkpoint's
+final documentation edit with `composer generate:mcp-docs`. No migration,
+deployment, push, staging/live/V2 mutation, or semantic data repair was run.
+The worktree remains intentionally uncommitted pending final verification.

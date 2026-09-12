@@ -8,6 +8,7 @@ use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, Subjec
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
 use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid;
 use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureContinuationTest extends TestCase
@@ -253,7 +254,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         $captures->create($capture);
         $events = [];
         $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, static function (): array {
-            throw new \RuntimeException('PROPOSAL_SUBJECT_BINDING_INVALID');
+            throw new ProposalSubjectBindingInvalid('wording changed but binding remains invalid');
         }));
 
         $result = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'binding-failure', 'text' => 'Bổ sung có lỗi binding.']);
@@ -261,6 +262,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('SYSTEM_BLOCKED', $result['capture']['status']);
         self::assertSame('PROPOSAL_SUBJECT_BINDING_INVALID', $result['capture']['diagnostics']['failure']['code']);
         self::assertSame('SYSTEM_BLOCKED', $result['capture']['diagnostics']['failure']['classification']);
+        self::assertSame('FAILED', $result['capture']['phase_receipts']['SEMANTICS_RECONCILED']['status']);
     }
 
     private function capture(): CaptureRecord

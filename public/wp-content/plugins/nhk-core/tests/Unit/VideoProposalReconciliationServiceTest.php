@@ -32,7 +32,7 @@ final class VideoProposalReconciliationServiceTest extends TestCase
             'url' => 'https://www.youtube.com/watch?v=3x9naQn1H_4',
             'metadata' => [
                 'source' => ['platform' => 'youtube', 'external_video_id' => '3x9naQn1H_4', 'canonical_source_url' => 'https://www.youtube.com/watch?v=3x9naQn1H_4', 'source_title' => 'Số 67 – Ô-đô 36/8 Nguyên Bản – Đời Máy Ba Vách Bệt Đáng Sưu Tầm'],
-                'subject_resolution_packet' => ['id' => '018f2f1e-7b2c-7abc-8def-0123456789b0', 'type' => 'brand', 'name' => 'Odo'],
+                'subject_resolution_packet' => ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Odo 36/8'],
                 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'evidence_refs' => [['kind' => 'USER_HINT', 'value' => 'legacy']]]],
             ],
         ], 'old-content', null, 'old-dependency', ProposalState::APPROVED, idempotencyKey: 'old-video', entityType: 'video');
@@ -70,6 +70,18 @@ final class VideoProposalReconciliationServiceTest extends TestCase
         );
 
         $result = $service->reconcile(self::OLD);
+
+        $resolve = new \ReflectionMethod($service, 'resolveSubject');
+        $resolve->setAccessible(true);
+        self::assertSame(self::VARIANT, $resolve->invoke($service, ['semantic_attachments' => [
+            ['predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => self::VARIANT],
+            ['predicate' => 'music', 'target_type' => 'music', 'target_uuid' => UuidCodec::newV7()],
+        ]], [])['id']);
+        self::assertNull($resolve->invoke($service, ['semantic_attachments' => [
+            ['predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => self::VARIANT],
+            ['predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => UuidCodec::newV7()],
+        ]], []));
+        self::assertNull($resolve->invoke($service, ['semantic_attachments' => [['predicate' => 'music', 'target_type' => 'music', 'target_uuid' => UuidCodec::newV7()]]], []));
 
         self::assertSame('REBUILT_AND_APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
         self::assertSame(ProposalState::SUPERSEDED, $repository->find(self::OLD)?->state);

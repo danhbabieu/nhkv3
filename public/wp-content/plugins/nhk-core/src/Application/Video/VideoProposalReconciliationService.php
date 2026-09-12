@@ -13,6 +13,7 @@ use NHK\Core\Application\PublicIdentity\PublicIdentityService;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 
 /**
  * Repairs an existing Video proposal through fresh governed dependencies.
@@ -186,18 +187,29 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
     private function resolveSubject(array $metadata, array $source): ?array
     {
         $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
-        $attachmentTarget = null;
+        $allowedTypes = (new VideoRelationAdminContract())->targetTypes();
+        $packetType = strtolower(trim((string) ($packet['type'] ?? '')));
+        if (UuidCodec::isValid((string) ($packet['id'] ?? '')) && in_array($packetType, $allowedTypes, true)) {
+            return ['id' => (string) $packet['id'], 'type' => strtolower(trim((string) $packet['type'])), 'name' => (string) ($packet['name'] ?? '')];
+        }
+        $aboutTargets = [];
         foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
             if (!is_array($attachment)) continue;
+            if (strtolower(trim((string) ($attachment['predicate'] ?? ''))) !== 'about') continue;
             $id = trim((string) ($attachment['target_uuid'] ?? ''));
-            $type = trim((string) ($attachment['target_type'] ?? ''));
-            if (UuidCodec::isValid($id) && $type !== '') {
-                $attachmentTarget = ['id' => $id, 'type' => $type, 'name' => ''];
-                break;
-            }
+            $type = strtolower(trim((string) ($attachment['target_type'] ?? '')));
+            if (UuidCodec::isValid($id) && in_array($type, $allowedTypes, true)) $aboutTargets[$type . ':' . strtolower($id)] = ['id' => $id, 'type' => $type, 'name' => ''];
         }
-        $packetIsVariant = strtolower(trim((string) ($packet['type'] ?? ''))) === 'variant';
-        if ($packetIsVariant && UuidCodec::isValid((string) ($packet['id'] ?? ''))) return $packet;
+        if (count($aboutTargets) > 1) return null;
+        if (count($aboutTargets) === 1) {
+            $about = array_values($aboutTargets)[0];
+            if ($this->subjects !== null) {
+                $resolved = $this->subjects->resolve([(string) ($source['source_title'] ?? '')]);
+                $primary = is_array($resolved['primary'] ?? null) ? $resolved['primary'] : null;
+                if ($primary !== null && strtolower((string) ($primary['id'] ?? '')) === strtolower((string) $about['id'])) return $primary;
+            }
+            return $about;
+        }
         if ($this->subjects !== null) {
             $title = (string) ($source['source_title'] ?? '');
             $hints = [$title];
@@ -206,8 +218,7 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
             $primary = is_array($resolved['primary'] ?? null) ? $resolved['primary'] : null;
             return $primary !== null && (string) ($primary['type'] ?? '') === 'variant' ? $primary : null;
         }
-        if ($attachmentTarget !== null) return $attachmentTarget;
-        return UuidCodec::isValid((string) ($packet['id'] ?? '')) && trim((string) ($packet['type'] ?? '')) !== '' ? $packet : null;
+        return null;
     }
 
     private function userHint(array $metadata): string { return is_array($metadata['provenance']['user_hint'] ?? null) ? (string) ($metadata['provenance']['user_hint']['value'] ?? '') : ''; }

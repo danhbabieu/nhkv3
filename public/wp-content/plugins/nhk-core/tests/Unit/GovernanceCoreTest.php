@@ -242,6 +242,43 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame('video', $repository->find($old->id)?->subjectId);
     }
 
+    #[RunInSeparateProcess]
+    public function test_wpdb_supersession_replay_preserves_history_and_rejects_changed_intent(): void
+    {
+        if (!defined('ARRAY_A')) define('ARRAY_A', 'ARRAY_A');
+        if (!function_exists('wp_json_encode')) eval('function wp_json_encode($value, $flags = 0) { return json_encode($value, $flags); }');
+        $oldId = UuidCodec::newV7(); $replacementId = UuidCodec::newV7(); $canonicalId = UuidCodec::newV7();
+        $old = ['id' => 1, 'proposal_uuid' => UuidCodec::toBinary($oldId), 'idempotency_key' => 'legacy-key', 'operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => 'video', 'target_uuid' => '', 'expected_revision' => null, 'command_json' => json_encode(['canonical_id' => $canonicalId]), 'fingerprint' => str_repeat('a', 32), 'dependency_fingerprint' => str_repeat('b', 32), 'state' => '6', 'revision' => '2', 'created_by' => '1', 'superseded_by_proposal_id' => '2', 'created_at' => null, 'updated_at' => null, 'submitted_at' => null, 'applied_at' => null, 'cancelled_at' => null, 'rejected_at' => null, 'superseded_at' => null];
+        $replacement = array_merge($old, ['id' => 2, 'proposal_uuid' => UuidCodec::toBinary($replacementId), 'idempotency_key' => 'video-repair:' . $oldId, 'subject_id' => $canonicalId, 'state' => '3', 'revision' => '1', 'superseded_by_proposal_id' => null, 'command_json' => json_encode(['canonical_id' => $canonicalId])]);
+        $database = new class($old, $replacement, $oldId, $replacementId) {
+            public string $prefix = 'wp_'; public string $last_error = '';
+            public function __construct(private array $old, private array $replacement, private string $oldId, private string $replacementId) {}
+            public function prepare(string $query, mixed ...$args): string { return $query . '|ARGS|' . base64_encode(serialize($args)); }
+            public function get_row(string $query, mixed $output): ?array
+            {
+                if (str_contains($query, 'idempotency_key=')) return $this->old;
+                if (str_contains($query, 'proposal_uuid=')) {
+                    $parts = explode('|ARGS|', $query, 2); $args = isset($parts[1]) ? unserialize(base64_decode($parts[1]), ['allowed_classes' => false]) : [];
+                    $id = isset($args[0]) ? bin2hex((string) $args[0]) : '';
+                    return $id === bin2hex(UuidCodec::toBinary($this->oldId)) ? $this->old : ($id === bin2hex(UuidCodec::toBinary($this->replacementId)) ? $this->replacement : null);
+                }
+                return null;
+            }
+            public function get_var(string $query): mixed
+            {
+                if (str_contains($query, 'approved_by')) return null;
+                if (str_contains($query, 'SELECT proposal_uuid')) return UuidCodec::toBinary($this->replacementId);
+                return null;
+            }
+        };
+        $repository = new WpdbProposalRepository($database);
+        self::assertSame($replacementId, $repository->findByIdempotencyKey('legacy-key')?->id);
+        self::assertSame('video', $repository->find($oldId)?->subjectId);
+        $changed = new Proposal(UuidCodec::newV7(), $canonicalId, 'ingest', ['canonical_id' => $canonicalId], str_repeat('c', 64), null, str_repeat('d', 64), ProposalState::DRAFT, idempotencyKey: 'legacy-key', entityType: 'video');
+        $this->expectException(ProposalIdempotencyConflict::class);
+        (new GovernanceService($repository))->create($changed);
+    }
+
     public function test_mcp_relation_requires_revision_aware_endpoint_registry(): void
     {
         $sourceUuid = UuidCodec::newV7();
