@@ -265,6 +265,110 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('FAILED', $result['capture']['phase_receipts']['SEMANTICS_RECONCILED']['status']);
     }
 
+    public function test_text_only_legacy_continuation_does_not_reenter_original_video_enrichment(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-legacy-video',
+            hash('sha256', 'legacy-video'),
+            CaptureStage::SUBJECTS_RESOLVED->value,
+            'FAILED_RETRYABLE',
+            445,
+            'state-445',
+            [],
+            [
+                'raw_input' => 'Odo 36/8 Westminster.',
+                'subject_hints' => ['Odo 36/8'],
+                // A legacy immutable request may document the original
+                // Video, but it is not a continuation delta or a planning
+                // asset and must not trigger a new external fetch.
+                'original_request' => ['video' => ['url' => 'https://youtu.be/_VWcu0gqg5s']],
+            ],
+            ['failure' => ['code' => 'VIDEO_RELATION_REQUIRES_EVIDENCE']],
+            [],
+        );
+        $captures->create($capture);
+        $videoCalls = 0;
+        $coordinator = new EditorialCaptureCoordinator(
+            $captures,
+            static fn (): array => ['items' => []],
+            static fn (): array => ['post_id' => 445, 'state_token' => 'state-445'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function () use (&$videoCalls): array {
+                $videoCalls++;
+                throw new \RuntimeException('VIDEO_ENRICHMENT_MUST_NOT_RUN');
+            },
+        );
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator);
+
+        $result = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'legacy-text-only-addendum',
+            'text' => 'Bổ sung ghi chú hiện trường.',
+        ]);
+
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+        self::assertSame(445, $result['capture']['article_id']);
+        self::assertSame('COMPLETED', $result['addendum']['status']);
+        self::assertSame(0, $videoCalls);
+        self::assertArrayNotHasKey('VIDEO_ENRICHED', $result['capture']['phase_receipts']);
+    }
+
+    public function test_video_enrichment_started_receipt_survives_callback_failure(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $videoCalls = 0;
+        $coordinator = new EditorialCaptureCoordinator(
+            $captures,
+            static fn (): array => ['items' => []],
+            static fn (): array => ['post_id' => 445, 'state_token' => 'state-445'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'REVIEW_REQUIRED', 'writes' => []],
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            static function () use (&$videoCalls): array {
+                $videoCalls++;
+                throw new \RuntimeException('BOUNDED_VIDEO_ENRICHMENT_FAILURE');
+            },
+        );
+
+        $result = $coordinator->execute([
+            'purpose' => 'EDITORIAL',
+            'idempotency_key' => 'new-video-capture',
+            'text' => 'Odo 36/8 Westminster.',
+            'video' => ['url' => 'https://youtu.be/_VWcu0gqg5s'],
+        ]);
+
+        self::assertSame(1, $videoCalls);
+        self::assertSame('FAILED_RETRYABLE', $result->status);
+        self::assertSame('FAILED', $result->phaseReceipts['VIDEO_ENRICHED']['status']);
+        self::assertSame('FAILED_RETRYABLE', $result->phaseReceipts['VIDEO_ENRICHED']['result']);
+        self::assertArrayNotHasKey('VIDEO_SOURCE_GOVERNANCE', $result->phaseReceipts);
+        self::assertArrayNotHasKey('VIDEO_CLAIM_GOVERNANCE', $result->phaseReceipts);
+        self::assertArrayNotHasKey('VIDEO_EVIDENCE_GOVERNANCE', $result->phaseReceipts);
+    }
+
     private function capture(): CaptureRecord
     {
         return new CaptureRecord(UuidCodec::newV7(), 'capture-original-' . bin2hex(random_bytes(2)), hash('sha256', 'original'), CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', 342, 'state-342', [], ['raw_input' => 'Ghi chú ban đầu.', 'subject_hints' => ['Odo 30']], ['composition' => ['title' => 'Bài 342']], []);
