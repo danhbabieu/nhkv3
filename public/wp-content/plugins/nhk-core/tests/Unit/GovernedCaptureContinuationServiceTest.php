@@ -7,8 +7,11 @@ use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Capture\CaptureOrchestrationBudget;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
+use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSeoProjection};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, VideoProposalReconciliationPort};
+use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -196,6 +199,46 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             'existing_capture_continuation' => true,
             'continuation_delta_text' => 'Bổ sung lý do cần đọc lại Video.',
             'subject_resolution' => ['resolved' => []], 'interpretation' => [], 'observations' => [],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]],
+        ], ['resume_children' => ['video']]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame($videoId, $result['writes'][0]['canonical_id']);
+    }
+
+    public function test_explicit_video_resume_creates_same_video_editorial_update_from_current_delta(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $videos = new class($videoId) implements VideoRepository {
+            public Video $video;
+            public function __construct(string $id) { $this->video = new Video($id, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Nguồn video', ['source' => ['source_title' => 'Nguồn video', 'external_video_id' => 'dQw4w9WgXcQ'], 'editorial' => ['title' => 'OLD', 'summary' => 'OLD SUMMARY', 'body' => 'OLD BODY', 'why_this_matters' => 'OLD WHY']]); }
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->video->canonicalId ? $this->video : null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return $platform === $this->video->platform && $externalId === $this->video->externalVideoId ? $this->video : null; }
+            public function create(Video $video): Video { return $this->video = $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $this->video = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata, $video->thumbnailMediaId, $video->active, $expectedRevision + 1); }
+            public function list(bool $includeRetired = false): array { return [$this->video]; }
+        };
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'update', [], 'content', 1, 'dependency', ProposalState::DRAFT, idempotencyKey: 'resume-editorial', targetUuid: $videoId, entityType: 'video');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static function (array $args) use ($videoId): bool {
+            return ($args['operation'] ?? '') === 'update'
+                && ($args['entity_type'] ?? '') === 'video'
+                && ($args['subject_id'] ?? '') === $videoId
+                && ($args['target_uuid'] ?? '') === $videoId
+                && ($args['payload']['metadata']['editorial']['summary'] ?? '') !== 'OLD SUMMARY';
+        }))->willReturn($proposal);
+        $governance->method('submit')->willReturn($proposal->transition(ProposalState::SUBMITTED));
+        $governance->method('review')->willReturn(['state' => 'approved', 'entity_type' => 'video', 'operation' => 'update', 'subject_id' => $videoId, 'target_uuid' => $videoId, 'payload' => $proposal->payload, 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+        $planner = new VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => ['canonical_id' => $videoId, 'canonical_readback' => ['canonical_id' => $videoId, 'active' => true, 'revision' => 2]], $this->policies(['video'], ['video' => 'AUTO_PUBLISH']), static fn (): bool => true, null, null, null, null, null, null, null, null, $planner);
+
+        $result = $service->execute('capture-resume', 'resume-editorial', [
+            'capture_id' => 'capture-resume',
+            'existing_capture_continuation' => true,
+            'continuation_delta_text' => 'Giải thích giá trị sưu tầm của video này.',
+            'subject_resolution' => ['primary' => ['id' => '22222222-2222-4222-8222-222222222222', 'type' => 'variant', 'name' => 'Odo 36/8']],
+            'retrieval' => ['selected_claims' => [['id' => 'claim-1', 'revision' => 4]]],
             'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]],
         ], ['resume_children' => ['video']]);
 

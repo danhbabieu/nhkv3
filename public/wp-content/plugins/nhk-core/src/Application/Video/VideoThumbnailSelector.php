@@ -71,15 +71,14 @@ final class VideoThumbnailSelector
         }
         $candidates = is_array($source['thumbnail_candidates'] ?? null) ? $source['thumbnail_candidates'] : [];
         if ($candidates !== [] && $this->probe !== null) return $this->select($candidates);
-        // Compatibility-read for older stored source packets: never revive a
-        // known tiny default.jpg blindly, but keep a previously supplied
-        // non-default URL visible until the next governed source refresh has
-        // persisted an actual probe result.
+        // Compatibility-read for older non-YouTube source packets. Known
+        // YouTube variants are intentionally not selected by filename alone;
+        // they must first pass the governed probe and be persisted above.
         foreach ((array) ($source['thumbnail_urls'] ?? []) as $legacyUrl) {
             $legacyUrl = trim((string) $legacyUrl);
             if ($legacyUrl === '' || strtolower((string) parse_url($legacyUrl, PHP_URL_SCHEME)) !== 'https') continue;
             $variant = $this->variant('', $legacyUrl);
-            if ($variant === 'default') continue;
+            if ($variant !== '') continue;
             return ['url' => $legacyUrl, 'variant' => $variant !== '' ? $variant : 'legacy'];
         }
         return [];

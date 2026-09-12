@@ -489,6 +489,7 @@ final class Plugin {
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
             $captureRepository = new WpdbCaptureRepository($wpdb);
             $captureClaimReuse = new ClaimReusePolicy();
+            $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection());
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
             $videoRelationCandidates = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies);
             $captureGovernance = new GovernedCaptureContinuationService(
@@ -530,6 +531,7 @@ final class Plugin {
                     $captureRepository->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $record->stage, $record->status, $record->articleId, $record->articleStateToken, $record->assets, $record->context, $record->diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
                 },
                 videoRelations: $videoRelationCandidates,
+                videoEditorialResume: $videoEditorialResume,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

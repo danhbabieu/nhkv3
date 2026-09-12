@@ -8626,8 +8626,10 @@ legacy Capture snapshots are re-probed during Video resume; no second Media
 identity is created.
 
 TEST EVIDENCE: Focused Capture/Video/Governance/Article/thumbnail/projection
-coverage passes 134 tests / 541 assertions. NHK Unit passes 1,344 tests /
-6,470 assertions (13 warnings, 11 deprecations and 13 PHPUnit deprecations;
+coverage passes 76 tests / 316 assertions for the final thumbnail/handoff
+slice; the broader focused Capture/Article/Governance slice passes 134 tests /
+541 assertions. NHK Unit passes 1,345 tests / 6,471 assertions
+(13 warnings, 11 deprecations and 13 PHPUnit deprecations;
 no failures). NHK Contract passes 4 tests / 31 assertions. Composer PHP lint,
 composer lint, composer validation and `git diff --check` pass. Static
 analysis tools are not configured in this checkout.

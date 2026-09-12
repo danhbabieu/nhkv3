@@ -14,6 +14,7 @@ use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Domain\Video\{VideoException, VideoRelationEvidenceRequired};
 use NHK\Core\Application\Video\VideoRelationCandidatePlanner;
+use NHK\Core\Application\Video\VideoEditorialResumePlanner;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -42,6 +43,7 @@ final class GovernedCaptureContinuationService
         private $phaseReceipt = null,
         ?CompletionCoordinator $completion = null,
         private ?VideoRelationCandidatePlanner $videoRelations = null,
+        private ?VideoEditorialResumePlanner $videoEditorialResume = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -88,6 +90,20 @@ final class GovernedCaptureContinuationService
         $writes = [];
         $lifecycle = [];
         foreach ($plans as $plan) {
+            if (is_array($plan['video_editorial_reuse'] ?? null)) {
+                $reuse = $plan['video_editorial_reuse'];
+                $writes[] = [
+                    'entity_type' => 'video',
+                    'status' => 'REUSED_VERIFIED',
+                    'canonical_id' => (string) ($reuse['subject_id'] ?? ''),
+                    'canonical_readback' => $reuse['canonical_readback'] ?? null,
+                    'fingerprint' => (string) ($reuse['fingerprint'] ?? ''),
+                    'idempotent' => true,
+                    'reused' => true,
+                ];
+                $videoChildren[] = ['fingerprint' => (string) ($reuse['fingerprint'] ?? ''), 'status' => 'REUSED_VERIFIED', 'reason' => 'REUSE_EDITORIAL'];
+                continue;
+            }
             try {
                 $this->budget?->check('VIDEO_CHILD_OR_GOVERNANCE');
             } catch (\Throwable $error) {
@@ -193,6 +209,15 @@ final class GovernedCaptureContinuationService
             $operation = trim((string) ($video['operation'] ?? 'ingest')) ?: 'ingest';
             $subjectId = trim((string) ($video['subject_id'] ?? ''));
             $payload = is_array($video['payload'] ?? null) ? $video['payload'] : $video;
+            if (!$includeSemanticChildren && $this->videoEditorialResume !== null && $entityType === 'video') {
+                $resume = $this->videoEditorialResume->plan($video, $context + ['capture_id' => $captureId]);
+                if (($resume['status'] ?? '') === 'REUSE_EDITORIAL') {
+                    $plans[] = ['video_editorial_reuse' => $resume];
+                } else {
+                    $plans[] = $resume;
+                }
+                continue;
+            }
             if ($this->videoProvenance !== null && $entityType === 'video' && $operation === 'ingest') {
                 $source = is_array($payload['metadata']['source'] ?? null) ? $payload['metadata']['source'] : (is_array($payload['metadata']['source_snapshot'] ?? null) ? $payload['metadata']['source_snapshot'] : []);
                 $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];

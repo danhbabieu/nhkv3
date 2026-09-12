@@ -67,4 +67,11 @@ final class VideoThumbnailSelectorTest extends TestCase
             $selector->fromSource(['thumbnail_selection' => ['url' => 'https://img.youtube.test/sddefault.jpg', 'variant' => 'sddefault', 'width' => 1280, 'height' => 720]]),
         );
     }
+
+    public function test_unprobed_youtube_variant_is_not_selected_by_filename_alone(): void
+    {
+        self::assertSame([], (new VideoThumbnailSelector())->fromSource([
+            'thumbnail_urls' => ['https://i.ytimg.com/vi/example/default.jpg', 'https://i.ytimg.com/vi/example/maxresdefault.jpg'],
+        ]));
+    }
 }
