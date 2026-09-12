@@ -86,8 +86,8 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         if (!UuidCodec::isValid($claimId)) return $this->blocked($proposalId, 'EVIDENCE_REQUIRED');
         $evidenceId = $this->resolveEvidence($claimId, $sourceId);
         if ($evidenceId === null) {
-            $withPlaceholder = $this->planner->attachEvidence($planned, $sourceId, $claimId, UuidCodec::newV7());
-            $evidenceArguments = (array) (($withPlaceholder['dependencies'] ?? [])[2] ?? []);
+            $withEvidenceDependency = $this->planner->attachEvidenceDependency($planned, $sourceId, $claimId);
+            $evidenceArguments = (array) (($withEvidenceDependency['dependencies'] ?? [])[2] ?? []);
             $evidenceWrite = $this->run($evidenceArguments);
             if (($evidenceWrite['status'] ?? '') !== 'APPLIED') return $this->blocked($proposalId, $this->firstReason((array) ($evidenceWrite['blockers'] ?? []), 'EVIDENCE_REQUIRED'));
             $evidenceId = $this->canonicalId($evidenceWrite);

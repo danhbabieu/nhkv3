@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Video Evidence handoff convergence
+
+WHAT: The Capture Video continuation now adds the governed Evidence dependency
+without a placeholder relation reference. After canonical Evidence read-back,
+the shared Video relation candidate planner validates and carries the exact
+Evidence UUID into the Video proposal before Governance Apply.
+
+RESUME: An explicit `resume_children:["video"]` continuation suppresses
+replayed Knowledge/relation plans and rehydrates only the immutable original
+Video child. Ordinary text addenda retain the existing no-implicit-resume
+behavior.
+
+DIAGNOSTICS: Video child results expose the canonical Source, Claim and Evidence
+handoff IDs plus relation evidence refs. Source/Evidence/Video identity remains
+idempotent and no replacement Video input is accepted by the continuation
+boundary.
+
+VERIFICATION: Focused Evidence handoff and continuation tests pass. No live
+Capture, publish, retry or semantic mutation was performed in this checkpoint.
+
+STATUS: IMPLEMENTED_CODE_SIDE / LIVE_RETRY_EXPLICITLY_BLOCKED.
+
 # Checkpoint — 2026-09-12 — Capture resume contract convergence
 
 WHAT: Added the optional `resume_children:["video"]` field to the one

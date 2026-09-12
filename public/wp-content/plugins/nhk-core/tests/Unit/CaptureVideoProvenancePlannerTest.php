@@ -6,8 +6,12 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Capture\CaptureVideoProvenancePlanner;
 use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
+use NHK\Core\Application\Video\VideoRelationCandidatePlanner;
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Graph\PredicateRegistry;
+use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -66,9 +70,13 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame('source-uuid', $completed['dependencies'][2]['payload']['source_id']);
         self::assertSame('claim-uuid', $completed['dependencies'][2]['payload']['claim_id']);
         self::assertSame(
-            [['target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => 'evidence-uuid']]]],
+            [['target_type' => 'variant', 'target_uuid' => self::VARIANT, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION', 'reason' => 'Source-specific provenance handoff.', 'confidence' => 1.0, 'evidence_refs' => [['evidence_id' => 'evidence-uuid']]]],
             $completed['video_proposal']['payload']['metadata']['semantic_attachments'],
         );
+
+        $prepared = $planner->attachEvidenceDependency($plan, 'source-uuid', 'claim-uuid');
+        self::assertSame([], $prepared['video_proposal']['payload']['metadata']['semantic_attachments']);
+        self::assertSame('source-uuid', $prepared['dependencies'][2]['payload']['source_id']);
     }
 
     public function test_source_identity_and_evidence_plan_are_not_reused_by_target_variant_only(): void
@@ -214,6 +222,95 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame($ids[0], $created[2]['payload']['source_id']);
         self::assertSame($ids[1], $created[2]['payload']['claim_id']);
         self::assertSame([['evidence_id' => $ids[2]]], $created[3]['payload']['metadata']['semantic_attachments'][0]['evidence_refs']);
+    }
+
+    public function test_explicit_video_resume_hands_canonical_evidence_to_relation_candidate_without_reapplying_knowledge(): void
+    {
+        $ids = array_map(static fn (): string => UuidCodec::newV7(), range(1, 4));
+        $created = [];
+        $proposals = [];
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::exactly(4))->method('createFromArguments')->willReturnCallback(function (array $arguments) use (&$created, &$proposals, $ids): Proposal {
+            $created[] = $arguments;
+            $index = count($created) - 1;
+            $proposal = new Proposal($ids[$index], (string) ($arguments['subject_id'] ?? 'subject'), 'ingest', (array) ($arguments['payload'] ?? []), 'content-' . $index, null, 'dependency-' . $index, ProposalState::DRAFT, idempotencyKey: (string) ($arguments['idempotency_key'] ?? ''), entityType: (string) ($arguments['entity_type'] ?? ''));
+            $proposals[] = $proposal;
+            return $proposal;
+        });
+        $governance->method('review')->willReturnCallback(function (string $id) use (&$proposals): array {
+            $proposal = array_values(array_filter($proposals, static fn (Proposal $item): bool => $item->id === $id))[0];
+            return ['state' => 'draft', 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'subject_id' => $proposal->subjectId, 'payload' => $proposal->payload, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint];
+        });
+        $governance->method('submit')->willReturnCallback(static function (string $id) use (&$proposals): Proposal { return array_values(array_filter($proposals, static fn (Proposal $item): bool => $item->id === $id))[0]; });
+        $governance->method('approve')->willReturnCallback(static function (string $id) use (&$proposals): Proposal { return array_values(array_filter($proposals, static fn (Proposal $item): bool => $item->id === $id))[0]->transition(ProposalState::APPROVED, 'test'); });
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+
+        $claims = new class($ids[1]) implements KnowledgeRepository {
+            public function __construct(private string $id) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return $id === $this->id ? new KnowledgeClaim($id, 'test:provenance', 'Source identifies the Video.') : null; }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $sources = new class($ids[0]) implements SourceRepository {
+            public function __construct(private string $id) {}
+            public function findByCanonicalId(string $id): ?Source { return $id === $this->id ? new Source($id, 'test:video-source', 'Variant A source', 'website', 'https://youtube.test/abcdefghijk') : null; }
+            public function findByStableKey(string $stableKey): ?Source { return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $evidence = new class($ids[2], $ids[1], $ids[0]) implements EvidenceRepository {
+            public function __construct(private string $id, private string $claimId, private string $sourceId) {}
+            public function findByCanonicalId(string $id): ?Evidence { return $id === $this->id ? new Evidence($id, $this->claimId, $this->sourceId, 'supports', 'Variant A source', 'https://youtube.test/abcdefghijk') : null; }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+        };
+        $relationPlanner = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources);
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static function (string $id) use ($ids): array {
+                $index = array_search($id, $ids, true);
+                return ['canonical_id' => $ids[$index], 'canonical_readback' => ['canonical_id' => $ids[$index], 'active' => true, 'revision' => 1], 'idempotent' => false];
+            },
+            new GovernanceAutomationPolicyResolver(['source', 'knowledge', 'evidence', 'video'], new class implements AutomationPolicyStorage {
+                public function read(): array { return ['source' => 'AUTO_PUBLISH', 'knowledge' => 'AUTO_PUBLISH', 'evidence' => 'AUTO_PUBLISH', 'video' => 'AUTO_PUBLISH']; }
+                public function write(array $policies): void {}
+            }),
+            static fn (string $capability): bool => true,
+            null,
+            new CaptureVideoProvenancePlanner(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            videoRelations: $relationPlanner,
+        );
+
+        $videoId = $ids[3];
+        $result = $service->execute('01a09370-effb-7ebc-bf11-5f9fbd62c529', 'capture:450:resume-video', [
+            'existing_capture_continuation' => true,
+            'continuation_delta_text' => '',
+            'subject_resolution' => ['primary' => ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'], 'resolved' => [['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A']]],
+            'interpretation' => ['user_claim_candidates' => array_map(static fn (int $index): array => ['text' => 'Completed claim ' . $index, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE'], range(1, 7))],
+            'observations' => [],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $videoId, 'payload' => ['canonical_id' => $videoId, 'url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot'], 'semantic_attachments' => []]]]]],
+        ], ['approval_confirmed' => true, 'resume_children' => ['video']]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame(['source', 'knowledge', 'evidence', 'video'], array_column($created, 'entity_type'));
+        self::assertSame($videoId, $created[3]['payload']['canonical_id']);
+        self::assertSame([['evidence_id' => $ids[2]]], $created[3]['payload']['metadata']['semantic_attachments'][0]['evidence_refs']);
+        self::assertSame('variant', $created[3]['payload']['metadata']['semantic_attachments'][0]['target_type']);
+        self::assertSame(self::VARIANT, $created[3]['payload']['metadata']['semantic_attachments'][0]['target_uuid']);
+        self::assertSame($ids[0], $result['writes'][3]['evidence_handoff']['source_id']);
+        self::assertSame($ids[1], $result['writes'][3]['evidence_handoff']['claim_id']);
+        self::assertSame($ids[2], $result['writes'][3]['evidence_handoff']['evidence_id']);
+        self::assertSame([['evidence_id' => $ids[2]]], $result['writes'][3]['evidence_handoff']['relation_evidence_refs']);
     }
 
     private function videoProposal(string $externalId): array

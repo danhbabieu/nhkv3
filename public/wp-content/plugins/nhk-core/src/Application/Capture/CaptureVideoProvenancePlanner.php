@@ -94,6 +94,7 @@ final class CaptureVideoProvenancePlanner
             ],
         ];
 
+        $originalRelation = $this->originalRelation($metadata, $subjectType, $subjectId);
         return [
             'status' => 'READY',
             'blockers' => [],
@@ -108,7 +109,14 @@ final class CaptureVideoProvenancePlanner
             'reuse_scope' => 'source-specific-external-video',
             'unsupported_classifications' => $unsupported,
             'video_proposal' => $emptyVideo,
-            'relation' => ['target_type' => $subjectType, 'target_uuid' => $subjectId, 'predicate' => 'about'],
+            'relation' => [
+                'target_type' => $subjectType,
+                'target_uuid' => $subjectId,
+                'predicate' => (string) ($originalRelation['predicate'] ?? 'about'),
+                'origin' => (string) ($originalRelation['origin'] ?? 'EXPLICIT_USER_RELATION'),
+                'reason' => (string) ($originalRelation['reason'] ?? 'Source-specific provenance handoff.'),
+                'confidence' => (float) ($originalRelation['confidence'] ?? 1.0),
+            ],
             'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType],
         ];
     }
@@ -127,6 +135,9 @@ final class CaptureVideoProvenancePlanner
             'target_type' => (string) ($relation['target_type'] ?? ''),
             'target_uuid' => (string) ($relation['target_uuid'] ?? ''),
             'predicate' => (string) ($relation['predicate'] ?? 'about'),
+            'origin' => (string) ($relation['origin'] ?? 'EXPLICIT_USER_RELATION'),
+            'reason' => (string) ($relation['reason'] ?? 'Source-specific provenance handoff.'),
+            'confidence' => (float) ($relation['confidence'] ?? 1.0),
             'evidence_refs' => [['evidence_id' => $evidenceId]],
         ];
         $plan['dependencies'] = $dependencies;
@@ -134,6 +145,38 @@ final class CaptureVideoProvenancePlanner
         $plan['evidence'] = $evidence;
         $plan['evidence_id'] = $evidenceId;
         return $plan;
+    }
+
+    /**
+     * Adds the governed Evidence dependency packet without putting a
+     * placeholder reference into the Video relation. The relation is attached
+     * only after the Evidence apply has returned a canonical read-back UUID.
+     *
+     * @return array<string,mixed>
+     */
+    public function attachEvidenceDependency(array $plan, string $sourceId, string $claimId): array
+    {
+        if (($plan['status'] ?? '') !== 'READY') return $plan;
+        $evidence = is_array($plan['evidence'] ?? null) ? $plan['evidence'] : [];
+        $evidence['source_id'] = $sourceId;
+        $evidence['claim_id'] = $claimId;
+        $dependencies = (array) ($plan['dependencies'] ?? []);
+        $dependencies[] = $this->arguments('evidence', $claimId, $evidence, (string) ($plan['evidence_idempotency_key'] ?? ''));
+        $plan['dependencies'] = $dependencies;
+        $plan['evidence'] = $evidence;
+        return $plan;
+    }
+
+    /** @return array<string,mixed> */
+    private function originalRelation(array $metadata, string $subjectType, string $subjectId): array
+    {
+        foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
+            if (!is_array($attachment)) continue;
+            if ((string) ($attachment['target_type'] ?? '') !== $subjectType || (string) ($attachment['target_uuid'] ?? '') !== $subjectId) continue;
+            if ((string) ($attachment['predicate'] ?? 'about') !== 'about') continue;
+            return $attachment;
+        }
+        return [];
     }
 
     /** @return array<string,mixed> */

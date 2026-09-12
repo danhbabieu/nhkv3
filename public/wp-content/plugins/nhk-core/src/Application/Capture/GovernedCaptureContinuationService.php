@@ -13,6 +13,7 @@ use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
 use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Domain\Video\{VideoException, VideoRelationEvidenceRequired};
+use NHK\Core\Application\Video\VideoRelationCandidatePlanner;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -40,6 +41,7 @@ final class GovernedCaptureContinuationService
         /** @var callable(string,string,array<string,mixed>):void|null */
         private $phaseReceipt = null,
         ?CompletionCoordinator $completion = null,
+        private ?VideoRelationCandidatePlanner $videoRelations = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -50,11 +52,14 @@ final class GovernedCaptureContinuationService
         $this->currentCaptureId = $captureId;
         $this->budget?->begin();
         $proposalIds = array_values(array_filter(array_map('strval', (array) ($control['proposal_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
+        $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($control['resume_children'] ?? [])))));
         $reusedClaims = $this->reusedClaims($context);
-        $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context);
+        $videoOnlyResume = $proposalIds === []
+            && ($context['existing_capture_continuation'] ?? false) === true
+            && in_array('video', $resumeChildren, true);
+        $plans = $proposalIds !== [] ? array_map(static fn (string $id): array => ['proposal_id' => $id], $proposalIds) : $this->plans($captureId, $continuationKey, $context, !$videoOnlyResume);
         $skippedVideoChildren = [];
         $videoChildren = [];
-        $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($control['resume_children'] ?? [])))));
         if ($proposalIds === [] && ($context['existing_capture_continuation'] ?? false) === true) {
             $previousChildren = $this->previousVideoChildren($context);
             $plans = array_values(array_filter($plans, function (array $plan) use (&$skippedVideoChildren, &$videoChildren, $previousChildren, $context, $resumeChildren): bool {
@@ -127,12 +132,12 @@ final class GovernedCaptureContinuationService
     }
 
     /** @return list<array<string,mixed>> */
-    private function plans(string $captureId, string $continuationKey, array $context): array
+    private function plans(string $captureId, string $continuationKey, array $context, bool $includeSemanticChildren = true): array
     {
         $resolved = is_array($context['subject_resolution']['resolved'] ?? null) ? $context['subject_resolution']['resolved'] : [];
         $variants = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? '') === 'variant' && UuidCodec::isValid((string) ($item['id'] ?? ''))));
         $plans = [];
-        if (count($variants) === 1) {
+        if ($includeSemanticChildren && count($variants) === 1) {
             $variant = $variants[0];
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
             $candidates = $deltaText !== ''
@@ -221,7 +226,7 @@ final class GovernedCaptureContinuationService
             array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['VIDEO_PROVENANCE_DEPENDENCY_READBACK_INCOMPLETE']]]));
             return;
         }
-        $withEvidence = $this->videoProvenance?->attachEvidence($provenancePlan, $canonicalIds[0], $canonicalIds[1], 'pending-evidence');
+        $withEvidence = $this->videoProvenance?->attachEvidenceDependency($provenancePlan, $canonicalIds[0], $canonicalIds[1]);
         if (!is_array($withEvidence)) {
             array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['VIDEO_PROVENANCE_PLANNER_UNAVAILABLE']]]));
             return;
@@ -245,6 +250,31 @@ final class GovernedCaptureContinuationService
             return;
         }
         $complete = $this->videoProvenance->attachEvidence($provenancePlan, $canonicalIds[0], $canonicalIds[1], $evidenceId);
+        if ($this->videoRelations !== null) {
+            try {
+                $videoProposal = (array) ($complete['video_proposal'] ?? []);
+                $videoPayload = is_array($videoProposal['payload'] ?? null) ? $videoProposal['payload'] : [];
+                $videoId = trim((string) ($videoPayload['canonical_id'] ?? $videoProposal['subject_id'] ?? ''));
+                $relation = is_array($complete['relation'] ?? null) ? $complete['relation'] : [];
+                $candidates = $this->videoRelations->plan($videoId, [[
+                    'target_id' => (string) ($relation['target_uuid'] ?? ''),
+                    'target_type' => (string) ($relation['target_type'] ?? ''),
+                    'predicate' => (string) ($relation['predicate'] ?? 'about'),
+                    'origin' => (string) ($relation['origin'] ?? 'EXPLICIT_USER_RELATION'),
+                    'evidence_refs' => [['evidence_id' => $evidenceId]],
+                    'reason' => (string) ($relation['reason'] ?? ''),
+                    'confidence' => (float) ($relation['confidence'] ?? 1.0),
+                ]]);
+                if ($candidates === []) throw new VideoRelationEvidenceRequired();
+                $videoPayload['metadata'] = is_array($videoPayload['metadata'] ?? null) ? $videoPayload['metadata'] : [];
+                $videoPayload['metadata']['semantic_attachments'] = array_map(static fn ($candidate): array => $candidate->toProposalPayload(), $candidates);
+                $videoProposal['payload'] = $videoPayload;
+                $complete['video_proposal'] = $videoProposal;
+            } catch (\Throwable $error) {
+                $writes[] = $this->classifiedFailure((array) ($complete['video_proposal'] ?? []), $error);
+                return;
+            }
+        }
         try {
             $this->budget?->check('VIDEO_PROPOSAL_GOVERNANCE');
         } catch (\Throwable $error) {
@@ -252,6 +282,12 @@ final class GovernedCaptureContinuationService
             return;
         }
         $videoWrite = $this->runGovernedChild((array) ($complete['video_proposal'] ?? []), $control, $lifecycle, 'VIDEO_GOVERNANCE');
+        $videoWrite['evidence_handoff'] = [
+            'source_id' => $canonicalIds[0],
+            'claim_id' => $canonicalIds[1],
+            'evidence_id' => $evidenceId,
+            'relation_evidence_refs' => [['evidence_id' => $evidenceId]],
+        ];
         array_push($writes, ...array_merge($allWrites, [$videoWrite]));
     }
 
