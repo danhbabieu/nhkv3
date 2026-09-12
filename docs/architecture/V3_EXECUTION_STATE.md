@@ -7971,3 +7971,38 @@ The canonical documentation projection was regenerated after this checkpoint's
 final documentation edit with `composer generate:mcp-docs`. No migration,
 deployment, push, staging/live/V2 mutation, or semantic data repair was run.
 The worktree remains intentionally uncommitted pending final verification.
+
+# Checkpoint — 2026-09-12 — Video provenance materialization on explicit resume
+
+ROOT CAUSE: The failed Video continuation re-entered semantic orchestration
+with an empty addendum resolution and did not reliably carry the immutable
+original Video subject/source packet into `CaptureVideoProvenancePlanner`.
+The planner consequently returned the governed fail-closed boundary before
+Source → provenance Claim → Evidence materialization; the later
+`VIDEO_RELATION_REQUIRES_EVIDENCE` diagnostic is not evidence that this chain
+had succeeded. `SEMANTIC_SUBJECT_OR_DELTA_REQUIRED` originates in the empty
+plan guard of `GovernedCaptureContinuationService`, not in Governance Apply.
+
+CODE: Explicit video-only resume now restores persisted resume control,
+rehydrates the original exact subject from the Capture diagnostics/Video
+packet, falls back to the immutable source snapshot, and keeps semantic child
+plans excluded. The existing governed dependency sequence remains Source,
+Knowledge provenance Claim, Evidence canonical read-back, relation candidate
+validation, then Video proposal Apply. No direct writer, placeholder Evidence,
+replacement input or live mutation is introduced.
+
+TEST: Focused provenance/continuation suite passes 37 tests / 197 assertions;
+the new regression covers an empty addendum reparse and exact Variant subject
+lock. The focused convergence suite passes 61 tests / 319 assertions. Full NHK
+Unit passes 1,196 tests / 5,900 assertions. MCP/schema and documentation
+contracts pass 66 tests / 602 assertions. Composer lint, PHP lint, diff check
+and changed-scope secret review pass. PHPUnit reports only existing
+warnings/deprecations. WordPress/MySQL Integration is environment-dependent
+and is not claimed as passing when its guarded bootstrap is unavailable.
+
+DB / LIVE EFFECT: No migration, deployment, push, Capture retry, publication,
+Source, Claim, Evidence, Video, Graph, public identity or other live semantic
+mutation was run in this checkpoint.
+
+STATUS: LOCAL VIDEO PROVENANCE ROOT-CAUSE FIX / REGRESSION VERIFIED;
+worktree is ready for a review/commit checkpoint. No live retry was performed.

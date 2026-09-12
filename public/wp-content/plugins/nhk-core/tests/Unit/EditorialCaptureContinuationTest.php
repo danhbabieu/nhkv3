@@ -328,6 +328,73 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertArrayNotHasKey('VIDEO_ENRICHED', $result['capture']['phase_receipts']);
     }
 
+    public function test_video_only_resume_keeps_original_subject_when_empty_addendum_reparse_resolves_nothing(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $variant = '852da54d-457a-4397-a16d-52d9452ba766';
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-video-resume-subject-lock',
+            hash('sha256', 'capture-video-resume-subject-lock'),
+            CaptureStage::READY_FOR_PUBLICATION->value,
+            'PARTIAL',
+            450,
+            'state-450',
+            [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'entity_type' => 'video',
+                    'operation' => 'ingest',
+                    'subject_id' => UuidCodec::newV7(),
+                    'payload' => ['metadata' => [
+                        'source' => ['platform' => 'youtube', 'external_video_id' => '4NmkQFrNeWQ', 'source_title' => 'Odo 36/8 source snapshot'],
+                        'subject_resolution_packet' => ['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8'],
+                    ]],
+                ],
+            ]],
+            [
+                'raw_input' => 'Odo 36/8 trong video.',
+                'subject_hints' => ['Odo 36/8'],
+                'title' => 'Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp',
+            ],
+            ['subjects' => ['status' => 'resolved', 'primary' => ['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8'], 'resolved' => [['id' => $variant, 'type' => 'variant', 'name' => 'Odo 36/8']]], 'composition' => ['title' => 'Đồng hồ Odo 36/8 mặt số nổi, thùng kính chuông hiếm gặp']],
+            [],
+        );
+        $captures->create($capture);
+        $seenResolution = null;
+        $coordinator = new EditorialCaptureCoordinator(
+            $captures,
+            static fn (array $input): array => ['items' => []],
+            static fn (array $input): array => ['post_id' => 450, 'state_token' => 'state-450'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$seenResolution): array {
+                $seenResolution = $context['subject_resolution'];
+                return ['status' => 'REVIEW_REQUIRED', 'writes' => []];
+            },
+            new ArticleComposer(),
+            static fn (array $context): array => ['status' => 'RECONCILED'],
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator);
+
+        $result = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'resume-video-subject-lock',
+            'text' => '',
+            'resume_children' => ['video'],
+        ]);
+
+        self::assertSame('COMPLETED', $result['addendum']['status']);
+        self::assertSame($capture->captureId, $result['capture']['capture_id']);
+        self::assertIsArray($seenResolution);
+        self::assertSame($variant, $seenResolution['primary']['id']);
+        self::assertSame('variant', $seenResolution['primary']['type']);
+    }
+
     public function test_video_enrichment_started_receipt_survives_callback_failure(): void
     {
         $captures = new ContinuationCaptureRepository();
