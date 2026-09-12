@@ -13,6 +13,11 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
     public function __construct(private ?object $database = null) {}
     private function db(): object { global $wpdb; return $this->database ?? $wpdb; }
     private function table(): string { return $this->db()->prefix . 'nhk_proposals'; }
+    private function nullableDate(mixed $value): ?string
+    {
+        $date = is_string($value) ? trim($value) : '';
+        return $date === '' || str_starts_with($date, '0000-00-00') ? null : $date;
+    }
     private function state(ProposalState $state): int { return array_search($state, ProposalState::cases(), true) + 1; }
     private function normalizedFingerprint(string $value): string { return preg_match('/^[a-f0-9]{64}$/i', $value) ? strtolower($value) : hash('sha256', $value); }
     private function fingerprintBinary(string $value): string { return hex2bin($this->normalizedFingerprint($value)); }
@@ -59,7 +64,7 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             if ((string) ($row['operation'] ?? '') === 'relation_create') {
                 $subjectId = trim((string) ($payload['source_uuid'] ?? $payload['source_key'] ?? $subjectId));
             }
-            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), $subjectId, (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $expectedRevision, !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $row['submitted_at'], $row['applied_at'], $target, (string) $row['entity_type'], $row['created_at'], $row['updated_at'], $row['cancelled_at'], $row['rejected_at'], $row['superseded_at'], $supersededBy);
+            return new Proposal(UuidCodec::fromBinary($row['proposal_uuid']), $subjectId, (string) $row['operation'], $payload, bin2hex((string) $row['fingerprint']), $expectedRevision, !empty($row['dependency_fingerprint']) ? bin2hex((string) $row['dependency_fingerprint']) : 'legacy', $state, (string) $row['created_by'], $decisionActor, null, (string) $row['idempotency_key'], (int) $row['revision'], $this->nullableDate($row['submitted_at'] ?? null), $this->nullableDate($row['applied_at'] ?? null), $target, (string) $row['entity_type'], $this->nullableDate($row['created_at'] ?? null), $this->nullableDate($row['updated_at'] ?? null), $this->nullableDate($row['cancelled_at'] ?? null), $this->nullableDate($row['rejected_at'] ?? null), $this->nullableDate($row['superseded_at'] ?? null), $supersededBy);
         } catch (\InvalidArgumentException|\JsonException) {
             return null;
         }

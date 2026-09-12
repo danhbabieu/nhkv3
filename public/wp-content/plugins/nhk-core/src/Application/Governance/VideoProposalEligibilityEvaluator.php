@@ -40,7 +40,8 @@ final class VideoProposalEligibilityEvaluator
         $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
         $subjectId = trim((string) ($packet['id'] ?? ''));
         $subjectType = trim((string) ($packet['type'] ?? ''));
-        if (!UuidCodec::isValid($subjectId) || $subjectType === '') $reasons[] = 'SUBJECT_UNRESOLVED';
+        $explicitSubjectResolved = UuidCodec::isValid($subjectId) && $subjectType !== '';
+        if (!$explicitSubjectResolved) $reasons[] = 'SUBJECT_UNRESOLVED';
 
         $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : [];
         if (array_key_exists('availability', $source) && (string) $source['availability'] !== 'available') $reasons[] = 'SOURCE_UNAVAILABLE';
@@ -96,7 +97,7 @@ final class VideoProposalEligibilityEvaluator
             }
         }
 
-        if ($this->subjectResolver !== null && is_array($source)) {
+        if (!$explicitSubjectResolved && $this->subjectResolver !== null && is_array($source)) {
             $hints = array_values(array_filter([(string) ($source['source_title'] ?? ''), $this->referenceHint((string) ($source['source_title'] ?? ''))], static fn (string $hint): bool => trim($hint) !== ''));
             if ($hints !== []) {
                 $resolved = $this->subjectResolver->resolve($hints);

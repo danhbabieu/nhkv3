@@ -5,6 +5,7 @@ namespace NHKTests\Unit;
 
 use NHK\Core\Application\Governance\{ProposalEligibilityService, VideoProposalEligibilityEvaluator};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
+use NHK\Core\Application\Semantic\SubjectResolutionService;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Governance\{DependencyRepository, EligibilityReader, ProposalRepository};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
@@ -46,7 +47,29 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertSame(['CANONICAL_EVIDENCE_REQUIRED'], $service->check($proposal->id)->reasons);
     }
 
-    private function service(Proposal $proposal): ProposalEligibilityService
+    public function test_explicit_video_subject_packet_is_authoritative_over_unresolved_title_hint(): void
+    {
+        $proposal = $this->proposal([
+            'source' => [
+                'platform' => 'youtube',
+                'external_video_id' => 'dQw4w9WgXcQ',
+                'source_title' => 'title without a canonical match',
+            ],
+            'subject_resolution_packet' => ['id' => self::SUBJECT, 'type' => 'variant', 'name' => 'Odo 36/8'],
+            'semantic_attachments' => [[
+                'target_type' => 'variant',
+                'target_uuid' => self::SUBJECT,
+                'predicate' => 'about',
+                'evidence_refs' => [['kind' => 'USER_HINT', 'value' => 'legacy']],
+            ]],
+        ]);
+        $resolver = new SubjectResolutionService(static fn (string $hint): array => []);
+        $reasons = $this->service($proposal, $resolver)->check($proposal->id)->reasons;
+
+        self::assertNotContains('SUBJECT_UNRESOLVED', $reasons);
+    }
+
+    private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {
             public function __construct(private Proposal $proposal) {}
@@ -104,7 +127,7 @@ final class ProposalEligibilityServiceTest extends TestCase
         $types->register(new EntityTypeDefinition('variant', 1, true, []));
         $endpoints = new EndpointTypeRegistry();
         $endpoints->register('variant', new AuthorityEndpointResolver($types, $authority));
-        $evaluator = new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence));
+        $evaluator = new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), $subjectResolver);
         return new ProposalEligibilityService($repository, new DependencyGraph(new class implements DependencyRepository { public function directDependencies(string $proposalId): array { return []; } public function add(string $proposalId, string $dependencyUuid): void {} }), $reader, $evaluator);
     }
 

@@ -8041,3 +8041,50 @@ STATUS: LOCAL FRESH/RESUME SUBJECT HANDOFF PATCH / REGRESSION VERIFIED;
 live acceptance remains blocked until the deployed runtime exposes or otherwise
 returns the internal Capture handoff diagnostics needed for method-level
 read-back. No migration, deployment or push was performed.
+
+# Checkpoint — 2026-09-12 — P0 repair applied-state forensic fix
+
+RUNTIME TRACE: Fresh read-only discovery through `@V3-1309` returned
+documentation version `c93cd5e5aa097cea4db6b476f8c3c6279e3fa594897a487d563b9a1b83d3b8aa`,
+manifest hash `bcfaa7fb68fa202a767f652883a16e702a5f78cfb88ff61783b07a04e2b7675f`,
+build identity `4dc51241fb20597e2d52132b6b4c0496dd5b454b60cc3110325ebd48ff4d2590`,
+and runtime `0.1.0`. Proposal review was approved/revision 3 with null target;
+Video and Graph were absent; Variant, Source, Claim, Evidence and Post 453 were
+present. Eligibility returned `SUBJECT_UNRESOLVED`. Apply/history surfaces were
+not exposed by the connector.
+
+DB TRACE: Read-only server inspection found proposal row 1236 with approved
+state 3, zero-date lifecycle sentinels, no `wp_nhk_apply_attempts` row, and only
+Created → Submitted → Approved audit events (6458 → 6459 → 6460). No Video row,
+Video external ID, or Video→about→Variant edge exists. Persisted evidence proves
+this Proposal was never applied; the runtime-only result was intentionally
+indeterminate until this database trace.
+
+SOURCE TRACE: `VideoProposalReconciliationService` correctly forbids applied
+state, non-null applied time, or a successful apply attempt. The false positive
+came from `WpdbProposalRepository::hydrate()` passing MySQL
+`0000-00-00 00:00:00.000000` through as a non-null `appliedAt`, so an approved,
+never-applied proposal matched the applied-time branch. The patch normalizes
+zero-date sentinels to null. The Video eligibility patch keeps an explicit valid
+`uuid_exact` subject packet authoritative and does not conflate the proposed
+Video owner with the Variant `about` target.
+
+TRANSACTION TRACE: `ControlledApplyService` creates the running attempt, invokes
+the canonical executor and read-back verifier, marks success, transitions the
+Proposal to applied, and commits those writes in one transaction. Failure before
+canonical persistence therefore cannot commit a successful applied marker. No
+ordering defect was found in this case.
+
+REGRESSION: Focused Governance/Proposal repair and Video eligibility tests pass;
+full NHK Unit passes 1,203 tests / 5,918 assertions; NHK Contract passes 4 tests /
+31 assertions; canonical MCP documentation generation passes. Composer lint,
+PHP lint, diff check and changed-scope secret review pass. WordPress/MySQL
+Integration is blocked by unavailable test database `nhk_v3_test` and is not
+claimed as passing.
+
+DB / LIVE EFFECT: No migration, deployment, push, Capture retry, proposal apply,
+repair mutation, direct writer, publication, or live semantic mutation was run.
+The worktree is intentionally uncommitted and ready for review/commit.
+
+STATUS: P0 REPAIR_APPLIED_PROPOSAL_FORBIDDEN FALSE-POSITIVE FIX / REGRESSION
+VERIFIED; READY_FOR_COMMIT.

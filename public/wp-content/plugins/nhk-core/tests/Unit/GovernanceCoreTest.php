@@ -176,6 +176,45 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame($videoUuid, $proposal?->subjectId);
     }
 
+    public function test_hydrates_mysql_zero_date_sentinels_as_null_for_lifecycle_fields(): void
+    {
+        $proposalUuid = UuidCodec::newV7();
+        $repository = new WpdbProposalRepository();
+        $hydrate = new \ReflectionMethod($repository, 'hydrate');
+        $hydrate->setAccessible(true);
+
+        $proposal = $hydrate->invoke($repository, [
+            'id' => 0,
+            'proposal_uuid' => UuidCodec::toBinary($proposalUuid),
+            'subject_id' => UuidCodec::newV7(),
+            'entity_type' => 'video',
+            'operation' => 'ingest',
+            'target_uuid' => str_repeat("\0", 16),
+            'expected_revision' => 1,
+            'command_json' => json_encode(['canonical_id' => UuidCodec::newV7(), 'metadata' => []], JSON_THROW_ON_ERROR),
+            'fingerprint' => hash('sha256', 'content', true),
+            'dependency_fingerprint' => hash('sha256', 'dependency', true),
+            'state' => 3,
+            'revision' => 3,
+            'created_by' => 1,
+            'idempotency_key' => 'video-zero-date-hydration',
+            'created_at' => '2026-09-12 07:59:49.000000',
+            'updated_at' => '2026-09-12 07:59:49.000000',
+            'submitted_at' => '2026-09-12 07:59:49.000000',
+            'applied_at' => '0000-00-00 00:00:00.000000',
+            'cancelled_at' => '0000-00-00 00:00:00.000000',
+            'rejected_at' => '0000-00-00 00:00:00.000000',
+            'superseded_at' => '0000-00-00 00:00:00.000000',
+            'superseded_by_proposal_id' => null,
+        ]);
+
+        self::assertSame(ProposalState::APPROVED, $proposal?->state);
+        self::assertNull($proposal?->appliedAt);
+        self::assertNull($proposal?->cancelledAt);
+        self::assertNull($proposal?->rejectedAt);
+        self::assertNull($proposal?->supersededAt);
+    }
+
     public function test_video_uuid_bound_proposal_rejects_entity_type_literal_subject_before_persistence(): void
     {
         $repository = new InMemoryProposalRepository();

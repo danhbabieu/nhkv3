@@ -100,6 +100,48 @@ final class VideoProposalReconciliationServiceTest extends TestCase
         self::assertSame($result['replaced_proposal_id'], $second['replaced_proposal_id']);
         self::assertCount(1, array_filter($lifecycle->created, static fn (Proposal $proposal): bool => $proposal->entityType === 'video'));
     }
+
+    public function test_approved_proposal_without_successful_apply_receipt_is_not_forbidden_by_repair_guard(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $proposal = new Proposal(self::OLD, 'video', 'ingest', ['canonical_id' => self::VIDEO], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'approved-without-receipt', entityType: 'video');
+        $repository->create($proposal);
+        $service = $this->minimalService($repository, static fn (string $id): bool => false);
+
+        $result = $service->reconcile(self::OLD);
+
+        self::assertNotSame('REPAIR_APPLIED_PROPOSAL_FORBIDDEN', $result['reason'] ?? null);
+        self::assertSame('SOURCE_UNAVAILABLE', $result['reason']);
+    }
+
+    public function test_successful_apply_receipt_keeps_approved_proposal_non_repairable(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $proposal = new Proposal(self::OLD, 'video', 'ingest', ['canonical_id' => self::VIDEO], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'approved-with-receipt', entityType: 'video');
+        $repository->create($proposal);
+        $service = $this->minimalService($repository, static fn (string $id): bool => true);
+
+        $result = $service->reconcile(self::OLD);
+
+        self::assertSame('REPAIR_APPLIED_PROPOSAL_FORBIDDEN', $result['reason']);
+    }
+
+    private function minimalService(InMemoryProposalRepository $repository, callable $successfulApplyExists): VideoProposalReconciliationService
+    {
+        return new VideoProposalReconciliationService(
+            $repository,
+            new RecordingVideoReconciliationLifecycle($repository),
+            new GovernanceService($repository),
+            new ProposalEligibilityService($repository, new DependencyGraph(new InMemoryDependencyRepository()), new AlwaysReadyEligibilityReader()),
+            static fn (string $id): array => [],
+            new EmptyVideoRepository(),
+            new EmptySourceRepository(),
+            new EmptyKnowledgeRepository(),
+            new EmptyEvidenceRepository(),
+            new CaptureVideoProvenancePlanner(),
+            successfulApplyExists: $successfulApplyExists,
+        );
+    }
 }
 
 final class RecordingVideoReconciliationLifecycle implements GovernedLifecycle
