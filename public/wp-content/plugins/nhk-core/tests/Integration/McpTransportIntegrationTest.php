@@ -107,6 +107,12 @@ final class McpTransportIntegrationTest extends TestCase
                 self::assertTrue($ability->get_meta_item('show_in_rest'));
                 self::assertSame(['files'], $ability->get_meta_item('_meta')['openai/fileParams']);
                 $captureSchema = $ability->get_input_schema();
+                self::assertSame([
+                    'type' => 'array',
+                    'minItems' => 1,
+                    'maxItems' => 1,
+                    'items' => ['type' => 'string', 'enum' => ['video']],
+                ], $captureSchema['properties']['resume_children']);
                 self::assertSame(['EDITORIAL', 'AUTHORITY', 'MIXED'], $captureSchema['properties']['purpose']['enum']);
                 self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $captureSchema['properties']['authority_intent']['properties']['mode']['enum']);
                 self::assertArrayHasKey('approved_plan_fingerprint', $captureSchema['properties']['authority_intent']['properties']);
@@ -203,6 +209,12 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertArrayHasKey('capture_id', $capture['inputSchema']['properties']);
         self::assertSame('string', $capture['inputSchema']['properties']['capture_id']['type']);
         self::assertSame('uuid', $capture['inputSchema']['properties']['capture_id']['format']);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $capture['inputSchema']['properties']['resume_children']);
         self::assertNotContains('capture_id', $capture['inputSchema']['required']);
         self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
     }

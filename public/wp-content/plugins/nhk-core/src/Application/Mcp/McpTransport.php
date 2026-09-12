@@ -212,6 +212,9 @@ final class McpTransport
     private function captureIngest(array $arguments, array $files): array
     {
         if (is_callable($this->runtimeWriteReady) && !(bool) ($this->runtimeWriteReady)()) throw new \RuntimeException('REQUIRED_SCHEMA_NOT_READY');
+        if (is_array($arguments['resume_children'] ?? null) && $arguments['resume_children'] !== [] && !isset($arguments['capture_id'])) {
+            throw new \InvalidArgumentException('CAPTURE_RESUME_REQUIRES_CAPTURE_ID');
+        }
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
         unset($arguments['files']);
         if ($files !== []) $arguments['files'] = $files;
@@ -271,6 +274,8 @@ final class McpTransport
             foreach ((array) ($schema['properties'] ?? []) as $property => $propertySchema) if (array_key_exists($property, $value)) $this->validateArgumentValue($key . '.' . $property, $value[$property], is_array($propertySchema) ? $propertySchema : []);
         }
         if (($schema['type'] ?? '') === 'array' && isset($schema['items']) && is_array($schema['items'])) foreach ($value as $item) $this->validateArgumentValue($key . '[]', $item, $schema['items']);
+        if (($schema['type'] ?? '') === 'array' && isset($schema['minItems']) && count($value) < (int) $schema['minItems']) throw new \InvalidArgumentException('Argument has too few items: ' . $key . '.');
+        if (($schema['type'] ?? '') === 'array' && isset($schema['maxItems']) && count($value) > (int) $schema['maxItems']) throw new \InvalidArgumentException('Argument has too many items: ' . $key . '.');
     }
 
     private function isModern(array $request, array $params, array $headers): bool

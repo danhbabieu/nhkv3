@@ -184,6 +184,14 @@ new asset is supplied; an existing Media is reusable only when its persisted
 subject scope matches the resolved canonical subject. Same-key/same-payload
 retries are idempotent; same-key payload changes return a conflict.
 
+An explicit child resume is available only for the registered Video child:
+`resume_children: ["video"]`. It requires an existing `capture_id`, carries no
+replacement `video` payload, rehydrates the immutable original Video identity
+and remains idempotent on the same Capture/Post/external identity. A text-only
+addendum does not implicitly resume unchanged Video work, and an addendum that
+contains a replacement `video` payload remains rejected with
+`CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED`.
+
 For a Capture with images, the orchestration unit is
 `Capture → attachments → attachment read-back → canonical Media adoption →
 Media interpretation → subject resolution → bounded Graph/Claim retrieval →

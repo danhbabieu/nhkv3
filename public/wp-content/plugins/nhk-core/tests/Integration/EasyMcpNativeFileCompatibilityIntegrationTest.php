@@ -38,6 +38,12 @@ final class EasyMcpNativeFileCompatibilityIntegrationTest extends TestCase
         $tools = array_column($projected['result']['tools'], null, 'name');
 
         self::assertArrayHasKey('capture_id', $tools['wp_ability_nhk_v3_capture_ingest']['inputSchema']['properties']);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $tools['wp_ability_nhk_v3_capture_ingest']['inputSchema']['properties']['resume_children']);
         self::assertSame(['files'], $tools['wp_ability_nhk_v3_capture_ingest']['_meta']['openai/fileParams']);
         self::assertArrayNotHasKey('_meta', $tools['wp_ability_nhk_v3_media_ingest']);
     }

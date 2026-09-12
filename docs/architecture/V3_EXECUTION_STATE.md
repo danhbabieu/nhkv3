@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Capture resume contract convergence
+
+WHAT: Added the optional `resume_children:["video"]` field to the one
+catalog-owned `nhk.capture.ingest` schema. The WordPress Ability, Easy MCP
+compatibility projection and direct MCP `tools/list` all consume that same
+schema; transport rejects a resume request without `capture_id` before any
+Capture writer is reached.
+
+CONTRACT: Existing Capture plus replacement `video` remains
+`CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED`; text-only addenda do not implicitly retry
+unchanged Video work. Explicit resume continues the immutable original Video
+child and remains governed/idempotent.
+
+VERIFICATION: Focused schema, continuation, completion and migration-gate tests
+pass. Canonical MCP documentation was regenerated after the contract edit.
+Live connector parity remains deployment-gated because no authenticated live
+MCP tools/list endpoint is available in this environment.
+
+STATUS: IMPLEMENTED_CODE_SIDE / LIVE_CONNECTOR_ACCEPTANCE_PENDING.
+The read-only local wire smoke is also BLOCKED because no localhost MCP server
+is listening in this environment.
+
 # Checkpoint — 2026-09-12 — Cross-domain completion convergence
 
 WHAT: Added one derived application-level completion packet to distinguish

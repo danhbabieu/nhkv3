@@ -535,6 +535,12 @@ final class McpContractTest extends TestCase
         self::assertArrayHasKey('capture_id', $tool['inputSchema']['properties']);
         self::assertSame('string', $tool['inputSchema']['properties']['capture_id']['type']);
         self::assertSame('uuid', $tool['inputSchema']['properties']['capture_id']['format']);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $tool['inputSchema']['properties']['resume_children']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
         self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
         self::assertSame('nhk-v3/capture-ingest', McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
@@ -549,6 +555,12 @@ final class McpContractTest extends TestCase
         self::assertSame(['files'], $capture['connectorMeta']['openai/fileParams']);
         self::assertSame(['idempotency_key', 'documentation_checkpoint'], $capture['inputSchema']['required']);
         self::assertNotContains('files', $capture['inputSchema']['required']);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $capture['inputSchema']['properties']['resume_children']);
         self::assertSame('array', $files['type']);
         self::assertSame('object', $files['items']['type']);
         self::assertSame('binary', $files['items']['format']);

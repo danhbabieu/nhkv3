@@ -28,6 +28,33 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame(['idempotency_key', 'documentation_checkpoint'], $schema['required']);
         self::assertSame(['files'], $capture['connectorMeta']['openai/fileParams']);
         self::assertArrayHasKey('capture_id', $schema['properties']);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $schema['properties']['resume_children']);
+    }
+
+    public function test_resume_children_requires_an_existing_capture_id_at_transport_boundary(): void
+    {
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new \NHK\Tests\Support\InMemoryProposalRepository())),
+            static fn (string $capability): bool => $capability === 'nhk_ingest_articles' || $capability === 'read',
+            documentation: $documentation,
+        );
+
+        $result = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/call', 'params' => ['name' => 'nhk.capture.ingest', 'arguments' => [
+            'idempotency_key' => 'resume-without-capture',
+            'resume_children' => ['video'],
+            'documentation_checkpoint' => ['documentation_version' => $checkpoint['documentation_version'], 'manifest_hash' => $checkpoint['manifest_hash']],
+        ]]], []);
+
+        self::assertSame(400, $result['status']);
+        self::assertSame('CAPTURE_RESUME_REQUIRES_CAPTURE_ID', $result['body']['error']['message']);
     }
 
     public function test_actual_tools_call_dispatches_plan_and_same_capture_apply(): void

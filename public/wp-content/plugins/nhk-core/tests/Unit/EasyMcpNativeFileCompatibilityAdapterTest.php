@@ -78,6 +78,12 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertArrayHasKey('capture_id', $tools[self::TARGET]['inputSchema']['properties']);
         self::assertSame('string', $tools[self::TARGET]['inputSchema']['properties']['capture_id']['type']);
         self::assertSame('uuid', $tools[self::TARGET]['inputSchema']['properties']['capture_id']['format']);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $tools[self::TARGET]['inputSchema']['properties']['resume_children']);
         self::assertNotContains('capture_id', $tools[self::TARGET]['inputSchema']['required']);
         self::assertSame(['idempotency_key', 'documentation_checkpoint'], $tools[self::TARGET]['inputSchema']['required']);
         self::assertSame('array', $tools[self::TARGET]['inputSchema']['properties']['files']['type']);
@@ -117,6 +123,12 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         $properties = $capture['inputSchema']['properties'];
 
         self::assertArrayHasKey('capture_id', $properties);
+        self::assertSame([
+            'type' => 'array',
+            'minItems' => 1,
+            'maxItems' => 1,
+            'items' => ['type' => 'string', 'enum' => ['video']],
+        ], $properties['resume_children']);
         self::assertSame(['EDITORIAL', 'AUTHORITY', 'MIXED'], $properties['purpose']['enum']);
         self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $properties['authority_intent']['properties']['mode']['enum']);
         self::assertArrayHasKey('approved_plan_fingerprint', $properties['authority_intent']['properties']);
