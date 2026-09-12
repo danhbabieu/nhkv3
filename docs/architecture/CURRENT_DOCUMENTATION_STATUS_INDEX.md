@@ -140,8 +140,8 @@ registry/catalog merely because its wording is present tense.
 ## 1.2 Editorial Capture operating interpretation — 2026-09-09
 
 The accepted Editorial Capture boundary is a cross-owner orchestrator, not a
-new semantic owner. For text-only and multipart image submissions, one new user
-submission maps by default to one durable Capture and one native WordPress
+new semantic owner. Every new user submission maps by default to one durable
+Capture; only `IMAGE_ARTICLE` and `TEXT_ARTICLE` map to one native WordPress
 draft. Replays with the same idempotency key and unchanged payload resume the
 same Capture; changed payloads conflict rather than creating a second Article or
 re-uploading completed physical assets.
@@ -181,11 +181,13 @@ Fresh target discovery/read-back controls callability claims.
 ### 1.3 Existing-Capture continuation — 2026-09-10
 
 The canonical `nhk.capture.ingest` boundary now accepts an optional
-`capture_id` for a text addendum to one existing Capture and its existing
+`capture_id` for a text addendum or explicit `followup_mode=ATTACH_ASSETS`
+asset continuation to one existing Capture and its existing
 WordPress draft. The original request/fingerprint is immutable; each addendum
 has an independent idempotency ledger, audit/revision append and bounded
 semantic rerun. Same-key/same-payload retries are idempotent and changed
-payloads conflict. Addenda reject files and do not create a second Post or
+payloads conflict. Text-only addenda reject files; asset follow-up accepts
+native files, stores only a safe manifest, and does not create a second Post or
 re-adopt/unscoped-fallback Media; an existing Media is reusable only after
 persisted subject-scope matching. Continuation semantic deltas use a bounded
 Capture-owned Governance orchestrator: proposal → submit → explicit

@@ -58,7 +58,9 @@ final class MediaBatchUploadService
                 $result = $this->ingestor->ingest($file, $filename, $title, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicImageSizingPolicy::MAX_LONG_EDGE, PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY);
                 $checksum = hash_file('sha256', (string) ($file['tmp_name'] ?? ''));
                 if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('CHECKSUM_FAILED');
-                $results[] = array_merge($this->manifestItem($result, $checksum, $clientId), ['sort_order' => (int) ($item['sort_order'] ?? $index)]);
+                $manifestItem = array_merge($this->manifestItem($result, $checksum, $clientId), ['sort_order' => (int) ($item['sort_order'] ?? $index)]);
+                if (is_array($item['visual_context'] ?? null)) $manifestItem['visual_context'] = $item['visual_context'];
+                $results[] = $manifestItem;
             } catch (\Throwable $error) {
                 $errors[] = ['client_file_id' => $clientId, 'upload_status' => 'FAILED', 'code' => $error->getMessage() !== '' ? $error->getMessage() : 'UPLOAD_FAILED'];
             }

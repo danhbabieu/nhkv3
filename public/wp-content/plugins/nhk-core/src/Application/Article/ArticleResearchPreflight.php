@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Article;
 
+use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
 use NHK\Core\Application\Dictionary\DictionaryObservationRegistry;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\Article\ArticleResearchResult;
@@ -76,12 +77,14 @@ final class ArticleResearchPreflight
         }
         foreach ((array) ($dictionaryPlan['warnings'] ?? []) as $warning) if (is_string($warning) && trim($warning) !== '') $warnings[] = $warning;
 
-        $compliance = ['status' => 'HUMAN_REVIEW_REQUIRED', 'warnings' => ['PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE']];
+        $claimDiagnostics = $this->claimComplianceDiagnostics(is_array($inventory['knowledge'] ?? null) ? $inventory['knowledge'] : [], is_array($resolution['primary'] ?? null) ? $resolution['primary'] : []);
+        $compliance = ['status' => 'HUMAN_REVIEW_REQUIRED', 'code' => 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', 'warnings' => ['PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE'], 'diagnostics' => $claimDiagnostics, 'review_required' => true];
         $plannedTitle = trim((string) ($articleContext['planned_title'] ?? $articleContext['title'] ?? $topic));
         $blueprint = ['primary_subject' => $resolution['primary'] ?? null, 'intent' => trim($topic), 'title_intent' => $plannedTitle, 'h1_intent' => $plannedTitle, 'slug_intent' => $this->slug($plannedTitle), 'meta_description_intent' => $plannedTitle, 'outline' => [], 'media_complete' => $mediaComplete, 'structured_data_applicable' => true, 'canonical_expectation' => 'PUBLIC_CANONICAL_ROUTE', 'indexability_expectation' => 'INDEXABLE_IF_PUBLISHED'];
         $mediaPlan = ['candidates' => $media, 'media_complete' => $mediaComplete];
         if ($articleMedia !== []) $mediaPlan = array_merge($articleMedia, $mediaPlan, ['media_complete' => $mediaComplete]);
         if (!$mediaComplete && !isset($mediaPlan['diagnostics'])) $mediaPlan['diagnostics'] = [['code' => 'ARTICLE_MEDIA_INLINE_MISSING']];
+        if (!isset($mediaPlan['guidance']) || !is_array($mediaPlan['guidance'])) $mediaPlan['guidance'] = $this->mediaGuidance($articleMedia, $resolution, $mediaComplete);
         return new ArticleResearchResult($resolution, $inventory, $overlap, ['claims' => $inventory['knowledge'] ?? [], 'sources' => $inventory['sources'] ?? [], 'evidence' => $inventory['evidence'] ?? []], $relations, $links, $category, $mediaPlan, ['candidates' => $inventory['videos'] ?? []], $blueprint, $compliance, array_values(array_unique($blockers)), array_values(array_unique($warnings)), $blockers === [], $dictionaryPlan);
     }
 
@@ -133,6 +136,61 @@ final class ArticleResearchPreflight
             if ($isNewOrModified && $status !== 'SUPPORTED_WITHIN_SCOPE') $blockers[] = 'PUBLIC_CLAIM_EVIDENCE_REQUIRED';
             elseif (($claim['legacy'] ?? false) === true && $status !== 'SUPPORTED_WITHIN_SCOPE') $warnings[] = 'LEGACY_EVIDENCE_DEBT';
         }
+    }
+
+    /** @param list<array<string,mixed>> $claims @param array<string,mixed> $subject @return list<array<string,mixed>> */
+    private function claimComplianceDiagnostics(array $claims, array $subject): array
+    {
+        $copy = new PublicClaimCopyPolicy();
+        $subjectName = trim((string) ($subject['name'] ?? $subject['canonical_name'] ?? ''));
+        $subjectScope = trim((string) ($subject['type'] ?? 'entity')) ?: 'entity';
+        $diagnostics = [];
+        foreach ($claims as $claim) {
+            if (!is_array($claim)) continue;
+            $text = trim((string) ($claim['claim_text'] ?? $claim['text'] ?? ''));
+            if ($text === '') continue;
+            $class = trim((string) ($claim['claim_class'] ?? ''));
+            if ($class === '') $class = $copy->containsUnsupportedSuperiority($text) ? 'superiority/uniqueness/absolute' : (trim((string) ($claim['claim_type'] ?? '')) ?: 'descriptive/editorial');
+            $scope = trim((string) ($claim['scope'] ?? $claim['semantic_scope'] ?? $subjectScope)) ?: $subjectScope;
+            $evidenceStatus = trim((string) ($claim['evidence_status'] ?? 'NO_EVIDENCE')) ?: 'NO_EVIDENCE';
+            $evidenceExists = $evidenceStatus === 'SUPPORTED_WITHIN_SCOPE' || (array) ($claim['evidence'] ?? $claim['evidence_refs'] ?? []) !== [];
+            $requiresReview = !$evidenceExists || str_contains($class, 'superiority') || str_contains($class, 'uniqueness') || str_contains($class, 'absolute');
+            $narrowable = $copy->containsUnsupportedSuperiority($text) && $subjectName !== '';
+            $diagnostics[] = [
+                'claim_id' => $claim['claim_id'] ?? $claim['id'] ?? null,
+                'claim_text' => $text,
+                'claim_class' => $class,
+                'scope' => $scope,
+                'semantic_subject' => ['id' => $subject['id'] ?? null, 'type' => $subjectScope, 'name' => $subjectName !== '' ? $subjectName : null],
+                'reason' => $evidenceExists ? 'Claim requires scope review before public publication.' : 'No canonical Evidence is available for this claim within its semantic scope.',
+                'evidence_status' => $evidenceStatus,
+                'canonical_evidence_exists' => $evidenceExists,
+                'can_safely_narrow' => $narrowable,
+                'suggested_rewrite' => $narrowable ? 'Theo nguồn tham chiếu, bản ghi này mô tả ' . $subjectName . ' với những đặc điểm được ghi nhận riêng trong nguồn; không suy rộng thành kết luận chung.' : null,
+                'review_required' => $requiresReview,
+            ];
+        }
+        return $diagnostics;
+    }
+
+    /** @param array<string,mixed> $articleMedia @param array<string,mixed> $resolution @return array<string,mixed> */
+    private function mediaGuidance(array $articleMedia, array $resolution, bool $complete): array
+    {
+        $slots = is_array($articleMedia['slots'] ?? null) ? $articleMedia['slots'] : [];
+        $featuredMissing = ($slots['featured_primary']['placeholder'] ?? !$complete) === true;
+        $inlineMissing = ($slots['inline_primary']['placeholder'] ?? !$complete) === true;
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        return [
+            'user_message' => $featuredMissing ? 'Bài đã đủ nội dung nhưng còn thiếu ảnh đại diện. Bạn có muốn tải ảnh đại diện cho bài này không?' : ($inlineMissing ? 'Bài còn thiếu ảnh minh họa trong nội dung. Bạn có muốn tải ảnh cho bài này không?' : 'Hình ảnh của bài đã sẵn sàng.'),
+            'featured_image_missing' => $featuredMissing,
+            'inline_image_missing' => $inlineMissing,
+            'expected_subject' => $primary['name'] ?? null,
+            'preferred_view' => null,
+            'preferred_aspect' => '16:9',
+            'video_thumbnail_fallback' => null,
+            'user_upload_preferred' => $featuredMissing,
+            'user_upload_required' => $featuredMissing,
+        ];
     }
     /** @param list<array<string,mixed>> $items @param list<string> $subjectIds @return list<array<string,mixed>> */
     private function branchItems(array $items, array $subjectIds): array

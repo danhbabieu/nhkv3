@@ -65,7 +65,7 @@ use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, GraphClockType
 use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
-use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaIngestGateway, MediaService, MediaVideoPageQuery};
+use NHK\Core\Application\Media\{ArticleMediaCoordinator, ArticleMediaSeoProjection, MediaIngestGateway, MediaService, MediaVideoPageQuery, VisualOpportunityDetector, VisualSupportRequirementService};
 use NHK\Core\Application\Video\{VideoCompletenessPolicy, VideoEditorialGenerator, VideoHubClassifier, VideoIntakeService, VideoInternalSemanticResearcher, VideoKnowledgeEnrichmentPlanner, VideoRelationCandidatePlanner, VideoSeoProjection, VideoService, YouTubeDataApiClient, YouTubeSourceAdapter};
 use NHK\Core\Application\Home\HomeSemanticQuery;
 use NHK\Core\Application\Search\SearchSemanticQuery;
@@ -497,7 +497,7 @@ final class Plugin {
                 $automationResolver,
                 static fn (string $capability): bool => current_user_can($capability),
                 $captureClaimReuse,
-                new CaptureVideoProvenancePlanner(),
+                new CaptureVideoProvenancePlanner(new \NHK\Core\Application\Video\VideoThumbnailSelector(\NHK\Core\Application\Video\VideoThumbnailSelector::wordpressProbe(...))),
                 $governanceRuntime->videoReconciliation,
                 static function (array $plan) use ($sources, $claims, $evidence, $proposalRepository): array {
                     $provenance = is_array($plan['capture_video_provenance'] ?? null) ? $plan['capture_video_provenance'] : $plan;
@@ -727,6 +727,7 @@ final class Plugin {
                         'subject_scope_locked' => $mediaSubjectIds !== [],
                         'allow_unscoped_reuse' => false,
                         'allow_scoped_reuse' => true,
+                        'video_thumbnail_fallback' => $context['video_thumbnail_fallback'] ?? null,
                     ], $selected, array_slice($mediaIds, 2));
                     $payload = $result->toArray();
                     $payload['force_inline_reconcile'] = true;
@@ -781,8 +782,21 @@ final class Plugin {
                 static function (array $context) use ($draftGateway): array {
                     return $draftGateway->update((int) ($context['article_id'] ?? 0), (array) ($context['fields'] ?? []), (string) ($context['expected_state_token'] ?? ''), (string) ($context['capture_id'] ?? ''));
                 },
-                static function (array $context) use ($attachmentBridge): array {
+                static function (array $context) use ($attachmentBridge, $media): array {
                     $mediaId = $attachmentBridge->adoptAttachment((int) ($context['attachment_id'] ?? 0));
+                    $visualContexts = array_values(array_filter((array) ($context['visual_support_contexts'] ?? []), 'is_array'));
+                    if ($mediaId !== null && $visualContexts !== []) {
+                        $current = $media->findByCanonicalId($mediaId);
+                        if ($current !== null) {
+                            $provenance = $current->provenance;
+                            $declared = is_array($provenance['visual_support_contexts'] ?? null) ? $provenance['visual_support_contexts'] : [];
+                            foreach ($visualContexts as $visualContext) if (!in_array($visualContext, $declared, true)) $declared[] = $visualContext;
+                            if ($declared !== (array) ($provenance['visual_support_contexts'] ?? [])) {
+                                $provenance['visual_support_contexts'] = array_values($declared);
+                                $media->update($current->canonicalId, $current->canonicalName, $current->readiness, $provenance, $current->revision);
+                            }
+                        }
+                    }
                     return $mediaId === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'media_id' => $mediaId];
                 },
                 static function (array $context) use ($draftGateway): array {
@@ -829,8 +843,12 @@ final class Plugin {
                 null,
                 $clockTypeShadowClassifier,
                 new \NHK\Core\Application\Capture\ContentIntentRouter(),
+                new VisualOpportunityDetector(),
+                new VisualSupportRequirementService(new \NHK\Core\Infrastructure\Media\WpdbVisualSupportRequirementRepository($wpdb)),
             );
-            $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
+            $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($mediaBatchUpload): array {
+                return $mediaBatchUpload->upload((string) ($input['idempotency_key'] ?? '') . ':assets', is_array($input['metadata'] ?? null) ? $input['metadata'] : [], is_array($input['files'] ?? null) ? $input['files'] : [], is_array($input['items'] ?? null) ? $input['items'] : []);
+            });
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };
             $allowedOrigins = array_values(array_filter(array_unique([$origin((string) site_url()), $origin((string) home_url())])));
             (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); })))->register();

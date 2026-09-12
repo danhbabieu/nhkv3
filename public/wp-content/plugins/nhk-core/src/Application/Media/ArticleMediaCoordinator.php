@@ -80,7 +80,8 @@ final class ArticleMediaCoordinator
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
-        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '');
+        $guidance = $this->guidance($slots, $context);
+        $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, is_array($editorial) ? (string) ($editorial['state_token'] ?? '') : '', $guidance);
         if ($this->wordpress !== null) {
             $payload = $result->toArray();
             $payload['force_inline_reconcile'] = ($context['force_inline_reconcile'] ?? false) === true;
@@ -115,7 +116,7 @@ final class ArticleMediaCoordinator
                 }
             }
             $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
-            $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''));
+            $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context));
         }
         return $result;
     }
@@ -133,7 +134,7 @@ final class ArticleMediaCoordinator
             $slots[$slot] = ['media_id' => $id, 'placeholder' => $placeholder, 'state' => $placeholder ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE, 'blueprint' => ($this->blueprints->findByPostAndSlot($postId, $slot) ?? MediaSeoBlueprint::forPost($postId, $slot, $context))->toArray()];
             if ($placeholder) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot];
         }
-        return new ArticleMediaResult($postId, $endpointKey, $diagnostics === [] ? MediaSeoStateRegistry::COMPLETE : MediaSeoStateRegistry::PLACEHOLDER, $slotMedia, $slots, $diagnostics);
+        return new ArticleMediaResult($postId, $endpointKey, $diagnostics === [] ? MediaSeoStateRegistry::COMPLETE : MediaSeoStateRegistry::PLACEHOLDER, $slotMedia, $slots, $diagnostics, '', $this->guidance($slots, $context));
     }
 
     private function endpointKey(int $postId): string
@@ -216,6 +217,37 @@ final class ArticleMediaCoordinator
         $key = 'system:placeholder:' . $slot;
         $name = $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'System placeholder — featured image' : 'System placeholder — inline image';
         return $this->mediaService->create($key, $name, 'ready', ['system_role' => 'placeholder', 'slot' => $slot]);
+    }
+
+    /** @param array<string,array<string,mixed>> $slots @return array<string,mixed> */
+    private function guidance(array $slots, array $context): array
+    {
+        $featuredMissing = ($slots[MediaUsageRoleRegistry::FEATURED_PRIMARY]['placeholder'] ?? true) === true;
+        $inlineMissing = ($slots[MediaUsageRoleRegistry::INLINE_PRIMARY]['placeholder'] ?? true) === true;
+        $blueprint = is_array($slots[MediaUsageRoleRegistry::FEATURED_PRIMARY]['blueprint'] ?? null) ? $slots[MediaUsageRoleRegistry::FEATURED_PRIMARY]['blueprint'] : [];
+        $fallback = is_array($context['video_thumbnail_fallback'] ?? null)
+            && ($context['video_thumbnail_fallback']['eligible'] ?? false) === true
+            ? $context['video_thumbnail_fallback']
+            : null;
+        if (!$featuredMissing && !$inlineMissing && $fallback !== null) $fallback = null;
+        $expectedSubject = trim((string) ($context['subject'] ?? ''));
+        if ($expectedSubject === '' && is_array($context['subject_context'] ?? null)) $expectedSubject = trim((string) (($context['subject_context']['subject'] ?? '')));
+        $message = $featuredMissing
+            ? ($fallback !== null
+                ? 'Bài đã đủ nội dung nhưng chưa có ảnh đại diện riêng. Có thể dùng ảnh thumbnail chất lượng cao của video làm ảnh tạm, hoặc bạn có thể tải ảnh đẹp hơn.'
+                : 'Bài đã đủ nội dung nhưng còn thiếu ảnh đại diện. Bạn có muốn tải ảnh đại diện cho bài này không?')
+            : ($inlineMissing ? 'Bài còn thiếu ảnh minh họa trong nội dung. Bạn có muốn tải ảnh cho bài này không?' : 'Hình ảnh của bài đã sẵn sàng.');
+        return [
+            'user_message' => $message,
+            'featured_image_missing' => $featuredMissing,
+            'inline_image_missing' => $inlineMissing,
+            'expected_subject' => $expectedSubject !== '' ? $expectedSubject : null,
+            'preferred_view' => $blueprint['preferred_view'] ?? null,
+            'preferred_aspect' => $blueprint['preferred_aspect'] ?? null,
+            'video_thumbnail_fallback' => $fallback,
+            'user_upload_preferred' => $featuredMissing,
+            'user_upload_required' => $featuredMissing && $fallback === null,
+        ];
     }
 
     private function reconcileUsage(string $endpointKey, string $slot, string $mediaId, \NHK\Core\Domain\Media\MediaSeoBlueprint $blueprint): void

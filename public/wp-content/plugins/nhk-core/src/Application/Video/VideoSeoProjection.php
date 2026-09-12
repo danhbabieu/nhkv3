@@ -42,8 +42,14 @@ final class VideoSeoProjection
         ];
         if (($source['published_at'] ?? null) !== null && (string) $source['published_at'] !== '') $object['uploadDate'] = (string) $source['published_at'];
         if (isset($source['duration_seconds']) && (int) $source['duration_seconds'] > 0) $object['duration'] = $this->duration((int) $source['duration_seconds']);
-        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';
-        if ($thumbnail !== '' && filter_var($thumbnail, FILTER_VALIDATE_URL) !== false) $object['thumbnailUrl'] = [$thumbnail];
+        $thumbnail = (new VideoThumbnailSelector())->fromSource($source);
+        if (($thumbnail['url'] ?? '') !== '') {
+            $object['thumbnailUrl'] = [(string) $thumbnail['url']];
+            if ((int) ($thumbnail['width'] ?? 0) > 0 && (int) ($thumbnail['height'] ?? 0) > 0) {
+                $object['thumbnailWidth'] = (int) $thumbnail['width'];
+                $object['thumbnailHeight'] = (int) $thumbnail['height'];
+            }
+        }
         $chapters = is_array($package['chapters'] ?? null) ? $package['chapters'] : [];
         if ($chapters !== []) {
             $parts = [];
@@ -61,7 +67,7 @@ final class VideoSeoProjection
             'description' => $seoDescription,
             'canonical' => $seoProjection['canonical'],
             'indexable' => $seoProjection['indexable'],
-            'open_graph' => [...$seoProjection['open_graph'], 'type' => 'video.other'],
+            'open_graph' => [...$seoProjection['open_graph'], 'type' => 'video.other'] + (($thumbnail['url'] ?? '') !== '' ? ['image' => (string) $thumbnail['url']] : []),
             'video_object' => $object,
         ];
     }

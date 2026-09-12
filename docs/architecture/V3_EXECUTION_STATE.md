@@ -1,5 +1,46 @@
 # NHK V3 Execution State
 
+# Checkpoint 2026-09-13 — PR2 Visual Enrichment + Asset Follow-up
+
+ROOT_CAUSE: VisualSupportRequirement already preserved an honest `MISSING`
+state, but Capture had no bounded opportunity planner and existing-Capture
+continuation was text-only. That made later contextual images impossible to
+attach through the canonical Capture boundary without risking duplicate
+Capture/Article or an unscoped Media path.
+
+FIX: Capture now produces at most three deterministic visual opportunities
+from registered Media detail keys after canonical subject resolution. The
+opportunities are optional enrichment and create only MISSING visual-support
+ledger rows; Knowledge Delta and text Article validity do not depend on an
+image. The registered `followup_mode=ATTACH_ASSETS` continuation uses a
+separate physical-ingest callback, appends the verified safe manifest to the
+same Capture, reuses the existing Article, adopts only new assets and keeps
+asset idempotency separate from the Capture/Addendum idempotency ledger.
+Visual context is carried as a hint; exact subject/scope/facet/feature/intent
+validation remains the Visual Support and canonical Media boundary.
+
+CONSTITUTION: No amendment required. Existing canonical ownership and the
+Visual Support state machine already permit optional MISSING requirements and
+Capture-owned intake. Active Article, Media, Visual Support, MCP and Control
+Plane contracts were reconciled to distinguish text-only addenda from the
+registered asset follow-up mode. No new semantic owner, entity type,
+predicate, direct writer or migration was introduced.
+
+VERIFICATION: Focused PR2 selection passes 64 tests / 602 assertions. Full NHK
+Unit passes 1,342 tests / 6,464 assertions with existing warnings/deprecations.
+NHK Contract passes 4 tests / 31 assertions. `composer lint` and
+`git diff --check` are required checkpoint gates. Integration was invoked with
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`; the WordPress bootstrap
+was found but database connection establishment failed, so integration remains
+ENVIRONMENT_BLOCKED rather than PASS.
+
+NO MUTATION: No production/staging/V2 database, live publication, deployment
+or push action was performed. PR3 has not started; continuation requires
+explicit `CONTINUE PR3`.
+
+STATUS: PR2_VISUAL_ENRICHMENT_ASSET_FOLLOWUP_IMPLEMENTED /
+INTEGRATION_ENVIRONMENT_BLOCKED
+
 # Checkpoint 2026-09-13 — PR1 Content Intent Router + Knowledge/Text Article split
 
 ROOT_CAUSE: The prior Capture coordinator created a native Article draft before
@@ -8555,3 +8596,60 @@ golden isolated validation and restored-data enrichment gate remain NOT RUN.
 
 STATUS: CAPTURE VIDEO DEPENDENCY REPLAY VERIFIED; LIVE SOURCE SNAPSHOT AND
 RECOVERY REMAIN BLOCKED; NO LIVE RETRY OR SEMANTIC MUTATION.
+
+# Checkpoint — 2026-09-13 — Capture → Video → Governance → Publication repair
+
+IMPLEMENTED: The Capture Video handoff now treats a stored `uuid_exact`
+subject-resolution packet as the immutable semantic authority. Valid packets
+are preserved as Video `about`, knowledge-enrichment subject and semantic
+scope; invalid explicit packets fail closed instead of falling through to a
+text resolver. Strong conflicting source candidates produce an explicit
+identity-conflict review while retaining the original UUID. The governed
+resume path now exposes the proposal identity envelope (`proposal_id`,
+`proposal_state`, `target_uuid`, `canonical_id=null`) and reuses idempotent
+Capture/Article/external-Video/proposal identities.
+
+PUBLICATION: Article media blockers now include Vietnamese conversational
+guidance with featured/inline status, expected subject, preferred view/aspect,
+optional eligible Video-thumbnail fallback and upload requirements. Public
+claim compliance now returns exact claim text/class/scope, evidence status,
+narrowing eligibility, a meaning-narrowing rewrite and review requirement.
+These remain fail-closed gates; no Media or claim is auto-created to bypass a
+requirement.
+
+THUMBNAILS: YouTube candidates are probed through the approved external-source
+boundary in quality order (`maxresdefault`, `sddefault`, `hqdefault`,
+`mqdefault`, `default`) with status/MIME/dimension/placeholder validation.
+Selection metadata is persisted in the governed Video payload and consumed by
+SEO, VideoObject, sitemap, dossier, home and frontend projections. Existing
+legacy Capture snapshots are re-probed during Video resume; no second Media
+identity is created.
+
+TEST EVIDENCE: Focused Capture/Video/Governance/Article/thumbnail/projection
+coverage passes 134 tests / 541 assertions. NHK Unit passes 1,344 tests /
+6,470 assertions (13 warnings, 11 deprecations and 13 PHPUnit deprecations;
+no failures). NHK Contract passes 4 tests / 31 assertions. Composer PHP lint,
+composer lint, composer validation and `git diff --check` pass. Static
+analysis tools are not configured in this checkout.
+
+DOCUMENTATION: Fresh local documentation generation produced 32 canonical MCP
+documents with manifest hash
+`b5dea26bb98307ffe63d085db75d61985f35fa9092f0cc393663c9efcf3a41cb`; the
+local bootstrap runtime is `0.1.0` and the fresh checkpoint was used by the
+verification run.
+
+INTEGRATION/LIVE: The guarded integration run cannot complete because the
+local MySQL server at `127.0.0.1:3306` refuses connections for `nhk_v3_test`;
+the acceptance harness also encounters the existing `absint()` redeclaration
+between `GovernanceQueueAdminPageTest` and WordPress bootstrap. Local frontend
+route smoke is blocked by `localhost:80` refusing connections. Deployment
+verification stops before any transfer or mutation with `WORKTREE_NOT_CLEAN`,
+and `NHK_DEMO_DEPLOY_CONFIG` is unset, so the repaired code is not deployed to
+the Demo runtime. No live Capture resume, Governance apply, Article publish,
+or external-state mutation was performed.
+
+STATUS: CODE REPAIR AND LOCAL REGRESSION GATES PASS; LIVE ACCEPTANCE BLOCKED
+AT DEPLOYMENT/INTEGRATION INFRASTRUCTURE PRECONDITIONS. Do not claim complete
+or ready for deploy until the exact existing Capture is resumed and all
+canonical Video, Graph, public-identity, Media/publication and final Article
+read-backs pass.

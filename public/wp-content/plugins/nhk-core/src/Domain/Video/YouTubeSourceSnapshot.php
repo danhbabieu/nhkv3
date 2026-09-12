@@ -24,6 +24,7 @@ final readonly class YouTubeSourceSnapshot
         public string $liveState = 'none',
         public ?string $fetchedAt = null,
         public string $sourceHash = '',
+        public array $thumbnailSelection = [],
     ) {
         if ($platform !== 'youtube' || !preg_match('/^[A-Za-z0-9_-]{11}$/', $externalVideoId) || $canonicalSourceUrl !== 'https://www.youtube.com/watch?v=' . $externalVideoId) {
             throw new InvalidVideoReference('YouTube source snapshot identity is invalid.');
@@ -61,6 +62,7 @@ final readonly class YouTubeSourceSnapshot
             strtolower((string) ($data['live_state'] ?? 'none')),
             self::nullableString($data['fetched_at'] ?? null),
             self::nullableString($data['source_hash'] ?? null) ?? '',
+            is_array($data['thumbnail_selection'] ?? null) ? $data['thumbnail_selection'] : [],
         );
     }
 
@@ -86,6 +88,7 @@ final readonly class YouTubeSourceSnapshot
             'live_state' => $this->liveState,
             'fetched_at' => $this->fetchedAt,
             'source_hash' => $this->sourceHash,
+            'thumbnail_selection' => $this->thumbnailSelection,
         ];
     }
 

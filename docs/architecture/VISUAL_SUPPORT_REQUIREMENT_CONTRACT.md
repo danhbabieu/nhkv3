@@ -56,6 +56,13 @@ If no exact suitable Media exists, the requirement persists as `MISSING` (or
 `REVIEW_REQUIRED` when ambiguity needs review). It is not infrastructure
 corruption, and it is not silently filled by a near match or placeholder.
 
+`MISSING` is an optional enrichment state unless the consuming Article's own
+publication policy explicitly requires a Media slot. It does not invalidate a
+Knowledge Delta, block a semantically complete text Article from processing,
+or require an immediate upload. The Capture visual-opportunity planner may
+recommend at most three useful views with exact subject/scope/facet,
+registered feature key, visual intent, reason, priority and reuse hints.
+
 After every canonical Media ingest/read-back, including Media arriving later
 through canonical Capture, the Media boundary performs bounded reverse
 reconciliation:
@@ -101,4 +108,8 @@ affected consumers without requiring raw UUID/fingerprint/JSON entry.
 
 Capture remains the normal input boundary. No direct MCP writer for this
 ledger exists. Additive UP-only persistence is allowed; no legacy backfill or
-production/staging/V2 mutation is part of this contract.
+production/staging/V2 mutation is part of this contract. A later asset may be
+attached through the registered Capture continuation mode
+`followup_mode=ATTACH_ASSETS`; it reuses the same Capture and Article, creates
+or reuses canonical Media, carries the opportunity as a hint, and still
+requires exact subject/scope/context validation before reverse reconciliation.

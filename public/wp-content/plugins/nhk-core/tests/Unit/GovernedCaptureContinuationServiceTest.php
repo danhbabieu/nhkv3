@@ -57,6 +57,10 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('submitted', $result['writes'][0]['proposal_state']);
         self::assertSame($videoId, $result['writes'][0]['target_uuid']);
         self::assertNull($result['writes'][0]['canonical_id']);
+        self::assertSame($proposalId, $result['proposal_id']);
+        self::assertSame('submitted', $result['proposal_state']);
+        self::assertSame($videoId, $result['target_uuid']);
+        self::assertNull($result['canonical_id']);
     }
 
     public function test_existing_capture_continuation_applies_only_after_governance_and_readback(): void

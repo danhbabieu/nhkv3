@@ -15,13 +15,36 @@ final class VisualSupportRequirementService
     public function require(string $subjectId, string $scope, string $facet, string $featureKey, string $visualIntent, array $context = [], string $subjectType = 'entity'): VisualSupportRequirement
     {
         $candidate = VisualSupportRequirement::create($subjectId, $scope, $facet, $featureKey, $visualIntent, $context, $subjectType);
-        return $this->requirements->findBySemanticFingerprint($candidate->semanticFingerprint)
+        $existing = $this->requirements->findBySemanticFingerprint($candidate->semanticFingerprint)
             ?? $this->requirements->findByIdempotencyFingerprint($candidate->idempotencyFingerprint)
-            ?? $this->requirements->save($candidate);
+            ?? null;
+        if ($existing === null) return $this->requirements->save($candidate);
+        $merged = $this->mergeContext($existing->context, $context);
+        if ($merged === $existing->context) return $existing;
+        $updated = new VisualSupportRequirement($existing->canonicalId, $existing->subjectType, $existing->subjectId, $existing->scope, $existing->facet, $existing->featureKey, $existing->visualIntent, $existing->state, $existing->mediaId, $existing->mediaRevision, $merged, $existing->provenance, $existing->unresolvedReason, $existing->semanticFingerprint, $existing->idempotencyFingerprint, $existing->revision);
+        return $this->requirements->save($updated, $existing->revision);
     }
 
     public function get(string $id): ?VisualSupportRequirement
     {
         return $this->requirements->findById($id);
+    }
+
+    /** @param array<string,mixed> $current @param array<string,mixed> $incoming @return array<string,mixed> */
+    private function mergeContext(array $current, array $incoming): array
+    {
+        $merged = $current;
+        $consumers = [];
+        foreach ([$current['consumer'] ?? null, ...((array) ($current['consumers'] ?? [])), $incoming['consumer'] ?? null, ...((array) ($incoming['consumers'] ?? []))] as $consumer) {
+            if (!is_array($consumer)) continue;
+            $key = trim((string) ($consumer['endpoint_type'] ?? $consumer['type'] ?? '')) . ':' . trim((string) ($consumer['endpoint_key'] ?? $consumer['key'] ?? ''));
+            if ($key !== ':') $consumers[$key] = $consumer;
+        }
+        if ($consumers !== []) {
+            $merged['consumers'] = array_values($consumers);
+            unset($merged['consumer']);
+        }
+        foreach ($incoming as $key => $value) if ($key !== 'consumer' && $key !== 'consumers' && !array_key_exists($key, $merged)) $merged[$key] = $value;
+        return $merged;
     }
 }

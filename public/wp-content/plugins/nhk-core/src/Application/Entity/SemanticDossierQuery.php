@@ -7,7 +7,7 @@ use NHK\Core\Application\Graph\RelatedSemanticQuery;
 use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
-use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoUrlPolicy};
+use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoThumbnailSelector, VideoUrlPolicy};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Entity\EntityDossierReader;
 use NHK\Core\Contracts\Media\MediaRepository;
@@ -157,10 +157,11 @@ final class SemanticDossierQuery implements EntityDossierReader
 
         $metadata = is_array($video->metadata) ? $video->metadata : [];
         $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
-        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+        $source = is_array($metadata['source_snapshot'] ?? null)
+            ? $metadata['source_snapshot']
+            : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
         $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;
-        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';
-        if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
+        $thumbnail = (new VideoThumbnailSelector())->fromSource($source);
 
         $media = $this->mediaProjection->forEntity('video', $video->canonicalId);
         [$primary, $gallery] = $this->mediaPacket($media);
@@ -175,7 +176,8 @@ final class SemanticDossierQuery implements EntityDossierReader
                 'title' => $title,
                 'url' => $url,
                 'source_url' => $video->canonicalUrl,
-                'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null,
+                'thumbnail_url' => $thumbnail['url'] ?? null,
+                'thumbnail' => $thumbnail,
             ],
             'seo_projection' => $seo,
             'primary_media' => $primary,
@@ -254,13 +256,14 @@ final class SemanticDossierQuery implements EntityDossierReader
             if (!$video instanceof Video || !$video->active || !$video->hasValidPublicReference()) return null;
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
-            $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+            $source = is_array($metadata['source_snapshot'] ?? null)
+                ? $metadata['source_snapshot']
+                : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
             $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title;
             $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null;
             if (!is_string($url) || $url === '') return null;
-            $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? trim((string) ($source['thumbnail_urls'][0] ?? '')) : '';
-            if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
-            return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null, 'deferred_embed' => true, 'origin' => $origin];
+            $thumbnail = (new VideoThumbnailSelector())->fromSource($source);
+            return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail['url'] ?? null, 'thumbnail' => $thumbnail, 'deferred_embed' => true, 'origin' => $origin];
         }
 
         if ($type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {

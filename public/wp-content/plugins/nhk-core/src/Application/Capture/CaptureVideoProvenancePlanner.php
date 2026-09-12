@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Application\Video\VideoThumbnailSelector;
 
 /**
  * Plans the source-specific provenance dependencies for a Capture-owned Video.
@@ -14,6 +15,10 @@ use NHK\Core\Shared\Uuid\UuidCodec;
  */
 final class CaptureVideoProvenancePlanner
 {
+    public function __construct(private ?VideoThumbnailSelector $thumbnailSelector = null)
+    {
+    }
+
     /** @return array<string,mixed> */
     public function plan(string $captureId, array $videoProposal, array $sourceSnapshot, array $resolvedSubject, array $context = []): array
     {
@@ -28,6 +33,12 @@ final class CaptureVideoProvenancePlanner
         $storedSource = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
         $sourceSnapshot = array_merge($storedSource, $sourceSnapshot);
         $resolvedSubject = $this->lockedSubject($resolvedSubject, $metadata, (bool) ($context['preserve_original_subject'] ?? false));
+        $thumbnailSelection = $this->thumbnailSelection($sourceSnapshot);
+        if ($thumbnailSelection !== []) {
+            $sourceSnapshot['thumbnail_selection'] = $thumbnailSelection;
+            $videoProposal = $this->withThumbnailSelection($video, $thumbnailSelection);
+            $video = $videoProposal;
+        }
         $sourceTitle = trim((string) ($sourceSnapshot['source_title'] ?? ''));
         $subjectId = trim((string) ($resolvedSubject['id'] ?? ''));
         $subjectType = trim((string) ($resolvedSubject['type'] ?? ''));
@@ -255,6 +266,10 @@ final class CaptureVideoProvenancePlanner
     private function lockedSubject(array $resolvedSubject, array $metadata, bool $preserveOriginal): array
     {
         $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
+        // The Capture packet is the semantic handoff. Once it is explicitly
+        // uuid_exact, even an invalid packet must remain visible so the Video
+        // gate can fail closed; a resolver result must never replace it.
+        if (strtolower(trim((string) ($packet['match'] ?? ''))) === 'uuid_exact') return $packet;
         $about = [];
         foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
             if (!is_array($attachment) || strtolower(trim((string) ($attachment['predicate'] ?? 'about'))) !== 'about') continue;
@@ -296,6 +311,37 @@ final class CaptureVideoProvenancePlanner
         $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         $metadata['semantic_attachments'] = $attachments;
+        $payload['metadata'] = $metadata;
+        $video['payload'] = $payload;
+        return $video;
+    }
+
+    /** @return array<string,mixed> */
+    private function thumbnailSelection(array $source): array
+    {
+        $existing = is_array($source['thumbnail_selection'] ?? null) ? $source['thumbnail_selection'] : [];
+        if (trim((string) ($existing['url'] ?? '')) !== '' && (int) ($existing['width'] ?? 0) > 0 && (int) ($existing['height'] ?? 0) > 0) return $existing;
+        if ($this->thumbnailSelector === null) return [];
+        $candidates = is_array($source['thumbnail_candidates'] ?? null) ? $source['thumbnail_candidates'] : [];
+        if ($candidates === []) {
+            foreach ((array) ($source['thumbnail_urls'] ?? $source['thumbnails'] ?? []) as $url) {
+                if (trim((string) $url) !== '') $candidates[] = ['url' => trim((string) $url)];
+            }
+        }
+        return $candidates === [] ? [] : $this->thumbnailSelector->select($candidates);
+    }
+
+    /** @param array<string,mixed> $video @return array<string,mixed> */
+    private function withThumbnailSelection(array $video, array $selection): array
+    {
+        $payload = is_array($video['payload'] ?? null) ? $video['payload'] : [];
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        foreach (['source', 'source_snapshot'] as $key) {
+            if (!is_array($metadata[$key] ?? null)) continue;
+            $metadata[$key]['thumbnail_selection'] = $selection;
+        }
+        if (!is_array($metadata['source'] ?? null)) $metadata['source'] = ['thumbnail_selection' => $selection];
+        $metadata['thumbnail_selection'] = $selection;
         $payload['metadata'] = $metadata;
         $video['payload'] = $payload;
         return $video;

@@ -85,6 +85,37 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertFalse($result->readyForDraft);
     }
 
+    public function test_public_claim_block_contains_exact_scope_evidence_reason_and_genuinely_narrower_rewrite(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'variant-a', 'type' => 'variant', 'name' => 'Variant A']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [], 'categories' => [['slug' => 'tri-thuc']], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'knowledge' => [[
+                    'claim_id' => 'claim-a',
+                    'text' => 'Variant A là mẫu hiếm nhất và tốt nhất.',
+                    'claim_type' => 'fact',
+                    'subject_id' => 'variant-a',
+                    'scope' => 'variant',
+                    'evidence_status' => 'NO_EVIDENCE',
+                    'new_or_modified' => true,
+                ]],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Variant A', ['type' => 'variant', 'name' => 'Variant A']);
+
+        self::assertSame('HUMAN_REVIEW_REQUIRED', $result->compliance['status']);
+        self::assertSame('Variant A là mẫu hiếm nhất và tốt nhất.', $result->compliance['diagnostics'][0]['claim_text']);
+        self::assertSame('variant', $result->compliance['diagnostics'][0]['scope']);
+        self::assertSame('NO_EVIDENCE', $result->compliance['diagnostics'][0]['evidence_status']);
+        self::assertTrue($result->compliance['diagnostics'][0]['review_required']);
+        self::assertStringNotContainsString('tốt nhất', strtolower((string) $result->compliance['diagnostics'][0]['suggested_rewrite']));
+        self::assertStringNotContainsString('hiếm nhất', strtolower((string) $result->compliance['diagnostics'][0]['suggested_rewrite']));
+    }
+
     public function test_persisted_article_state_is_separate_from_planning_subject_and_global_candidates(): void
     {
         $service = new ArticleResearchPreflight(

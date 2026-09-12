@@ -138,7 +138,8 @@ final class MediaVideoPageQuery
             'public_url' => $publicUrl,
             'embed_url' => $sourceAvailable ? 'https://www.youtube-nocookie.com/embed/' . $video->externalVideoId : null,
             'source_available' => $sourceAvailable,
-            'source_thumbnail_url' => $this->sourceThumbnail($source),
+            'source_thumbnail_url' => ($thumbnail = $this->sourceThumbnail($source))['url'] ?? null,
+            'source_thumbnail' => $thumbnail,
             'source_status' => (string) ($source['availability'] ?? 'unknown'),
             'seo_projection' => $seoProjection,
             'provenance' => $this->publicProvenance($metadata, $source),
@@ -195,10 +196,9 @@ final class MediaVideoPageQuery
         }));
     }
 
-    private function sourceThumbnail(array $source): ?string
+    /** @return array<string,mixed> */
+    private function sourceThumbnail(array $source): array
     {
-        $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';
-        if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') return null;
-        return $thumbnail;
+        return (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
     }
 }

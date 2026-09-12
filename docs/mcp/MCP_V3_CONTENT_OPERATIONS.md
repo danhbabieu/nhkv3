@@ -147,8 +147,9 @@ creation alone is never `COMPLETE`.
 `nhk.capture.ingest` is the shared editorial boundary for one user submission.
 It persists one Capture identity and idempotency key, stores the raw editorial
 intent and subject hints, accepts text-only, multipart images or the registered
-Video adapter, creates one native WordPress draft, adopts each verified image
-attachment into canonical Media, preserves Video as a distinct governed owner,
+Video adapter, creates one native WordPress draft only for `IMAGE_ARTICLE` or
+`TEXT_ARTICLE`, adopts each verified image attachment into canonical Media,
+preserves Video as a distinct governed owner,
 interprets text into scoped candidates, resolves Authority subjects, retrieves
 bounded Claims through the Graph neighborhood, composes the draft, reconciles
 `MediaUsage`, runs the publication gate and performs final native read-back.
@@ -176,14 +177,17 @@ semantic scope proof; an absent eligible Media is an honest incomplete state,
 not permission for global fallback.
 
 The same tool also accepts an optional `capture_id` to continue one existing
-Capture with a text addendum. The original request/fingerprint is immutable;
+Capture with a text addendum or the registered asset follow-up mode
+`followup_mode=ATTACH_ASSETS`. The original request/fingerprint is immutable;
 the addendum has its own idempotency key, appends an auditable Capture revision,
 and records the resulting Capture revision in both the audit event and addendum
 ledger. Rejected addenda retain only sanitized text/subject hints/observations/
-metadata; file metadata and paths are never persisted. The addendum reuses the
-same native Post and reruns bounded semantic resolution,
-Governance/review and Article reconciliation. Addenda reject files, never
-create a second Post, and never re-adopt or use unscoped/global Media when no
+metadata; file metadata and paths are never persisted. Asset follow-up stores
+only a safe canonical Media manifest and per-file contextual hint. The
+addendum reuses the same native Post and reruns bounded semantic resolution,
+Governance/review and Article reconciliation. Text-only addenda reject files;
+explicit asset follow-up reuses the same Capture/Post, adopts only its new
+verified assets and never uses unscoped/global Media when no
 new asset is supplied; an existing Media is reusable only when its persisted
 subject scope matches the resolved canonical subject. Same-key/same-payload
 retries are idempotent; same-key payload changes return a conflict.

@@ -30,6 +30,7 @@ final class McpToolCatalog
             self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, resolve bounded semantic context, reconcile MediaUsage when an Article exists and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'capture_id' => self::uuidField(),
+                'followup_mode' => ['type' => 'string', 'enum' => ['ATTACH_ASSETS'], 'description' => 'Required when files are attached to an existing Capture. Legacy text-only addenda continue to reject files.'],
                 'resume_children' => [
                     'type' => 'array',
                     'minItems' => 1,

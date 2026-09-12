@@ -7,8 +7,8 @@ use NHK\Core\Domain\Video\{VideoException, YouTubeVideoIdentity};
 
 final class YouTubeDataApiClient
 {
-    /** @param callable(string,array<string,mixed>):mixed|null $http */
-    public function __construct(private ?string $apiKey = null, private $http = null, private ?YouTubeApiConfiguration $configuration = null)
+    /** @param callable(string,array<string,mixed>):mixed|null $http @param callable(string):array<string,mixed>|null $thumbnailProbe */
+    public function __construct(private ?string $apiKey = null, private $http = null, private ?YouTubeApiConfiguration $configuration = null, private $thumbnailProbe = null)
     {
     }
 
@@ -36,11 +36,15 @@ final class YouTubeDataApiClient
         $snippet = is_array($item['snippet'] ?? null) ? $item['snippet'] : [];
         $details = is_array($item['contentDetails'] ?? null) ? $item['contentDetails'] : [];
         $status = is_array($item['status'] ?? null) ? $item['status'] : [];
+        $thumbnailCandidates = $this->thumbnailCandidates($snippet['thumbnails'] ?? []);
+        $thumbnailSelection = (new VideoThumbnailSelector($this->thumbnailProbe ?? $this->wordpressThumbnailProbe(...)))->select($thumbnailCandidates);
         return [
             'channel_id' => $snippet['channelId'] ?? null, 'channel_title' => $snippet['channelTitle'] ?? null,
             'title' => $snippet['title'] ?? null, 'description' => $snippet['description'] ?? null,
             'published_at' => $snippet['publishedAt'] ?? null, 'duration_seconds' => $this->duration((string) ($details['duration'] ?? '')),
-            'thumbnails' => $this->thumbnailUrls($snippet['thumbnails'] ?? []), 'tags' => $snippet['tags'] ?? [],
+            'thumbnails' => array_values(array_map(static fn (array $item): string => $item['url'], $thumbnailCandidates)),
+            'thumbnail_selection' => $thumbnailSelection,
+            'tags' => $snippet['tags'] ?? [],
             'default_language' => $snippet['defaultLanguage'] ?? ($snippet['defaultAudioLanguage'] ?? null),
             'caption_availability' => (($details['caption'] ?? 'false') === 'true') ? 'available' : 'unavailable',
             'embeddable' => array_key_exists('embeddable', $status) ? (bool) $status['embeddable'] : null,
@@ -62,11 +66,22 @@ final class YouTubeDataApiClient
         return preg_match('/timeout|timed out|operation timed out/i', $message) === 1;
     }
 
-    /** @return list<string> */
-    private function thumbnailUrls(mixed $thumbnails): array
+    /** @return list<array<string,mixed>> */
+    private function thumbnailCandidates(mixed $thumbnails): array
     {
         if (!is_array($thumbnails)) return [];
-        return array_values(array_filter(array_map(static fn (mixed $item): string => is_array($item) ? (string) ($item['url'] ?? '') : '', $thumbnails), static fn (string $url): bool => $url !== ''));
+        $candidates = [];
+        foreach ($thumbnails as $name => $item) {
+            if (!is_array($item) || trim((string) ($item['url'] ?? '')) === '') continue;
+            $candidates[] = ['variant' => (string) $name, 'url' => trim((string) $item['url'])];
+        }
+        return $candidates;
+    }
+
+    /** @return array<string,mixed>|null */
+    private function wordpressThumbnailProbe(string $url): ?array
+    {
+        return VideoThumbnailSelector::wordpressProbe($url);
     }
 
     private function duration(string $iso): ?int

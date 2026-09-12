@@ -8,10 +8,11 @@ use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage}
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
-/** Continues one existing Capture/Post with an idempotent text addendum. */
+/** Continues one existing Capture/Post with an idempotent text or asset addendum. */
 final class EditorialCaptureContinuationService
 {
-    public function __construct(private CaptureRepository $captures, private CaptureAddendumRepository $addenda, private EditorialCaptureCoordinator $coordinator) {}
+    /** @param callable(array<string,mixed>):array|null $assetIngest */
+    public function __construct(private CaptureRepository $captures, private CaptureAddendumRepository $addenda, private EditorialCaptureCoordinator $coordinator, private $assetIngest = null) {}
 
     /** @return array{capture:array<string,mixed>,addendum:array<string,mixed>} */
     public function execute(array $input): array
@@ -23,6 +24,7 @@ final class EditorialCaptureContinuationService
         $fingerprint = $this->fingerprint($input);
         $existing = $this->addenda->findByIdempotencyKey($key);
         if ($existing !== null) {
+            if (strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS' && (!isset($input['files']) || (array) $input['files'] === [])) $fingerprint = $this->fingerprint($input, $existing);
             if (!hash_equals($existing->requestFingerprint, $fingerprint) || $existing->captureId !== $captureId) return $this->conflict($existing, $captureId, $fingerprint);
             // A governance decision is a continuation of the same addendum,
             // not a new addendum. Re-run the guarded semantic checkpoint with
@@ -38,6 +40,13 @@ final class EditorialCaptureContinuationService
             if ($control !== []) {
                 $capture = $this->captures->findById($captureId);
                 if (!$capture instanceof CaptureRecord) return $this->response(null, $existing);
+                if (strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS') {
+                    $input['followup_mode'] = 'ATTACH_ASSETS';
+                    $input['asset_followup_items'] = array_values(array_filter((array) ($existing->payload['asset_manifest']['items'] ?? []), 'is_array'));
+                    $input['asset_followup_manifest'] = is_array($existing->payload['asset_manifest'] ?? null) ? $existing->payload['asset_manifest'] : [];
+                    $input['visual_context'] = is_array($existing->payload['visual_context'] ?? null) ? $existing->payload['visual_context'] : [];
+                    $input['asset_followup_replay'] = true;
+                }
                 $input['text'] = '';
                 $input['subject_hints'] = (array) ($existing->payload['subject_hints'] ?? []);
                 $input['observations'] = [];
@@ -58,10 +67,13 @@ final class EditorialCaptureContinuationService
         $capture = $this->captures->findById($captureId);
         if (!$capture instanceof CaptureRecord) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_NOT_FOUND', $input);
         if ($capture->stage === CaptureStage::PUBLISHED->value) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_CONTINUATION_NOT_ALLOWED_AFTER_PUBLICATION', $input);
-        if (isset($input['files']) && (array) $input['files'] !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_FILES_NOT_ALLOWED', $input);
-        foreach (['video' => 'CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED', 'items' => 'CAPTURE_ADDENDUM_ITEMS_NOT_ALLOWED'] as $field => $code) {
+        $assetFollowup = strtoupper(trim((string) ($input['followup_mode'] ?? ''))) === 'ATTACH_ASSETS';
+        if ($assetFollowup && (!isset($input['files']) || (array) $input['files'] === [])) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ASSET_FOLLOWUP_FILES_REQUIRED', $input);
+        if (!$assetFollowup && isset($input['files']) && (array) $input['files'] !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_FILES_NOT_ALLOWED', $input);
+        foreach (['video' => 'CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED'] as $field => $code) {
             if (isset($input[$field]) && (array) $input[$field] !== []) return $this->failed($captureId, $key, $fingerprint, $code, $input);
         }
+        if (!$assetFollowup && isset($input['items']) && (array) $input['items'] !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_ITEMS_NOT_ALLOWED', $input);
         $resumeChildren = $input['resume_children'] ?? [];
         if ($resumeChildren !== [] && !is_array($resumeChildren)) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_RESUME_CHILDREN_INVALID', $input);
         $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) $resumeChildren))));
@@ -80,6 +92,14 @@ final class EditorialCaptureContinuationService
             $input['continuation_idempotency_key'] = $key;
             $input['continuation_delta_text'] = trim((string) ($input['text'] ?? $input['content'] ?? ''));
             if ($resumeChildren !== []) $input['governance'] = ['resume_children' => $resumeChildren] + (is_array($input['governance'] ?? null) ? $input['governance'] : []);
+            if ($assetFollowup) {
+                if (!is_callable($this->assetIngest)) throw new \RuntimeException('CAPTURE_ASSET_FOLLOWUP_INGEST_UNAVAILABLE');
+                $manifest = ($this->assetIngest)(['capture_id' => $captureId, 'idempotency_key' => $key . ':assets', 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [], 'files' => $input['files'], 'items' => is_array($input['items'] ?? null) ? $input['items'] : []]);
+                $items = array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array'));
+                if ($items === []) throw new \RuntimeException('CAPTURE_ASSET_FOLLOWUP_READBACK_UNAVAILABLE');
+                $input['asset_followup_items'] = $items;
+                $input['asset_followup_manifest'] = $manifest;
+            }
             $continued = $this->coordinator->continueWithAddendum($capture, $input);
             if (in_array($continued->status, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
                 $failed = $this->saveAddendum($addendum, 'FAILED', $continued->revision, ['code' => (string) ($continued->diagnostics['failure']['code'] ?? 'CAPTURE_CONTINUATION_FAILED')]);
@@ -88,6 +108,7 @@ final class EditorialCaptureContinuationService
             $context = $continued->context;
             $audit = is_array($context['continuations'] ?? null) ? $context['continuations'] : [];
             $payload = $addendum->payload;
+            if ($assetFollowup && is_array($input['asset_followup_manifest'] ?? null)) $payload['asset_manifest'] = $this->safeManifest($input['asset_followup_manifest']);
             $resultingRevision = $continued->revision + 1;
             $audit[] = ['addendum_id' => $addendum->addendumId, 'idempotency_key' => $key, 'request_fingerprint' => $fingerprint, 'payload' => $payload, 'capture_revision' => $resultingRevision, 'status' => 'COMPLETED', 'at' => gmdate('c')];
             $continuationState = [
@@ -102,7 +123,7 @@ final class EditorialCaptureContinuationService
             $updatedContext['continuations'] = $audit;
             $updatedContext['continuation_state'] = $continuationState;
             $updated = $this->captures->save(new CaptureRecord($continued->captureId, $continued->idempotencyKey, $continued->requestFingerprint, $continued->stage, $continued->status, $continued->articleId, $continued->articleStateToken, $continued->assets, $updatedContext, $continued->diagnostics, $continued->phaseReceipts, $resultingRevision, $continued->createdAt, gmdate('Y-m-d H:i:s.u')));
-            $completed = $this->saveAddendum($addendum, 'COMPLETED', $updated->revision, []);
+            $completed = $this->saveAddendum($addendum, 'COMPLETED', $updated->revision, [], $payload);
             return $this->response($updated, $completed);
         } catch (\Throwable $error) {
             $failed = $this->saveAddendum($addendum, 'FAILED', $capture->revision, ['code' => $this->code($error)]);
@@ -116,17 +137,54 @@ final class EditorialCaptureContinuationService
         $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
         $payload = ['text' => trim((string) ($input['text'] ?? $input['content'] ?? '')), 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : []];
         if ($resumeChildren !== []) $payload['resume_children'] = $resumeChildren;
+        if (strtoupper(trim((string) ($input['followup_mode'] ?? ''))) === 'ATTACH_ASSETS') {
+            $payload['followup_mode'] = 'ATTACH_ASSETS';
+            $payload['asset_fingerprints'] = $this->assetFingerprints((array) ($input['files'] ?? []));
+            $payload['items'] = $this->safeItems((array) ($input['items'] ?? []));
+            if (is_array($input['visual_context'] ?? null)) $payload['visual_context'] = $input['visual_context'];
+        }
         return $payload;
     }
 
-    private function fingerprint(array $input): string
+    private function fingerprint(array $input, ?CaptureAddendumRecord $existing = null): string
     {
-        return hash('sha256', CommandCanonicalizer::canonicalize($this->payload($input)));
+        $payload = $this->payload($input);
+        if ($existing !== null && ($payload['followup_mode'] ?? '') === 'ATTACH_ASSETS' && ($payload['asset_fingerprints'] ?? []) === []) $payload['asset_fingerprints'] = $existing->payload['asset_fingerprints'] ?? [];
+        return hash('sha256', CommandCanonicalizer::canonicalize($payload));
     }
 
-    private function saveAddendum(CaptureAddendumRecord $record, string $status, int $captureRevision, array $diagnostics): CaptureAddendumRecord
+    private function saveAddendum(CaptureAddendumRecord $record, string $status, int $captureRevision, array $diagnostics, ?array $payload = null): CaptureAddendumRecord
     {
-        return $this->addenda->save(new CaptureAddendumRecord($record->addendumId, $record->captureId, $record->idempotencyKey, $record->requestFingerprint, $status, $record->payload, $captureRevision, $diagnostics, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+        return $this->addenda->save(new CaptureAddendumRecord($record->addendumId, $record->captureId, $record->idempotencyKey, $record->requestFingerprint, $status, $payload ?? $record->payload, $captureRevision, $diagnostics, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function assetFingerprints(array $files): array
+    {
+        $files = isset($files['files']) && is_array($files['files']) ? $files['files'] : $files;
+        if (isset($files['tmp_name']) && !is_array($files['tmp_name'])) $files = [$files];
+        if (isset($files['tmp_name']) && is_array($files['tmp_name'])) {
+            $normalized = [];
+            foreach ($files['tmp_name'] as $index => $path) $normalized[] = ['name' => is_array($files['name'] ?? null) ? (string) ($files['name'][$index] ?? '') : '', 'size' => is_array($files['size'] ?? null) ? (int) ($files['size'][$index] ?? 0) : 0, 'checksum' => is_file((string) $path) ? hash_file('sha256', (string) $path) : null];
+            return $normalized;
+        }
+        return array_values(array_map(static function (mixed $file): array { $file = is_array($file) ? $file : []; $path = (string) ($file['tmp_name'] ?? ''); return ['name' => (string) ($file['name'] ?? ''), 'size' => (int) ($file['size'] ?? 0), 'checksum' => is_file($path) ? hash_file('sha256', $path) : null]; }, $files));
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function safeItems(array $items): array
+    {
+        return array_values(array_map(static function (mixed $item): array { $item = is_array($item) ? $item : []; return array_filter(['client_file_id' => $item['client_file_id'] ?? null, 'sort_order' => $item['sort_order'] ?? null, 'title' => $item['title'] ?? null, 'visual_context' => is_array($item['visual_context'] ?? null) ? $item['visual_context'] : null], static fn (mixed $value): bool => $value !== null && $value !== ''); }, $items));
+    }
+
+    /** @return array<string,mixed> */
+    private function safeManifest(array $manifest): array
+    {
+        $copy = $manifest;
+        unset($copy['tmp_name'], $copy['path'], $copy['file_path']);
+        if (is_array($copy['items'] ?? null)) $copy['items'] = array_values(array_map(static function (mixed $item): array { $item = is_array($item) ? $item : []; unset($item['tmp_name'], $item['path'], $item['file_path']); return $item; }, $copy['items']));
+        if (is_array($copy['errors'] ?? null)) $copy['errors'] = array_values(array_map(static function (mixed $item): array { $item = is_array($item) ? $item : []; unset($item['tmp_name'], $item['path'], $item['file_path']); return $item; }, $copy['errors']));
+        return $copy;
     }
 
     /** @return array{capture:array<string,mixed>,addendum:array<string,mixed>} */

@@ -222,8 +222,10 @@ the addendum has its own idempotency key and fingerprint, is recorded as an
 audit/revision event whose `capture_revision` is the resulting Capture
 revision after the append, and reuses the existing Capture and native Post. A
 changed payload under the same addendum key conflicts, while an unchanged
-retry is idempotent. Addenda do not accept files, create a second Post or
-re-adopt Media; text-only continuation may reuse an existing Media only when
+retry is idempotent. A text-only addendum does not accept files. The registered
+`followup_mode=ATTACH_ASSETS` continuation accepts native files through the
+same Capture boundary, creates or reuses canonical Media, and does not create
+a second Capture or Post. Text-only continuation may reuse an existing Media only when
 its persisted subject scope matches the resolved canonical subject and cannot
 use unscoped/global Media as a readiness fallback. If no eligible Media exists,
 the wrong-variant usage is removed and the Article remains missing/placeholder.

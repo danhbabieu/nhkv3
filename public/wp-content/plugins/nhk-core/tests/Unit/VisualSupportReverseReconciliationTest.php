@@ -21,6 +21,18 @@ final class VisualSupportReverseReconciliationTest extends TestCase
         self::assertSame($requirement->canonicalId, $repo->findBySemanticFingerprint($requirement->semanticFingerprint)?->canonicalId);
     }
 
+    public function test_same_requirement_accumulates_consumers_without_creating_a_second_visual_row(): void
+    {
+        $repo = new VisualSupportMemoryRepository();
+        $service = new VisualSupportRequirementService($repo);
+        $first = $service->require(self::SUBJECT, 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail', ['consumer' => ['endpoint_type' => 'wp_post', 'endpoint_key' => '1']]);
+        $second = $service->require(self::SUBJECT, 'variant', 'configuration', 'COMPONENT_DETAIL', 'technical_detail', ['consumer' => ['endpoint_type' => 'video', 'endpoint_key' => '2']]);
+
+        self::assertSame($first->canonicalId, $second->canonicalId);
+        self::assertCount(2, $second->context['consumers']);
+        self::assertSame(['wp_post', 'video'], array_column($second->context['consumers'], 'endpoint_type'));
+    }
+
     public function test_exact_subject_scope_facet_feature_and_intent_resolve(): void
     {
         $repo = new VisualSupportMemoryRepository();

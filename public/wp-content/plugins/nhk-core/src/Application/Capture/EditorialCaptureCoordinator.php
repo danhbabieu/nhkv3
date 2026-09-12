@@ -46,6 +46,8 @@ final class EditorialCaptureCoordinator
         ?CompletionCoordinator $completion = null,
         private ?ClockTypeShadowClassifier $clockTypeShadowClassifier = null,
         private ?ContentIntentRouter $contentIntentRouter = null,
+        private ?\NHK\Core\Application\Media\VisualOpportunityDetector $visualOpportunityDetector = null,
+        private ?\NHK\Core\Application\Media\VisualSupportRequirementService $visualSupportRequirements = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -109,6 +111,13 @@ final class EditorialCaptureCoordinator
                 : (string) ($record->diagnostics['composition']['title'] ?? '');
         }
         if (trim((string) ($input['excerpt'] ?? '')) === '') $input['excerpt'] = (string) ($record->context['excerpt'] ?? ($record->diagnostics['article_draft']['excerpt'] ?? ''));
+        if (strtoupper((string) ($input['followup_mode'] ?? '')) === 'ATTACH_ASSETS' && !isset($input['visual_support_contexts'])) {
+            $input['visual_support_contexts'] = array_values(array_filter(array_map(static function (mixed $opportunity): array {
+                $opportunity = is_array($opportunity) ? $opportunity : [];
+                $subject = is_array($opportunity['subject'] ?? null) ? $opportunity['subject'] : [];
+                return ['subject_type' => (string) ($subject['type'] ?? ''), 'subject_id' => (string) ($subject['id'] ?? ''), 'scope' => (string) ($opportunity['scope'] ?? ''), 'facet' => (string) ($opportunity['facet'] ?? ''), 'feature_key' => (string) ($opportunity['feature_key'] ?? ''), 'visual_intent' => (string) ($opportunity['visual_intent'] ?? '')];
+            }, (array) ($record->diagnostics['visual_opportunities'] ?? [])), static fn (array $context): bool => $context['subject_type'] !== '' && $context['subject_id'] !== '' && $context['feature_key'] !== ''));
+        }
         return $this->run($record, $input);
     }
 
@@ -120,6 +129,22 @@ final class EditorialCaptureCoordinator
         $diagnostics = $record->diagnostics;
         $receipts = $record->phaseReceipts;
         try {
+            $followupItems = array_values(array_filter((array) ($input['asset_followup_items'] ?? []), 'is_array'));
+            if ($followupItems !== []) {
+                $existingKeys = array_fill_keys(array_map([$this, 'assetIdentity'], $assets), true);
+                foreach ($followupItems as $item) {
+                    $key = $this->assetIdentity($item);
+                    if ($key !== '' && isset($existingKeys[$key])) continue;
+                    $assets[] = $item;
+                    if ($key !== '') $existingKeys[$key] = true;
+                }
+                $this->beginPhase('ASSET_FOLLOWUP');
+                $diagnostics['asset_followup'] = ['status' => 'verified', 'items' => count($followupItems), 'manifest' => $this->withoutBody((array) ($input['asset_followup_manifest'] ?? [])), 'context_hint' => $this->withoutBody((array) ($input['visual_context'] ?? []))];
+                $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'ASSET_FOLLOWUP', $record->articleId, $record->articleStateToken);
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
+            }
             if ($assets === [] && !$this->hasStage($record, CaptureStage::ASSETS_STORED)) {
                 $this->beginPhase('ASSETS_STORED');
                 $manifest = ($this->physicalIngest)($input);
@@ -164,17 +189,22 @@ final class EditorialCaptureCoordinator
                 $diagnostics['draft'] = $this->withoutBody($draft);
                 $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $articleId, (string) ($draft['state_token'] ?? ''));
             }
-            if (!array_key_exists('media_adoption', $diagnostics)) {
+            if (!array_key_exists('media_adoption', $diagnostics) || ($followupItems !== [] && ($input['asset_followup_replay'] ?? false) !== true)) {
                 $this->beginPhase('MEDIA_ADOPTED');
                 $adopted = [];
+                $followupKeys = array_fill_keys(array_map([$this, 'assetIdentity'], $followupItems), true);
+                $hasPriorAdoption = array_key_exists('media_adoption', $diagnostics);
                 foreach ($assets as $asset) {
                     if (!is_array($asset)) continue;
                     $adoptedAsset = $asset;
-                    if (is_callable($this->mediaAdoption) && isset($asset['attachment_id'])) {
+                    $isFollowupAsset = $followupItems !== [] && isset($followupKeys[$this->assetIdentity($asset)]);
+                    if (is_callable($this->mediaAdoption) && isset($asset['attachment_id']) && (!$hasPriorAdoption || $isFollowupAsset)) {
                         $adoption = ($this->mediaAdoption)([
                             'capture_id' => $record->captureId,
                             'attachment_id' => (int) $asset['attachment_id'],
                             'asset' => $asset,
+                            'visual_context' => is_array($asset['visual_context'] ?? null) ? $asset['visual_context'] : (is_array($input['visual_context'] ?? null) ? $input['visual_context'] : null),
+                            'visual_support_contexts' => is_array($input['visual_support_contexts'] ?? null) ? $input['visual_support_contexts'] : [],
                         ]);
                         $adoptedAsset['media_adoption'] = $this->withoutBody($adoption);
                         if (isset($adoption['media_id'])) $adoptedAsset['media_id'] = (string) $adoption['media_id'];
@@ -257,7 +287,22 @@ final class EditorialCaptureCoordinator
                 $diagnostics['semantic_diagnostics']['clock_type_shadow'] = $shadow->toArray();
             }
 
-            $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
+            $visualOpportunities = $this->visualOpportunityDetector?->detect($text, $interpretation, $resolution) ?? [];
+            $visualRequirements = [];
+            $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+            if ($visualOpportunities !== [] && $this->visualSupportRequirements !== null) {
+                foreach ($visualOpportunities as $opportunity) {
+                    $requirement = $this->visualSupportRequirements->require((string) $primary['id'], (string) $opportunity['scope'], (string) $opportunity['facet'], (string) $opportunity['feature_key'], (string) $opportunity['visual_intent'], [
+                        'consumer' => $record->articleId !== null ? ['endpoint_type' => 'wp_post', 'endpoint_key' => (string) $record->articleId] : ['endpoint_type' => 'capture', 'endpoint_key' => $record->captureId],
+                        'feature_label' => (string) ($opportunity['feature_label'] ?? ''), 'recommended_view' => (string) ($opportunity['recommended_view'] ?? ''), 'reason' => (string) ($opportunity['reason'] ?? ''), 'priority' => (int) ($opportunity['priority'] ?? 0), 'potential_reuse' => $opportunity['potential_reuse'] ?? [], 'opportunity_source' => 'editorial_capture',
+                    ], (string) $primary['type']);
+                    $visualRequirements[] = ['requirement_id' => $requirement->canonicalId, 'state' => $requirement->state, 'revision' => $requirement->revision, 'feature_key' => $requirement->featureKey];
+                }
+            }
+            $diagnostics['visual_opportunities'] = $visualOpportunities;
+            $diagnostics['visual_support'] = ['status' => $visualRequirements === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements];
+
+            $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
             $this->beginPhase('KNOWLEDGE_RETRIEVED');
             $retrieved = $this->claims->retrieve($semanticContext);
             $diagnostics['claim_retrieval'] = $retrieved;
@@ -291,14 +336,17 @@ final class EditorialCaptureCoordinator
                 ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
                 : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
             $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
+            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities);
 
             if (!$articleRequired && $record->articleId === null) {
                 return $this->finishNonArticleIntent($record, $assets, $diagnostics, $receipts, $intent, $retrieved, $writes, $videoPublication, $resolution);
             }
 
+            $videoThumbnailFallback = $this->eligibleVideoThumbnailFallback($assets, $videoPublication);
+
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');
-            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets]);
+            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities]);
             $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot']];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {
@@ -318,8 +366,11 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $media = ($this->mediaReconcile)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'composition' => $this->withoutBody($composition)]);
+            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
+            if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
+            $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);
+            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, $media, $visualOpportunities);
             if (trim((string) ($media['editorial_state_token'] ?? '')) !== '' && $media['editorial_state_token'] !== $record->articleStateToken) {
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, (string) $media['editorial_state_token']);
             }
@@ -395,6 +446,29 @@ final class EditorialCaptureCoordinator
     {
         $order = array_flip(array_map(static fn (CaptureStage $item): string => $item->value, CaptureStage::cases()));
         return isset($order[$record->stage], $order[$stage->value]) && $order[$record->stage] >= $order[$stage->value];
+    }
+
+    private function assetIdentity(array $asset): string
+    {
+        foreach (['media_id', 'attachment_id', 'checksum_sha256', 'checksum', 'client_file_id'] as $key) {
+            $value = trim((string) ($asset[$key] ?? ''));
+            if ($value !== '') return $key . ':' . $value;
+        }
+        return '';
+    }
+
+    /** @return array<string,mixed> */
+    private function deepEnrichment(array $retrieved, array $writes, array $media, array $opportunities): array
+    {
+        $reusedKnowledge = array_values(array_filter((array) ($writes['reused_claims'] ?? $retrieved['selected_claims'] ?? []), 'is_array'));
+        $articleCandidates = array_values(array_filter((array) ($media['internal_link_candidates'] ?? $media['related_articles'] ?? $writes['internal_link_candidates'] ?? []), 'is_array'));
+        return [
+            'status' => ($reusedKnowledge !== [] || $articleCandidates !== []) ? 'REUSE_EXISTING' : ($opportunities !== [] ? 'NEW_DEEP_CONTENT_OPPORTUNITY' : 'NOT_REQUESTED'),
+            'visual_support' => $opportunities === [] ? ['status' => 'not_requested', 'requirements' => []] : ['status' => 'optional_enrichment', 'requirements' => array_values(array_map(static fn (array $item): array => ['feature_key' => $item['feature_key'] ?? '', 'recommended_view' => $item['recommended_view'] ?? '', 'priority' => $item['priority'] ?? 0], $opportunities))],
+            'knowledge_reuse' => $reusedKnowledge,
+            'article_reuse_internal_link' => $articleCandidates,
+            'new_deep_content_opportunity' => $reusedKnowledge === [] && $articleCandidates === [] && $opportunities !== [] ? ['status' => 'NEW_DEEP_CONTENT_OPPORTUNITY', 'opportunities' => $opportunities, 'auto_create' => false] : null,
+        ];
     }
 
     /**
@@ -596,6 +670,42 @@ final class EditorialCaptureCoordinator
     }
 
     /** @return list<array<string,mixed>> */
+    /** @param list<array<string,mixed>> $assets @param array<string,mixed> $videoPublication @return array<string,mixed>|null */
+    private function eligibleVideoThumbnailFallback(array $assets, array $videoPublication): ?array
+    {
+        $verified = [];
+        foreach ((array) ($videoPublication['items'] ?? []) as $item) {
+            if (!is_array($item) || ($item['status'] ?? '') !== 'verified') continue;
+            $verified[(string) ($item['video_id'] ?? '') . '|' . (string) ($item['platform'] ?? '') . '|' . (string) ($item['external_video_id'] ?? $item['external_id'] ?? '')] = true;
+        }
+        if ($verified === []) return null;
+        foreach ($assets as $asset) {
+            if (($asset['kind'] ?? '') !== 'video') continue;
+            $proposal = is_array($asset['video_proposal'] ?? null) ? $asset['video_proposal'] : [];
+            $payload = is_array($proposal['payload'] ?? null) ? $proposal['payload'] : [];
+            $source = is_array($payload['metadata']['source'] ?? null) ? $payload['metadata']['source'] : (is_array($payload['metadata']['source_snapshot'] ?? null) ? $payload['metadata']['source_snapshot'] : []);
+            $selection = is_array($source['thumbnail_selection'] ?? null) ? $source['thumbnail_selection'] : [];
+            $url = trim((string) ($selection['url'] ?? ''));
+            $width = (int) ($selection['width'] ?? 0);
+            $height = (int) ($selection['height'] ?? 0);
+            if ($url === '' || strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https' || $width < 320 || $height < 180) continue;
+            $key = (string) ($asset['video_id'] ?? $payload['canonical_id'] ?? '') . '|' . (string) ($asset['platform'] ?? $source['platform'] ?? '') . '|' . (string) ($asset['external_video_id'] ?? $asset['external_id'] ?? $source['external_video_id'] ?? '');
+            if (!isset($verified[$key])) continue;
+            return [
+                'eligible' => true,
+                'url' => $url,
+                'variant' => (string) ($selection['variant'] ?? ''),
+                'width' => $width,
+                'height' => $height,
+                'video_id' => (string) ($asset['video_id'] ?? $payload['canonical_id'] ?? ''),
+                'external_video_id' => (string) ($asset['external_video_id'] ?? $asset['external_id'] ?? $source['external_video_id'] ?? ''),
+                'adopted_as_media' => false,
+                'user_upload_preferred' => true,
+            ];
+        }
+        return null;
+    }
+
     private function completionChildren(CaptureRecord $record, array $writes, array $media, array $videoPublication, array $publication, array $final, bool $published): array
     {
         $children = [];

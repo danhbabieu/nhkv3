@@ -28,6 +28,32 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertNotEmpty($first->diagnostics);
     }
 
+    public function test_missing_featured_media_exposes_conversational_guidance_without_opening_publication_gate(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(44, [
+            'subject' => 'Đồng hồ Odo 24 Odo 57',
+            'preferred_view' => 'WHOLE_FRONT',
+            'preferred_aspect' => '16:9',
+            'video_thumbnail_fallback' => [
+                'eligible' => true,
+                'url' => 'https://i.ytimg.com/vi/VwP1AH9E3HA/maxresdefault.jpg',
+                'variant' => 'maxresdefault',
+                'width' => 1920,
+                'height' => 1080,
+                'adopted_as_media' => false,
+            ],
+        ]);
+
+        self::assertTrue($result->guidance['featured_image_missing']);
+        self::assertTrue($result->guidance['inline_image_missing']);
+        self::assertStringContainsString('chưa có ảnh đại diện riêng', $result->guidance['user_message']);
+        self::assertSame('WHOLE_FRONT', $result->guidance['preferred_view']);
+        self::assertTrue($result->guidance['video_thumbnail_fallback']['eligible']);
+        self::assertFalse($result->guidance['video_thumbnail_fallback']['adopted_as_media']);
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+    }
+
     public function test_suitable_existing_media_is_reused_without_duplicate_identity(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

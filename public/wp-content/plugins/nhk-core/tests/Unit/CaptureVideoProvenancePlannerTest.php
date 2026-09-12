@@ -6,7 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Capture\CaptureVideoProvenancePlanner;
 use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
-use NHK\Core\Application\Video\{VideoRelationCandidatePlanner, YouTubeSourceAdapter};
+use NHK\Core\Application\Video\{VideoRelationCandidatePlanner, VideoThumbnailSelector, YouTubeSourceAdapter};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -166,6 +166,33 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame('uuid_exact', $plan['diagnostics']['subject_match']);
     }
 
+    public function test_resume_probe_persists_highest_quality_usable_legacy_thumbnail(): void
+    {
+        $selector = new VideoThumbnailSelector(static function (string $url): array {
+            return match (basename($url)) {
+                'maxresdefault.jpg' => ['status' => 200, 'mime_type' => 'image/jpeg', 'width' => 1920, 'height' => 1080],
+                'sddefault.jpg' => ['status' => 200, 'mime_type' => 'image/jpeg', 'width' => 640, 'height' => 360],
+                default => ['status' => 200, 'mime_type' => 'image/jpeg', 'width' => 120, 'height' => 90],
+            };
+        });
+        $video = $this->videoProposal('legacythumb1');
+        $video['payload']['metadata']['source']['thumbnail_urls'] = [
+            'https://img.youtube.test/default.jpg',
+            'https://img.youtube.test/sddefault.jpg',
+            'https://img.youtube.test/maxresdefault.jpg',
+        ];
+        $plan = (new CaptureVideoProvenancePlanner($selector))->plan(
+            'capture-thumbnail-resume',
+            $video,
+            $video['payload']['metadata']['source'],
+            ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A', 'match' => 'uuid_exact', 'revision' => 1, 'active' => true],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame('maxresdefault', $plan['video_proposal']['payload']['metadata']['source']['thumbnail_selection']['variant']);
+        self::assertSame(1920, $plan['video_proposal']['payload']['metadata']['source']['thumbnail_selection']['width']);
+    }
+
     public function test_strong_conflicting_canonical_source_candidate_requires_review_without_replacing_explicit_subject(): void
     {
         $other = '22222222-2222-4222-8222-222222222222';
@@ -210,6 +237,22 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
                 'type' => 'variant',
                 'match' => 'uuid_exact',
             ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SUBJECT_UNRESOLVED', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+    }
+
+    public function test_invalid_stored_uuid_exact_packet_cannot_be_replaced_by_resolver_subject(): void
+    {
+        $video = $this->videoProposal('invalidstored1');
+        $video['payload']['metadata']['subject_resolution_packet'] = ['id' => 'not-a-uuid', 'type' => 'variant', 'match' => 'uuid_exact'];
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-invalid-stored',
+            $video,
+            $video['payload']['metadata']['source'],
+            ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Resolver fallback', 'match' => 'exact_name_or_alias'],
         );
 
         self::assertSame('REVIEW_REQUIRED', $plan['status']);

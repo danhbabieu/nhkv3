@@ -122,6 +122,36 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertNotNull($data['fetched_at']);
     }
 
+    public function test_youtube_api_client_persists_highest_quality_probe_result_not_api_order(): void
+    {
+        $client = new YouTubeDataApiClient(
+            'secret-key',
+            static fn (string $url, array $options): array => [
+                'response' => ['code' => 200],
+                'body' => json_encode(['items' => [[
+                    'snippet' => ['title' => 'Video', 'thumbnails' => [
+                        'default' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg'],
+                        'high' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'],
+                        'maxres' => ['url' => 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'],
+                    ]],
+                    'status' => ['privacyStatus' => 'public', 'embeddable' => true],
+                ]]], JSON_THROW_ON_ERROR),
+            ],
+            null,
+            static function (string $url): array {
+                return str_contains($url, 'maxres')
+                    ? ['status' => 200, 'mime_type' => 'image/jpeg', 'width' => 1920, 'height' => 1080]
+                    : ['status' => 200, 'mime_type' => 'image/jpeg', 'width' => 480, 'height' => 360];
+            },
+        );
+
+        $data = $client->fetch(YouTubeUrlNormalizer::normalize('https://youtu.be/dQw4w9WgXcQ'));
+
+        self::assertSame('maxresdefault', $data['thumbnail_selection']['variant']);
+        self::assertSame(1920, $data['thumbnail_selection']['width']);
+        self::assertSame(1080, $data['thumbnail_selection']['height']);
+    }
+
     public function test_youtube_api_client_does_not_fabricate_availability_when_embeddability_is_missing(): void
     {
         $client = new YouTubeDataApiClient('secret-key', static fn (string $url, array $options): array => [

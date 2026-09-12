@@ -124,6 +124,13 @@ final class GovernedCaptureContinuationService
         $failureWrites = $blocked !== [] ? $blocked : $retryable;
         $failureBlockers = $failureWrites !== [] ? array_values(array_unique(array_merge(...array_map(static fn (array $write): array => (array) ($write['blockers'] ?? []), $failureWrites)))) : ($pending !== [] ? ['GOVERNANCE_APPROVAL_REQUIRED'] : ($skippedVideoChildren !== [] ? ['VIDEO_CHILD_UNCHANGED_ON_TEXT_ADDENDUM'] : []));
         $result = ['status' => $status, 'writes' => array_merge($skippedVideoChildren, $writes), 'reused_claims' => $reusedClaims, 'video_children' => $videoChildren, 'blockers' => $failureBlockers, 'governance' => ['lifecycle' => array_values(array_unique($lifecycle)), 'status' => $status, 'applied_count' => count($applied), 'pending_count' => count($pending), 'retryable_count' => count($retryable), 'skipped_video_children' => count($skippedVideoChildren)]];
+        if ($pending !== []) {
+            $identity = $pending[0];
+            $result['proposal_id'] = $identity['proposal_id'] ?? null;
+            $result['proposal_state'] = $identity['proposal_state'] ?? null;
+            $result['target_uuid'] = $identity['target_uuid'] ?? null;
+            $result['canonical_id'] = null;
+        }
         $result['completion'] = $this->completion->aggregateCapture($this->currentCaptureId, $this->completionChildren($writes), [
             'canonical_state' => 'COMPLETE',
             'blockers' => $failureBlockers,
@@ -194,7 +201,11 @@ final class GovernedCaptureContinuationService
                     $primary = $resolvedVariants[0] ?? [];
                 }
                 $hint = is_array($payload['metadata']['provenance']['user_hint'] ?? null) ? (string) ($payload['metadata']['provenance']['user_hint']['value'] ?? '') : '';
-                $plans[] = ['capture_video_provenance' => $this->videoProvenance->plan($captureId, $video, $source, $primary, ['user_hint' => $hint, 'preserve_original_subject' => !$includeSemanticChildren])];
+                $plans[] = ['capture_video_provenance' => $this->videoProvenance->plan($captureId, $video, $source, $primary, [
+                    'user_hint' => $hint,
+                    'preserve_original_subject' => !$includeSemanticChildren,
+                    'source_subject_candidates' => $resolved,
+                ])];
                 continue;
             }
             $plans[] = $this->arguments($entityType, $operation, $subjectId, $payload, 'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
@@ -648,7 +659,9 @@ final class GovernedCaptureContinuationService
         $payload = is_array($review['payload'] ?? null) ? $review['payload'] : $proposal->payload;
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         $subject = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : null;
-        $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : [];
+        $source = is_array($metadata['source'] ?? null)
+            ? $metadata['source']
+            : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
         $targetUuid = $review['target_uuid'] ?? $proposal->targetUuid;
         return [
             'proposal_id' => $proposal->id,

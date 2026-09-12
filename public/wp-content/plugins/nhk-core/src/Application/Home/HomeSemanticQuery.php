@@ -66,17 +66,19 @@ final class HomeSemanticQuery
             foreach ($this->videos->list() as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
                 $metadata = is_array($item->metadata) ? $item->metadata : [];
-                $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : [];
+                $source = is_array($metadata['source_snapshot'] ?? null)
+                    ? $metadata['source_snapshot']
+                    : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
                 if (isset($source['availability']) && !in_array($source['availability'], ['available','unknown'], true)) continue;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
-                $thumbnail = is_array($source['thumbnail_urls'] ?? null) ? (string) ($source['thumbnail_urls'][0] ?? '') : '';
-                if ($thumbnail === '' || filter_var($thumbnail, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($thumbnail, PHP_URL_SCHEME)) !== 'https') $thumbnail = '';
+                $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
                 $modules['videos'][] = [
                     'title' => $title,
                     'platform' => $item->platform,
                     'url' => (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($item, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'],
-                    'thumbnail_url' => $thumbnail !== '' ? $thumbnail : null,
+                    'thumbnail_url' => $thumbnail['url'] ?? null,
+                    'thumbnail' => $thumbnail,
                 ];
                 if (count($modules['videos']) >= 6) break;
             }
