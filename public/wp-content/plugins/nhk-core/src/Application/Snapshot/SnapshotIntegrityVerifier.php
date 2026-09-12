@@ -43,10 +43,12 @@ final class SnapshotIntegrityVerifier
         }
         $rules = [
             'capture_addenda' => ['capture_id', 'capture_uuid'],
+            'proposals' => ['subject_uuid', 'canonical_owner_uuid', 'target_uuid'],
             'proposal_approvals' => ['proposal_id', 'proposal_uuid'],
             'proposal_audit_history' => ['proposal_id', 'proposal_uuid'],
             'apply_attempts' => ['proposal_id', 'proposal_uuid'],
             'evidence' => ['source_id', 'source_uuid', 'claim_id', 'claim_uuid'],
+            'videos' => ['evidence_id', 'evidence_uuid'],
             'graph_edges' => ['source_id', 'source_uuid', 'target_id', 'target_uuid'],
             'public_identities' => ['owner_id', 'owner_uuid'],
         ];

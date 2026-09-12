@@ -21,6 +21,7 @@ final class SnapshotArtifactCodec
     public static function write(string $path, CanonicalSnapshot $snapshot): string
     {
         if ($path === '' || str_contains($path, "\0")) throw new \InvalidArgumentException('SNAPSHOT_ARTIFACT_PATH_INVALID');
+        if (is_file($path)) throw new \RuntimeException('SNAPSHOT_ARTIFACT_ALREADY_EXISTS');
         $contents = self::encode($snapshot);
         if (file_put_contents($path, $contents, LOCK_EX) === false) throw new \RuntimeException('SNAPSHOT_ARTIFACT_WRITE_FAILED');
         return hash('sha256', $contents);

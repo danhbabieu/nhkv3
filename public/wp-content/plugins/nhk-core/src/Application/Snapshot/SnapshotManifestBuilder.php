@@ -33,7 +33,7 @@ final class SnapshotManifestBuilder
             'migration_level' => ['current' => (int) ($migrationLevel['current'] ?? -1), 'target' => (int) ($migrationLevel['target'] ?? -1)],
             'object_counts' => array_map(static fn (array $item): int => $item['count'], $inventory),
             'content_hashes' => array_map(static fn (array $item): string => $item['sha256'], $inventory),
-            'repositories' => $repositoryInventory,
+            'repositories' => SnapshotCanonicalizer::sanitize($repositoryInventory),
         ];
         $hashInput = $manifest;
         unset($hashInput['manifest_hash'], $hashInput['exported_at']);

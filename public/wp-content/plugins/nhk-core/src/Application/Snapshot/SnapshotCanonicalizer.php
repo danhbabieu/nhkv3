@@ -32,6 +32,12 @@ final class SnapshotCanonicalizer
     }
 
     /** @param mixed $value @return mixed */
+    public static function sanitize(mixed $value): mixed
+    {
+        return self::value($value);
+    }
+
+    /** @param mixed $value @return mixed */
     private static function value(mixed $value): mixed
     {
         if (is_array($value)) {
