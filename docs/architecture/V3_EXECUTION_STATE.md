@@ -8836,3 +8836,70 @@ The dated target Graph evidence remains `classified_as total=0, active=0` and
 is not substituted for a fresh PR6.1 run. No staging mutation, migration,
 backfill, normalization, Public Identity operation, Video/Media/Knowledge
 rewrite or PR7 implementation occurred.
+
+# Checkpoint — 2026-09-13 — Video completeness persistence reconciliation
+
+ROOT CAUSE: Existing Video resume/reconciliation with unchanged editorial
+input returned `REUSE_EDITORIAL` from `VideoEditorialResumePlanner` and wrote
+only the reuse receipt. That branch did not re-read active Graph `about`
+relations and canonical Evidence or persist a new Video metadata snapshot.
+The stale `metadata.completeness.blockers` therefore survived fresh WPDB
+hydration. `WpdbVideoRepository` remains the canonical metadata writer; no
+recursive JSON merge or alternate completeness column was found.
+
+FIX: `VideoCompletenessReconciliationService` now rebuilds current completeness
+from active Graph attachments and validated Evidence, then persists the full
+Video metadata through `VideoService`/`VideoRepository` with the hydrated
+revision. Production wiring uses this boundary after governed Graph attachment
+apply and during existing Video resume. Invalid, missing or retired semantic
+attachments remain blocked fail-closed.
+
+VERIFICATION: Fresh-hydration regression tests cover corrected persistence,
+already-existing stale Video resume, missing/retired/invalid dependencies and
+idempotent replay without duplicate Video, Graph relation or Evidence. Focused
+Video tests pass `67 tests / 316 assertions`; full Unit passes `1,406 tests /
+6,694 assertions`; Contract passes `4 tests / 31 assertions`; Composer PHP
+lint and `git diff --check` pass. WordPress integration is unavailable at the
+local database boundary (`Error establishing a database connection`), so it
+is not reported as passing. No server, staging runtime, migration or semantic
+data was modified.
+
+# Checkpoint — 2026-09-13 — PR6.1 final read-only audit verification
+
+CODE-SIDE IMPLEMENTATION: PR6.1 now contains the production
+`CanonicalKnowledgeEvidenceAuditReader` over the existing canonical
+KnowledgeClaim → Evidence → Source owners, the bounded cursor Authority
+inventory bridge, and the read-only `clock-type-audit` maintenance surface.
+`ClockTypeClassificationAudit` depends only on `CursorAuthorityInventoryReader`,
+Graph reads, profile resolution and the audit evidence read port. It has no
+Proposal, Governance, Controlled Apply or semantic writer dependency. The
+report includes source-type audited counts, bounded cursor state, target family
+buckets, safe owner-review samples and a timestamp-free semantic fingerprint.
+
+FRESH LIVE READS: `https://demo.1945.vn` was read at this checkpoint. MCP
+`initialize` succeeded and the live health read reported plugin `0.1.0`,
+database/Graph/Authority/Knowledge storage ready and migration `20/20`. The
+fresh bounded canonical inventory reported Model `31`, Variant `42`, Specimen
+`0`, Product `0`, and Classification `188`; the live Graph read reported
+`classified_as total=0, active=0`. The live `tools/list` did not expose the
+PR6.1 audit operation. The documentation bootstrap call was rejected with
+`Capability required: read`, so the previously supplied documentation and
+manifest hashes are not treated as fresh live evidence. Local code-side
+bootstrap remains separate from this target result.
+
+REAL DRY-RUN: `LIVE_AUDIT_SURFACE_NOT_EXPOSED`. No real PR6.1 dry-run counts,
+candidate samples or audit fingerprint are claimed for the target. The
+read-only remote maintenance transport is not configured in this checkout,
+and no writer, workaround endpoint, SSH deployment, migration or semantic
+operation was invoked. This is the legitimate PR6.1 blocked path: code is
+implemented, but the target has not exposed a callable audit surface.
+
+VERIFICATION: Focused PR6.1 tests pass `30 tests / 92 assertions`; the full
+Unit suite passes `1,410 tests / 6,708 assertions` with only existing warnings
+and deprecations. Composer PHP lint passes. The full suite remains environment
+blocked by the existing local WordPress boundary (`stdClass::query()` and
+missing WordPress functions), 15 guarded acceptance failures requiring
+`NHK_WP_TEST_PATH=public`, and one unrelated Collector contract failure; no
+PR6.1 test failure was observed. No staging data, Graph edge, Authority row,
+Claim, Evidence, Source, Proposal, Governance record, Media, Video, Article,
+Public Identity or route was mutated. PR7 remains NOT READY.

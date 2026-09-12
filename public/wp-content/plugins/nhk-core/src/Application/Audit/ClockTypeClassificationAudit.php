@@ -5,8 +5,8 @@ namespace NHK\Core\Application\Audit;
 
 use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Contracts\Audit\ClockTypeAuditEvidenceReader;
-use NHK\Core\Contracts\Authority\CursorAuthorityInventoryReader;
-use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Contracts\Authority\{AuthorityInventoryReader, ClassificationTargetInventoryReader};
+use NHK\Core\Contracts\Graph\GraphReader;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Graph\{GraphEdge, NodeReference};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -45,8 +45,9 @@ final class ClockTypeClassificationAudit
     private const SUPPORTED_EVIDENCE = ['SUPPORTED', 'VERIFIED', 'APPROVED'];
 
     public function __construct(
-        private CursorAuthorityInventoryReader $authority,
-        private GraphService $graph,
+        private AuthorityInventoryReader $authority,
+        private ClassificationTargetInventoryReader $classificationTargets,
+        private GraphReader $graph,
         private EntityProfileResolver $profiles = new EntityProfileResolver(),
         private ?ClockTypeAuditEvidenceReader $evidence = null,
     ) {}
@@ -101,7 +102,7 @@ final class ClockTypeClassificationAudit
         $rows = [];
         $canonical = [];
         $legacy = [];
-        try { $entities = $this->readAuthorityType('classification', true); } catch (\Throwable) {
+        try { $entities = $this->readClassificationTargets(true); } catch (\Throwable) {
             return ['inventory' => ['status' => 'UNAVAILABLE', 'records' => [], 'counts' => [], 'counterpart_counts' => []], 'canonical' => [], 'legacy' => [], 'all' => [], 'allById' => []];
         }
         usort($entities, static fn (AuthorityEntity $a, AuthorityEntity $b): int => strcmp($a->canonicalId, $b->canonicalId));
@@ -145,7 +146,7 @@ final class ClockTypeClassificationAudit
         if ($profile->status === 'RESOLVED' && $profile->profileKey === 'clock_type') return 'CANONICAL_CLOCK_TYPE';
         if ($profile->status === 'COMPATIBILITY_READ' && $profile->profileKey === 'clock_type') return 'LEGACY_CLOCK_TYPE';
         if ($family === null) return 'FAMILY_MISSING';
-        return in_array($family, self::KNOWN_OTHER_FAMILIES, true) ? 'OTHER_FAMILY' : 'FAMILY_UNRESOLVED';
+        return in_array($family, self::KNOWN_OTHER_FAMILIES, true) ? 'OTHER_CLASSIFICATION_FAMILY' : 'FAMILY_UNRESOLVED';
     }
 
     /** @param list<AuthorityEntity> $entities */
@@ -314,11 +315,15 @@ final class ClockTypeClassificationAudit
     }
 
     /** @return list<AuthorityEntity> */
-    private function readAuthorityType(string $type, bool $includeRetired): array
+    private function readClassificationTargets(bool $includeRetired): array
     {
         $items = []; $after = null;
         for ($page = 0; $page < 10000; $page++) {
-            $result = $this->pageAuthorityType($type, 200, $after, $includeRetired);
+            $result = $this->classificationTargets->pageClassifications(200, $after, $includeRetired);
+            if (!is_array($result)) throw new \RuntimeException('CLASSIFICATION_TARGET_AUDIT_READ_SURFACE_UNAVAILABLE');
+            $next = $result['next_cursor'] ?? null;
+            if ($next !== null && (!is_string($next) || !UuidCodec::isValid($next) || $next === $after)) throw new \RuntimeException('CLASSIFICATION_TARGET_AUDIT_CURSOR_INVALID');
+            $result = ['items' => array_values(array_filter((array) ($result['items'] ?? []), static fn (mixed $item): bool => $item instanceof AuthorityEntity)), 'next_cursor' => $next];
             foreach ($result['items'] as $entity) $items[] = $entity;
             $next = $result['next_cursor'];
             if ($next === null || !is_string($next) || $next === $after) return $items;

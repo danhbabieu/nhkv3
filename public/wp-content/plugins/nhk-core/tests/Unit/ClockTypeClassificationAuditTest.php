@@ -7,7 +7,7 @@ use NHK\Core\Application\Audit\ClockTypeClassificationAudit;
 use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, GraphService};
 use NHK\Core\Contracts\Audit\ClockTypeAuditEvidenceReader;
-use NHK\Core\Contracts\Authority\{AuthorityRepository, CursorAuthorityInventoryReader};
+use NHK\Core\Contracts\Authority\{AuthorityRepository, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader};
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
@@ -243,7 +243,7 @@ final class ClockTypeClassificationAuditTest extends TestCase
         foreach ($byType as $type => $ids) $endpoints->register($type, new FakeEndpointResolver($type, $ids));
         $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
         if ($createWrongEdge) $graph->create(new NodeReference('variant', $entities[0]->canonicalId), 'classified_as', new NodeReference('classification', $entities[1]->canonicalId));
-        return [new ClockTypeClassificationAudit($repo, $graph, new EntityProfileResolver(), $evidence), $repo, $graph];
+        return [new ClockTypeClassificationAudit($repo, $repo, $graph, new EntityProfileResolver(), $evidence), $repo, $graph];
     }
 
     private function auditWithRepo(AuditAuthorityRepository $repo, array $entities, ClockTypeAuditEvidenceReader $evidence): ClockTypeClassificationAudit
@@ -252,7 +252,7 @@ final class ClockTypeClassificationAuditTest extends TestCase
         foreach ($entities as $entity) $byType[$entity->entityType][] = $entity->canonicalId;
         foreach ($byType as $type => $ids) $endpoints->register($type, new FakeEndpointResolver($type, $ids));
         $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
-        return new ClockTypeClassificationAudit($repo, $graph, new EntityProfileResolver(), $evidence);
+        return new ClockTypeClassificationAudit($repo, $repo, $graph, new EntityProfileResolver(), $evidence);
     }
 
     private function entity(string $type, string $name, string $id, array $payload = [], AuthorityState $state = AuthorityState::ACTIVE): AuthorityEntity
@@ -273,7 +273,7 @@ final class FixtureEvidenceReader implements ClockTypeAuditEvidenceReader
     public function findForSubject(string $sourceType, string $sourceUuid): array { return $this->records[$sourceUuid] ?? []; }
 }
 
-class AuditAuthorityRepository implements AuthorityRepository, CursorAuthorityInventoryReader
+class AuditAuthorityRepository implements AuthorityRepository, CursorAuthorityInventoryReader, ClassificationTargetInventoryReader
 {
     /** @param list<AuthorityEntity> $entities */
     public int $pages = 0;
@@ -300,5 +300,10 @@ final class FailingAuditAuthorityRepository extends AuditAuthorityRepository
     public function pageByType(string $type, int $limit = 100, ?string $after = null, bool $includeRetired = false): array
     {
         throw new \RuntimeException('AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE');
+    }
+
+    public function pageClassifications(int $limit = 100, ?string $after = null, bool $includeRetired = false): array
+    {
+        return $this->pageByType('classification', $limit, $after, $includeRetired);
     }
 }

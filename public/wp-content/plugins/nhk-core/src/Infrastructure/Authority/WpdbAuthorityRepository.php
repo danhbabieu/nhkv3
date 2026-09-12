@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Authority;
-use NHK\Core\Contracts\Authority\{AuthorityRepository, CursorAuthorityInventoryReader};
+use NHK\Core\Contracts\Authority\{AuthorityRepository, AuthorityInventoryReader, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader};
 use NHK\Core\Domain\Authority\{AuthorityEntity,AuthorityState};
 use NHK\Core\Authority\Exception\{AuthorityRevisionConflict,StableKeyCollision};
 use NHK\Core\Shared\Uuid\UuidCodec;
-final class WpdbAuthorityRepository implements AuthorityRepository, CursorAuthorityInventoryReader {
+final class WpdbAuthorityRepository implements AuthorityRepository, AuthorityInventoryReader, ClassificationTargetInventoryReader, CursorAuthorityInventoryReader {
  private AuthorityRowHydrator $hydrator;
  /** @param callable(string, string|null, array|null): void|null $rowErrorSink */
  public function __construct(mixed $hydrator=null, private $rowErrorSink=null){$this->hydrator=$hydrator instanceof AuthorityRowHydrator?$hydrator:new AuthorityRowHydrator();}
@@ -27,4 +27,5 @@ final class WpdbAuthorityRepository implements AuthorityRepository, CursorAuthor
  public function rekey(AuthorityEntity $e,string $oldStableKey,string $newStableKey,int $expectedRevision):AuthorityEntity{global $wpdb;$now=gmdate('Y-m-d H:i:s.u');$ok=$wpdb->query($wpdb->prepare('UPDATE '.$this->table().' SET stable_key=%s,revision=revision+1,updated_at=%s WHERE canonical_uuid=%s AND entity_type=%s AND stable_key=%s AND revision=%d',$newStableKey,$now,UuidCodec::toBinary($e->canonicalId),$e->entityType,$oldStableKey,$expectedRevision));if($ok===false){$existing=$this->findByStableKey($e->entityType,$newStableKey);if($existing!==null&&$existing->canonicalId!==$e->canonicalId)throw new StableKeyCollision('Stable key already exists.');throw new \RuntimeException('Authority rekey failed: '.(string)$wpdb->last_error);}if($ok!==1)throw new AuthorityRevisionConflict('Authority revision conflict.');return $this->findByCanonicalId($e->canonicalId)??$e;}
  public function listByType(string $type,bool $includeRetired=false):array{global $wpdb;$state=$includeRetired?'':' AND state=1';$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.$this->table().' WHERE entity_type=%s'.$state.' ORDER BY id',$type),ARRAY_A)?:[];$items=[];foreach($rows as $row){try{$items[]=$this->hydrator->hydrate($row);}catch(MalformedAuthorityRow $error){if(is_callable($this->rowErrorSink))($this->rowErrorSink)($error->reasonCode,$error->stableKey,$row);}}return $items;}
  public function pageByType(string $type,int $limit=100,?string $after=null,bool $includeRetired=false):array{global $wpdb;$limit=max(1,min(500,$limit));if($after!==null&&trim($after)!==''&&!UuidCodec::isValid($after))throw new \InvalidArgumentException('Authority inventory cursor is invalid.');$state=$includeRetired?'':' AND state=1';$afterSql=$after!==null&&trim($after)!==''?' AND canonical_uuid > %s':'';$args=[$type];if($afterSql!=='')$args[]=UuidCodec::toBinary($after);$args[]=$limit+1;$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.$this->table().' WHERE entity_type=%s'.$state.$afterSql.' ORDER BY canonical_uuid LIMIT %d',...$args),ARRAY_A)?:[];$items=[];foreach($rows as $row){try{$entity=$this->hydrator->hydrate($row);if($entity instanceof AuthorityEntity)$items[]=$entity;}catch(MalformedAuthorityRow $error){if(is_callable($this->rowErrorSink))($this->rowErrorSink)($error->reasonCode,$error->stableKey,$row);}}$hasNext=count($rows)>$limit;if(count($items)>$limit)$items=array_slice($items,0,$limit);$next=$hasNext&&$items!==[]?$items[count($items)-1]->canonicalId:null;return ['items'=>$items,'next_cursor'=>$next];}
+ public function pageClassifications(int $limit=100,?string $after=null,bool $includeRetired=false):array{return $this->pageByType('classification',$limit,$after,$includeRetired);}
 }

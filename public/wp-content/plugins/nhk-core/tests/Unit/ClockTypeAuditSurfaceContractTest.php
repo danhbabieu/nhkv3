@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Audit\ClockTypeClassificationAudit;
+use NHK\Core\Application\Graph\GraphService;
+use NHK\Core\Contracts\Authority\{AuthorityInventoryReader, ClassificationTargetInventoryReader};
+use NHK\Core\Contracts\Graph\GraphReader;
 use NHK\Core\Infrastructure\Demo\RemoteRuntimeAdapter;
 use PHPUnit\Framework\TestCase;
 
@@ -47,9 +51,27 @@ final class ClockTypeAuditSurfaceContractTest extends TestCase
         $audit = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Audit/ClockTypeClassificationAudit.php');
         $factory = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Audit/WpdbClockTypeClassificationAuditFactory.php');
 
-        foreach (['Proposal', 'Governance', 'ControlledApply'] as $forbidden) {
+        foreach (['GraphService', 'Proposal', 'Governance', 'ControlledApply', 'GraphWriter', 'AuthorityWriter', 'KnowledgeWriter', 'CaptureWriter'] as $forbidden) {
             self::assertStringNotContainsString($forbidden, $audit . $factory, $forbidden);
         }
+    }
+
+    public function test_audit_constructor_is_bound_to_read_only_ports(): void
+    {
+        $constructor = (new \ReflectionClass(ClockTypeClassificationAudit::class))->getConstructor();
+        self::assertNotNull($constructor);
+        $types = array_map(static fn (\ReflectionParameter $parameter): ?string => $parameter->getType()?->getName(), $constructor->getParameters());
+
+        self::assertSame([
+            AuthorityInventoryReader::class,
+            ClassificationTargetInventoryReader::class,
+            GraphReader::class,
+        ], array_slice($types, 0, 3));
+    }
+
+    public function test_graph_service_implements_the_read_only_graph_port(): void
+    {
+        self::assertTrue(is_subclass_of(GraphService::class, GraphReader::class));
     }
 
     public function test_maintenance_entrypoint_and_plugin_register_only_read_only_audit_filter(): void

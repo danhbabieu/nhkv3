@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 namespace NHK\Core\Application\Graph;
-use NHK\Core\Contracts\Graph\{AuditSink,GraphRepository};
+use NHK\Core\Contracts\Graph\{AuditSink,GraphReader,GraphRepository};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry,GraphEdge,NodeReference,PredicateRegistry,RelationPolicy};
 use NHK\Core\Graph\Exception\{InvalidRelationSourceType,InvalidRelationTargetType};
-final class GraphService {
+final class GraphService implements GraphReader {
     public function __construct(private GraphRepository $repository, private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private AuditSink $audit, private ?ClassificationHierarchyPolicy $hierarchy = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
     public function create(NodeReference $source, string $predicate, NodeReference $target): GraphEdge {
         $definition=$this->predicates->get($predicate); $source=$this->endpoints->assertExists($source); $target=$this->endpoints->assertExists($target);
