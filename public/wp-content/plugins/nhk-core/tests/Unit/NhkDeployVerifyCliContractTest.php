@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Infrastructure\Demo\PluginHeaderVersionReader;
 use PHPUnit\Framework\TestCase;
 
 final class NhkDeployVerifyCliContractTest extends TestCase
@@ -38,5 +39,18 @@ final class NhkDeployVerifyCliContractTest extends TestCase
 
         self::assertNotSame(0, $status);
         self::assertStringContainsString('WORKTREE_NOT_CLEAN', implode("\n", $output));
+    }
+
+    public function test_plugin_header_reader_accepts_wordpress_comment_format(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'nhk-plugin-header-');
+        self::assertIsString($path);
+        file_put_contents($path, "/**\n * Plugin Name: NHK Core\n * Version: 0.1.0\n */\n");
+
+        try {
+            self::assertSame('0.1.0', PluginHeaderVersionReader::read($path));
+        } finally {
+            unlink($path);
+        }
     }
 }

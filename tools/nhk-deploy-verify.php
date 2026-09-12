@@ -5,6 +5,7 @@ use NHK\Core\Application\Demo\DemoCutoverContext;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Infrastructure\Demo\RemoteDeploymentAdapter;
 use NHK\Core\Infrastructure\Demo\RemoteMcpDocumentationVerifier;
+use NHK\Core\Infrastructure\Demo\PluginHeaderVersionReader;
 
 $root = dirname(__DIR__);
 $target = null;
@@ -58,7 +59,7 @@ if (!is_readable($autoload)) finish(['status' => 'failed', 'reason_code' => 'COM
 require_once $autoload;
 
 $pluginRoot = $root . '/public/wp-content/plugins/nhk-core';
-$runtimeVersion = pluginVersion($pluginRoot . '/nhk-core.php');
+    $runtimeVersion = PluginHeaderVersionReader::read($pluginRoot . '/nhk-core.php');
 try {
     if ($runtimeVersion === null) throw new RuntimeException('PLUGIN_VERSION_UNAVAILABLE');
     $localBootstrap = (new McpDocumentationRegistry($pluginRoot . '/resources/canonical-docs', $runtimeVersion))->bootstrap();
@@ -131,13 +132,6 @@ function validBaseUrl(string $baseUrl, string $target): bool
         && in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
         && strtolower((string) ($parts['host'] ?? '')) === $target
         && !isset($parts['user'], $parts['pass']);
-}
-
-function pluginVersion(string $pluginFile): ?string
-{
-    $contents = is_readable($pluginFile) ? file_get_contents($pluginFile) : false;
-    if (!is_string($contents) || preg_match('/^\s*Version:\s*([^\s]+)\s*$/mi', $contents, $match) !== 1) return null;
-    return trim($match[1]);
 }
 
 /** @param array<string,mixed> $manifest @return array<string,mixed> */
