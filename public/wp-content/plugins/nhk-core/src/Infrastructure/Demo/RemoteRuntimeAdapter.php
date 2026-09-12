@@ -11,7 +11,7 @@ use NHK\Core\Application\Demo\StageResult;
 final class RemoteRuntimeAdapter
 {
     private const OPERATIONS = [
-        'health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'migration-up', 'dry-run', 'backup/snapshot',
+        'health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'clock-type-audit', 'migration-up', 'dry-run', 'backup/snapshot',
         'governance-plan', 'controlled-apply', 'read-back',
     ];
 
@@ -69,6 +69,10 @@ final class RemoteRuntimeAdapter
         ]);
         $result = ($this->executor)($command);
         if ($result[0] !== 0) {
+            $decoded = json_decode($result[1], true);
+            if ($operation === 'clock-type-audit' && is_array($decoded) && in_array(($decoded['reason_code'] ?? null), ['REMOTE_OPERATION_NOT_ALLOWLISTED', 'LIVE_AUDIT_SURFACE_NOT_EXPOSED'], true)) {
+                return StageResult::blocked('LIVE_AUDIT_SURFACE_NOT_EXPOSED');
+            }
             return StageResult::failed('REMOTE_RUNTIME_EXECUTION_FAILED');
         }
         try {

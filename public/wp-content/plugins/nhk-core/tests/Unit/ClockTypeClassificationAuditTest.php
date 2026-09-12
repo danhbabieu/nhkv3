@@ -180,6 +180,51 @@ final class ClockTypeClassificationAuditTest extends TestCase
         self::assertNotNull($report->pagination['next_cursor']);
     }
 
+    public function test_report_exposes_bounded_audited_counts_by_source_type(): void
+    {
+        $sources = [
+            $this->entity('model', 'Model A', '00000000-0000-4000-8000-000000000121'),
+            $this->entity('variant', 'Variant A', '00000000-0000-4000-8000-000000000122'),
+            $this->entity('specimen', 'Specimen A', '00000000-0000-4000-8000-000000000123'),
+            $this->entity('product', 'Product A', '00000000-0000-4000-8000-000000000124'),
+        ];
+        [$audit] = $this->audit($sources, new FixtureEvidenceReader([]));
+
+        $report = $audit->audit(['limit' => 500]);
+
+        self::assertSame(4, $report->auditedCounts['total']);
+        self::assertSame(1, $report->auditedCounts['model']);
+        self::assertSame(1, $report->auditedCounts['variant']);
+        self::assertSame(1, $report->auditedCounts['specimen']);
+        self::assertSame(1, $report->auditedCounts['product']);
+        self::assertSame($report->auditedCounts, $report->toArray()['audited_counts']);
+    }
+
+    public function test_authority_page_failure_is_reported_as_unavailable_not_empty_completion(): void
+    {
+        $source = $this->entity('model', 'Model A', '00000000-0000-4000-8000-000000000131');
+        $repo = new FailingAuditAuthorityRepository([$source]);
+        $audit = $this->auditWithRepo($repo, [$source], new FixtureEvidenceReader([]));
+
+        $report = $audit->audit(['limit' => 1]);
+
+        self::assertSame('UNAVAILABLE', $report->pagination['surface_status']);
+        self::assertSame('AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE', $report->pagination['reason_code']);
+        self::assertFalse($report->pagination['completed']);
+        self::assertSame(0, $report->pagination['records_read']);
+        self::assertSame([], $report->results);
+    }
+
+    public function test_malformed_authority_cursor_fails_closed(): void
+    {
+        $source = $this->entity('model', 'Model A', '00000000-0000-4000-8000-000000000141');
+        [$audit] = $this->audit([$source], new FixtureEvidenceReader([]));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('AUTHORITY_AUDIT_CURSOR_INVALID');
+        $audit->audit(['after' => 'model|not-a-uuid']);
+    }
+
     /** @return array{0:ClockTypeClassificationAudit,1:AuditAuthorityRepository,2:GraphService} */
     private function audit(array $entities, ?ClockTypeAuditEvidenceReader $evidence = null, bool $createWrongEdge = false): array
     {
@@ -219,7 +264,7 @@ final class FixtureEvidenceReader implements ClockTypeAuditEvidenceReader
     public function findForSubject(string $sourceType, string $sourceUuid): array { return $this->records[$sourceUuid] ?? []; }
 }
 
-final class AuditAuthorityRepository implements AuthorityRepository, CursorAuthorityInventoryReader
+class AuditAuthorityRepository implements AuthorityRepository, CursorAuthorityInventoryReader
 {
     /** @param list<AuthorityEntity> $entities */
     public int $pages = 0;
@@ -239,4 +284,12 @@ final class CallbackEvidenceReader implements ClockTypeAuditEvidenceReader
 {
     public function __construct(private \Closure $callback) {}
     public function findForSubject(string $sourceType, string $sourceUuid): array { ($this->callback)(); return []; }
+}
+
+final class FailingAuditAuthorityRepository extends AuditAuthorityRepository
+{
+    public function pageByType(string $type, int $limit = 100, ?string $after = null, bool $includeRetired = false): array
+    {
+        throw new \RuntimeException('AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE');
+    }
 }

@@ -65,6 +65,11 @@ final class ClockTypeClassificationAudit
         $counts = array_fill_keys([self::ALREADY_CANONICAL, self::READY_FOR_OWNER_REVIEW, self::LEGACY_TARGET_REQUIRES_REVIEW, self::RETIRED_RELATION_REVIEW_REQUIRED, self::AMBIGUOUS_CLOCK_TYPE, self::INSUFFICIENT_EVIDENCE, self::DISCOVERY_HINT_ONLY, self::NO_CLOCK_TYPE_SIGNAL, self::TARGET_UNRESOLVED, self::FAMILY_UNRESOLVED, self::SOURCE_UNSUPPORTED, self::SOURCE_INACTIVE, self::DEPENDENCY_UNAVAILABLE, self::INVALID_CLOCK_TYPE_MEMBERSHIP_TARGET], 0);
         foreach ($results as $result) $counts[$result['status']] = ($counts[$result['status']] ?? 0) + 1;
         ksort($counts);
+        $auditedCounts = ['total' => count($results), 'model' => 0, 'variant' => 0, 'specimen' => 0, 'product' => 0];
+        foreach ($results as $result) {
+            $type = $result['source_type'] ?? null;
+            if (is_string($type) && array_key_exists($type, $auditedCounts)) $auditedCounts[$type]++;
+        }
         $samples = [];
         foreach ([self::READY_FOR_OWNER_REVIEW, self::AMBIGUOUS_CLOCK_TYPE, self::DISCOVERY_HINT_ONLY, self::LEGACY_TARGET_REQUIRES_REVIEW] as $status) $samples[$status] = [];
         foreach ($results as $result) {
@@ -79,13 +84,15 @@ final class ClockTypeClassificationAudit
             'after' => $sources['after'],
             'next_cursor' => $sources['next_cursor'],
             'records_read' => count($sources['items']),
-            'completed' => $sources['next_cursor'] === null,
+            'completed' => $sources['surface_status'] === 'AUDITED' && $sources['next_cursor'] === null,
+            'surface_status' => $sources['surface_status'],
+            'reason_code' => $sources['reason_code'],
             'ordering' => 'source_type_order_then_canonical_uuid',
             'authority_cursor_surface' => 'CANONICAL_AUTHORITY_PAGE_BY_TYPE',
             'audit_state' => 'TRANSIENT_READ_ONLY',
         ];
-        $payload = ['target_inventory' => $targets['inventory'], 'results' => $results, 'result_counts' => $counts, 'pagination' => $pagination, 'samples' => $samples];
-        return new ClockTypeClassificationAuditReport($targets['inventory'], $results, $counts, $pagination, $this->fingerprint($payload), $samples);
+        $payload = ['target_inventory' => $targets['inventory'], 'results' => $results, 'result_counts' => $counts, 'audited_counts' => $auditedCounts, 'pagination' => $pagination, 'samples' => $samples];
+        return new ClockTypeClassificationAuditReport($targets['inventory'], $results, $counts, $pagination, $this->fingerprint($payload), $samples, $auditedCounts);
     }
 
     /** @return array<string,mixed> */
@@ -260,13 +267,13 @@ final class ClockTypeClassificationAudit
     /** @param array<string,mixed> $base @param list<string> $blockers @param list<string> $warnings @param array<string,mixed> $extra */
     private function result(string $status, array $base, array $blockers = [], array $warnings = [], array $extra = []): array { $result = array_merge($base, ['status' => $status, 'blockers' => array_values(array_unique($blockers)), 'warnings' => array_values(array_unique($warnings))], $extra); $result['candidate_fingerprint'] = $this->fingerprint($result); return $result; }
 
-    /** @param array<string,mixed> $options @return array{items:list<AuthorityEntity>,limit:int,after:?string,next_cursor:?string} */
+    /** @param array<string,mixed> $options @return array{items:list<AuthorityEntity>,limit:int,after:?string,next_cursor:?string,surface_status:string,reason_code:?string} */
     private function sourceSnapshot(array $options): array
     {
         $after = is_string($options['after'] ?? null) && trim((string) $options['after']) !== '' ? trim((string) $options['after']) : null;
         $limit = max(1, min(500, (int) ($options['limit'] ?? 500)));
+        [$typeIndex, $typeAfter] = $this->decodeSourceCursor($after);
         try {
-            [$typeIndex, $typeAfter] = $this->decodeSourceCursor($after);
             $items = [];
             $next = null;
             for ($index = $typeIndex; $index < count(self::SOURCE_TYPES) && count($items) < $limit; $index++) {
@@ -276,12 +283,12 @@ final class ClockTypeClassificationAudit
                 foreach ($page['items'] as $entity) if ($entity instanceof AuthorityEntity) $items[] = $entity;
                 $pageNext = $page['next_cursor'];
                 if ($pageNext !== null) { $next = $this->sourceCursor($type, $pageNext); break; }
-                if (count($items) === $limit && $items !== []) $next = $this->sourceCursor($type, $items[count($items) - 1]->canonicalId);
+                if (count($items) === $limit && $items !== [] && $index < count(self::SOURCE_TYPES) - 1) $next = $this->sourceCursor($type, $items[count($items) - 1]->canonicalId);
             }
             if ($next !== null && count($items) < $limit) $next = null;
-            return ['items' => $items, 'limit' => $limit, 'after' => $after, 'next_cursor' => $next];
+            return ['items' => $items, 'limit' => $limit, 'after' => $after, 'next_cursor' => $next, 'surface_status' => 'AUDITED', 'reason_code' => null];
         } catch (\Throwable) {
-            return ['items' => [], 'limit' => $limit, 'after' => $after, 'next_cursor' => null];
+            return ['items' => [], 'limit' => $limit, 'after' => $after, 'next_cursor' => $after, 'surface_status' => 'UNAVAILABLE', 'reason_code' => 'AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE'];
         }
     }
 
@@ -300,7 +307,10 @@ final class ClockTypeClassificationAudit
     private function pageAuthorityType(string $type, int $limit, ?string $after, bool $includeRetired): array
     {
         $result = $this->authority->pageByType($type, $limit, $after, $includeRetired);
-        return ['items' => array_values(array_filter((array) ($result['items'] ?? []), static fn (mixed $item): bool => $item instanceof AuthorityEntity)), 'next_cursor' => isset($result['next_cursor']) && is_string($result['next_cursor']) ? $result['next_cursor'] : null];
+        if (!is_array($result)) throw new \RuntimeException('AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE');
+        $next = $result['next_cursor'] ?? null;
+        if ($next !== null && (!is_string($next) || !UuidCodec::isValid($next) || $next === $after)) throw new \RuntimeException('AUTHORITY_AUDIT_CURSOR_INVALID');
+        return ['items' => array_values(array_filter((array) ($result['items'] ?? []), static fn (mixed $item): bool => $item instanceof AuthorityEntity)), 'next_cursor' => $next];
     }
 
     /** @return list<AuthorityEntity> */
@@ -324,9 +334,11 @@ final class ClockTypeClassificationAudit
         $nextCursor = null;
         for ($page = 0; $page < 100; $page++) {
             $result = $this->graph->findOutgoing(new NodeReference($source->entityType, $source->canonicalId), 'classified_as', $after, 200, true, 'classification');
+            if (!is_array($result)) throw new \RuntimeException('GRAPH_AUDIT_READ_SURFACE_UNAVAILABLE');
             foreach ((array) ($result['items'] ?? []) as $edge) $items[] = $edge;
             $next = $result['next_cursor'] ?? null;
-            if (!is_int($next) || $next <= $after) { $nextCursor = null; break; }
+            if ($next === null) { $nextCursor = null; break; }
+            if (!is_int($next) || $next <= $after) throw new \RuntimeException('GRAPH_AUDIT_CURSOR_INVALID');
             $after = $next;
             $nextCursor = $next;
         }

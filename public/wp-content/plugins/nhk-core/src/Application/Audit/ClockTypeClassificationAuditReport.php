@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Audit;
 
 final readonly class ClockTypeClassificationAuditReport
 {
-    /** @param array<string,mixed> $targetInventory @param list<array<string,mixed>> $results @param array<string,int> $resultCounts @param array<string,mixed> $pagination @param array<string,list<array<string,mixed>>> $samples */
+    /** @param array<string,mixed> $targetInventory @param list<array<string,mixed>> $results @param array<string,int> $resultCounts @param array<string,mixed> $pagination @param array<string,list<array<string,mixed>>> $samples @param array<string,int> $auditedCounts */
     public function __construct(
         public array $targetInventory,
         public array $results,
@@ -13,6 +13,7 @@ final readonly class ClockTypeClassificationAuditReport
         public array $pagination,
         public string $fingerprint,
         public array $samples = [],
+        public array $auditedCounts = [],
     ) {}
 
     /** @return array<string,mixed> */
@@ -24,6 +25,7 @@ final readonly class ClockTypeClassificationAuditReport
             'target_inventory' => $this->targetInventory,
             'results' => $this->results,
             'result_counts' => $this->resultCounts,
+            'audited_counts' => $this->auditedCounts,
             'pagination' => $this->pagination,
             'samples' => $this->samples,
             'fingerprint' => $this->fingerprint,

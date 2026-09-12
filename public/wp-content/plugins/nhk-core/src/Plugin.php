@@ -57,6 +57,7 @@ use NHK\Core\Contracts\Article\PublicationPrincipal;
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Infrastructure\Authority\WpdbAuthorityRepository;
+use NHK\Core\Infrastructure\Audit\WpdbClockTypeClassificationAuditFactory;
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, SemanticNeighborhoodQuery, StructuralContextQuery};
 use NHK\Core\Application\Graph\{LegacyRelationPlanner, RelationBackfillCandidate, RelationBackfillService};
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
@@ -173,6 +174,8 @@ final class Plugin {
             CoreEndpointResolverRegistrar::register($publicEndpoints, $publicTypes, $publicAuthority, $publicMedia, $publicVideos);
             $publicStatus = new MigrationStatus();
             $publicGraph = new GraphService(new WpdbGraphRepository($wpdb), $publicEndpoints, new PredicateRegistry(), new WpdbAuditSink());
+            $clockTypeAudit = WpdbClockTypeClassificationAuditFactory::create($publicGraph, $wpdb);
+            add_filter('nhk_v3_clock_type_classification_audit', static fn (mixed $current): mixed => $current ?? $clockTypeAudit, 10, 1);
             $publicContexts = new StructuralContextQuery($publicGraph, $publicAuthority);
             $publicRoutes = new PublicRouteResolver($publicAuthority, $publicTypes, $publicContexts);
             $publicEligibility = new PublicEntityEligibilityPolicy($publicAuthority, $publicTypes, $publicRoutes, $publicContexts);

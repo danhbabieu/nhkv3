@@ -8,6 +8,7 @@ use NHK\Core\Infrastructure\Maintenance\MaintenanceCapabilityBridge;
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceService;
 use NHK\Core\Application\Snapshot\{CanonicalSnapshotExportService, CanonicalSnapshotImportService, RecoveryRuntimeGuard, SnapshotArtifactCodec};
 use NHK\Core\Contracts\Snapshot\{CanonicalSnapshotSource, CanonicalSnapshotWriter};
+use NHK\Core\Application\Audit\ClockTypeClassificationAudit;
 
 $operation = null;
 $json = false;
@@ -20,6 +21,8 @@ $dryRun = false;
 $proposalId = '';
 $input = '';
 $output = '';
+$auditLimit = 500;
+$auditAfter = null;
 $recoveryMode = false;
 foreach (array_slice($argv, 1) as $argument) {
     if ($argument === '--json') { $json = true; continue; }
@@ -31,12 +34,14 @@ foreach (array_slice($argv, 1) as $argument) {
     if (str_starts_with($argument, '--proposal-id=')) { $proposalId = substr($argument, 14); continue; }
     if (str_starts_with($argument, '--input=')) { $input = substr($argument, 8); continue; }
     if (str_starts_with($argument, '--output=')) { $output = substr($argument, 9); continue; }
+    if (str_starts_with($argument, '--audit-limit=')) { $auditLimit = (int) substr($argument, 13); continue; }
+    if (str_starts_with($argument, '--audit-after=')) { $auditAfter = substr($argument, 14); continue; }
     if ($argument === '--recovery-mode') { $recoveryMode = true; continue; }
     if ($argument === '--dry-run') { $dryRun = true; continue; }
     if ($argument === '--apply') { $apply = true; continue; }
     fwrite(STDERR, "UNKNOWN_ARGUMENT\n"); exit(64);
 }
-$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'migration-up', 'dry-run', 'backup/snapshot', 'v3-snapshot-export', 'v3-snapshot-import', 'governance-plan', 'controlled-apply', 'read-back', 'collector-facet-maintenance'];
+$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'clock-type-audit', 'migration-up', 'dry-run', 'backup/snapshot', 'v3-snapshot-export', 'v3-snapshot-import', 'governance-plan', 'controlled-apply', 'read-back', 'collector-facet-maintenance'];
 if (!is_string($operation) || !in_array($operation, $allowed, true)) {
     $payload = ['status' => 'blocked', 'reason_code' => 'REMOTE_OPERATION_NOT_ALLOWLISTED'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL;
@@ -56,7 +61,27 @@ if (!is_readable($wpLoad)) {
 }
 try {
     require_once $wpLoad;
-    if ($operation === 'collector-facet-maintenance') {
+    if ($operation === 'clock-type-audit') {
+        if ($apply) {
+            $payload = ['status' => 'blocked', 'reason_code' => 'READ_ONLY_AUDIT_ONLY'];
+        } else {
+            do_action('rest_api_init');
+            $audit = apply_filters('nhk_v3_clock_type_classification_audit', null);
+            if (!$audit instanceof ClockTypeClassificationAudit) {
+                $payload = ['status' => 'blocked', 'reason_code' => 'LIVE_AUDIT_SURFACE_NOT_EXPOSED'];
+            } else {
+                $report = $audit->audit(['limit' => $auditLimit, 'after' => $auditAfter]);
+                $payload = ['status' => 'pass', 'identifier' => 'remote-clock-type-audit', 'fingerprint' => $report->fingerprint, 'audit' => $report->toArray(), 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
+                if (($report->pagination['surface_status'] ?? null) !== 'AUDITED') {
+                    $payload['status'] = 'blocked';
+                    $payload['reason_code'] = (string) ($report->pagination['reason_code'] ?? 'AUTHORITY_AUDIT_READ_SURFACE_UNAVAILABLE');
+                } elseif (($report->targetInventory['status'] ?? null) !== 'AUDITED') {
+                    $payload['status'] = 'blocked';
+                    $payload['reason_code'] = 'TARGET_INVENTORY_UNAVAILABLE';
+                }
+            }
+        }
+    } elseif ($operation === 'collector-facet-maintenance') {
         if ($classification === '' && !$apply) throw new \RuntimeException('CLASSIFICATION_UUID_REQUIRED');
         if ($apply && $proposalId === '') throw new \RuntimeException('APPROVED_PROPOSAL_ID_REQUIRED');
         do_action('rest_api_init');
