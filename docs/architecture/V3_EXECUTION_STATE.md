@@ -1,5 +1,52 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — PR1 Brand/Clock-Type contract lock
+
+WHAT: Added the ACTIVE `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md`, its
+read-only gap report/PR2–PR6 plan, canonical documentation allowlist entry and
+golden regression suite. The contract locks Clock Type as
+`entity_type=classification` + exact `family=clock_type`, keeps Brand as an
+independent optional profile, preserves the existing `classified_as` matrix,
+and forbids shortcut Brand↔Clock-Type edges, `Odo vai bò`, Unknown Brand,
+write-path, backfill and URL reprojection.
+
+REGRESSION: New PR1 golden suite passes 16 tests / 99 assertions after the
+Brand-only empty-result case was added. Relevant existing Authority/Graph/
+Dossier/Video/Public Identity/SEO suites pass 104 tests / 493 assertions.
+Full NHK Unit passes 1,236 tests / 6,022 assertions; NHK Contract passes 4
+tests / 31 assertions. PHPUnit reports existing warnings/deprecations only.
+
+DOCUMENTATION CHECKPOINT: local runtime `0.1.0`; final documentation_version,
+manifest_hash and build_identity are recorded in the PR1 gap report/final
+verification after the immutable snapshot is generated. These are local
+package identities, not live/deploy evidence. This execution-state entry does
+not embed self-referential manifest hashes.
+
+NO MUTATION: No migration, seed, semantic entity/claim/source/evidence write,
+Graph edge apply/backfill, Public Identity allocation/reprojection, Article
+publication, Video/Media/Knowledge rewrite or live/staging/production action
+was performed. Existing unrelated `docs/agent-handoff/*` changes were
+preserved.
+
+STATUS: PR1_CONTRACT_AND_GOLDEN_REGRESSION_COMPLETE / PR2_REVIEW_GATE_OPEN /
+LIVE_DEPLOYMENT_NOT_CLAIMED.
+
+# Checkpoint — 2026-09-12 — Easy MCP files[] deployment recheck
+
+TARGET: The requested files[] fix commit is
+`a66c7eae918c6eccad61121fa95e36348f53fe6b`. Fresh local state has
+`HEAD=405ef90e` and `origin/main=a0977957`; the target is not an ancestor of
+either ref, so no merge, cherry-pick, push, pull or deployment was attempted.
+
+BLOCKERS: The canonical `scripts/nhk-deploy-verify` path requires the intended
+commit and a clean checkout before the documented Composer → docs generation →
+RemoteDeploymentAdapter → direct MCP verification flow. The worktree contains
+preserved Snapshot/docs changes, and `NHK_DEMO_DEPLOY_CONFIG` is unset. No
+target `tools/list`, documentation bootstrap, Capture call or media upload was
+performed.
+
+STATUS: DEPLOYMENT_BLOCKED / LIVE_ACCEPTANCE_PENDING.
+
 # Checkpoint — 2026-09-12 — Governed V3 snapshot boundary
 
 WHAT: Added the normalized V3 semantic snapshot export/import contract for the

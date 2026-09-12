@@ -16,6 +16,7 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('constitution', $keys);
         self::assertContains('documentation-status-index', $keys);
         self::assertContains('authority', $keys);
+        self::assertContains('entity-profile-clock-type', $keys);
         self::assertContains('knowledge', $keys);
         self::assertContains('collector-profile', $keys);
         self::assertContains('graph', $keys);
@@ -23,6 +24,16 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('media', $keys);
         self::assertContains('visual-support-requirement', $keys);
         self::assertContains('mcp', $keys);
+    }
+
+    public function test_clock_type_entity_profile_contract_is_active_and_readable(): void
+    {
+        $document = (new McpDocumentationRegistry())->get('entity-profile-clock-type');
+        self::assertSame('ACTIVE', $document['status']);
+        self::assertSame('authority', $document['domain']);
+        self::assertStringContainsString('family=clock_type', str_replace('`', '', $document['content']));
+        self::assertStringContainsString('classified_as', $document['content']);
+        self::assertStringContainsString('Odo vai bò', $document['content']);
     }
 
     public function test_document_is_read_by_key_with_hash_and_no_absolute_path(): void

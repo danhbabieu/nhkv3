@@ -14,7 +14,7 @@ LIVE_ACCEPTANCE_PENDING: `true`
 
 DEPLOYED_COMMIT: `NOT_DEPLOYED`
 
-DEPLOY_RESULT: `BLOCKED — canonical wrapper requires a clean checkout and NHK_DEMO_DEPLOY_CONFIG; current HEAD/origin/main is 946ec1fb, not target a66c..., and Snapshot changes must be preserved.`
+DEPLOY_RESULT: `BLOCKED — a66c... is not an ancestor of HEAD 405ef90e or origin/main a0977957; worktree has preserved Snapshot/docs changes and NHK_DEMO_DEPLOY_CONFIG is unavailable.`
 
 LIVE_RUNTIME_IDENTITY: `NOT_VERIFIED`
 

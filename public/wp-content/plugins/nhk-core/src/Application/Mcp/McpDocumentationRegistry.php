@@ -18,6 +18,7 @@ final class McpDocumentationRegistry
         'documentation-status-index' => ['path' => 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md', 'classification' => 'canonical_index', 'status' => 'ACTIVE', 'domain' => 'operator'],
         'execution-runtime-state' => ['path' => 'docs/architecture/V3_EXECUTION_STATE.md', 'classification' => 'current_evidence', 'status' => 'ACTIVE', 'domain' => 'deployment'],
         'authority' => ['path' => 'docs/architecture/02_AUTHORITY_BOUNDARY.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'authority'],
+        'entity-profile-clock-type' => ['path' => 'docs/architecture/ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'authority'],
         'article-ingest' => ['path' => 'docs/architecture/ARTICLE_INGEST_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'article'],
         'article-research-preflight' => ['path' => 'docs/architecture/ARTICLE_SEMANTIC_SEO_RESEARCH_PREFLIGHT_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'article'],
         'article-seo' => ['path' => 'docs/seo/ARTICLE_SEO_PROJECTION_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'article'],

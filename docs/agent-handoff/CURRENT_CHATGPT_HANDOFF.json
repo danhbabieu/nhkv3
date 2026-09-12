@@ -2,7 +2,7 @@
   "ROOT_CAUSE": "EasyMcpNativeFileCompatibilityAdapter normalized native files only while self::$proxyDispatch was active; Easy MCP 1.7.17 can execute the registered Ability directly, so WP_Ability::validate_input saw ChatGPT's model-facing opaque files[] strings and emitted input[files][0] is not of type object before the native file bag reached the canonical callback.",
   "COMMIT_SHA": "a66c7eae918c6eccad61121fa95e36348f53fe6b",
   "DEPLOYED_COMMIT": null,
-  "DEPLOY_RESULT": "BLOCKED: canonical wrapper requires a clean checkout and NHK_DEMO_DEPLOY_CONFIG; current HEAD/origin/main is 946ec1fb, not target a66c..., and Snapshot changes must be preserved.",
+  "DEPLOY_RESULT": "BLOCKED: a66c... is not an ancestor of HEAD 405ef90e or origin/main a0977957; worktree has preserved Snapshot/docs changes and NHK_DEMO_DEPLOY_CONFIG is unavailable.",
   "LIVE_RUNTIME_IDENTITY": "NOT_VERIFIED",
   "DOCUMENTATION_VERSION": null,
   "MANIFEST_HASH": null,
