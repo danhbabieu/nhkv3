@@ -419,7 +419,10 @@ final class EditorialCaptureCoordinator
             $diagnostics['final_read_back'] = $this->withoutBody($final);
             if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
             $children = $this->completionChildren($record, $writes, $media, $videoPublication, $publication, $final, $published);
-            $completion = $this->completion->aggregateCapture($record->captureId, $children, ['canonical_state' => 'COMPLETE']);
+            $completion = $this->completion->aggregateCapture($record->captureId, $children, [
+                'canonical_state' => 'COMPLETE',
+                'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication),
+            ]);
             $diagnostics['completion'] = $completion;
             $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'FINAL_READBACK', $record->articleId, $record->articleStateToken, $record->status, 'VERIFIED');
             $assets = $record->assets;
@@ -433,11 +436,27 @@ final class EditorialCaptureCoordinator
             if ($latest !== null) {
                 $record = $latest;
                 $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
             }
             $failureCode = $this->failureCode($error);
             $status = $this->failureStatus($failureCode);
             $diagnostics['failure'] = ['code' => $failureCode, 'message' => $error->getMessage(), 'classification' => $status];
+            $intent = is_array($diagnostics['content_intent'] ?? null) ? $diagnostics['content_intent'] : [];
+            $writes = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
+            $media = is_array($diagnostics['media_usage'] ?? null) ? $diagnostics['media_usage'] : [];
+            $videoPublication = is_array($diagnostics['video_publication'] ?? null) ? $diagnostics['video_publication'] : [];
+            $partialCompletion = $this->completion->aggregateCapture(
+                $record->captureId,
+                $this->completionChildren($record, $writes, $media, $videoPublication, [], [], false),
+                [
+                    'canonical_state' => 'COMPLETE',
+                    'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication),
+                    'blockers' => [$failureCode],
+                ],
+            );
+            $diagnostics['completion'] = $partialCompletion;
+            $diagnostics['resume_hints'] = $partialCompletion['resume_hints'] ?? ['resume_children' => []];
             return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status);
         }
     }
@@ -501,7 +520,10 @@ final class EditorialCaptureCoordinator
         $diagnostics['final_read_back'] = $this->withoutBody($final);
         if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
 
-        $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, [], $videoPublication, [], $final, false), ['canonical_state' => 'COMPLETE']);
+        $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, [], $videoPublication, [], $final, false), [
+            'canonical_state' => 'COMPLETE',
+            'required_owners' => $this->requiredOwners($intent, $record, $assets, [], $videoPublication),
+        ]);
         $diagnostics['completion'] = $completion;
         $semanticStatus = strtoupper(trim((string) ($writes['status'] ?? '')));
         $status = ($completion['complete'] ?? false) === true
@@ -517,6 +539,29 @@ final class EditorialCaptureCoordinator
         $governance = is_array($input['governance'] ?? null) ? $input['governance'] : [];
         $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($governance['resume_children'] ?? [])))));
         return $children === ['video'];
+    }
+
+    /**
+     * Declares the owner branches required by the resolved intent. This is a
+     * receipt-level policy only; each owner still performs its own mutation
+     * and canonical read-back.
+     *
+     * @param array<string,mixed> $intent
+     * @param list<array<string,mixed>> $assets
+     * @param array<string,mixed> $media
+     * @param array<string,mixed> $videoPublication
+     * @return list<array{owner_type:string}>
+     */
+    private function requiredOwners(array $intent, CaptureRecord $record, array $assets, array $media, array $videoPublication): array
+    {
+        $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
+            'VIDEO' => [['owner_type' => 'video']],
+            'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
+            'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post']],
+            default => [],
+        };
+        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'IMAGE_ARTICLE' && $assets !== []) $required[] = ['owner_type' => 'media'];
+        return $required;
     }
 
     /** @param array<string,mixed> $input */

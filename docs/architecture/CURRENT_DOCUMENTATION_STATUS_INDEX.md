@@ -115,6 +115,16 @@ relations, not relation count. The controlled provenance classes are
 `OBSERVED_FROM_MEDIA`, `EXPLICIT_USER_KNOWLEDGE`, `CATALOG_SUPPORTED`,
 `EXTERNAL_RESEARCH` and `SYSTEM_INFERENCE`.
 
+## 1.2 Editorial Capture convergence receipt — current implementation
+
+The Capture coordinator still delegates canonical writes to the owning domain
+services. Its completion receipt lists the owner branches required by the
+resolved intent, verifies canonical read-back for each branch, and reports
+missing branches plus bounded child resume hints. `PARTIAL` is preserved when a
+child has committed but a dependent reconciliation fails. This does not change
+the Content Intent law: `VIDEO` and `KNOWLEDGE_DELTA` do not create an Article
+implicitly, and optional visual enrichment does not become a Knowledge blocker.
+
 ## 1.3 Universal Capture entry point — current canonical route
 
 All new content submissions use one entry point: `nhk.capture.ingest` and its

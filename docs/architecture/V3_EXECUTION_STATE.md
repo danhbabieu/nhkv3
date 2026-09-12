@@ -8716,3 +8716,27 @@ invalid explicit revision in addition to the existing valid/no-match,
 weak-match, conflict, invalid UUID and inactive-state cases. Contract remains
 `4 / 31`; guarded Integration remains `123 / 1,044`, `7` skips, zero failures
 and zero errors. No live semantic mutation was performed.
+
+# Checkpoint — 2026-09-13 — editorial capture convergence closeout
+
+PR5 LOCAL CONVERGENCE: The Capture completion boundary now declares required
+owner branches by Content Intent, requires canonical owner read-back even when
+an upstream phase reports `COMPLETE`, and records missing branches and bounded
+child resume hints. A successful owner followed by a dependent reconciliation
+failure remains `PARTIAL`. The PR5 E2E-focused slice passes `3 tests / 21
+assertions`; the full relevant Capture/Video/Article slice passes `94 tests /
+437 assertions`. Full Unit passes `1,358 tests / 6,534 assertions`; Contract
+passes `4 / 31`; Composer lint, PHP lint, documentation generation and
+`git diff --check` pass.
+
+INTEGRATION: The guarded invocation used `NHK_WP_TEST_PATH=public
+NHK_WP_TEST_DB=nhk_v3_test vendor/bin/phpunit --configuration
+phpunit.xml.dist --testsuite 'NHK Integration'`. WordPress bootstrap resolved,
+but the first unavailable boundary was the database connection: the local
+MySQL socket `/tmp/mysql.sock` had no listening server and WordPress returned
+`Error establishing a database connection`. No non-test database was touched.
+
+LIVE/DEPLOYMENT: No migration, publication, semantic mutation, deployment or
+push was performed. Deployment and live acceptance remain authorization and
+target-runtime gates. Existing unrelated worktree/history changes remain
+preserved and are not part of the PR5 scope.

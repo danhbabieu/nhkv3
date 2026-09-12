@@ -138,4 +138,43 @@ final class CompletionConvergenceTest extends TestCase
         self::assertTrue($packet['complete']);
         self::assertSame('NOT_APPLICABLE', $packet['relation_or_usage_state']);
     }
+
+    public function test_explicit_canonical_complete_without_owner_readback_is_not_complete(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'canonical_state' => 'COMPLETE',
+            'dependency_state' => 'COMPLETE',
+            'relation_or_usage_state' => 'NOT_APPLICABLE',
+            'content_quality' => 'CONTENT_COMPLETE',
+            'public_eligible' => true,
+            'frontend_verified' => true,
+        ]);
+
+        self::assertFalse($packet['complete']);
+        self::assertSame('BLOCKED', $packet['canonical_state']);
+        self::assertContains('CANONICAL_READBACK_UNVERIFIED', $packet['blockers']);
+    }
+
+    public function test_capture_required_owner_branch_is_reported_when_readback_is_missing(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            [
+                'owner_type' => 'wp_post',
+                'owner_id' => '450',
+                'canonical_readback' => ['id' => 450],
+                'public_eligible' => true,
+                'frontend_verified' => true,
+            ],
+        ], [
+            'required_owners' => [
+                ['owner_type' => 'wp_post', 'owner_id' => '450'],
+                ['owner_type' => 'video'],
+            ],
+        ]);
+
+        self::assertFalse($packet['complete']);
+        self::assertSame([['owner_type' => 'video', 'owner_id' => '']], $packet['missing_required_owners']);
+        self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $packet['blockers']);
+        self::assertContains('video', $packet['resume_hints']['resume_children']);
+    }
 }

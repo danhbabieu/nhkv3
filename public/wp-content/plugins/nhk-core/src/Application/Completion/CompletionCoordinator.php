@@ -26,13 +26,19 @@ final class CompletionCoordinator
         $ownerId = trim($ownerId);
         $publicCapable = in_array($ownerType, self::PUBLIC_CAPABLE, true);
         $blockers = $this->strings($evidence['blockers'] ?? []);
+        $canonicalReadbackVerified = $this->readBack($evidence['canonical_readback'] ?? null);
 
         $canonical = $this->state(
             $evidence['canonical_state'] ?? null,
-            $this->readBack($evidence['canonical_readback'] ?? null),
+            $canonicalReadbackVerified,
             'COMPLETE',
             'BLOCKED',
         );
+        // A caller-provided state is only an assertion about the phase. It
+        // cannot replace the owner read-back required for truthful
+        // completion. This keeps partial child state from being promoted by
+        // an optimistic coordinator flag.
+        if (!$canonicalReadbackVerified) $canonical = 'BLOCKED';
         $dependencies = $this->state(
             $evidence['dependency_state'] ?? $evidence['dependencies'] ?? null,
             true,
@@ -94,6 +100,7 @@ final class CompletionCoordinator
             'owner_id' => $ownerId,
             'proposal_state' => $evidence['proposal_state'] ?? null,
             'canonical_state' => $canonical,
+            'canonical_readback_verified' => $canonicalReadbackVerified,
             'dependency_state' => $dependencies,
             'relation_or_usage_state' => $relations,
             'content_state' => $content,
@@ -118,12 +125,32 @@ final class CompletionCoordinator
             $packets[] = $packet;
             if (($packet['complete'] ?? false) !== true) array_push($blockers, ...$this->strings($packet['blockers'] ?? []));
         }
+        $requiredOwners = $this->ownerSpecs($evidence['required_owners'] ?? []);
+        $missingRequiredOwners = array_values(array_filter($requiredOwners, function (array $required) use ($packets): bool {
+            foreach ($packets as $packet) {
+                if (!is_array($packet)) continue;
+                if (strtolower((string) ($packet['owner_type'] ?? '')) !== $required['owner_type']) continue;
+                $requiredId = $required['owner_id'];
+                if ($requiredId === '' || $requiredId === trim((string) ($packet['owner_id'] ?? ''))) return false;
+            }
+            return true;
+        }));
+        if ($missingRequiredOwners !== []) $blockers[] = 'REQUIRED_OWNER_READBACK_UNVERIFIED';
         $canonical = ($evidence['canonical_state'] ?? null) === 'BLOCKED' ? 'BLOCKED' : 'COMPLETE';
         $complete = $canonical === 'COMPLETE' && $packets !== [] && $blockers === [] && array_reduce($packets, static fn (bool $ok, array $packet): bool => $ok && ($packet['complete'] ?? false) === true, true);
+        $resumeChildren = [];
+        foreach ($missingRequiredOwners as $required) $resumeChildren[] = $this->resumeChild($required['owner_type']);
+        foreach ($packets as $packet) {
+            if (($packet['complete'] ?? false) === true) continue;
+            $resumeChildren[] = $this->resumeChild((string) ($packet['owner_type'] ?? ''));
+        }
+        $resumeChildren = array_values(array_unique(array_filter($resumeChildren, static fn (string $item): bool => $item !== '')));
         return [
             'owner_type' => 'capture',
             'owner_id' => trim($captureId),
             'canonical_state' => $canonical,
+            'required_owners' => $requiredOwners,
+            'missing_required_owners' => $missingRequiredOwners,
             'dependency_state' => $complete ? 'COMPLETE' : 'PARTIAL',
             'relation_or_usage_state' => 'NOT_APPLICABLE',
             'public_state' => 'NOT_APPLICABLE',
@@ -132,6 +159,7 @@ final class CompletionCoordinator
             'status' => $complete ? 'COMPLETE' : ($canonical === 'BLOCKED' ? 'BLOCKED' : 'PARTIAL'),
             'blockers' => array_values(array_unique($blockers)),
             'children' => $packets,
+            'resume_hints' => ['resume_children' => $resumeChildren],
         ];
     }
 
@@ -147,6 +175,29 @@ final class CompletionCoordinator
         if (is_bool($fallback)) return $fallback ? $allowed[0] : ($allowed[1] ?? 'BLOCKED');
         if (is_array($fallback)) return $allowed[0];
         return $allowed[1] ?? $allowed[0];
+    }
+
+    /** @return list<array{owner_type:string,owner_id:string}> */
+    private function ownerSpecs(mixed $value): array
+    {
+        if (!is_array($value)) return [];
+        $owners = [];
+        foreach ($value as $item) {
+            if (is_string($item)) $item = ['owner_type' => $item];
+            if (!is_array($item)) continue;
+            $type = strtolower(trim((string) ($item['owner_type'] ?? $item['type'] ?? '')));
+            if ($type === '') continue;
+            $owners[] = ['owner_type' => $type, 'owner_id' => trim((string) ($item['owner_id'] ?? $item['id'] ?? ''))];
+        }
+        return array_values(array_unique($owners, SORT_REGULAR));
+    }
+
+    private function resumeChild(string $ownerType): string
+    {
+        return match (strtolower(trim($ownerType))) {
+            'wp_post' => 'article',
+            default => strtolower(trim($ownerType)),
+        };
     }
 
     /** @return list<string> */

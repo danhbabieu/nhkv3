@@ -312,3 +312,16 @@ treated as disposable generated content. Public text fields are checked by a
 fail-closed `PUBLIC_INTERNAL_JARGON_LEAK` boundary before the native write;
 machine context such as IDs, provenance and resolution packets remains outside
 public prose.
+
+### Capture convergence and completion truth — 2026-09-13
+
+When Article ingest is orchestrated by Capture, the completion receipt declares
+the native WordPress Post as a required owner branch and, for an image Article,
+the canonical Media branch as well. The receipt is complete only after each
+required owner has supplied canonical read-back; a draft write, proposal result
+or optimistic phase state cannot substitute for that proof. A successful child
+followed by an Article/CAS/publication failure is recorded as `PARTIAL` and
+resumes at the failed child boundary without duplicating the successful owner.
+Knowledge-only and Video-only intents do not acquire an implicit Article
+requirement. This is orchestration and recovery evidence, not a second Article
+or semantic content store.

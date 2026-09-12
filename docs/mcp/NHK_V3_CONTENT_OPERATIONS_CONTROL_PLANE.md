@@ -141,6 +141,17 @@ idempotency conflict. Ambiguous subject resolution, unavailable semantic
 Governance, incomplete MediaUsage or missing publication evidence remain
 machine-readable review/blocker states.
 
+### Cross-domain completion truth — 2026-09-13
+
+Capture aggregates only the owner branches required by the resolved Content
+Intent. Every required branch must provide canonical read-back before the
+Capture receipt may be `COMPLETE`; `canonical_state=COMPLETE` is not sufficient
+evidence by itself. The receipt exposes the required and missing owner branches,
+per-owner packets and bounded child resume hints. If one owner has committed and
+a dependent owner fails, the result remains `PARTIAL` with the committed child
+visible and the failed child resumable. This aggregation does not own Article,
+Video, Media or Knowledge truth.
+
 The current code-side semantic write-back phase creates bounded proposals and
 does not silently apply candidate Claims or relations. Existing-Capture
 continuation uses the Capture-owned Governance lifecycle and requires

@@ -199,6 +199,19 @@ Article/Video/SEO textual projections reject structured internal workflow
 tokens and identifiers with `PUBLIC_INTERNAL_JARGON_LEAK`; machine context is
 kept in the Capture/research trace.
 
+### Cross-domain convergence receipt — 2026-09-13
+
+The Capture coordinator remains orchestration-only while the completion receipt
+declares the owner branches required by the resolved intent. A branch is not
+complete from an optimistic phase flag: its canonical owner read-back must be
+present and verified. The receipt records `required_owners`,
+`missing_required_owners`, per-owner completion packets and bounded
+`resume_hints`; a child failure after another owner succeeds is `PARTIAL`, never
+`COMPLETE`. For `KNOWLEDGE_DELTA`, Article and image branches are not required;
+for Article intents the native Post is required, and `IMAGE_ARTICLE` also
+requires the canonical Media branch. This is a completion/read-back boundary,
+not a new semantic owner or mutation path.
+
 An explicit child resume is available only for the registered Video child:
 `resume_children: ["video"]`. It requires an existing `capture_id`, carries no
 replacement `video` payload, rehydrates the immutable original Video identity
