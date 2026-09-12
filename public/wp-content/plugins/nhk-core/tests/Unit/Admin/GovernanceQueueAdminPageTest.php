@@ -13,7 +13,9 @@ namespace {
     if (!function_exists('sanitize_key')) { function sanitize_key($value) { return strtolower(preg_replace('/[^a-z0-9_\-]/i', '', (string) $value)); } }
     if (!function_exists('sanitize_text_field')) { function sanitize_text_field($value) { return trim((string) $value); } }
     if (!function_exists('sanitize_textarea_field')) { function sanitize_textarea_field($value) { return trim((string) $value); } }
-    if (!function_exists('absint')) { function absint($value) { return abs((int) $value); } }
+    // WordPress owns this global in integration runs. Keep the unit-only
+    // compatibility shim mutually exclusive with the WordPress bootstrap.
+    if (getenv('NHK_WP_TEST_PATH') === false && !function_exists('absint')) { function absint($value) { return abs((int) $value); } }
     if (!function_exists('wp_json_encode')) { function wp_json_encode($value, $flags = 0) { return json_encode($value, $flags); } }
     if (!function_exists('esc_html')) { function esc_html($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }
     if (!function_exists('esc_attr')) { function esc_attr($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }

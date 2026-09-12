@@ -90,3 +90,16 @@ input remains `nhk.capture.ingest`; no direct requirement writer is exposed.
 Canonical Media read-back performs bounded reverse reconciliation and
 invalidates affected Video/Knowledge/Article projections. Thumbnail/source
 identity alone never satisfies technical visual support or creates Evidence.
+
+## Existing-Capture editorial resume — 2026-09-13
+
+`resume_children=["video"]` is an explicit continuation of the Video child on
+the existing Capture. It reads the immutable Video UUID from the child state,
+builds a fingerprint from current source identity/revision, user editorial
+delta, resolved subject, selected Claim IDs/revisions and policy version, then
+uses the shared Governance path for a bounded `update` of that same Video.
+Unchanged input returns `REUSE_EDITORIAL`; changed input regenerates the
+editorial package and its current SEO/Open Graph/VideoObject projection before
+canonical Video read-back. External platform identity, relations and current
+metadata remain bound to the original Video. Capture/addendum persistence is
+not sufficient evidence of a successful Video resume.

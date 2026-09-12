@@ -53,6 +53,8 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertNotSame('OLD SUMMARY', $plan['payload']['metadata']['editorial']['summary']);
         self::assertSame($plan['payload']['metadata']['editorial']['summary'], $plan['payload']['metadata']['seo']['description']);
         self::assertSame($plan['payload']['metadata']['editorial']['summary'], $plan['payload']['metadata']['seo_projection']['description']);
+        self::assertSame($plan['payload']['metadata']['seo_projection']['description'], $plan['payload']['metadata']['seo_projection']['open_graph']['description']);
+        self::assertSame($plan['payload']['metadata']['seo_projection']['description'], $plan['payload']['metadata']['seo_projection']['video_object']['description']);
 
         $updated = (new AuthorityProposalExecutor(
             new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()),
@@ -97,6 +99,14 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertSame('REUSE_EDITORIAL', $second['status']);
         self::assertSame($first['fingerprint'], $second['fingerprint']);
         self::assertSame($videoId, $second['canonical_readback']['canonical_id']);
+
+        $changedClaim = $context;
+        $changedClaim['retrieval']['selected_claims'] = [['id' => 'claim-1', 'revision' => 2]];
+        self::assertNotSame($second['fingerprint'], $planner->plan(['payload' => ['canonical_id' => $videoId]], $changedClaim)['fingerprint']);
+
+        $unrelated = $context;
+        $unrelated['fetched_at'] = 'later';
+        self::assertSame($second['fingerprint'], $planner->plan(['payload' => ['canonical_id' => $videoId]], $unrelated)['fingerprint']);
     }
 }
 

@@ -217,3 +217,21 @@ context proves the exact subject, scope, facet, feature and intent. Missing
 visual support is retained independently of Video identity and is resolved by
 later canonical Media Capture/reconciliation; it is not Claim/Evidence and
 does not broaden scope.
+
+### Existing-Capture editorial resume — 2026-09-13
+
+An explicit `resume_children=["video"]` continuation is bound to the Video
+child recorded on the same Capture. The coordinator reads that canonical Video
+by UUID, assembles a deterministic editorial-input fingerprint from the source
+identity/revision, current user editorial delta, resolved subject packet,
+selected Claim IDs/revisions and policy version, then creates a governed
+`video + update` proposal against the current Video revision. It never resolves
+the child by title or creates a second Video.
+
+When the effective fingerprint is unchanged, the continuation returns a
+canonical read-back with `REUSE_EDITORIAL`. When it changes, the same Video
+owner receives a regenerated `metadata.editorial` package and the matching
+`metadata.seo` plus `metadata.seo_projection` (`open_graph` and `video_object`)
+surfaces. The update preserves the source identity, external ID, relations and
+other current metadata. Completion is based on the canonical Video read-back,
+not on Capture addendum persistence or a proposal response alone.

@@ -61,6 +61,29 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame(2, $result['claim_trace'][0]['claim_revision']);
     }
 
+    public function test_repeated_resume_replaces_same_managed_claim_section_instead_of_appending(): void
+    {
+        $claims = [
+            ['claim_id' => 'claim-1', 'revision' => 2, 'text' => 'Cấu hình này dùng bộ máy được ghi nhận trong hồ sơ.', 'relation_path' => [], 'provenance' => 'CATALOG_SUPPORTED'],
+            ['claim_id' => 'claim-1', 'revision' => 2, 'text' => 'Cấu hình này dùng bộ máy được ghi nhận trong hồ sơ.', 'relation_path' => [], 'provenance' => 'CATALOG_SUPPORTED'],
+        ];
+
+        $composer = new ArticleComposer();
+        $first = $composer->compose('Ghi chú ban đầu.', [], $claims);
+        $second = $composer->compose($first['content'] . "\n\nBổ sung biên tập.", [], $claims);
+        $third = $composer->compose($second['content'] . "\n\nBổ sung lần ba.", [], $claims);
+
+        self::assertCount(1, array_filter(
+            preg_split('/\n\n/u', $third['content']) ?: [],
+            static fn (string $paragraph): bool => str_contains($paragraph, 'Trong bối cảnh hồ sơ đã được kiểm chứng'),
+        ));
+        self::assertCount(1, array_filter(
+            $third['managed_sections'] ?? [],
+            static fn (array $section): bool => ($section['semantic_key'] ?? '') === 'claim-context:claim-1:2',
+        ));
+        self::assertStringContainsString('Bổ sung lần ba.', $third['content']);
+    }
+
     public function test_explicit_title_and_excerpt_survive_text_continuation(): void
     {
         $result = (new ArticleComposer())->compose(
