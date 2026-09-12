@@ -9,6 +9,7 @@ use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Application\Video\VideoService;
+use NHK\Core\Application\Video\VideoCompletenessReconciliationService;
 use NHK\Core\Contracts\Governance\{ApplyExecutionHook, GovernanceAuthorizer};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{DependencyGraph, Proposal, ProposalState};
@@ -96,6 +97,53 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         self::assertSame(1, (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . $GLOBALS['wpdb']->prefix . 'nhk_knowledge_claims WHERE stable_key=%s', $this->prefix . '-claim')));
         self::assertCount(1, (new WpdbEvidenceRepository($GLOBALS['wpdb']))->listByClaim($claim['canonical_id'], true));
         self::assertSame(1, (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . $GLOBALS['wpdb']->prefix . 'nhk_videos WHERE external_video_id=%s', $externalVideoId)));
+    }
+
+    public function test_existing_stale_video_completeness_is_repaired_and_survives_fresh_wpdb_hydration(): void
+    {
+        [, $variant, $governance, $apply, $endpoints] = $this->fixture();
+        $source = $this->runGoverned($governance, $apply, 'source', ['stable_key' => $this->prefix . '-stale-source', 'title' => 'Stale source', 'source_type' => 'catalog']);
+        $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-stale-claim', 'text' => 'Stale completeness claim', 'claim_type' => 'fact']);
+        $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Stale completeness evidence', 'relation' => 'supports']);
+        $video = $this->runGoverned($governance, $apply, 'video', [
+            'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
+            'title' => 'Generic stale video',
+            'metadata' => $this->videoMetadata([[
+                'target_type' => 'variant', 'target_uuid' => $variant->canonicalId, 'predicate' => 'about',
+                'evidence_refs' => [['evidence_id' => $evidence['canonical_id']]],
+            ]], true),
+        ]);
+        $videos = new WpdbVideoRepository($GLOBALS['wpdb']);
+        $stored = $videos->findByCanonicalId($video['canonical_id']);
+        self::assertNotNull($stored);
+        $storedMetadata = $stored->metadata;
+        $storedMetadata['completeness'] = ['publishable' => false, 'blockers' => ['NO_SEMANTIC_ATTACHMENT'], 'warnings' => []];
+        $GLOBALS['wpdb']->query($GLOBALS['wpdb']->prepare(
+            'UPDATE ' . $GLOBALS['wpdb']->prefix . 'nhk_videos SET metadata_json=%s WHERE canonical_uuid=%s',
+            wp_json_encode($storedMetadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            UuidCodec::toBinary($video['canonical_id']),
+        ));
+
+        $claims = new WpdbKnowledgeRepository($GLOBALS['wpdb']);
+        $sources = new WpdbSourceRepository($GLOBALS['wpdb']);
+        $evidenceRepository = new WpdbEvidenceRepository($GLOBALS['wpdb']);
+        $dependencies = new CanonicalDependencyValidator($claims, $sources, $evidenceRepository);
+        $graph = new GraphService(new WpdbGraphRepository($GLOBALS['wpdb']), $endpoints, new PredicateRegistry(), new WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($GLOBALS['wpdb'])));
+        $reconciliation = new VideoCompletenessReconciliationService($videos, $graph, $dependencies);
+        $first = $reconciliation->reconcile($video['canonical_id']);
+        $second = $reconciliation->reconcile($video['canonical_id']);
+        unset($reconciliation, $videos, $graph, $dependencies);
+
+        $freshVideo = (new WpdbVideoRepository($GLOBALS['wpdb']))->findByCanonicalId($video['canonical_id']);
+        $freshEdge = (new WpdbGraphRepository($GLOBALS['wpdb']))->findEdge(new NodeReference('video', $video['canonical_id']), 'about', new NodeReference('variant', $variant->canonicalId));
+        self::assertNotNull($freshVideo);
+        self::assertNotNull($freshEdge);
+        self::assertTrue($freshEdge->isActive());
+        self::assertNotContains('NO_SEMANTIC_ATTACHMENT', $freshVideo->metadata['completeness']['blockers']);
+        self::assertSame($first->revision, $second->revision);
+        self::assertSame($video['canonical_id'], $freshVideo->canonicalId);
+        self::assertCount(1, (new WpdbEvidenceRepository($GLOBALS['wpdb']))->listByClaim($claim['canonical_id'], true));
+        self::assertSame(1, (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . $GLOBALS['wpdb']->prefix . 'nhk_videos WHERE canonical_uuid=%s', UuidCodec::toBinary($video['canonical_id']))));
     }
 
     public function test_knowledge_relation_preserves_source_uuid_through_governance_and_graph_readback(): void

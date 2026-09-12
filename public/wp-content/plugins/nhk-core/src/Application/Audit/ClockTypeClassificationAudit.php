@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Audit;
 
 use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Contracts\Audit\ClockTypeAuditEvidenceReader;
-use NHK\Core\Contracts\Authority\{AuthorityRepository, CursorAuthorityInventoryReader};
+use NHK\Core\Contracts\Authority\CursorAuthorityInventoryReader;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Graph\{GraphEdge, NodeReference};
@@ -45,11 +45,10 @@ final class ClockTypeClassificationAudit
     private const SUPPORTED_EVIDENCE = ['SUPPORTED', 'VERIFIED', 'APPROVED'];
 
     public function __construct(
-        private AuthorityRepository $authority,
+        private CursorAuthorityInventoryReader $authority,
         private GraphService $graph,
         private EntityProfileResolver $profiles = new EntityProfileResolver(),
         private ?ClockTypeAuditEvidenceReader $evidence = null,
-        private ?CursorAuthorityInventoryReader $cursorInventory = null,
     ) {}
 
     /**
@@ -75,10 +74,14 @@ final class ClockTypeClassificationAudit
         }
         $pagination = [
             'limit' => $sources['limit'],
+            'batch_size' => $sources['limit'],
+            'cursor' => $sources['after'],
             'after' => $sources['after'],
             'next_cursor' => $sources['next_cursor'],
+            'records_read' => count($sources['items']),
+            'completed' => $sources['next_cursor'] === null,
             'ordering' => 'source_type_order_then_canonical_uuid',
-            'authority_cursor_surface' => 'UNAVAILABLE_CURRENT_LIST_BY_TYPE_API',
+            'authority_cursor_surface' => 'CANONICAL_AUTHORITY_PAGE_BY_TYPE',
             'audit_state' => 'TRANSIENT_READ_ONLY',
         ];
         $payload = ['target_inventory' => $targets['inventory'], 'results' => $results, 'result_counts' => $counts, 'pagination' => $pagination, 'samples' => $samples];
@@ -135,7 +138,7 @@ final class ClockTypeClassificationAudit
         if ($profile->status === 'RESOLVED' && $profile->profileKey === 'clock_type') return 'CANONICAL_CLOCK_TYPE';
         if ($profile->status === 'COMPATIBILITY_READ' && $profile->profileKey === 'clock_type') return 'LEGACY_CLOCK_TYPE';
         if ($family === null) return 'FAMILY_MISSING';
-        return in_array($family, self::KNOWN_OTHER_FAMILIES, true) ? 'OTHER_CLASSIFICATION_FAMILY' : 'FAMILY_UNRESOLVED';
+        return in_array($family, self::KNOWN_OTHER_FAMILIES, true) ? 'OTHER_FAMILY' : 'FAMILY_UNRESOLVED';
     }
 
     /** @param list<AuthorityEntity> $entities */
@@ -154,6 +157,7 @@ final class ClockTypeClassificationAudit
         $base = ['source_type' => $source->entityType, 'source_uuid' => $source->canonicalId, 'source_revision' => $source->revision, 'source_display_name' => $source->canonicalName, 'predicate' => 'classified_as'];
         if (!in_array($source->entityType, self::SOURCE_TYPES, true)) return $this->result(self::SOURCE_UNSUPPORTED, $base, ['SOURCE_TYPE_NOT_REGISTERED']);
         if (!$source->active()) return $this->result(self::SOURCE_INACTIVE, $base, ['SOURCE_INACTIVE']);
+        if (($targets['inventory']['status'] ?? null) !== 'AUDITED') return $this->result(self::DEPENDENCY_UNAVAILABLE, $base, ['TARGET_INVENTORY_UNAVAILABLE']);
 
         try {
             $graph = $this->readClassifiedEdges($source);
@@ -259,33 +263,54 @@ final class ClockTypeClassificationAudit
     /** @param array<string,mixed> $options @return array{items:list<AuthorityEntity>,limit:int,after:?string,next_cursor:?string} */
     private function sourceSnapshot(array $options): array
     {
-        $all = [];
-        foreach (self::SOURCE_TYPES as $type) {
-            try { foreach ($this->readAuthorityType($type, true) as $entity) if ($entity instanceof AuthorityEntity) $all[] = $entity; } catch (\Throwable) { return ['items' => [], 'limit' => 0, 'after' => null, 'next_cursor' => null]; }
-        }
-        $order = array_flip(self::SOURCE_TYPES);
-        usort($all, static fn (AuthorityEntity $a, AuthorityEntity $b): int => ($order[$a->entityType] <=> $order[$b->entityType]) ?: strcmp($a->canonicalId, $b->canonicalId));
         $after = is_string($options['after'] ?? null) && trim((string) $options['after']) !== '' ? trim((string) $options['after']) : null;
-        if ($after !== null) $all = array_values(array_filter($all, fn (AuthorityEntity $entity): bool => $this->sourceCursor($entity) > $after));
         $limit = max(1, min(500, (int) ($options['limit'] ?? 500)));
-        $page = array_slice($all, 0, $limit);
-        $next = count($all) > $limit && $page !== [] ? $this->sourceCursor($page[count($page) - 1]) : null;
-        return ['items' => $page, 'limit' => $limit, 'after' => $after, 'next_cursor' => $next];
+        try {
+            [$typeIndex, $typeAfter] = $this->decodeSourceCursor($after);
+            $items = [];
+            $next = null;
+            for ($index = $typeIndex; $index < count(self::SOURCE_TYPES) && count($items) < $limit; $index++) {
+                $type = self::SOURCE_TYPES[$index];
+                $cursor = $index === $typeIndex ? $typeAfter : null;
+                $page = $this->pageAuthorityType($type, $limit - count($items), $cursor, true);
+                foreach ($page['items'] as $entity) if ($entity instanceof AuthorityEntity) $items[] = $entity;
+                $pageNext = $page['next_cursor'];
+                if ($pageNext !== null) { $next = $this->sourceCursor($type, $pageNext); break; }
+                if (count($items) === $limit && $items !== []) $next = $this->sourceCursor($type, $items[count($items) - 1]->canonicalId);
+            }
+            if ($next !== null && count($items) < $limit) $next = null;
+            return ['items' => $items, 'limit' => $limit, 'after' => $after, 'next_cursor' => $next];
+        } catch (\Throwable) {
+            return ['items' => [], 'limit' => $limit, 'after' => $after, 'next_cursor' => null];
+        }
     }
 
-    private function sourceCursor(AuthorityEntity $entity): string { return $entity->entityType . '|' . $entity->canonicalId; }
+    /** @return array{0:int,1:?string} */
+    private function decodeSourceCursor(?string $cursor): array
+    {
+        if ($cursor === null) return [0, null];
+        $parts = explode('|', $cursor, 2);
+        if (count($parts) !== 2 || !in_array($parts[0], self::SOURCE_TYPES, true) || !UuidCodec::isValid($parts[1])) throw new \InvalidArgumentException('AUTHORITY_AUDIT_CURSOR_INVALID');
+        return [array_search($parts[0], self::SOURCE_TYPES, true), $parts[1]];
+    }
+
+    private function sourceCursor(string $type, string $uuid): string { return $type . '|' . $uuid; }
+
+    /** @return array{items:list<AuthorityEntity>,next_cursor:?string} */
+    private function pageAuthorityType(string $type, int $limit, ?string $after, bool $includeRetired): array
+    {
+        $result = $this->authority->pageByType($type, $limit, $after, $includeRetired);
+        return ['items' => array_values(array_filter((array) ($result['items'] ?? []), static fn (mixed $item): bool => $item instanceof AuthorityEntity)), 'next_cursor' => isset($result['next_cursor']) && is_string($result['next_cursor']) ? $result['next_cursor'] : null];
+    }
+
     /** @return list<AuthorityEntity> */
     private function readAuthorityType(string $type, bool $includeRetired): array
     {
-        $cursorInventory = $this->cursorInventory instanceof CursorAuthorityInventoryReader
-            ? $this->cursorInventory
-            : ($this->authority instanceof CursorAuthorityInventoryReader ? $this->authority : null);
-        if (!$cursorInventory instanceof CursorAuthorityInventoryReader) return $this->authority->listByType($type, $includeRetired);
         $items = []; $after = null;
         for ($page = 0; $page < 10000; $page++) {
-            $result = $cursorInventory->pageByType($type, 200, $after, $includeRetired);
-            foreach ((array) ($result['items'] ?? []) as $entity) if ($entity instanceof AuthorityEntity) $items[] = $entity;
-            $next = $result['next_cursor'] ?? null;
+            $result = $this->pageAuthorityType($type, 200, $after, $includeRetired);
+            foreach ($result['items'] as $entity) $items[] = $entity;
+            $next = $result['next_cursor'];
             if ($next === null || !is_string($next) || $next === $after) return $items;
             $after = $next;
         }

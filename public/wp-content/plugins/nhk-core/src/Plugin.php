@@ -492,6 +492,7 @@ final class Plugin {
             $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection());
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
             $videoRelationCandidates = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies);
+            $videoCompleteness = new \NHK\Core\Application\Video\VideoCompletenessReconciliationService($videos, $graphService, $canonicalDependencies, new VideoCompletenessPolicy());
             $captureGovernance = new GovernedCaptureContinuationService(
                 $mcpGovernance,
                 static fn (string $proposalId): array => $mcpGovernance->apply($proposalId),
@@ -532,6 +533,7 @@ final class Plugin {
                 },
                 videoRelations: $videoRelationCandidates,
                 videoEditorialResume: $videoEditorialResume,
+                videoCompleteness: $videoCompleteness,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

@@ -29,14 +29,14 @@ final class CanonicalKnowledgeEvidenceAuditReader implements ClockTypeAuditEvide
         foreach ($this->claims->list(true) as $claim) {
             if (!$claim instanceof KnowledgeClaim) continue;
             $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
-            $subjectId = $this->firstString([$metadata['subject_uuid'] ?? null, $metadata['subject_id'] ?? null, $claim->provenance['subject_uuid'] ?? null, $claim->provenance['subject_id'] ?? null]);
-            $subjectType = $this->firstString([$metadata['subject_type'] ?? null, $claim->provenance['subject_type'] ?? null]);
-            $scope = $this->firstString([$metadata['scope'] ?? null, $claim->provenance['scope'] ?? null]);
+            $subjectId = $this->canonicalString($metadata['subject_id'] ?? null);
+            $subjectType = $this->canonicalString($metadata['subject_type'] ?? null);
+            $scope = $this->canonicalString($metadata['scope'] ?? null);
             if ($subjectId !== $sourceUuid || $subjectType !== $sourceType) continue;
 
             $targetId = $this->targetId($claim, $metadata);
-            $provenance = $this->firstString([$metadata['provenance_class'] ?? null, $metadata['provenance'] ?? null, $claim->provenance['provenance_class'] ?? null, $claim->provenance['provenance'] ?? null, $metadata['origin'] ?? null]);
-            $tier = strtoupper($this->firstString([$metadata['audit_tier'] ?? null, $metadata['evidence_tier'] ?? null]));
+            $provenance = $this->canonicalString($metadata['provenance_class'] ?? null);
+            $tier = strtoupper($this->canonicalString($metadata['audit_tier'] ?? null));
             $support = $this->support($claim);
             $rows[] = [
                 'tier' => in_array($tier, ['B', 'C', 'D'], true) ? $tier : '',
@@ -57,7 +57,9 @@ final class CanonicalKnowledgeEvidenceAuditReader implements ClockTypeAuditEvide
                     'claim_active' => $claim->active,
                     'evidence_ids' => $support['evidence_ids'],
                     'evidence_state' => $support['status'],
+                    'evidence_revisions' => $support['evidence_revisions'],
                     'source_ids' => $support['source_ids'],
+                    'source_revisions' => $support['source_revisions'],
                     'source_state' => $support['source_state'],
                     'visibility' => $support['visibility'],
                     'claim_visibility' => $claim->isPublic() ? 'PUBLIC' : 'PRIVATE',
@@ -68,16 +70,18 @@ final class CanonicalKnowledgeEvidenceAuditReader implements ClockTypeAuditEvide
         return $rows;
     }
 
-    /** @return array{status:string,evidence_ids:list<string>,source_ids:list<string>,source_state:string,visibility:list<string>} */
+    /** @return array{status:string,evidence_ids:list<string>,evidence_revisions:array<string,int>,source_ids:list<string>,source_revisions:array<string,int>,source_state:string,visibility:list<string>} */
     private function support(KnowledgeClaim $claim): array
     {
-        $evidenceIds = []; $sourceIds = []; $visibility = []; $activeSupport = false; $sourceState = 'UNAVAILABLE';
+        $evidenceIds = []; $evidenceRevisions = []; $sourceIds = []; $sourceRevisions = []; $visibility = []; $activeSupport = false; $sourceState = 'UNAVAILABLE';
         foreach ($this->evidence->listByClaim($claim->canonicalId, true) as $item) {
             if (!$item instanceof Evidence) continue;
+            if ($item->claimId !== $claim->canonicalId) continue;
             $evidenceIds[] = $item->canonicalId;
+            $evidenceRevisions[$item->canonicalId] = $item->revision;
             $source = $this->sources->findByCanonicalId($item->sourceId);
-            if ($source instanceof Source) $sourceIds[] = $source->canonicalId;
-            $visibility[] = $item->isPublic() ? 'PUBLIC' : 'PRIVATE';
+            if ($source instanceof Source) { $sourceIds[] = $source->canonicalId; $sourceRevisions[$source->canonicalId] = $source->revision; }
+            $visibility[] = $this->visibility($item->metadata, $item->isPublic());
             if (!$item->active || $item->relation !== 'supports') continue;
             if (!$source instanceof Source) { $sourceState = 'MISSING'; continue; }
             if (!$source->active) { $sourceState = 'INACTIVE'; continue; }
@@ -87,18 +91,24 @@ final class CanonicalKnowledgeEvidenceAuditReader implements ClockTypeAuditEvide
         $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
         $claimStatus = strtoupper((string) ($metadata['knowledge_status'] ?? ''));
         if (!$claim->active || in_array($claimStatus, ['PRIVATE', 'HIDDEN', 'DRAFT', 'NEEDS_CONFIRMATION'], true)) $activeSupport = false;
-        return ['status' => $activeSupport ? 'SUPPORTED' : ($evidenceIds === [] ? 'NO_EVIDENCE' : 'UNSUPPORTED'), 'evidence_ids' => array_values(array_unique($evidenceIds)), 'source_ids' => array_values(array_unique($sourceIds)), 'source_state' => $sourceState, 'visibility' => array_values(array_unique($visibility))];
+        return ['status' => $activeSupport ? 'SUPPORTED' : ($evidenceIds === [] ? 'NO_EVIDENCE' : 'UNSUPPORTED'), 'evidence_ids' => array_values(array_unique($evidenceIds)), 'evidence_revisions' => $evidenceRevisions, 'source_ids' => array_values(array_unique($sourceIds)), 'source_revisions' => $sourceRevisions, 'source_state' => $sourceState, 'visibility' => array_values(array_unique($visibility))];
     }
 
     /** @param array<string,mixed> $metadata */
     private function targetId(KnowledgeClaim $claim, array $metadata): string
     {
-        $targetType = $this->firstString([$metadata['target_type'] ?? null, $claim->provenance['target_type'] ?? null]);
-        if ($targetType !== '' && !in_array($targetType, ['classification', 'clock_type'], true)) return '';
-        $value = $this->firstString([$metadata['clock_type_uuid'] ?? null, $metadata['classification_uuid'] ?? null, $metadata['target_uuid'] ?? null, $claim->provenance['clock_type_uuid'] ?? null, $claim->provenance['classification_uuid'] ?? null, $claim->provenance['target_uuid'] ?? null]);
+        $targetType = $this->canonicalString($metadata['target_type'] ?? null);
+        if ($targetType !== '' && $targetType !== 'classification') return '';
+        $value = $this->canonicalString($metadata['target_uuid'] ?? null);
         return UuidCodec::isValid($value) ? $value : '';
     }
 
     /** @param list<mixed> $values */
-    private function firstString(array $values): string { foreach ($values as $value) if (is_string($value) && trim($value) !== '') return trim($value); return ''; }
+    private function canonicalString(mixed $value): string { return is_string($value) ? trim($value) : ''; }
+
+    private function visibility(array $metadata, bool $public): string
+    {
+        $value = strtoupper($this->canonicalString($metadata['visibility'] ?? null));
+        return in_array($value, ['PUBLIC', 'PRIVATE', 'HIDDEN'], true) ? $value : ($public ? 'PUBLIC' : 'PRIVATE');
+    }
 }

@@ -23,7 +23,6 @@ final class WpdbClockTypeClassificationAuditFactory
             $graph,
             new EntityProfileResolver(),
             new CanonicalKnowledgeEvidenceAuditReader($claims, $sources, $evidence),
-            $authority,
         );
     }
 }

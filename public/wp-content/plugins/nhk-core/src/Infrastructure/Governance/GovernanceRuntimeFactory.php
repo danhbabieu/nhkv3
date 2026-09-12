@@ -63,6 +63,7 @@ final class GovernanceRuntimeFactory
             $governanceAudit->recordEvent($event, 'semantic_merge', (string) ($receipt->idempotencyKey ?? ''), null, $receipt->toArray());
         }, new WpdbSemanticMergeReceiptRepository($wpdb));
         $dependencyValidator = new CanonicalDependencyValidator($claims, $sources, $evidence);
+        $videoCompleteness = new \NHK\Core\Application\Video\VideoCompletenessReconciliationService($videos, $graphService, $dependencyValidator, new VideoCompletenessPolicy());
         $canonicalReadBack = new CanonicalApplyReadBackVerifier(static function (string $entityType, string $id) use ($authority, $media, $videos, $claims, $sources, $evidence, $graphRepository): ?array {
             $record = match ($entityType) {
                 'knowledge' => $claims->findByCanonicalId($id),
@@ -106,7 +107,7 @@ final class GovernanceRuntimeFactory
             $proposalRepository,
             $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
-            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor),
+            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness),
             $governanceAudit,
             $eligibility,
             new NoOpApplyExecutionHook(),

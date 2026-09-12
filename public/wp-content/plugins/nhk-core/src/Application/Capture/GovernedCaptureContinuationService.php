@@ -13,7 +13,7 @@ use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
 use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 use NHK\Core\Domain\Video\{VideoException, VideoRelationEvidenceRequired};
-use NHK\Core\Application\Video\VideoRelationCandidatePlanner;
+use NHK\Core\Application\Video\{VideoCompletenessReconciliationService, VideoRelationCandidatePlanner};
 use NHK\Core\Application\Video\VideoEditorialResumePlanner;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -44,6 +44,7 @@ final class GovernedCaptureContinuationService
         ?CompletionCoordinator $completion = null,
         private ?VideoRelationCandidatePlanner $videoRelations = null,
         private ?VideoEditorialResumePlanner $videoEditorialResume = null,
+        private ?VideoCompletenessReconciliationService $videoCompleteness = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -92,6 +93,31 @@ final class GovernedCaptureContinuationService
         foreach ($plans as $plan) {
             if (is_array($plan['video_editorial_reuse'] ?? null)) {
                 $reuse = $plan['video_editorial_reuse'];
+                if ($this->videoCompleteness !== null) {
+                    try {
+                        $reconciled = $this->videoCompleteness->reconcile((string) ($reuse['subject_id'] ?? ''));
+                        $reuse['canonical_readback'] = [
+                            'canonical_id' => $reconciled->canonicalId,
+                            'entity_type' => 'video',
+                            'platform' => $reconciled->platform,
+                            'external_video_id' => $reconciled->externalVideoId,
+                            'active' => $reconciled->active,
+                            'revision' => $reconciled->revision,
+                            'completeness' => $reconciled->metadata['completeness'] ?? [],
+                        ];
+                        $reuse['completeness_reconciled'] = true;
+                    } catch (\Throwable $error) {
+                        $writes[] = [
+                            'entity_type' => 'video',
+                            'status' => 'FAILED_RETRYABLE',
+                            'canonical_id' => (string) ($reuse['subject_id'] ?? ''),
+                            'blockers' => ['VIDEO_COMPLETENESS_RECONCILIATION_FAILED'],
+                            'error' => $error->getMessage(),
+                        ];
+                        $videoChildren[] = ['fingerprint' => (string) ($reuse['fingerprint'] ?? ''), 'status' => 'FAILED_RETRYABLE', 'blockers' => ['VIDEO_COMPLETENESS_RECONCILIATION_FAILED']];
+                        continue;
+                    }
+                }
                 $writes[] = [
                     'entity_type' => 'video',
                     'status' => 'REUSED_VERIFIED',

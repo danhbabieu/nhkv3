@@ -127,7 +127,7 @@ final class ClockTypeClassificationAuditTest extends TestCase
         $counts = $audit->audit()->targetInventory['counts'];
         self::assertSame(1, $counts['CANONICAL_CLOCK_TYPE']);
         self::assertSame(1, $counts['LEGACY_CLOCK_TYPE']);
-        self::assertSame(1, $counts['OTHER_CLASSIFICATION_FAMILY']);
+        self::assertSame(1, $counts['OTHER_FAMILY']);
         self::assertSame(1, $counts['FAMILY_MISSING']);
         self::assertSame(1, $counts['INACTIVE']);
     }
@@ -162,6 +162,24 @@ final class ClockTypeClassificationAuditTest extends TestCase
         self::assertNotSame($page->results[1]['source_uuid'], $resumed->results[0]['source_uuid']);
     }
 
+    public function test_source_batch_is_processed_before_the_next_source_page_is_read(): void
+    {
+        $sources = [
+            $this->entity('model', 'Model A', '00000000-0000-4000-8000-000000000111'),
+            $this->entity('model', 'Model B', '00000000-0000-4000-8000-000000000112'),
+        ];
+        $repo = new AuditAuthorityRepository($sources);
+        $reader = new CallbackEvidenceReader(static function () use ($repo): void {
+            self::assertSame(1, $repo->pagesByType['model'] ?? 0, 'audit must not prefetch later source pages');
+        });
+        $audit = $this->auditWithRepo($repo, $sources, $reader);
+
+        $report = $audit->audit(['limit' => 1]);
+        self::assertCount(1, $report->results);
+        self::assertSame(1, $report->pagination['records_read']);
+        self::assertNotNull($report->pagination['next_cursor']);
+    }
+
     /** @return array{0:ClockTypeClassificationAudit,1:AuditAuthorityRepository,2:GraphService} */
     private function audit(array $entities, ?ClockTypeAuditEvidenceReader $evidence = null, bool $createWrongEdge = false): array
     {
@@ -172,6 +190,15 @@ final class ClockTypeClassificationAuditTest extends TestCase
         $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
         if ($createWrongEdge) $graph->create(new NodeReference('variant', $entities[0]->canonicalId), 'classified_as', new NodeReference('classification', $entities[1]->canonicalId));
         return [new ClockTypeClassificationAudit($repo, $graph, new EntityProfileResolver(), $evidence), $repo, $graph];
+    }
+
+    private function auditWithRepo(AuditAuthorityRepository $repo, array $entities, ClockTypeAuditEvidenceReader $evidence): ClockTypeClassificationAudit
+    {
+        $endpoints = new EndpointTypeRegistry(); $byType = [];
+        foreach ($entities as $entity) $byType[$entity->entityType][] = $entity->canonicalId;
+        foreach ($byType as $type => $ids) $endpoints->register($type, new FakeEndpointResolver($type, $ids));
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
+        return new ClockTypeClassificationAudit($repo, $graph, new EntityProfileResolver(), $evidence);
     }
 
     private function entity(string $type, string $name, string $id, array $payload = [], AuthorityState $state = AuthorityState::ACTIVE): AuthorityEntity
@@ -196,6 +223,8 @@ final class AuditAuthorityRepository implements AuthorityRepository, CursorAutho
 {
     /** @param list<AuthorityEntity> $entities */
     public int $pages = 0;
+    /** @var array<string,int> */
+    public array $pagesByType = [];
     public function __construct(private array $entities, public int $writes = 0) {}
     public function findByCanonicalId(string $id): ?AuthorityEntity { foreach ($this->entities as $entity) if ($entity->canonicalId === $id) return $entity; return null; }
     public function findByStableKey(string $type, string $key): ?AuthorityEntity { foreach ($this->entities as $entity) if ($entity->entityType === $type && $entity->stableKey === $key) return $entity; return null; }
@@ -203,5 +232,11 @@ final class AuditAuthorityRepository implements AuthorityRepository, CursorAutho
     public function update(AuthorityEntity $entity, int $expectedRevision): AuthorityEntity { $this->writes++; throw new \LogicException('Audit must not write Authority.'); }
     public function rekey(AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): AuthorityEntity { $this->writes++; throw new \LogicException('Audit must not write Authority.'); }
     public function listByType(string $type, bool $includeRetired = false): array { return array_values(array_filter($this->entities, static fn (AuthorityEntity $entity): bool => $entity->entityType === $type && ($includeRetired || $entity->active()))); }
-    public function pageByType(string $type, int $limit = 100, ?string $after = null, bool $includeRetired = false): array { $this->pages++; $items = $this->listByType($type, $includeRetired); usort($items, static fn (AuthorityEntity $a, AuthorityEntity $b): int => strcmp($a->canonicalId, $b->canonicalId)); if ($after !== null) $items = array_values(array_filter($items, static fn (AuthorityEntity $entity): bool => $entity->canonicalId > $after)); $page = array_slice($items, 0, $limit); return ['items' => $page, 'next_cursor' => count($items) > $limit && $page !== [] ? $page[count($page) - 1]->canonicalId : null]; }
+    public function pageByType(string $type, int $limit = 100, ?string $after = null, bool $includeRetired = false): array { $this->pages++; $this->pagesByType[$type] = ($this->pagesByType[$type] ?? 0) + 1; $items = $this->listByType($type, $includeRetired); usort($items, static fn (AuthorityEntity $a, AuthorityEntity $b): int => strcmp($a->canonicalId, $b->canonicalId)); if ($after !== null) $items = array_values(array_filter($items, static fn (AuthorityEntity $entity): bool => $entity->canonicalId > $after)); $page = array_slice($items, 0, $limit); return ['items' => $page, 'next_cursor' => count($items) > $limit && $page !== [] ? $page[count($page) - 1]->canonicalId : null]; }
+}
+
+final class CallbackEvidenceReader implements ClockTypeAuditEvidenceReader
+{
+    public function __construct(private \Closure $callback) {}
+    public function findForSubject(string $sourceType, string $sourceUuid): array { ($this->callback)(); return []; }
 }

@@ -64,6 +64,32 @@ final class CanonicalKnowledgeEvidenceAuditReaderTest extends TestCase
         self::assertSame('UNSUPPORTED', $reader->findForSubject('variant', $subject)[0]['evidence_status']);
     }
 
+    public function test_evidence_chain_rejects_a_row_that_does_not_point_back_to_the_claim(): void
+    {
+        $subject = $this->id('51'); $claim = $this->claim($subject, $this->id('52')); $source = $this->source('53');
+        $wrongClaim = $this->claim($this->id('56'), $this->id('54'));
+        $evidence = new Evidence($this->id('55'), $wrongClaim->canonicalId, $source->canonicalId, 'supports', 'wrong claim');
+        $reader = new CanonicalKnowledgeEvidenceAuditReader(new FakeKnowledgeAuditRepository([$claim]), new FakeSourceAuditRepository([$source]), new FakeEvidenceAuditRepository([$evidence]));
+
+        $row = $reader->findForSubject('variant', $subject)[0];
+        self::assertSame('NO_EVIDENCE', $row['evidence_status']);
+        self::assertSame([], $row['support_summary']['evidence_ids']);
+    }
+
+    public function test_support_summary_contains_canonical_revisions_but_never_private_payload(): void
+    {
+        $subject = $this->id('61'); $target = $this->id('62'); $claim = $this->claim($subject, $target); $source = $this->source('63');
+        $evidence = new Evidence($this->id('64'), $claim->canonicalId, $source->canonicalId, 'supports', 'private detail', revision: 3, metadata: ['visibility' => 'HIDDEN']);
+        $reader = new CanonicalKnowledgeEvidenceAuditReader(new FakeKnowledgeAuditRepository([$claim]), new FakeSourceAuditRepository([$source]), new FakeEvidenceAuditRepository([$evidence]));
+
+        $row = $reader->findForSubject('variant', $subject)[0];
+        self::assertSame(1, $row['claim_revision']);
+        self::assertSame(3, $row['support_summary']['evidence_revisions'][$evidence->canonicalId]);
+        self::assertSame(1, $row['support_summary']['source_revisions'][$source->canonicalId]);
+        self::assertSame(['HIDDEN'], $row['support_summary']['visibility']);
+        self::assertStringNotContainsString('private detail', json_encode($row, JSON_THROW_ON_ERROR));
+    }
+
     private function claim(string $subject, string $target, bool $active = true, string $sourceType = 'variant', string $scope = ''): KnowledgeClaim
     {
         $metadata = ['subject_id' => $subject, 'subject_type' => $sourceType, 'scope' => $scope !== '' ? $scope : $sourceType, 'audit_tier' => 'B', 'provenance_class' => 'CATALOG_SUPPORTED', 'knowledge_status' => 'APPROVED'];
