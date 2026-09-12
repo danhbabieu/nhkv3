@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Contracts\Governance\{EligibilityReader, ProposalRepository};
-use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalState};
+use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalState, ProposalSubjectBindingValidator};
 
 final class ProposalEligibilityService
 {
@@ -15,6 +15,7 @@ final class ProposalEligibilityService
         $proposal = $this->proposals->find($proposalId);
         if ($proposal === null) return EligibilityResult::blocked('PROPOSAL_NOT_FOUND');
         if ($proposal->state === ProposalState::APPLIED) return EligibilityResult::blocked('ALREADY_APPLIED');
+        if (!ProposalSubjectBindingValidator::isValid($proposal)) return EligibilityResult::blocked('PROPOSAL_SUBJECT_BINDING_INVALID');
         if (!in_array($proposal->state, [ProposalState::SUBMITTED, ProposalState::APPROVED], true)) return EligibilityResult::blocked('NOT_APPROVED');
         if ($proposal->state !== ProposalState::APPROVED) return EligibilityResult::blocked('APPROVAL_MISSING');
         $approval = $this->proposals->latestApproval($proposalId);

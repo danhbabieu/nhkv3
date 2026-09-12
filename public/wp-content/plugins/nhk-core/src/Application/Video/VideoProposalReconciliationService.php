@@ -11,7 +11,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, Sourc
 use NHK\Core\Contracts\PublicIdentity\{PublicIdentityRepository};
 use NHK\Core\Application\PublicIdentity\PublicIdentityService;
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
+use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -40,6 +40,8 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         private $publicIdentityReadback = null,
         private ?PublicIdentityService $publicIdentities = null,
         private ?PublicIdentityRepository $identityRepository = null,
+        /** @var callable(string):bool|null */
+        private $successfulApplyExists = null,
     ) {
     }
 
@@ -49,6 +51,18 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         $original = $this->proposals->find($proposalId);
         if ($original === null) return $this->blocked($proposalId, 'PROPOSAL_NOT_FOUND');
         if ($original->entityType !== 'video' || $original->operation !== 'ingest') return $this->blocked($proposalId, 'VIDEO_RECONCILIATION_UNSUPPORTED');
+        if ($original->state === ProposalState::APPLIED || $original->appliedAt !== null || $this->hasSuccessfulApply($proposalId)) return $this->blocked($proposalId, 'REPAIR_APPLIED_PROPOSAL_FORBIDDEN');
+        if ($original->state === ProposalState::SUPERSEDED) {
+            $replacementId = trim((string) ($original->supersededByProposalId ?? ''));
+            if (!UuidCodec::isValid($replacementId)) return $this->blocked($proposalId, 'REPAIR_SUPERSEDED_REPLACEMENT_MISSING');
+            $replayed = $this->run(['proposal_id' => $replacementId]);
+            if (($replayed['status'] ?? '') !== 'APPLIED') return $this->withReplacement($proposalId, $replayed);
+            $replayed['status'] = 'REUSED_CANONICAL';
+            $replayed['replaced_proposal_id'] = $replacementId;
+            $replayed['canonical_id'] = $this->canonicalId($replayed);
+            $replayed['public_identity_readback'] = $this->publicIdentityReadback($replayed['canonical_id']);
+            return $replayed;
+        }
         if ($original->state !== ProposalState::APPROVED) return $this->blocked($proposalId, 'NOT_APPROVED');
 
         $payload = $original->payload;
@@ -108,6 +122,11 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
             if (!$proposal instanceof Proposal) return ['status' => 'FAILED', 'blockers' => ['PROPOSAL_NOT_FOUND']];
             $review = $this->lifecycle->review($proposal->id);
             $state = (string) ($review['state'] ?? $proposal->state->value);
+            if ($state === ProposalState::APPLIED->value || $proposal->state === ProposalState::APPLIED) {
+                $applied = ($this->apply)($proposal->id);
+                if (!is_array($applied['canonical_readback'] ?? null)) return ['status' => 'FAILED_RETRYABLE', 'blockers' => ['CANONICAL_READBACK_VERIFICATION_FAILED']];
+                return ['status' => 'APPLIED', 'proposal_id' => $proposal->id, 'canonical_id' => $applied['canonical_id'] ?? $applied['result_entity_uuid'] ?? null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? true)];
+            }
             if ($state === ProposalState::DRAFT->value) {
                 $proposal = $this->lifecycle->submit($proposal->id);
                 $review = $this->lifecycle->review($proposal->id);
@@ -166,6 +185,19 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
 
     private function resolveSubject(array $metadata, array $source): ?array
     {
+        $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
+        $attachmentTarget = null;
+        foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
+            if (!is_array($attachment)) continue;
+            $id = trim((string) ($attachment['target_uuid'] ?? ''));
+            $type = trim((string) ($attachment['target_type'] ?? ''));
+            if (UuidCodec::isValid($id) && $type !== '') {
+                $attachmentTarget = ['id' => $id, 'type' => $type, 'name' => ''];
+                break;
+            }
+        }
+        $packetIsVariant = strtolower(trim((string) ($packet['type'] ?? ''))) === 'variant';
+        if ($packetIsVariant && UuidCodec::isValid((string) ($packet['id'] ?? ''))) return $packet;
         if ($this->subjects !== null) {
             $title = (string) ($source['source_title'] ?? '');
             $hints = [$title];
@@ -174,7 +206,7 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
             $primary = is_array($resolved['primary'] ?? null) ? $resolved['primary'] : null;
             return $primary !== null && (string) ($primary['type'] ?? '') === 'variant' ? $primary : null;
         }
-        $packet = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
+        if ($attachmentTarget !== null) return $attachmentTarget;
         return UuidCodec::isValid((string) ($packet['id'] ?? '')) && trim((string) ($packet['type'] ?? '')) !== '' ? $packet : null;
     }
 
@@ -205,5 +237,15 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         }
         if (!is_array($identity) || (string) ($identity['current_path'] ?? '') !== '/video/' . (string) ($identity['current_slug'] ?? '') . '/') throw new \RuntimeException('PUBLIC_IDENTITY_NOT_PERSISTED');
         return $identity;
+    }
+
+    private function hasSuccessfulApply(string $proposalId): bool
+    {
+        if ($this->successfulApplyExists === null) return false;
+        try {
+            return (bool) ($this->successfulApplyExists)($proposalId);
+        } catch (\Throwable) {
+            throw new \RuntimeException('REPAIR_APPLY_HISTORY_UNAVAILABLE');
+        }
     }
 }

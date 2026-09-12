@@ -57,7 +57,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         $orderExpression = self::SORTS[$filters['order_by']];
         $direction = strtoupper($filters['order']);
         $itemsSql = sprintf(
-            'SELECT id, proposal_uuid, entity_type, operation, target_uuid, expected_revision, command_json, state, created_at, updated_at, revision, fingerprint, dependency_fingerprint FROM %s%s ORDER BY %s %s, id %s LIMIT %%d OFFSET %%d',
+            'SELECT id, proposal_uuid, entity_type, subject_id, operation, target_uuid, expected_revision, command_json, state, created_at, updated_at, revision, fingerprint, dependency_fingerprint FROM %s%s ORDER BY %s %s, id %s LIMIT %%d OFFSET %%d',
             $table,
             $whereSql,
             $orderExpression,
@@ -226,7 +226,7 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
             'proposal_id' => $proposalId,
             'entity_type' => (string) ($row['entity_type'] ?? ''),
             'operation' => (string) ($row['operation'] ?? ''),
-            'subject_id' => '',
+            'subject_id' => $this->string($row['subject_id'] ?? null),
             'target_uuid' => $targetUuid,
             'name' => '',
             'summary' => '',
@@ -261,10 +261,11 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         }
 
         $subjectId = $this->string($payload['subject_id'] ?? null);
+        if ($subjectId === '') $subjectId = (string) $base['subject_id'];
         $name = $this->firstString($payload, ['name', 'title']);
         $summary = $this->firstString($payload, ['summary', 'text', 'claim_text', 'description']);
         return array_replace($base, [
-            'subject_id' => $subjectId !== '' ? $subjectId : ($base['target_uuid'] ?: $base['entity_type']),
+            'subject_id' => $subjectId !== '' ? $subjectId : ($base['target_uuid'] ?: (in_array($base['entity_type'], ['video', 'component'], true) ? '' : $base['entity_type'])),
             'name' => $name !== '' ? $name : $base['entity_type'],
             'summary' => $summary,
             'provenance_summary' => $this->provenanceSummary($payload),
@@ -302,6 +303,9 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
         $entityType = trim((string) ($row['entity_type'] ?? ''));
         $operation = trim((string) ($row['operation'] ?? ''));
         if ($entityType === '' || $operation === '' || !in_array($entityType, $this->types(), true) || !$this->compatibility->supports($entityType, $operation)) return false;
+
+        if ($entityType === 'video' && $operation === 'ingest' && !$this->uuid($row['subject_id'] ?? null)) return false;
+        if ($entityType === 'component' && in_array($operation, ['merge', 'rekey', 'update', 'rename', 'retire', 'reactivate'], true) && !$this->uuid($row['subject_id'] ?? null)) return false;
 
         $expected = $row['expected_revision'] ?? null;
         $isTargetlessCreate = in_array($operation, ['create', 'ingest'], true) && $this->targetUuid($row['target_uuid'] ?? null) === null;

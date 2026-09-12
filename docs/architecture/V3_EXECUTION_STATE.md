@@ -1,5 +1,92 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Capture/Governance convergence implementation
+
+WHAT: Implemented the shared Proposal subject-binding repair and bounded
+Capture continuation convergence slice. No live/staging semantic data was
+read or mutated and no deployment was performed.
+
+CODE: Added the forward-only Governance subject_id migration and schema-health
+check; Proposal persistence, hydration, idempotency comparison and binding
+fingerprints now preserve canonical subject identity. Video ingest and
+component identity-changing commands fail fast when subject_id is not a valid
+canonical UUID. Eligibility and Controlled Apply reject malformed legacy
+bindings without accepting entity-type literals. Superseded legacy Video
+commands replay through their governed replacement while retaining the old
+audit row and never editing an applied binding.
+
+The Governance queue projection now reads the persisted subject_id and marks
+legacy UUID-bound rows without one as non-actionable instead of displaying the
+entity type as a subject.
+
+Repair now consults the durable ApplyAttempt success ledger before accepting a
+legacy Proposal for supersession; an applied or uncertain command is refused.
+
+CONTINUATION: Capture diagnostics now persist Video child fingerprints,
+dependency state, status and phase timing receipts. Existing text-only
+continuations skip an unchanged failed/system-blocked Video child; explicit
+resume or changed Source/Claim/Evidence state can re-enter the child. Parent
+Capture execution returns the semantic failure state before article
+composition/publication, preventing synchronous replay from waiting on a
+state that the same invocation cannot produce. Failure classification now
+distinguishes review/dependency wait, transient retryable failure and system
+repair/blocker.
+
+VERIFICATION: Focused Capture/Video/Governance slice passes 56 tests / 207
+assertions. Full NHK Unit passes 1,167 tests / 5,765 assertions. Repository
+PHP lint and git diff --check pass; changed-scope secret review found no
+credential material. The guarded Migration integration test is environment
+blocked before WordPress bootstrap (`update_option()` unavailable), so it is
+not counted as passing.
+
+DOC GATE: repository canonical snapshot remains
+`documentation_version=fbf1c1065f6b2924cac786d551d94d957c43e2e3653ef7cd13c04f29b1b3af17`,
+`manifest_hash=9471a2f61b7d0c440eeae7ff7497171def59447b569e02c9066edb7e58adf13f`;
+the supplied live checkpoint remains
+`8647e1eb83799902845a80047c3ec8fb01e099b5a0065ec0848451d7550a5bcf` /
+`109c5f0dce7d1e877cd749769cc1970e1895cd9dfca1124a43d2a6bf3521965c`.
+Mismatch remains fail-closed and blocks live acceptance/deploy claims.
+
+STATUS: IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING.
+
+# Checkpoint — 2026-09-12 — Capture/Governance convergence trace
+
+WHAT: Traced the shared Proposal construction, persistence, hydration,
+idempotency and Capture continuation paths before implementation. No
+live/staging semantic data was read or mutated and no deployment was performed.
+
+ROOT CAUSE PROVEN: `VideoIntakeService::proposalArguments()` and
+`McpGovernanceHandler::createFromArguments()` supply the canonical Video UUID
+as `subject_id`, but `GovernanceMigration003` does not define a `subject_id`
+column. `WpdbProposalRepository::create()` therefore persists only
+`entity_type`/`target_uuid`/command JSON, while `hydrate()` reconstructs every
+non-relation `subject_id` from `entity_type`. The same shared boundary explains
+the historical component merge/source binding defect. Idempotency comparison
+and `Proposal::bindingFingerprint()` also prefer `entity_type`, so a malformed
+legacy row can be returned for a correctly requested command.
+
+CONTINUATION TRACE: `EditorialCaptureContinuationService` reuses the same
+Capture/Addendum but `EditorialCaptureCoordinator::continueWithAddendum()`
+always reaches semantic write-back. The wired closure rebuilds the persisted
+Video provenance plan and `GovernedCaptureContinuationService` re-enters the
+dependency/Video lifecycle, including the child idempotency key. Existing
+phase receipts currently guard physical/draft/media phases but do not guard an
+unchanged failed Video child. `ControlledApplyService` also holds its
+transaction across the executor call; this remains an audited lock boundary,
+not a reason to change global timeouts.
+
+DOC GATE: repository canonical snapshot remains
+`documentation_version=fbf1c1065f6b2924cac786d551d94d957c43e2e3653ef7cd13c04f29b1b3af17`,
+`manifest_hash=9471a2f61b7d0c440eeae7ff7497171def59447b569e02c9066edb7e58adf13f`;
+the supplied live checkpoint remains
+`8647e1eb83799902845a80047c3ec8fb01e099b5a0065ec0848451d7550a5bcf` /
+`109c5f0dce7d1e877cd749769cc1970e1895cd9dfca1124a43d2a6bf3521965c`.
+Mismatch is fail-closed.
+
+PLAN: `docs/superpowers/plans/2026-09-12-capture-governance-convergence.md`.
+
+STATUS: TRACE_COMPLETE / IMPLEMENTATION_PENDING.
+
 # Checkpoint — 2026-09-11 — Easy MCP native Capture validation-boundary repair
 
 WHAT: Repaired the narrow Easy MCP compatibility boundary for native Capture

@@ -70,7 +70,7 @@ final class EditorialCaptureContinuationService
             $input['continuation_idempotency_key'] = $key;
             $input['continuation_delta_text'] = trim((string) ($input['text'] ?? $input['content'] ?? ''));
             $continued = $this->coordinator->continueWithAddendum($capture, $input);
-            if ($continued->status === 'FAILED_RETRYABLE') {
+            if (in_array($continued->status, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
                 $failed = $this->saveAddendum($addendum, 'FAILED', $continued->revision, ['code' => (string) ($continued->diagnostics['failure']['code'] ?? 'CAPTURE_CONTINUATION_FAILED')]);
                 return $this->response($continued, $failed);
             }

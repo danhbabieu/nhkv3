@@ -12,7 +12,15 @@ final class InMemoryProposalRepository implements ProposalRepository
     private array $items = [];
     public function create(Proposal $proposal): Proposal { $this->items[$proposal->id] = $proposal; return $proposal; }
     public function find(string $id): ?Proposal { return $this->items[$id] ?? null; }
-    public function findByIdempotencyKey(string $key): ?Proposal { foreach ($this->items as $item) if ($item->idempotencyKey === $key) return $item; return null; }
+    public function findByIdempotencyKey(string $key): ?Proposal
+    {
+        foreach ($this->items as $item) {
+            if ($item->idempotencyKey !== $key) continue;
+            if ($item->state === \NHK\Core\Domain\Governance\ProposalState::SUPERSEDED && $item->supersededByProposalId !== null) return $this->find($item->supersededByProposalId) ?? $item;
+            return $item;
+        }
+        return null;
+    }
     public function save(Proposal $proposal): Proposal { $this->items[$proposal->id] = $proposal; return $proposal; }
     public function findForUpdate(string $id): ?Proposal { return $this->find($id); }
     public function recordApproval(Proposal $proposal, string $actor): void {}

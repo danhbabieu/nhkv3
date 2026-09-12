@@ -245,13 +245,31 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame($capture->requestFingerprint, $captures->findById($capture->captureId)?->requestFingerprint);
     }
 
+    public function test_deterministic_proposal_binding_failure_is_system_blocked_not_retryable(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events, static function (): array {
+            throw new \RuntimeException('PROPOSAL_SUBJECT_BINDING_INVALID');
+        }));
+
+        $result = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'binding-failure', 'text' => 'Bổ sung có lỗi binding.']);
+
+        self::assertSame('SYSTEM_BLOCKED', $result['capture']['status']);
+        self::assertSame('PROPOSAL_SUBJECT_BINDING_INVALID', $result['capture']['diagnostics']['failure']['code']);
+        self::assertSame('SYSTEM_BLOCKED', $result['capture']['diagnostics']['failure']['classification']);
+    }
+
     private function capture(): CaptureRecord
     {
         return new CaptureRecord(UuidCodec::newV7(), 'capture-original-' . bin2hex(random_bytes(2)), hash('sha256', 'original'), CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', 342, 'state-342', [], ['raw_input' => 'Ghi chú ban đầu.', 'subject_hints' => ['Odo 30']], ['composition' => ['title' => 'Bài 342']], []);
     }
 
     /** @param array<string,int|string> $events */
-    private function coordinator(ContinuationCaptureRepository $captures, array &$events): EditorialCaptureCoordinator
+    private function coordinator(ContinuationCaptureRepository $captures, array &$events, ?callable $semantic = null): EditorialCaptureCoordinator
     {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -260,7 +278,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             new TextInputInterpreter(),
             new SubjectResolutionService(static fn (string $hint): array => []),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            static function (array $context) use (&$events): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; $events['merged_text'] = $context['raw_input']; return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
+            $semantic ?? static function (array $context) use (&$events): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; $events['merged_text'] = $context['raw_input']; return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
             new ArticleComposer(),
             static function (array $context) use (&$events): array { $events['media'] = ($events['media'] ?? 0) + 1; return ['status' => 'RECONCILED']; },
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],

@@ -4,7 +4,7 @@ namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Contracts\Governance\{ApplyAttemptRepository,ApplyExecutionHook,GovernanceAuditSink,GovernanceAuthorizer,ProposalRepository};
 use NHK\Core\Contracts\Shared\TransactionManager;
-use NHK\Core\Domain\Governance\{ApplyAttempt,ProposalState};
+use NHK\Core\Domain\Governance\{ApplyAttempt,ProposalState,ProposalSubjectBindingValidator};
 use NHK\Core\Governance\Exception\{InvalidProposalTransition,ProposalNotFound};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Contracts\Article\ArticleApplyService;
@@ -24,6 +24,7 @@ final class ControlledApplyService implements ArticleApplyService
                 $proposal=$this->proposals->findForUpdate($proposalId)??throw new ProposalNotFound('Proposal not found.');
                 if($proposal->state===ProposalState::APPLIED){$success=$this->attempts->findSuccessful($proposalId); $resultId=$success?->resultEntityUuid; $readBack=$this->readBack?->verify($proposal, (string) $resultId); return ['proposal_id'=>$proposalId,'attempt_no'=>$success?->number??0,'result_entity_uuid'=>$resultId,'canonical_id'=>$resultId,'canonical_readback'=>$readBack,'idempotent'=>true];}
                 if($proposal->state!==ProposalState::APPROVED)throw new InvalidProposalTransition('Only approved proposals can be applied.');
+                ProposalSubjectBindingValidator::assertValid($proposal);
                 if($this->eligibility && !($this->eligibility->check($proposalId))->ready)throw new InvalidProposalTransition('Proposal is not eligible for apply.');
                 $attempt=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$this->attempts->nextAttemptNumberLocked($proposalId),'running',null,null,null,$started);
                 $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted(); $this->auditEvent('ApplyStarted',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,['attempt_no'=>$attempt->number]);
@@ -86,6 +87,7 @@ final class ControlledApplyService implements ArticleApplyService
             return ['proposal_id' => $proposalId, 'attempt_no' => $success?->number ?? 0, 'result_entity_uuid' => $resultId, 'canonical_id' => $resultId, 'canonical_readback' => $this->readBack?->verify($proposal, (string) $resultId), 'idempotent' => true];
         }
         if ($proposal->state !== ProposalState::APPROVED) throw new InvalidProposalTransition('Only approved proposals can be applied.');
+        ProposalSubjectBindingValidator::assertValid($proposal);
         if ($this->eligibility && !($this->eligibility->check($proposalId))->ready) throw new InvalidProposalTransition('Proposal is not eligible for apply.');
         $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposalId, $this->attempts->nextAttemptNumberLocked($proposalId), 'running', null, null, null, $started);
         $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted();

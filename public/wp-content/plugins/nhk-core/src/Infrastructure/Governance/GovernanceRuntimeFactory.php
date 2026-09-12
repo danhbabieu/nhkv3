@@ -104,7 +104,7 @@ final class GovernanceRuntimeFactory
         $collectorExecutor = new CollectorFacetMaintenanceExecutor($knowledgeService, $collectorBranchReader);
         $controlledApply = new ControlledApplyService(
             $proposalRepository,
-            new WpdbApplyAttemptRepository($wpdb),
+            $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
             new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor),
             $governanceAudit,
@@ -135,6 +135,7 @@ final class GovernanceRuntimeFactory
             null,
             $publicIdentityService,
             $publicIdentityRepository,
+            static function (string $proposalId) use ($applyAttempts): bool { return $applyAttempts->findSuccessful($proposalId) !== null; },
         );
 
         return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation);

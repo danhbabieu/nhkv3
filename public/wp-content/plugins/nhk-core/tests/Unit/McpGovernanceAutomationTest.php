@@ -7,6 +7,7 @@ use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Contracts\Governance\AutomationPolicyStorage;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -24,10 +25,12 @@ final class McpGovernanceAutomationTest extends TestCase
             }),
         );
 
+        $videoId = UuidCodec::newV7();
         $result = $handler->ingestFromArguments([
             'operation' => 'ingest',
             'entity_type' => 'video',
-            'payload' => ['url' => 'https://example.test/video'],
+            'subject_id' => $videoId,
+            'payload' => ['canonical_id' => $videoId, 'url' => 'https://example.test/video'],
             'idempotency_key' => 'mcp-policy-review',
         ]);
 

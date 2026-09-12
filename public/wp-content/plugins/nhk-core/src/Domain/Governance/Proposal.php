@@ -56,11 +56,10 @@ final readonly class Proposal
         $dependency = preg_match('/^[a-f0-9]{64}$/i', $this->dependencyFingerprint)
             ? strtolower($this->dependencyFingerprint)
             : hash('sha256', $this->dependencyFingerprint);
-        $subject = $this->entityType ?: $this->subjectId;
-        // When a target UUID is present it is the stable subject identity;
-        // otherwise entity type is the persisted identity available to the
-        // repository (the command payload remains part of the content hash).
-        return hash('sha256', $subject . "\n" . $this->operation . "\n" . ($this->targetUuid ?: $subject) . "\n" . $content . "\n" . ($this->expectedRevision === null ? 'null' : (string) $this->expectedRevision) . "\n" . $dependency);
+        // Entity type is a dispatch label, never a substitute for the
+        // canonical subject. The subject binding must survive persistence and
+        // is part of the idempotency fingerprint independently of target_uuid.
+        return hash('sha256', $this->subjectId . "\n" . $this->operation . "\n" . ($this->targetUuid ?: $this->subjectId) . "\n" . $content . "\n" . ($this->expectedRevision === null ? 'null' : (string) $this->expectedRevision) . "\n" . $dependency);
     }
 
     public function transition(ProposalState $state, ?string $decisionActor = null, ?string $at = null, ?string $supersededBy = null): self

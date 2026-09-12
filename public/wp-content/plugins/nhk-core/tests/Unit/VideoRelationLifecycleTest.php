@@ -54,13 +54,13 @@ final class VideoRelationLifecycleTest extends TestCase
     {
         $governance = new GovernanceService(new InMemoryProposalRepository());
         $payload = ['canonical_id' => '01a07971-2fe3-77da-9424-998cf6f249e0', 'url' => 'https://youtu.be/dQw4w9WgXcQ'];
-        $first = new Proposal('video-proposal-a', 'video', 'ingest', $payload, 'content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
-        $replay = new Proposal('video-proposal-b', 'video', 'ingest', $payload, 'content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
+        $first = new Proposal('video-proposal-a', $payload['canonical_id'], 'ingest', $payload, 'content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
+        $replay = new Proposal('video-proposal-b', $payload['canonical_id'], 'ingest', $payload, 'content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
 
         self::assertSame($first->id, $governance->create($first)->id);
         self::assertSame($first->id, $governance->create($replay)->id);
 
-        $changedFingerprint = new Proposal('video-proposal-c', 'video', 'ingest', $payload, 'changed-content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
+        $changedFingerprint = new Proposal('video-proposal-c', $payload['canonical_id'], 'ingest', $payload, 'changed-content-fingerprint', null, 'dependency-fingerprint', ProposalState::DRAFT, idempotencyKey: 'video-replay', entityType: 'video');
         $this->expectExceptionMessage('Idempotency key is already bound to different content.');
         $governance->create($changedFingerprint);
     }

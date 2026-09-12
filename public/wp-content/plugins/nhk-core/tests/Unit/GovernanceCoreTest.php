@@ -141,6 +141,107 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame($sourceUuid, $proposal?->subjectId);
     }
 
+    public function test_persisted_video_hydration_preserves_stored_canonical_subject_uuid(): void
+    {
+        $videoUuid = UuidCodec::newV7();
+        $repository = new WpdbProposalRepository();
+        $hydrate = new \ReflectionMethod($repository, 'hydrate');
+        $hydrate->setAccessible(true);
+
+        $proposal = $hydrate->invoke($repository, [
+            'id' => 0,
+            'proposal_uuid' => UuidCodec::toBinary(UuidCodec::newV7()),
+            'subject_id' => $videoUuid,
+            'entity_type' => 'video',
+            'operation' => 'ingest',
+            'target_uuid' => '',
+            'expected_revision' => null,
+            'command_json' => json_encode(['canonical_id' => $videoUuid, 'metadata' => []], JSON_THROW_ON_ERROR),
+            'fingerprint' => hash('sha256', 'content', true),
+            'dependency_fingerprint' => hash('sha256', 'dependency', true),
+            'state' => 1,
+            'revision' => 1,
+            'created_by' => 0,
+            'idempotency_key' => 'video-hydration',
+            'created_at' => null,
+            'updated_at' => null,
+            'submitted_at' => null,
+            'applied_at' => null,
+            'cancelled_at' => null,
+            'rejected_at' => null,
+            'superseded_at' => null,
+            'superseded_by_proposal_id' => null,
+        ]);
+
+        self::assertSame($videoUuid, $proposal?->subjectId);
+    }
+
+    public function test_video_uuid_bound_proposal_rejects_entity_type_literal_subject_before_persistence(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $handler = new McpGovernanceHandler(new GovernanceService($repository));
+        $videoUuid = UuidCodec::newV7();
+
+        $this->expectExceptionMessage('PROPOSAL_SUBJECT_BINDING_INVALID');
+        $handler->createFromArguments([
+            'operation' => 'ingest',
+            'entity_type' => 'video',
+            'subject_id' => 'video',
+            'payload' => ['canonical_id' => $videoUuid],
+            'idempotency_key' => 'invalid-video-subject',
+        ]);
+    }
+
+    public function test_component_uuid_bound_proposal_rejects_entity_type_literal_subject_before_persistence(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $handler = new McpGovernanceHandler(new GovernanceService($repository));
+        $sourceUuid = UuidCodec::newV7();
+
+        $this->expectExceptionMessage('PROPOSAL_SUBJECT_BINDING_INVALID');
+        $handler->createFromArguments([
+            'operation' => 'merge',
+            'entity_type' => 'component',
+            'subject_id' => 'component',
+            'target_uuid' => UuidCodec::newV7(),
+            'payload' => ['source_uuid' => $sourceUuid, 'source_revision' => 1, 'target_revision' => 1],
+            'idempotency_key' => 'invalid-component-subject',
+        ]);
+    }
+
+    public function test_invalid_approved_video_binding_is_not_eligible_as_subject_unresolved(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $proposal = new Proposal(UuidCodec::newV7(), 'video', 'ingest', ['canonical_id' => UuidCodec::newV7()], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'invalid-approved-video', entityType: 'video');
+        $repository->create($proposal);
+        $eligibility = new \NHK\Core\Application\Governance\ProposalEligibilityService(
+            $repository,
+            new DependencyGraph(new InMemoryDependencyRepository()),
+            new class implements \NHK\Core\Contracts\Governance\EligibilityReader {
+                public function isApplied(string $dependencyUuid): bool { return true; }
+                public function targetRevision(string $targetUuid): ?int { return 1; }
+                public function targetExists(string $targetUuid): bool { return true; }
+            },
+        );
+
+        self::assertSame(['PROPOSAL_SUBJECT_BINDING_INVALID'], $eligibility->check($proposal->id)->reasons);
+    }
+
+    public function test_superseded_legacy_idempotency_key_replays_the_governed_replacement(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $old = new Proposal(UuidCodec::newV7(), 'video', 'ingest', ['canonical_id' => UuidCodec::newV7()], 'old-content', null, 'old-dependency', ProposalState::APPROVED, idempotencyKey: 'legacy-video-key', entityType: 'video');
+        $replacementId = UuidCodec::newV7();
+        $canonicalId = UuidCodec::newV7();
+        $replacement = new Proposal($replacementId, $canonicalId, 'ingest', ['canonical_id' => $canonicalId], 'new-content', null, 'new-dependency', ProposalState::APPROVED, idempotencyKey: 'video-repair:' . $old->id, entityType: 'video');
+        $repository->create($old);
+        $repository->create($replacement);
+        $repository->save($old->transition(ProposalState::SUPERSEDED, 'repairer', null, $replacementId));
+
+        self::assertSame($replacementId, $repository->findByIdempotencyKey('legacy-video-key')?->id);
+        self::assertSame('video', $repository->find($old->id)?->subjectId);
+    }
+
     public function test_mcp_relation_requires_revision_aware_endpoint_registry(): void
     {
         $sourceUuid = UuidCodec::newV7();

@@ -19,7 +19,7 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
-use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, VisualSupportRequirementMigration019};
+use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
@@ -80,7 +80,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', VisualSupportRequirementMigration019::VERSION, false);
+        update_option('nhk_core_migration_target', GovernanceSubjectBindingMigration020::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
             global $wpdb;
@@ -491,6 +491,21 @@ final class Plugin {
                 static fn (string $capability): bool => current_user_can($capability),
                 $captureClaimReuse,
                 new CaptureVideoProvenancePlanner(),
+                $governanceRuntime->videoReconciliation,
+                static function (array $plan) use ($sources, $claims, $evidence): array {
+                    $provenance = is_array($plan['capture_video_provenance'] ?? null) ? $plan['capture_video_provenance'] : $plan;
+                    $dependencies = (array) ($provenance['dependencies'] ?? []);
+                    $sourcePayload = is_array(($dependencies[0]['payload'] ?? null)) ? $dependencies[0]['payload'] : [];
+                    $claimPayload = is_array(($dependencies[1]['payload'] ?? null)) ? $dependencies[1]['payload'] : [];
+                    $source = trim((string) ($sourcePayload['stable_key'] ?? '')) !== '' ? $sources->findByStableKey((string) $sourcePayload['stable_key']) : null;
+                    $claim = trim((string) ($claimPayload['stable_key'] ?? '')) !== '' ? $claims->findByStableKey((string) $claimPayload['stable_key']) : null;
+                    $evidenceRows = $claim !== null ? $evidence->listByClaim($claim->canonicalId) : [];
+                    return [
+                        'source' => $source === null ? null : [$source->canonicalId, $source->revision, $source->active],
+                        'claim' => $claim === null ? null : [$claim->canonicalId, $claim->revision, $claim->active],
+                        'evidence' => array_map(static fn ($item): array => [$item->canonicalId, $item->revision, $item->sourceId, $item->active], $evidenceRows),
+                    ];
+                },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
@@ -864,12 +879,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureMigration017::VERSION || !EditorialCaptureMigration017::schemaReady($wpdb)) (new EditorialCaptureMigration017())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureAddendumMigration018::VERSION || !EditorialCaptureAddendumMigration018::schemaReady($wpdb)) (new EditorialCaptureAddendumMigration018())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < VisualSupportRequirementMigration019::VERSION || !VisualSupportRequirementMigration019::schemaReady($wpdb)) (new VisualSupportRequirementMigration019())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < GovernanceSubjectBindingMigration020::VERSION || !GovernanceSubjectBindingMigration020::schemaReady($wpdb)) (new GovernanceSubjectBindingMigration020())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', VisualSupportRequirementMigration019::VERSION, '', false);
+        add_option('nhk_core_migration_target', GovernanceSubjectBindingMigration020::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

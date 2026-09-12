@@ -16,9 +16,11 @@ final class CanonicalGovernedLifecycleAdapter implements GovernedLifecycle
     {
         $operation = trim((string) ($arguments['operation'] ?? ''));
         $entityType = trim((string) ($arguments['entity_type'] ?? ''));
-        $subjectId = trim((string) ($arguments['subject_id'] ?? '')) ?: $entityType;
         $payload = is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [];
         $targetUuid = trim((string) ($arguments['target_uuid'] ?? '')) ?: null;
+        $subjectId = trim((string) ($arguments['subject_id'] ?? ''));
+        if ($subjectId === '' && $entityType === 'video') $subjectId = UuidCodec::isValid((string) ($payload['canonical_id'] ?? '')) ? (string) $payload['canonical_id'] : (UuidCodec::isValid((string) $targetUuid) ? (string) $targetUuid : '');
+        if ($subjectId === '') $subjectId = $entityType;
         $expectedRevision = array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null ? (int) $arguments['expected_revision'] : null;
         $dependencies = array_values(array_filter(array_map('strval', (array) ($arguments['dependency_ids'] ?? [])), static fn (string $id): bool => UuidCodec::isValid($id)));
         $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencies];

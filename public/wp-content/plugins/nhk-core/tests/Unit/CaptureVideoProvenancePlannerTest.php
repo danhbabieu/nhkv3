@@ -206,7 +206,7 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             'subject_resolution' => ['primary' => ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'], 'resolved' => [['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A']]],
             'interpretation' => [],
             'observations' => [],
-            'assets' => [['kind' => 'video', 'video_proposal' => ['operation' => 'ingest', 'entity_type' => 'video', 'payload' => ['url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot']]]]]],
+            'assets' => [['kind' => 'video', 'video_proposal' => ['operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $ids[3], 'payload' => ['canonical_id' => $ids[3], 'url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'abcdefghijk', 'canonical_source_url' => 'https://www.youtube.com/watch?v=abcdefghijk', 'source_title' => 'Variant A – source snapshot']]]]]],
         ], ['approval_confirmed' => true]);
 
         self::assertSame('APPLIED', $result['status']);

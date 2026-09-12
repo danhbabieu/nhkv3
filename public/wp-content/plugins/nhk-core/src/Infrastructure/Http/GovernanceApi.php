@@ -67,13 +67,16 @@ final class GovernanceApi
             if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
                 $subjectId = trim((string) $payload['source_uuid']);
             } elseif ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) {
-                $subjectId = $entityType !== '' ? $entityType : 'relation';
+                $subjectId = $entityType === 'video' && UuidCodec::isValid((string) ($payload['canonical_id'] ?? ''))
+                    ? (string) $payload['canonical_id']
+                    : ($entityType !== 'video' ? $entityType : '');
             } elseif ($subjectId === '' && $operation === 'relation_create') {
                 $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
             }
             $expectedRevision = $operation === 'relation_create' ? null : max(1, (int) ($body['expected_revision'] ?? 1));
             $targetUuid = isset($body['target_uuid']) ? trim((string) $body['target_uuid']) : null;
             $targetUuid = $targetUuid !== '' ? $targetUuid : null;
+            if ($subjectId === '' && $entityType === 'video' && $targetUuid !== null) $subjectId = $targetUuid;
             $dependencyIds = is_array($body['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $body['dependency_ids']))) : [];
             $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencyIds];
             $contentFingerprint = trim((string) ($body['content_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($binding));

@@ -15,7 +15,7 @@ use NHK\Core\Domain\Governance\{DependencyGraph, Proposal, ProposalState};
 use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
-use NHK\Tests\Support\InMemoryProposalRepository;
+use NHK\Tests\Support\{InMemoryDependencyRepository, InMemoryProposalRepository};
 use PHPUnit\Framework\TestCase;
 
 final class VideoProposalReconciliationServiceTest extends TestCase
@@ -27,7 +27,7 @@ final class VideoProposalReconciliationServiceTest extends TestCase
     public function test_existing_approved_video_proposal_is_rebuilt_with_canonical_provenance_and_old_approval_is_not_reused(): void
     {
         $repository = new InMemoryProposalRepository();
-        $original = new Proposal(self::OLD, self::VIDEO, 'ingest', [
+        $original = new Proposal(self::OLD, 'video', 'ingest', [
             'canonical_id' => self::VIDEO,
             'url' => 'https://www.youtube.com/watch?v=3x9naQn1H_4',
             'metadata' => [
@@ -55,7 +55,7 @@ final class VideoProposalReconciliationServiceTest extends TestCase
             $repository,
             $lifecycle,
             new GovernanceService($repository),
-            new ProposalEligibilityService($repository, new DependencyGraph(new EmptyDependencyRepository()), new AlwaysReadyEligibilityReader()),
+            new ProposalEligibilityService($repository, new DependencyGraph(new InMemoryDependencyRepository()), new AlwaysReadyEligibilityReader()),
             $apply,
             new EmptyVideoRepository(),
             new EmptySourceRepository(),
@@ -75,11 +75,18 @@ final class VideoProposalReconciliationServiceTest extends TestCase
         self::assertSame(ProposalState::SUPERSEDED, $repository->find(self::OLD)?->state);
         self::assertNotSame(self::OLD, $result['replaced_proposal_id']);
         $videoProposal = array_values(array_filter($lifecycle->created, static fn (Proposal $proposal): bool => $proposal->entityType === 'video'))[0];
+        self::assertSame(self::VIDEO, $videoProposal->subjectId);
         self::assertNotSame('old-content', $videoProposal->contentFingerprint);
         self::assertNotSame('old-dependency', $videoProposal->dependencyFingerprint);
         self::assertSame([['evidence_id' => $ids['evidence']]], $videoProposal->payload['metadata']['semantic_attachments'][0]['evidence_refs']);
         self::assertSame(['source', 'knowledge', 'evidence', 'video'], $appliedTypes);
         self::assertSame([$ids['video']], $publicReadbacks);
+
+        $second = $service->reconcile(self::OLD);
+
+        self::assertSame('REUSED_CANONICAL', $second['status']);
+        self::assertSame($result['replaced_proposal_id'], $second['replaced_proposal_id']);
+        self::assertCount(1, array_filter($lifecycle->created, static fn (Proposal $proposal): bool => $proposal->entityType === 'video'));
     }
 }
 

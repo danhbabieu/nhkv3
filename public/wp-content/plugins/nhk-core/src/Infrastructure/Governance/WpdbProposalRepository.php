@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Contracts\Governance\{ApprovedRelationProposalRepository,ProposalRepository};
-use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Governance\{Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Governance\Exception\ProposalIdempotencyStaleBinding;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -18,7 +18,7 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
     private function fingerprintBinary(string $value): string { return hex2bin($this->normalizedFingerprint($value)); }
     private function sameIdempotentContent(Proposal $existing, Proposal $proposal): bool
     {
-        return ($existing->entityType ?: $existing->subjectId) === ($proposal->entityType ?: $proposal->subjectId)
+        return $existing->subjectId === $proposal->subjectId
             && $existing->operation === $proposal->operation
             && $existing->payload === $proposal->payload
             && $existing->targetUuid === $proposal->targetUuid
@@ -54,7 +54,8 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             $expectedRevision = ($isRelationCreate || ($isCreateWithoutTarget && ($row['expected_revision'] === null || $row['expected_revision'] === '' || (string) $row['expected_revision'] === '0')))
                 ? null
                 : ($row['expected_revision'] === null || $row['expected_revision'] === '' ? null : (int) $row['expected_revision']);
-            $subjectId = (string) $row['entity_type'];
+            $subjectId = trim((string) ($row['subject_id'] ?? ''));
+            if ($subjectId === '') $subjectId = (string) $row['entity_type'];
             if ((string) ($row['operation'] ?? '') === 'relation_create') {
                 $subjectId = trim((string) ($payload['source_uuid'] ?? $payload['source_key'] ?? $subjectId));
             }
@@ -64,6 +65,7 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
         }
     }
     public function create(Proposal $proposal): Proposal {
+        ProposalSubjectBindingValidator::assertValid($proposal);
         $db = $this->db();
         $existing = $this->findByIdempotencyKey($proposal->idempotencyKey);
         if ($existing !== null) {
@@ -71,7 +73,7 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
             throw new \NHK\Core\Governance\Exception\ProposalIdempotencyConflict('Idempotency key is already bound to different content.');
         }
         $now = gmdate('Y-m-d H:i:s.u');
-        $insertQuery = $db->prepare('INSERT INTO '.$this->table().' (proposal_uuid,idempotency_key,operation,entity_type,target_uuid,expected_revision,command_json,fingerprint,dependency_fingerprint,state,revision,created_by,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s)', UuidCodec::toBinary($proposal->id), $proposal->idempotencyKey, $proposal->operation, $proposal->entityType ?: $proposal->subjectId, $proposal->targetUuid ? UuidCodec::toBinary($proposal->targetUuid) : null, $proposal->expectedRevision, wp_json_encode($proposal->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $this->fingerprintBinary($proposal->contentFingerprint), $this->fingerprintBinary($proposal->dependencyFingerprint), $this->state($proposal->state), $proposal->revision, (int) ($proposal->actor ?? 0), $now, $now);
+        $insertQuery = $db->prepare('INSERT INTO '.$this->table().' (proposal_uuid,idempotency_key,operation,entity_type,subject_id,target_uuid,expected_revision,command_json,fingerprint,dependency_fingerprint,state,revision,created_by,created_at,updated_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%s,%s)', UuidCodec::toBinary($proposal->id), $proposal->idempotencyKey, $proposal->operation, $proposal->entityType ?: $proposal->subjectId, $proposal->subjectId, $proposal->targetUuid ? UuidCodec::toBinary($proposal->targetUuid) : null, $proposal->expectedRevision, wp_json_encode($proposal->payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $this->fingerprintBinary($proposal->contentFingerprint), $this->fingerprintBinary($proposal->dependencyFingerprint), $this->state($proposal->state), $proposal->revision, (int) ($proposal->actor ?? 0), $now, $now);
         $ok = $db->query($insertQuery);
         $insertLastError = (string) $db->last_error;
         $insertLastQuery = (string) ($db->last_query ?? $insertQuery);
@@ -127,6 +129,13 @@ final class WpdbProposalRepository implements ProposalRepository, ApprovedRelati
         $proposal = $this->hydrate($row);
         if ($proposal === null) {
             throw new ProposalIdempotencyStaleBinding('IDEMPOTENCY_STALE_BINDING: existing idempotency binding is not readable from the canonical proposal store.');
+        }
+        // A governed repair preserves the original command and records the
+        // replacement through supersession. Resolve the old key to that
+        // replacement for replay, without mutating the original audit row.
+        if ($proposal->state === ProposalState::SUPERSEDED && UuidCodec::isValid((string) ($proposal->supersededByProposalId ?? ''))) {
+            $replacement = $this->find((string) $proposal->supersededByProposalId);
+            if ($replacement !== null) return $replacement;
         }
         return $proposal;
     }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Contracts\Governance\{GovernanceAuditSink, GovernanceAuthorizer, ProposalRepository};
-use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Domain\Governance\{Proposal, ProposalState, ProposalSubjectBindingValidator};
 use NHK\Core\Governance\Exception\{InvalidProposalTransition, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalNotFound};
 use NHK\Core\Contracts\Shared\TransactionManager;
 
@@ -15,6 +15,7 @@ final class GovernanceService
     public function create(Proposal $proposal): Proposal
     {
         $this->authorizer?->require('nhk_create_proposals');
+        ProposalSubjectBindingValidator::assertValid($proposal);
         if ($proposal->idempotencyKey === '') throw new ProposalBindingConflict('Idempotency key is required.');
         $byKey = $this->repository->findByIdempotencyKey($proposal->idempotencyKey);
         if ($byKey !== null) {
@@ -37,6 +38,11 @@ final class GovernanceService
         return $this->get($id);
     }
 
+    public function findByIdempotencyKey(string $key): ?Proposal
+    {
+        return $this->repository->findByIdempotencyKey($key);
+    }
+
     public function submit(string $id): Proposal
     {
         $this->authorizer?->require('nhk_submit_proposals');
@@ -52,6 +58,7 @@ final class GovernanceService
         $approve = function () use ($id, $contentFingerprint, $dependencyFingerprint, $actor): Proposal {
             $proposal = $this->repository->findForUpdate($id) ?? throw new ProposalNotFound('Proposal not found.');
             if (!in_array($proposal->state, [ProposalState::DRAFT, ProposalState::SUBMITTED], true)) throw new InvalidProposalTransition('Only draft or submitted proposals can be approved.');
+            ProposalSubjectBindingValidator::assertValid($proposal);
             if ($proposal->contentFingerprint !== $contentFingerprint || $proposal->dependencyFingerprint !== $dependencyFingerprint) throw new ProposalBindingConflict('Approval binding no longer matches the proposal.');
             $saved = $this->transition($proposal, ProposalState::APPROVED, $actor, 'approved');
             $this->repository->recordApproval($saved, $actor);

@@ -47,6 +47,7 @@ final class McpGovernanceHandler implements GovernedLifecycle
     }
 
     public function create(Proposal $proposal): Proposal { return $this->governance->create($proposal); }
+    public function findByIdempotencyKey(string $key): ?Proposal { return $this->governance->findByIdempotencyKey($key); }
     public function review(string $id): array
     {
         $proposal = $this->governance->review($id);
@@ -79,12 +80,15 @@ final class McpGovernanceHandler implements GovernedLifecycle
         if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
             $subjectId = trim((string) $payload['source_uuid']);
         } elseif ($subjectId === '' && in_array($operation, ['create', 'ingest'], true)) {
-            $subjectId = $entityType !== '' ? $entityType : 'relation';
+            $subjectId = $entityType === 'video' && UuidCodec::isValid((string) ($payload['canonical_id'] ?? ''))
+                ? (string) $payload['canonical_id']
+                : ($entityType !== 'video' ? $entityType : '');
         } elseif ($subjectId === '' && $operation === 'relation_create') {
             $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
         }
         $targetUuid = isset($arguments['target_uuid']) ? trim((string) $arguments['target_uuid']) : null;
         $targetUuid = $targetUuid !== '' ? $targetUuid : null;
+        if ($subjectId === '' && $entityType === 'video' && $targetUuid !== null) $subjectId = $targetUuid;
         $expectedRevision = $operation === 'relation_create' ? null : (array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null
             ? max(1, (int) $arguments['expected_revision'])
             : (in_array($operation, ['create', 'ingest'], true) && $targetUuid === null ? null : 1));
