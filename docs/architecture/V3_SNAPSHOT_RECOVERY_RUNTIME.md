@@ -111,10 +111,12 @@ The intended isolated deployment is:
 Provisioning requires infrastructure credentials outside Git and a running
 WordPress/MySQL service. The local MySQL endpoint is available and the
 dedicated database `nhk_v3_video_recovery` has been provisioned. WordPress and
-NHK Core boot on an isolated local site at `http://127.0.0.1:8090`; NHK Core is
-active and the guarded UP migration marker is `20/20`. This is a real empty
-bootstrap only: no historical data was copied into it. No approved snapshot
-artifact, live source adapter, recovery writer adapter or registered
+NHK Core boot on an isolated local site at `http://127.0.0.1:8090` using the
+non-secret `tools/recovery-runtime-prepend.php` bootstrap; read-back reports
+the recovery database identity, runtime `v3-video-recovery-1309`, mode
+`recovery`, active NHK Core and guarded UP migration marker `20/20`. This is a
+real empty bootstrap only: no historical data was copied into it. No approved
+snapshot artifact, live source adapter, recovery writer adapter or registered
 `@V3-Recovery` connector has been provided, so this local runtime cannot pass
 the golden gate yet.
 

@@ -8353,3 +8353,48 @@ read-only source adapter deployment/credential path (or approved snapshot
 artifact), a governed recovery writer binding, and registration of
 `@V3-Recovery` to the isolated runtime. The golden #372 gate must pass after
 restore before any backlog wave.
+
+# Checkpoint — 2026-09-12 — Live source proof and integration contract repair
+
+SOURCE READ-BACK: The authenticated read-only Demo connector resolves to
+`https://demo.1945.vn`, environment `staging`, WordPress `7.1`, PHP `8.4.11`,
+MariaDB `10.11.13-MariaDB-cll-lve-log`, and migration `20/20`. Its fresh
+documentation bootstrap reports runtime `0.1.0`, documentation version
+`1f5885058fcbe37d63f99a2d722df1ee8d6652014a92d824dfe366e5069c8664`, manifest
+hash `414b96f9f5f209a9e76f54bf03560509acea751eb1dc1d16e023189c1f20d3d4`, and
+build identity `558fcf89df3c905eeba46009e58228d1304779962f15f953118bb6ba12bcbf66`.
+The source canonical read surface confirms golden Video
+`01a094df-6ff2-7872-9bbe-ca4e843a68ef`, Variant
+`852da54d-457a-4397-a16d-52d9452ba766`, and one ACTIVE Video → about → Variant
+edge; the public golden route returns HTTP 200. The connector catalog contains
+no snapshot export/import operation, and the source deployment variable
+`NHK_DEMO_DEPLOY_CONFIG` is absent from this operator environment. The local
+source code therefore cannot register an authenticated live adapter against
+the Demo runtime, and no source artifact was generated.
+
+RECOVERY READ-BACK: The local HTTP recovery runtime now uses a real
+pre-WordPress bootstrap (`tools/recovery-runtime-prepend.php`) with database
+`nhk_v3_video_recovery`, environment `v3-video-recovery-1309`, mode `recovery`,
+site `http://127.0.0.1:8090`, active NHK Core, and migration `20/20`. This
+corrects the earlier symlink resolution defect that silently loaded the root
+development DB. The recovery database remains empty of the historical Video
+backlog; its golden route is therefore not an imported-golden acceptance.
+
+INTEGRATION: After migration UP on the exact guarded `nhk_v3_test` database,
+the full NHK Integration suite passes `123 tests / 1,037 assertions`, with
+zero errors and zero failures (7 skips, 1 warning and 1 deprecation remain in
+the suite). The five regressions were stale subject-binding fixtures plus the
+MCP legacy Video adapter's missing canonical identity binding. Fixtures now
+bind Video `subject_id` to `payload.canonical_id`, the adapter assigns a UUID
+for the URL-only public shape, and the test reads eligibility reasons before
+asserting the generic apply rejection. NHK Unit remains `1,237 / 6,026` and
+NHK Contract `4 / 31`.
+
+SAFETY: No Demo/staging mutation, snapshot import, recovery semantic write,
+Video backlog mutation, Article publication, deployment or push was performed.
+`@V3-Recovery` is not registered in the current connector surface, so the
+golden isolated validation and restored-data enrichment gate remain NOT RUN.
+
+STATUS: LIVE SOURCE SNAPSHOT BLOCKED BY MISSING AUTHENTICATED READ-ONLY
+ADAPTER/DEPLOYMENT PATH; LOCAL RECOVERY BOOT AND INTEGRATION REGRESSION GATES
+VERIFIED; READY_FOR_FIRST_RECOVERY_WAVE: NO.

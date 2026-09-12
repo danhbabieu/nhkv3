@@ -423,7 +423,13 @@ final class McpTransport
         $videoArguments = $arguments;
         $videoArguments['operation'] = 'ingest';
         $videoArguments['entity_type'] = 'video';
+        // The public legacy shape accepts only the external URL, so bind the
+        // governed proposal to a canonical Video identity before dispatch.
+        // This keeps the schema-compatible path inside the same strict
+        // subject-binding contract as the enriched intake path.
+        $videoArguments['subject_id'] = UuidCodec::newV7();
         $videoArguments['payload'] = [
+            'canonical_id' => $videoArguments['subject_id'],
             'url' => (string) ($arguments['url'] ?? ''),
             'title' => (string) ($arguments['title'] ?? ''),
             'metadata' => is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],

@@ -557,11 +557,15 @@ final class McpTransportIntegrationTest extends TestCase
             self::assertSame(200, $submit->get_status());
             $approve = $this->request('tools/call', ['id' => 11, 'params' => ['name' => 'nhk.proposal.approve', 'arguments' => ['id' => $proposalId, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint]]], ['Mcp-Name' => 'nhk.proposal.approve']);
             self::assertSame(200, $approve->get_status());
-            $apply = $this->request('tools/call', ['id' => 12, 'params' => ['name' => 'nhk.proposal.apply', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.apply']);
+            $eligibility = $this->request('tools/call', ['id' => 12, 'params' => ['name' => 'nhk.proposal.eligibility', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.eligibility']);
+            self::assertSame(200, $eligibility->get_status());
+            self::assertFalse($eligibility->get_data()['result']['structuredContent']['ready']);
+            self::assertContains('NO_SEMANTIC_ATTACHMENT', $eligibility->get_data()['result']['structuredContent']['reasons']);
+            $apply = $this->request('tools/call', ['id' => 13, 'params' => ['name' => 'nhk.proposal.apply', 'arguments' => ['id' => $proposalId]]], ['Mcp-Name' => 'nhk.proposal.apply']);
             self::assertSame(200, $apply->get_status());
             $applied = $apply->get_data()['result']['structuredContent'];
             self::assertTrue($apply->get_data()['result']['isError'], (string) wp_json_encode($apply->get_data()));
-            self::assertStringContainsString('NO_SEMANTIC_ATTACHMENT', (string) ($apply->get_data()['result']['content'][0]['text'] ?? ''));
+            self::assertSame('Proposal is not eligible for apply.', (string) ($apply->get_data()['result']['content'][0]['text'] ?? ''));
         } finally {
             wp_set_current_user($previousUser);
         }

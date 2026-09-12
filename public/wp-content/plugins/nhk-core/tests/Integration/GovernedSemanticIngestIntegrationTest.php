@@ -155,7 +155,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Relation failure evidence', 'relation' => 'supports']);
         $videoId = UuidCodec::newV7();
         $missingTarget = UuidCodec::newV7();
-        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'video', 'ingest', [
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), $videoId, 'ingest', [
             'canonical_id' => $videoId,
             'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
             'title' => 'Relation rollback video',
@@ -188,7 +188,7 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
         $claim = $this->runGoverned($governance, $apply, 'knowledge', ['stable_key' => $this->prefix . '-activation-failure-claim', 'text' => 'Activation failure claim', 'claim_type' => 'fact']);
         $evidence = $this->runGoverned($governance, $apply, 'evidence', ['claim_id' => $claim['canonical_id'], 'source_id' => $source['canonical_id'], 'excerpt' => 'Activation failure evidence', 'relation' => 'supports']);
         $videoId = UuidCodec::newV7();
-        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), 'video', 'ingest', [
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), $videoId, 'ingest', [
             'canonical_id' => $videoId,
             'url' => 'https://youtu.be/' . substr(bin2hex(random_bytes(8)), 0, 11),
             'title' => 'Activation rollback video',
@@ -314,7 +314,13 @@ final class GovernedSemanticIngestIntegrationTest extends TestCase
 
     private function runGoverned(GovernanceService $governance, ControlledApplyService $apply, string $type, array $payload): array
     {
-        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), $type, 'ingest', $payload, hash('sha256', json_encode($payload)), null, hash('sha256', $type), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-' . $type . '-' . count($this->owned), entityType: $type));
+        if ($type === 'video') {
+            $payload['canonical_id'] ??= UuidCodec::newV7();
+            $subjectId = (string) $payload['canonical_id'];
+        } else {
+            $subjectId = $type;
+        }
+        $proposal = $governance->create(new Proposal(UuidCodec::newV7(), $subjectId, 'ingest', $payload, hash('sha256', json_encode($payload)), null, hash('sha256', $type), ProposalState::DRAFT, idempotencyKey: $this->prefix . '-' . $type . '-' . count($this->owned), entityType: $type));
         self::assertNotNull((new WpdbProposalRepository($GLOBALS['wpdb']))->find($proposal->id));
         $proposal = $governance->submit($proposal->id); $proposal = $governance->approve($proposal->id, $proposal->contentFingerprint, $proposal->dependencyFingerprint, 'test-policy');
         self::assertTrue($governance->review($proposal->id)->state === ProposalState::APPROVED);
