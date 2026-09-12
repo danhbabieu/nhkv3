@@ -8929,12 +8929,17 @@ PLAN → approval → eligibility/Controlled Apply → canonical read-back and
 duplicate verification. Video `about`, Media `depicts` and Knowledge subject/
 reachability semantics remain unchanged.
 
-VERIFICATION: Full Unit passes `1,427 tests / 6,826 assertions`; Contract passes
+VERIFICATION: Full Unit passes `1,428 tests / 6,828 assertions`; Contract passes
 `4 tests / 31 assertions`. Focused audit, profile, route, admin and lifecycle
 tests pass; PHP lint and `git diff --check` pass. Relevant guarded Integration
 was invoked with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` and was
 blocked at the local WordPress boundary by `Error establishing a database
 connection`; no non-test database was touched.
+
+LIVE READ-ONLY CHECK: The sanctioned `clock-type-audit` maintenance surface was
+invoked with a bounded limit and reached WordPress, but the same database
+boundary returned `Error establishing a database connection`; the target
+surface remains typed `LIVE_AUDIT_SURFACE_NOT_EXPOSED`.
 
 LIVE MUTATION GATE: No Clock Type was created. No Authority, Graph, Knowledge,
 Evidence, Source, Media, Video, Article, Public Identity, route or sitemap was

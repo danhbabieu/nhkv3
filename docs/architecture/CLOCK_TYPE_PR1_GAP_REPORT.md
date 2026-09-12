@@ -480,14 +480,16 @@ Local organization closure is implemented without changing the ontology:
   governed eligibility/Controlled Apply → canonical read-back and duplicate
   verification. No bulk apply/backfill or PR7 was introduced.
 
-LOCAL VERIFICATION: Unit `1427 tests / 6826 assertions` passed with existing
+LOCAL VERIFICATION: Unit `1428 tests / 6828 assertions` passed with existing
 warnings/deprecations; Contract `4 tests / 31 assertions` passed; focused
 Clock-Type, route, admin and lifecycle regressions passed. Relevant guarded
 Integration was invoked against `nhk_v3_test` but stopped at the local
 WordPress boundary with `Error establishing a database connection`.
 
-LIVE VERIFICATION: `LIVE_AUDIT_SURFACE_NOT_EXPOSED` remains the typed target
-gap. No SQL workaround, writer, Governance apply, Public Identity allocation,
+LIVE VERIFICATION: the fresh sanctioned local `clock-type-audit` invocation
+reached WordPress but was blocked by `Error establishing a database
+connection`; the target surface remains typed `LIVE_AUDIT_SURFACE_NOT_EXPOSED`.
+No SQL workaround, writer, Governance apply, Public Identity allocation,
 semantic mutation, legacy backfill or PR7 operation was used. Therefore the
 repository code organization is complete, but the overall architecture gate
 remains `ORGANIZATION_BLOCKED` until a sanctioned production/read runtime
