@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — V3-1309 actual-target Video backlog audit
+
+WHAT: Fresh canonical discovery through `@V3-1309` proved the actual target is
+`https://demo.1945.vn` in `staging`, with the supplied golden Capture/Video /
+Variant and public route for Video #372. The actual read-only inventory contains
+6 canonical Videos, 11 active Video Graph edges and 29 Video Proposals (18
+approved, 11 applied), including 5 applied orphan P4 candidates.
+
+RECOVERY: No remote Proposal Apply, post-apply reconciliation, Source/Claim/
+Evidence recovery, semantic attachment repair, completeness recompute, content
+enrichment, Public Identity allocation, route projection or Article publication
+was performed. Applied Proposals remain immutable. The local `nhk_v3` database
+was not used as a substitute for the proven target.
+
+BLOCKER: Constitution/AGENTS make staging read-only, and the connected runtime
+exposes no governed Video write boundary. The audit therefore remains
+fail-closed pending an isolated non-staging canonical runtime. Capture rows and
+some private Source/Claim/Evidence fields were not exposed by the safe read
+boundary; absence from read-back is not treated as data absence.
+
+REPORT: `docs/architecture/VIDEO_BACKLOG_RECOVERY_V3-1309_ACTUAL_TARGET_2026-09-12.md`.
+
+REMOTE CHECKPOINT: documentation version `8bc7971937567dde502c7915e9ef41aca1fc8ff12a6f84b449c4818f094645ba`, manifest hash `1c417670567b624e4a7a0af25c4068b55ac046b6376d4d80f177b6cc1c02032e`, build identity `a85123462b9d571929212df1f95dcebaef43cf654c0ab4cb5cc0e16cebba07c9`, runtime `0.1.0`.
+
+STATUS: ACTUAL_TARGET_INVENTORIED / RECOVERY_BLOCKED_BY_STAGING_SCOPE.
+
 # Checkpoint — 2026-09-12 — V3-1309 Video backlog audit fail-closed
 
 WHAT: Completed the read-only full Video/Capture/Proposal inventory available
