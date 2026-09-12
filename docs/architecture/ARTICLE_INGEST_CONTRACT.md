@@ -33,9 +33,11 @@ turn generated copy into Evidence.
 
 New Article/Post submissions do not begin at a draft writer, Article writer or
 publication writer. The only normal entry point is `nhk.capture.ingest`, which
-accepts text-only, knowledge-only text, images and the registered Video adapter
-and creates one Capture plus one native draft by default. Capture then runs the
-shared semantic core before Article composition and publication.
+accepts text-only, knowledge-only text, images and the registered Video adapter.
+Capture first resolves the registered Content Intent (`VIDEO`, `IMAGE_ARTICLE`,
+`TEXT_ARTICLE` or `KNOWLEDGE_DELTA`); only Article intents create one native
+draft. Capture then runs the shared semantic core before Article composition
+and publication when an Article owner exists.
 
 `nhk.article.ingest` and typed native draft/publication operations remain
 internal/admin lifecycle boundaries for existing records or Capture-controlled
@@ -234,8 +236,10 @@ the existing Capture, followed by the same final read-back.
 
 ## Capture composition and current-state reconciliation — 2026-09-09
 
-Một Capture mặc định tạo một Article draft; N assets tạo N canonical Media/
-MediaAsset identities nhưng không tạo N Article. Mỗi asset giữ caption, alt,
+Một Capture tạo Article draft chỉ khi Content Intent là `IMAGE_ARTICLE` hoặc
+`TEXT_ARTICLE`; N assets tạo N canonical Media/MediaAsset identities nhưng
+không tạo N Article. `VIDEO` giữ owner Video riêng và `KNOWLEDGE_DELTA` giữ
+semantic owner riêng, không yêu cầu Article hay image. Mỗi asset giữ caption, alt,
 description, observation và relation context riêng. Composition chỉ dùng ba
 nguồn đã phân loại: user input, observation từ Media và canonical Claims đã
 được chọn; không dump raw claim payload vào body. Trace máy đọc được phải giữ

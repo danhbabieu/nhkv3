@@ -45,6 +45,7 @@ final class EditorialCaptureCoordinator
         private $videoPublicationVerifier = null,
         ?CompletionCoordinator $completion = null,
         private ?ClockTypeShadowClassifier $clockTypeShadowClassifier = null,
+        private ?ContentIntentRouter $contentIntentRouter = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -126,7 +127,29 @@ final class EditorialCaptureCoordinator
                 $diagnostics['physical_ingest'] = $this->withoutBody($manifest);
                 $record = $this->save($record, CaptureStage::ASSETS_STORED, $assets, $diagnostics, $receipts, 'ASSETS_STORED');
             }
-            if (!$this->hasStage($record, CaptureStage::DRAFT_CREATED)) {
+            $this->beginPhase('INTERPRETED');
+            $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
+            $diagnostics['interpretation'] = $this->withoutBody($interpretation);
+            $intent = ($this->contentIntentRouter ?? new ContentIntentRouter())->route($input, $interpretation, $assets);
+            $diagnostics['content_intent'] = $intent;
+            $record = $this->save(
+                $record,
+                CaptureStage::INTERPRETED,
+                $assets,
+                $diagnostics,
+                $receipts,
+                'INTERPRETED',
+                $record->articleId,
+                $record->articleStateToken,
+                'IN_PROGRESS',
+                null,
+                $record->context + ['content_intent' => $intent],
+            );
+            if (($intent['status'] ?? '') !== 'resolved') {
+                return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
+            }
+            $articleRequired = ($intent['article_required'] ?? false) === true || $record->articleId !== null;
+            if ($articleRequired && $record->articleId === null) {
                 $this->beginPhase('DRAFT_CREATED');
                 $draft = ($this->draftCreator)([
                     'capture_id' => $record->captureId,
@@ -141,7 +164,7 @@ final class EditorialCaptureCoordinator
                 $diagnostics['draft'] = $this->withoutBody($draft);
                 $record = $this->save($record, CaptureStage::DRAFT_CREATED, $assets, $diagnostics, $receipts, 'DRAFT_CREATED', $articleId, (string) ($draft['state_token'] ?? ''));
             }
-            if (!$this->hasStage($record, CaptureStage::MEDIA_ADOPTED)) {
+            if (!array_key_exists('media_adoption', $diagnostics)) {
                 $this->beginPhase('MEDIA_ADOPTED');
                 $adopted = [];
                 foreach ($assets as $asset) {
@@ -165,11 +188,6 @@ final class EditorialCaptureCoordinator
                 ];
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
-            $this->beginPhase('INTERPRETED');
-            $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
-            $diagnostics['interpretation'] = $this->withoutBody($interpretation);
-            $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken);
-
             $this->beginPhase('SUBJECTS_RESOLVED');
             $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
             $resolution = $this->subjects->resolve(array_values(array_unique(array_merge(
@@ -239,7 +257,7 @@ final class EditorialCaptureCoordinator
                 $diagnostics['semantic_diagnostics']['clock_type_shadow'] = $shadow->toArray();
             }
 
-            $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
+            $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
             $this->beginPhase('KNOWLEDGE_RETRIEVED');
             $retrieved = $this->claims->retrieve($semanticContext);
             $diagnostics['claim_retrieval'] = $retrieved;
@@ -273,6 +291,10 @@ final class EditorialCaptureCoordinator
                 ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
                 : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
             $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
+
+            if (!$articleRequired && $record->articleId === null) {
+                return $this->finishNonArticleIntent($record, $assets, $diagnostics, $receipts, $intent, $retrieved, $writes, $videoPublication, $resolution);
+            }
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');
@@ -375,6 +397,45 @@ final class EditorialCaptureCoordinator
         return isset($order[$record->stage], $order[$stage->value]) && $order[$record->stage] >= $order[$stage->value];
     }
 
+    /**
+     * Finish a Capture whose intent has no Article owner. The semantic/video
+     * owners still receive final read-back, but Article publication stages are
+     * not fabricated as a substitute for their canonical completion.
+     *
+     * @param array<string,mixed> $intent
+     * @param array<string,mixed> $retrieved
+     * @param array<string,mixed> $writes
+     * @param array<string,mixed> $videoPublication
+     * @param array<string,mixed> $resolution
+     */
+    private function finishNonArticleIntent(CaptureRecord $record, array $assets, array $diagnostics, array $receipts, array $intent, array $retrieved, array $writes, array $videoPublication, array $resolution): CaptureRecord
+    {
+        $this->beginPhase('FINAL_READBACK');
+        $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'FINAL_READBACK');
+        $assets = $record->assets;
+        $diagnostics = $record->diagnostics;
+        $receipts = $record->phaseReceipts;
+        $final = ($this->finalReadBack)([
+            'capture' => $record->toArray(),
+            'article_id' => null,
+            'content_intent' => $intent,
+            'semantic' => $retrieved,
+            'semantic_write_back' => $writes,
+            'video_publication' => $videoPublication,
+            'subject_resolution' => $resolution,
+        ]);
+        $diagnostics['final_read_back'] = $this->withoutBody($final);
+        if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
+
+        $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, [], $videoPublication, [], $final, false), ['canonical_state' => 'COMPLETE']);
+        $diagnostics['completion'] = $completion;
+        $semanticStatus = strtoupper(trim((string) ($writes['status'] ?? '')));
+        $status = ($completion['complete'] ?? false) === true
+            ? 'COMPLETE'
+            : (in_array($semanticStatus, ['REVIEW_REQUIRED', 'PLANNED', 'APPROVAL_PENDING'], true) || ($videoPublication['blockers'] ?? []) !== [] ? 'REVIEW_REQUIRED' : 'PARTIAL');
+        return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'FINAL_READBACK', null, null, $status, 'VERIFIED');
+    }
+
     /** @param array<string,mixed> $input */
     private function isVideoOnlyResume(array $input): bool
     {
@@ -418,7 +479,7 @@ final class EditorialCaptureCoordinator
     }
 
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
-    private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS', ?string $receiptResult = null): CaptureRecord
+    private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS', ?string $receiptResult = null, ?array $context = null): CaptureRecord
     {
         $stage = $stage instanceof CaptureStage ? $stage->value : $stage;
         $completedAt = microtime(true);
@@ -445,7 +506,7 @@ final class EditorialCaptureCoordinator
         $semanticDiagnostics = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
         $failureCode = trim((string) ($diagnostics['failure']['code'] ?? ($semanticDiagnostics['blockers'][0] ?? '')));
         if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $receipts[$receiptStage]['failure_code'] = $failureCode;
-        return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
+        return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $context ?? $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
 
     private function beginPhase(string $phase): void

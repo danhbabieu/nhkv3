@@ -37,11 +37,15 @@ fields, operations, taxonomy or data population.
 
 `nhk.capture.ingest` is the only normal MCP entry point for a new submission.
 It accepts text-only, knowledge-only text, text with one or more multipart
-images, and the registered Video adapter. Each submission creates one Capture
-and one native Article draft by default, then follows
-`physical ingest when applicable → resolve → Graph discovery → Claim retrieval
-→ governed semantic write-back/apply/read-back → Article composition →
-publication gate → final read-back`.
+images, and the registered Video adapter. Capture resolves Content Intent before
+creating an Article: `TEXT_ARTICLE` and `IMAGE_ARTICLE` create one native draft;
+`VIDEO` and `KNOWLEDGE_DELTA` do not create an Article unless a valid explicit
+Article intent is supplied. All intents then follow the shared semantic and
+final read-back boundary, with Article composition/publication only when
+required by the resolved intent.
+`physical ingest when applicable → interpret → Content Intent resolution →
+resolve → Graph discovery → Claim retrieval → governed semantic write-back/apply/read-back → Article composition when
+required → publication gate when applicable → final read-back`.
 
 The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
 Article draft/update/publish, relation and proposal creation are retained only
@@ -303,7 +307,7 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.semantic.resolve` | Authority context | READ | No | N/A | No raw edge | READY; ambiguity fails closed |
 | `nhk.article.preflight` | Existing WP Post + semantic bundle | READ | No | N/A | Registry/Graph read only | READY; reconcile preflight |
 | `nhk.article.ingest` | Article operation receipt + governed semantic delta | WRITE | Yes | Receipt + semantic revisions | Controlled Apply only | READY for reconcile; create/update fail closed |
-| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + native draft token | Bounded neighborhood read; relation writes remain governed | LIVE RUNTIME ACCEPTANCE PASS (2026-09-09); guarded Integration PASS (120 tests / 1,016 assertions, 4 canonical skips) |
+| `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + Article draft token when Article intent requires it | Bounded neighborhood read; relation writes remain governed | PR1 intent routing implemented; guarded runtime acceptance remains pending |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE / INTERNAL | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Internal/admin compatibility boundary; new submissions use Capture |
@@ -342,7 +346,7 @@ preflight is read-gated.
 | Create Knowledge claim | `nhk.knowledge.ingest` + lifecycle | READY |
 | Read/create relation | Governed `relation_create`; raw Graph inventory and relation dry-run are read-only MCP tools; relation creation remains governed | PARTIAL / IMPLEMENTATION_GAP |
 | Create/update/publish Post | typed Article draft create/update plus gated publish/trash/restore boundary; exact live catalog/runtime still requires discovery/read-back | PARTIAL / RUNTIME-GATED |
-| Capture editorial text/images into one draft | `nhk.capture.ingest` | LIVE RUNTIME ACCEPTANCE PASS (2026-09-09); publication remains owner-policy gated |
+| Capture editorial text/images | `nhk.capture.ingest` | PR1 routes `TEXT_ARTICLE`/`IMAGE_ARTICLE` to Article; `VIDEO`/`KNOWLEDGE_DELTA` remain non-Article unless explicitly overridden; publication remains owner-policy gated |
 | Upload/find Media | governed metadata ingest plus direct multipart image attachment and attachment read-back | READY for current image contract |
 | Attach MediaUsage | nested in Media ingest only | PARTIAL |
 | Product / Specimen | registered Authority types via generic paths | PARTIAL |

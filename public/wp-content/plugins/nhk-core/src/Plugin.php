@@ -773,7 +773,9 @@ final class Plugin {
                     return ['eligible' => (($review['outcome'] ?? '') === 'PASS' || ($review['eligible'] ?? false) === true) && $blockers === [], 'blockers' => $blockers, 'review' => $review, 'fresh_preflight' => $freshResearch->toArray(), 'state_token' => $review['state_token'] ?? $expectedToken];
                 },
                 static function (array $context) use ($articleEditorial): array {
-                    $post = $articleEditorial->read((int) ($context['article_id'] ?? 0));
+                    $articleId = (int) ($context['article_id'] ?? 0);
+                    if ($articleId < 1) return ['status' => 'verified', 'post' => null, 'article_owner' => 'NOT_REQUIRED'];
+                    $post = $articleEditorial->read($articleId);
                     return $post === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'post' => $post->snapshot()];
                 },
                 static function (array $context) use ($draftGateway): array {
@@ -826,6 +828,7 @@ final class Plugin {
                 },
                 null,
                 $clockTypeShadowClassifier,
+                new \NHK\Core\Application\Capture\ContentIntentRouter(),
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };

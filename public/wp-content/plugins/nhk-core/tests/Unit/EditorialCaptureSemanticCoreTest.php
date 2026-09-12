@@ -349,8 +349,8 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         $replay = $coordinator->execute($input);
 
         self::assertSame($first->captureId, $replay->captureId);
-        self::assertSame(408, $replay->articleId);
-        self::assertSame(['draft' => 1, 'video' => 1, 'claims' => 2, 'semantic' => 1], $counts);
+        self::assertNull($replay->articleId);
+        self::assertSame(['draft' => 0, 'video' => 1, 'claims' => 4, 'semantic' => 2], $counts);
     }
 
     public function test_video_input_uses_capture_and_preserves_distinct_video_owner_context(): void
@@ -416,6 +416,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
 
         $result = $coordinator->execute([
             'idempotency_key' => 'capture-odo-36-10-handoff',
+            'intent' => 'TEXT_ARTICLE',
             'text' => 'Odo 36/10 có 10 côn 10 búa và chơi 2 bài nhạc.',
             'subject_hints' => ['Odo 36/10'],
             'video' => ['url' => 'https://www.youtube.com/watch?v=oRfvArkX8NA', 'user_hint' => 'Odo 36/10'],
@@ -474,6 +475,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
 
         $result = $coordinator->execute([
             'idempotency_key' => 'capture-video-fresh-subject-handoff',
+            'intent' => 'TEXT_ARTICLE',
             'text' => 'Bản ghi từ video.',
             'video' => ['url' => 'https://youtu.be/fresh-handoff', 'user_hint' => 'Video ghi lại Đồng hồ Odo 36/8 đang chạy.'],
         ]);

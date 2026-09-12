@@ -21,8 +21,9 @@
 ### Governed Conversational Authority — 2026-09-11
 
 Capture is the operator entry point for Authority planning as well as
-editorial intake. `purpose=EDITORIAL` preserves the legacy one-Capture/one-draft
-contract; `purpose=AUTHORITY` stores a plan and creates no Post; `purpose=MIXED`
+editorial intake. `purpose=EDITORIAL` preserves the one-Capture contract and
+resolves Content Intent before any Article draft; `purpose=AUTHORITY` stores a
+plan and creates no Post; `purpose=MIXED`
 owns at most one Post and resumes semantic reconciliation on the same Capture
 after Authority read-back. Missing purpose remains Editorial for legacy
 clients. `capture_id`, `purpose`, `authority_intent` and multipart `files[]`
@@ -67,8 +68,10 @@ contract.
 ### One-entry-point operator law — 2026-09-09
 
 The operator-facing creation flow is `nhk.capture.ingest` only. Text, images,
-Video and knowledge-only input share one Capture coordinator and one default
-Capture → draft mapping. Direct Media, Video, Knowledge, Source/Evidence,
+Video and knowledge-only input share one Capture coordinator. Capture resolves
+Content Intent before mapping to an Article draft: `IMAGE_ARTICLE` and
+`TEXT_ARTICLE` create one draft, while `VIDEO` and `KNOWLEDGE_DELTA` do not
+create an Article unless a valid explicit Article intent is supplied. Direct Media, Video, Knowledge, Source/Evidence,
 Article, relation and publication mutations are not normal operator paths.
 They remain available only for explicitly bounded internal/admin lifecycle
 work with `nhk_internal_content_operations`; otherwise the runtime fails closed
@@ -94,7 +97,7 @@ explicit `--affirmation="Đăng"` argument and is never hard-coded.
 
 | Classification | Current surfaces | Rule |
 |---|---|---|
-| Canonical | `nhk.capture.ingest`, Admin “Capture nội dung mới” | only normal creation boundary; one Capture and one native draft by default |
+| Canonical | `nhk.capture.ingest`, Admin “Capture nội dung mới” | only normal creation boundary; one Capture per submission; Article draft only for Article intents |
 | Legacy but still needed internally | direct Article/draft/publication, Media upload/ingest, Video ingest, Knowledge/Source/Evidence ingest, proposal/relation and URL maintenance tools | retained for bounded lifecycle, migration or repair work; require `nhk_internal_content_operations` and are not auto-enabled for normal Easy MCP discovery |
 | Deprecated public/operator path | standalone creation buttons and direct mutation Ability exposure | removed from the normal Admin surface and public Ability metadata; no silent redirect is used when the input context would be lost |
 | Dangerous bypass path | any direct mutation call without the internal boundary | fails closed before schema/capability execution with `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`; no partial mutation or fallback writer is allowed |
@@ -116,12 +119,14 @@ unavailable outcomes are intermediate and cannot be reported as complete.
 ### Editorial Capture boundary — 2026-09-09
 
 `nhk.capture.ingest` is the single-submission coordinator for editorial text
-and optional images. One idempotency key maps to one durable Capture and one
-native WordPress draft. The resumable phases are:
+and optional images. One idempotency key maps to one durable Capture; the
+resolved Article intents map to at most one native WordPress draft. The
+resumable phases are:
 
 ```text
-Capture received → physical attachments stored/read back → draft created
-→ Media adopted → text interpreted → subjects resolved
+Capture received → physical attachments stored/read back → text interpreted
+→ Content Intent resolved → draft created when required → Media adopted
+→ subjects resolved
 → bounded Claims retrieved → governed semantic proposal/apply/read-back
 → Article composed/updated → MediaUsage reconciled
 → publication gate → final native read-back
@@ -204,14 +209,14 @@ never reported as frontend publication success.
 | Content kind | Owner | Current boundary | Mutation policy |
 |---|---|---|---|
 | Post/Article | WordPress `wp_posts` | Capture for new submissions; guarded Article lifecycle for existing posts | new submission Post writes are Capture-owned; existing-post maintenance is internal/admin and semantic changes use Governance |
-| Editorial Capture | Capture repository + WordPress draft + downstream owners | `nhk.capture.ingest` coordinator | one Capture/one draft by idempotency; no implicit semantic apply/publication |
+| Editorial Capture | Capture repository + downstream owners, plus WordPress draft for Article intents | `nhk.capture.ingest` coordinator | one Capture by idempotency; one draft only for `IMAGE_ARTICLE`/`TEXT_ARTICLE`; no implicit semantic apply/publication |
 | Category/hub | WordPress taxonomy | typed `CategoryGateway` + native WordPress adapter | deterministic resolve/create, parent validation, fingerprint CAS, guarded delete and read-back |
 | Authority | Authority registry | entity application services | governed revision/lifecycle |
 | Knowledge/Source/Evidence | bounded Knowledge contexts | ingest/read services | Proposal → Approval → Eligibility → Apply |
 | Graph relation | Graph | GraphService | governed relation lifecycle only |
 
 | Media/MediaUsage | Media contexts + WordPress binary | governed Media service/coordinator plus attachment projection | multipart/file input creates-or-resolves one Media; source-original is PRIVATE/protected, the normalized public derivative has max long edge 1200px with no upscale/crop and preserved aspect ratio, eligible derivatives are PUBLIC under that Media, representative/evidence/detail roles are distinct, and attachment mapping is idempotent |
-| Video | Video | Capture Video adapter for new submissions; guarded Video intake/sync for lifecycle | governed canonical external reference; optional Living Knowledge output is planning-only |
+| Video | Video | Capture Video adapter for new submissions; guarded Video intake/sync for lifecycle | governed canonical external reference; Video intent does not create an Article by default; optional Living Knowledge output is planning-only |
 | Product/Specimen | Authority | existing type contracts | no Product–Specimen shortcut until approved |
 | Projection module | application/frontend | configuration/query boundary | source-code/runtime contract, never semantic content |
 

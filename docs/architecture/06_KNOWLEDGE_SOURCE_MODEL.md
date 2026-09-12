@@ -24,9 +24,11 @@ implementation must route the link through the approved governed boundary.
 ## Single entry point for new knowledge input — 2026-09-09
 
 Knowledge-only text is still a new submission and enters `nhk.capture.ingest`.
-Capture resolves canonical subjects, inspects bounded Graph context, retrieves
-and evaluates Claims, then returns semantic write-back through Governance before
-composing the native Article draft. `nhk.knowledge.ingest`, Source and Evidence
+Capture resolves Content Intent before creating an Article. For
+`KNOWLEDGE_DELTA`, it resolves canonical subjects, inspects bounded Graph
+context, retrieves and evaluates Claims, then returns semantic write-back
+through Governance without creating an Article or requiring an image.
+`nhk.knowledge.ingest`, Source and Evidence
 writers remain internal/admin governed compatibility boundaries, not normal
 operator entry points; direct calls without the dedicated internal capability
 fail closed.

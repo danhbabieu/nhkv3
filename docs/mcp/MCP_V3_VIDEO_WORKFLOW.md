@@ -3,7 +3,8 @@
 New Video submissions use the registered Video adapter inside
 `nhk.capture.ingest`, not a standalone operator writer. The Video identity and
 external-reference boundary remain distinct, while Capture owns the submission
-sequence and default Article draft. `nhk.video.ingest` is internal/admin
+sequence. A valid Video intent does not create an Article unless an explicit
+Article intent is supplied. `nhk.video.ingest` is internal/admin
 lifecycle compatibility and requires the dedicated internal capability.
 
 `nhk.video.ingest` is the one-shot governed adapter for YouTube intake. It

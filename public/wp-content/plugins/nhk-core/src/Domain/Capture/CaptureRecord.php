@@ -38,6 +38,7 @@ final readonly class CaptureRecord
         return [
             'capture_id' => $this->captureId,
             'purpose' => (string) ($this->context['purpose'] ?? CapturePurpose::EDITORIAL->value),
+            'content_intent' => $this->context['content_intent'] ?? null,
             'idempotency_key' => $this->idempotencyKey,
             'request_fingerprint' => $this->requestFingerprint,
             'stage' => $this->stage,

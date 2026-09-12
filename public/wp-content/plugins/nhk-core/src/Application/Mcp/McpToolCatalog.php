@@ -27,7 +27,7 @@ final class McpToolCatalog
             self::tool('nhk.entity.neighborhood', 'Read a bounded semantic neighborhood from canonical Graph relations.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'profile' => ['type' => 'string', 'enum' => ['brand', 'model', 'variant', 'classification', 'specimen']], 'max_hops' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['type', 'id', 'profile']),
             self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),
             self::tool('nhk.article.ingest', 'Resume a governed Article semantic reconciliation using the same idempotency key; Phase 1 is reconcile-only.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
-            self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture with a text addendum; preserve one native draft, resolve bounded semantic context, reconcile MediaUsage and return the current read-back.', [
+            self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, resolve bounded semantic context, reconcile MediaUsage when an Article exists and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'capture_id' => self::uuidField(),
                 'resume_children' => [
@@ -37,6 +37,7 @@ final class McpToolCatalog
                     'items' => ['type' => 'string', 'enum' => ['video']],
                 ],
                 'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
+                'intent' => ['type' => 'string', 'enum' => ['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA']],
                 'authority_intent' => [
                     'type' => 'object',
                     'properties' => [

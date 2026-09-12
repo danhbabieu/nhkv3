@@ -119,11 +119,12 @@ relations, not relation count. The controlled provenance classes are
 
 All new content submissions use one entry point: `nhk.capture.ingest` and its
 `EditorialCaptureCoordinator`. Text-only, knowledge-only text, text plus one or
-more images, and the registered Video adapter all create one durable Capture
-and one native WordPress draft by default, then share the sequence
-`physical ingest when applicable → resolve → Graph discovery → Claim retrieval
-→ governed semantic write-back/apply/read-back → Article composition → publication gate
-→ final read-back`.
+more images, and the registered Video adapter all create one durable Capture.
+Capture resolves Content Intent; only `IMAGE_ARTICLE` and `TEXT_ARTICLE` create
+one native WordPress draft, then share the sequence
+`physical ingest when applicable → interpret → Content Intent resolution →
+resolve → Graph discovery → Claim retrieval → governed semantic write-back/apply/read-back → Article composition and
+publication gate when Article intent requires it → final read-back`.
 
 Direct Media/Video/Knowledge/Source/Evidence/Article/relation/publication
 mutation tools remain only for internal/admin compatibility or lifecycle work.
@@ -260,7 +261,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 
 | Area | Current boundary | Current status / reuse rule |
 |---|---|---|
-| Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the only normal one-Capture/one-draft submission boundary for text/image/Video/knowledge-only input |
+| Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the only normal Capture boundary, with one draft only for `IMAGE_ARTICLE`/`TEXT_ARTICLE` |
 | Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
 | Entity Profile / Clock Type | `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md` | Brand and Clock Type are independent profiles; Clock Type is `classification + family=clock_type`; PR3 adds shared dossier/root read foundation and PR4.1 wires the shadow classifier into the existing Capture diagnostics surface plus a Graph-backed membership reader. Legacy `clock-type` remains compatibility-read only; no shadow result is Graph/Knowledge/Evidence/Video truth, and live coordinator/root parity remains separately gated. |
@@ -270,7 +271,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Public Identity | persisted identity/history implementation plus shared public-slug policy exist in code | `PublicIdentityService`, `CanonicalPublicSlugPolicy`, repository/WPDB boundary, migration 014 and exact one-hop history resolver are implemented; compatibility routes now reuse the shared normalizer/collision candidates, while guarded migration/data allocation/current-route durable consumer parity and live re-projection remain runtime-unverified |
 | Knowledge / Source / Evidence | atomic canonical claim + provenance/support contexts; Collector Profile maintenance is defined by `docs/architecture/COLLECTOR_PROFILE_CONTRACT.md` and executable `CollectorFacetRegistry` | governed writes only; reuse canonical IDs/revisions; Collector facet maintenance is metadata-only and facet-allowlisted; Article prose, Video transcript, OCR, captions and generated copy are not automatic Evidence; Article reuse retains Claim revision/path trace rather than duplicating claim text into semantic storage |
 | Living Knowledge | read/plan/resolve then governed mutation | no silent semantic rewrite; downstream reuse must preserve scope and provenance; Dictionary labels may assist lexical matching but never mint claims/evidence |
-| Video | canonical external reference | registered Video adapter now enters `nhk.capture.ingest` for new submissions; Video identity remains distinct and proposal/apply stays governed; standalone `nhk.video.ingest` is internal/admin-only lifecycle compatibility |
+| Video | canonical external reference | registered Video adapter now enters `nhk.capture.ingest` for new submissions; Video identity remains distinct and proposal/apply stays governed; a Video intent does not create an Article by default; standalone `nhk.video.ingest` is internal/admin-only lifecycle compatibility |
 | Media | `docs/architecture/04_MEDIA_MODEL.md`, `docs/architecture/22_P6_MEDIA_VIDEO_FOUNDATION.md`, `docs/architecture/ADMIN_MEDIA_INPUT_GUIDANCE.md`, `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md` | new operator submissions carry files through Capture; `nhk.media.upload-batch`/`nhk.media.ingest` remain internal/admin physical and semantic compatibility boundaries with the same governed Media owner; post-ingest semantic enrichment, relation reconciliation and representative reconciliation are mandatory |
 | Media → Living Knowledge | no approved automatic adapter yet | MediaUsage/`depicts`/OCR/recognition do not become Knowledge/Evidence implicitly |
 | Article → Living Knowledge body update | suggestion/governed boundary only | Knowledge changes never auto-rewrite a published WordPress Article body |
@@ -296,7 +297,7 @@ canonical read-back / media-attachment-get → media-ingest → MediaAsset → M
 or Graph truth during the transport phase; after canonical Media ingest
 read-back, universal post-ingest reconciliation is mandatory.
 For editorial submissions, `nhk.capture.ingest` wraps this Media flow with one
-durable Capture, one native Article draft, bounded semantic enrichment,
+durable Capture, an Article draft only for Article intents, bounded semantic enrichment,
 MediaUsage reconciliation, publication gating and final read-back.
 Product/Specimen future sequencing is allowed as a workflow shape only;
 the entities remain distinct and Product–Specimen remains `REGISTRY_GAP` until

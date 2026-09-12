@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint 2026-09-13 — PR1 Content Intent Router + Knowledge/Text Article split
+
+ROOT_CAUSE: The prior Capture coordinator created a native Article draft before
+understanding whether the submission was Video, an image-backed Article, a
+text-only Article or a Knowledge Delta. That made Article/Media stages appear
+universal and conflicted with the canonical owner boundaries.
+
+FIX: `EditorialCaptureCoordinator` now resolves the registered Content Intent
+before Article creation. `VIDEO` and `KNOWLEDGE_DELTA` preserve the Capture and
+semantic/Video owner paths without fabricating an Article; `IMAGE_ARTICLE` and
+`TEXT_ARTICLE` retain one native WordPress Article path. Explicit valid intent
+wins, invalid intent fails closed and ambiguous input returns review-required.
+The MCP catalog exposes the optional registered `intent` enum. Existing
+Captures that already own an Article continue through the Article path, and
+the final read-back adapter does not query an Article with a fabricated ID.
+
+CONSTITUTION: Amendment 2026-09-13 records Content Intent resolution before
+editorial owner creation. Active Capture, Article, Knowledge, Video, MCP and
+Control Plane documentation now describe the same routing law. No new owner,
+entity type, predicate, migration or direct writer was introduced.
+
+VERIFICATION: Focused router/Capture/MCP regression selection passes 67 tests /
+587 assertions; NHK Unit passes 1,324 tests / 6,377 assertions with existing
+warnings/deprecations; NHK Contract passes 4 tests / 31 assertions; PHP lint
+passes. Full NHK Integration is environment-blocked because
+`NHK_WP_TEST_PATH=public` and the WordPress test bootstrap are unavailable;
+the suite reports guarded skips plus existing mandatory-environment failures.
+
+NO MUTATION: No database, live runtime, publication, deployment or push action
+was performed. PR2 has not started; continuation requires explicit
+`CONTINUE PR2`.
+
+STATUS: PR1_CONTENT_INTENT_ROUTER_IMPLEMENTED /
+INTEGRATION_ENVIRONMENT_BLOCKED
+
 # Checkpoint 2026-09-12 — canonical Video completeness projection reconciliation
 
 ROOT_CAUSE: Video intake persisted preview `completeness` metadata before the

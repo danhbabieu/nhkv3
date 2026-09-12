@@ -192,10 +192,11 @@ canonical semantic/editorial sequence.
 canonical boundary: `nhk.capture.ingest` / the Editorial Capture coordinator.
 The boundary accepts text, text plus one or more images, text plus Video and
 knowledge-only text, then runs `Capture → physical ingest when applicable →
-resolve → Graph discovery → Claim retrieval → governed semantic write-back /
-review → Article composition → publication gate → publication when explicitly
-allowed → final read-back`. A new submission creates one Capture and one new
-native Article draft by default. Video, Media, Knowledge, Source, Evidence and
+interpret → Content Intent resolution → resolve → Graph discovery → Claim
+retrieval → governed semantic write-back / review → Article composition when
+an Article intent requires it → publication gate when applicable → final
+read-back`. A new submission creates one Capture; only Article intents create a
+native Article draft. Video, Media, Knowledge, Source, Evidence and
 Graph retain their canonical owners and identities, but none may be entered by
 a new operator submission through a direct writer.
 
@@ -216,6 +217,53 @@ controlled apply and other internal lifecycle actions remain available only at
 their explicit guarded boundaries.
 
 **DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-09.
+
+## Amendment record — 2026-09-13 — Content Intent Before Editorial Owner Creation
+
+**WHY:** The universal Capture boundary is correct, but creating a native
+Article draft for every submission conflates editorial Article intent with
+Video and Knowledge Delta intent. That creates an unwanted Article owner for
+valid semantic updates and Video submissions, and incorrectly makes Article or
+Media completion a dependency of non-Article work.
+
+**WHAT LAW CHANGES:** `nhk.capture.ingest` remains the sole canonical new
+submission boundary and still creates exactly one durable Capture. Before any
+Article draft is created, Capture must resolve a registered Content Intent:
+`VIDEO`, `IMAGE_ARTICLE`, `TEXT_ARTICLE` or `KNOWLEDGE_DELTA`. `IMAGE_ARTICLE`
+and `TEXT_ARTICLE` create at most one native WordPress Article draft and then
+follow the Article/Media rules. `VIDEO` preserves or resolves the canonical
+Video owner and does not create an Article unless a valid explicit Article
+intent is supplied. `KNOWLEDGE_DELTA` resolves and reuses the canonical
+Knowledge/Source/Evidence/Graph boundaries and does not create an Article or
+require an image. Explicit valid intent wins over heuristic classification;
+ambiguous or invalid intent fails closed or returns review-required state.
+
+The intent router is orchestration only. It does not become an Article,
+Video, Media or Knowledge owner, does not copy Article body into Knowledge,
+does not create duplicate canonical identities and does not bypass Governance.
+Article composition, MediaUsage reconciliation and publication gating run only
+when an Article owner exists or the resolved intent requires one. All paths
+retain idempotency, revision, provenance, typed relation, readiness and final
+canonical-owner read-back invariants.
+
+**AFFECTED SUBSYSTEMS:** Constitution and active Capture, Article, Video,
+Knowledge/Source/Evidence, Media/Visual Support, MCP Content Operations,
+Control Plane, SEO/Public Projection documentation and their runtime contract
+tests.
+
+**COMPATIBILITY:** Existing Captures, native Posts, Videos, Media and semantic
+records remain readable and are not migrated, duplicated, deleted or repaired.
+Existing Captures that already have an Article continue through their Article
+owner path. The MCP `intent` field is optional for compatibility; when absent,
+the router applies only the registered heuristic and otherwise returns
+review-required rather than inventing an owner.
+
+**DATA, MIGRATION AND ROLLOUT:** No database migration, backfill, seed,
+production/staging mutation, live publication, push or deployment is
+authorized by this amendment. New runtime behavior is covered by focused,
+unit, contract and guarded integration tests.
+
+**DECISION OWNER / DATE:** NHK V3 architecture approval, 2026-09-13.
 
 ## Amendment record — 2026-09-11 — Governed Conversational Authority Capture Modes
 
@@ -1474,8 +1522,9 @@ entity hoặc semantic type mới bằng workflow Article.
 
 Mọi Article mới hoặc Post mới có semantic intent phải bắt đầu tại Editorial
 Capture. `nhk.capture.ingest` là cổng canonical duy nhất cho text, image, Video
-và knowledge-only input; nó tạo Capture và native draft rồi mới gọi các owner
-semantic/editorial theo thứ tự đã định. `nhk.article.ingest`, draft writer và
+và knowledge-only input; nó tạo Capture, resolve Content Intent rồi mới tạo
+native draft khi intent yêu cầu và gọi các owner semantic/editorial theo thứ
+tự đã định. `nhk.article.ingest`, draft writer và
 publication writer chỉ còn là boundary internal/admin cho lifecycle đã có hoặc
 được Capture gọi nội bộ, không phải entry point cho submission mới.
 
@@ -2157,7 +2206,7 @@ editorial, semantic and verification stages.
 92. Text-only, image, multi-image, Video và knowledge-only input đều phải đi qua cùng Capture orchestration boundary.
 93. Direct Media/Video/Knowledge/Source/Evidence/Article/Graph/publication mutation chỉ được internal/admin với capability guard riêng hoặc bị block fail-closed.
 94. Direct mutation bị block phải trả `DIRECT_WRITE_BLOCKED` và `USE_CANONICAL_CAPTURE_FLOW`, không tạo partial semantic/editorial side effect.
-95. Một submission mới mặc định tạo đúng một Capture và một native Article draft; physical Media/Video identities vẫn do owner riêng sở hữu.
+95. Một submission mới tạo đúng một Capture; chỉ `IMAGE_ARTICLE` và `TEXT_ARTICLE` tạo native Article draft, còn `VIDEO` và `KNOWLEDGE_DELTA` không tạo Article nếu không có explicit Article intent; physical Media/Video identities vẫn do owner riêng sở hữu.
 96. Publication là chặng cuối của Capture; direct publish không phải entry point cho submission mới.
 97. Một visually explainable semantic feature có requirement exact, và requirement thiếu ảnh được giữ durable ở `MISSING` hoặc `REVIEW_REQUIRED`.
 98. Feature-level technical/contextual visual support không bị đồng nhất với node-level representative image.
