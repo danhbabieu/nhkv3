@@ -32,11 +32,11 @@
 - Consumes: existing `KnowledgeRepository`, `EvidenceRepository`, `SourceRepository` read methods and canonical domain objects.
 - Produces: `findForSubject(string $sourceType, string $sourceUuid): list<array<string,mixed>>` rows containing only canonical IDs/revisions, exact scope, target UUID, tier, provenance class, support state and safe support summary.
 
-- [ ] Write failing tests for supported exact subject, wrong subject, scope mismatch, inactive Claim, inactive Source, inactive/unusable Evidence and private payload redaction.
-- [ ] Run the focused PHPUnit file and verify failures are caused by missing canonical-chain behavior.
-- [ ] Implement the minimal resolver: enumerate canonical Claims, validate canonical subject fields from the approved claim representation, follow each Claim’s Evidence rows to canonical Source, require active `supports` Evidence and active Source, and emit no excerpts/raw metadata.
-- [ ] Run the focused test file and then the existing Knowledge unit tests.
-- [ ] Refactor only after green; preserve repository owner boundaries and no write calls.
+- [x] Write failing tests for supported exact subject, wrong subject, scope mismatch, inactive Claim, inactive Source, inactive/unusable Evidence and private payload redaction.
+- [x] Run the focused PHPUnit file and verify failures are caused by missing canonical-chain behavior.
+- [x] Implement the minimal resolver: enumerate canonical Claims, validate canonical subject fields from the approved claim representation, follow each Claim’s Evidence rows to canonical Source, require active `supports` Evidence and active Source, and emit no excerpts/raw metadata.
+- [x] Run the focused test file and then the existing Knowledge unit tests.
+- [x] Refactor only after green; preserve repository owner boundaries and no write calls.
 
 ### Task 2: Bounded Authority inventory and target buckets
 
@@ -50,12 +50,12 @@
 - Consumes: `pageByType(type, limit, after, includeRetired)` read-only pages ordered by canonical UUID.
 - Produces: bounded source-page audit results with `batch_size`, `cursor`, `next_cursor`, `records_read`, `completed`, and target inventory buckets `CANONICAL_CLOCK_TYPE`, `LEGACY_CLOCK_TYPE`, `OTHER_FAMILY`, `FAMILY_MISSING`, `FAMILY_UNRESOLVED`, `INACTIVE`.
 
-- [ ] Add failing tests proving all four source types paginate without eager whole-dataset loading, cursor replay is deterministic, inactive rows are filtered when requested, and canonical payload family controls classification.
-- [ ] Add failing audit tests for exact evidence READY, hint-only, brandless source, ambiguous targets, legacy target, wrong family, no signal and unavailable dependencies.
-- [ ] Run focused tests and confirm expected RED failures.
-- [ ] Implement one bounded page per audit invocation; keep target inventory bounded/read-only, sort stable results, and never use stable-key family inference.
-- [ ] Run focused tests and the PR5 graph/derived regression suite.
-- [ ] Refactor while preserving the existing status vocabulary and explicit failure states.
+- [x] Add failing tests proving all four source types paginate without eager whole-dataset loading, cursor replay is deterministic, inactive rows are filtered when requested, and canonical payload family controls classification.
+- [x] Add failing audit tests for exact evidence READY, hint-only, brandless source, ambiguous targets, legacy target, wrong family, no signal and unavailable dependencies.
+- [x] Run focused tests and confirm expected RED failures.
+- [x] Implement one bounded page per audit invocation; keep target inventory bounded/read-only, sort stable results, and never use stable-key family inference.
+- [x] Run focused tests and the PR5 graph/derived regression suite.
+- [x] Refactor while preserving the existing status vocabulary and explicit failure states.
 
 ### Task 3: Read-only dry-run surface and report contract
 
@@ -70,11 +70,11 @@
 - Consumes: existing WordPress bootstrap and factory composition; no `ProposalRepository`, `ControlledApplyService`, Governance service or writer adapter.
 - Produces: allowlisted read-only audit operation returning `LIVE_AUDIT_SURFACE_NOT_EXPOSED` when the callable target surface is absent, otherwise the bounded report and safe samples.
 
-- [ ] Add failing tests for report fields, sample cap, timestamp-free fingerprint, no-write dependency graph and typed not-exposed behavior.
-- [ ] Run the focused tests and verify RED.
-- [ ] Implement the read-only operation/factory wiring and keep the existing maintenance allowlist’s write operations separate and unreachable from the audit branch.
-- [ ] Run focused tests, PHP lint and command-level dry-run help/blocked-surface checks.
-- [ ] Refactor only after green; do not broaden MCP catalog or add PR7 operations.
+- [x] Add failing tests for report fields, sample cap, timestamp-free fingerprint, no-write dependency graph and typed not-exposed behavior.
+- [x] Run the focused tests and verify RED.
+- [x] Implement the read-only operation/factory wiring and keep the existing maintenance allowlist’s write operations separate and unreachable from the audit branch.
+- [x] Run focused tests, PHP lint and command-level dry-run help/blocked-surface checks.
+- [x] Refactor only after green; do not broaden MCP catalog or add PR7 operations.
 
 ### Task 4: Fresh verification and checkpoint documentation
 
@@ -83,8 +83,7 @@
 - Modify: `docs/architecture/CLOCK_TYPE_PR1_GAP_REPORT.md`
 - Modify: `docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md` only if the active contract/runtime index requires a precise update
 
-- [ ] Run the full relevant Unit suite, PHP lint, `git diff --check`, secret review and existing PR5/Video regressions.
-- [ ] Re-read fresh documentation bootstrap, environment, `classified_as` inventory and target capability; run the real bounded dry-run only if the target exposes the new read-only surface.
-- [ ] Record separate `DOCUMENTATION_CHECKPOINT_MATCH`, `CODE-SIDE IMPLEMENTATION`, `LIVE READ SURFACE AVAILABLE`, `REAL DRY-RUN EXECUTED` outcomes and exact counts or typed gap.
-- [ ] Confirm no mutation before/after and do not claim PR7 readiness unless the acceptance criteria explicitly permit it; PR7 remains `NOT_READY`.
-
+- [x] Run the full relevant Unit suite, PHP lint, `git diff --check`, secret review and existing PR5/Video regressions.
+- [x] Re-read fresh documentation bootstrap, environment, `classified_as` inventory and target capability; run the real bounded dry-run only if the target exposes the new read-only surface.
+- [x] Record separate `DOCUMENTATION_CHECKPOINT_MATCH`, `CODE-SIDE IMPLEMENTATION`, `LIVE READ SURFACE AVAILABLE`, `REAL DRY-RUN EXECUTED` outcomes and exact counts or typed gap.
+- [x] Confirm no mutation before/after and do not claim PR7 readiness unless the acceptance criteria explicitly permit it; PR7 remains `NOT_READY`.
