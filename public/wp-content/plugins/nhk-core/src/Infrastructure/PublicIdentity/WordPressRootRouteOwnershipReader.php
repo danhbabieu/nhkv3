@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\PublicIdentity;
 
 use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Application\PublicIdentity\RootRouteOwnershipRegistry;
 use NHK\Core\Contracts\PublicIdentity\RootRouteOwnershipReader;
 
 /**
@@ -16,7 +17,7 @@ use NHK\Core\Contracts\PublicIdentity\RootRouteOwnershipReader;
 final class WordPressRootRouteOwnershipReader implements RootRouteOwnershipReader
 {
     /** @param \Closure(string):array<string,mixed>|null $registeredRouteReader */
-    public function __construct(private ?\Closure $registeredRouteReader = null) {}
+    public function __construct(private ?\Closure $registeredRouteReader = null, private ?RootRouteOwnershipRegistry $registry = null) {}
 
     /** @return array{status:string,owners:list<array<string,mixed>>,source:string} */
     public function inspect(string $path): array
@@ -31,6 +32,10 @@ final class WordPressRootRouteOwnershipReader implements RootRouteOwnershipReade
 
         $native = $this->nativeOwners($slug);
         if ($native !== []) return ['status' => 'AVAILABLE', 'owners' => $native, 'source' => 'wordpress'];
+
+        if ($this->registry !== null) {
+            return $this->registry->inspect($path);
+        }
 
         if ($this->registeredRouteReader !== null) {
             $result = ($this->registeredRouteReader)($path);

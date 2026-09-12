@@ -62,18 +62,11 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository, Ro
         return is_array($row) ? $this->hydrate($row) : null;
     }
 
-    /**
-     * Root read support currently covers the persisted root Brand route. A
-     * future root Classification allocation needs its separately governed
-     * route-policy/storage extension; it is not inferred from a namespaced
-     * Classification row.
-     *
-     * @return list<array<string,mixed>>
-     */
+    /** @return list<array<string,mixed>> */
     public function findCurrentByRootSlug(string $slug): array
     {
         if ($slug === '' || $slug !== \NHK\Core\Application\Entity\PublicRouteResolver::slug($slug) || !PublicIdentityMigration014::schemaReady($this->wpdb)) return [];
-        $rows = $this->wpdb->get_results($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE owner_kind=%s AND route_type=%s AND collision_scope=%s AND current_slug=%s', 'authority', 'brand', 'root', $slug), ARRAY_A) ?: [];
+        $rows = $this->wpdb->get_results($this->wpdb->prepare('SELECT * FROM '.$this->currentTable().' WHERE owner_kind=%s AND collision_scope=%s AND current_slug=%s', 'authority', 'root', $slug), ARRAY_A) ?: [];
         $result = [];
         foreach ($rows as $row) if (is_array($row)) {
             try { $result[] = $this->hydrate($row); } catch (\Throwable) { return []; }

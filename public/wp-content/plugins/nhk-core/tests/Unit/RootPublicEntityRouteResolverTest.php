@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Entity\{EntityProfilePublicDossier, EntityProfileReadFoundation, EntityProfileRegistry, EntityProfileResolver};
-use NHK\Core\Application\PublicIdentity\{RootPublicEntityRouteResolver, RootRouteCollisionPolicy};
+use NHK\Core\Application\PublicIdentity\{RootPublicEntityRouteResolver, RootRouteCollisionPolicy, RootRouteOwnershipRegistry};
 use NHK\Core\Contracts\Entity\EntityDossierReader;
 use NHK\Core\Contracts\PublicIdentity\{RootPublicIdentityReader, RootRouteOwnershipReader};
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState};
@@ -15,6 +15,30 @@ use PHPUnit\Framework\TestCase;
 
 final class RootPublicEntityRouteResolverTest extends TestCase
 {
+    public function test_central_root_registry_has_one_destination_and_rejects_collision(): void
+    {
+        $registry = new RootRouteOwnershipRegistry();
+        $owner = ['kind' => 'authority', 'identity_id' => 'identity-1', 'owner_id' => 'entity-1'];
+
+        $registry->register('/vai-bo/', $owner);
+
+        self::assertSame('AVAILABLE', $registry->inspect('/vai-bo/')['status']);
+        self::assertSame([$owner], $registry->inspect('/vai-bo/')['owners']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('PUBLIC_SLUG_CONFLICT');
+        $registry->register('/vai-bo/', ['kind' => 'wp_page', 'owner_id' => '42']);
+    }
+
+    public function test_root_registry_is_read_registration_only_and_does_not_allocate_or_reproject(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/PublicIdentity/RootRouteOwnershipRegistry.php');
+
+        foreach (['allocate(', 'reproject(', 'slugExists(', 'wp_safe_redirect'] as $forbidden) {
+            self::assertStringNotContainsString($forbidden, $source, $forbidden);
+        }
+    }
+
     public function test_existing_brand_root_identity_resolves_to_brand_profile_without_slug_guessing(): void
     {
         $brand = $this->entity('brand', 'Odo', []);
@@ -166,6 +190,18 @@ final class RootPublicEntityRouteResolverTest extends TestCase
             self::assertSame('reserved_route', $inspection['owners'][0]['kind'], $slug);
         }
 
+        self::assertSame('UNAVAILABLE', $reader->inspect('/odo/')['status']);
+    }
+
+    public function test_wordpress_route_owner_can_read_the_central_registered_route_registry(): void
+    {
+        $registry = new RootRouteOwnershipRegistry();
+        $owner = ['kind' => 'registered_route', 'owner_id' => 'video-router'];
+        $registry->register('/clock-types/', $owner);
+        $reader = new WordPressRootRouteOwnershipReader(null, $registry);
+
+        self::assertSame('AVAILABLE', $reader->inspect('/clock-types/')['status']);
+        self::assertSame([$owner], $reader->inspect('/clock-types/')['owners']);
         self::assertSame('UNAVAILABLE', $reader->inspect('/odo/')['status']);
     }
 
