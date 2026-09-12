@@ -1,6 +1,6 @@
 # V3 Snapshot Recovery Runtime
 
-Status: `CODE_IMPLEMENTED / LOCAL_RUNTIME_PROVISIONED / SNAPSHOT_NOT_IMPORTED / READY_FOR_FIRST_RECOVERY_WAVE: NO`
+Status: `RUNTIME_ADAPTERS_IMPLEMENTED / LOCAL_RUNTIME_PROVISIONED / SNAPSHOT_NOT_IMPORTED / READY_FOR_FIRST_RECOVERY_WAVE: NO`
 
 This document defines the isolated restore boundary for the historical Video
 backlog. `https://demo.1945.vn` is a staging source and remains read-only. It
@@ -52,9 +52,11 @@ php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php \
   --operation=v3-snapshot-export --output=/path/to/artifact.json --json
 ```
 
-It requires a registered `nhk_v3_snapshot_source` adapter. No such adapter is
-registered for the Demo staging connector in this checkout, so no staging
-artifact was requested or created during this phase.
+It requires the registered `nhk_v3_snapshot_source` adapter. The production
+`WpdbCanonicalSnapshotSource` binds the existing canonical WPDB stores through
+a read-only composition seam; it has no Capture, Governance, Video, Knowledge,
+Graph or Public Identity mutation methods. Live export still requires the
+operator-controlled Demo deployment/authentication boundary.
 
 ## Import contract and guard
 
@@ -89,9 +91,11 @@ php public/wp-content/plugins/nhk-core/bin/nhk-core-maintenance.php \
   --recovery-mode --json
 ```
 
-It requires a registered `nhk_v3_snapshot_writer` adapter. The current
-repository has no data-bearing recovery runtime or writer adapter, so import
-has not been executed.
+It requires a registered `nhk_v3_snapshot_writer` adapter. The production
+`WpdbCanonicalSnapshotWriter` is bound only when the runtime is explicitly
+recovery, uses the allow-listed database and a transaction, preserves source
+identities/revisions/history and is followed by application read-back
+verification. It is never registered on Demo/staging or production.
 
 ## Recovery runtime lifecycle
 
@@ -116,9 +120,10 @@ non-secret `tools/recovery-runtime-prepend.php` bootstrap; read-back reports
 the recovery database identity, runtime `v3-video-recovery-1309`, mode
 `recovery`, active NHK Core and guarded UP migration marker `20/20`. This is a
 real empty bootstrap only: no historical data was copied into it. No approved
-snapshot artifact, live source adapter, recovery writer adapter or registered
-`@V3-Recovery` connector has been provided, so this local runtime cannot pass
-the golden gate yet.
+snapshot artifact or registered `@V3-Recovery` connector has been provided, so
+this local runtime cannot pass the golden gate yet. The runtime adapter
+registration is now present in code; live source export remains operator-gated
+and the recovery writer remains dormant until an artifact is approved.
 
 Raw DB backup/restore may be used by infrastructure solely to provision the
 isolated database, subject to its own backup controls. It does not replace the

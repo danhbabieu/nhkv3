@@ -55,10 +55,10 @@ queue and Controlled Apply remain the only semantic mutation owners.
 
 `V3_SNAPSHOT_RECOVERY_RUNTIME.md` defines the governed logical snapshot
 boundary, deterministic manifest/hash contract, recovery-only import guard and
-mandatory post-import read-back. Demo staging remains read-only. A real local
-empty recovery bootstrap now exists at `nhk_v3_video_recovery` with migration
-20/20, but the data-bearing restore, source/writer adapters and dedicated
-connector remain infrastructure gates; no golden validation or Video recovery
+mandatory post-import read-back. Demo staging remains read-only. The WPDB
+source adapter and recovery-only writer are now registered in the composition
+root; the real source export/authentication, data-bearing restore and dedicated
+connector remain infrastructure gates. No golden validation or Video recovery
 wave is authorized until they pass.
 
 ## 1. Authority and read order

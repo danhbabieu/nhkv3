@@ -1,5 +1,7 @@
 # NHK V3 Execution State
 
+# Checkpoint 2026-09-12: adapters done; no staging mutation
+
 # Checkpoint — 2026-09-12 — files[] provided-reference bridge remains fail-closed
 
 ROOT_CAUSE: The current ChatGPT connector sends the declared
