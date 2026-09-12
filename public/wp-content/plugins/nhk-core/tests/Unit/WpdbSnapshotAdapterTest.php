@@ -44,6 +44,17 @@ final class WpdbSnapshotAdapterTest extends TestCase
         self::assertSame($addendum, $row['uuid']);
     }
 
+    public function test_optional_zero_target_uuid_is_projected_as_null(): void
+    {
+        $source = new WpdbCanonicalSnapshotSource($this->sourceDb(), $this->sourceEnvironment());
+        $row = $source->normalizeRow(
+            ['target_uuid' => UuidCodec::toBinary('00000000-0000-0000-0000-000000000000')],
+            ['target_uuid' => ['Type' => 'binary(16)']],
+        );
+
+        self::assertNull($row['target_uuid']);
+    }
+
     public function test_source_to_recovery_writer_round_trip_preserves_golden_identity(): void
     {
         $snapshot = (new CanonicalSnapshotExportService())->export(new WpdbCanonicalSnapshotSource($this->sourceDb(), $this->sourceEnvironment(), null, null, static fn (): array => ['current' => 20, 'target' => 20]), '2026-09-12T00:00:00+00:00');

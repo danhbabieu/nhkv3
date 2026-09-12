@@ -241,6 +241,7 @@ final class WpdbCanonicalSnapshotSource implements CanonicalSnapshotSource
             $type = strtolower((string) ($column['Type'] ?? ''));
             if (preg_match('/^binary\(16\)/', $type) === 1) {
                 try { $row[$name] = UuidCodec::fromBinary((string) $row[$name]); } catch (\Throwable) { throw new \RuntimeException('SNAPSHOT_UUID_INVALID:' . $name); }
+                if ($name === 'target_uuid' && $row[$name] === '00000000-0000-0000-0000-000000000000') $row[$name] = null;
             } elseif (preg_match('/^binary\(32\)/', $type) === 1) {
                 $row[$name] = bin2hex((string) $row[$name]);
             } elseif (str_ends_with($name, '_json')) {
