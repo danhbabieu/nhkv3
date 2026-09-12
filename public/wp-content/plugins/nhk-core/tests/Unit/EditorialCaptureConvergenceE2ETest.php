@@ -103,6 +103,31 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame('video-pr5-1', $videoChild['owner_id']);
     }
 
+    public function test_existing_knowledge_and_article_are_reuse_candidates_not_new_deep_content(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticExtra: ['reused_claims' => [['claim_id' => 'claim-existing', 'revision' => 3]]],
+            media: static fn (array $context): array => ['status' => 'RECONCILED', 'internal_link_candidates' => [['post_id' => 88, 'url' => '/bai-lien-quan/']]],
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'pr5-reuse-existing',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Bài viết độc lập về cấu hình này. Có thêm một chi tiết hữu ích.',
+        ]);
+
+        self::assertSame('REUSE_EXISTING', $result->diagnostics['deep_enrichment']['status']);
+        self::assertSame('claim-existing', $result->diagnostics['deep_enrichment']['knowledge_reuse'][0]['claim_id']);
+        self::assertSame(88, $result->diagnostics['deep_enrichment']['article_reuse_internal_link'][0]['post_id']);
+        self::assertNull($result->diagnostics['deep_enrichment']['new_deep_content_opportunity']);
+    }
+
     /**
      * @param array<string,int> $calls
      * @param list<string> $events
@@ -115,6 +140,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?callable $videoEnrichment = null,
         ?callable $videoPublication = null,
         ?callable $media = null,
+        array $semanticExtra = [],
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -123,7 +149,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             new TextInputInterpreter(),
             new SubjectResolutionService(static fn (string $hint): array => []),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            static function (array $context) use (&$calls, &$events, $semanticStatus): array { ++$calls['semantic']; $events[] = 'semantic'; return ['status' => $semanticStatus, 'writes' => []]; },
+            static function (array $context) use (&$calls, &$events, $semanticStatus, $semanticExtra): array { ++$calls['semantic']; $events[] = 'semantic'; return array_merge(['status' => $semanticStatus, 'writes' => []], $semanticExtra); },
             new ArticleComposer(),
             $media ?? static function (array $context) use (&$calls, &$events): array { ++$calls['media']; $events[] = 'media'; return ['status' => 'RECONCILED']; },
             static function (array $context) use (&$calls, &$events): array { ++$calls['publication']; $events[] = 'publication'; return ['eligible' => true]; },
