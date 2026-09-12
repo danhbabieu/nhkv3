@@ -4,11 +4,14 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
+use NHK\Core\Domain\Video\VideoEditorialEnrichmentContext;
 
 final class VideoEditorialGenerator
 {
+    public function __construct(private ?VideoEditorialEnrichmentService $enrichment = null) {}
+
     /** @param array<string,mixed> $source @return array<string,mixed> */
-    public function generate(array $source, string $userHint = '', string $instruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = ''): array
+    public function generate(array $source, string $userHint = '', string $instruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = '', ?array $enrichmentContext = null): array
     {
         $sourceTitle = trim((string) ($source['source_title'] ?? ''));
         $hint = trim($userHint);
@@ -31,7 +34,7 @@ final class VideoEditorialGenerator
         $context = [];
         if ($hint !== '') $context[] = ['text' => $hint, 'provenance' => 'USER_HINT'];
         if ($sourceTitle !== '') $context[] = ['text' => $sourceTitle, 'provenance' => 'SOURCE_FACT'];
-        return [
+        $base = [
             'title' => $title,
             'summary' => $summary,
             'body' => $body,
@@ -41,6 +44,8 @@ final class VideoEditorialGenerator
             'related_knowledge' => [],
             'compliance_context' => ['note' => trim($complianceNote), 'rewrite_applied' => $requestedTitle !== '' && $title !== $requestedTitle],
         ];
+        if ($enrichmentContext === null) return $base;
+        return array_merge($base, ($this->enrichment ?? new VideoEditorialEnrichmentService())->enrich($base, VideoEditorialEnrichmentContext::fromArray($enrichmentContext))['editorial']);
     }
 
     private function firstSentence(string $value): string { return trim((string) preg_split('/[.!?\n]/', $value, 2)[0]); }

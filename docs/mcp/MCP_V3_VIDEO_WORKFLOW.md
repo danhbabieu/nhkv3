@@ -43,6 +43,15 @@ enrichment. The same Variant target must not be silently broadened to Model or
 Brand by title/user-hint text matching. Without an explicit valid target, normal
 read-only resolution remains fail-closed on ambiguity.
 
+Historical Video recovery and final projection use the same bounded editorial
+enrichment seam. Its immutable context preserves specimen facts, source facts,
+canonical entity context and directly related Knowledge/Entity references as
+separate layers. Existing Knowledge is reused by ID; the enrichment seam has
+no Knowledge/Evidence writer and never invents a claim to satisfy a content
+length target. `CONTENT_COMPLETE` is a deterministic content gate distinct
+from technical completeness and frontend verification. A route resolving HTTP
+200 is insufficient when the content gate is `CONTENT_NEEDS_REVIEW`.
+
 `USER_HINT` is high-value factual context but is not Evidence by itself.
 Authorized transcript text is source material only; it must first yield bounded
 atomic observations through an approved extractor. Whole transcript text and

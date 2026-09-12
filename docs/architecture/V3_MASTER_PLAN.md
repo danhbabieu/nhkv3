@@ -31,6 +31,14 @@ weak/speculative edges remain rejected. Code-side batch/idempotency
 implementation exists; live multipart acceptance and target runtime read-back
 remain pending.
 
+Video recovery runtime checkpoint (2026-09-12): the actual V3-1309 target was
+proven as read-only staging, so it was not mutated. The repository now has a
+bounded immutable Video editorial enrichment context/service and a deterministic
+`CONTENT_COMPLETE` gate joined to technical/public/frontend completion. The
+five-item first recovery wave is planned, but an isolated data-bearing
+non-staging runtime and governed V3 semantic snapshot importer are not yet
+provisioned; no golden restore acceptance or recovery Apply is claimed.
+
 | Phase | Status | Evidence / next gate |
 |---|---|---|
 | P0 Bootstrap | ACCEPTED/CLOSED | Repository and V3 boundaries established. |

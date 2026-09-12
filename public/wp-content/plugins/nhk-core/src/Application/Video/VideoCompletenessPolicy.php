@@ -19,6 +19,10 @@ final class VideoCompletenessPolicy
         if (!VideoSourceRights::isValid((string) ($package['source_rights'] ?? ''))) $blockers[] = 'SOURCE_RIGHTS_UNRESOLVED';
         $editorial = is_array($package['editorial'] ?? null) ? $package['editorial'] : [];
         foreach (['title', 'summary', 'body'] as $field) if (trim((string) ($editorial[$field] ?? '')) === '') $blockers[] = 'EDITORIAL_INCOMPLETE';
+        if (array_key_exists('content_quality', $package)) {
+            $quality = is_array($package['content_quality']) ? (string) ($package['content_quality']['status'] ?? '') : (string) $package['content_quality'];
+            if ($quality !== 'CONTENT_COMPLETE') $blockers[] = 'CONTENT_NEEDS_REVIEW';
+        }
         $category = is_array($package['category'] ?? null) ? $package['category'] : [];
         if (!is_array($category['primary'] ?? null) || trim((string) ($category['primary']['key'] ?? '')) === '') $blockers[] = 'CATEGORY_UNRESOLVED';
         if (!is_array($package['semantic_attachments'] ?? null) || $package['semantic_attachments'] === []) $blockers[] = 'NO_SEMANTIC_ATTACHMENT';

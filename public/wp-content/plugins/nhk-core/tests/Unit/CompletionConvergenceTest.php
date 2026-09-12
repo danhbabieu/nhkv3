@@ -29,6 +29,7 @@ final class CompletionConvergenceTest extends TestCase
             'canonical_readback' => ['canonical_id' => 'video-1'],
             'dependency_state' => 'COMPLETE',
             'relation_or_usage_state' => 'COMPLETE',
+            'content_quality' => 'CONTENT_COMPLETE',
             'public_eligible' => true,
             'frontend_verified' => true,
         ]);
@@ -37,6 +38,22 @@ final class CompletionConvergenceTest extends TestCase
         self::assertSame('READY', $packet['public_state']);
         self::assertSame('VERIFIED', $packet['frontend_state']);
         self::assertSame([], $packet['blockers']);
+    }
+
+    public function test_video_completion_requires_content_complete_in_addition_to_public_readbacks(): void
+    {
+        $packet = (new CompletionCoordinator())->finalize('video', 'video-1', [
+            'canonical_readback' => ['canonical_id' => 'video-1'],
+            'dependency_state' => 'COMPLETE',
+            'relation_or_usage_state' => 'COMPLETE',
+            'content_quality' => 'CONTENT_NEEDS_REVIEW',
+            'public_eligible' => true,
+            'frontend_verified' => true,
+        ]);
+
+        self::assertFalse($packet['complete']);
+        self::assertSame('CONTENT_NEEDS_REVIEW', $packet['content_state']);
+        self::assertContains('CONTENT_NEEDS_REVIEW', $packet['blockers']);
     }
 
     public function test_source_and_evidence_can_complete_without_public_route(): void

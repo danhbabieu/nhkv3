@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Domain\Video\{VideoIntakePreview, VideoSourceRights};
+use NHK\Core\Domain\Video\{VideoEditorialEnrichmentContext, VideoIntakePreview, VideoSourceRights};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 final class VideoIntakeService
@@ -67,7 +67,12 @@ final class VideoIntakeService
             $category['primary'] = ['key' => $intendedCategory, 'label' => VideoHubClassifier::hubs()[$intendedCategory], 'primary' => true, 'score' => 0];
             $category['categories'] = [$category['primary']];
         }
-        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $effectiveSubject, $editorialTitle, $complianceNote);
+        $enrichmentContext = [
+            'source_facts' => trim((string) ($snapshot['source_title'] ?? '')) !== '' ? [['text' => (string) $snapshot['source_title']]] : [],
+            'canonical_context' => is_array($effectiveSubject) && trim((string) ($effectiveSubject['name'] ?? '')) !== '' ? [['text' => (string) $effectiveSubject['name'], 'entity_id' => (string) ($effectiveSubject['id'] ?? ''), 'entity_type' => (string) ($effectiveSubject['type'] ?? '')]] : [],
+        ];
+        $editorial = $this->editorial->generate($snapshot, $userHint, $editorialInstruction, $effectiveSubject, $editorialTitle, $complianceNote, $enrichmentContext);
+        $contentQuality = (new VideoEditorialQualityPolicy())->evaluate($editorial, VideoEditorialEnrichmentContext::fromArray($enrichmentContext));
         $seoData = ['title' => $editorial['title'], 'description' => $editorial['summary']];
         $package = [
             'intake_version' => 1,
@@ -78,6 +83,7 @@ final class VideoIntakeService
             'semantic_attachments' => $candidatePayloads,
             'subject_resolution_packet' => $effectiveSubject,
             'seo' => $seoData,
+            'content_quality' => $contentQuality->toArray(),
             'embed_url' => 'https://www.youtube-nocookie.com/embed/' . $snapshot['external_video_id'],
             'provenance' => ['source_url' => $snapshot['canonical_source_url'], 'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null],
             'source_rights' => VideoSourceRights::PUBLIC_EXTERNAL_REFERENCE,

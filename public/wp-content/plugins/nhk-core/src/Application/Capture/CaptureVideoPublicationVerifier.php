@@ -8,7 +8,8 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry, PublicIdentityService};
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Domain\Video\Video;
+use NHK\Core\Domain\Video\{Video, VideoEditorialEnrichmentContext};
+use NHK\Core\Application\Video\VideoEditorialQualityPolicy;
 
 /** Verifies a Capture Video independently from the companion Article gate. */
 final class CaptureVideoPublicationVerifier
@@ -23,6 +24,7 @@ final class CaptureVideoPublicationVerifier
         /** @var callable(string,string):bool|null */
         private $frontendReadback = null,
         ?CompletionCoordinator $completion = null,
+        private ?VideoEditorialQualityPolicy $editorialQuality = null,
     ) {
         PublicIdentityReadRegistry::register($identityRepository);
         $this->completion = $completion ?? new CompletionCoordinator();
@@ -60,6 +62,12 @@ final class CaptureVideoPublicationVerifier
                 }
             }
             $metadata = is_array($video->metadata) ? $video->metadata : [];
+            $editorialContext = VideoEditorialEnrichmentContext::fromArray(is_array($metadata['enrichment_context'] ?? null) ? $metadata['enrichment_context'] : []);
+            $contentQuality = ($this->editorialQuality ?? new VideoEditorialQualityPolicy())->evaluate(is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [], $editorialContext);
+            if (!$contentQuality->complete()) {
+                $blockers[] = 'CONTENT_NEEDS_REVIEW';
+                continue;
+            }
             $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
             if ($attachments === []) {
                 $blockers[] = 'NO_SEMANTIC_ATTACHMENT';
@@ -135,6 +143,7 @@ final class CaptureVideoPublicationVerifier
                 'relation_or_usage_state' => 'COMPLETE',
                 'public_eligible' => true,
                 'frontend_verified' => $frontendVerified,
+                'content_quality' => $contentQuality->status,
                 'blockers' => $frontendVerified === false ? ['VIDEO_FRONTEND_READBACK_FAILED'] : [],
             ]);
             $items[] = ['video_id' => $video->canonicalId, 'platform' => $video->platform, 'external_id' => $video->externalVideoId, 'external_video_id' => $video->externalVideoId, 'status' => 'verified', 'completion' => $completion, 'public_identity' => ['identity_id' => $identity['identity_id'] ?? null, 'slug' => $identity['current_slug'], 'path' => $path]];

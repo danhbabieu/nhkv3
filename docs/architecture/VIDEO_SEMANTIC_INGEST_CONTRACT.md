@@ -96,6 +96,28 @@ Its output is the bounded `knowledge_enrichment` packet with `status`,
 dependencies; `add_evidence` additionally requires canonical `source_id` and
 `source_revision`.
 
+## Editorial enrichment and content gate — 2026-09-12
+
+Historical Video recovery uses the application-level
+`VideoEditorialEnrichmentService` with one immutable
+`VideoEditorialEnrichmentContext`. The context is assembled from bounded
+read-back only and keeps `SPECIMEN`, `SOURCE_FACT` and `CANONICAL_CONTEXT`
+separate. Direct Graph neighbors are preferred; related Knowledge and Entity
+IDs are reused as references and no Knowledge writer is invoked merely to make
+copy longer. Generated editorial prose is never Evidence.
+
+The enrichment result may carry the existing editorial package fields
+`title`, `summary`, `body`, `context`, `facts`, `why_this_matters`,
+`related_knowledge`, `related_entities`, plus derived SEO text and a
+`content_quality` packet. `VideoEditorialQualityPolicy` returns exactly
+`CONTENT_COMPLETE` or `CONTENT_NEEDS_REVIEW`. The latter is emitted for
+missing/trivial/cut-off copy, unsupported universal language, missing specimen
+scope, unused available canonical context or missing available related
+references. A Video may reach `COMPLETE_VERIFIED` only when technical
+completion, `CONTENT_COMPLETE`, public completion and frontend verification
+all pass. This is a derived gate; it does not create a new semantic owner or a
+second persistence store.
+
 Transcript text is source material, not an atomic Knowledge claim. An approved
 read-only factual-observation extractor must return bounded observations with
 provenance/locator. If no extractor is configured, the packet emits

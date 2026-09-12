@@ -26,7 +26,12 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
             'https://www.youtube.com/watch?v=abcdefghijk',
             'Video A',
             [
-                'editorial' => ['title' => 'Video A', 'summary' => 'Tóm tắt an toàn'],
+                'editorial' => [
+                    'title' => 'Video A',
+                    'summary' => 'Bản ghi cho thấy các chi tiết nhận diện chính của hiện vật được chọn.',
+                    'body' => 'Video này ghi lại đúng hiện vật trong một nguồn tham chiếu cụ thể. Người đọc có thể đối chiếu mặt số, cấu hình và âm thanh được mô tả mà không suy rộng những quan sát riêng thành đặc tính của toàn bộ dòng đồng hồ. Các dữ kiện khác cần được kiểm tra qua nguồn canonical phù hợp.',
+                    'why_this_matters' => 'Trang giúp tách dữ kiện của hiện vật khỏi bối cảnh chung trước khi nhận diện sâu hơn.',
+                ],
                 'hub' => ['primary' => ['key' => '01', 'label' => 'Tri thức']],
                 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
             ],
@@ -52,7 +57,7 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
     {
         $videoId = UuidCodec::newV7();
         $videos = $this->createMock(VideoRepository::class);
-        $videos->method('findByCanonicalId')->willReturn(new Video($videoId, 'youtube', 'abcdefghijk', 'https://www.youtube.com/watch?v=abcdefghijk', 'Video A', ['semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]], null, true));
+        $videos->method('findByCanonicalId')->willReturn(new Video($videoId, 'youtube', 'abcdefghijk', 'https://www.youtube.com/watch?v=abcdefghijk', 'Video A', ['editorial' => ['title' => 'Video A', 'summary' => 'Bản ghi cho thấy chi tiết nhận diện của hiện vật.', 'body' => 'Video này ghi lại đúng hiện vật trong nguồn tham chiếu. Các chi tiết quan sát được cần được tách khỏi bối cảnh chung để người đọc kiểm tra thêm mà không suy rộng mô tả riêng thành đặc tính phổ quát của dòng đồng hồ.', 'why_this_matters' => 'Trang giữ phạm vi rõ ràng giữa hiện vật và tri thức chung.'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]], null, true));
         $identityRepository = new InMemoryCaptureIdentityRepository();
         $service = new CaptureVideoPublicationVerifier($videos, new PublicIdentityService($identityRepository, static fn (string $slug): bool => false), $identityRepository);
 
@@ -74,7 +79,7 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
             'abcdefghijk',
             'https://www.youtube.com/watch?v=abcdefghijk',
             'Video A',
-            ['semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]],
+            ['editorial' => ['title' => 'Video A', 'summary' => 'Bản ghi cho thấy chi tiết nhận diện của hiện vật.', 'body' => 'Video này ghi lại đúng hiện vật trong nguồn tham chiếu. Các chi tiết quan sát được cần được tách khỏi bối cảnh chung để người đọc kiểm tra thêm mà không suy rộng mô tả riêng thành đặc tính phổ quát của dòng đồng hồ.', 'why_this_matters' => 'Trang giữ phạm vi rõ ràng giữa hiện vật và tri thức chung.'], 'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => UuidCodec::newV7()]]]]],
         ));
         $service = new CaptureVideoPublicationVerifier($videos, new PublicIdentityService($identityRepository, static fn (string $slug): bool => false), $identityRepository, null, static fn (string $videoId, string $targetType, string $targetId): bool => false);
 
@@ -90,7 +95,12 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
         $videoId = UuidCodec::newV7();
         $evidenceId = UuidCodec::newV7();
         $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Video chính xác', [
-            'editorial' => ['title' => 'Video chính xác', 'summary' => 'Tóm tắt'],
+            'editorial' => [
+                'title' => 'Video chính xác',
+                'summary' => 'Bản ghi cho thấy các chi tiết nhận diện chính của hiện vật được chọn.',
+                'body' => 'Video này ghi lại đúng hiện vật trong nguồn tham chiếu. Nội dung giữ riêng các chi tiết quan sát được trên chiếc đồng hồ và phân biệt chúng với bối cảnh canonical, để người đọc có thể kiểm tra thêm mà không biến mô tả riêng thành đặc tính phổ quát.',
+                'why_this_matters' => 'Trang tạo điểm đối chiếu có phạm vi rõ ràng giữa nguồn video và tri thức NHK.',
+            ],
             'hub' => ['primary' => ['key' => '01']],
             'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
         ]);
