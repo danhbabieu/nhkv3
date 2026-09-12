@@ -11,7 +11,7 @@ use NHK\Core\Domain\Governance\{CommandCanonicalizer, Proposal, ProposalState};
 use NHK\Core\Domain\Governance\ProposalSubjectBindingValidator;
 use NHK\Core\Domain\Knowledge\KnowledgeFacetProfile;
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
-use NHK\Core\Domain\Video\VideoException;
+use NHK\Core\Domain\Video\{VideoException, VideoRelationEvidenceRequired};
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalBindingConflict, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -343,6 +343,9 @@ final class GovernedCaptureContinuationService
                 default => 'PROPOSAL_GOVERNANCE_CONTRACT_INVALID',
             };
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => [$reason]];
+        }
+        if ($error instanceof VideoRelationEvidenceRequired) {
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'REVIEW_REQUIRED', 'blockers' => [VideoRelationEvidenceRequired::ERROR_CODE]];
         }
         if ($error instanceof CaptureOrchestrationBudgetExceeded || $error instanceof VideoException) {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'FAILED_RETRYABLE', 'blockers' => [$error instanceof CaptureOrchestrationBudgetExceeded ? 'CAPTURE_ORCHESTRATION_BUDGET_EXCEEDED' : 'VIDEO_EXTERNAL_TRANSIENT_FAILURE']];

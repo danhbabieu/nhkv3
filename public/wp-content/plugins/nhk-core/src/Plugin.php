@@ -795,6 +795,7 @@ final class Plugin {
                         $primary,
                         trim((string) ($video['editorial_title'] ?? $context['editorial_title'] ?? '')),
                         trim((string) ($video['compliance_note'] ?? $context['compliance_note'] ?? '')),
+                        true,
                     );
                     return [
                         'status' => 'verified',

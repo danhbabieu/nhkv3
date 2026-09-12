@@ -25,7 +25,7 @@ final class VideoIntakeService
     }
 
     /** @param list<array<string,mixed>> $intendedRelations @param array<string,mixed>|null $resolvedSubject */
-    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = ''): VideoIntakePreview
+    public function preview(string $url, string $userHint = '', ?string $intendedCategory = null, array $intendedRelations = [], string $editorialInstruction = '', ?array $resolvedSubject = null, string $editorialTitle = '', string $complianceNote = '', bool $allowDeferredEvidence = false): VideoIntakePreview
     {
         $resolution = $this->source->resolve($url);
         $snapshot = $resolution->snapshot->toArray();
@@ -52,7 +52,7 @@ final class VideoIntakeService
                 'reason' => 'Resolved against existing NHK canonical identity.', 'confidence' => $userHint !== '' ? 0.9 : 0.7,
             ];
         }
-        $candidateObjects = $this->relations->plan($videoId, $relations);
+        $candidateObjects = $this->relations->plan($videoId, $relations, $allowDeferredEvidence);
         $candidatePayloads = array_map(static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => $candidate->toProposalPayload(), $candidateObjects);
         $intendedTargets = array_values(array_map(
             static fn (\NHK\Core\Domain\Video\VideoRelationCandidate $candidate): array => ['id' => $candidate->targetId, 'type' => $candidate->targetType],

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Domain\Graph\PredicateRegistry;
-use NHK\Core\Domain\Video\VideoRelationCandidate;
+use NHK\Core\Domain\Video\{VideoRelationCandidate, VideoRelationEvidenceRequired};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -16,7 +16,7 @@ final class VideoRelationCandidatePlanner
     }
 
     /** @param list<array<string,mixed>> $relations @return list<VideoRelationCandidate> */
-    public function plan(string $videoId, array $relations): array
+    public function plan(string $videoId, array $relations, bool $allowDeferredEvidence = false): array
     {
         if (!UuidCodec::isValid($videoId)) throw new \InvalidArgumentException('Video relation source identity is invalid.');
         $seen = [];
@@ -29,7 +29,7 @@ final class VideoRelationCandidatePlanner
             $evidence = is_array($relation['evidence_refs'] ?? null) ? array_values($relation['evidence_refs']) : [];
             if (!UuidCodec::isValid($targetId)) throw new \InvalidArgumentException('Video relation target must be a canonical UUID.');
             if (!in_array($origin, ['EXPLICIT_USER_RELATION', 'INFERRED_RELATION'], true)) throw new \InvalidArgumentException('Video relation origin is invalid.');
-            if ($evidence === []) throw new \InvalidArgumentException('Video relation requires evidence.');
+            if ($evidence === [] && !$allowDeferredEvidence) throw new VideoRelationEvidenceRequired();
             foreach ($evidence as $reference) {
                 if (!is_array($reference) || array_keys($reference) !== ['evidence_id']) throw new \InvalidArgumentException('Video relation evidence reference is invalid.');
                 $evidenceId = trim((string) $reference['evidence_id']);

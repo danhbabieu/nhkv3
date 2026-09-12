@@ -287,6 +287,48 @@ final class VideoSemanticCoreTest extends TestCase
         self::assertContains('evidence_refs', $tools['nhk.video.ingest']['inputSchema']['properties']['intended_relations']['items']['required']);
     }
 
+    public function test_capture_video_preview_allows_only_explicit_deferred_evidence_for_provenance_children(): void
+    {
+        $variantId = '852da54d-457a-4397-a16d-52d9452ba766';
+        $service = new VideoIntakeService(
+            new YouTubeSourceAdapter(static fn (object $identity): array => [
+                'title' => 'Odo 36/8 Westminster',
+                'description' => 'Một video tham chiếu về đồng hồ Odo 36/8.',
+                'availability' => 'available',
+                'embeddable' => true,
+                'fetched_at' => '2026-09-12T01:00:00Z',
+            ]),
+            $this->emptyVideos(),
+            new VideoHubClassifier(),
+            $this->planner(),
+            new VideoEditorialGenerator(),
+            new VideoCompletenessPolicy(),
+            new VideoSeoProjection(),
+        );
+
+        $preview = $service->preview(
+            'https://youtu.be/_VWcu0gqg5s',
+            'Video này ghi lại một Odo 36/8 đang chạy Westminster.',
+            null,
+            [[
+                'target_id' => $variantId,
+                'target_type' => 'variant',
+                'predicate' => 'about',
+                'origin' => 'EXPLICIT_USER_RELATION',
+                'evidence_refs' => [],
+            ]],
+            '',
+            ['id' => $variantId, 'type' => 'variant', 'name' => 'Odo 36/8'],
+            'Odo 36/8 — Westminster',
+            '',
+            true,
+        );
+
+        self::assertSame('about', $preview->package['semantic_attachments'][0]['predicate']);
+        self::assertSame($variantId, $preview->package['semantic_attachments'][0]['target_uuid']);
+        self::assertSame([], $preview->package['semantic_attachments'][0]['evidence_refs']);
+    }
+
     public function test_classifier_uses_multi_signal_evidence_and_returns_one_primary_hub(): void
     {
         $classified = (new VideoHubClassifier())->classify([

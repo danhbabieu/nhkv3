@@ -7,6 +7,7 @@ use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, Editorial
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
 use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage};
+use NHK\Core\Domain\Video\VideoRelationEvidenceRequired;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid;
 use PHPUnit\Framework\TestCase;
@@ -262,7 +263,7 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertSame('SYSTEM_BLOCKED', $result['capture']['status']);
         self::assertSame('PROPOSAL_SUBJECT_BINDING_INVALID', $result['capture']['diagnostics']['failure']['code']);
         self::assertSame('SYSTEM_BLOCKED', $result['capture']['diagnostics']['failure']['classification']);
-        self::assertSame('FAILED', $result['capture']['phase_receipts']['SEMANTICS_RECONCILED']['status']);
+        self::assertSame('BLOCKED', $result['capture']['phase_receipts']['SEMANTICS_RECONCILED']['status']);
     }
 
     public function test_text_only_legacy_continuation_does_not_reenter_original_video_enrichment(): void
@@ -367,6 +368,63 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertArrayNotHasKey('VIDEO_SOURCE_GOVERNANCE', $result->phaseReceipts);
         self::assertArrayNotHasKey('VIDEO_CLAIM_GOVERNANCE', $result->phaseReceipts);
         self::assertArrayNotHasKey('VIDEO_EVIDENCE_GOVERNANCE', $result->phaseReceipts);
+    }
+
+    public function test_partial_semantic_blocker_finalizes_semantics_receipt(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService(
+            $captures,
+            $addenda,
+            $this->coordinator($captures, $events, static fn (array $context): array => [
+                'status' => 'PARTIAL',
+                'blockers' => ['VIDEO_RELATION_REQUIRES_EVIDENCE'],
+                'writes' => [],
+            ]),
+        );
+
+        $result = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'partial-semantic-blocker',
+            'text' => 'Bổ sung ghi chú nhưng quan hệ Video còn thiếu Evidence.',
+        ]);
+
+        $receipt = $result['capture']['phase_receipts']['SEMANTICS_RECONCILED'];
+        self::assertSame('BLOCKED', $receipt['status']);
+        self::assertSame('PARTIAL', $receipt['result']);
+        self::assertSame('VIDEO_RELATION_REQUIRES_EVIDENCE', $receipt['failure_code']);
+        self::assertNotNull($receipt['completed_at']);
+    }
+
+    public function test_evidence_blocker_classification_is_independent_of_exception_wording(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService(
+            $captures,
+            $addenda,
+            $this->coordinator($captures, $events, static function (): array {
+                throw new VideoRelationEvidenceRequired('wording intentionally changed');
+            }),
+        );
+
+        $result = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'typed-evidence-blocker',
+            'text' => 'Bổ sung nhưng Evidence chưa sẵn sàng.',
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['capture']['status']);
+        self::assertSame(VideoRelationEvidenceRequired::ERROR_CODE, $result['capture']['diagnostics']['failure']['code']);
+        self::assertSame('REVIEW_REQUIRED', $result['capture']['diagnostics']['failure']['classification']);
+        self::assertSame('REVIEW_REQUIRED', $result['capture']['phase_receipts']['SEMANTICS_RECONCILED']['status']);
     }
 
     private function capture(): CaptureRecord

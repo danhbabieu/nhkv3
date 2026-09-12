@@ -10,6 +10,7 @@ use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
+use NHK\Core\Domain\Video\VideoRelationEvidenceRequired;
 
 /**
  * Shared Capture orchestration. Input/media adapters are injected at the edge;
@@ -211,7 +212,11 @@ final class EditorialCaptureCoordinator
                 $receipts = $record->phaseReceipts;
             }
             $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
-            $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken);
+            $semanticStatus = (string) ($writes['status'] ?? 'COMPLETED');
+            $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $semanticStatus);
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             if (in_array((string) ($writes['status'] ?? ''), ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
                 return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, (string) $writes['status']);
             }
@@ -292,6 +297,10 @@ final class EditorialCaptureCoordinator
             $final = ($this->finalReadBack)(['capture' => $record->toArray(), 'article_id' => $record->articleId, 'composition' => $this->withoutBody($composition), 'publication' => $publication, 'video_publication' => $videoPublication, 'semantic_write_back' => $writes, 'published' => $published]);
             $diagnostics['final_read_back'] = $this->withoutBody($final);
             if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
+            $record = $this->save($record, $record->stage, $assets, $diagnostics, $receipts, 'FINAL_READBACK', $record->articleId, $record->articleStateToken, $record->status, 'VERIFIED');
+            $assets = $record->assets;
+            $diagnostics = $record->diagnostics;
+            $receipts = $record->phaseReceipts;
             $stage = $published ? CaptureStage::PUBLISHED->value : CaptureStage::READY_FOR_PUBLICATION->value;
             $status = $published ? 'PUBLISHED' : (($resolution['status'] ?? '') === 'ambiguous' ? 'REVIEW_REQUIRED' : 'PARTIAL');
             return $this->save($record, $stage, $assets, $diagnostics, $receipts, $stage, $record->articleId, $record->articleStateToken, $status);
@@ -349,7 +358,7 @@ final class EditorialCaptureCoordinator
     }
 
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
-    private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS'): CaptureRecord
+    private function save(CaptureRecord $record, CaptureStage|string $stage, array $assets, array $diagnostics, array $receipts, string $receiptStage, ?int $articleId = null, ?string $token = null, string $status = 'IN_PROGRESS', ?string $receiptResult = null): CaptureRecord
     {
         $stage = $stage instanceof CaptureStage ? $stage->value : $stage;
         $completedAt = microtime(true);
@@ -358,14 +367,24 @@ final class EditorialCaptureCoordinator
         unset($this->phaseStartedAt[$receiptStage]);
         if ($this->activeReceiptPhase === $receiptStage) $this->activeReceiptPhase = null;
         $prior = is_array($receipts[$receiptStage] ?? null) ? $receipts[$receiptStage] : [];
+        $receiptStatus = match ($status) {
+            'FAILED_RETRYABLE' => 'FAILED',
+            'SYSTEM_BLOCKED' => 'BLOCKED',
+            'REVIEW_REQUIRED' => 'REVIEW_REQUIRED',
+            'PARTIAL' => $receiptStage === 'SEMANTICS_RECONCILED' && is_array($diagnostics['semantic_write_back']['blockers'] ?? null) && $diagnostics['semantic_write_back']['blockers'] !== [] ? 'BLOCKED' : 'COMPLETED',
+            default => 'COMPLETED',
+        };
         $receipts[$receiptStage] = [
-            'status' => in_array($status, ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true) ? 'FAILED' : 'COMPLETED',
-            'result' => $status,
+            'status' => $receiptStatus,
+            'result' => $receiptResult ?? $status,
             'started_at' => (string) ($prior['started_at'] ?? $startedAt),
             'completed_at' => gmdate('c'),
             'elapsed_ms' => $startedEpoch === false ? 0 : max(0, (int) (($completedAt - (float) $startedEpoch) * 1000)),
             'at' => gmdate('c'),
         ];
+        $semanticDiagnostics = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
+        $failureCode = trim((string) ($diagnostics['failure']['code'] ?? ($semanticDiagnostics['blockers'][0] ?? '')));
+        if ($failureCode !== '' && $receiptStatus !== 'COMPLETED') $receipts[$receiptStage]['failure_code'] = $failureCode;
         return $this->captures->save(new CaptureRecord($record->captureId, $record->idempotencyKey, $record->requestFingerprint, $stage, $status, $articleId ?? $record->articleId, $token ?? $record->articleStateToken, $assets, $record->context, $diagnostics, $receipts, $record->revision + 1, $record->createdAt, gmdate('Y-m-d H:i:s.u')));
     }
 
@@ -395,6 +414,7 @@ final class EditorialCaptureCoordinator
         if ($error instanceof ProposalSubjectBindingInvalid) return 'PROPOSAL_SUBJECT_BINDING_INVALID';
         if ($error instanceof ProposalIdempotencyConflict) return 'PROPOSAL_IDEMPOTENCY_CONFLICT';
         if ($error instanceof ProposalIdempotencyStaleBinding) return 'IDEMPOTENCY_STALE_BINDING';
+        if ($error instanceof VideoRelationEvidenceRequired) return VideoRelationEvidenceRequired::ERROR_CODE;
         if ($error instanceof GovernanceException) return 'CAPTURE_GOVERNANCE_CONTRACT_FAILURE';
         $message = strtoupper(trim($error->getMessage()));
         return $message !== '' ? preg_replace('/[^A-Z0-9_:-]+/', '_', $message) ?? 'CAPTURE_FAILED' : 'CAPTURE_FAILED';
@@ -403,6 +423,7 @@ final class EditorialCaptureCoordinator
     private function failureStatus(string $failureCode): string
     {
         if (preg_match('/(?:ARTICLE_MEDIA_BLUEPRINT_IS_INVALID|PROPOSAL_SUBJECT_BINDING_INVALID|VIDEO_PROPOSAL_REPAIR_REQUIRED|REPAIR_APPLIED_PROPOSAL_FORBIDDEN|IDEMPOTENCY_STALE_BINDING|PROPOSAL_IDEMPOTENCY_CONFLICT|PROPOSAL_BINDING_CONFLICT)/', $failureCode) === 1) return 'SYSTEM_BLOCKED';
+        if ($failureCode === VideoRelationEvidenceRequired::ERROR_CODE) return 'REVIEW_REQUIRED';
         if (preg_match('/(?:SUBJECT_NOT_FOUND|AMBIGUOUS_SUBJECT|NO_SEMANTIC_ATTACHMENT|TRANSCRIPT_UNAVAILABLE|MEDIA_(?:FEATURED|INLINE)_MISSING|MEDIAUSAGE_INCOMPLETE)/', $failureCode) === 1) return 'PARTIAL';
         return 'FAILED_RETRYABLE';
     }
