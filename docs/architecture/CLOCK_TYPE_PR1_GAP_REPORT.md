@@ -297,6 +297,95 @@ staging/live database.
 | PR5 | new-data governed `classified_as`, scope/evidence/revision/idempotency, shared Brand↔Type derived query | no legacy apply, no shortcut edge |
 | PR6 | legacy inventory, evidence-aware dry-run, owner-review packet and canonical read-back plan | no live apply, no title/token-only inference |
 
+## PR6 STATUS / LEGACY DRY-RUN AUDIT
+
+- Audit engine: **IMPLEMENTED_LOCALLY_READ_ONLY**. `ClockTypeClassificationAudit`
+  inventories canonical Classification targets, audits only Model/Variant/
+  Specimen/Product sources, evaluates exact scoped evidence and emits typed
+  dry-run rows with deterministic fingerprints. No semantic writer is a
+  constructor dependency.
+- Target family law: **VERIFIED_LOCALLY**. `clock_type` is canonical;
+  `clock-type` is a separate compatibility bucket. Other, missing, unresolved
+  and inactive targets are retained as diagnostics. Possible legacy/canonical
+  counterparts are review signals only and are never merged.
+- Evidence gate: **VERIFIED_LOCALLY**. Only exact canonical target/source
+  scope with active records, unchanged revisions, acceptable provenance/support
+  and no active edge can be `READY_FOR_OWNER_REVIEW`. Lexical/media hints are
+  `DISCOVERY_HINT_ONLY`; scope mismatch and ambiguity fail closed.
+- Graph truth: **VERIFIED_LOCALLY** through `GraphService` read APIs. Active
+  canonical membership is `ALREADY_CANONICAL`; retired, dangling, inactive,
+  wrong-family and legacy targets remain explicit review/blocker states.
+- Evidence read surface: **READ_SURFACE_GAP** in the default composition.
+  Current Knowledge/Source/Evidence contracts do not expose a dedicated
+  Clock-Type audit enumeration owner, so the audit requires an injected
+  approved read adapter for evidence-aware review. Without it, the result is
+  `DEPENDENCY_UNAVAILABLE`, never a false `NO_CLOCK_TYPE_SIGNAL`.
+- Pagination: **BOUNDED_SNAPSHOT_WITH_CURSOR**. Graph pages are consumed via
+  the current bounded cursor API. Authority exposes `listByType` but no cursor
+  method; the report records this limitation rather than adding a second
+  repository truth.
+- Outputs: **TRANSIENT_ONLY**. Machine-readable `toArray()` and human
+  `summary()` are available to callers; no generated semantic-data report is
+  committed and no private excerpt/payload is serialized.
+
+## PR6 GAP CLASSIFICATION
+
+### ALREADY_SUPPORTED
+
+- Canonical Authority identity/revision/state and Graph `classified_as` read
+  boundaries are reusable.
+- Predicate/source legality remains the executable Graph registry law; PR6
+  does not add a predicate or source type.
+- PR5 bounded, profile-specific Brand↔Clock-Type derived recipe remains
+  unchanged and read-only.
+
+### IMPLEMENTED_IN_PR6
+
+- Read-only target inventory with canonical/legacy/other/missing/unresolved/
+  inactive buckets and counterpart review diagnostics.
+- Deterministic source audit, typed evidence tiers, exact scope/revision gate,
+  active/retired membership handling, brandless support and stable fingerprints.
+- Graph page traversal and unit fixtures for no-signal, ambiguity,
+  wrong-family, legacy, retired, active canonical and lexical-only cases.
+
+### IMPLEMENTATION_GAP
+
+- No production Knowledge/Evidence adapter currently enumerates the safe
+  exact Clock-Type evidence shape required for a complete live dry-run.
+- Authority source inventory cannot stream through a repository cursor; the
+  current implementation bounds the audit page after obtaining the owner
+  snapshot and records that limitation.
+
+### REGISTRY_GAP
+
+- No central audit evidence registry/cursor contract is currently registered;
+  PR6 adds only a narrow read adapter seam and does not invent a semantic
+  evidence store.
+
+### DATA_GAP
+
+- Actual non-staging canonical/legacy membership population is not inferred.
+  Legacy/canonical counterpart review remains unresolved until owner review.
+
+### PUBLIC_PROJECTION_GAP
+
+- Root public route allocation/reprojection is outside PR6 and unchanged.
+
+### LIVE_VERIFICATION_GAP
+
+- PR6 code is local to the clean PR5 source and has no deployed runtime
+  identity. The dated staging evidence remains `classified_as total=0,
+  active=0`; no staging mutation was run.
+
+## PR6 NO-MUTATION BOUNDARY
+
+The audit has no Authority/Graph/Proposal/Governance/Knowledge/Evidence/
+Media/Video/Public Identity/Capture/Article writer dependency and its tests
+use writer-spy repositories. Running it cannot create, update, retire,
+reactivate, normalize or backfill semantic data. Its report cannot be passed
+directly to PR7 as an executable write command; PR7 must re-read revisions and
+revalidate owner approval.
+
 ## Review gate
 
 PR3 đã hoàn tất ở mức local additive/read-side foundation. PR4 chỉ bắt đầu sau

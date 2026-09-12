@@ -8774,3 +8774,39 @@ LIVE/DEPLOYMENT: No migration, publication, semantic mutation, deployment or
 push was performed. Deployment and live acceptance remain authorization and
 target-runtime gates. Existing unrelated worktree/history changes remain
 preserved and are not part of the PR5 scope.
+
+# Checkpoint — 2026-09-13 — PR6 legacy Clock-Type dry-run audit
+
+PR6 LOCAL READ-ONLY: `ClockTypeClassificationAudit` inventories active and
+retired Classification targets and Model/Variant/Specimen/Product source
+records through the existing Authority and Graph read boundaries. It keeps
+`family=clock_type` separate from legacy `family=clock-type`, distinguishes
+other/missing/unresolved/inactive families, preserves exact source scope and
+does not infer membership from Brand, title, token, slug, stable key, media,
+OCR, transcript or generated prose. Active canonical edges are reported as
+`ALREADY_CANONICAL`; retired and legacy edges remain review states.
+
+DRY-RUN: Exact supported canonical evidence can produce a transient
+`READY_FOR_OWNER_REVIEW` packet only when source/target identity, active state,
+revision, family, scope, provenance and support gates pass. Ambiguous,
+wrong-family, legacy, inactive, retired, unavailable and weak lexical cases
+remain typed blockers/hints. The fingerprint is deterministic audit evidence
+only; it is not a Proposal or executable PR7 plan. The audit has no semantic
+writer dependency and no generated semantic-data report was persisted.
+
+READ SURFACE: Graph reads use the existing bounded cursor API. Authority's
+current `listByType` contract has no cursor, so the audit exposes a stable
+snapshot page cursor and records that streaming inventory is a current read
+surface gap. The default runtime has no dedicated safe Knowledge/Evidence
+enumerator for this audit; absent evidence is `DEPENDENCY_UNAVAILABLE`, not a
+false empty result.
+
+VERIFICATION: Local unit fixtures prove deterministic two-run output,
+canonical/legacy/wrong-family/retired handling, exact scope protection,
+brandless review candidates and no writer calls. The latest owner-provided
+read-only Demo staging evidence remains dated `classified_as total=0,
+active=0`; PR6 is not deployed there and no staging mutation was run. No
+legacy normalization, backfill, Public Identity allocation, Video/Media/
+Knowledge rewrite or PR7 implementation occurred. Fresh documentation and
+manifest identities are emitted by the canonical bootstrap rather than
+embedded here to avoid a self-referential state hash.

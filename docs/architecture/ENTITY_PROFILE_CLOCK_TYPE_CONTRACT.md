@@ -402,3 +402,41 @@ fallback SQL/taxonomy/title matching.
 
 PR5 chỉ được kiểm thử locally. `https://demo.1945.vn` là `staging`; không có
 live Proposal/Approval/Controlled Apply/Graph mutation trong checkpoint này.
+
+## 16. PR6 legacy classification dry-run audit
+
+PR6 chỉ inventory và dry-run read-only trên canonical Authority/Graph read
+boundaries. Audit source universe là `model`, `variant`, `specimen` và
+`product`; Brand và Movement không bao giờ là source của `classified_as`.
+Target được tách thành `CANONICAL_CLOCK_TYPE` với exact
+`family=clock_type`, `LEGACY_CLOCK_TYPE` với stored `family=clock-type`, các
+family khác, family thiếu/chưa xác minh và record inactive. Legacy record chỉ
+được đọc để review; không normalize, merge hoặc tạo migration SQL.
+
+Evidence tiers được đánh giá theo thứ tự: existing canonical Graph truth,
+exact governed canonical Evidence/Knowledge/Authority context, explicit
+historical assertion có scope exact, structured metadata có semantic contract,
+rồi discovery hint yếu. Title, token, stable key, slug, filename, OCR,
+caption, transcript, visual similarity và Brand context tối đa tạo
+`DISCOVERY_HINT_ONLY`; chúng không bao giờ tạo `READY_FOR_OWNER_REVIEW`.
+Evidence của Specimen/Variant không được promote lên Variant/Model, và
+Brandless source vẫn hợp lệ.
+
+`ClockTypeClassificationAudit` trả deterministic result rows, target inventory,
+typed blockers, supporting canonical IDs và fingerprint. Candidate fingerprint
+chỉ phục vụ so sánh audit; nó không phải approved plan fingerprint và không
+cấp quyền PR7. `READY_FOR_OWNER_REVIEW` chỉ được trả khi source/target active,
+UUID/revision/scope/family/predicate hợp lệ, target canonical, không có active
+edge, không có ambiguity và provenance/support đủ theo contract. Active edge
+trả `ALREADY_CANONICAL`; retired edge trả
+`RETIRED_RELATION_REVIEW_REQUIRED`; legacy edge trả
+`LEGACY_TARGET_REQUIRES_REVIEW`.
+
+Audit không có Writer dependency, không gọi Proposal/Governance/Controlled
+Apply và không persist report vào semantic store. Evidence reader chưa có
+cursor-specific owner trong current runtime nên absence/unavailability được
+trả typed `DEPENDENCY_UNAVAILABLE`/`READ_SURFACE_GAP`, không giả định là empty
+data. Authority `listByType` hiện cũng chưa expose cursor API; audit giữ stable
+ordering và page cursor trên snapshot, đồng thời ghi nhận giới hạn này để
+không claim streaming inventory. PR6 không backfill, không allocation/reproject
+Public Identity và không thay đổi Video, Media, Knowledge hay route.
