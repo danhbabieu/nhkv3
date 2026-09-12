@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-13 — Editorial Capture guarded runtime closure
+
+VERIFICATION: Fresh local runtime verification reached WordPress and the
+exact guarded database `nhk_v3_test` at `127.0.0.1`; a read-only identity probe
+returned `DB=nhk_v3_test`. The repository-approved UP-only maintenance
+entrypoint advanced the test schema from `current=8/target=20` to `20/20`.
+Deployment preflight then passed all 11 checks, including WordPress/plugin
+bootstrap, canonical documentation, schema migration, Authority hydration and
+REST bootstrap.
+
+GUARDED INTEGRATION: The full `NHK Integration` suite passed 123 tests / 1,044
+assertions with 0 failures and 0 errors. Seven tests were skipped only because
+the test database has no confirmed Post 55 fixture (2 tests) or the optional
+Easy MCP package/bridge is unavailable (5 tests). PHPUnit reported one
+pre-existing test warning from an expected generic MCP error response and one
+PHP 8.5 `imagedestroy()` deprecation in the existing WordPress media adapter.
+The migration lifecycle tests temporarily leave the test database at 8/20;
+the final maintenance read-back restored it to 20/20.
+
+LOCAL GATES: The current Unit suite passed 1,367 tests / 6,558 assertions;
+Contract passed 4 tests / 31 assertions; the Editorial Capture closure smoke
+selection passed 91 tests / 688 assertions; Composer validation, full PHP lint,
+`git diff --check`, deterministic canonical documentation generation and the
+changed-scope secret review passed. The generated documentation manifest was
+verified separately and is intentionally not embedded here to avoid a
+self-referential documentation hash.
+
+BOUNDARY: No pull, push, deployment, publication or live mutation was
+performed. Deployed/live acceptance remains pending. An unrelated local
+Snapshot commit `e1e6c700` was preserved and not created by this checkpoint.
+
+STATUS: GUARDED_INTEGRATION_VERIFIED_LOCAL / LIVE_ACCEPTANCE_PENDING
+
 # Checkpoint — 2026-09-13 — Editorial Capture PR3/PR4 local implementation
 
 PR3: Existing-Capture explicit Video resume now reads the immutable Video
