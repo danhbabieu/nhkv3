@@ -2,6 +2,21 @@
 
 Updated: 2026-09-12
 
+## Commit checkpoint — files[] fix
+
+COMMIT_SHA: `a66c7eae918c6eccad61121fa95e36348f53fe6b`
+
+TEST_RESULTS: Required focused selection **96 tests / 714 assertions PASS**;
+NHK Unit **1,216 / 5,957 PASS**; PHP lint, `git diff --check`, JSON validation
+and secret review **PASS**.
+
+LIVE_ACCEPTANCE_PENDING: `true`
+
+NEXT_ACTION_FOR_CHATGPT: `deploy this commit to demo.1945.vn, fresh bootstrap/discovery, then test one real chat attachment and a multi-file submission`
+
+This commit contains only the seven files listed in the files[] checkpoint.
+Video and other concurrent changes are not in the commit.
+
 ## files[] transport repair — current checkpoint
 
 Scope was restricted to the Easy MCP native multipart compatibility boundary

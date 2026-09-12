@@ -1,5 +1,6 @@
 {
   "ROOT_CAUSE": "EasyMcpNativeFileCompatibilityAdapter normalized native files only while self::$proxyDispatch was active; Easy MCP 1.7.17 can execute the registered Ability directly, so WP_Ability::validate_input saw ChatGPT's model-facing opaque files[] strings and emitted input[files][0] is not of type object before the native file bag reached the canonical callback.",
+  "COMMIT_SHA": "a66c7eae918c6eccad61121fa95e36348f53fe6b",
   "CALL_PATH": "ChatGPT file parameter -> Easy MCP tools/list -> _meta[openai/fileParams]=[files] -> model-facing string[] -> JSON-RPC plus native multipart files[] -> Easy MCP direct/nested-proxy dispatch -> native descriptor normalization -> WP_Ability::validate_input -> McpAbilityRegistration::executeMcp -> /nhk/v1/mcp -> McpTransport -> one nhk.capture.ingest -> existing Capture physical/Media boundary",
   "FILES_CHANGED": [
     "public/wp-content/plugins/nhk-core/src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php",
@@ -8,7 +9,7 @@
     "public/wp-content/plugins/nhk-core/tests/Unit/MediaBatchUploadServiceTest.php"
   ],
   "TEST_RESULTS": {
-    "focused": "PASS: 115 tests, 808 assertions",
+    "focused": "PASS: 96 tests, 714 assertions (required files[]/Capture/Media/MCP selection); broader regression PASS: 115 tests, 808 assertions",
     "unit": "PASS: 1,216 tests, 5,957 assertions",
     "contract": "PASS: 4 tests, 31 assertions",
     "php_lint": "PASS",
@@ -17,7 +18,8 @@
     "diff_check_and_secret_review": "PASS: git diff --check; no credential/private-key/token material"
   },
   "REMAINING_LIVE_GAP": "No authenticated live connector/runtime endpoint or local integration DB is available here; fresh ChatGPT tools/list rediscovery and authorized 1-file/2-file native multipart Capture smoke remain unverified. No deployment is claimed.",
-  "NEXT_ACTION_FOR_CHATGPT": "After authorized deployment/restart/cache refresh, rediscover nhk.capture.ingest and run one text+one-file plus one text+two-file submission. Verify one Capture, native multipart forwarding, ordered items alignment, and absence of input[files][0] schema error. Never retry via paths or base64; absent native parts must return NATIVE_MULTIPART_FILES_REQUIRED.",
+  "LIVE_ACCEPTANCE_PENDING": true,
+  "NEXT_ACTION_FOR_CHATGPT": "deploy this commit to demo.1945.vn, fresh bootstrap/discovery, then test one real chat attachment and a multi-file submission",
   "phase_2_probe_correction": {
     "prior_rest_do_request_probe_invalid_for_post_dispatch": true,
     "previous_generated_command_superseded": true,
