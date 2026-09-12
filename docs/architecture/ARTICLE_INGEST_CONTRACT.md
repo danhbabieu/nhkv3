@@ -294,3 +294,21 @@ remains an honest `MISSING`/review dependency and is not infrastructure or
 blueprint corruption when the Article content is otherwise valid. Publication
 policy distinguishes `REQUIRED_FOR_PUBLICATION` from
 `OPTIONAL_VISUAL_SUPPORT` when the owning contract declares both.
+
+### Editorial reconciliation and public-copy boundary — 2026-09-13
+
+Article resume is a reconciliation of current Capture inputs, not an
+append-only operation. The composer preserves current user-authored input and
+rebuilds managed derived sections from deterministic semantic identities such
+as `claim-context:{claim_id}:{revision}`. A matching managed section is
+replaced, a removed current Claim section is removed, and repeated input does
+not create another representation. Generated Article prose never becomes
+Knowledge or Evidence.
+
+The native WordPress Post remains the Article owner and its state token is
+checked by the existing draft update/read-back boundary. A continuation passes
+the prior managed-section manifest to composition so user-authored text is not
+treated as disposable generated content. Public text fields are checked by a
+fail-closed `PUBLIC_INTERNAL_JARGON_LEAK` boundary before the native write;
+machine context such as IDs, provenance and resolution packets remains outside
+public prose.

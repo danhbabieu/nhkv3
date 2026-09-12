@@ -196,6 +196,18 @@ read-back. A pending decision resumes on the same addendum/idempotency key;
 it never creates a duplicate Capture, Article or proposal. Publication remains
 a separate governed owner-publication lifecycle.
 
+### 1.4 Editorial resume/public copy reconciliation — 2026-09-13
+
+Existing Video resume uses the same canonical Video UUID and a deterministic
+editorial-input fingerprint; changed input is a governed update and unchanged
+input is a verified reuse. Article continuation composition is section-aware:
+managed Claim sections have deterministic identities and are rebuilt/replaced
+while user-authored input is preserved. Public editorial, SEO, Open Graph and
+VideoObject text pass a fail-closed machine-language boundary; internal IDs,
+provenance and resolution packets remain private context. This is local
+code/contract verification only; WordPress integration runtime remains
+environment-gated.
+
 The 2026-09-10 orchestration convergence makes the Capture's single typed
 canonical subject-resolution packet the handoff context for Claim retrieval,
 Video enrichment, Media reconciliation, composition and Governance. Historical

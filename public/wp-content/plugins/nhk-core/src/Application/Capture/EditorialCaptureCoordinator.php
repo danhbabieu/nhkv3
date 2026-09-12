@@ -346,8 +346,8 @@ final class EditorialCaptureCoordinator
 
             $observations = array_merge($semanticContext['observations'], is_array($interpretation['media_observations'] ?? null) ? $interpretation['media_observations'] : []);
             $this->beginPhase('COMPOSED');
-            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities]);
-            $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot']];
+            $composition = $this->composer->compose($text, $observations, $retrieved['selected_claims'] ?? [], ['title' => (string) ($input['title'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? ''), 'asset_count' => count($assets), 'assets' => $assets, 'visual_opportunities' => $visualOpportunities, 'prior_composition' => is_array($diagnostics['composition'] ?? null) ? $diagnostics['composition'] : []]);
+            $diagnostics['composition'] = ['title' => $composition['title'], 'claim_trace' => $composition['claim_trace'], 'research_snapshot' => $composition['research_snapshot'], 'managed_sections' => $composition['managed_sections'] ?? []];
             $diagnostics['article_draft'] = ['title' => $composition['title'], 'excerpt' => $composition['excerpt'], 'content_available' => true];
             if (is_callable($this->draftUpdater) && $record->articleId !== null && $record->articleStateToken !== null) {
                 $updatedDraft = ($this->draftUpdater)([

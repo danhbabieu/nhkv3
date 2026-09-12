@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
+use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Domain\Video\VideoEditorialEnrichmentContext;
 
 final class VideoEditorialGenerator
@@ -44,8 +45,8 @@ final class VideoEditorialGenerator
             'related_knowledge' => [],
             'compliance_context' => ['note' => trim($complianceNote), 'rewrite_applied' => $requestedTitle !== '' && $title !== $requestedTitle],
         ];
-        if ($enrichmentContext === null) return $base;
-        return array_merge($base, ($this->enrichment ?? new VideoEditorialEnrichmentService())->enrich($base, VideoEditorialEnrichmentContext::fromArray($enrichmentContext))['editorial']);
+        if ($enrichmentContext === null) return (new PublicEditorialCopyGuard())->assertEditorialPackage($base);
+        return (new PublicEditorialCopyGuard())->assertEditorialPackage(array_merge($base, ($this->enrichment ?? new VideoEditorialEnrichmentService())->enrich($base, VideoEditorialEnrichmentContext::fromArray($enrichmentContext))['editorial']));
     }
 
     private function firstSentence(string $value): string { return trim((string) preg_split('/[.!?\n]/', $value, 2)[0]); }

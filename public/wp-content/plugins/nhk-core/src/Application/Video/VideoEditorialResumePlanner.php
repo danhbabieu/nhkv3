@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Video;
 
+use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Video\Video;
@@ -16,6 +17,7 @@ final class VideoEditorialResumePlanner
         private VideoRepository $videos,
         private VideoEditorialGenerator $editorial,
         private VideoSeoProjection $seo,
+        private ?PublicEditorialCopyGuard $publicCopyGuard = null,
     ) {
     }
 
@@ -50,6 +52,7 @@ final class VideoEditorialResumePlanner
             'canonical_context' => $subject === null ? [] : [['text' => (string) ($subject['name'] ?? ''), 'entity_id' => (string) ($subject['id'] ?? ''), 'entity_type' => (string) ($subject['type'] ?? '')]],
         ];
         $editorial = $this->editorial->generate($source, $delta, '', $subject, '', '', $enrichment);
+        ($this->publicCopyGuard ?? new PublicEditorialCopyGuard())->assertEditorialPackage($editorial);
         $seo = ['title' => (string) ($editorial['title'] ?? ''), 'description' => (string) ($editorial['summary'] ?? '')];
         $package = [
             'source' => $source,

@@ -192,6 +192,13 @@ new asset is supplied; an existing Media is reusable only when its persisted
 subject scope matches the resolved canonical subject. Same-key/same-payload
 retries are idempotent; same-key payload changes return a conflict.
 
+Article continuation is section-aware rather than append-only. The current
+user-authored text remains owned by the native WordPress Post, while managed
+derived sections are reconciled by deterministic semantic identity. Public
+Article/Video/SEO textual projections reject structured internal workflow
+tokens and identifiers with `PUBLIC_INTERNAL_JARGON_LEAK`; machine context is
+kept in the Capture/research trace.
+
 An explicit child resume is available only for the registered Video child:
 `resume_children: ["video"]`. It requires an existing `capture_id`, carries no
 replacement `video` payload, rehydrates the immutable original Video identity

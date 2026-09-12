@@ -120,6 +120,14 @@ Knowledge references, MediaUsage, category, Dictionary lexical state, SEO
 projection and related content. Plans are reconciled; they are never blindly
 appended.
 
+The reconciliation manifest distinguishes user-authored content from managed
+derived sections. Derived sections use deterministic semantic identity and are
+replaced or removed from the current composition; the same input does not
+append another copy. Reader-facing Article and SEO text pass the shared
+fail-closed public-copy boundary before native WordPress persistence, while
+Claim IDs, provenance, scope and resolution diagnostics stay in the research
+trace.
+
 After an actual Article save/update, the Dictionary observation boundary may
 persist lexical Mention/Candidate state idempotently. That post-write lexical
 observation is non-semantic and must not rewrite the stored Article body.

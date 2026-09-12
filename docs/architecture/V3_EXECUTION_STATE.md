@@ -1,5 +1,27 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-13 — Editorial Capture PR3/PR4 local implementation
+
+PR3: Existing-Capture explicit Video resume now reads the immutable Video
+child, fingerprints current editorial inputs, reuses unchanged packages and
+plans a governed update of the same Video when inputs change. The update
+preserves external identity/relations and refreshes editorial plus owned SEO,
+Open Graph and VideoObject projections before canonical read-back.
+
+PR4: Public prose fields now pass a fail-closed
+`PUBLIC_INTERNAL_JARGON_LEAK` boundary; internal context remains machine
+metadata. Article composition carries deterministic managed Claim section
+identity/origin metadata, removes only prior owned sections and preserves
+current user-authored content during resume.
+
+VERIFICATION: PR3/PR4 focused selections pass; full NHK Unit passes 1,351
+tests / 6,500 assertions; NHK Contract passes 4 tests / 31 assertions. PHP
+lint and diff checks remain required at final checkpoint. WordPress integration
+is environment-blocked by the unavailable `nhk_v3_test` database after public
+bootstrap resolution. No live mutation, publication, deploy or push.
+
+STATUS: PR4_IMPLEMENTED / INTEGRATION_ENVIRONMENT_BLOCKED
+
 # Checkpoint 2026-09-13 — PR2 Visual Enrichment + Asset Follow-up
 
 ROOT_CAUSE: VisualSupportRequirement already preserved an honest `MISSING`

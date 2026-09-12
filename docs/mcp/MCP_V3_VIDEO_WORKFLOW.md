@@ -103,3 +103,10 @@ editorial package and its current SEO/Open Graph/VideoObject projection before
 canonical Video read-back. External platform identity, relations and current
 metadata remain bound to the original Video. Capture/addendum persistence is
 not sufficient evidence of a successful Video resume.
+
+The public editorial boundary is evaluated before persistence and projection.
+Reader-facing title, summary, body, SEO description, Open Graph description
+and VideoObject description must not contain structured workflow tokens,
+canonical identifiers or diagnostic packets. Such output fails closed with
+`PUBLIC_INTERNAL_JARGON_LEAK`; provenance and resolution context remain
+machine-readable metadata only.

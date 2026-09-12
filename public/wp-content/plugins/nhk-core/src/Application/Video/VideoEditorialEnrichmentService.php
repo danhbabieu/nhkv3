@@ -26,12 +26,12 @@ final class VideoEditorialEnrichmentService
         $canonical = $this->texts($context->canonicalContext);
         $paragraphs = ['Video này ghi lại đúng hiện vật được nêu trong nguồn tham chiếu; các mô tả dưới đây chỉ áp dụng cho phạm vi của bản ghi này.'];
         if ($specimen !== []) $paragraphs[] = 'Trên chính hiện vật, nguồn mô tả: ' . implode('; ', $specimen) . '. Đây là thông tin quan sát/nhận diện của chiếc xuất hiện trong video, không phải đặc tính mặc định của toàn bộ dòng sản phẩm.';
-        if ($source !== []) $paragraphs[] = 'Theo metadata nguồn, video được giới thiệu với các thông tin: ' . implode('; ', $source) . '. NHK giữ lớp này như SOURCE_FACT và không biến cách diễn đạt marketing thành kết luận phổ quát.';
-        if ($canonical !== []) $paragraphs[] = 'Trong bối cảnh tri thức NHK, chủ thể liên quan được nhận diện là ' . $subject . '. Bối cảnh canonical giúp đặt hiện vật vào đúng Variant/Model hoặc thực thể liên quan, nhưng không thay thế bằng chứng riêng của chiếc trong video.';
-        $paragraphs[] = 'Khi đối chiếu hoặc sưu tầm, nên tách đặc điểm nhìn thấy trên bản ghi khỏi thông tin chung của thực thể canonical; các điểm chưa có Source/Evidence phù hợp vẫn cần được xem là nội dung chờ rà soát.';
-        if ($context->relatedKnowledge !== [] || $context->relatedEntities !== []) $paragraphs[] = 'Người đọc có thể tiếp tục từ các Knowledge và thực thể canonical liên quan bên dưới để so sánh thuật ngữ, cấu hình hoặc bối cảnh đã được NHK ghi nhận.';
+        if ($source !== []) $paragraphs[] = 'Theo thông tin đi kèm nguồn tham chiếu, video được giới thiệu với các chi tiết: ' . implode('; ', $source) . '. NHK giữ các chi tiết này trong đúng phạm vi của nguồn và không biến cách diễn đạt marketing thành kết luận phổ quát.';
+        if ($canonical !== []) $paragraphs[] = 'Trong bối cảnh tri thức NHK, chủ thể liên quan được nhận diện là ' . $subject . '. Bối cảnh nhận diện giúp đặt hiện vật vào đúng dòng hoặc cấu hình liên quan, nhưng không thay thế bằng chứng riêng của chiếc trong video.';
+        $paragraphs[] = 'Khi đối chiếu hoặc sưu tầm, nên tách đặc điểm nhìn thấy trên bản ghi khỏi thông tin chung của thực thể liên quan; các điểm chưa có tài liệu đối chiếu phù hợp vẫn cần được xem là nội dung chờ rà soát.';
+        if ($context->relatedKnowledge !== [] || $context->relatedEntities !== []) $paragraphs[] = 'Người đọc có thể tiếp tục từ các tri thức và thực thể liên quan bên dưới để so sánh thuật ngữ, cấu hình hoặc bối cảnh đã được NHK ghi nhận.';
 
-        $summary = 'Video này ghi lại ' . ($subject !== '' ? $subject : 'một hiện vật đồng hồ') . ' qua một nguồn tham chiếu cụ thể. Nội dung phân biệt dữ kiện của chính hiện vật, thông tin từ nguồn và bối cảnh canonical để việc nhận diện không bị suy rộng quá mức.';
+        $summary = 'Video này ghi lại ' . ($subject !== '' ? $subject : 'một hiện vật đồng hồ') . ' qua một nguồn tham chiếu cụ thể. Nội dung phân biệt dữ kiện của chính hiện vật, thông tin từ nguồn và bối cảnh đã được xác định để việc nhận diện không bị suy rộng quá mức.';
         $body = implode("\n\n", $paragraphs);
         $facts = array_merge($this->tagged($context->specimenFacts, 'SPECIMEN'), $this->tagged($context->sourceFacts, 'SOURCE_FACT'));
         $editorial = [
@@ -40,7 +40,7 @@ final class VideoEditorialEnrichmentService
             'body' => $body,
             'context' => array_merge((array) ($base['context'] ?? []), $this->tagged($context->canonicalContext, 'CANONICAL_CONTEXT')),
             'facts' => array_merge((array) ($base['facts'] ?? []), $facts),
-            'why_this_matters' => 'Video tạo một điểm đối chiếu cụ thể giữa hiện vật, nguồn tham chiếu và tri thức canonical; nhờ đó người đọc có thể nhận diện đúng phạm vi thông tin trước khi đi sâu vào các Knowledge liên quan.',
+            'why_this_matters' => 'Video tạo một điểm đối chiếu cụ thể giữa hiện vật, nguồn tham chiếu và tri thức canonical; nhờ đó người đọc có thể nhận diện đúng phạm vi thông tin trước khi đi sâu vào các tri thức liên quan.',
             'related_knowledge' => $this->identityRows($context->relatedKnowledge),
             'related_entities' => $this->identityRows($context->relatedEntities),
         ];

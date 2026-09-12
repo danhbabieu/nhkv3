@@ -70,8 +70,8 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
 
         $composer = new ArticleComposer();
         $first = $composer->compose('Ghi chú ban đầu.', [], $claims);
-        $second = $composer->compose($first['content'] . "\n\nBổ sung biên tập.", [], $claims);
-        $third = $composer->compose($second['content'] . "\n\nBổ sung lần ba.", [], $claims);
+        $second = $composer->compose($first['content'] . "\n\nBổ sung biên tập.", [], $claims, ['prior_composition' => $first]);
+        $third = $composer->compose($second['content'] . "\n\nBổ sung lần ba.", [], $claims, ['prior_composition' => $second]);
 
         self::assertCount(1, array_filter(
             preg_split('/\n\n/u', $third['content']) ?: [],

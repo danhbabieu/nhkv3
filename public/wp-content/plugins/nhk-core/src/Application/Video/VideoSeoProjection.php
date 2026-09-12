@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Video;
 
 use NHK\Core\Application\Compliance\PublicClaimCopyPolicy;
+use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 
 final class VideoSeoProjection
@@ -19,10 +20,15 @@ final class VideoSeoProjection
         $subject = is_array($package['subject_resolution_packet'] ?? null) ? trim((string) ($package['subject_resolution_packet']['name'] ?? '')) : '';
         $safeTitle = $subject !== '' ? $subject . ' — Video tham chiếu NHK' : 'Video tham chiếu NHK';
         $copyPolicy = new PublicClaimCopyPolicy();
+        $publicGuard = new PublicEditorialCopyGuard();
         $editorialTitle = $copyPolicy->safe((string) ($editorial['title'] ?? ''), $safeTitle);
         $editorialSummary = $copyPolicy->safe((string) ($editorial['summary'] ?? ''), 'Video tham chiếu được NHK chuẩn hóa từ nguồn bên ngoài.');
         $seoTitle = $copyPolicy->safe((string) ($seo['title'] ?? ''), $editorialTitle);
         $seoDescription = $copyPolicy->safe((string) ($seo['description'] ?? ''), $editorialSummary);
+        $publicGuard->assertSafe($editorialTitle);
+        $publicGuard->assertSafe($editorialSummary);
+        $publicGuard->assertSafe($seoTitle);
+        $publicGuard->assertSafe($seoDescription);
         $seoProjection = (new PublicSeoProjection())->project($urlResult, ['title' => $seoTitle, 'description' => $seoDescription, 'type' => 'VideoObject']);
         $id = (string) ($source['external_video_id'] ?? '');
         $object = [
