@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
+use NHK\Core\Infrastructure\Admin\VideoRelationAdminContract;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /**
@@ -44,7 +45,47 @@ final class CaptureVideoProvenancePlanner
 
         $identityFields = $this->sourceIdentityFields($sourceSnapshot);
         $identityMatches = $this->identityMatchesSubject($identityFields, $resolvedSubject);
-        if ($sourceTitle === '' || $subjectId === '' || $subjectType === '' || $identityMatches === []) {
+        $handoff = $this->explicitSubjectHandoff($resolvedSubject);
+        $conflicts = $this->sourceConflicts($context, $handoff['subject'] ?? []);
+        $diagnostics = [
+            'source_title' => $sourceTitle,
+            'subject_id' => $subjectId,
+            'subject_type' => $subjectType,
+            'identity_fields' => array_keys($identityFields),
+            'identity_matches' => $identityMatches,
+            'subject_match' => (string) ($resolvedSubject['match'] ?? ''),
+            'explicit_subject' => $handoff['subject'] ?? null,
+            'conflicts' => $conflicts,
+        ];
+        if (($handoff['status'] ?? '') !== 'valid') {
+            return [
+                'status' => 'REVIEW_REQUIRED',
+                'blockers' => [(string) ($handoff['reason'] ?? 'SUBJECT_UNRESOLVED')],
+                'dependencies' => [],
+                'video_proposal' => $emptyVideo,
+                'evidence_idempotency_key' => $evidenceKey,
+                'reuse_scope' => 'source-specific-external-video',
+                'unsupported_classifications' => $unsupported,
+                'diagnostics' => $diagnostics,
+            ];
+        }
+        if ($conflicts !== []) {
+            return [
+                'status' => 'REVIEW_REQUIRED',
+                'blockers' => ['SOURCE_SUBJECT_IDENTITY_CONFLICT'],
+                'dependencies' => [],
+                'video_proposal' => $emptyVideo,
+                'evidence_idempotency_key' => $evidenceKey,
+                'reuse_scope' => 'source-specific-external-video',
+                'unsupported_classifications' => $unsupported,
+                'diagnostics' => $diagnostics,
+                'relation' => ['target_type' => $subjectType, 'target_uuid' => $subjectId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'],
+            ];
+        }
+        // A valid uuid_exact packet is the immutable semantic handoff from
+        // Capture. Trusted source text remains provenance/editorial input and
+        // may diagnose a conflict, but it cannot veto or replace this packet.
+        if (!$handoff['explicit'] && ($sourceTitle === '' || $subjectId === '' || $subjectType === '' || $identityMatches === [])) {
             return [
                 'status' => 'REVIEW_REQUIRED',
                 'blockers' => ['SOURCE_SUBJECT_IDENTITY_UNCONFIRMED'],
@@ -53,14 +94,14 @@ final class CaptureVideoProvenancePlanner
                 'evidence_idempotency_key' => $evidenceKey,
                 'reuse_scope' => 'source-specific-external-video',
                 'unsupported_classifications' => $unsupported,
-                'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType, 'identity_fields' => array_keys($identityFields), 'identity_matches' => $identityMatches],
+                'diagnostics' => $diagnostics,
             ];
         }
 
         $identity = 'canonical ' . ($subjectName !== '' ? $subjectName : $subjectId);
         $sourcePayload = [
             'stable_key' => $sourceKey,
-            'title' => $sourceTitle,
+            'title' => $sourceTitle !== '' ? $sourceTitle : 'YouTube video ' . ($externalId !== '' ? $externalId : 'source'),
             'source_type' => 'website',
             'locator' => $locator !== '' ? $locator : null,
             'metadata' => [
@@ -90,7 +131,7 @@ final class CaptureVideoProvenancePlanner
         $evidencePayload = [
             'claim_id' => null,
             'source_id' => null,
-            'excerpt' => $sourceTitle,
+            'excerpt' => $sourceTitle !== '' ? $sourceTitle : $locator,
             'relation' => 'supports',
             'locator' => $locator !== '' ? $locator : null,
             'metadata' => [
@@ -128,8 +169,40 @@ final class CaptureVideoProvenancePlanner
                 'reason' => (string) ($originalRelation['reason'] ?? 'Source-specific provenance handoff.'),
                 'confidence' => (float) ($originalRelation['confidence'] ?? 1.0),
             ],
-            'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType, 'identity_fields' => array_keys($identityFields), 'identity_matches' => $identityMatches],
+            'diagnostics' => $diagnostics,
         ];
+    }
+
+    /** @return array{status:string,explicit:bool,subject:array<string,mixed>,reason:string} */
+    private function explicitSubjectHandoff(array $subject): array
+    {
+        $id = trim((string) ($subject['id'] ?? ''));
+        $type = strtolower(trim((string) ($subject['type'] ?? '')));
+        $explicit = strtolower(trim((string) ($subject['match'] ?? ''))) === 'uuid_exact';
+        if (!$explicit) return ['status' => 'valid', 'explicit' => false, 'subject' => [], 'reason' => ''];
+        if (!UuidCodec::isValid($id)) return ['status' => 'invalid', 'explicit' => true, 'subject' => $subject, 'reason' => 'SUBJECT_UNRESOLVED'];
+        if (!in_array($type, (new VideoRelationAdminContract())->targetTypes(), true)) return ['status' => 'invalid', 'explicit' => true, 'subject' => $subject, 'reason' => 'SUBJECT_TYPE_UNSUPPORTED'];
+        if (array_key_exists('active', $subject) && $subject['active'] !== true) return ['status' => 'invalid', 'explicit' => true, 'subject' => $subject, 'reason' => 'SUBJECT_INACTIVE'];
+        if (array_key_exists('revision', $subject) && (int) $subject['revision'] < 1) return ['status' => 'invalid', 'explicit' => true, 'subject' => $subject, 'reason' => 'SUBJECT_REVISION_INVALID'];
+        return ['status' => 'valid', 'explicit' => true, 'subject' => $subject, 'reason' => ''];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function sourceConflicts(array $context, array $explicitSubject): array
+    {
+        if ($explicitSubject === []) return [];
+        $explicitId = strtolower(trim((string) ($explicitSubject['id'] ?? '')));
+        $conflicts = [];
+        foreach ((array) ($context['source_subject_candidates'] ?? []) as $candidate) {
+            if (!is_array($candidate) || !UuidCodec::isValid((string) ($candidate['id'] ?? ''))) continue;
+            $candidateId = strtolower(trim((string) $candidate['id']));
+            $match = strtolower(trim((string) ($candidate['match'] ?? '')));
+            $confidence = (float) ($candidate['confidence'] ?? 0);
+            if ($candidateId !== '' && $candidateId !== $explicitId && $confidence >= 0.9 && in_array($match, ['uuid_exact', 'stable_key_exact', 'exact_name_or_alias', 'exact_variant_reference', 'exact_variant_name_reference'], true)) {
+                $conflicts[] = ['candidate' => $candidate, 'explicit_subject_id' => $explicitSubject['id'], 'reason' => 'Source metadata resolves strongly to another canonical entity.'];
+            }
+        }
+        return $conflicts;
     }
 
     /** @return array<string,mixed> */

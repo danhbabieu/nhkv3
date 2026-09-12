@@ -643,7 +643,34 @@ final class GovernedCaptureContinuationService
         return new Proposal($id, (string) ($review['subject_id'] ?? ''), (string) ($review['operation'] ?? ''), (array) ($review['payload'] ?? []), (string) ($review['content_fingerprint'] ?? ''), isset($review['expected_revision']) ? (int) $review['expected_revision'] : null, (string) ($review['dependency_fingerprint'] ?? ''), ProposalState::from((string) ($review['state'] ?? 'submitted')), revision: (int) ($review['revision'] ?? 1), targetUuid: isset($review['target_uuid']) ? (string) $review['target_uuid'] : null, entityType: (string) ($review['entity_type'] ?? ''));
     }
 
-    private function pending(Proposal $proposal, array $review): array { return ['proposal_id' => $proposal->id, 'status' => 'REVIEW_REQUIRED', 'proposal_state' => (string) ($review['state'] ?? $proposal->state->value), 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint]; }
+    private function pending(Proposal $proposal, array $review): array
+    {
+        $payload = is_array($review['payload'] ?? null) ? $review['payload'] : $proposal->payload;
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $subject = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : null;
+        $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : [];
+        $targetUuid = $review['target_uuid'] ?? $proposal->targetUuid;
+        return [
+            'proposal_id' => $proposal->id,
+            'status' => 'REVIEW_REQUIRED',
+            'proposal_state' => (string) ($review['state'] ?? $proposal->state->value),
+            'entity_type' => $proposal->entityType,
+            'operation' => $proposal->operation,
+            'subject_id' => $proposal->subjectId,
+            'target_uuid' => $targetUuid !== null && trim((string) $targetUuid) !== '' ? (string) $targetUuid : null,
+            // A governed proposal is not a canonical owner read-back. Keep
+            // this null until Controlled Apply and the owner read boundary
+            // have both verified the Video identity.
+            'canonical_id' => null,
+            'semantic_subject' => $subject,
+            'external_video' => [
+                'platform' => (string) ($source['platform'] ?? ''),
+                'external_video_id' => (string) ($source['external_video_id'] ?? ''),
+            ],
+            'content_fingerprint' => $proposal->contentFingerprint,
+            'dependency_fingerprint' => $proposal->dependencyFingerprint,
+        ];
+    }
 
     private function applied(Proposal $proposal, array $applied): array
     {

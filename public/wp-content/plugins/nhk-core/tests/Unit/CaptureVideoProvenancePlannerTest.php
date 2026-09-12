@@ -123,6 +123,121 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame([], $plan['video_proposal']['payload']['metadata']['semantic_attachments']);
     }
 
+    public function test_valid_uuid_exact_variant_packet_is_authoritative_when_source_title_has_no_match(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-explicit-variant',
+            $this->videoProposal('explicitvariant1'),
+            $this->snapshot('explicitvariant1', ''),
+            [
+                'id' => self::VARIANT,
+                'type' => 'variant',
+                'name' => 'Đồng hồ Odo 24 Odo 57',
+                'match' => 'uuid_exact',
+                'revision' => 4,
+                'active' => true,
+            ],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame(self::VARIANT, $plan['relation']['target_uuid']);
+        self::assertSame([], $plan['diagnostics']['identity_matches']);
+        self::assertSame('uuid_exact', $plan['diagnostics']['subject_match']);
+    }
+
+    public function test_valid_uuid_exact_variant_packet_ignores_weak_unrelated_text(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-explicit-weak-text',
+            $this->videoProposal('explicitweak11'),
+            $this->snapshot('explicitweak11', 'Đồng hồ cổ tuyệt đẹp từ kho lưu trữ'),
+            [
+                'id' => self::VARIANT,
+                'type' => 'variant',
+                'name' => 'Đồng hồ Odo 24 Odo 57',
+                'match' => 'uuid_exact',
+                'revision' => 4,
+                'active' => true,
+            ],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame(self::VARIANT, $plan['relation']['target_uuid']);
+        self::assertSame('uuid_exact', $plan['diagnostics']['subject_match']);
+    }
+
+    public function test_strong_conflicting_canonical_source_candidate_requires_review_without_replacing_explicit_subject(): void
+    {
+        $other = '22222222-2222-4222-8222-222222222222';
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-explicit-conflict',
+            $this->videoProposal('explicitconf1'),
+            $this->snapshot('explicitconf1', 'Canonical B source title'),
+            [
+                'id' => self::VARIANT,
+                'type' => 'variant',
+                'name' => 'Variant A',
+                'match' => 'uuid_exact',
+                'revision' => 4,
+                'active' => true,
+            ],
+            [
+                'source_subject_candidates' => [[
+                    'id' => $other,
+                    'type' => 'variant',
+                    'name' => 'Canonical B',
+                    'match' => 'exact_name_or_alias',
+                    'confidence' => 0.98,
+                ]],
+            ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SOURCE_SUBJECT_IDENTITY_CONFLICT', $plan['blockers']);
+        self::assertSame(self::VARIANT, $plan['relation']['target_uuid']);
+        self::assertSame(self::VARIANT, $plan['diagnostics']['explicit_subject']['id']);
+        self::assertSame($other, $plan['diagnostics']['conflicts'][0]['candidate']['id']);
+    }
+
+    public function test_invalid_explicit_uuid_packet_fails_closed_without_source_fallback(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-invalid-explicit',
+            $this->videoProposal('invalidexplicit'),
+            $this->snapshot('invalidexplicit', 'No canonical identity here'),
+            [
+                'id' => 'not-a-uuid',
+                'type' => 'variant',
+                'match' => 'uuid_exact',
+            ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SUBJECT_UNRESOLVED', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+    }
+
+    public function test_inactive_explicit_uuid_packet_fails_closed(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-inactive-explicit',
+            $this->videoProposal('inactiveexplicit'),
+            $this->snapshot('inactiveexplicit', 'Variant A source title'),
+            [
+                'id' => self::VARIANT,
+                'type' => 'variant',
+                'name' => 'Variant A',
+                'match' => 'uuid_exact',
+                'revision' => 4,
+                'active' => false,
+            ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SUBJECT_INACTIVE', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+    }
+
     public function test_official_source_description_can_confirm_locked_subject_without_becoming_evidence(): void
     {
         $plan = (new CaptureVideoProvenancePlanner())->plan(

@@ -33,6 +33,32 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
     }
 
+    public function test_video_review_required_exposes_governance_and_canonical_identity_separately(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, $videoId, 'ingest', ['canonical_id' => $videoId], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:pending:video', targetUuid: $videoId, entityType: 'video');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposalId)->willReturnOnConsecutiveCalls(
+            ['proposal_id' => $proposalId, 'state' => 'draft', 'entity_type' => 'video', 'target_uuid' => $videoId, 'payload' => ['canonical_id' => $videoId], 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['proposal_id' => $proposalId, 'state' => 'submitted', 'entity_type' => 'video', 'target_uuid' => $videoId, 'payload' => ['canonical_id' => $videoId], 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->expects(self::once())->method('submit')->with($proposalId)->willReturn($proposal->transition(ProposalState::SUBMITTED));
+        $governance->expects(self::never())->method('approve');
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => throw new \LogicException('apply must not run before approval'), $this->policies(['video']), static fn (): bool => true);
+
+        $result = $service->execute('capture-pending', 'capture-pending:video', [
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => ['canonical_id' => $videoId]]]],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame($proposalId, $result['writes'][0]['proposal_id']);
+        self::assertSame('submitted', $result['writes'][0]['proposal_state']);
+        self::assertSame($videoId, $result['writes'][0]['target_uuid']);
+        self::assertNull($result['writes'][0]['canonical_id']);
+    }
+
     public function test_existing_capture_continuation_applies_only_after_governance_and_readback(): void
     {
         $proposalId = UuidCodec::newV7();
