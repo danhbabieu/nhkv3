@@ -386,6 +386,69 @@ reactivate, normalize or backfill semantic data. Its report cannot be passed
 directly to PR7 as an executable write command; PR7 must re-read revisions and
 revalidate owner approval.
 
+## PR6.1 STATUS / PRODUCTION READ BRIDGE
+
+- Knowledge/Evidence adapter: **IMPLEMENTED_IN_PR6.1**. The production read
+  adapter reuses the current Knowledge, Evidence and Source repositories,
+  validates exact subject/type/scope, claim state, Evidence support state and
+  Source state, and emits only safe canonical references. It never serializes
+  claim text or raw/private excerpts.
+- Authority inventory: **IMPLEMENTED_IN_PR6.1**. `CursorAuthorityInventoryReader`
+  is implemented by the canonical WPDB Authority repository using stable
+  canonical-UUID ordering, bounded pages and resumable cursors. The audit uses
+  this interface when available and retains the prior snapshot fallback only
+  for test/readers without cursor capability.
+- Audit composition: **IMPLEMENTED_IN_PR6.1_LOCALLY** through
+  `WpdbClockTypeClassificationAuditFactory`; the factory composes existing
+  Graph/Authority/Knowledge/Evidence/Source owners and has no write service
+  dependency.
+- Real dry-run: **LIVE_AUDIT_SURFACE_NOT_EXPOSED**. The current target is
+  `https://demo.1945.vn` (`staging`), but the checked-out PR6.1 code is not
+  deployed there and no approved audit read endpoint/connector is exposed.
+  No live counts are substituted with fixture counts.
+
+## PR6.1 GAP CLASSIFICATION
+
+### ALREADY_SUPPORTED
+
+- Existing KnowledgeClaim provenance metadata, canonical Evidence/Source
+  dependency readers and Graph/Authority read boundaries remain the owners.
+- PR5 Governance and derived Brand↔Clock-Type recipe are untouched.
+
+### IMPLEMENTED_IN_PR6.1
+
+- Production-owner Knowledge/Evidence safe audit adapter with exact scope and
+  dependency validation.
+- Bounded, stable Authority inventory cursor and local composition factory.
+- Unit coverage for supported exact evidence, wrong scope/subject, inactive
+  dependencies, private-data redaction and resumable inventory.
+
+### IMPLEMENTATION_GAP
+
+- No target-facing read-only audit operation currently exposes the PR6.1
+  factory/report through the deployed MCP or approved operator connector.
+
+### REGISTRY_GAP
+
+- The audit evidence metadata shape is now an explicit adapter seam, but no
+  dedicated central audit registry or deployed cursor contract is registered.
+
+### DATA_GAP
+
+- Real target source/target/candidate counts remain unverified. The dated
+  staging Graph fact is still `classified_as total=0, active=0`; it is not a
+  production assumption.
+
+### PUBLIC_PROJECTION_GAP
+
+- Root route allocation/reprojection remains outside PR6.1.
+
+### LIVE_VERIFICATION_GAP
+
+- Documentation checkpoint can be regenerated locally, but code-side
+  implementation does not prove deployment. No real dry-run or staging
+  mutation was executed; PR7 remains not ready.
+
 ## Review gate
 
 PR3 đã hoàn tất ở mức local additive/read-side foundation. PR4 chỉ bắt đầu sau

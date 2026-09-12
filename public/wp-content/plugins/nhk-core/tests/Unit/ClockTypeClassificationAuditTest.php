@@ -7,7 +7,7 @@ use NHK\Core\Application\Audit\ClockTypeClassificationAudit;
 use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, GraphService};
 use NHK\Core\Contracts\Audit\ClockTypeAuditEvidenceReader;
-use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Authority\{AuthorityRepository, CursorAuthorityInventoryReader};
 use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
@@ -28,6 +28,7 @@ final class ClockTypeClassificationAuditTest extends TestCase
         self::assertSame($target->canonicalId, $report->results[0]['target_uuid']);
         self::assertSame('clock_type', $report->results[0]['target_family']);
         self::assertSame(0, $repo->writes);
+        self::assertCount(1, $report->samples[ClockTypeClassificationAudit::READY_FOR_OWNER_REVIEW]);
     }
 
     public function test_brandless_specimen_is_a_valid_review_candidate(): void
@@ -145,6 +146,22 @@ final class ClockTypeClassificationAuditTest extends TestCase
         self::assertSame($first->toArray(), $second->toArray());
     }
 
+    public function test_cursor_authority_inventory_is_used_with_stable_resume_cursor(): void
+    {
+        $sources = [
+            $this->entity('model', 'Model A', '00000000-0000-4000-8000-000000000101'),
+            $this->entity('model', 'Model B', '00000000-0000-4000-8000-000000000102'),
+            $this->entity('variant', 'Variant A', '00000000-0000-4000-8000-000000000103'),
+        ];
+        [$audit, $repo] = $this->audit($sources, new FixtureEvidenceReader([]));
+        $page = $audit->audit(['limit' => 2]);
+        self::assertNotNull($page->pagination['next_cursor']);
+        self::assertGreaterThan(1, $repo->pages);
+        $resumed = $audit->audit(['limit' => 2, 'after' => $page->pagination['next_cursor']]);
+        self::assertSame('variant', $resumed->results[0]['source_type']);
+        self::assertNotSame($page->results[1]['source_uuid'], $resumed->results[0]['source_uuid']);
+    }
+
     /** @return array{0:ClockTypeClassificationAudit,1:AuditAuthorityRepository,2:GraphService} */
     private function audit(array $entities, ?ClockTypeAuditEvidenceReader $evidence = null, bool $createWrongEdge = false): array
     {
@@ -164,7 +181,7 @@ final class ClockTypeClassificationAuditTest extends TestCase
 
     private function evidence(AuthorityEntity $source, AuthorityEntity $target, string $tier): array
     {
-        return ['tier' => $tier, 'source_type' => $source->entityType, 'source_uuid' => $source->canonicalId, 'scope_source_uuid' => $source->canonicalId, 'target_uuid' => $target->canonicalId, 'evidence_status' => 'SUPPORTED', 'provenance_class' => 'EXPLICIT_USER_KNOWLEDGE', 'basis' => 'EXACT_CANONICAL_EVIDENCE', 'supporting_canonical_ids' => [$source->canonicalId, $target->canonicalId]];
+        return ['tier' => $tier, 'source_type' => $source->entityType, 'source_uuid' => $source->canonicalId, 'scope_source_uuid' => $source->canonicalId, 'scope' => $source->entityType, 'target_uuid' => $target->canonicalId, 'evidence_status' => 'SUPPORTED', 'provenance_class' => 'EXPLICIT_USER_KNOWLEDGE', 'basis' => 'EXACT_CANONICAL_EVIDENCE', 'supporting_canonical_ids' => [$source->canonicalId, $target->canonicalId]];
     }
 }
 
@@ -175,9 +192,10 @@ final class FixtureEvidenceReader implements ClockTypeAuditEvidenceReader
     public function findForSubject(string $sourceType, string $sourceUuid): array { return $this->records[$sourceUuid] ?? []; }
 }
 
-final class AuditAuthorityRepository implements AuthorityRepository
+final class AuditAuthorityRepository implements AuthorityRepository, CursorAuthorityInventoryReader
 {
     /** @param list<AuthorityEntity> $entities */
+    public int $pages = 0;
     public function __construct(private array $entities, public int $writes = 0) {}
     public function findByCanonicalId(string $id): ?AuthorityEntity { foreach ($this->entities as $entity) if ($entity->canonicalId === $id) return $entity; return null; }
     public function findByStableKey(string $type, string $key): ?AuthorityEntity { foreach ($this->entities as $entity) if ($entity->entityType === $type && $entity->stableKey === $key) return $entity; return null; }
@@ -185,4 +203,5 @@ final class AuditAuthorityRepository implements AuthorityRepository
     public function update(AuthorityEntity $entity, int $expectedRevision): AuthorityEntity { $this->writes++; throw new \LogicException('Audit must not write Authority.'); }
     public function rekey(AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): AuthorityEntity { $this->writes++; throw new \LogicException('Audit must not write Authority.'); }
     public function listByType(string $type, bool $includeRetired = false): array { return array_values(array_filter($this->entities, static fn (AuthorityEntity $entity): bool => $entity->entityType === $type && ($includeRetired || $entity->active()))); }
+    public function pageByType(string $type, int $limit = 100, ?string $after = null, bool $includeRetired = false): array { $this->pages++; $items = $this->listByType($type, $includeRetired); usort($items, static fn (AuthorityEntity $a, AuthorityEntity $b): int => strcmp($a->canonicalId, $b->canonicalId)); if ($after !== null) $items = array_values(array_filter($items, static fn (AuthorityEntity $entity): bool => $entity->canonicalId > $after)); $page = array_slice($items, 0, $limit); return ['items' => $page, 'next_cursor' => count($items) > $limit && $page !== [] ? $page[count($page) - 1]->canonicalId : null]; }
 }

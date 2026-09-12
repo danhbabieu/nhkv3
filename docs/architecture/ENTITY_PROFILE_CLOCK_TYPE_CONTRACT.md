@@ -1,6 +1,6 @@
 # NHK V3 Entity Profile — Brand và Clock Type Contract
 
-> **ACTIVE contract — PR1 + PR2 + PR3 + PR4 + PR5, 2026-09-13.** Contract này nằm dưới
+> **ACTIVE contract — PR1 + PR2 + PR3 + PR4 + PR5 + PR6.1, 2026-09-13.** Contract này nằm dưới
 > `docs/constitution/NHK_V3_CONSTITUTION.md`. Nó khóa read/profile seams và
 > regression boundary; PR5 chỉ cho phép new-data membership qua Governance và
 > Controlled Apply ở local/test scope, không cấp quyền live mutation, backfill,
@@ -440,3 +440,29 @@ data. Authority `listByType` hiện cũng chưa expose cursor API; audit giữ s
 ordering và page cursor trên snapshot, đồng thời ghi nhận giới hạn này để
 không claim streaming inventory. PR6 không backfill, không allocation/reproject
 Public Identity và không thay đổi Video, Media, Knowledge hay route.
+
+## 17. PR6.1 production read bridge
+
+PR6.1 bổ sung hai read-only seams để audit có thể chạy trên canonical runtime:
+`CanonicalKnowledgeEvidenceAuditReader` dùng các owner hiện hành
+`KnowledgeRepository`, `EvidenceRepository` và `SourceRepository`; còn
+`CursorAuthorityInventoryReader` được implement tại
+`WpdbAuthorityRepository` để đọc theo stable canonical-UUID cursor và bounded
+batch. Factory production chỉ compose các reader này với `GraphService` và
+`ClockTypeClassificationAudit`; nó không phụ thuộc Proposal, Governance hoặc
+Controlled Apply.
+
+Knowledge/Evidence adapter chỉ nhận claim có exact subject UUID/type/scope và
+canonical target UUID được khai báo trong metadata/provenance. Nó kiểm tra
+claim active, Evidence active/supports và Source dependency active; status
+`SUPPORTED` mới đủ điều kiện để audit tiếp tục kiểm tra family/revision/target.
+Claim text, body, raw excerpt, private metadata và source payload không được
+serialize. Private/Public chỉ xuất hiện dưới dạng safe visibility summary.
+Thiếu target canonical, sai scope, inactive dependency, unsupported evidence
+hoặc target legacy vẫn là blocker; text/title/keyword không được nâng cấp.
+
+PR6.1 vẫn là dry-run thuần phân tích. Real target audit chỉ được claim khi
+PR6.1 code đã được deploy và target expose đúng read surface/checkpoint. Với
+`demo.1945.vn` staging hiện tại, nếu bridge chưa được deploy hoặc connector
+không expose audit API thì trạng thái là `LIVE_AUDIT_SURFACE_NOT_EXPOSED`; không
+dùng mutation tool thay thế.

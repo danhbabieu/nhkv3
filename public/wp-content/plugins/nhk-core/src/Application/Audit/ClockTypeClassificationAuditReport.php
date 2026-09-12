@@ -5,13 +5,14 @@ namespace NHK\Core\Application\Audit;
 
 final readonly class ClockTypeClassificationAuditReport
 {
-    /** @param array<string,mixed> $targetInventory @param list<array<string,mixed>> $results @param array<string,int> $resultCounts @param array<string,mixed> $pagination */
+    /** @param array<string,mixed> $targetInventory @param list<array<string,mixed>> $results @param array<string,int> $resultCounts @param array<string,mixed> $pagination @param array<string,list<array<string,mixed>>> $samples */
     public function __construct(
         public array $targetInventory,
         public array $results,
         public array $resultCounts,
         public array $pagination,
         public string $fingerprint,
+        public array $samples = [],
     ) {}
 
     /** @return array<string,mixed> */
@@ -24,6 +25,7 @@ final readonly class ClockTypeClassificationAuditReport
             'results' => $this->results,
             'result_counts' => $this->resultCounts,
             'pagination' => $this->pagination,
+            'samples' => $this->samples,
             'fingerprint' => $this->fingerprint,
         ];
     }
@@ -39,6 +41,7 @@ final readonly class ClockTypeClassificationAuditReport
         ];
         foreach ($this->resultCounts as $status => $count) $lines[] = sprintf('- %s: %d', $status, $count);
         $lines[] = '';
+        $lines[] = 'Owner-review samples: ' . count(array_merge(...array_values($this->samples))) . ' safe rows';
         $lines[] = 'Fingerprint: `' . $this->fingerprint . '`';
         return implode("\n", $lines) . "\n";
     }

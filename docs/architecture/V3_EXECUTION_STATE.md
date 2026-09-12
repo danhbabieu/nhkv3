@@ -8810,3 +8810,29 @@ legacy normalization, backfill, Public Identity allocation, Video/Media/
 Knowledge rewrite or PR7 implementation occurred. Fresh documentation and
 manifest identities are emitted by the canonical bootstrap rather than
 embedded here to avoid a self-referential state hash.
+
+# Checkpoint — 2026-09-13 — PR6.1 production read bridge
+
+PR6.1 LOCAL CODE: The legacy Clock-Type audit now has a production-owner
+Knowledge/Evidence adapter over the existing canonical repositories. It
+requires exact subject UUID/type/scope, active Claim, active supporting
+Evidence and active Source dependencies, and returns safe references plus
+claim/evidence/source revisions and visibility state. Raw claim text, private
+metadata and Evidence excerpts are never emitted. A cursor-capable Authority
+inventory boundary was added to the existing WPDB repository using stable
+canonical-UUID ordering and bounded resumable pages; no semantic repository or
+datastore was added.
+
+COMPOSITION: `WpdbClockTypeClassificationAuditFactory` supplies only existing
+Graph, Authority, Knowledge, Source and Evidence read owners to the audit. It
+does not depend on Proposal, Governance, Controlled Apply or any semantic
+writer. Existing PR1–PR6 Video/Media/Knowledge and PR5 derived-recipe tests
+remain regression gates.
+
+REAL DRY-RUN: The target remains `https://demo.1945.vn` in `staging`. PR6.1 is
+not deployed there and the current approved connector does not expose the new
+read-only audit operation, so `LIVE_AUDIT_SURFACE_NOT_EXPOSED` is recorded.
+The dated target Graph evidence remains `classified_as total=0, active=0` and
+is not substituted for a fresh PR6.1 run. No staging mutation, migration,
+backfill, normalization, Public Identity operation, Video/Media/Knowledge
+rewrite or PR7 implementation occurred.

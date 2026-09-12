@@ -5,7 +5,7 @@ namespace NHK\Core\Application\Audit;
 
 use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Contracts\Audit\ClockTypeAuditEvidenceReader;
-use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Authority\{AuthorityRepository, CursorAuthorityInventoryReader};
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Graph\{GraphEdge, NodeReference};
@@ -49,6 +49,7 @@ final class ClockTypeClassificationAudit
         private GraphService $graph,
         private EntityProfileResolver $profiles = new EntityProfileResolver(),
         private ?ClockTypeAuditEvidenceReader $evidence = null,
+        private ?CursorAuthorityInventoryReader $cursorInventory = null,
     ) {}
 
     /**
@@ -62,9 +63,16 @@ final class ClockTypeClassificationAudit
         $hints = is_array($options['discovery_hints'] ?? null) ? $options['discovery_hints'] : [];
         foreach ($sources['items'] as $source) $results[] = $this->auditSource($source, $targets, is_array($hints[$source->canonicalId] ?? null) ? $hints[$source->canonicalId] : []);
 
-        $counts = [];
+        $counts = array_fill_keys([self::ALREADY_CANONICAL, self::READY_FOR_OWNER_REVIEW, self::LEGACY_TARGET_REQUIRES_REVIEW, self::RETIRED_RELATION_REVIEW_REQUIRED, self::AMBIGUOUS_CLOCK_TYPE, self::INSUFFICIENT_EVIDENCE, self::DISCOVERY_HINT_ONLY, self::NO_CLOCK_TYPE_SIGNAL, self::TARGET_UNRESOLVED, self::FAMILY_UNRESOLVED, self::SOURCE_UNSUPPORTED, self::SOURCE_INACTIVE, self::DEPENDENCY_UNAVAILABLE, self::INVALID_CLOCK_TYPE_MEMBERSHIP_TARGET], 0);
         foreach ($results as $result) $counts[$result['status']] = ($counts[$result['status']] ?? 0) + 1;
         ksort($counts);
+        $samples = [];
+        foreach ([self::READY_FOR_OWNER_REVIEW, self::AMBIGUOUS_CLOCK_TYPE, self::DISCOVERY_HINT_ONLY, self::LEGACY_TARGET_REQUIRES_REVIEW] as $status) $samples[$status] = [];
+        foreach ($results as $result) {
+            $status = $result['status'];
+            if (!array_key_exists($status, $samples) || count($samples[$status]) >= 10) continue;
+            $samples[$status][] = array_intersect_key($result, array_flip(['source_type', 'source_uuid', 'source_revision', 'source_display_name', 'target_uuid', 'target_revision', 'target_name', 'target_family', 'targets', 'status', 'resolution_basis', 'provenance_class', 'support_summary', 'blockers', 'warnings']));
+        }
         $pagination = [
             'limit' => $sources['limit'],
             'after' => $sources['after'],
@@ -73,8 +81,8 @@ final class ClockTypeClassificationAudit
             'authority_cursor_surface' => 'UNAVAILABLE_CURRENT_LIST_BY_TYPE_API',
             'audit_state' => 'TRANSIENT_READ_ONLY',
         ];
-        $payload = ['target_inventory' => $targets['inventory'], 'results' => $results, 'result_counts' => $counts, 'pagination' => $pagination];
-        return new ClockTypeClassificationAuditReport($targets['inventory'], $results, $counts, $pagination, $this->fingerprint($payload));
+        $payload = ['target_inventory' => $targets['inventory'], 'results' => $results, 'result_counts' => $counts, 'pagination' => $pagination, 'samples' => $samples];
+        return new ClockTypeClassificationAuditReport($targets['inventory'], $results, $counts, $pagination, $this->fingerprint($payload), $samples);
     }
 
     /** @return array<string,mixed> */
@@ -83,7 +91,7 @@ final class ClockTypeClassificationAudit
         $rows = [];
         $canonical = [];
         $legacy = [];
-        try { $entities = $this->authority->listByType('classification', true); } catch (\Throwable) {
+        try { $entities = $this->readAuthorityType('classification', true); } catch (\Throwable) {
             return ['inventory' => ['status' => 'UNAVAILABLE', 'records' => [], 'counts' => [], 'counterpart_counts' => []], 'canonical' => [], 'legacy' => [], 'all' => [], 'allById' => []];
         }
         usort($entities, static fn (AuthorityEntity $a, AuthorityEntity $b): int => strcmp($a->canonicalId, $b->canonicalId));
@@ -213,6 +221,7 @@ final class ClockTypeClassificationAudit
             if ($profile->status !== 'RESOLVED' || $profile->profileKey !== 'clock_type') { $blockers[] = $profile->diagnostic === 'FAMILY_NOT_CLOCK_TYPE' ? 'CLASSIFICATION_FAMILY_NOT_CLOCK_TYPE' : 'FAMILY_UNRESOLVED'; continue; }
             if (($record['source_uuid'] ?? $source->canonicalId) !== $source->canonicalId || ($record['source_type'] ?? $source->entityType) !== $source->entityType) { $blockers[] = 'SCOPE_MISMATCH'; continue; }
             if (($record['scope_source_uuid'] ?? $source->canonicalId) !== $source->canonicalId) { $blockers[] = 'SCOPE_MISMATCH'; continue; }
+            if (($record['scope'] ?? '') !== $source->entityType) { $blockers[] = 'SCOPE_MISMATCH'; continue; }
             if (array_key_exists('source_revision', $record) && (int) $record['source_revision'] !== $source->revision) { $blockers[] = 'SOURCE_REVISION_MISMATCH'; continue; }
             if (array_key_exists('target_revision', $record) && (int) $record['target_revision'] !== $target->revision) { $blockers[] = 'TARGET_REVISION_MISMATCH'; continue; }
             $exact[$targetId] = ['target' => $target, 'record' => $record];
@@ -229,7 +238,7 @@ final class ClockTypeClassificationAudit
             if (!in_array($tier, ['A', 'B', 'C'], true)) $blockers[] = 'EVIDENCE_TIER_NOT_REVIEW_ELIGIBLE';
             if ($blockers !== []) return $this->result(self::INSUFFICIENT_EVIDENCE, $base, array_values(array_unique($blockers)));
             $target = $item['target'];
-            $packet = array_merge($base, ['target_uuid' => $target->canonicalId, 'target_revision' => $target->revision, 'target_name' => $target->canonicalName, 'target_family' => 'clock_type', 'resolution_basis' => (string) ($record['basis'] ?? 'EXACT_CANONICAL_EVIDENCE'), 'provenance_class' => $provenance, 'supporting_canonical_ids' => $this->safeIds($record['supporting_canonical_ids'] ?? []), 'status' => self::READY_FOR_OWNER_REVIEW]);
+            $packet = array_merge($base, ['target_uuid' => $target->canonicalId, 'target_revision' => $target->revision, 'target_name' => $target->canonicalName, 'target_family' => 'clock_type', 'resolution_basis' => (string) ($record['basis'] ?? 'EXACT_CANONICAL_EVIDENCE'), 'provenance_class' => $provenance, 'supporting_canonical_ids' => $this->safeIds($record['supporting_canonical_ids'] ?? []), 'claim_uuid' => $record['claim_uuid'] ?? null, 'claim_revision' => $record['claim_revision'] ?? null, 'support_summary' => is_array($record['support_summary'] ?? null) ? $record['support_summary'] : [], 'status' => self::READY_FOR_OWNER_REVIEW]);
             $packet['candidate_fingerprint'] = $this->fingerprint($packet);
             return $this->result(self::READY_FOR_OWNER_REVIEW, $packet, [], $blockers);
         }
@@ -252,7 +261,7 @@ final class ClockTypeClassificationAudit
     {
         $all = [];
         foreach (self::SOURCE_TYPES as $type) {
-            try { foreach ($this->authority->listByType($type, true) as $entity) if ($entity instanceof AuthorityEntity) $all[] = $entity; } catch (\Throwable) { return ['items' => [], 'limit' => 0, 'after' => null, 'next_cursor' => null]; }
+            try { foreach ($this->readAuthorityType($type, true) as $entity) if ($entity instanceof AuthorityEntity) $all[] = $entity; } catch (\Throwable) { return ['items' => [], 'limit' => 0, 'after' => null, 'next_cursor' => null]; }
         }
         $order = array_flip(self::SOURCE_TYPES);
         usort($all, static fn (AuthorityEntity $a, AuthorityEntity $b): int => ($order[$a->entityType] <=> $order[$b->entityType]) ?: strcmp($a->canonicalId, $b->canonicalId));
@@ -265,6 +274,23 @@ final class ClockTypeClassificationAudit
     }
 
     private function sourceCursor(AuthorityEntity $entity): string { return $entity->entityType . '|' . $entity->canonicalId; }
+    /** @return list<AuthorityEntity> */
+    private function readAuthorityType(string $type, bool $includeRetired): array
+    {
+        $cursorInventory = $this->cursorInventory instanceof CursorAuthorityInventoryReader
+            ? $this->cursorInventory
+            : ($this->authority instanceof CursorAuthorityInventoryReader ? $this->authority : null);
+        if (!$cursorInventory instanceof CursorAuthorityInventoryReader) return $this->authority->listByType($type, $includeRetired);
+        $items = []; $after = null;
+        for ($page = 0; $page < 10000; $page++) {
+            $result = $cursorInventory->pageByType($type, 200, $after, $includeRetired);
+            foreach ((array) ($result['items'] ?? []) as $entity) if ($entity instanceof AuthorityEntity) $items[] = $entity;
+            $next = $result['next_cursor'] ?? null;
+            if ($next === null || !is_string($next) || $next === $after) return $items;
+            $after = $next;
+        }
+        throw new \RuntimeException('AUTHORITY_AUDIT_PAGE_BOUND_EXCEEDED');
+    }
     /** @return array{items:list<GraphEdge>,next_cursor:null} */
     private function readClassifiedEdges(AuthorityEntity $source): array
     {
