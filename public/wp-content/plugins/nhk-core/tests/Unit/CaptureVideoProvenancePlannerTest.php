@@ -281,6 +281,48 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame([], $plan['dependencies']);
     }
 
+    public function test_unsupported_explicit_uuid_type_fails_closed(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-unsupported-explicit',
+            $this->videoProposal('unsupportedexplicit'),
+            $this->snapshot('unsupportedexplicit', 'Variant A source title'),
+            [
+                'id' => self::VARIANT,
+                'type' => 'unsupported_entity',
+                'name' => 'Variant A',
+                'match' => 'uuid_exact',
+                'revision' => 1,
+                'active' => true,
+            ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SUBJECT_TYPE_UNSUPPORTED', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+    }
+
+    public function test_invalid_explicit_uuid_revision_fails_closed(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-invalid-revision',
+            $this->videoProposal('invalidrevision'),
+            $this->snapshot('invalidrevision', 'Variant A source title'),
+            [
+                'id' => self::VARIANT,
+                'type' => 'variant',
+                'name' => 'Variant A',
+                'match' => 'uuid_exact',
+                'revision' => 0,
+                'active' => true,
+            ],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SUBJECT_REVISION_INVALID', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+    }
+
     public function test_official_source_description_can_confirm_locked_subject_without_becoming_evidence(): void
     {
         $plan = (new CaptureVideoProvenancePlanner())->plan(

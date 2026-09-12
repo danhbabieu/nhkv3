@@ -8619,61 +8619,84 @@ golden isolated validation and restored-data enrichment gate remain NOT RUN.
 STATUS: CAPTURE VIDEO DEPENDENCY REPLAY VERIFIED; LIVE SOURCE SNAPSHOT AND
 RECOVERY REMAIN BLOCKED; NO LIVE RETRY OR SEMANTIC MUTATION.
 
-# Checkpoint — 2026-09-13 — Capture → Video → Governance → Publication repair
+# Checkpoint — 2026-09-13 — Capture → Video → Governance → Publication repair final verification
 
-IMPLEMENTED: The Capture Video handoff now treats a stored `uuid_exact`
-subject-resolution packet as the immutable semantic authority. Valid packets
-are preserved as Video `about`, knowledge-enrichment subject and semantic
-scope; invalid explicit packets fail closed instead of falling through to a
-text resolver. Strong conflicting source candidates produce an explicit
-identity-conflict review while retaining the original UUID. The governed
-resume path now exposes the proposal identity envelope (`proposal_id`,
-`proposal_state`, `target_uuid`, `canonical_id=null`) and reuses idempotent
-Capture/Article/external-Video/proposal identities.
+IMPLEMENTED: Capture preserves a valid explicit `uuid_exact` subject-resolution
+packet as the authoritative Video `about` target, knowledge-enrichment subject
+and semantic scope. Text/source metadata remains provenance, enrichment or
+conflict evidence and cannot silently replace the explicit subject. Invalid,
+inactive, unsupported or stale explicit identity fails closed. Governance
+resume exposes the proposal identity envelope and reuses the same Capture,
+Article, external Video identity and proposal through idempotent continuation.
 
-PUBLICATION: Article media blockers now include Vietnamese conversational
-guidance with featured/inline status, expected subject, preferred view/aspect,
-optional eligible Video-thumbnail fallback and upload requirements. Public
-claim compliance now returns exact claim text/class/scope, evidence status,
-narrowing eligibility, a meaning-narrowing rewrite and review requirement.
-These remain fail-closed gates; no Media or claim is auto-created to bypass a
-requirement.
+PUBLICATION: Article media and public-claim diagnostics remain fail-closed but
+now provide reader-safe Vietnamese guidance and structured featured/inline,
+subject, view/aspect, fallback and upload fields. Claim diagnostics preserve
+exact claim text, class, subject/scope, evidence state, narrowing eligibility,
+meaning-narrowing rewrite and review requirement. No Media, Evidence, claim or
+publication gate was bypassed.
 
-THUMBNAILS: YouTube candidates are probed through the approved external-source
-boundary in quality order (`maxresdefault`, `sddefault`, `hqdefault`,
-`mqdefault`, `default`) with status/MIME/dimension/placeholder validation.
-Selection metadata is persisted in the governed Video payload and consumed by
-SEO, VideoObject, sitemap, dossier, home and frontend projections. Existing
-legacy Capture snapshots are re-probed during Video resume; no second Media
-identity is created.
+THUMBNAILS: The governed selector probes candidates in
+`maxresdefault`, `sddefault`, `hqdefault`, `mqdefault`, `default` order and
+validates response, MIME, dimensions and placeholders. Selection metadata is
+reused by Video SEO, VideoObject, Open Graph, sitemap and public projections.
+The live external-source read-only probe for `VwP1AH9E3HA` verified
+`maxresdefault` as usable at `1280x720`; no live canonical Video projection was
+claimed because deployed build identity and Video owner read-back were not
+available.
 
-TEST EVIDENCE: Focused Capture/Video/Governance/Article/thumbnail/projection
-coverage passes 76 tests / 316 assertions for the final thumbnail/handoff
-slice; the broader focused Capture/Article/Governance slice passes 134 tests /
-541 assertions. NHK Unit passes 1,345 tests / 6,471 assertions
-(13 warnings, 11 deprecations and 13 PHPUnit deprecations;
-no failures). NHK Contract passes 4 tests / 31 assertions. Composer PHP lint,
-composer lint, composer validation and `git diff --check` pass. Static
-analysis tools are not configured in this checkout.
+TEST EVIDENCE: The global WordPress compatibility-shim collision was closed by
+running P4 against the dedicated `NHK Integration` suite with an exact
+`nhk_v3_test` database preflight. Final NHK Unit passes `1,351 tests / 6,500
+assertions`; NHK Contract passes `4 / 31`; the focused Capture/Video/Governance/
+Article/thumbnail/projection slice passes `145 / 598`. Guarded Integration
+passes `123 tests / 1,044 assertions`, with `7` skips, `1` warning and `1`
+deprecation, and zero failures/errors. PHP lint, Composer lint, validation and
+diff checks pass. PHPStan/Psalm are not configured in this checkout.
 
-DOCUMENTATION: Fresh local documentation generation produced 32 canonical MCP
-documents with manifest hash
-`b5dea26bb98307ffe63d085db75d61985f35fa9092f0cc393663c9efcf3a41cb`; the
-local bootstrap runtime is `0.1.0` and the fresh checkpoint was used by the
-verification run.
+DOCUMENTATION: Fresh generation produced 32 canonical MCP documents. Local
+bootstrap reports runtime `0.1.0`, documentation version
+`fe88253485682cee68d56e39cc70bfd284f55dfdeedfeef3824d14234c020fa1`, and
+manifest hash
+`2f2e225755cf698658ced8bbbafef40d5e59b3187dc27292dfabfd2a0988cc15`.
 
-INTEGRATION/LIVE: The guarded integration run cannot complete because the
-local MySQL server at `127.0.0.1:3306` refuses connections for `nhk_v3_test`;
-the acceptance harness also encounters the existing `absint()` redeclaration
-between `GovernanceQueueAdminPageTest` and WordPress bootstrap. Local frontend
-route smoke is blocked by `localhost:80` refusing connections. Deployment
-verification stops before any transfer or mutation with `WORKTREE_NOT_CLEAN`,
-and `NHK_DEMO_DEPLOY_CONFIG` is unset, so the repaired code is not deployed to
-the Demo runtime. No live Capture resume, Governance apply, Article publish,
-or external-state mutation was performed.
+LIVE/DEPLOYMENT: Read-only Demo pages are reachable and Article `467` remains
+operator-visible with its existing content; the target Video is not listed as
+public. The canonical deployment verifier fails closed before transfer because
+the worktree is not clean, and no `NHK_DEMO_DEPLOY_CONFIG` is available. Local
+deployment preflight cannot bootstrap WordPress in this runner, while the
+guarded database integration runtime is available and passing. Therefore the
+deployed build identity is unverified and no live Capture resume, Governance
+Apply, Article publication or semantic mutation was performed. The ChatGPT
+context URL was available through the existing browser session; direct CLI/web
+URL access was not available as a machine-readable source.
 
-STATUS: CODE REPAIR AND LOCAL REGRESSION GATES PASS; LIVE ACCEPTANCE BLOCKED
-AT DEPLOYMENT/INTEGRATION INFRASTRUCTURE PRECONDITIONS. Do not claim complete
-or ready for deploy until the exact existing Capture is resumed and all
-canonical Video, Graph, public-identity, Media/publication and final Article
-read-backs pass.
+STATUS: CODE, DOCUMENTATION AND LOCAL TEST GATES PASS. LIVE ACCEPTANCE remains
+blocked only at the external deployment/runtime identity boundary; canonical
+Video, Graph, public identity, Article media/compliance and publication
+read-backs were intentionally not fabricated.
+
+# Checkpoint — 2026-09-13 — final local runtime verification
+
+RUNTIME: The exact guarded `nhk_v3_test` database was read-only preflighted,
+then advanced through the official UP-only migration runner from `8/20` to
+`20/20`. A fresh deployment preflight now passes all 11 checks, including
+WordPress bootstrap, NHK Core bootstrap, canonical documentation, schema and
+authority hydration. The P4 acceptance harness then completed the full
+`NHK Integration` suite: `123 tests / 1,044 assertions / 7 skips / 0 failures /
+0 errors` (1 warning and 1 deprecation).
+
+CODE: The final Unit suite remains `1,351 / 6,500` and Contract remains `4 /
+31`; the focused repair slice remains `145 / 598`. The public-copy regression
+was closed without weakening the guard: enrichment no longer emits the
+internal English `Knowledge` label in reader-facing copy. No semantic live
+record was created or changed.
+
+LIVE GATE: The live YouTube read-only probe verified all five requested
+thumbnail URLs and selected `maxresdefault` at `1280x720`. Demo public pages
+are reachable, but the repaired build is not runtime-verified: the canonical
+deployment wrapper stops at `WORKTREE_NOT_CLEAN`, and
+`NHK_DEMO_DEPLOY_CONFIG` is unavailable. Consequently the exact Capture
+resume, proposal lifecycle, canonical Video read-back, Graph edge read-back,
+Article reconciliation and publication remain NOT RUN. This is an external
+deployment/runtime boundary, not a local test or code blocker.
