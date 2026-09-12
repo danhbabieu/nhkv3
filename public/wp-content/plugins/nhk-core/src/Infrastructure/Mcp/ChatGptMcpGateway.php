@@ -122,16 +122,31 @@ final class ChatGptMcpGateway
         $totalBytes = 0;
         try {
             foreach ($provided as $index => $reference) {
-                if (!is_array($reference) || array_diff(array_keys($reference), self::REFERENCE_FIELDS) !== []) {
-                    throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference is not a supported OpenAI file object.');
-                }
-                foreach (['download_url', 'file_id'] as $required) {
-                    if (!isset($reference[$required]) || !is_string($reference[$required]) || trim($reference[$required]) === '') {
+                $declaredMime = '';
+                $providedName = '';
+                if (is_string($reference)) {
+                    // ChatGPT's live connector currently supplies the
+                    // declared file parameter as a transient HTTPS URL
+                    // string. Opaque IDs and local paths must never be
+                    // reinterpreted as filesystem or remote imports.
+                    $reference = trim($reference);
+                    if (!str_starts_with(strtolower($reference), 'https://')) {
                         throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be resolved.');
                     }
+                    $url = self::validateUrl($reference, $hostPolicy);
+                } else {
+                    if (!is_array($reference) || array_diff(array_keys($reference), self::REFERENCE_FIELDS) !== []) {
+                        throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference is not a supported OpenAI file object.');
+                    }
+                    foreach (['download_url', 'file_id'] as $required) {
+                        if (!isset($reference[$required]) || !is_string($reference[$required]) || trim($reference[$required]) === '') {
+                            throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be resolved.');
+                        }
+                    }
+                    $declaredMime = trim((string) ($reference['mime_type'] ?? ''));
+                    $providedName = trim((string) ($reference['file_name'] ?? ''));
+                    $url = self::validateUrl((string) $reference['download_url'], $hostPolicy);
                 }
-
-                $url = self::validateUrl((string) $reference['download_url'], $hostPolicy);
                 $path = tempnam(sys_get_temp_dir(), 'nhk-chatgpt-');
                 if (!is_string($path) || $path === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.');
                 $temporaryPaths[] = $path;
@@ -147,10 +162,10 @@ final class ChatGptMcpGateway
                 }
                 $mime = self::sniffMime($path);
                 if (!in_array($mime, self::ALLOWED_MIME_TYPES, true)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file is not a supported image.');
-                if (isset($reference['mime_type']) && is_string($reference['mime_type']) && trim($reference['mime_type']) !== '' && strtolower(trim($reference['mime_type'])) !== $mime) {
+                if ($declaredMime !== '' && strtolower($declaredMime) !== $mime) {
                     throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_MISMATCH', 'The uploaded file MIME type does not match its bytes.');
                 }
-                $name = self::safeFilename((string) ($reference['file_name'] ?? ''), $url, $mime);
+                $name = self::safeFilename($providedName, $url, $mime);
                 $fileBag['files']['name'][] = $name;
                 $fileBag['files']['type'][] = $mime;
                 $fileBag['files']['tmp_name'][] = $path;

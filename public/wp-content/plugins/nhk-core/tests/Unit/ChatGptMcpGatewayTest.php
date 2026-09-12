@@ -5,11 +5,95 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGateway;
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGatewayException;
+use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
+use NHK\Core\Application\Mcp\McpAbilityRegistration;
 use PHPUnit\Framework\TestCase;
 
 final class ChatGptMcpGatewayTest extends TestCase
 {
     private const URL_HOST = 'files.openai.test';
+
+    public function test_live_connector_string_shape_enters_the_capture_gateway(): void
+    {
+        self::assertTrue(ChatGptMcpGateway::shouldHandle('/easy-mcp-ai/v1/mcp', [
+            'method' => 'tools/call',
+            'params' => [
+                'name' => ChatGptMcpGateway::TARGET_TOOL,
+                'arguments' => ['files' => ['https://' . self::URL_HOST . '/signed/file.gif?fixture=redacted']],
+            ],
+        ]));
+    }
+
+    public function test_live_string_url_becomes_native_file_before_ability_validation(): void
+    {
+        $signedUrl = 'https://' . self::URL_HOST . '/signed/file.gif?fixture=redacted';
+        $result = ChatGptMcpGateway::materializeReferences([
+            $signedUrl,
+        ], static function (string $url, string $path, int $remaining): array {
+            file_put_contents($path, self::gifBytes());
+            return ['status' => 200];
+        }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+
+        $nativeInput = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput(
+            ['files' => [$signedUrl], 'items' => [['client_file_id' => 'live-file']]],
+            'nhk-v3/capture-ingest',
+            $result['files'],
+            '1.7.17'
+        );
+        $proxy = ChatGptMcpGateway::proxyRpcWithoutFiles([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => ChatGptMcpGateway::TARGET_TOOL, 'arguments' => [
+                'files' => [$signedUrl],
+                'items' => [['client_file_id' => 'live-file']],
+            ]],
+        ]);
+
+        self::assertSame('image/gif', $nativeInput['files'][0]['type']);
+        self::assertSame($result['files']['files']['tmp_name'][0], $nativeInput['files'][0]['tmp_name']);
+        self::assertSame([['client_file_id' => 'live-file']], $nativeInput['items']);
+        self::assertArrayNotHasKey('files', $proxy['params']['arguments']);
+        self::assertSame($nativeInput['items'], $proxy['params']['arguments']['items']);
+        self::assertFalse(McpAbilityRegistration::requiresNativeTransportFiles('nhk.capture.ingest', $nativeInput, $result['files']));
+        self::assertSame(['items' => $nativeInput['items']], McpAbilityRegistration::canonicalTransportArguments('nhk.capture.ingest', $nativeInput));
+        self::assertFileExists($nativeInput['files'][0]['tmp_name']);
+        self::cleanup($result['temporary_paths']);
+        self::assertFileDoesNotExist($nativeInput['files'][0]['tmp_name']);
+    }
+
+    public function test_live_string_urls_preserve_order_and_items_alignment(): void
+    {
+        $urls = [
+            'https://' . self::URL_HOST . '/a.gif?fixture=a',
+            'https://' . self::URL_HOST . '/b.gif?fixture=b',
+            'https://' . self::URL_HOST . '/c.gif?fixture=c',
+        ];
+        $result = ChatGptMcpGateway::materializeReferences($urls, static function (string $url, string $path, int $remaining): array {
+            file_put_contents($path, self::gifBytes() . basename((string) parse_url($url, PHP_URL_PATH)));
+            return ['status' => 200];
+        }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+
+        $nativeInput = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput(
+            ['files' => $urls, 'items' => [
+                ['client_file_id' => 'a'],
+                ['client_file_id' => 'b'],
+                ['client_file_id' => 'c'],
+            ]],
+            'nhk-v3/capture-ingest',
+            $result['files'],
+            '1.7.17'
+        );
+
+        self::assertSame(['a.gif', 'b.gif', 'c.gif'], array_column($nativeInput['files'], 'name'));
+        self::assertSame([
+            ['client_file_id' => 'a'],
+            ['client_file_id' => 'b'],
+            ['client_file_id' => 'c'],
+        ], $nativeInput['items']);
+        self::assertCount(3, $nativeInput['files']);
+        self::cleanup($result['temporary_paths']);
+    }
 
     public function test_one_official_file_object_becomes_one_native_file_part(): void
     {
@@ -100,6 +184,9 @@ final class ChatGptMcpGatewayTest extends TestCase
     {
         return [
             'opaque id' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', [['file_id' => 'file_only']]],
+            'opaque live string' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', ['file_opaque']],
+            'filesystem path' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', ['/mnt/data/foo.jpg']],
+            'http live string' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', ['http://' . self::URL_HOST . '/file']],
             'arbitrary url' => ['CHATGPT_FILE_HOST_NOT_ALLOWED', [['download_url' => 'https://attacker.test/file', 'file_id' => 'file_attacker']]],
             'http url' => ['CHATGPT_FILE_URL_REJECTED', [['download_url' => 'http://' . self::URL_HOST . '/file', 'file_id' => 'file_http']]],
             'private host' => ['CHATGPT_FILE_HOST_NOT_ALLOWED', [['download_url' => 'https://127.0.0.1/file', 'file_id' => 'file_private']]],
@@ -131,14 +218,14 @@ final class ChatGptMcpGatewayTest extends TestCase
     {
         try {
             ChatGptMcpGateway::materializeReferences([
-                ['download_url' => 'https://ATTACKER.test/file?X-Amz-Signature=secret', 'file_id' => 'file_secret'],
+                ['download_url' => 'https://ATTACKER.test/file?fixture=redacted', 'file_id' => 'file_secret'],
             ], null, static fn (string $host, string $url): bool => false);
             self::fail('Expected an allowlist rejection.');
         } catch (ChatGptMcpGatewayException $error) {
             self::assertSame('CHATGPT_FILE_HOST_NOT_ALLOWED', $error->reasonCode());
             self::assertSame('attacker.test', $error->host());
             self::assertSame('CHATGPT_FILE_HOST_NOT_ALLOWED host=attacker.test', $error->getMessage());
-            self::assertStringNotContainsString('secret', $error->getMessage());
+            self::assertStringNotContainsString('redacted', $error->getMessage());
             self::assertStringNotContainsString('?', $error->getMessage());
         }
     }
@@ -154,14 +241,14 @@ final class ChatGptMcpGatewayTest extends TestCase
         try {
             ChatGptMcpGateway::validateRedirectTarget(
                 'https://' . self::URL_HOST . '/start',
-                'https://attacker.test/next?sig=secret',
+                'https://attacker.test/next?fixture=redacted',
                 $allowlist
             );
             self::fail('Expected the redirect host to be revalidated.');
         } catch (ChatGptMcpGatewayException $error) {
             self::assertSame('CHATGPT_FILE_HOST_NOT_ALLOWED', $error->reasonCode());
             self::assertSame('attacker.test', $error->host());
-            self::assertStringNotContainsString('sig=secret', $error->getMessage());
+            self::assertStringNotContainsString('fixture=redacted', $error->getMessage());
         }
     }
 
@@ -221,6 +308,9 @@ final class ChatGptMcpGatewayTest extends TestCase
         self::assertStringNotContainsString('wp_upload_media', $gateway);
         self::assertStringNotContainsString('wp_upload_media_from_url', $gateway);
         self::assertStringNotContainsString('base64_decode', $gateway);
+        self::assertStringContainsString("str_starts_with(strtolower(\$reference), 'https://')", $gateway);
+        self::assertStringContainsString("unset(\$params['arguments']['files'])", $gateway);
+        self::assertStringContainsString('finally {', $gateway);
     }
 
     private static function gifBytes(): string
