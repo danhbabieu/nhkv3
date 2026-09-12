@@ -41,6 +41,7 @@ final class McpDocumentationRegistry
         'mcp' => ['path' => 'docs/mcp/MCP_V3_CONTENT_OPERATIONS.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'mcp'],
         'mcp-control-plane' => ['path' => 'docs/mcp/NHK_V3_CONTENT_OPERATIONS_CONTROL_PLANE.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'mcp'],
         'deployment' => ['path' => 'docs/architecture/P0_DEPLOYMENT_PREFLIGHT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'deployment'],
+        'snapshot-recovery' => ['path' => 'docs/architecture/V3_SNAPSHOT_RECOVERY_RUNTIME.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'deployment'],
         'public-claim-compliance' => ['path' => 'docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'governance'],
     ];
 

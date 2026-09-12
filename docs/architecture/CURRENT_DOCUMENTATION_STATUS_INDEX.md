@@ -51,6 +51,15 @@ policy and effective Governance state. Changed dependencies require
 `PLAN_REAPPROVAL_REQUIRED` before Proposal creation. The existing Governance
 queue and Controlled Apply remain the only semantic mutation owners.
 
+## 0.3 Isolated V3 snapshot recovery — 2026-09-12
+
+`V3_SNAPSHOT_RECOVERY_RUNTIME.md` defines the governed logical snapshot
+boundary, deterministic manifest/hash contract, recovery-only import guard and
+mandatory post-import read-back. Demo staging remains read-only. The code
+boundary exists, but a data-bearing recovery runtime and source/writer adapters
+are infrastructure prerequisites; no golden validation or Video recovery wave
+is authorized until they pass.
+
 ## 1. Authority and read order
 
 Use this precedence when deciding current behavior:

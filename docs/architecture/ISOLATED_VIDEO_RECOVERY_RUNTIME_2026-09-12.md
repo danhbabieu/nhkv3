@@ -6,7 +6,9 @@
 
 The repository has a safe local WordPress bootstrap and guarded integration
 database, but it does not currently contain a provisioned, data-bearing,
-non-staging canonical runtime or a governed V3 semantic snapshot importer.
+non-staging canonical runtime or a live snapshot source/writer adapter. The
+governed V3 semantic snapshot export/import boundary is now implemented in
+code and documented in `V3_SNAPSHOT_RECOVERY_RUNTIME.md`.
 The Demo target remains read-only. No staging mutation, export, import,
 deployment or push was performed in this phase.
 
@@ -25,7 +27,7 @@ isolated database and the golden identity checks pass.
 | Remote maintenance | `RemoteRuntimeAdapter` | Allowlisted maintenance operations include `backup/snapshot`, `read-back` and `controlled-apply`, but current adapter is Demo-target-specific and connector exposure is read-only |
 | Deployment | `RemoteDeploymentAdapter` / `nhk-deploy-verify` | Hardcoded `demo.1945.vn` allowlist; not an isolated recovery deployment path |
 | V2 restore | `tools/v2-restore-normalize.php` | V2-only migration evidence; forbidden as a Video backlog snapshot mechanism |
-| Semantic V3 snapshot import | none found | `CODE_GAP`; no direct SQL or generic writer may fill this gap |
+| Semantic V3 snapshot import | `Application/Snapshot` export/import services and typed source/writer ports | `CODE_IMPLEMENTED`; a data-bearing runtime adapter is still required; no direct SQL or generic writer may fill that gap |
 
 ## Required isolated configuration
 
@@ -45,12 +47,11 @@ not written to an environment file:
 | Write capability | Dedicated governed MCP/Admin lifecycle only: Proposal → approval → eligibility → Controlled Apply → canonical read-back; no direct repository/SQL writer |
 | Article policy | Native Posts required for provenance/context remain drafts; no Article publication |
 
-The current guard does not yet register `v3-video-recovery-1309` or the
-proposed database as an allowed runtime. Provisioning must therefore add a
-small explicit recovery-mode guard/configuration change, with tests, before
-any runtime write. It must reject `staging`, `production`, `demo.1945.vn`, the
-Demo database identity and missing snapshot proof. It must not broaden the
-existing Demo staging allowance.
+The recovery import guard now rejects `staging`, `production`, `test`,
+`demo.1945.vn`, the Demo database identity and missing snapshot proof. A
+dedicated runtime still has to register the proposed name/database and bind a
+canonical source/writer adapter before any runtime write. This does not broaden
+the existing Demo staging allowance.
 
 ## Snapshot/restore plan
 
@@ -83,9 +84,9 @@ The restore sequence is:
 7. Read back counts and dependency closure, then run the golden acceptance
    below before granting the recovery write capability.
 
-No approved governed V3 snapshot artifact or importer is present in this
-workspace. The plan is therefore not an executed restore and cannot be used to
-claim that the local runtime contains the historical backlog.
+No approved governed V3 snapshot artifact or live source/writer adapter is
+present in this workspace. The plan is therefore not an executed restore and
+cannot be used to claim that the local runtime contains the historical backlog.
 
 ## Golden acceptance gate
 
@@ -154,7 +155,7 @@ may proceed.
 
 | Requirement | Status |
 |---|---|
-| Isolated runtime plan/config proven | `NO` — no provisioned data-bearing runtime or V3 snapshot importer |
+| Isolated runtime plan/config proven | `NO` — no provisioned data-bearing runtime or live source/writer adapter |
 | Golden #372 in isolated runtime | `NOT RUN` — local targets do not contain the source dataset |
 | Enrichment implementation | `PASS` — immutable context, bounded service and quality policy added |
 | Enrichment regression tests | `PASS` — focused suite 54 tests / 208 assertions |

@@ -6,6 +6,8 @@ use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Plugin;
 use NHK\Core\Infrastructure\Maintenance\MaintenanceCapabilityBridge;
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceService;
+use NHK\Core\Application\Snapshot\{CanonicalSnapshotExportService, CanonicalSnapshotImportService, RecoveryRuntimeGuard, SnapshotArtifactCodec};
+use NHK\Core\Contracts\Snapshot\{CanonicalSnapshotSource, CanonicalSnapshotWriter};
 
 $operation = null;
 $json = false;
@@ -16,6 +18,9 @@ $classification = '';
 $apply = false;
 $dryRun = false;
 $proposalId = '';
+$input = '';
+$output = '';
+$recoveryMode = false;
 foreach (array_slice($argv, 1) as $argument) {
     if ($argument === '--json') { $json = true; continue; }
     if (str_starts_with($argument, '--operation=')) { $operation = substr($argument, 12); continue; }
@@ -24,17 +29,20 @@ foreach (array_slice($argv, 1) as $argument) {
     if (str_starts_with($argument, '--source-revision=')) { $sourceRevision = substr($argument, 18); continue; }
     if (str_starts_with($argument, '--classification=')) { $classification = substr($argument, 16); continue; }
     if (str_starts_with($argument, '--proposal-id=')) { $proposalId = substr($argument, 14); continue; }
+    if (str_starts_with($argument, '--input=')) { $input = substr($argument, 8); continue; }
+    if (str_starts_with($argument, '--output=')) { $output = substr($argument, 9); continue; }
+    if ($argument === '--recovery-mode') { $recoveryMode = true; continue; }
     if ($argument === '--dry-run') { $dryRun = true; continue; }
     if ($argument === '--apply') { $apply = true; continue; }
     fwrite(STDERR, "UNKNOWN_ARGUMENT\n"); exit(64);
 }
-$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'migration-up', 'dry-run', 'backup/snapshot', 'governance-plan', 'controlled-apply', 'read-back', 'collector-facet-maintenance'];
+$allowed = ['health', 'inventory', 'canonical-inventory', 'graph-inventory', 'relation-dry-run', 'migration-up', 'dry-run', 'backup/snapshot', 'v3-snapshot-export', 'v3-snapshot-import', 'governance-plan', 'controlled-apply', 'read-back', 'collector-facet-maintenance'];
 if (!is_string($operation) || !in_array($operation, $allowed, true)) {
     $payload = ['status' => 'blocked', 'reason_code' => 'REMOTE_OPERATION_NOT_ALLOWLISTED'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL;
     exit(2);
 }
-if ($operation !== 'collector-facet-maintenance' && ($pack === '' || $runId === '' || $sourceRevision === '')) {
+if (!in_array($operation, ['collector-facet-maintenance', 'v3-snapshot-export', 'v3-snapshot-import'], true) && ($pack === '' || $runId === '' || $sourceRevision === '')) {
     $payload = ['status' => 'blocked', 'reason_code' => 'MAINTENANCE_CONTEXT_REQUIRED'];
     echo json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL;
     exit(2);
@@ -61,6 +69,27 @@ try {
             $payload = $service->plan($classification);
             $payload['dry_run'] = true;
         }
+    } elseif ($operation === 'v3-snapshot-export') {
+        if ($output === '') throw new \RuntimeException('SNAPSHOT_OUTPUT_PATH_REQUIRED');
+        do_action('rest_api_init');
+        $source = apply_filters('nhk_v3_snapshot_source', null);
+        if (!$source instanceof CanonicalSnapshotSource) throw new \RuntimeException('SNAPSHOT_SOURCE_ADAPTER_UNAVAILABLE');
+        $snapshot = (new CanonicalSnapshotExportService())->export($source);
+        $payload = [
+            'status' => 'pass', 'identifier' => 'v3-snapshot-export',
+            'manifest' => $snapshot->manifest, 'snapshot_path' => $output,
+            'snapshot_sha256' => SnapshotArtifactCodec::write($output, $snapshot),
+        ];
+    } elseif ($operation === 'v3-snapshot-import') {
+        if ($input === '') throw new \RuntimeException('SNAPSHOT_INPUT_PATH_REQUIRED');
+        if (!is_readable($input)) throw new \RuntimeException('SNAPSHOT_INPUT_UNREADABLE');
+        $snapshot = SnapshotArtifactCodec::decode((string) file_get_contents($input));
+        $allowedDatabases = getenv('NHK_RECOVERY_ALLOWED_DATABASES');
+        $allowedDatabases = is_string($allowedDatabases) && $allowedDatabases !== '' ? array_values(array_filter(array_map('trim', explode(',', $allowedDatabases)))) : [];
+        $writer = apply_filters('nhk_v3_snapshot_writer', null);
+        if (!$writer instanceof CanonicalSnapshotWriter) throw new \RuntimeException('SNAPSHOT_WRITER_ADAPTER_UNAVAILABLE');
+        $receipt = (new CanonicalSnapshotImportService(new RecoveryRuntimeGuard($allowedDatabases)))->import($snapshot, $writer, $recoveryMode);
+        $payload = ['status' => 'pass', 'identifier' => 'v3-snapshot-import', 'receipt' => $receipt, 'snapshot_path' => $input];
     } elseif ($operation === 'migration-up') {
         Plugin::runPendingMigrations();
         $payload = ['status' => 'pass', 'identifier' => 'remote-migration-up', 'current' => (int) get_option('nhk_core_migration_current', 0), 'target' => (int) get_option('nhk_core_migration_target', 0), 'pack' => $pack, 'run_id' => $runId, 'source_revision' => $sourceRevision];
@@ -89,7 +118,7 @@ try {
         $ok = ($payload['layers']['storage']['ok'] ?? false) && ($payload['layers']['application']['ok'] ?? false);
         $payload = ['status' => $ok ? 'pass' : 'blocked', 'identifier' => 'remote-health', 'health' => $payload];
         if (!$ok) $payload['reason_code'] = 'REMOTE_HEALTH_NOT_READY';
-    } elseif ($operation === 'inventory' || $operation === 'backup/snapshot') {
+    } elseif ($operation === 'inventory') {
         global $wpdb;
         if (!isset($wpdb) || !is_object($wpdb) || empty($wpdb->dbh)) {
             $payload = ['status' => 'blocked', 'reason_code' => 'DATABASE_UNREACHABLE'];
@@ -123,25 +152,10 @@ try {
                 'source_revision' => $sourceRevision, 'database' => (string) $wpdb->get_var('SELECT DATABASE()'),
                 'inventory' => $inventory,
             ];
-            if ($operation === 'backup/snapshot') {
-                $snapshotRoot = getenv('NHK_CUTOVER_SNAPSHOT_ROOT');
-                $snapshotRoot = is_string($snapshotRoot) && $snapshotRoot !== '' ? rtrim($snapshotRoot, '/') : dirname($wordpressRoot) . '/nhk-cutover-snapshots';
-                if (!is_dir($snapshotRoot) && !mkdir($snapshotRoot, 0700, true) && !is_dir($snapshotRoot)) {
-                    $payload = ['status' => 'blocked', 'reason_code' => 'SNAPSHOT_PATH_UNAVAILABLE'];
-                } else {
-                    $stamp = gmdate('Ymd\THis\Z');
-                    $path = $snapshotRoot . '/odo-' . $stamp . '-' . substr(hash('sha256', $runId), 0, 12) . '.json';
-                    $contents = json_encode($receipt, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR) . PHP_EOL;
-                    if (file_put_contents($path, $contents, LOCK_EX) === false) {
-                        $payload = ['status' => 'blocked', 'reason_code' => 'SNAPSHOT_WRITE_FAILED'];
-                    } else {
-                        $receipt['snapshot_path'] = $path;
-                        $receipt['snapshot_sha256'] = hash_file('sha256', $path);
-                        $payload = $receipt;
-                    }
-                }
-            } else $payload = $receipt;
+            $payload = $receipt;
         }
+    } elseif ($operation === 'backup/snapshot') {
+        $payload = ['status' => 'blocked', 'reason_code' => 'LEGACY_RAW_SNAPSHOT_RETIRED', 'replacement' => 'v3-snapshot-export'];
     } else {
         // The read/planning/apply implementations are deliberately composed
         // in the application layer; this entrypoint never accepts SQL or PHP
@@ -149,7 +163,10 @@ try {
         $payload = ['status' => 'blocked', 'reason_code' => 'CUTOVER_APPLICATION_WIRING_REQUIRED', 'operation' => $operation];
     }
 } catch (Throwable $error) {
-    $payload = ['status' => 'failed', 'reason_code' => 'REMOTE_RUNTIME_BOOTSTRAP_FAILED'];
+    $reason = in_array($operation, ['v3-snapshot-export', 'v3-snapshot-import'], true)
+        ? (string) $error->getMessage()
+        : 'REMOTE_RUNTIME_BOOTSTRAP_FAILED';
+    $payload = ['status' => 'failed', 'reason_code' => $reason !== '' ? $reason : 'REMOTE_RUNTIME_BOOTSTRAP_FAILED'];
 }
 echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . PHP_EOL;
 exit(($payload['status'] ?? '') === 'pass' ? 0 : 2);

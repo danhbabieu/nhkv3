@@ -12,6 +12,20 @@ and secret review **PASS**.
 
 LIVE_ACCEPTANCE_PENDING: `true`
 
+DEPLOYED_COMMIT: `NOT_DEPLOYED`
+
+DEPLOY_RESULT: `BLOCKED — canonical wrapper requires a clean checkout and NHK_DEMO_DEPLOY_CONFIG; current HEAD/origin/main is 946ec1fb, not target a66c..., and Snapshot changes must be preserved.`
+
+LIVE_RUNTIME_IDENTITY: `NOT_VERIFIED`
+
+DOCUMENTATION_VERSION: `NOT_VERIFIED`
+
+MANIFEST_HASH: `NOT_VERIFIED`
+
+CAPTURE_FILES_SCHEMA: `NOT_VERIFIED — no target tools/list was called`
+
+LIVE_ACCEPTANCE_READY: `NO`
+
 NEXT_ACTION_FOR_CHATGPT: `deploy this commit to demo.1945.vn, fresh bootstrap/discovery, then test one real chat attachment and a multi-file submission`
 
 This commit contains only the seven files listed in the files[] checkpoint.

@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Governed V3 snapshot boundary
+
+WHAT: Added the normalized V3 semantic snapshot export/import contract for the
+isolated Video recovery runtime. Export is read-only and repository-adapter
+driven; import is recovery-only, UUID/revision/history preserving,
+transactional and mandatory-read-back verified. The legacy raw `backup/snapshot`
+branch is retired fail-closed.
+
+FILES: `CanonicalSnapshotSource`, `CanonicalSnapshotWriter`, snapshot
+environment/registry/canonicalizer/manifest/artifact codec, export/import
+services, recovery guard, maintenance dispatch, focused snapshot tests,
+`docs/architecture/V3_SNAPSHOT_RECOVERY_RUNTIME.md` and the non-secret recovery
+runtime example configuration.
+
+VERIFICATION: Snapshot contract 13 tests / 25 assertions PASS; related
+maintenance contract tests 21 tests / 54 assertions PASS; NHK Unit 1,229 tests
+/ 5,982 assertions PASS; NHK Contract 4 tests / 31 assertions PASS; Composer
+PHP lint and `git diff --check` PASS. NHK Integration remains environment
+blocked because `NHK_WP_TEST_PATH=public`/WordPress bootstrap and MySQL are not
+available. No source export, snapshot import, runtime provisioning, staging
+mutation, deployment or push was performed. No data-bearing recovery
+adapter/runtime is configured.
+
+STATUS: SNAPSHOT_BOUNDARY_IMPLEMENTED / RUNTIME_PROVISIONING_BLOCKED /
+GOLDEN_NOT_RUN / FIRST_WAVE_NOT_READY.
+
 # Checkpoint — 2026-09-12 — Isolated Video recovery runtime design
 
 WHAT: The repository-supported runtime path was inspected. Root Composer and
