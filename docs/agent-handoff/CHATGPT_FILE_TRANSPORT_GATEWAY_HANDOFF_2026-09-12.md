@@ -25,3 +25,16 @@ its absence is reported as an environment block rather than a gateway pass.
 No Capture, Media, Governance, Graph, Authority or Article semantics are
 defined or changed here. No writer fallback, base64 transport or live action
 is part of this handoff.
+
+## Staging host allowlist checkpoint
+
+The staging site bootstrap at
+`public/wp-content/mu-plugins/nhk-chatgpt-file-transport.php` registers the
+existing `nhk_chatgpt_file_allowed_hosts` filter and adds only
+`sdmntpraustraliaeast.oaiusercontent.com` when the WordPress environment is
+`staging`. Gateway host matching is exact; sibling hosts, other subdomains and
+the parent `oaiusercontent.com` are rejected. Redirect targets are validated
+again at every hop.
+
+Verification: focused gateway suite passes 76 tests / 607 assertions. No live
+Capture, image test, deployment or signed-URL logging was performed.
