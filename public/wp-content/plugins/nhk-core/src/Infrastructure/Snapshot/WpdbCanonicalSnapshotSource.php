@@ -248,7 +248,7 @@ final class WpdbCanonicalSnapshotSource implements CanonicalSnapshotSource
             }
         }
         foreach (['addendum_uuid', 'approval_uuid', 'attempt_uuid', 'event_uuid', 'evidence_uuid', 'asset_uuid', 'usage_uuid', 'edge_uuid', 'identity_uuid', 'canonical_uuid', 'capture_uuid', 'proposal_uuid'] as $identityColumn) {
-            if (isset($row[$identityColumn]) && !isset($row['uuid'])) { $row['uuid'] = $row[$identityColumn]; break; }
+            if (isset($row[$identityColumn]) && (string) $row[$identityColumn] !== '') { $row['uuid'] = $row[$identityColumn]; break; }
         }
         return $row;
     }

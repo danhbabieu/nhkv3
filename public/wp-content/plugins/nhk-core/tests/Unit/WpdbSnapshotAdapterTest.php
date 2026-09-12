@@ -37,8 +37,8 @@ final class WpdbSnapshotAdapterTest extends TestCase
         $capture = '77777777-7777-4777-8777-777777777777';
 
         $row = $source->normalizeRow(
-            ['capture_uuid' => $capture, 'addendum_uuid' => $addendum],
-            ['capture_uuid' => ['Type' => 'varchar(36)'], 'addendum_uuid' => ['Type' => 'varchar(36)']],
+            ['uuid' => $capture, 'capture_uuid' => $capture, 'addendum_uuid' => $addendum],
+            ['uuid' => ['Type' => 'varchar(36)'], 'capture_uuid' => ['Type' => 'varchar(36)'], 'addendum_uuid' => ['Type' => 'varchar(36)']],
         );
 
         self::assertSame($addendum, $row['uuid']);
