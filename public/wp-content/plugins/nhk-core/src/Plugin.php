@@ -43,6 +43,7 @@ use NHK\Core\Infrastructure\Http\LegacyUrlRedirects;
 use NHK\Core\Infrastructure\Http\PublicKnowledgeRoutes;
 use NHK\Core\Infrastructure\Http\PublicVideoSitemapRoutes;
 use NHK\Core\Infrastructure\Http\McpApi;
+use NHK\Core\Infrastructure\Mcp\ChatGptMcpGateway;
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Admin\AdminShell;
@@ -128,6 +129,7 @@ final class Plugin {
         add_action('rest_api_init', [McpAbilityRegistration::class, 'bootstrapRegistry'], 0);
         add_action('rest_api_init', [McpAbilityRegistration::class, 'logEasyMcpExportDiagnostics'], PHP_INT_MAX);
         EasyMcpNativeFileCompatibilityAdapter::register();
+        ChatGptMcpGateway::register();
         add_action('wp_abilities_api_init', static function (): void {
             global $wpdb;
             if (!isset($wpdb) || !is_object($wpdb)) return;
@@ -509,9 +511,9 @@ final class Plugin {
                     $about = is_array($provenance['relation'] ?? null) ? $provenance['relation'] : [];
                     return [
                         'subject' => isset($about['target_uuid']) ? ['id' => (string) $about['target_uuid'], 'type' => (string) ($about['target_type'] ?? '')] : null,
-                        'source' => $source === null ? null : [$source->canonicalId, $source->revision, $source->active],
-                        'claim' => $claim === null ? null : [$claim->canonicalId, $claim->revision, $claim->active],
-                        'evidence' => array_map(static fn ($item): array => [$item->canonicalId, $item->revision, $item->sourceId, $item->active], $evidenceRows),
+                        'source' => $source === null ? null : ['canonical_id' => $source->canonicalId, 'revision' => $source->revision, 'active' => $source->active, 'title' => $source->title, 'source_type' => $source->sourceType, 'locator' => $source->locator, 'metadata' => $source->metadata],
+                        'claim' => $claim === null ? null : ['canonical_id' => $claim->canonicalId, 'revision' => $claim->revision, 'active' => $claim->active, 'claim_text' => $claim->claimText, 'claim_type' => $claim->claimType, 'provenance' => $claim->provenance],
+                        'evidence' => array_map(static fn ($item): array => ['canonical_id' => $item->canonicalId, 'revision' => $item->revision, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'active' => $item->active, 'metadata' => $item->metadata], $evidenceRows),
                         'proposal' => $proposal === null ? null : [$proposal->id, $proposal->revision, $proposal->state->value, $proposal->subjectId],
                     ];
                 },

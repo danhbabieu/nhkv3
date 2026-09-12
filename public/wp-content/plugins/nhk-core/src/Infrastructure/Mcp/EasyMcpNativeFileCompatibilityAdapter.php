@@ -165,6 +165,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     public static function interceptMultipartCapture(mixed $response, mixed $handler, mixed $request): mixed
     {
         if (self::$proxyDispatch || !is_object($request) || !method_exists($request, 'get_route')) return $response;
+        if (method_exists($request, 'get_header') && $request->get_header('X-NHK-ChatGPT-Gateway') === '1') return $response;
         if (!self::isSupportedInstalledVersion() || !method_exists($request, 'get_file_params')) return $response;
 
         $files = $request->get_file_params();

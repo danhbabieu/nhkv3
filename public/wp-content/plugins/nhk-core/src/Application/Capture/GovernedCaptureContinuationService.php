@@ -218,15 +218,22 @@ final class GovernedCaptureContinuationService
                 $writes[] = $this->classifiedFailure($dependency, $error);
                 return;
             }
-            $write = $this->runGovernedChild($dependency, $control, $lifecycle, count($dependencyWrites) === 0 ? 'VIDEO_SOURCE_GOVERNANCE' : 'VIDEO_CLAIM_GOVERNANCE');
+            $kind = count($dependencyWrites) === 0 ? 'source' : 'claim';
+            $phase = $kind === 'source' ? 'VIDEO_SOURCE_GOVERNANCE' : 'VIDEO_CLAIM_GOVERNANCE';
+            $write = $this->reusedDependency($dependency, $provenancePlan, $kind, $phase)
+                ?? $this->runGovernedChild($dependency, $control, $lifecycle, $phase);
             $dependencyWrites[] = $write;
-            if (($write['status'] ?? '') !== 'APPLIED') {
+            if (!$this->dependencyWriteCompleted($write)) {
                 array_push($writes, ...$dependencyWrites);
                 return;
             }
             $canonicalId = trim((string) ($write['canonical_id'] ?? ''));
             if (!$this->hasCanonicalReadback($write, $canonicalId)) {
                 array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['CANONICAL_READBACK_VERIFICATION_FAILED']]]));
+                return;
+            }
+            if (!$this->dependencyReadback($provenancePlan, $kind, $canonicalId)) {
+                array_push($writes, ...array_merge($dependencyWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['CANONICAL_DEPENDENCY_READBACK_VERIFICATION_FAILED']]]));
                 return;
             }
             $canonicalIds[] = $canonicalId;
@@ -247,15 +254,20 @@ final class GovernedCaptureContinuationService
             $writes[] = $this->classifiedFailure($evidenceArguments, $error);
             return;
         }
-        $evidenceWrite = $this->runGovernedChild($evidenceArguments, $control, $lifecycle, 'VIDEO_EVIDENCE_GOVERNANCE');
+        $evidenceWrite = $this->reusedDependency($evidenceArguments, $withEvidence, 'evidence', 'VIDEO_EVIDENCE_GOVERNANCE')
+            ?? $this->runGovernedChild($evidenceArguments, $control, $lifecycle, 'VIDEO_EVIDENCE_GOVERNANCE');
         $allWrites = array_merge($dependencyWrites, [$evidenceWrite]);
-        if (($evidenceWrite['status'] ?? '') !== 'APPLIED') {
+        if (!$this->dependencyWriteCompleted($evidenceWrite)) {
             array_push($writes, ...$allWrites);
             return;
         }
         $evidenceId = trim((string) ($evidenceWrite['canonical_id'] ?? ''));
         if (!$this->hasCanonicalReadback($evidenceWrite, $evidenceId)) {
             array_push($writes, ...array_merge($allWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['CANONICAL_READBACK_VERIFICATION_FAILED']]]));
+            return;
+        }
+        if (!$this->dependencyReadback($withEvidence, 'evidence', $evidenceId)) {
+            array_push($writes, ...array_merge($allWrites, [['status' => 'SYSTEM_BLOCKED', 'blockers' => ['CANONICAL_DEPENDENCY_READBACK_VERIFICATION_FAILED']]]));
             return;
         }
         $complete = $this->videoProvenance->attachEvidence($provenancePlan, $canonicalIds[0], $canonicalIds[1], $evidenceId);
@@ -329,6 +341,109 @@ final class GovernedCaptureContinuationService
         if (!UuidCodec::isValid($canonicalId)) return false;
         $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
         return (string) ($readback['canonical_id'] ?? '') === $canonicalId && ($readback['active'] ?? false) === true;
+    }
+
+    private function dependencyWriteCompleted(array $write): bool
+    {
+        return in_array((string) ($write['status'] ?? ''), ['APPLIED', 'REUSED_VERIFIED'], true);
+    }
+
+    /**
+     * Search the canonical owner through the injected read boundary before
+     * opening another child proposal. This is deliberately limited to the
+     * source-specific provenance chain; it is not a generic semantic writer.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function reusedDependency(array $dependency, array $plan, string $kind, string $phase): ?array
+    {
+        if ($this->videoDependencyState === null || !in_array($kind, ['source', 'claim', 'evidence'], true)) return null;
+        try {
+            $state = ($this->videoDependencyState)($plan);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!is_array($state)) return null;
+        $record = $state[$kind] ?? null;
+        if ($kind === 'evidence') {
+            $sourceId = trim((string) (($dependency['payload']['source_id'] ?? '')));
+            $claimId = trim((string) (($dependency['payload']['claim_id'] ?? '')));
+            $record = $this->matchingEvidence($state['evidence'] ?? [], $sourceId, $claimId, (array) ($dependency['payload'] ?? []));
+        }
+        if (!$this->canonicalDependencyMatches($record, (array) ($dependency['payload'] ?? []), $kind)) return null;
+        [$canonicalId, $revision, $active] = $this->canonicalStateTuple($record);
+        if (!UuidCodec::isValid($canonicalId) || !$active) return null;
+        $this->emitPhaseReceipt($phase, ['status' => 'COMPLETED', 'result' => 'REUSED_VERIFIED', 'canonical_id' => $canonicalId, 'revision' => $revision, 'idempotent' => true]);
+        return [
+            'canonical_id' => $canonicalId,
+            'status' => 'REUSED_VERIFIED',
+            'idempotent' => true,
+            'reused' => true,
+            'canonical_readback' => ['canonical_id' => $canonicalId, 'entity_type' => $kind === 'claim' ? 'knowledge' : $kind, 'active' => true, 'revision' => $revision],
+        ];
+    }
+
+    private function dependencyReadback(array $plan, string $kind, string $expectedId): bool
+    {
+        if ($this->videoDependencyState === null) return true;
+        try {
+            $state = ($this->videoDependencyState)($plan);
+        } catch (\Throwable) {
+            return false;
+        }
+        if (!is_array($state)) return false;
+        if ($kind === 'evidence') {
+            $evidence = is_array($state['evidence'] ?? null) ? $state['evidence'] : [];
+            foreach ($evidence as $record) {
+                [$canonicalId, , $active] = $this->canonicalStateTuple($record);
+                if ($canonicalId === $expectedId && $active) return true;
+            }
+            return false;
+        }
+        [$canonicalId, , $active] = $this->canonicalStateTuple($state[$kind] ?? null);
+        return $canonicalId === $expectedId && $active;
+    }
+
+    /** @return array{0:string,1:int,2:bool} */
+    private function canonicalStateTuple(mixed $record): array
+    {
+        if (!is_array($record)) return ['', 0, false];
+        if (array_is_list($record)) return [(string) ($record[0] ?? ''), (int) ($record[1] ?? 0), (bool) ($record[2] ?? false)];
+        return [
+            (string) ($record['canonical_id'] ?? $record['id'] ?? $record['uuid'] ?? ''),
+            (int) ($record['revision'] ?? 0),
+            ($record['active'] ?? false) === true,
+        ];
+    }
+
+    /** @return array<string,mixed>|list<mixed>|null */
+    private function matchingEvidence(mixed $records, string $sourceId, string $claimId, array $payload): array|null
+    {
+        foreach (is_array($records) ? $records : [] as $record) {
+            if (!is_array($record)) continue;
+            $recordSource = array_is_list($record) ? (string) ($record[2] ?? '') : (string) ($record['source_id'] ?? '');
+            $recordClaim = array_is_list($record) ? $claimId : (string) ($record['claim_id'] ?? $claimId);
+            if ($recordSource === $sourceId && $recordClaim === $claimId && $this->canonicalDependencyMatches($record, $payload, 'evidence')) return $record;
+        }
+        return null;
+    }
+
+    private function canonicalDependencyMatches(mixed $record, array $payload, string $kind): bool
+    {
+        // Legacy tuple read-backs contain only identity/revision/state. They
+        // remain usable as a compatibility read shape; the production Plugin
+        // supplies the richer canonical fields below for strict reuse.
+        if (!is_array($record) || array_is_list($record)) return true;
+        $fields = match ($kind) {
+            'source' => ['title' => 'title', 'source_type' => 'source_type', 'locator' => 'locator', 'metadata' => 'metadata'],
+            'claim' => ['claim_text' => 'text', 'claim_type' => 'claim_type', 'provenance' => 'provenance'],
+            'evidence' => ['relation' => 'relation', 'excerpt' => 'excerpt', 'locator' => 'locator', 'metadata' => 'metadata'],
+            default => [],
+        };
+        foreach ($fields as $canonicalField => $payloadField) {
+            if (array_key_exists($canonicalField, $record) && $record[$canonicalField] !== ($payload[$payloadField] ?? null)) return false;
+        }
+        return true;
     }
 
     /** @param array<string,mixed> $plan @param list<string> $lifecycle @return array<string,mixed> */
@@ -546,7 +661,7 @@ final class GovernedCaptureContinuationService
             if (is_array($write['completion'] ?? null)) { $children[] = ['completion' => $write['completion']]; continue; }
             $ownerId = trim((string) ($write['canonical_id'] ?? $write['result_entity_uuid'] ?? ''));
             if ($ownerId === '') continue;
-            $children[] = ['owner_type' => trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge', 'owner_id' => $ownerId, 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
+            $children[] = ['owner_type' => trim((string) ($write['entity_type'] ?? 'knowledge')) ?: 'knowledge', 'owner_id' => $ownerId, 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => $this->dependencyWriteCompleted($write) ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
         }
         return $children;
     }

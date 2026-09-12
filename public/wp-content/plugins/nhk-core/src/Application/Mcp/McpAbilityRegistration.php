@@ -365,6 +365,27 @@ final class McpAbilityRegistration
     /** @return array<string,mixed> */
     private static function abilityInputSchema(string $tool, array $schema): array
     {
+        if ($tool === 'nhk.capture.ingest' && isset($schema['properties']['files'])) {
+            // Ability validation sees the native descriptors produced by the
+            // connector boundary. The canonical MCP catalog remains the
+            // official ChatGPT fileParams schema and is projected at tools/list.
+            $schema['properties']['files'] = [
+                'type' => 'array',
+                'maxItems' => 20,
+                'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string'],
+                        'type' => ['type' => 'string'],
+                        'tmp_name' => ['type' => 'string', 'minLength' => 1],
+                        'error' => ['type' => 'integer', 'minimum' => 0],
+                        'size' => ['type' => 'integer', 'minimum' => 0],
+                    ],
+                    'required' => ['tmp_name'],
+                    'additionalProperties' => false,
+                ],
+            ];
+        }
         if ($tool !== 'nhk.media.ingest') return $schema;
 
         foreach (['file', 'filename', 'max_width', 'max_height', 'quality'] as $property) {

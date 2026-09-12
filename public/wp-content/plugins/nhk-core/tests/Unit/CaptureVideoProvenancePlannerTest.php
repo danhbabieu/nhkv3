@@ -6,7 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Capture\CaptureVideoProvenancePlanner;
 use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
-use NHK\Core\Application\Video\VideoRelationCandidatePlanner;
+use NHK\Core\Application\Video\{VideoRelationCandidatePlanner, YouTubeSourceAdapter};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
@@ -115,6 +115,44 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             $this->videoProposal('ambiguous11'),
             $this->snapshot('ambiguous11', 'Một video đồng hồ cổ không rõ mẫu'),
             ['id' => self::VARIANT, 'type' => 'variant', 'name' => 'Variant A'],
+        );
+
+        self::assertSame('REVIEW_REQUIRED', $plan['status']);
+        self::assertContains('SOURCE_SUBJECT_IDENTITY_UNCONFIRMED', $plan['blockers']);
+        self::assertSame([], $plan['dependencies']);
+        self::assertSame([], $plan['video_proposal']['payload']['metadata']['semantic_attachments']);
+    }
+
+    public function test_official_source_description_can_confirm_locked_subject_without_becoming_evidence(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-source-description',
+            $this->videoProposal('gsjfYNH2r6M'),
+            $this->snapshot('gsjfYNH2r6M', 'Collection video – archival record') + [
+                'source_description' => 'Official description identifies Odo Jacquemart, model record.',
+                'channel_title' => 'NHK official archive',
+            ],
+            ['id' => '30515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model', 'name' => 'Odo Jacquemart'],
+        );
+
+        self::assertSame('READY', $plan['status']);
+        self::assertSame(['source_description'], $plan['diagnostics']['identity_matches']);
+        self::assertSame('Collection video – archival record', $plan['evidence']['excerpt']);
+        self::assertStringNotContainsString('Official description identifies', $plan['evidence']['excerpt']);
+    }
+
+    public function test_source_metadata_not_identifying_locked_subject_fails_closed_even_with_user_hint(): void
+    {
+        $plan = (new CaptureVideoProvenancePlanner())->plan(
+            'capture-source-negative',
+            $this->videoProposal('gsjfYNH2r6M'),
+            $this->snapshot('gsjfYNH2r6M', 'Collection video – archival record') + [
+                'source_description' => 'Official description contains no model identity.',
+                'channel_title' => 'NHK official archive',
+                'tags' => ['archive', 'horology'],
+            ],
+            ['id' => '30515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model', 'name' => 'Odo Jacquemart'],
+            ['user_hint' => 'Odo Jacquemart'],
         );
 
         self::assertSame('REVIEW_REQUIRED', $plan['status']);
@@ -257,6 +295,116 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
         self::assertSame($ids[0], $created[2]['payload']['source_id']);
         self::assertSame($ids[1], $created[2]['payload']['claim_id']);
         self::assertSame([['evidence_id' => $ids[2]]], $created[3]['payload']['metadata']['semantic_attachments'][0]['evidence_refs']);
+    }
+
+    public function test_capture_video_governed_dependency_e2e_reuses_source_and_reads_back_one_canonical_chain(): void
+    {
+        $subjectId = '30515de5-efe5-48e1-aec5-34130509a4dc';
+        $videoId = '40515de5-efe5-48e1-aec5-34130509a4dc';
+        $canonicalIds = [
+            '50515de5-efe5-48e1-aec5-34130509a4dc',
+            '60515de5-efe5-48e1-aec5-34130509a4dc',
+            '70515de5-efe5-48e1-aec5-34130509a4dc',
+        ];
+        $governance = new class implements GovernedLifecycle {
+            /** @var array<string,Proposal> */
+            public array $proposals = [];
+            public int $created = 0;
+
+            public function createFromArguments(array $arguments): Proposal
+            {
+                ++$this->created;
+                $proposal = new Proposal(
+                    UuidCodec::newV7(),
+                    (string) ($arguments['subject_id'] ?? 'subject'),
+                    'ingest',
+                    (array) ($arguments['payload'] ?? []),
+                    hash('sha256', json_encode($arguments['payload'] ?? [], JSON_THROW_ON_ERROR)),
+                    null,
+                    hash('sha256', (string) ($arguments['idempotency_key'] ?? '')),
+                    ProposalState::DRAFT,
+                    idempotencyKey: (string) ($arguments['idempotency_key'] ?? ''),
+                    entityType: (string) ($arguments['entity_type'] ?? ''),
+                );
+                return $this->proposals[$proposal->id] = $proposal;
+            }
+
+            public function findByIdempotencyKey(string $key): ?Proposal
+            {
+                foreach ($this->proposals as $proposal) if ($proposal->idempotencyKey === $key) return $proposal;
+                return null;
+            }
+
+            public function submit(string $id): Proposal { return $this->proposals[$id] = $this->proposals[$id]->transition(ProposalState::SUBMITTED, 'test'); }
+
+            public function review(string $id): array
+            {
+                $proposal = $this->proposals[$id];
+                return ['state' => $proposal->state->value, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'subject_id' => $proposal->subjectId, 'payload' => $proposal->payload, 'content_fingerprint' => $proposal->contentFingerprint, 'dependency_fingerprint' => $proposal->dependencyFingerprint];
+            }
+
+            public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { return $this->proposals[$id] = $this->proposals[$id]->transition(ProposalState::APPROVED, $actor); }
+
+            public function eligibility(string $id): array { return ['ready' => true]; }
+        };
+        $state = ['source' => null, 'claim' => null, 'evidence' => []];
+        $createdCanonical = ['source' => 0, 'claim' => 0, 'evidence' => 0, 'video' => 0];
+        $officialSnapshot = (new YouTubeSourceAdapter(static fn (object $identity): array => [
+            'source_title' => 'Official archive record',
+            'source_description' => 'Official description identifies Odo Jacquemart.',
+            'channel_title' => 'NHK official archive',
+        ]))->resolve('https://www.youtube.com/watch?v=gsjfYNH2r6M')->snapshot->toArray();
+        $apply = function (string $proposalId) use (&$state, &$createdCanonical, $governance, $canonicalIds, $videoId): array {
+            $proposal = $governance->proposals[$proposalId];
+            $kind = $proposal->entityType === 'knowledge' ? 'claim' : $proposal->entityType;
+            $map = ['source' => $canonicalIds[0], 'claim' => $canonicalIds[1], 'evidence' => $canonicalIds[2], 'video' => $videoId];
+            $canonicalId = $map[$kind];
+            if ($kind === 'source') $state['source'] = ['canonical_id' => $canonicalId, 'revision' => 1, 'active' => true];
+            elseif ($kind === 'claim') $state['claim'] = ['canonical_id' => $canonicalId, 'revision' => 1, 'active' => true];
+            elseif ($kind === 'evidence') $state['evidence'] = [['canonical_id' => $canonicalId, 'revision' => 1, 'claim_id' => $canonicalIds[1], 'source_id' => $canonicalIds[0], 'active' => true]];
+            if (!isset($createdCanonical[$kind]) || $createdCanonical[$kind] === 0) ++$createdCanonical[$kind];
+            if ($proposal->state === ProposalState::APPROVED) $governance->proposals[$proposalId] = $proposal->transition(ProposalState::APPLIED, 'test');
+            return ['canonical_id' => $canonicalId, 'canonical_readback' => ['canonical_id' => $canonicalId, 'entity_type' => $kind === 'claim' ? 'knowledge' : $kind, 'active' => true, 'revision' => 1], 'idempotent' => false];
+        };
+        $stateReader = static function (array $plan) use (&$state): array {
+            return $state + ['subject' => ['id' => '30515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model']];
+        };
+        $policies = new GovernanceAutomationPolicyResolver(['source', 'knowledge', 'evidence', 'video'], new class implements AutomationPolicyStorage {
+            public function read(): array { return ['source' => 'AUTO_PUBLISH', 'knowledge' => 'AUTO_PUBLISH', 'evidence' => 'AUTO_PUBLISH', 'video' => 'AUTO_PUBLISH']; }
+            public function write(array $policies): void {}
+        });
+        $service = new GovernedCaptureContinuationService($governance, $apply, $policies, static fn (string $capability): bool => true, null, new CaptureVideoProvenancePlanner(), null, $stateReader);
+        $context = [
+            'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'model', 'name' => 'Odo Jacquemart'], 'resolved' => [['id' => $subjectId, 'type' => 'model', 'name' => 'Odo Jacquemart']]],
+            'interpretation' => [],
+            'observations' => [],
+            'assets' => [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'operation' => 'ingest', 'entity_type' => 'video', 'subject_id' => $videoId, 'idempotency_key' => 'capture:video:gsjfYNH2r6M',
+                    'payload' => ['canonical_id' => $videoId, 'url' => 'https://www.youtube.com/watch?v=gsjfYNH2r6M', 'metadata' => [
+                        'source' => $officialSnapshot,
+                        'subject_resolution_packet' => ['id' => $subjectId, 'type' => 'model', 'name' => 'Odo Jacquemart'],
+                    ]],
+                ],
+            ]],
+        ];
+
+        $first = $service->execute('capture-gsjfYNH2r6M', 'capture-gsjfYNH2r6M:semantic', $context, ['approval_confirmed' => true]);
+        $replay = $service->execute('capture-gsjfYNH2r6M', 'capture-gsjfYNH2r6M:semantic', $context, ['approval_confirmed' => true]);
+
+        self::assertSame('APPLIED', $first['status']);
+        self::assertSame('APPLIED', $replay['status']);
+        self::assertSame(4, $governance->created, 'Replay must reuse the same governed dependency identities.');
+        self::assertSame(['source' => 1, 'claim' => 1, 'evidence' => 1, 'video' => 1], $createdCanonical);
+        self::assertSame($canonicalIds[0], $state['source']['canonical_id']);
+        self::assertSame($canonicalIds[1], $state['claim']['canonical_id']);
+        self::assertSame($canonicalIds[2], $state['evidence'][0]['canonical_id']);
+        self::assertSame([['evidence_id' => $canonicalIds[2]]], $first['writes'][3]['evidence_handoff']['relation_evidence_refs']);
+        self::assertSame([['evidence_id' => $canonicalIds[2]]], $replay['writes'][3]['evidence_handoff']['relation_evidence_refs']);
+        self::assertSame('REUSED_VERIFIED', $replay['writes'][0]['status']);
+        self::assertSame('REUSED_VERIFIED', $replay['writes'][1]['status']);
+        self::assertSame('REUSED_VERIFIED', $replay['writes'][2]['status']);
     }
 
     public function test_explicit_video_resume_hands_canonical_evidence_to_relation_candidate_without_reapplying_knowledge(): void

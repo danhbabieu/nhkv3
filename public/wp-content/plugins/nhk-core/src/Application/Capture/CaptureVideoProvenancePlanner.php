@@ -42,7 +42,9 @@ final class CaptureVideoProvenancePlanner
         $evidenceKey = 'video-provenance:evidence:' . hash('sha256', CommandCanonicalizer::canonicalize([$sourceKey, $claimKey]));
         $emptyVideo = $this->withAttachments($video, []);
 
-        if ($sourceTitle === '' || $subjectId === '' || $subjectType === '' || !$this->titleIdentifiesSubject($sourceTitle, $resolvedSubject)) {
+        $identityFields = $this->sourceIdentityFields($sourceSnapshot);
+        $identityMatches = $this->identityMatchesSubject($identityFields, $resolvedSubject);
+        if ($sourceTitle === '' || $subjectId === '' || $subjectType === '' || $identityMatches === []) {
             return [
                 'status' => 'REVIEW_REQUIRED',
                 'blockers' => ['SOURCE_SUBJECT_IDENTITY_UNCONFIRMED'],
@@ -51,7 +53,7 @@ final class CaptureVideoProvenancePlanner
                 'evidence_idempotency_key' => $evidenceKey,
                 'reuse_scope' => 'source-specific-external-video',
                 'unsupported_classifications' => $unsupported,
-                'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType],
+                'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType, 'identity_fields' => array_keys($identityFields), 'identity_matches' => $identityMatches],
             ];
         }
 
@@ -126,7 +128,7 @@ final class CaptureVideoProvenancePlanner
                 'reason' => (string) ($originalRelation['reason'] ?? 'Source-specific provenance handoff.'),
                 'confidence' => (float) ($originalRelation['confidence'] ?? 1.0),
             ],
-            'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType],
+            'diagnostics' => ['source_title' => $sourceTitle, 'subject_id' => $subjectId, 'subject_type' => $subjectType, 'identity_fields' => array_keys($identityFields), 'identity_matches' => $identityMatches],
         ];
     }
 
@@ -226,21 +228,55 @@ final class CaptureVideoProvenancePlanner
         return $video;
     }
 
-    private function titleIdentifiesSubject(string $title, array $subject): bool
+    /** @return array<string,string> */
+    private function sourceIdentityFields(array $snapshot): array
     {
-        $title = $this->normalize($title);
-        if ($title === '') return false;
-        if (($subject['type'] ?? '') === 'variant' && $this->variantReferenceIdentifies($title, $subject)) return true;
+        $fields = [];
+        foreach ([
+            'source_title' => $snapshot['source_title'] ?? $snapshot['title'] ?? '',
+            'source_description' => $snapshot['source_description'] ?? $snapshot['description'] ?? '',
+            'channel_title' => $snapshot['channel_title'] ?? '',
+        ] as $field => $value) {
+            $value = trim((string) $value);
+            if ($value !== '') $fields[$field] = $value;
+        }
+        $tags = array_values(array_filter(array_map('strval', (array) ($snapshot['tags'] ?? [])), static fn (string $tag): bool => trim($tag) !== ''));
+        if ($tags !== []) $fields['tags'] = implode(' ', $tags);
+        return $fields;
+    }
+
+    /**
+     * Official source metadata may confirm the locked subject. This identity
+     * check is intentionally separate from Evidence creation: matching a
+     * title, description, channel or tag never becomes an Evidence reference.
+     *
+     * @param array<string,string> $fields @return list<string>
+     */
+    private function identityMatchesSubject(array $fields, array $subject): array
+    {
+        $normalizedFields = [];
+        foreach ($fields as $field => $value) {
+            $normalized = $this->normalize($value);
+            if ($normalized !== '') $normalizedFields[$field] = $normalized;
+        }
+        if ($normalizedFields === []) return [];
         $terms = array_merge(
-            [(string) ($subject['name'] ?? '')],
+            [(string) ($subject['name'] ?? ''), (string) ($subject['label'] ?? ''), (string) ($subject['display_name'] ?? ''), (string) ($subject['canonical_name'] ?? '')],
             array_map('strval', (array) ($subject['aliases'] ?? [])),
             $this->stableKeyIdentityTerms($subject),
         );
+        $matches = [];
         foreach ($terms as $term) {
             $term = $this->normalize($term);
-            if ($term !== '' && str_contains($title, $term)) return true;
+            if ($term === '') continue;
+            foreach ($normalizedFields as $field => $value) {
+                if (str_contains($value, $term)) $matches[] = $field;
+            }
         }
-        return false;
+        if (($subject['type'] ?? '') === 'variant') {
+            foreach ($normalizedFields as $field => $value) if ($this->variantReferenceIdentifies($value, $subject)) $matches[] = $field;
+        }
+        return array_values(array_unique($matches));
     }
 
     private function variantReferenceIdentifies(string $title, array $subject): bool

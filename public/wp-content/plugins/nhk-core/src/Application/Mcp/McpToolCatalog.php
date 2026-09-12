@@ -88,8 +88,14 @@ final class McpToolCatalog
                 ],
                 'files' => ['type' => 'array', 'maxItems' => 20, 'items' => [
                     'type' => 'object',
-                    'format' => 'binary',
-                    'description' => 'Native multipart file parts. Binary bytes are transported out-of-band; base64 and paths are not accepted.',
+                    'description' => 'OpenAI ChatGPT uploaded file reference. The connector supplies a temporary download URL and opaque file ID; the server materializes bytes into a native temporary file.',
+                    'properties' => [
+                        'download_url' => ['type' => 'string', 'format' => 'uri'],
+                        'file_id' => ['type' => 'string', 'minLength' => 1],
+                        'mime_type' => ['type' => 'string'],
+                        'file_name' => ['type' => 'string'],
+                    ],
+                    'required' => ['download_url', 'file_id'],
                 ]],
             ], ['idempotency_key', 'documentation_checkpoint'], true, ['openai/fileParams' => ['files']]),
             self::tool('nhk.category.resolve', 'Resolve a native WordPress Category by ID, exact slug or exact name.', ['selector' => ['type' => 'object']], ['selector']),
