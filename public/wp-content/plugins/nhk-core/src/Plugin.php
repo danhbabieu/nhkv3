@@ -24,7 +24,7 @@ use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\MediaBatchUploadService;
-use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
+use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -61,7 +61,7 @@ use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTr
 use NHK\Core\Application\Graph\{LegacyRelationPlanner, RelationBackfillCandidate, RelationBackfillService};
 use NHK\Core\Application\Inventory\{CanonicalInventoryService, GraphInventoryService};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, PredicateRegistry};
-use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, WpdbAuditSink, WpdbGraphRepository};
+use NHK\Core\Infrastructure\Graph\{CoreEndpointResolverRegistrar, GraphClockTypeCanonicalMembershipReader, WpdbAuditSink, WpdbGraphRepository};
 use NHK\Core\Infrastructure\Governance\WpdbDependencyRepository;
 use NHK\Core\Infrastructure\Governance\GovernanceRuntimeFactory;
 use NHK\Core\Application\Entity\{ComparisonPageQuery, EntityMediaProjection, EntityPageQuery, PublicEndpointEligibilityResolver, PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, RelatedContentQuery};
@@ -587,6 +587,8 @@ final class Plugin {
             );
             $captureAddendumRepository = new WpdbCaptureAddendumRepository($wpdb);
             $captureSubjectResolver = new SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types));
+            $clockTypeMembershipReader = new GraphClockTypeCanonicalMembershipReader($graphService, $authority);
+            $clockTypeShadowClassifier = new ClockTypeShadowClassifier($authority, new \NHK\Core\Application\Entity\EntityProfileResolver(), $clockTypeMembershipReader);
             $captureNeighborhood = $mcpNeighborhood;
             $captureClaims = new ClaimRetrievalEngine(
                 static function (array $subject) use ($captureNeighborhood): array {
@@ -822,6 +824,8 @@ final class Plugin {
                 static function (array $context) use ($videoPublicationVerifier): array {
                     return $videoPublicationVerifier->verify($context);
                 },
+                null,
+                $clockTypeShadowClassifier,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture);
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };

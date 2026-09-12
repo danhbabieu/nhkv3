@@ -44,6 +44,7 @@ final class EditorialCaptureCoordinator
         private $videoEnrichment = null,
         private $videoPublicationVerifier = null,
         ?CompletionCoordinator $completion = null,
+        private ?ClockTypeShadowClassifier $clockTypeShadowClassifier = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -215,6 +216,27 @@ final class EditorialCaptureCoordinator
                 }
                 $diagnostics['video_enrichment'] = $this->withoutBody($videoManifest);
                 $record = $this->save($record, CaptureStage::SUBJECTS_RESOLVED, $assets, $diagnostics, $receipts, 'VIDEO_ENRICHED', $record->articleId, $record->articleStateToken);
+            }
+
+            // Clock-Type is a sibling shadow diagnostic of the resolved
+            // Capture subject. It must run after the video handoff has locked
+            // the primary subject and is never fed back into any writer.
+            if ($this->clockTypeShadowClassifier !== null) {
+                $shadow = $this->clockTypeShadowClassifier->resolve([
+                    'capture_id' => $record->captureId,
+                    'raw_input' => $text,
+                    'title' => trim((string) ($input['title'] ?? '')),
+                    'subject_resolution' => $resolution,
+                    'interpretation' => $interpretation,
+                    'assets' => $assets,
+                    'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [],
+                    'brand_context' => $input['brand_context'] ?? null,
+                    'classification_uuid' => $input['classification_uuid'] ?? null,
+                    'classification_stable_key' => $input['classification_stable_key'] ?? null,
+                    'clock_type_name' => $input['clock_type_name'] ?? null,
+                    'clock_type_hints' => $input['clock_type_hints'] ?? [],
+                ]);
+                $diagnostics['semantic_diagnostics']['clock_type_shadow'] = $shadow->toArray();
             }
 
             $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];

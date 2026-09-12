@@ -63,7 +63,7 @@ NO MUTATION: No semantic write, Graph apply/backfill, family normalization,
 Public Identity allocation, Capture, Media/Video/Knowledge write,
 Article publication, migration or live action.
 
-STATUS: PR3_READ_FOUNDATION_IMPLEMENTED / PR4_REVIEW_GATE_OPEN / LIVE_NOT_CLAIMED.
+STATUS: PR3_READ_FOUNDATION_IMPLEMENTED / PR4_SHADOW_LOCAL_OK / LIVE_NOT_CLAIMED.
 
 # Checkpoint — 2026-09-12 — PR2 Entity Profile Registry + Clock-Type read foundation
 

@@ -319,7 +319,38 @@ normalize hoặc ghi lại family. Không có proposal/apply, `classified_as` wr
 Classification create/update, Graph edge, Knowledge claim, Media relation,
 Video `about`, Article, Capture revision hay slug allocation trong PR4.
 
-Shadow output không được persist vào Capture semantic truth store. Nếu current
-Capture coordinator chưa được inject seam này, kết quả vẫn transient và việc
-wire production diagnostics là implementation gap riêng; không invent audit
-store để lấp gap.
+Shadow output không được persist vào Capture semantic truth store. Trước
+PR4.1 classifier chỉ là transient seam; từ PR4.1 coordinator dùng existing
+Capture diagnostics/readback surface để expose packet, nhưng đó vẫn không phải
+semantic truth và không tạo audit/store mới.
+
+## 13. PR4.1 production Capture read integration
+
+PR4.1 đóng seam orchestration ở mức read-only: sau khi Capture đã resolve
+`subject_resolution.primary` và hoàn tất Video subject handoff, production
+`EditorialCaptureCoordinator` gọi `ClockTypeShadowClassifier` một lần và đặt
+safe serializer tại `diagnostics.semantic_diagnostics.clock_type_shadow`.
+Packet này là sibling diagnostic của immutable primary subject. Nó không được
+đưa vào `semantic_write_back`, Proposal, Authority, Graph, Knowledge,
+Evidence, Media, Video hoặc Public Identity writer. Capture continuation dùng
+cùng coordinator và không tạo Capture revision mới chỉ vì shadow read.
+
+`GraphClockTypeCanonicalMembershipReader` là adapter read-only nối classifier
+với `GraphService::findOutgoing()` của canonical Graph boundary. Adapter chỉ
+đọc `classified_as` từ `model`, `variant`, `specimen` hoặc `product`; nó xác
+nhận target active `classification` và resolve profile từ family metadata.
+`family=clock_type` là canonical, còn `family=clock-type` chỉ là
+`COMPATIBILITY_READ` và giữ `DATA_COMPATIBILITY_GAP`. Wrong-family, dangling,
+inactive và invalid target không được coi là Clock Type. Nhiều membership được
+giữ nguyên và trả `AMBIGUOUS`; không có first-result selection.
+
+Editorial và MIXED editorial child có thể nhận shadow packet. AUTHORITY-only
+Capture hiện không có canonical primary subject trong flow hiện hành nên giữ
+typed not-applicable/không chạy classifier; PR4.1 không mở rộng flow đó. Video
+child, Video `about`, Media scope và Knowledge subject không nhận shadow
+candidate làm input ghi.
+
+Production wiring local đã được kiểm thử ở orchestration level. Chưa có live
+deployment/read-back evidence; do đó PR4.1 không claim live readiness. Đây vẫn
+là shadow-only phase: shadow result không phải Graph truth, Evidence,
+Knowledge, Video attachment hay Authority create.

@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Entity\{EntityProfileResolution, EntityProfileResolver};
 use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
-use NHK\Core\Contracts\Capture\ClockTypeCanonicalMembershipReader;
+use NHK\Core\Contracts\Capture\{ClockTypeCanonicalMembershipDiagnosticsReader, ClockTypeCanonicalMembershipReader};
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
@@ -77,7 +77,26 @@ final class ClockTypeShadowClassifier
         // any text. A reader failure is not converted into an empty success.
         if ($this->memberships !== null) {
             try {
-                $members = $this->memberships->listClockTypesForSubject((string) $primary['type'], (string) $primary['id']);
+                $membershipDiagnostics = [];
+                if ($this->memberships instanceof ClockTypeCanonicalMembershipDiagnosticsReader) {
+                    $membershipRead = $this->memberships->readClockTypeMemberships((string) $primary['type'], (string) $primary['id']);
+                    $members = $membershipRead->members;
+                    $membershipDiagnostics = $membershipRead->diagnostics;
+                    $diagnostics = array_values(array_unique([...$diagnostics, ...$membershipDiagnostics]));
+                    if ($membershipRead->status === 'UNAVAILABLE') {
+                        return new ClockTypeShadowResolution(
+                            ClockTypeShadowResolution::UNAVAILABLE,
+                            [],
+                            null,
+                            ['CANONICAL_GRAPH_MEMBERSHIP'],
+                            [],
+                            array_values(array_unique([...$diagnostics, 'CANONICAL_MEMBERSHIP_READ_UNAVAILABLE'])),
+                            $primary,
+                        );
+                    }
+                } else {
+                    $members = $this->memberships->listClockTypesForSubject((string) $primary['type'], (string) $primary['id']);
+                }
             } catch (\Throwable) {
                 return new ClockTypeShadowResolution(
                     ClockTypeShadowResolution::UNAVAILABLE,
@@ -104,8 +123,11 @@ final class ClockTypeShadowClassifier
                 if (count($canonicalCandidates) > 1) {
                     return $this->ambiguous($primary, $canonicalCandidates, $basis, $diagnostics, 'MULTIPLE_CANONICAL_CLOCK_TYPES');
                 }
+                $status = $canonicalCandidates[0]->profileStatus === EntityProfileResolution::COMPATIBILITY_READ
+                    ? ClockTypeShadowResolution::DATA_COMPATIBILITY_GAP
+                    : ClockTypeShadowResolution::RESOLVED_CANONICAL;
                 return new ClockTypeShadowResolution(
-                    ClockTypeShadowResolution::RESOLVED_CANONICAL,
+                    $status,
                     $canonicalCandidates,
                     $canonicalCandidates[0],
                     $basis,

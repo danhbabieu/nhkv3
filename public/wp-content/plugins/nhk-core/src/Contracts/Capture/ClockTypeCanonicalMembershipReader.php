@@ -9,8 +9,8 @@ use NHK\Core\Domain\Authority\AuthorityEntity;
  * Read-only adapter for already-canonical classification membership.
  *
  * The adapter deliberately returns Authority entities instead of accepting a
- * write command. A Graph-backed implementation belongs to a later governed
- * integration and must keep Graph as the source of relation truth.
+ * write command. The production adapter reads through GraphService and keeps
+ * Graph as the source of relation truth.
  */
 interface ClockTypeCanonicalMembershipReader
 {
