@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — V3-1309 Video backlog audit fail-closed
+
+WHAT: Completed the read-only full Video/Capture/Proposal inventory available
+in the authorized workspace. Development `nhk_v3` is schema 20/20 but contains
+0 Videos, 0 Editorial Captures, 0 Video Proposals and 0 Public Identities. The
+integration database contains 0 Videos and was not mutated. Demo/staging was
+observed only as a read-only reference: its public `/video/` archive contains
+two items, including the supplied Video 372 control; its governance queue shows
+27 invalid/unsafe Video Proposal rows plus an applied-but-unverified reference.
+
+RECOVERY: No semantic Apply, post-apply reconciliation, Source/Claim/Evidence,
+Graph, Public Identity, slug, Video enrichment or Article publication was
+performed. The only development mutation was the authorized UP-only schema
+migration 13 → 20. No duplicate Capture, Video, semantic entity or Article
+publication occurred.
+
+BLOCKER: Historical backlog data is not present in the permitted canonical
+development target, while demo/staging is explicitly read-only and does not
+provide an authoritative complete canonical read-back. Recovery is therefore
+fail-closed pending an isolated canonical runtime or governed export.
+
+REPORT: `docs/architecture/VIDEO_BACKLOG_RECOVERY_V3-1309_2026-09-12.md`.
+
+DOC CHECKPOINT: The immutable values for this audit are recorded in the
+linked V3-1309 report after the final bootstrap; this execution-state document
+is itself part of the canonical manifest and therefore does not embed a
+self-referential documentation hash.
+
+VERIFICATION: Unit suite 1,203 tests / 5,918 assertions PASS; PHP lint,
+`git diff --check` and changed-scope secret review PASS. Full Composer suite is
+environment-blocked before WordPress integration bootstrap with 35 errors and
+15 `NHK_WP_TEST_PATH`/integration-gate failures; no integration pass is claimed.
+
+STATUS: AUDIT_COMPLETE / RECOVERY_BLOCKED_BY_TARGET_DATA_SCOPE.
+
 # Checkpoint — 2026-09-12 — Video Evidence handoff convergence
 
 WHAT: The Capture Video continuation now adds the governed Evidence dependency
