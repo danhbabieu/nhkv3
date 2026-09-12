@@ -1,6 +1,82 @@
 # Current ChatGPT Handoff
 
-Updated: 2026-09-10
+Updated: 2026-09-12
+
+## files[] transport repair — current checkpoint
+
+Scope was restricted to the Easy MCP native multipart compatibility boundary
+for `nhk.capture.ingest`. No Capture, Governance, Media, Authority, Knowledge,
+Graph, Video or Public Identity semantics changed; no deploy, push or live
+mutation was performed.
+
+### ROOT_CAUSE
+
+`EasyMcpNativeFileCompatibilityAdapter::normalizeAbilityInput()` only ran when
+`self::$proxyDispatch` was true. Easy MCP 1.7.17 can invoke the registered
+Ability directly after parsing the incoming multipart request. In that path the
+Ability received ChatGPT's model-facing opaque `files[]` strings and strict
+`WP_Ability::validate_input()` rejected `input[files][0]` before the existing
+callback could forward the native PHP file bag. The failure is transport/schema
+ordering, not a Capture or Media-owner failure.
+
+### CALL_PATH
+
+`ChatGPT file parameter` → Easy MCP `tools/list` → canonical Capture schema +
+`_meta[openai/fileParams]=["files"]` → model-facing `string[]` → execution
+JSON-RPC plus native multipart `files[]` → Easy MCP direct or nested-proxy
+dispatch → native descriptor normalization → `WP_Ability::validate_input()` →
+`McpAbilityRegistration::executeMcp()` strips `files` from JSON and attaches the
+native file bag to `WP_REST_Request` → `/nhk/v1/mcp` → `McpTransport` → one
+`nhk.capture.ingest` → existing Capture physical ingest/Media boundary.
+
+### FILES_CHANGED
+
+- `public/wp-content/plugins/nhk-core/src/Infrastructure/Mcp/EasyMcpNativeFileCompatibilityAdapter.php`
+- `public/wp-content/plugins/nhk-core/src/Application/Mcp/McpAbilityRegistration.php`
+- focused tests in `EasyMcpNativeFileCompatibilityAdapterTest.php` and
+  `MediaBatchUploadServiceTest.php`
+
+The adapter now normalizes native parts on both supported Easy MCP paths,
+preserves order/cardinality, keeps `items[i]` positional context untouched and
+returns typed `nhk_native_multipart_required` or alignment errors when native
+parts are absent/mismatched. Bytes never enter JSON; opaque IDs are never
+treated as filesystem paths. Existing 1..20 / 50MB limits, partial-success,
+idempotency, cleanup, text-only, addendum-file rejection and Video resume
+paths remain delegated to their existing owners.
+
+### TEST_RESULTS
+
+- Focused transport/Capture/Media/Video/MCP: **115 tests, 808 assertions — PASS**.
+- NHK Unit: **1,216 tests, 5,957 assertions — PASS** (13 warnings, 11
+  deprecations, 11 PHPUnit deprecations).
+- NHK Contract: **4 tests, 31 assertions — PASS**.
+- PHP lint for changed PHP files: **PASS**.
+- Typed bare-string probe with WordPress `WP_Error`: **PASS** —
+  `nhk_native_multipart_required` / `NATIVE_MULTIPART_FILES_REQUIRED`.
+- NHK Integration: **BLOCKED**, 4 bootstrap errors and 14 environment-gated
+  failures because `update_option()`/`NHK_WP_TEST_PATH` is unavailable; no
+  integration pass claimed.
+- `git diff --check`: **PASS**; changed-scope secret review: **PASS** (no
+  credential/private-key/token material).
+
+### REMAINING_LIVE_GAP
+
+The supplied live evidence identifies Easy MCP AI **1.7.17** and the original
+validation error. This workspace has no authenticated live connector/runtime
+endpoint and no local WordPress integration database, so the repaired request
+has not been replayed live. Fresh ChatGPT `tools/list` rediscovery and one
+read-only 1-file/2-file multipart Capture smoke are still required after the
+code is deployed by an authorized operator. No deployment is claimed.
+
+### NEXT_ACTION_FOR_CHATGPT
+
+After an authorized deployment/restart/cache refresh, rediscover
+`nhk.capture.ingest`; confirm `files` remains native binary in the descriptor and
+`_meta["openai/fileParams"]` is `["files"]`. Then run one text+one-file and one
+text+two-file submission with distinct `items[]`, verifying one Capture, native
+multipart forwarding, ordered `items[i]` alignment and no `input[files][0]`
+schema error. If native parts are still absent, report the typed
+`NATIVE_MULTIPART_FILES_REQUIRED` response and do not retry via paths/base64.
 
 ## L3 descriptor investigation — current checkpoint
 

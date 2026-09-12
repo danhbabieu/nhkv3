@@ -380,7 +380,7 @@ final class McpAbilityRegistration
         $request->set_header('Content-Type', 'application/json');
         $files = isset($_FILES) && is_array($_FILES) ? $_FILES : [];
         if (self::requiresNativeTransportFiles($tool, $input, $files)) {
-            return new \WP_Error('nhk_native_file_required', 'Native multipart file parts are required when files are supplied.', ['status' => 422]);
+            return new \WP_Error('nhk_native_multipart_required', 'Native multipart file parts are required when files are supplied; opaque IDs, filesystem paths, base64 and bare descriptors are not accepted.', ['status' => 422, 'reason_code' => 'NATIVE_MULTIPART_FILES_REQUIRED', 'field' => 'files']);
         }
         if (in_array($tool, ['nhk.media.upload-batch', 'nhk.capture.ingest'], true) && $files !== []) {
             // Preserve connector multipart parts while delegating to the

@@ -31,6 +31,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
         self::$registered = true;
         add_filter('rest_request_before_callbacks', [self::class, 'interceptMultipartCapture'], 10, 3);
         add_filter('wp_ability_normalize_input', [self::class, 'normalizeAbilityInput'], 10, 3);
+        add_filter('wp_ability_validate_input', [self::class, 'validateAbilityInput'], 10, 3);
         // Easy MCP versions differ in whether their Streamable HTTP response
         // is finalized before or after WordPress serializes the REST response.
         // Project at both canonical WordPress boundaries so the connector
@@ -114,10 +115,32 @@ final class EasyMcpNativeFileCompatibilityAdapter
      */
     public static function normalizeAbilityInput(mixed $input, string $abilityName, mixed $ability): mixed
     {
-        if (!self::$proxyDispatch || !self::isSupportedInstalledVersion()) return $input;
+        // Easy MCP 1.7.17 can invoke the Ability directly after it has parsed
+        // the multipart request. Do not make native-file normalization depend
+        // on the compatibility proxy having been entered; the Ability must
+        // see objects before WP_Ability::validate_input() on either path.
+        if (!self::isSupportedInstalledVersion()) return $input;
         $files = isset($_FILES) && is_array($_FILES) ? $_FILES : [];
 
         return self::normalizeNativeFileInput($input, $abilityName, $files, self::installedVersion());
+    }
+
+    /**
+     * Keep bare/unmaterialized connector strings and malformed file payloads
+     * out of the generic JSON-schema error. They are never filesystem paths or
+     * a base64 transport; only native multipart parts can reach Capture.
+     */
+    public static function validateAbilityInput(mixed $validity, mixed $input, string $abilityName): mixed
+    {
+        if ($abilityName !== 'nhk-v3/capture-ingest' || !self::isSupportedInstalledVersion() || !is_array($input)) return $validity;
+        $provided = $input['files'] ?? null;
+        if ($provided === null || $provided === [] || !array_key_exists('files', $input)) return $validity;
+
+        $files = isset($_FILES) && is_array($_FILES) ? $_FILES : [];
+        if (self::nativeFileDescriptors($files['files'] ?? null) !== []) return $validity;
+
+        $error = self::nativeMultipartRequiredError();
+        return $error ?? $validity;
     }
 
     /** @param array<string,mixed> $files @return mixed */
@@ -127,6 +150,13 @@ final class EasyMcpNativeFileCompatibilityAdapter
 
         $nativeFiles = self::nativeFileDescriptors($files['files'] ?? null);
         if ($nativeFiles === []) return $input;
+
+        if (array_key_exists('files', $input) && $input['files'] !== []) {
+            if (!is_array($input['files']) || !array_is_list($input['files']) || count($input['files']) !== count($nativeFiles)) {
+                $error = self::nativeMultipartAlignmentError();
+                return $error ?? $input;
+            }
+        }
 
         $input['files'] = $nativeFiles;
         return $input;
@@ -251,7 +281,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     /** @param array<string,mixed> $file @return array<string,mixed>|null */
     private static function nativeFileDescriptor(array $file, int|string|null $index, mixed $temporaryName, mixed $error): ?array
     {
-        if (!self::isSuccessfulUpload($temporaryName, $error)) return null;
+        if (!is_string($temporaryName)) return null;
         $value = static function (string $key) use ($file, $index): mixed {
             $candidate = $file[$key] ?? '';
             return $index !== null && is_array($candidate) ? ($candidate[$index] ?? '') : $candidate;
@@ -264,6 +294,26 @@ final class EasyMcpNativeFileCompatibilityAdapter
             'error' => is_int($error) ? $error : (int) $error,
             'size' => (int) $value('size'),
         ];
+    }
+
+    private static function nativeMultipartRequiredError(): mixed
+    {
+        if (!class_exists('WP_Error')) return null;
+        return new \WP_Error(
+            'nhk_native_multipart_required',
+            'Capture files must be supplied as native multipart file parts; opaque IDs, filesystem paths, base64 and bare descriptors are not accepted.',
+            ['status' => 422, 'reason_code' => 'NATIVE_MULTIPART_FILES_REQUIRED', 'field' => 'files'],
+        );
+    }
+
+    private static function nativeMultipartAlignmentError(): mixed
+    {
+        if (!class_exists('WP_Error')) return null;
+        return new \WP_Error(
+            'nhk_native_multipart_alignment',
+            'Capture files must preserve one ordered native multipart part for each files[] item.',
+            ['status' => 422, 'reason_code' => 'NATIVE_MULTIPART_FILES_ALIGNMENT_INVALID', 'field' => 'files'],
+        );
     }
 
     /** @param array<string,mixed> $files */

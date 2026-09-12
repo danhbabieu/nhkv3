@@ -1,5 +1,76 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-12 — Isolated Video recovery runtime design
+
+WHAT: The repository-supported runtime path was inspected. Root Composer and
+environment-driven WordPress bootstrap, `TestDatabaseGuard` for exact
+`nhk_v3_test`, migration guards and the allowlisted maintenance transport are
+available. No provisioned data-bearing non-staging recovery runtime or
+governed V3 semantic snapshot importer exists in this workspace.
+
+CODE: Added the immutable `VideoEditorialEnrichmentContext`, bounded
+`VideoEditorialEnrichmentService` and deterministic `VideoEditorialQualityPolicy`.
+The Video completion path now requires `CONTENT_COMPLETE` in addition to
+technical, public and frontend completion. Existing Knowledge/Entity IDs are
+reused; no writer, duplicate semantic object or new relation is created by the
+enrichment seam.
+
+PLAN: First recovery wave is prepared for five already-applied canonical owners
+(`P4KaHX3LBOw`, `TsQWw2Q6-HM`, `4d4oxh35cT8`, `truOChTNbwA`, `V18Me9TdnkU`).
+Applied Proposal history remains immutable; orphan/data-conflict and duplicate
+groups are excluded. Golden validation in an isolated runtime is not run because
+no approved snapshot/runtime exists.
+
+VERIFICATION: Focused Video/enrichment/completion suite passes 54 tests / 208
+assertions; full NHK Unit passes 1,216 tests / 5,957 assertions; Composer PHP
+lint passes. No staging mutation, snapshot export/import, deployment or push was
+performed.
+
+REPORT: `docs/architecture/ISOLATED_VIDEO_RECOVERY_RUNTIME_2026-09-12.md`.
+
+STATUS: ENRICHMENT_IMPLEMENTED / RUNTIME_PROVISIONING_BLOCKED / FIRST_WAVE_NOT_READY.
+
+# Checkpoint — 2026-09-12 — Easy MCP 1.7.17 Capture files[] repair
+
+WHAT: Repaired only the Easy MCP/WordPress Ability transport boundary for
+`nhk.capture.ingest` native multipart `files[]`. The canonical Capture,
+Governance, Media, Authority, Knowledge, Graph, Video and Public Identity
+owners were not changed. Native bytes remain out-of-band and are forwarded to
+the existing `/nhk/v1/mcp` transport.
+
+ROOT CAUSE: `EasyMcpNativeFileCompatibilityAdapter::normalizeAbilityInput()`
+was gated by `self::$proxyDispatch`. Easy MCP 1.7.17 can execute the registered
+Ability directly after parsing multipart, so that path reached
+`WP_Ability::validate_input()` with ChatGPT's model-facing opaque `string[]`.
+The strict canonical schema then emitted `input[files][0] is not of type
+object` before `McpAbilityRegistration::executeMcp()` could preserve native
+parts. Code trace is: ChatGPT file param → Easy MCP tools/list →
+`_meta[openai/fileParams]` → model-facing `string[]` → native multipart request
+→ Ability normalization → Ability validation → native file bag → canonical
+MCP `nhk.capture.ingest`.
+
+FIX: Native file normalization now runs on both direct and nested-proxy Ability
+paths for supported Easy MCP 1.7.16/1.7.17. Ordered native descriptors retain
+one descriptor per submitted part and reject cardinality mismatch. A missing or
+malformed native file bag fails closed with typed
+`nhk_native_multipart_required` / `NATIVE_MULTIPART_FILES_REQUIRED` instead of
+interpreting opaque IDs as paths or allowing base64/JSON bytes. Existing
+Capture addendum file rejection, idempotency, partial-success and cleanup
+owners remain unchanged.
+
+FILES: `EasyMcpNativeFileCompatibilityAdapter.php`,
+`McpAbilityRegistration.php`, and focused transport/batch tests only.
+
+VERIFICATION: Focused Capture/Media/Video/MCP suite 115 tests / 808 assertions
+PASS; NHK Unit 1,216 tests / 5,957 assertions PASS; NHK Contract 4 tests / 31
+assertions PASS; PHP lint and `git diff --check` PASS; changed-scope secret
+review PASS with no credential/private-key/token material.
+NHK Integration is environment-blocked (WordPress bootstrap missing
+`update_option()`/`NHK_WP_TEST_PATH`); no live request, deploy, push or data
+mutation was performed.
+
+STATUS: IMPLEMENTED_CODE_SIDE / LIVE_CONNECTOR_ACCEPTANCE_PENDING.
+
 # Checkpoint — 2026-09-12 — V3-1309 actual-target Video backlog audit
 
 WHAT: Fresh canonical discovery through `@V3-1309` proved the actual target is

@@ -301,6 +301,58 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertNotSame(['file_000000009f0082119bfda7a3663e9084'], $normalized['files']);
     }
 
+    public function test_direct_easy_mcp_1717_normalization_preserves_native_file_order_and_cardinality(): void
+    {
+        $input = [
+            'idempotency_key' => 'capture-native-files-test',
+            'documentation_checkpoint' => ['documentation_version' => 'doc', 'manifest_hash' => 'hash'],
+            'files' => ['file-one', 'file-two'],
+            'items' => [
+                ['client_file_id' => 'file-one'],
+                ['client_file_id' => 'file-two'],
+            ],
+        ];
+        $files = ['files' => [
+            'name' => ['first.jpg', 'second.jpg'],
+            'type' => ['image/jpeg', 'image/png'],
+            'tmp_name' => ['/tmp/first', '/tmp/second'],
+            'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_OK],
+            'size' => [101, 202],
+        ]];
+
+        $normalized = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput($input, 'nhk-v3/capture-ingest', $files, '1.7.17');
+
+        self::assertSame(['first.jpg', 'second.jpg'], array_column($normalized['files'], 'name'));
+        self::assertSame(['/tmp/first', '/tmp/second'], array_column($normalized['files'], 'tmp_name'));
+        self::assertSame($input['items'], $normalized['items']);
+        self::assertCount(2, $normalized['files']);
+    }
+
+    public function test_native_file_alignment_rejects_a_different_number_of_connector_items(): void
+    {
+        $input = [
+            'idempotency_key' => 'capture-native-files-mismatch',
+            'files' => ['only-one-file-id'],
+        ];
+        $files = ['files' => [
+            'name' => ['first.jpg', 'second.jpg'],
+            'tmp_name' => ['/tmp/first', '/tmp/second'],
+            'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_OK],
+            'size' => [101, 202],
+        ]];
+
+        $normalized = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput($input, 'nhk-v3/capture-ingest', $files, '1.7.17');
+
+        // WordPress supplies WP_Error here. The framework-only unit suite has
+        // no WordPress bootstrap, so the pure fallback remains unchanged.
+        if (class_exists('WP_Error')) {
+            self::assertInstanceOf('WP_Error', $normalized);
+            self::assertSame('nhk_native_multipart_alignment', $normalized->get_error_code());
+        } else {
+            self::assertSame($input, $normalized);
+        }
+    }
+
     public function test_native_capture_files_are_not_put_into_canonical_json_arguments(): void
     {
         $arguments = McpAbilityRegistration::canonicalTransportArguments('nhk.capture.ingest', [
