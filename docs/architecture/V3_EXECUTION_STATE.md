@@ -8340,6 +8340,13 @@ golden #372 route returns 404 because this is intentionally an empty bootstrap,
 not a backlog substitute. No import, semantic mutation, Video recovery,
 Article publication, deployment, push or staging write was performed.
 
+INTEGRATION: The separately guarded `nhk_v3_test` bootstrap was advanced by
+normal UP migration from `8/20` to `20/20`; it is not the recovery runtime and
+does not contain the backlog snapshot. The integration suite now boots and
+executes 123 tests with 1,002 assertions, but remains blocked by 3 existing
+subject-binding errors and 2 contract failures in governed semantic/MCP
+fixtures. No recovery or staging data was used.
+
 STATUS: REAL EMPTY RECOVERY BOOTSTRAP / SNAPSHOT SOURCE AND CONNECTOR
 BLOCKED; READY_FOR_FIRST_RECOVERY_WAVE: NO. Exact next prerequisite is a
 read-only source adapter deployment/credential path (or approved snapshot
