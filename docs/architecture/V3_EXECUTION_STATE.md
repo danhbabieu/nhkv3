@@ -8979,3 +8979,40 @@ ROUTE SCOPE: Root route allocation/reprojection remains outside this
 acceptance and is not a blocker; the read/collision foundation remains intact.
 
 STATUS: ORGANIZATION_COMPLETE
+
+# Checkpoint — 2026-09-13 — Clock Type ecosystem read/write contract closure
+
+CONTRACT AUDIT: The ecosystem matrix is now documented in the ACTIVE
+`CLOCK_TYPE_ECOSYSTEM_CONTRACT.md`. It reuses the registered `subtype_of`,
+`classified_as`, `model_of`, `variant_of`, `about` and `depicts` vocabulary;
+Graph remains the relation owner. Clock Type remains the `classification`
+profile with persisted `family=clock_type`; the `clock-type` spelling is
+compatibility-read only and stable keys never determine family.
+
+READ PROJECTIONS: The central Entity Profile seam now composes a bounded
+Clock-Type hierarchy, derived Brand paths, direct/derived Media context and
+read-only public/admin dossier sections. Article, Knowledge and Video keep
+exact-subject semantics; object membership remains Model/Variant/Specimen/
+Product → `classified_as` → Clock Type. No Brand shortcut edge is materialized.
+
+VERIFICATION: Targeted Clock-Type ecosystem tests pass `34 tests / 179
+assertions`; the added Article/Video explicit-vs-derived regression is covered
+by the golden suite. Full Unit passes `1438 tests / 6877 assertions`; Contract
+passes `6 tests / 48 assertions`. The focused Integration selection was
+attempted against the approved `nhk_v3_test` path and is environment-blocked
+by `Error establishing a database connection`; no alternate database or guard
+override was used.
+
+NO-MUTATION: This checkpoint performed no Authority, Graph, Article,
+Knowledge, Evidence, Source, Media, Video, Public Identity or route mutation.
+No hierarchy, membership, enrichment, backfill, PR7 operation or route
+allocation/reprojection was performed. Existing dirty deployment bridge work
+remains outside this closure.
+
+ECOSYSTEM STATUS: `ECOSYSTEM_COMPLETE` at the architecture and local
+read/write-contract level. The remaining declared gaps are non-blocking
+projection boundaries: no sanctioned Product/Specimen → Brand structural path
+exists, and direct conceptual Media → Clock Type remains conditional on the
+existing Media contract/evidence. The local WordPress database boundary still
+blocks the relevant Integration runtime; this does not change the read/write
+contract or authorize a workaround.
