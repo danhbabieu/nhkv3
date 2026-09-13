@@ -1,6 +1,6 @@
 # NHK V3 Current Documentation Status Index
 
-> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-09.**
+> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-13.**
 > This file is not a second Constitution and does not create semantic vocabulary,
 > operations, predicates, storage, routes or data. Its purpose is to tell
 > downstream systems which sources are current law/contract, which sources are
@@ -71,6 +71,22 @@ source adapter and recovery-only writer are now registered in the composition
 root; the real source export/authentication, data-bearing restore and dedicated
 connector remain infrastructure gates. No golden validation or Video recovery
 wave is authorized until they pass.
+
+## 0.4 Clock Type public route namespace — 2026-09-13
+
+Owner decision: Brand detail routes remain root-short (`/{brand-slug}/`), while
+Clock Type detail routes use the profile-driven presentation namespace
+`/dong-ho-{type-slug}/`. The builder strips exactly one leading lexical
+`Đồng hồ ` from a Clock Type display name before adding `dong-ho-`; this avoids
+`/dong-ho-dong-ho-cong-cong/` without broad token heuristics. Archives remain
+`/thuong-hieu/` and `/loai-dong-ho/`.
+
+The prefix is Public Identity/routing presentation only. Clock Type remains
+`entity_type=classification` with exact `family=clock_type`; UUID, stable key,
+Graph ownership and semantic identity do not change. Resolution remains
+`slug → Public Identity → canonical UUID → entity_type/profile → Entity
+Dossier`, and persisted Public Identity is not mass-rewritten. Global route
+collisions fail closed; no automatic `foo-2` suffix is permitted.
 
 ## 1. Authority and read order
 
@@ -299,7 +315,7 @@ Available`, `Frontend Available`, `Frontend Blocked`.
 | Article | WordPress `wp_posts` owns editorial title/body/excerpt/order/public editorial URL | semantic truth remains separate; Article completion is cross-boundary and runtime-gated; no body copy into Knowledge/Graph/receipts; `nhk.capture.ingest` is the only normal Capture boundary, with one draft only for `IMAGE_ARTICLE`/`TEXT_ARTICLE` |
 | Dictionary / lexical curation | dedicated Concept/Label/Candidate/Mention lexical stores under `DICTIONARY_LEXICAL_KNOWLEDGE_CONTRACT.md` | lexical lookup/curation only; search first, reuse existing owner, unknown terms become private candidates; no Authority/Knowledge/Evidence/Graph truth; research preview is read-only and stored Article body is never rewritten by auto-link projection |
 | Authority | nine registered canonical types | canonical UUID/stable key/revision; no prose/URL/checksum-derived identity |
-| Entity Profile / Clock Type | `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md` | Brand and Clock Type are independent profiles; Clock Type is `classification + family=clock_type`; PR3 adds shared dossier/root read foundation, PR4.1 wires shadow diagnostics and a Graph-backed membership reader, PR5 adds a locally tested Governance-only new-data membership candidate/apply seam plus bounded derived Brand↔Type read recipe, PR6 adds a read-only legacy target/source dry-run audit, and PR6.1 adds production-owner Knowledge/Evidence and cursor-inventory read bridges. Legacy `clock-type` remains compatibility-read only; no shadow/candidate/audit result is Graph/Knowledge/Evidence/Video truth, and staging/live apply remains prohibited. |
+| Entity Profile / Clock Type | `ENTITY_PROFILE_CLOCK_TYPE_CONTRACT.md` | Brand and Clock Type are independent profiles; Clock Type is `classification + family=clock_type`; current public detail namespace is `/dong-ho-{type-slug}/` while Brand remains `/{brand-slug}/`; the prefix is presentation-only and does not alter semantic identity. PR3 adds shared dossier/root read foundation, PR4.1 wires shadow diagnostics and a Graph-backed membership reader, PR5 adds a locally tested Governance-only new-data membership candidate/apply seam plus bounded derived Brand↔Type read recipe, PR6 adds a read-only legacy target/source dry-run audit, and PR6.1 adds production-owner Knowledge/Evidence and cursor-inventory read bridges. Legacy `clock-type` remains compatibility-read only; no shadow/candidate/audit result is Graph/Knowledge/Evidence/Video truth, and staging/live apply remains prohibited. |
 | Graph | only semantic relation persistence | current executable predicate vocabulary includes `about`, `depicts`, `model_of`, `variant_of`, `uses_movement`, `supports_music`, `configured_with_music`, `observed_playing_music`, `subtype_of` and `classified_as`; hierarchy is ACTIVE/same-family/cycle-free and membership is scope-bound; physical row completeness/family audit remains a separate runtime/data question |
 | Public Entity Dossier | `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`; detail-only read model over existing canonical owners | shared dossier seam is wired through `nhk_v3_entity_detail_projection`; Brand is the first complete typed path-recipe projection; direct subject Knowledge remains subject-scoped, deep Brand context keeps origin path, archives stay outside the heavy dossier path, and no display shortcut relation is persisted |
 | Product–Specimen | no approved canonical persistence relation | payload fields, taxonomy, post meta or broad `about` are not ownership substitutes; contract/registry extension required before canonical linkage |

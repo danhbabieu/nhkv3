@@ -143,6 +143,76 @@ final class PublicRouteResolverTest extends TestCase
         self::assertSame('/loai-dong-ho/', $resolver->archivePathForProfile('clock_type'));
     }
 
+    public function test_clock_type_profile_uses_prefixed_detail_routes_without_changing_semantic_identity(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $brand = $authority->create('brand', 'nhk:brand:odo-route', 'Odo');
+        $vaiBo = $authority->create('classification', 'nhk:classification:clock-type.vai-bo', 'Vai bò', ['family' => 'clock_type']);
+        $congCong = $authority->create('classification', 'nhk:classification:clock-type.cong-cong', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $chimCucCu = $authority->create('classification', 'nhk:classification:clock-type.chim-cuc-cu', 'Chim cúc cu', ['family' => 'clock_type']);
+
+        self::assertSame('/odo/', $resolver->path($brand));
+        self::assertSame('/dong-ho-vai-bo/', $resolver->path($vaiBo));
+        self::assertSame('/dong-ho-cong-cong/', $resolver->path($congCong));
+        self::assertSame('/dong-ho-chim-cuc-cu/', $resolver->path($chimCucCu));
+        self::assertStringNotContainsString('/dong-ho-dong-ho-cong-cong/', (string) $resolver->path($congCong));
+        self::assertSame($congCong->canonicalId, $resolver->resolve('classification', ['dong-ho-cong-cong'])?->canonicalId);
+        self::assertSame('classification', $congCong->entityType);
+        self::assertSame('clock_type', $congCong->payload['family']);
+        self::assertSame('nhk:classification:clock-type.cong-cong', $congCong->stableKey);
+    }
+
+    public function test_clock_type_slug_collisions_fail_closed_and_legacy_family_keeps_generic_route(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $first = $authority->create('classification', 'nhk:classification:clock-type.vai-bo', 'Vai bò', ['family' => 'clock_type']);
+        $second = $authority->create('classification', 'nhk:classification:clock-type.vai-bo-prefixed', 'Đồng hồ Vai bò', ['family' => 'clock_type']);
+        $legacy = $authority->create('classification', 'nhk:classification:legacy-vai-bo', 'Đồng hồ Vai bò', ['family' => 'clock-type']);
+
+        self::assertNull($resolver->path($first));
+        self::assertNull($resolver->path($second));
+        self::assertSame('/phan-loai/dong-ho-vai-bo/', $resolver->path($legacy));
+        self::assertNull($resolver->resolve('classification', ['dong-ho-vai-bo']));
+
+        $crossRepository = new InMemoryAuthorityRepository();
+        $crossTypes = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($crossTypes);
+        $crossAuthority = new AuthorityService($crossRepository, $crossTypes);
+        $crossClock = $crossAuthority->create('classification', 'nhk:classification:clock-type.cross', 'Vai bò', ['family' => 'clock_type']);
+        $crossBrand = $crossAuthority->create('brand', 'nhk:brand:clock-type-cross', 'Đồng hồ Vai bò');
+        $crossResolver = new PublicRouteResolver($crossRepository, $crossTypes);
+
+        self::assertNull($crossResolver->path($crossClock));
+        self::assertNull($crossResolver->path($crossBrand));
+    }
+
+    public function test_persisted_clock_type_identity_remains_authoritative_without_auto_rewrite(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $this->resolver($repository, $types);
+        $authority = new AuthorityService($repository, $types);
+        $entity = $authority->create('classification', 'nhk:classification:clock-type.persisted', 'Vai bò', ['family' => 'clock_type']);
+        $identity = new class($entity->canonicalId) implements \NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository {
+            public function __construct(private string $ownerId) {}
+            public function allocate(array $record, string $idempotencyKey): array { return []; }
+            public function change(array $record, string $oldPath, int $expectedRevision, string $idempotencyKey): array { return []; }
+            public function findCurrentById(string $identityId): ?array { return null; }
+            public function findCurrentByOwner(string $ownerKind, string $ownerId, string $routeType): ?array
+            { return $ownerId === $this->ownerId ? ['current_slug' => 'vai-bo', 'current_path' => '/phan-loai/vai-bo/'] : null; }
+            public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool { return false; }
+            public function resolveHistoric(string $path): array { return []; }
+        };
+
+        $resolver = new PublicRouteResolver($repository, $types, null, null, $identity);
+
+        self::assertSame('/phan-loai/vai-bo/', $resolver->path($entity));
+        self::assertSame($entity->canonicalId, $resolver->resolve('classification', ['vai-bo'])?->canonicalId);
+    }
+
     public function test_brand_and_model_archives_use_vietnamese_hubs_and_all_hubs_are_reserved(): void
     {
         $repository = new InMemoryAuthorityRepository(); $types = null;

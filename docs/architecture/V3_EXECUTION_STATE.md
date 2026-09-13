@@ -9240,3 +9240,32 @@ to avoid a self-referential hash inside this canonical snapshot source.
 Guarded Integration was attempted with `NHK_WP_TEST_PATH=public` and
 `NHK_WP_TEST_DB=nhk_v3_test` but the environment returned “Error establishing
 a database connection”; default Integration is therefore not claimed PASS.
+
+# Checkpoint — 2026-09-13 — Owner decision: Clock Type public route namespace
+
+DECISION: Brand detail routes remain `/{brand-slug}/`. Clock Type detail
+routes are `/dong-ho-{type-slug}/`; archives remain `/thuong-hieu/` and
+`/loai-dong-ho/`. Clock Type remains `entity_type=classification` with exact
+`family=clock_type`. The route prefix is Public Identity/routing presentation,
+not semantic identity or an instruction to infer type from URL.
+
+NORMALIZATION: Profile-driven Clock Type slug building strips exactly one
+leading lexical `Đồng hồ `, then normalizes the remainder and adds `dong-ho-`.
+Fixtures include `Vai bò → /dong-ho-vai-bo/`,
+`Đồng hồ công cộng → /dong-ho-cong-cong/` and
+`Chim cúc cu → /dong-ho-chim-cuc-cu/`; `/dong-ho-dong-ho-cong-cong/` is
+forbidden. Global collisions fail closed; no `foo-2` allocation is allowed.
+
+IMPLEMENTATION: Documentation and read-only route projection/tests were
+updated only. No semantic mutation, Public Identity allocation/reprojection,
+Graph change, legacy backfill or APPLY occurred. Existing persisted Public
+Identity remains authoritative and is not auto-rewritten.
+
+GOVERNANCE CONSEQUENCE: After documentation regeneration/deploy changes
+`documentation_version`/`manifest_hash`, the current `Đồng hồ công cộng`
+PLAN/fingerprint is stale. The old Capture
+`01a09a1c-8395-7d7b-9b71-b2b53a3a4e4c`, candidate
+`candidate-5f55a6d22188d84d61cd` and fingerprint
+`1f443294dc55ca76c81153a82ef1051f5775033f97ac57773e1bc6947271b0c2` must not
+be applied. After deployment, rerun Search/Reuse → PLAN and continue through
+the existing Governance lifecycle.

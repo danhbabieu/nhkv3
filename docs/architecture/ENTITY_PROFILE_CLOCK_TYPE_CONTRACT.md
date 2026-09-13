@@ -177,29 +177,53 @@ Việc tồn tại Clock-Type Profile không thay đổi owner hoặc output c�
 Các regression phải so sánh canonical owner output trước/sau khi thêm Clock-Type
 context, không dùng live mutation để chứng minh compatibility.
 
-## 7. Public Identity và route intent
+## 7. Public Identity và route intent — quyết định 2026-09-13
 
-PR1 không đổi route hiện có, không cấp slug và không reproject live identity.
-Desired future detail route cho root Public Identity namespace là:
+Public detail route policy đã được owner chốt cho các Public Identity mới và
+mọi route projection được governed sau này. Policy này chỉ điều khiển Public
+Identity/presentation; không tạo semantic type và không suy `entity_type` từ
+URL:
 
 ```text
 Brand Odo                  → /odo/
-Clock Type Đồng hồ vai bò  → /vai-bo/
+Brand Hermle               → /hermle/
+Clock Type Vai bò          → /dong-ho-vai-bo/
 Clock Type Đồng hồ công cộng → /dong-ho-cong-cong/
-Clock Type Đồng hồ chim cúc cu → /dong-ho-chim-cuc-cu/
+Clock Type Chim cúc cu     → /dong-ho-chim-cuc-cu/
+Clock Type Để bàn          → /dong-ho-de-ban/
+Clock Type Tủ cây          → /dong-ho-tu-cay/
 ```
 
-Archive/navigation có thể giữ `/thuong-hieu/` và `/loai-dong-ho/`. Route
-resolution tương lai phải là:
+Clock Type vẫn là `entity_type=classification`, `family=clock_type`. Builder
+chỉ strip đúng một lexical prefix `Đồng hồ ` ở đầu tên, nếu prefix đó thực sự
+có mặt; mọi token khác giữ nguyên. Vì vậy `Đồng hồ công cộng` trở thành
+`cong-cong` trước khi thêm route prefix `dong-ho-`, không bao giờ tạo
+`/dong-ho-dong-ho-cong-cong/`. Đây là profile-driven rule cho toàn bộ
+`clock_type`, không phải ngoại lệ cho một tên cụ thể.
+
+Archive/navigation giữ:
+
+```text
+/thuong-hieu/
+/loai-dong-ho/
+```
+
+Route resolution phải là:
 
 ```text
 slug → Public Identity → canonical UUID → entity_type/profile → Entity Dossier
 ```
 
-Không đoán entity type từ slug. Root slug phải unique trong toàn bộ routable
-Public Identity namespace; collision giữa Brand và Classification phải fail
-closed hoặc cần governed resolution. Không tự sinh `foo-2` nếu contract chưa
-cho phép. Video vẫn giữ route exception `/video/{slug}/` hiện hành.
+Route owner truyền semantic type/profile một cách tường minh; URL prefix không
+được dùng để đoán semantic type. Global collision giữa Brand và Clock Type
+phải fail closed/review-required. Không tự sinh `foo-2` nếu contract chưa cho
+phép. Video vẫn giữ route exception `/video/{slug}/` hiện hành.
+
+Public Identity đã persist là source of truth. Existing `current_slug` và
+`current_path` không tự rewrite hàng loạt chỉ vì policy này đổi; mọi
+reprojection phải là lifecycle governed riêng, có collision audit và
+read-back. Policy mới không cấp slug, không APPLY dữ liệu và không tạo
+`Đồng hồ công cộng` trong checkpoint này.
 
 ## 8. Backward compatibility và forbidden shortcuts
 

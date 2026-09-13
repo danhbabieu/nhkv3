@@ -119,7 +119,6 @@ final class EntityPageQuery
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
     private function routeSegments(string $type, string $slug): array
     {
-        $namespace = PublicRouteResolver::namespaceFor($type);
-        return $namespace === null ? [trim($slug)] : [$namespace, trim($slug)];
+        return PublicRouteResolver::routeSegments($type, $slug);
     }
 }

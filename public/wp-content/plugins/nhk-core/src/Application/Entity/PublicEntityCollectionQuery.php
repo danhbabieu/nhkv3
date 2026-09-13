@@ -151,7 +151,6 @@ final class PublicEntityCollectionQuery
     /** @return list<string> */
     private function routeSegments(string $type, string $slug): array
     {
-        $namespace = PublicRouteResolver::namespaceFor($type);
-        return $namespace === null ? [trim($slug)] : [$namespace, trim($slug)];
+        return PublicRouteResolver::routeSegments($type, $slug);
     }
 }

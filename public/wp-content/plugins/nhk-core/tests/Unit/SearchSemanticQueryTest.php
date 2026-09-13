@@ -79,7 +79,7 @@ final class SearchSemanticQueryTest extends TestCase
         self::assertSame(1, $result['_totals']['entities']);
         self::assertSame('clock_type', $result['entities'][0]['profile_key']);
         self::assertSame('[LOẠI ĐỒNG HỒ]', $result['entities'][0]['profile_badge']);
-        self::assertSame('/phan-loai/dong-ho-cong-cong/', $result['entities'][0]['url']);
+        self::assertSame('/dong-ho-cong-cong/', $result['entities'][0]['url']);
     }
 
     public function test_clock_type_search_does_not_use_title_slug_fallback_without_persisted_identity(): void

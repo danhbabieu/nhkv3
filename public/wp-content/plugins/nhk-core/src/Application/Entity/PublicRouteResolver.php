@@ -31,7 +31,7 @@ final class PublicRouteResolver
      *        boundary probe. The application remains usable without WP in
      *        unit tests and non-HTTP consumers.
      */
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null, private ?\Closure $nativeRootExists = null, private ?PublicIdentityRepository $publicIdentities = null) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?StructuralContextQuery $contexts = null, private ?\Closure $nativeRootExists = null, private ?PublicIdentityRepository $publicIdentities = null, private ?EntityProfileResolver $profiles = null) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
@@ -40,7 +40,7 @@ final class PublicRouteResolver
         if (!$this->types->has($entity->entityType) || !$entity->active()) return null;
         if ($entity->entityType === 'brand') {
             $slug = $this->publicSlug($entity);
-            return $slug === null || in_array($slug, self::RESERVED_ROOTS, true) || $this->nativeRootExists($slug) ? null : '/' . $slug . '/';
+            return $slug === null || !$this->rootRouteAvailable($entity, $slug) ? null : '/' . $slug . '/';
         }
         if ($entity->entityType === 'model') {
             $context = $this->context($entity);
@@ -57,6 +57,14 @@ final class PublicRouteResolver
             $slug = $this->publicSlug($entity, $model->canonicalId);
             $parentPath = $this->path($model);
             return $slug !== null && $parentPath !== null ? $parentPath . $slug . '/' : null;
+        }
+        if ($this->isCanonicalClockType($entity)) {
+            $persistedPath = $this->persistedPath($entity);
+            if ($persistedPath !== null) return $persistedPath;
+            $stored = $this->persistedSlug($entity);
+            $slug = $stored ?? $this->publicSlug($entity);
+            $routeSlug = $stored !== null ? $slug : $this->clockTypeRouteSlug($slug);
+            return $routeSlug === null || !$this->rootRouteAvailable($entity, $routeSlug) ? null : '/' . $routeSlug . '/';
         }
         $namespace = self::NAMESPACES[$entity->entityType] ?? null;
         $slug = $namespace === null ? null : $this->publicSlug($entity);
@@ -112,6 +120,11 @@ final class PublicRouteResolver
             $model = $brand ? $this->uniqueChild('model', $slugs[1], $brand->canonicalId) : null;
             return $model ? $this->uniqueChild('variant', $slugs[2], $model->canonicalId) : null;
         }
+        // The semantic type is supplied by the route owner; the slug never
+        // infers it. A one-segment Classification resolution is retained for
+        // persisted pre-namespace Clock-Type identities, while new derived
+        // identities use the profile prefix above.
+        if ($type === 'classification' && count($slugs) === 1) return $this->uniqueClockType($slugs[0]);
         if (isset(self::NAMESPACES[$type], $slugs[1]) && count($slugs) === 2 && $slugs[0] === self::NAMESPACES[$type]) return $this->unique($type, $slugs[1]);
         return null;
     }
@@ -124,6 +137,24 @@ final class PublicRouteResolver
     /** @return list<string> */
     public static function reservedRoots(): array { return self::RESERVED_ROOTS; }
     public static function namespaceFor(string $type): ?string { return self::NAMESPACES[$type] ?? null; }
+
+    public static function routePrefixForProfile(string $profileKey): ?string
+    {
+        $definition = (new EntityProfileRegistry())->get($profileKey);
+        if (!$definition instanceof EntityProfileDefinition) return null;
+        $prefix = trim((string) ($definition->rootDetailRouteIntent['route_prefix'] ?? ''), " /\t\n\r\0\x0B");
+        return $prefix === '' ? null : $prefix;
+    }
+
+    /** @return list<string> */
+    public static function routeSegments(string $type, string $slug): array
+    {
+        $slug = trim($slug);
+        $clockPrefix = self::routePrefixForProfile('clock_type');
+        if ($type === 'classification' && $clockPrefix !== null && str_starts_with($slug, $clockPrefix)) return [$slug];
+        $namespace = self::namespaceFor($type);
+        return $namespace === null ? [$slug] : [$namespace, $slug];
+    }
 
     private function nativeRootExists(string $slug): bool
     {
@@ -147,6 +178,12 @@ final class PublicRouteResolver
         return count($matches) === 1 ? $matches[0] : null;
     }
 
+    private function uniqueClockType(string $slug): ?AuthorityEntity
+    {
+        $matches = array_values(array_filter($this->authority->listByType('classification'), fn (AuthorityEntity $item): bool => $item->active() && $this->isCanonicalClockType($item) && $this->routeSlugForEntity($item) === $slug));
+        return count($matches) === 1 ? $matches[0] : null;
+    }
+
     private function uniqueChild(string $type, string $slug, string $parentId): ?AuthorityEntity
     {
         $matches = array_values(array_filter($this->authority->listByType($type), fn (AuthorityEntity $item): bool => $item->active() && $this->parentForRoute($item) === $parentId && $this->publicSlug($item, $parentId) === $slug));
@@ -155,20 +192,38 @@ final class PublicRouteResolver
 
     private function publicSlug(AuthorityEntity $entity, ?string $parentId = null): ?string
     {
-        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
-        if ($repository !== null) {
-            try {
-                $identity = $repository->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
-                if (is_array($identity)) {
-                    $stored = trim((string) ($identity['current_slug'] ?? ''));
-                    return $stored !== '' && CanonicalPublicSlugPolicy::isCanonical($stored) ? $stored : null;
-                }
-            } catch (\Throwable) {
-                // Demo compatibility fallback only; semantic identity is never changed.
-            }
-        }
+        $stored = $this->persistedSlug($entity);
+        if ($stored !== null) return $stored;
         foreach ($this->candidateSlugs($entity) as $candidate) {
             if ($this->candidateAvailable($entity, $candidate, $parentId)) return $candidate;
+        }
+        return null;
+    }
+
+    private function persistedSlug(AuthorityEntity $entity): ?string
+    {
+        $identity = $this->persistedIdentity($entity);
+        $stored = is_array($identity) ? trim((string) ($identity['current_slug'] ?? '')) : '';
+        return $stored !== '' && CanonicalPublicSlugPolicy::isCanonical($stored) ? $stored : null;
+    }
+
+    private function persistedPath(AuthorityEntity $entity): ?string
+    {
+        $identity = $this->persistedIdentity($entity);
+        $path = is_array($identity) ? trim((string) ($identity['current_path'] ?? '')) : '';
+        return preg_match('#^/[a-z0-9]+(?:[/-][a-z0-9]+)*/$#', $path) === 1 ? $path : null;
+    }
+
+    /** @return array<string,mixed>|null */
+    private function persistedIdentity(AuthorityEntity $entity): ?array
+    {
+        $repository = $this->publicIdentities ?? PublicIdentityReadRegistry::repository();
+        if ($repository === null) return null;
+        try {
+            $identity = $repository->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
+            return is_array($identity) ? $identity : null;
+        } catch (\Throwable) {
+            // Demo compatibility fallback only; semantic identity is never changed.
         }
         return null;
     }
@@ -186,7 +241,47 @@ final class PublicRouteResolver
     /** @return list<string> */
     private function candidateSlugs(AuthorityEntity $entity): array
     {
-        return CanonicalPublicSlugPolicy::candidates($entity->canonicalName, $this->meaningfulCollisionValues($entity));
+        $name = $entity->canonicalName;
+        if ($this->isCanonicalClockType($entity)) {
+            $definition = (new EntityProfileRegistry())->get('clock_type');
+            $prefix = is_object($definition) ? (string) ($definition->rootDetailRouteIntent['strip_lexical_prefix'] ?? '') : '';
+            if ($prefix !== '' && str_starts_with($name, $prefix)) $name = substr($name, strlen($prefix));
+        }
+        return CanonicalPublicSlugPolicy::candidates($name, $this->meaningfulCollisionValues($entity));
+    }
+
+    private function isCanonicalClockType(AuthorityEntity $entity): bool
+    {
+        if ($entity->entityType !== 'classification') return false;
+        $resolution = ($this->profiles ??= new EntityProfileResolver())->resolveProfile($entity);
+        return $resolution->profileKey === 'clock_type' && $resolution->status === 'RESOLVED';
+    }
+
+    private function clockTypeRouteSlug(?string $slug): ?string
+    {
+        if ($slug === null || $slug === '') return null;
+        $prefix = self::routePrefixForProfile('clock_type');
+        return $prefix === null || str_starts_with($slug, $prefix) ? $slug : $prefix . $slug;
+    }
+
+    private function routeSlugForEntity(AuthorityEntity $entity): ?string
+    {
+        if ($entity->entityType === 'brand') return $this->publicSlug($entity);
+        if (!$this->isCanonicalClockType($entity)) return null;
+        $stored = $this->persistedSlug($entity);
+        return $stored ?? $this->clockTypeRouteSlug($this->publicSlug($entity));
+    }
+
+    private function rootRouteAvailable(AuthorityEntity $entity, string $slug): bool
+    {
+        if ($slug === '' || in_array($slug, self::RESERVED_ROOTS, true) || $this->nativeRootExists($slug)) return false;
+        foreach (['brand', 'classification'] as $type) {
+            foreach ($this->authority->listByType($type) as $other) {
+                if (!$other->active() || $other->canonicalId === $entity->canonicalId) continue;
+                if ($this->routeSlugForEntity($other) === $slug) return false;
+            }
+        }
+        return true;
     }
 
     /** @return list<string> */

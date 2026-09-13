@@ -26,6 +26,8 @@ final class EntityProfileRegistryTest extends TestCase
         self::assertFalse($registry->get('clock_type')->rootDetailRouteIntent['enabled']);
         self::assertSame('read_foundation', $registry->get('clock_type')->rootDetailRouteIntent['resolution']);
         self::assertSame('governed_only', $registry->get('clock_type')->rootDetailRouteIntent['allocation']);
+        self::assertSame('dong-ho-', $registry->get('clock_type')->rootDetailRouteIntent['route_prefix']);
+        self::assertSame('Đồng hồ ', $registry->get('clock_type')->rootDetailRouteIntent['strip_lexical_prefix']);
         self::assertContains('knowledge', $registry->get('clock_type')->supportedDossierSections);
         self::assertContains('video', $registry->get('clock_type')->supportedDossierSections);
         self::assertNotContains('brand_has_clock_type', $registry->get('clock_type')->capabilities);

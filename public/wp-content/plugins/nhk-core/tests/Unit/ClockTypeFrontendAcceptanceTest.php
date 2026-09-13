@@ -32,7 +32,7 @@ final class ClockTypeFrontendAcceptanceTest extends TestCase
         self::assertSame(1, $archive['total']);
         self::assertSame('clock_type', $archive['items'][0]['profile_key']);
         self::assertSame('[LOẠI ĐỒNG HỒ]', $archive['items'][0]['profile_badge']);
-        self::assertSame('/phan-loai/dong-ho-cong-cong/', $archive['items'][0]['url']);
+        self::assertSame('/dong-ho-cong-cong/', $archive['items'][0]['url']);
         self::assertSame($before, $after);
     }
 

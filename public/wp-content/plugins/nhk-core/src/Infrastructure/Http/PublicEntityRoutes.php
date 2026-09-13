@@ -53,6 +53,8 @@ final class PublicEntityRoutes
         $reserved = implode('|', array_map(static fn (string $root): string => preg_quote($root, '#'), PublicRouteResolver::reservedRoots()));
         add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/([a-z0-9-]+)/([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=variant&nhk_public_entity_a=$matches[1]&nhk_public_entity_b=$matches[2]&nhk_public_entity_c=$matches[3]', 'top');
         add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=model&nhk_public_entity_a=$matches[1]&nhk_public_entity_b=$matches[2]', 'top');
+        $clockTypePrefix = PublicRouteResolver::routePrefixForProfile('clock_type');
+        if ($clockTypePrefix !== null) add_rewrite_rule('^' . preg_quote($clockTypePrefix, '#') . '([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=classification&nhk_public_entity_a=$matches[1]', 'top');
         // Keep the native slug query attached to the root request. WP_Query
         // can therefore resolve a Post before NHK decides whether a Brand
         // route is actually claimable.
