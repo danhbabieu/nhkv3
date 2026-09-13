@@ -53,7 +53,11 @@ for internal/admin compatibility or lifecycle operations. They are marked
 `internal_admin_only` in the executable catalog/Ability metadata, require
 `nhk_internal_content_operations`, and return `DIRECT_WRITE_BLOCKED` with
 `USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
-not fall back to one of these writers when Capture is unavailable.
+not fall back to one of these writers when Capture is unavailable. The existing
+Easy MCP bridge has one explicit internal/admin opt-in for the bounded
+`nhk-v3/public-url-reproject` Ability; it remains non-public, is never added
+by `PROJECT_BUILD`, and retains the internal capability and public-URL
+management guards.
 
 ### Runtime semantic-write policy — 2026-09-13
 

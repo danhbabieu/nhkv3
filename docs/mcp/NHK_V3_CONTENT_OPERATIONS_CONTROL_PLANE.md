@@ -107,6 +107,12 @@ verification. Existing records remain readable and maintainable through their
 owner/lifecycle boundaries; this inventory changes the creation route, not
 canonical identity or historical data.
 
+The existing Easy MCP bridge permits one explicit internal/admin lifecycle
+opt-in, `nhk-v3/public-url-reproject`, for bounded URL maintenance. This
+Ability remains `internal_admin_only`, is not auto-enabled by normal operator
+reconciliation or `PROJECT_BUILD`, and retains both the
+`nhk_internal_content_operations` and public-URL management capability guards.
+
 Every MCP ingest domain uses this bounded deep reconciliation, including
 Media, Video, Knowledge, Source, Evidence and Authority entities. “Maximize
 relations” means maximize justified useful relations, not edge count; weak or

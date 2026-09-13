@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-13 — Explicit Easy MCP public URL reproject exposure
+
+CHANGE: The existing `nhk-v3/public-url-reproject` Ability can now be retained
+by the existing Easy MCP enabled-Ability reconciliation only when an
+administrator explicitly includes that exact Ability. The normal operator
+allowlist remains unchanged and does not auto-enable this internal lifecycle
+operation.
+
+GUARDS: The existing `internal_admin_only` catalog/Ability metadata,
+`nhk_internal_content_operations` boundary, `nhk_manage_public_urls` guard,
+Public Identity owner, collision checks, idempotency/revision checks and
+canonical read-back remain unchanged. `PROJECT_BUILD` does not grant access.
+
+VERIFICATION: Focused MCP exposure/guard tests passed 42 tests / 773
+assertions; Public URL tests passed 15 tests / 44 assertions; full Unit passed
+1,488 tests / 7,118 assertions; Contract passed 6 tests / 48 assertions; PHP
+lint and deterministic documentation generation passed. Guarded WordPress
+integration is blocked by unavailable database/WordPress bootstrap in the
+current environment; no source or data bypass was used.
+
+SCOPE: Only `McpAbilityRegistration`, its focused contract tests and the
+current MCP/status documentation changed. No deployment, publication,
+semantic mutation, schema change or live mutation was performed.
+
 # Checkpoint — 2026-09-13 — Editorial Capture guarded runtime closure
 
 VERIFICATION: Fresh local runtime verification reached WordPress and the

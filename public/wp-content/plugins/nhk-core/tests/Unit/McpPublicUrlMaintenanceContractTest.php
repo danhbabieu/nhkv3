@@ -32,6 +32,35 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
         self::assertSame('nhk-v3/public-url-reproject', McpAbilityRegistration::abilityNameForTool('nhk.public-url.reproject'));
     }
 
+    public function test_internal_public_url_reproject_can_be_explicitly_enabled_without_operator_auto_exposure(): void
+    {
+        $ability = 'nhk-v3/public-url-reproject';
+
+        self::assertSame([$ability], McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
+        self::assertNotContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
+        self::assertContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));
+        self::assertNotContains('nhk-v3/media-ingest', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));
+        self::assertNotContains($ability, McpAbilityRegistration::operatorEnabledAbilityAllowlist());
+    }
+
+    public function test_public_url_reproject_fails_closed_without_internal_capability(): void
+    {
+        $transport = new McpTransport(
+            $this->read(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => $capability !== 'nhk_internal_content_operations',
+        );
+
+        $response = $transport->dispatch($this->call('nhk.public-url.reproject', [
+            'idempotency_key' => 'url-capability-absent',
+            'pre_public_confirmed' => true,
+        ]));
+
+        self::assertSame(200, $response['status']);
+        self::assertTrue($response['body']['result']['isError']);
+        self::assertSame('DIRECT_WRITE_BLOCKED', $response['body']['result']['structuredContent']['error']['code']);
+    }
+
     public function test_transport_audit_is_read_only_and_reproject_requires_dedicated_capability(): void
     {
         $currentSlug = 'tu-i';

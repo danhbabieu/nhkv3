@@ -168,7 +168,10 @@ mutation tools remain only for internal/admin compatibility or lifecycle work.
 They are marked `internal_admin_only`, require
 `nhk_internal_content_operations`, and fail closed with
 `DIRECT_WRITE_BLOCKED`/`USE_CANONICAL_CAPTURE_FLOW` otherwise. Existing data is
-read-compatible; no duplicate owner or fallback writer is created.
+read-compatible; no duplicate owner or fallback writer is created. The Easy
+MCP bridge has an explicit opt-in only for the existing
+`nhk-v3/public-url-reproject` lifecycle Ability; it remains non-public,
+internal-capability guarded and is not enabled by `PROJECT_BUILD` alone.
 
 A newer timestamp alone never overrides the Constitution or an approved
 contract. Conversely, an old checkpoint must not override a later executable

@@ -17,6 +17,11 @@ final class McpAbilityRegistration
         'wp_count_*',
     ];
 
+    /** @var list<string> Explicit internal/admin lifecycle opt-ins only. */
+    private const EASY_MCP_EXPLICIT_INTERNAL_ABILITIES = [
+        'nhk-v3/public-url-reproject',
+    ];
+
     public static function bootstrapRegistry(): void
     {
         if (function_exists('wp_get_abilities')) {
@@ -38,13 +43,23 @@ final class McpAbilityRegistration
         return array_values(array_unique($allowlist));
     }
 
+    /** @return list<string> */
+    public static function explicitInternalAdminAbilityAllowlist(): array
+    {
+        return self::EASY_MCP_EXPLICIT_INTERNAL_ABILITIES;
+    }
+
     /** @param mixed $enabled @return list<string> */
     public static function ensureEasyMcpEnabledAbilities(mixed $enabled): array
     {
         $enabled = is_array($enabled) ? $enabled : [];
         $preserved = array_values(array_filter($enabled, static fn (mixed $ability): bool => is_string($ability) && !str_starts_with($ability, 'nhk-v3/')));
+        $explicitInternal = array_values(array_intersect(
+            self::explicitInternalAdminAbilityAllowlist(),
+            array_values(array_filter($enabled, 'is_string')),
+        ));
 
-        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist())));
+        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $explicitInternal)));
     }
 
     public static function reconcileEasyMcpEnabledAbilities(): void
