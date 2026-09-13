@@ -9063,3 +9063,58 @@ DECISION: `OPERATIONAL_TARGET_NOT_WRITABLE`. No exact Clock Type search was
 promoted into a mutation workflow, and no Authority PLAN, Proposal, Graph,
 Knowledge, Public Identity, Article, Media, Video, route, backfill or PR7
 operation was attempted. `NO_SEMANTIC_MUTATION`.
+
+# Checkpoint — 2026-09-13 — Canonical writable runtime provisioning gate
+
+RUNTIME INVENTORY: The repository-approved lanes remain separated. Development
+uses `nhk_v3` for local runtime smoke and permitted UP-only maintenance, not an
+operational semantic store. Integration uses the exact `nhk_v3_test` database
+under `TestDatabaseGuard`; its test lifecycle can clean or recreate semantic
+tables and it is not an operational data target. The current remote connector
+targets `https://demo.1945.vn`, environment `staging`, and its sanctioned
+policy is read/reconciliation only. Production/live has no registered
+connector, datastore binding or autonomous cutover authorization in this
+checkout.
+
+RECOVERY OPTION: The only dedicated persistent database provisioned by the
+repository path is `nhk_v3_video_recovery`, bound to the isolated local site
+`http://127.0.0.1:8090`, runtime `v3-video-recovery-1309`, mode `recovery`, with
+guarded migrations `20/20`. It is an empty recovery bootstrap, not the
+operational website datastore: no approved data-bearing snapshot is present,
+the golden identity gate has not passed, and no authenticated `@V3-Recovery`
+connector is registered. Recovery snapshot source/writer registration and
+deployment remain operator/infrastructure-gated.
+
+DEPLOYMENT BOUNDARY: `RemoteDeploymentAdapter` and `RemoteRuntimeAdapter` are
+allowlisted for the Demo target only. They transport/verify the NHK Core
+artifact or invoke its maintenance entrypoint; they do not provision a
+dedicated database, establish a canonical operational binding, or grant a
+semantic writer. The repository contains no sanctioned non-staging operational
+provisioning adapter or connector registration path that can be executed from
+this checkout.
+
+PRIOR CLOCK TYPE: The prior successful Apply reported database
+`nhk_v3_test`. Repository contracts identify that database as guarded
+integration/test-only, with destructive test lifecycle exposure. It therefore
+supports the classification `PREVIOUS_CLOCK_TYPE_WAS_GUARDED_TEST_ACCEPTANCE_DATA`,
+not persistent operational website data; the old UUID must not be treated as an
+operational identity until an intended canonical runtime is separately proven.
+
+PERSISTENCE GATES: No target currently proves all of dedicated persistent
+datastore binding, current migrations, governed Authority capability through a
+callable connector, same-runtime read-after-write, connector provenance,
+backup/recovery ownership and shared Authority/Graph/Knowledge/Media/Video/
+Public Identity ownership. The existing runtime identity code exposes
+environment/site/database/mode to sanctioned local snapshot composition, but
+there is no registered operational read-only identity surface for a writable
+canonical deployment. Secrets and credentials remain outside the repository.
+
+PROVISIONING DECISION: `CANONICAL_RUNTIME_NOT_PROVISIONED`. No staging policy
+was changed, no test guard was bypassed, no database was copied or restored,
+and no migration, Authority, Capture, Proposal, Graph, Knowledge, Media,
+Video, Article or Public Identity mutation was performed. A future
+infrastructure-owned provisioning action must first create a dedicated
+non-test, non-staging runtime, bind all semantic owners to the same datastore,
+register a dedicated connector, prove identity/restart continuity and
+backup/recovery, then run a PLAN-only governed smoke before any Clock Type
+operation.
