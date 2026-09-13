@@ -8948,3 +8948,34 @@ apply/backfill or PR7 operation was used. Fresh target runtime verification
 remains typed `LIVE_AUDIT_SURFACE_NOT_EXPOSED`, so the overall closure status
 is `ORGANIZATION_BLOCKED` pending sanctioned production/read-surface exposure
 and guarded integration infrastructure.
+
+# Checkpoint — 2026-09-13 — Clock Type guarded acceptance complete
+
+GUARDED RUNTIME: Exact database identity was verified as `nhk_v3_test`. The
+repository-approved UP-only maintenance entrypoint restored schema state to
+`20/20` before final verification. No production/staging database was used.
+
+DOCUMENTATION: Fresh canonical bootstrap passed with 32 active documents.
+Snapshot generation and manifest parity passed.
+
+AUDIT: The registered `clock-type-audit` maintenance surface was callable and
+returned `status=pass`, `surface_status=AUDITED`, `completed=true` with a
+bounded limit. The real inventory was empty: `classified_as=0`, canonical
+`clock_type=0`, legacy `clock-type=0`, Models `0`, Variants `0`, Specimens `0`,
+Products `0`; all requested audit outcomes were `0`.
+
+INTEGRATION: Full guarded Integration passed `124 tests / 1065 assertions`
+with 0 failures/errors, 1 warning, 1 deprecation and 7 pre-existing skips.
+Focused Clock-Type Integration passed `1 test / 25 assertions`. Full Unit
+passed `1428 / 6828`; Contract passed `4 / 31`.
+
+ZERO-WRITE: Before/after read-only audit snapshots of canonical tables were
+identical. No Clock Type was created. No Authority, Graph, Knowledge,
+Evidence, Source, Media, Video, Article, Public Identity, route or sitemap was
+mutated. No generic writer, SQL workaround, route allocation/reprojection,
+legacy bulk apply/backfill or PR7 operation was used.
+
+ROUTE SCOPE: Root route allocation/reprojection remains outside this
+acceptance and is not a blocker; the read/collision foundation remains intact.
+
+STATUS: ORGANIZATION_COMPLETE

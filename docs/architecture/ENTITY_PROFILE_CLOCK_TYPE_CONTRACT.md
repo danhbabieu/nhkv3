@@ -497,3 +497,20 @@ remains limited to active, same-family, cycle-free Clock-Type hierarchy.
 Local code and regression verification are complete. Fresh target audit
 verification remains `LIVE_AUDIT_SURFACE_NOT_EXPOSED`; no live semantic
 mutation, legacy bulk apply/backfill or PR7 was performed.
+
+## 19. Guarded acceptance closure — 2026-09-13
+
+The authorized `nhk_v3_test` runtime now exposes the registered read-only
+Clock-Type audit surface. Fresh documentation bootstrap passed; schema was
+verified at `20/20`; the bounded audit returned `AUDITED` and `completed=true`.
+The real inventory was empty (`classified_as=0`, canonical `clock_type=0`,
+legacy `clock-type=0`, and zero Model/Variant/Specimen/Product records), so no
+candidate was produced. Before/after canonical counts were identical.
+
+Full guarded Integration passed `124/1065`, focused Clock-Type Integration
+passed `1/25`, and Unit/Contract/lint/docs parity remained green. Existing
+optional Easy MCP/fixture skips and the existing transport warning are not
+Clock-Type failures. No semantic mutation, route allocation, reprojection,
+backfill or PR7 operation occurred.
+
+Acceptance status: `ORGANIZATION_COMPLETE`.

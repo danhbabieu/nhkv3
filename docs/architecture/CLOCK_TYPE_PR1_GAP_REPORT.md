@@ -495,3 +495,27 @@ repository code organization is complete, but the overall architecture gate
 remains `ORGANIZATION_BLOCKED` until a sanctioned production/read runtime
 exposes the fresh audit surface and guarded integration infrastructure is
 available.
+
+## GUARDED ACCEPTANCE CLOSURE — 2026-09-13
+
+The two acceptance blockers are closed on the authorized guarded runtime:
+
+- `nhk_v3_test` was verified before and after execution; the sanctioned
+  UP-only maintenance path restored schema `20/20`.
+- Fresh documentation bootstrap passed, and the registered
+  `clock-type-audit` maintenance surface returned `status=pass`,
+  `surface_status=AUDITED` and `completed=true` with bounded pagination.
+- Full guarded Integration passed `124 tests / 1065 assertions`; focused
+  Clock-Type integration passed `1 test / 25 assertions`.
+- The real dry-run found an empty inventory: `classified_as=0`, canonical
+  `clock_type=0`, legacy `clock-type=0`, and all source/result counters `0`.
+- Before/after canonical table counts were identical. No semantic writer,
+  route allocation, Public Identity reprojection, legacy backfill or PR7 was
+  invoked.
+
+The seven Integration skips are pre-existing fixture/optional Easy MCP gaps;
+the single warning and deprecation are pre-existing MCP/PHP runtime issues and
+no failure was introduced by Clock Type organization. Root route allocation
+remains intentionally outside this acceptance scope.
+
+STATUS: `ORGANIZATION_COMPLETE`
