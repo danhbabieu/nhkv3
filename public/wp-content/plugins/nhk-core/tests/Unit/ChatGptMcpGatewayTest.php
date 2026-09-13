@@ -255,6 +255,8 @@ final class ChatGptMcpGatewayTest extends TestCase
     public function test_runtime_allowlist_is_exact_and_rejects_siblings_and_subdomains(): void
     {
         $method = new \ReflectionMethod(ChatGptMcpGateway::class, 'isExactAllowlistedHost');
+        self::assertTrue($method->invoke(null, 'oaisdmntpraustraliaeast.blob.core.windows.net', ['oaisdmntpraustraliaeast.blob.core.windows.net']));
+        self::assertFalse($method->invoke(null, 'oaisdmntpraustraliaeast2.blob.core.windows.net', ['oaisdmntpraustraliaeast.blob.core.windows.net']));
         self::assertTrue($method->invoke(null, 'sdmntpraustraliaeast.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
         self::assertFalse($method->invoke(null, 'sdmntpraustraliaeast2.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
         self::assertFalse($method->invoke(null, 'child.sdmntpraustraliaeast.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
