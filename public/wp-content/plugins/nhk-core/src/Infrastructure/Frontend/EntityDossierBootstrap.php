@@ -67,6 +67,9 @@ final class EntityDossierBootstrap
         $clockTypeDossier = new ClockTypeDossierProjection(
             new ClockTypeHierarchyProjection($authority, $graph),
             new ClockTypeDerivedRelationshipQuery($graph, $authority),
+            routes: $routes,
+            identities: new PublicIdentityContract($types),
+            authority: $authority,
         );
         $brandProjection = new BrandDossierProjection();
 

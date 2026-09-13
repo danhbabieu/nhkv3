@@ -234,7 +234,13 @@ final class SemanticDossierQuery implements EntityDossierReader
             if ($path === null) return null;
             $url = (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $path, 'public_eligible' => true], ['type' => 'Entity'])['internal_link'] ?? null;
             if (!is_string($url) || $url === '') return null;
-            return ['type' => $type, 'title' => $entity->canonicalName, 'url' => $url, 'origin' => $origin];
+            $item = ['type' => $type, 'title' => $entity->canonicalName, 'url' => $url, 'origin' => $origin];
+            $profile = (new EntityProfileResolver())->resolveProfile($entity);
+            if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
+                $definition = (new EntityProfileRegistry())->get((string) $profile->profileKey);
+                if ($definition instanceof EntityProfileDefinition) $item += ['profile_key' => $definition->key, 'profile_label' => $definition->visitorLabel, 'profile_badge' => $definition->toArray()['admin_badge'], 'profile_status' => $profile->status];
+            }
+            return $item;
         }
 
         if ($type === 'media') {

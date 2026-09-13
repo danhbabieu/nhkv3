@@ -25,6 +25,29 @@ final class PublicEntityCollectionQuery
 
     public function types(): EntityTypeRegistry { return $this->types; }
 
+    /** @return array{available:bool,type:string,profile_key:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
+    public function archiveProfile(string $profileKey, int $page = 1, int $perPage = 24, string $query = ''): array
+    {
+        $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $query = trim($query);
+        $definition = (new EntityProfileRegistry())->get($profileKey);
+        $type = $definition instanceof EntityProfileDefinition ? (string) ($definition->matchingRule['entity_type'] ?? '') : '';
+        $empty = ['available' => $this->isAvailable(), 'type' => $type, 'profile_key' => $profileKey, 'page' => $page, 'per_page' => $perPage, 'total' => 0, 'query' => $query, 'items' => []];
+        if (!$this->isAvailable() || !$definition instanceof EntityProfileDefinition || $type === '') return $empty;
+
+        $items = [];
+        $resolver = new EntityProfileResolver();
+        foreach ($this->authority->listByType($type, true) as $entity) {
+            $resolution = $resolver->resolveProfile($entity);
+            if (!$entity->active() || $resolution->profileKey !== $profileKey || !in_array($resolution->status, ['RESOLVED', EntityProfileResolution::COMPATIBILITY_READ], true)) continue;
+            $item = $this->item($entity, $query, false, true, $resolution);
+            if ($item !== null) $items[] = $item;
+        }
+        $empty['available'] = true;
+        $empty['total'] = count($items);
+        $empty['items'] = array_slice($items, ($page - 1) * $perPage, $perPage);
+        return $empty;
+    }
+
     /** @return array{available:bool,type:string,page:int,per_page:int,total:int,query:string,items:list<array<string,mixed>>} */
     public function archive(string $type, int $page = 1, int $perPage = 24, string $query = ''): array
     {
@@ -83,17 +106,22 @@ final class PublicEntityCollectionQuery
     }
 
     /** @return array<string,mixed>|null */
-    private function item(AuthorityEntity $entity, string $query = '', bool $detail = false): ?array
+    private function item(AuthorityEntity $entity, string $query = '', bool $detail = false, bool $requirePersistedIdentity = false, ?EntityProfileResolution $profileResolution = null): ?array
     {
         $decision = $this->eligibility->evaluate($entity);
         if (!$decision->eligible) return null;
-        $identity = $this->identity->resolve($entity);
+        $identity = $requirePersistedIdentity ? $this->identity->resolvePersisted($entity) : $this->identity->resolve($entity);
         $path = $identity === null ? null : $this->routes->path($entity);
         if ($identity === null || $path === null) return null;
         $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
         $url = (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'Entity'])['card'];
         $item = [...$identity, 'payload' => $payload, 'url' => $url];
+        $profile = $profileResolution ?? (new EntityProfileResolver())->resolveProfile($entity);
+        if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
+            $definition = (new EntityProfileRegistry())->get((string) $profile->profileKey);
+            if ($definition instanceof EntityProfileDefinition) $item += ['profile_key' => $definition->key, 'profile_label' => $definition->visitorLabel, 'profile_badge' => $definition->toArray()['admin_badge'], 'profile_status' => $profile->status];
+        }
         if ($this->entityMedia !== null) {
             $media = $this->entityMedia->forEntity($entity->entityType, $entity->canonicalId);
             $item['media'] = [

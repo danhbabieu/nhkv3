@@ -17,6 +17,11 @@ final class EntityPageQuery
 
     public function publicPath(AuthorityEntity $entity): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->path($entity); }
     public function archivePath(string $type): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePath($type); }
+    public function archivePathForProfile(string $profileKey): ?string { return ($this->routes ??= new PublicRouteResolver($this->authority, $this->types))->archivePathForProfile($profileKey); }
+    public function archiveProfile(string $profileKey, int $page = 1, int $perPage = 24, string $query = ''): array
+    {
+        return $this->collection?->archiveProfile($profileKey, $page, $perPage, $query) ?? ['available' => $this->available(), 'type' => '', 'profile_key' => $profileKey, 'page' => max(1, $page), 'per_page' => min(100, max(1, $perPage)), 'total' => 0, 'query' => trim($query), 'items' => []];
+    }
     public function detailForEntity(AuthorityEntity $entity): ?array
     {
         if ($this->collection !== null) return $this->withRelated($this->collection->detailForEntity($entity), $entity);

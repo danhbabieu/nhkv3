@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Http;
 
 use NHK\Core\Application\Entity\EntityPageQuery;
+use NHK\Core\Application\Entity\EntityProfileRegistry;
+use NHK\Core\Application\Entity\EntityProfileResolver;
 use NHK\Core\Application\Entity\PublicRouteResolver;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
@@ -22,11 +24,11 @@ final class PublicEntityRoutes
         'component' => 'linh-kien', 'classification' => 'phan-loai', 'specimen' => 'hien-vat', 'product' => 'san-pham',
     ];
 
-    public function __construct(private EntityPageQuery $query, private EntityTypeRegistry $types, private ?HistoricPublicRouteService $historic = null) {}
+    public function __construct(private EntityPageQuery $query, private EntityTypeRegistry $types, private ?HistoricPublicRouteService $historic = null, private ?EntityProfileRegistry $profiles = null) {}
 
     public function register(): void
     {
-        add_filter('query_vars', function (array $vars): array { foreach (['nhk_entity_type', 'nhk_entity_key', 'nhk_entity_page', 'nhk_entity_q', 'nhk_entity_alias', 'nhk_legacy_archive', 'nhk_public_entity_type', 'nhk_public_entity_a', 'nhk_public_entity_b', 'nhk_public_entity_c'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
+        add_filter('query_vars', function (array $vars): array { foreach (['nhk_entity_type', 'nhk_entity_profile', 'nhk_entity_key', 'nhk_entity_page', 'nhk_entity_q', 'nhk_entity_alias', 'nhk_legacy_archive', 'nhk_public_entity_type', 'nhk_public_entity_a', 'nhk_public_entity_b', 'nhk_public_entity_c'] as $name) if (!in_array($name, $vars, true)) $vars[] = $name; return $vars; });
         add_filter('request', [$this, 'preserveNativeRootRoute'], 20);
         add_action('init', [$this, 'rewrite']);
         add_action('template_redirect', [$this, 'legacyArchiveRedirect'], 1);
@@ -58,6 +60,14 @@ final class PublicEntityRoutes
         foreach (self::CANONICAL_ARCHIVES as $type => $namespace) {
             add_rewrite_rule('^' . preg_quote($namespace, '#') . '/page/([1-9][0-9]*)/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_alias=' . $namespace . '&nhk_entity_page=$matches[1]', 'top');
             add_rewrite_rule('^' . preg_quote($namespace, '#') . '/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_alias=' . $namespace, 'top');
+        }
+        foreach (($this->profiles ?? new EntityProfileRegistry())->all() as $profile) {
+            $archivePath = trim((string) ($profile->archiveNavigationIntent['archive_path'] ?? ''), " /");
+            $type = (string) ($profile->matchingRule['entity_type'] ?? '');
+            if ($archivePath === '' || $type === '') continue;
+            if ((self::CANONICAL_ARCHIVES[$type] ?? '') === $archivePath) continue;
+            add_rewrite_rule('^' . preg_quote($archivePath, '#') . '/page/([1-9][0-9]*)/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_profile=' . $profile->key . '&nhk_entity_alias=' . $archivePath . '&nhk_entity_page=$matches[1]', 'top');
+            add_rewrite_rule('^' . preg_quote($archivePath, '#') . '/?$', 'index.php?nhk_entity_type=' . $type . '&nhk_entity_profile=' . $profile->key . '&nhk_entity_alias=' . $archivePath, 'top');
         }
         foreach ($this->types->all() as $definition) {
             $namespace = PublicRouteResolver::namespaceFor($definition->type);
@@ -96,7 +106,9 @@ final class PublicEntityRoutes
             }
             $this->set200();
             $path = $this->query->publicPath($entity);
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $path, 'seo_projection' => $this->seo($path)];
+            $profile = (new EntityProfileResolver())->resolveProfile($entity);
+            $archivePath = $profile->profileKey !== null ? $this->query->archivePathForProfile($profile->profileKey) : $this->query->archivePath($publicType);
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'detail', 'type' => $publicType, 'profile' => $profile->profileKey ?? '', 'entity' => $this->query->detailForEntity($entity), 'archive_url' => $archivePath !== null ? home_url($archivePath) : '', 'seo_projection' => $this->seo($path)];
             $themeTemplate = locate_template('entity.php');
             return $themeTemplate !== '' ? $themeTemplate : $template;
         }
@@ -113,9 +125,11 @@ final class PublicEntityRoutes
             wp_safe_redirect(home_url($target), 301, 'NHK canonical public route');
             exit;
         } else {
-            $page = max(1, (int) get_query_var('nhk_entity_page', 1)); $query = trim((string) get_query_var('nhk_entity_q'));
-            $path = $this->query->archivePath($type) ?? '/';
-            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'archive' => $this->query->archive($type, $page, 24, $query), 'archive_url' => home_url($path), 'seo_projection' => $this->seo($path)];
+            $page = max(1, (int) get_query_var('nhk_entity_page', 1)); $query = trim((string) get_query_var('nhk_entity_q')); $profile = trim((string) get_query_var('nhk_entity_profile'));
+            $path = $profile !== '' ? $this->query->archivePathForProfile($profile) : $this->query->archivePath($type);
+            $archive = $profile !== '' ? $this->query->archiveProfile($profile, $page, 24, $query) : $this->query->archive($type, $page, 24, $query);
+            if ($profile !== '' && (string) ($archive['type'] ?? '') !== $type) { $this->set404(); return get_404_template(); }
+            $GLOBALS['nhk_core_entity_context'] = ['mode' => 'archive', 'type' => $type, 'profile' => $profile, 'archive' => $archive, 'archive_url' => home_url($path ?? '/'), 'seo_projection' => $this->seo($path)];
         }
         $themeTemplate = locate_template('entity.php');
         return $themeTemplate !== '' ? $themeTemplate : $template;

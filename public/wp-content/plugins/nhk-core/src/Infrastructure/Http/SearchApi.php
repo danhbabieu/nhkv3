@@ -11,7 +11,7 @@ use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Domain\Media\Media;
 use NHK\Core\Domain\Video\Video;
-use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicRouteResolver};
+use NHK\Core\Application\Entity\{EntityProfileRegistry, PublicEntityCollectionQuery, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Shared\Migration\MigrationStatus;
@@ -34,7 +34,7 @@ final class SearchApi
         $posts = new \WP_Query(['post_type' => 'post', 'post_status' => 'publish', 's' => $term, 'posts_per_page' => $perPage, 'paged' => $page, 'ignore_sticky_posts' => true]);
         $groups = ['posts' => array_map(static fn (\WP_Post $post): array => ['type' => 'post', 'id' => (string) $post->ID, 'title' => get_the_title($post), 'url' => get_permalink($post), 'excerpt' => wp_trim_words(wp_strip_all_tags(get_the_excerpt($post)), 28), 'date' => get_the_date('c', $post)], $posts->posts)];
         $groups['entities'] = [];
-        if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->types->all() as $definition) foreach (($this->collection?->archive($definition->type, 1, 100, $term)['items'] ?? []) as $item) $groups['entities'][] = ['type' => $item['type'], 'title' => $item['name'], 'url' => (new PublicSeoProjection())->project(['path' => $item['url'], 'eligible' => true, 'canonical_url' => $item['url'], 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Entity'])['search']];
+        if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->entityItemsForSearch($term) as $item) $groups['entities'][] = $item;
         $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $item->active && $item->readiness === 'ready' && $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
         $videoSearch = new VideoSearchDocument($this->authority);
         $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $videoSearch->isDiscoverable($item) && $this->matches($term, ...$videoSearch->values($item))))) : [];
@@ -65,5 +65,33 @@ final class SearchApi
     {
         $url = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
         return is_string($url) && trim($url) !== '' ? ['type' => 'knowledge', 'title' => $item->claimText, 'url' => $url] : null;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function entityItemsForSearch(string $term): array
+    {
+        if ($this->collection === null) return [];
+        $routes = new PublicRouteResolver($this->authority, $this->types);
+        $profileOnly = [];
+        $items = [];
+        foreach ((new EntityProfileRegistry())->all() as $profile) {
+            $type = (string) ($profile->matchingRule['entity_type'] ?? '');
+            $profilePath = $routes->archivePathForProfile($profile->key);
+            $genericPath = $type === '' ? null : $routes->archivePath($type);
+            if ($type === '' || $profilePath === null || $profilePath === $genericPath) continue;
+            $profileOnly[$profile->key] = true;
+            foreach ($this->collection->archiveProfile($profile->key, 1, 100, $term)['items'] as $item) $items[] = $this->searchEntity($item);
+        }
+        foreach ($this->types->all() as $definition) foreach (($this->collection->archive($definition->type, 1, 100, $term)['items'] ?? []) as $item) {
+            if (isset($profileOnly[(string) ($item['profile_key'] ?? '')])) continue;
+            $items[] = $this->searchEntity($item);
+        }
+        return $items;
+    }
+
+    /** @param array<string,mixed> $item @return array<string,mixed> */
+    private function searchEntity(array $item): array
+    {
+        return ['type' => $item['type'], 'profile_key' => $item['profile_key'] ?? null, 'profile_label' => $item['profile_label'] ?? null, 'profile_badge' => $item['profile_badge'] ?? null, 'profile_status' => $item['profile_status'] ?? null, 'title' => $item['name'], 'url' => (new PublicSeoProjection())->project(['path' => $item['url'], 'eligible' => true, 'canonical_url' => $item['url'], 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'Entity'])['search']];
     }
 }

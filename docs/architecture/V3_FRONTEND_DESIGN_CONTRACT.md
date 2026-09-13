@@ -146,6 +146,30 @@ Templates do not reconstruct facts from WordPress, external URLs, raw Source or
 private Evidence. `Frontend Available` requires route resolution and read-back;
 Apply PASS alone is not frontend success. “Xem trên web” resolves to the
 first-party Video route, while “Mở nguồn gốc” is the external source action.
+
+## Clock Type profile integration — 2026-09-13
+
+Clock Type uses the shared Entity Profile frontend seam: a canonical
+`classification` whose validated family is `clock_type` resolves to the
+`clock_type` profile. Its archive intent is read from the profile registry and
+is exposed at `/loai-dong-ho/`; generic classifications retain `/phan-loai/`.
+Archive cards require a persisted Public Identity before a link is emitted.
+Profile metadata is reader-safe (`profile_key`, visitor label, badge and
+compatibility status); it is never inferred from a title, slug or stable key.
+
+Detail, archive, search, breadcrumb and related cards reuse the shared
+Entity/Profile projections. Clock-Type hierarchy, direct/derived Article,
+Video, Media and Brand context remain bounded read projections. Missing route
+identity, route collision, wrong family, retired relation and unavailable
+owners remain fail-closed and are not rendered as empty content. This
+checkpoint performs no Authority, Graph, Article, Knowledge, Media, Video or
+Public Identity mutation; live Public Identity allocation/reprojection remains
+outside scope.
+
+Semantic search uses a profile archive when its route intent is distinct from
+the generic entity archive. Clock-Type results therefore require persisted
+Public Identity and retain the profile badge; they are not reintroduced through
+generic classification fallback when that identity is unavailable.
 # Semantic Claim Ledger — 2026-09-08
 
 Entity detail pages consume `ClaimProjectionService` for the shared

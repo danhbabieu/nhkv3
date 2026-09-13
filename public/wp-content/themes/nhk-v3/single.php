@@ -2,7 +2,10 @@
 /* Native WordPress permalink/canonical remains authoritative; dossier is read-only context projection. */
 get_header();
 $fallback = get_theme_file_uri('/assets/default-archive.svg');
-$nhkReaderType = static fn(array $item): string => nhk_v3_public_type((string) ($item['type'] ?? ''));
+$nhkReaderType = static function (array $item): string {
+    if (trim((string) ($item['profile_key'] ?? '')) === '') return nhk_v3_public_type((string) ($item['type'] ?? ''));
+    return nhk_v3_public_type((string) ($item['type'] ?? ''), (string) $item['profile_key']);
+};
 $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng hồ', 'variants' => 'Biến thể', 'movements' => 'Bộ máy', 'music' => 'Bản nhạc', 'components' => 'Linh kiện', 'classifications' => 'Phân loại', 'specimens' => 'Hiện vật', 'products' => 'Sản phẩm', 'articles' => 'Bài viết liên quan', 'media' => 'Hình ảnh', 'videos' => 'Video'];
 ?>
 <main id="main-content" class="site-main article-shell article-v2">

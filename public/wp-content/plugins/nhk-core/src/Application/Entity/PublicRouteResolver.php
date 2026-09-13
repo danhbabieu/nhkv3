@@ -72,6 +72,14 @@ final class PublicRouteResolver
         return $namespace === null ? null : '/' . $namespace . '/';
     }
 
+    public function archivePathForProfile(string $profileKey): ?string
+    {
+        $definition = (new EntityProfileRegistry())->get($profileKey);
+        if (!$definition instanceof EntityProfileDefinition) return null;
+        $path = trim((string) ($definition->archiveNavigationIntent['archive_path'] ?? ''), " /");
+        return $path === '' ? null : '/' . $path . '/';
+    }
+
     public static function existingSemanticPath(string $type, string $id): ?string
     {
         if (!UuidCodec::isValid($id)) return null;

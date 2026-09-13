@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\{ClockTypeDerivedRelationshipQuery, ClockTypeHierarchyProjection};
+use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 
 /** Read-only Clock-Type enrichment over the shared Entity dossier packet. */
@@ -13,6 +14,9 @@ final class ClockTypeDossierProjection
         private ClockTypeHierarchyProjection $hierarchy,
         private ClockTypeDerivedRelationshipQuery $derivedBrands,
         private EntityProfileResolver $profiles = new EntityProfileResolver(),
+        private ?PublicRouteResolver $routes = null,
+        private ?PublicIdentityContract $identities = null,
+        private ?AuthorityRepository $authority = null,
     ) {}
 
     /** @param array<string,mixed> $dossier @return array<string,mixed> */
@@ -58,7 +62,7 @@ final class ClockTypeDossierProjection
             $path = is_array($item['best_path'] ?? null) ? $item['best_path'] : [];
             $predicates = array_values(array_filter(array_map(static fn (mixed $hop): string => is_array($hop) ? trim((string) ($hop['predicate'] ?? '')) : '', $path), static fn (string $predicate): bool => $predicate !== ''));
             $viaTypes = in_array('variant_of', $predicates, true) ? ['model', 'variant'] : ['model'];
-            $items[] = [
+            $projected = [
                 'canonical_id' => $id,
                 'type' => (string) ($item['entity_type'] ?? 'brand'),
                 'title' => $name,
@@ -70,8 +74,19 @@ final class ClockTypeDossierProjection
                     'via_types' => $viaTypes,
                 ],
             ];
+            $brand = $this->routes === null || $this->identities === null ? null : $this->authorityFind($id);
+            if ($brand instanceof AuthorityEntity && $this->identities->resolvePersisted($brand) !== null) {
+                $path = $this->routes->path($brand);
+                if ($path !== null) $projected['url'] = $path;
+            }
+            $items[] = $projected;
         }
         return $items;
+    }
+
+    private function authorityFind(string $id): ?AuthorityEntity
+    {
+        return $this->authority?->findByCanonicalId($id);
     }
 
     /** @param list<mixed> $existing @param list<array<string,mixed>> $incoming @return list<array<string,mixed>> */

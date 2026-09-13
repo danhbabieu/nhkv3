@@ -118,13 +118,15 @@ add_filter('the_content_feed', 'nhk_v3_public_content_filter', 20);
 
 function nhk_v3_excerpt(): string { return wp_trim_words(wp_strip_all_tags(get_the_excerpt()), 28); }
 
-function nhk_v3_entity_label(string $type): string
+function nhk_v3_entity_label(string $type, string $profile = ''): string
 {
+    if ($profile === 'clock_type') return 'loại đồng hồ';
     return ['brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm'][$type] ?? 'hồ sơ';
 }
 
-function nhk_v3_public_type(string $type): string
+function nhk_v3_public_type(string $type, string $profile = ''): string
 {
+    if ($profile === 'clock_type') return 'loại đồng hồ';
     return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng', 'publication' => 'ấn phẩm', 'website' => 'website', 'archive' => 'lưu trữ', 'catalog' => 'catalogue', 'interview' => 'phỏng vấn', 'fact' => 'dữ kiện', 'technical' => 'kỹ thuật', 'specification' => 'thông số'][$type] ?? 'nội dung liên quan';
 }
 
@@ -255,7 +257,7 @@ function nhk_v3_document_title(string $title): string
     $knowledge = $GLOBALS['nhk_core_knowledge_context'] ?? null;
     $comparison = $GLOBALS['nhk_core_comparison_context'] ?? null;
     if (is_array($entity) && ($entity['mode'] ?? '') === 'detail' && is_array($entity['entity'] ?? null)) return (string) $entity['entity']['name'] . ' — Đồng Hồ Nhà Kho';
-    if (is_array($entity) && ($entity['mode'] ?? '') === 'archive') return 'Khám phá ' . nhk_v3_entity_label((string) ($entity['type'] ?? '')) . ' — Đồng Hồ Nhà Kho';
+    if (is_array($entity) && ($entity['mode'] ?? '') === 'archive') return 'Khám phá ' . nhk_v3_entity_label((string) ($entity['type'] ?? ''), (string) ($entity['profile'] ?? '')) . ' — Đồng Hồ Nhà Kho';
     if (is_array($media) && ($media['mode'] ?? '') === 'detail' && is_array($media['media'] ?? null)) return (string) ($media['media']['name'] ?? 'Media') . ' — Đồng Hồ Nhà Kho';
     if (is_array($video) && ($video['mode'] ?? '') === 'detail' && is_array($video['video'] ?? null)) return (string) (($video['video']['title'] ?? '') ?: 'Video NHK') . ' — Đồng Hồ Nhà Kho';
     if (is_array($media) && ($media['mode'] ?? '') === 'archive') return 'Hình ảnh & media — Đồng Hồ Nhà Kho';
@@ -326,7 +328,7 @@ function nhk_v3_seo_head(): void
     if (is_singular('post')) { $description = nhk_v3_excerpt(); $canonical = get_permalink(); }
     if (is_array($context)) {
         if (($context['mode'] ?? '') === 'detail' && is_array($context['entity'] ?? null)) { $entity = $context['entity']; $title = (string) $entity['name'] . ' — Đồng Hồ Nhà Kho'; $description = 'Hồ sơ ' . (string) $entity['name'] . ' trong kho NHK.'; }
-        elseif (($context['mode'] ?? '') === 'archive') { $label = nhk_v3_entity_label((string) ($context['type'] ?? '')); $title = 'Khám phá ' . $label . ' — Đồng Hồ Nhà Kho'; $description = 'Khám phá ' . $label . ' trong kho tri thức NHK.'; }
+        elseif (($context['mode'] ?? '') === 'archive') { $label = nhk_v3_entity_label((string) ($context['type'] ?? ''), (string) ($context['profile'] ?? '')); $title = 'Khám phá ' . $label . ' — Đồng Hồ Nhà Kho'; $description = 'Khám phá ' . $label . ' trong kho tri thức NHK.'; }
     }
     if (is_array($media_context)) {
         if (($media_context['mode'] ?? '') === 'detail' && is_array($media_context['media'] ?? null)) { $media = $media_context['media']; $title = (string) ($media['name'] ?? 'Hình ảnh') . ' — Đồng Hồ Nhà Kho'; $description = 'Hình ảnh liên quan trong thư viện NHK.'; }
@@ -357,7 +359,7 @@ function nhk_v3_seo_head(): void
     if (is_singular('post') && $articleImage !== '') echo '<meta property="og:image" content="' . esc_url($articleImage) . '">' . "\n";
     $breadcrumb = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => [['@type' => 'ListItem', 'position' => 1, 'name' => 'NHK', 'item' => home_url('/')]]];
     if (is_singular('post')) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => get_the_title(), 'item' => get_permalink()];
-    if (is_array($context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => nhk_v3_entity_label((string) ($context['type'] ?? '')), 'item' => (string) ($context['archive_url'] ?? home_url('/'))];
+    if (is_array($context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => nhk_v3_entity_label((string) ($context['type'] ?? ''), (string) ($context['profile'] ?? '')), 'item' => (string) ($context['archive_url'] ?? home_url('/'))];
     if (is_array($media_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Thư viện media', 'item' => home_url('/thu-vien/')];
     if (is_array($video_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Video', 'item' => home_url('/video/')];
     if (is_array($knowledge_context)) $breadcrumb['itemListElement'][] = ['@type' => 'ListItem', 'position' => 2, 'name' => 'Tri thức', 'item' => home_url('/tri-thuc/')];

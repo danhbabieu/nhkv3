@@ -33,6 +33,20 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString("home_url('/model/')", $sidebar);
     }
 
+    public function test_clock_type_frontend_is_profile_driven_and_uses_safe_archive_metadata(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $entity = (string) file_get_contents($theme . '/entity.php');
+        $index = (string) file_get_contents($theme . '/index.php');
+        $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
+        self::assertStringContainsString("profile_key", $entity);
+        self::assertStringContainsString("profile_badge", $index);
+        self::assertStringContainsString("archiveProfile", $routes);
+        self::assertStringContainsString("nhk_entity_profile", $routes);
+        self::assertStringNotContainsString('Đồng hồ công cộng', $entity);
+        self::assertStringNotContainsString('01a09872-6af8-7890-90b7-f913fab7bee4', $entity);
+    }
+
     public function test_discovery_consumers_are_wired_to_one_public_collection_query(): void
     {
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');

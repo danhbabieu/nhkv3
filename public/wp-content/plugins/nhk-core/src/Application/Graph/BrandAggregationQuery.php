@@ -98,6 +98,11 @@ final class BrandAggregationQuery
     private function item(AuthorityEntity $entity, string $kind, array $path): array
     {
         $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'origin' => ['kind' => $kind, 'path' => $path, 'hop_count' => count($path)]];
+        $profile = $this->profiles->resolveProfile($entity);
+        if ($profile->resolved() || $profile->status === \NHK\Core\Application\Entity\EntityProfileResolution::COMPATIBILITY_READ) {
+            $definition = (new \NHK\Core\Application\Entity\EntityProfileRegistry())->get((string) $profile->profileKey);
+            if ($definition instanceof \NHK\Core\Application\Entity\EntityProfileDefinition) $item += ['profile_key' => $definition->key, 'profile_label' => $definition->visitorLabel, 'profile_badge' => $definition->toArray()['admin_badge'], 'profile_status' => $profile->status];
+        }
         $url = $this->routes?->path($entity);
         if ($url !== null) $item['url'] = $url;
         return $item;

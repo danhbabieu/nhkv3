@@ -134,6 +134,15 @@ final class PublicRouteResolverTest extends TestCase
         }
     }
 
+    public function test_clock_type_profile_has_registered_archive_intent_without_changing_generic_classification_archive(): void
+    {
+        $repository = new InMemoryAuthorityRepository(); $types = null;
+        $resolver = $this->resolver($repository, $types);
+
+        self::assertSame('/phan-loai/', $resolver->archivePath('classification'));
+        self::assertSame('/loai-dong-ho/', $resolver->archivePathForProfile('clock_type'));
+    }
+
     public function test_brand_and_model_archives_use_vietnamese_hubs_and_all_hubs_are_reserved(): void
     {
         $repository = new InMemoryAuthorityRepository(); $types = null;

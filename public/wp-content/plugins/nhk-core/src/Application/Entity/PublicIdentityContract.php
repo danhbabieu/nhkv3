@@ -20,6 +20,14 @@ final class PublicIdentityContract
         return ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'slug' => $slug];
     }
 
+    /** @return array{type:string,name:string,slug:string}|null */
+    public function resolvePersisted(AuthorityEntity $entity): ?array
+    {
+        if (!$this->types->has($entity->entityType)) return null;
+        $slug = $this->persistedSlug($entity);
+        return $slug === null ? null : ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'slug' => $slug];
+    }
+
     /** @return array<string,mixed> Public payload excludes internal relationship identifiers. */
     public function payload(AuthorityEntity $entity): array
     {

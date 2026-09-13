@@ -9,7 +9,7 @@ use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligib
 use NHK\Core\Contracts\Knowledge\KnowledgeRepository;
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeDefinition, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeDefinition, EntityTypeRegistry};
 use NHK\Core\Domain\Knowledge\KnowledgeClaim;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 use NHK\Core\Domain\Video\Video;
@@ -62,6 +62,40 @@ final class SearchSemanticQueryTest extends TestCase
         $empty = $query->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], '   ');
         self::assertSame(0, $empty['_totals']['entities']);
         self::assertSame([], $empty['entities']);
+    }
+
+    public function test_clock_type_search_result_keeps_profile_badge_and_does_not_use_generic_classification_label(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authorityRepository = new InMemoryAuthorityRepository();
+        $clockType = (new AuthorityService($authorityRepository, $types))->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $identities = new SearchFixtureIdentityRepository(['authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong']]);
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
+        $collection = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);
+
+        $result = (new SearchSemanticQuery($authorityRepository, $this->emptyMediaRepository(), $this->emptyVideoRepository(), $this->knowledgeRepository([]), $types, null, $routes, $collection))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Đồng hồ công cộng');
+
+        self::assertSame(1, $result['_totals']['entities']);
+        self::assertSame('clock_type', $result['entities'][0]['profile_key']);
+        self::assertSame('[LOẠI ĐỒNG HỒ]', $result['entities'][0]['profile_badge']);
+        self::assertSame('/phan-loai/dong-ho-cong-cong/', $result['entities'][0]['url']);
+    }
+
+    public function test_clock_type_search_does_not_use_title_slug_fallback_without_persisted_identity(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authorityRepository = new InMemoryAuthorityRepository();
+        (new AuthorityService($authorityRepository, $types))->create('classification', 'nhk:classification:clock-type.no-route', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $identities = new SearchFixtureIdentityRepository([]);
+        $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
+        $collection = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);
+
+        $result = (new SearchSemanticQuery($authorityRepository, $this->emptyMediaRepository(), $this->emptyVideoRepository(), $this->knowledgeRepository([]), $types, null, $routes, $collection))->extend(['entities' => [], 'media' => [], 'videos' => [], 'knowledge' => []], 'Đồng hồ công cộng');
+
+        self::assertSame([], $result['entities']);
+        self::assertSame(0, $result['_totals']['entities']);
     }
 
     public function test_semantic_search_does_not_match_unregistered_payload_fields(): void
@@ -208,4 +242,16 @@ final class SearchSemanticQueryTest extends TestCase
             public function list(bool $includeRetired = false): array { return $this->items; }
         };
     }
+}
+
+final class SearchFixtureIdentityRepository implements \NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository
+{
+    /** @param array<string,array<string,mixed>> $records */
+    public function __construct(private array $records) {}
+    public function allocate(array $record, string $idempotencyKey): array { return []; }
+    public function change(array $record, string $oldPath, int $expectedRevision, string $idempotencyKey): array { return []; }
+    public function findCurrentById(string $identityId): ?array { return null; }
+    public function findCurrentByOwner(string $ownerKind, string $ownerId, string $routeType): ?array { return $this->records[$ownerKind . '|' . $ownerId . '|' . $routeType] ?? null; }
+    public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool { return false; }
+    public function resolveHistoric(string $path): array { return []; }
 }

@@ -82,6 +82,45 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertSame(0, $archive['total']);
     }
 
+    public function test_clock_type_profile_archive_filters_family_and_exposes_safe_profile_metadata(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $authority = new AuthorityService($repository, $types);
+        $clockType = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $authority->create('classification', 'nhk:classification:case-form.public', 'Đồng hồ công cộng', ['family' => 'case_form']);
+        $routes = new PublicRouteResolver($repository, $types);
+        $identity = new FixturePublicIdentityRepository(['authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong']]);
+        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes);
+
+        $archive = $query->archiveProfile('clock_type');
+
+        self::assertSame(1, $archive['total']);
+        self::assertSame($clockType->canonicalName, $archive['items'][0]['name']);
+        self::assertSame('clock_type', $archive['items'][0]['profile_key']);
+        self::assertSame('Loại đồng hồ', $archive['items'][0]['profile_label']);
+        self::assertSame('[LOẠI ĐỒNG HỒ]', $archive['items'][0]['profile_badge']);
+        self::assertArrayNotHasKey('canonical_id', $archive['items'][0]);
+        self::assertArrayNotHasKey('stable_key', $archive['items'][0]);
+    }
+
+    public function test_clock_type_profile_archive_fails_closed_without_persisted_public_identity(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $authority = new AuthorityService($repository, $types);
+        $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $routes = new PublicRouteResolver($repository, $types);
+        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, new NullPublicIdentityRepository()), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes);
+
+        $archive = $query->archiveProfile('clock_type');
+
+        self::assertSame(0, $archive['total']);
+        self::assertSame([], $archive['items']);
+    }
+
     public function test_brand_detail_can_include_graph_aggregation_without_changing_public_identity(): void
     {
         $types = new EntityTypeRegistry();
@@ -104,4 +143,26 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertSame('Model One', $detail['aggregation']['models'][0]['name']);
         self::assertSame('/brand-one/model-one/', $detail['aggregation']['models'][0]['url']);
     }
+}
+
+final class NullPublicIdentityRepository implements \NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository
+{
+    public function allocate(array $record, string $idempotencyKey): array { return []; }
+    public function change(array $record, string $oldPath, int $expectedRevision, string $idempotencyKey): array { return []; }
+    public function findCurrentById(string $identityId): ?array { return null; }
+    public function findCurrentByOwner(string $ownerKind, string $ownerId, string $routeType): ?array { return null; }
+    public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool { return false; }
+    public function resolveHistoric(string $path): array { return []; }
+}
+
+final class FixturePublicIdentityRepository implements \NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository
+{
+    /** @param array<string,array<string,mixed>> $records */
+    public function __construct(private array $records) {}
+    public function allocate(array $record, string $idempotencyKey): array { return []; }
+    public function change(array $record, string $oldPath, int $expectedRevision, string $idempotencyKey): array { return []; }
+    public function findCurrentById(string $identityId): ?array { return null; }
+    public function findCurrentByOwner(string $ownerKind, string $ownerId, string $routeType): ?array { return $this->records[$ownerKind . '|' . $ownerId . '|' . $routeType] ?? null; }
+    public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool { return false; }
+    public function resolveHistoric(string $path): array { return []; }
 }

@@ -9016,3 +9016,25 @@ exists, and direct conceptual Media → Clock Type remains conditional on the
 existing Media contract/evidence. The local WordPress database boundary still
 blocks the relevant Integration runtime; this does not change the read/write
 contract or authorize a workaround.
+
+# Checkpoint — 2026-09-13 — Clock Type frontend integration
+
+FRONTEND: `CLOCK_TYPE_FRONTEND_IMPLEMENTED`. The shared Entity Profile seam
+now resolves the canonical `classification` + `family=clock_type` profile for
+archive cards, search badges, breadcrumbs, detail hierarchy and related
+object/Brand projections. The registered profile archive intent is read as
+`/loai-dong-ho/`; generic `/phan-loai/` remains unchanged. Missing persisted
+Public Identity, route collisions, wrong family, legacy compatibility state,
+retired relations and unavailable projections remain fail-closed.
+
+SEMANTICS: Article, Knowledge, Media and Video retain their existing direct or
+derived subject/attachment semantics. Brand ↔ Clock Type remains a bounded
+derived projection with no shortcut edge. Templates use shared profile and
+route metadata and contain no Clock-Type entity name, UUID or stable-key
+special case.
+
+LIVE SCOPE: `LIVE_PUBLIC_IDENTITY_NOT_ALLOCATED` and
+`NO_SEMANTIC_MUTATION`. No Authority, Graph, Article, Knowledge, Evidence,
+Source, Media, Video, Capture, Proposal, Public Identity, route allocation,
+route reprojection, backfill or PR7 operation was performed. The synthetic
+frontend acceptance fixture is in-memory only.
