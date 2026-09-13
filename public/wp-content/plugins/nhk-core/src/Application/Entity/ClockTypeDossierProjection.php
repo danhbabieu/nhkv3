@@ -57,6 +57,7 @@ final class ClockTypeDossierProjection
             if ($id === '' || $name === '') continue;
             $path = is_array($item['best_path'] ?? null) ? $item['best_path'] : [];
             $predicates = array_values(array_filter(array_map(static fn (mixed $hop): string => is_array($hop) ? trim((string) ($hop['predicate'] ?? '')) : '', $path), static fn (string $predicate): bool => $predicate !== ''));
+            $viaTypes = in_array('variant_of', $predicates, true) ? ['model', 'variant'] : ['model'];
             $items[] = [
                 'canonical_id' => $id,
                 'type' => (string) ($item['entity_type'] ?? 'brand'),
@@ -66,7 +67,7 @@ final class ClockTypeDossierProjection
                     'kind' => (string) ($item['relationship_class'] ?? 'DERIVED'),
                     'hop_count' => count($predicates),
                     'predicates' => $predicates,
-                    'via_types' => ['model'],
+                    'via_types' => $viaTypes,
                 ],
             ];
         }
@@ -106,6 +107,7 @@ final class ClockTypeDossierProjection
         return match ($status) {
             'AVAILABLE_WITH_ITEMS' => 'AVAILABLE_WITH_ITEMS',
             'AVAILABLE_EMPTY' => 'AVAILABLE_EMPTY',
+            'BLOCKED' => 'BLOCKED',
             default => 'UNAVAILABLE_IMPLEMENTATION_GAP',
         };
     }

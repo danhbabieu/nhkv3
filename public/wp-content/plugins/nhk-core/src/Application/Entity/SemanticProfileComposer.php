@@ -32,7 +32,7 @@ final class SemanticProfileComposer
         $videos = array_values(is_array($relations['videos'] ?? null) ? $relations['videos'] : []);
         $articles = array_values(is_array($relations['articles'] ?? null) ? $relations['articles'] : []);
 
-        return [
+        $result = [
             'identity' => $identity,
             'hierarchy' => $this->hierarchy($type, $relations, is_array($dossier['clock_type_hierarchy'] ?? null) ? $dossier['clock_type_hierarchy'] : []),
             'relation_sections' => $relations,
@@ -40,7 +40,6 @@ final class SemanticProfileComposer
             'evidence_context' => $this->evidenceContext($knowledge),
             'primary_media' => is_array($dossier['primary_media'] ?? null) ? $dossier['primary_media'] : [],
             'media_gallery' => array_values(is_array($dossier['media_gallery'] ?? null) ? $dossier['media_gallery'] : []),
-            'media_context' => is_array($dossier['media_context'] ?? null) ? $this->publicMediaContext($dossier['media_context']) : [],
             'videos' => $videos,
             'articles' => $articles,
             'navigation' => is_array($dossier['navigation'] ?? null) ? $dossier['navigation'] : [],
@@ -51,6 +50,8 @@ final class SemanticProfileComposer
             'section_order' => self::SECTION_ORDER[$type] ?? ['identity', 'relation_sections', 'knowledge', 'media_gallery', 'videos', 'articles', 'navigation'],
             'relation_order' => $this->relationOrder($type),
         ];
+        if ($type === 'clock_type') $result['media_context'] = is_array($dossier['media_context'] ?? null) ? $this->publicMediaContext($dossier['media_context']) : [];
+        return $result;
     }
 
     /** @return array<string,mixed> */

@@ -178,4 +178,37 @@ final class ClockTypePr1GoldenRegressionTest extends TestCase
         self::assertNull($graph->findEdge(new NodeReference('video', $video->canonicalId), 'about', new NodeReference('classification', $clockTypeId)));
         self::assertCount(2, $graphRepo->allEdges());
     }
+
+    public function test_article_and_video_keep_exact_subjects_while_whole_type_attachments_are_explicit(): void
+    {
+        $clockTypeId = UuidCodec::newV7();
+        $variantId = UuidCodec::newV7();
+        $directArticle = new NodeReference('wp_post', '1:901');
+        $objectArticle = new NodeReference('wp_post', '1:902');
+        $directVideo = new NodeReference('video', UuidCodec::newV7());
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new FakeEndpointResolver('wp_post', ['1:901', '1:902']));
+        $endpoints->register('video', new FakeEndpointResolver('video', [$directVideo->endpoint_key]));
+        $endpoints->register('variant', new FakeEndpointResolver('variant', [$variantId]));
+        $endpoints->register('classification', new FakeEndpointResolver('classification', [$clockTypeId]));
+        $predicates = new PredicateRegistry();
+        $graphRepository = new InMemoryGraphRepository();
+        $graph = new GraphService($graphRepository, $endpoints, $predicates, new InMemoryAuditSink(), classifiedAs: new ClassifiedAsPolicy());
+        $graph->create($directArticle, 'about', new NodeReference('classification', $clockTypeId));
+        $graph->create($objectArticle, 'about', new NodeReference('variant', $variantId));
+        $graph->create(new NodeReference('variant', $variantId), 'classified_as', new NodeReference('classification', $clockTypeId));
+        $graph->create($directVideo, 'about', new NodeReference('classification', $clockTypeId));
+        $related = new RelatedSemanticQuery($graph, new PredicateTraversalPolicy($predicates));
+
+        $directArticleResult = $related->query($directArticle, ['classification'], 2, 10);
+        $objectArticleResult = $related->query($objectArticle, ['classification'], 2, 10);
+        $directVideoResult = $related->query($directVideo, ['classification'], 1, 10);
+
+        self::assertSame('DIRECT', $directArticleResult['items'][0]['relationship_class']);
+        self::assertSame(1, $directArticleResult['items'][0]['hop_count']);
+        self::assertSame('DERIVED', $objectArticleResult['items'][0]['relationship_class']);
+        self::assertSame(2, $objectArticleResult['items'][0]['hop_count']);
+        self::assertSame('DIRECT', $directVideoResult['items'][0]['relationship_class']);
+        self::assertNull($graph->findEdge($objectArticle, 'about', new NodeReference('classification', $clockTypeId)));
+    }
 }

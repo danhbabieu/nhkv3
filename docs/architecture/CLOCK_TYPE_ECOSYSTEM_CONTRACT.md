@@ -92,8 +92,8 @@ Brand ← model_of — Model ← variant_of — Variant — classified_as → Cl
 The reader returns deterministic `DIRECT`/`DERIVED` origin, hop count, ordered
 predicates, explainable path and alternative paths where available. Product or
 Specimen to Brand paths are `CONTRACT_GAP` when no registered structural path
-proves them; they are not inferred. No Brand→Clock Type shortcut or parallel
-relation field is persisted.
+proves them; they are not inferred. Không tạo Brand↔Clock Type shortcut edge;
+no parallel relation field is persisted.
 
 ## 6. Article and Knowledge
 

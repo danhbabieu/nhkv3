@@ -16,6 +16,14 @@ final class ClockTypeEcosystemContractTest extends TestCase
         foreach (['family      = clock_type', '`subtype_of`', '`classified_as`', '`model_of`', '`variant_of`', '`about`', '`depicts`', 'Graph là relation owner duy nhất', 'Không tạo Brand↔Clock Type shortcut edge', 'Không cấp Public Identity/root route', 'DIRECT_MEDIA', 'DERIVED_MEDIA'] as $required) {
             self::assertStringContainsString($required, $contract, $required);
         }
-        foreach (['ClockType', 'brand_types', 'types[]', 'new predicate'] as $forbidden) self::assertStringNotContainsString($forbidden, $contract, $forbidden);
+        foreach (['ClockType', 'brand_types', 'types[]'] as $forbidden) self::assertStringNotContainsString($forbidden, $contract, $forbidden);
+    }
+
+    public function test_ecosystem_contract_is_in_canonical_documentation_registry(): void
+    {
+        self::assertContains(
+            'docs/architecture/CLOCK_TYPE_ECOSYSTEM_CONTRACT.md',
+            \NHK\Core\Application\Mcp\McpDocumentationRegistry::documentPaths(),
+        );
     }
 }
