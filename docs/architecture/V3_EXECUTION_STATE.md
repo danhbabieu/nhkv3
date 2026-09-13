@@ -9151,3 +9151,13 @@ DOCUMENTATION: Canonical MCP documentation was regenerated only through
 fresh version/hash are recorded by the final verification report. No staging
 deployment, snapshot transfer, database mutation, semantic mutation, Clock
 Type creation, PR7 operation or backfill was performed.
+
+FINAL VERIFICATION: Package tests pass `11 tests / 104 assertions`; full Unit
+passes `1449 tests / 6954 assertions` with existing warnings/deprecations and
+no failures; full Contract passes `6 tests / 48 assertions`. A combined Unit +
+Contract invocation exposed one pre-existing suite-order failure in
+`CollectorProfileApiContractTest`: another Unit test defines a global
+`current_user_can()` helper, while the isolated Contract test expects that
+WordPress capability context to be absent. The affected test passes when run
+isolated; no unrelated permission behavior was changed. PHP lint, diff check,
+secret review and two deterministic documentation generations pass.
