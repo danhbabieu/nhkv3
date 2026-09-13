@@ -482,10 +482,11 @@ final class Plugin {
             (new EntityApi($authority, $types, $publicStatus, $publicCollection))->register();
             (new GraphApi($graphService, new MigrationStatus()))->register();
             $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
+            $existingMediaResolver = new \NHK\Core\Application\Media\ExistingMediaReferenceResolver($media, $assets, $wordpressAttachments);
             $mediaBatchUpload = new MediaBatchUploadService($wordpressAttachments);
             $imageIngest = new ImageIngestEntrypoint(
                 static fn (string $idempotencyKey, array $metadata, array $files, array $items): array => $mediaBatchUpload->upload($idempotencyKey, $metadata, $files, $items),
-                static fn (mixed $references): array => ChatGptMcpGateway::materializeReferences($references),
+                static fn (mixed $references): array => \NHK\Core\Infrastructure\Mcp\TrustedProvidedFileMaterializer::materialize($references),
             );
             $mcpNeighborhood = new SemanticNeighborhoodQuery(new RelatedSemanticQuery($graphService, new PredicateTraversalPolicy(new PredicateRegistry())));
             $canonicalInventory = self::canonicalInventory($types, $authority, $media, $videos, $claims, $sources, $evidence);
@@ -659,7 +660,13 @@ final class Plugin {
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
-                static function (array $input) use ($imageIngest): array {
+                static function (array $input) use ($imageIngest, $existingMediaResolver): array {
+                    $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
+                    if ($mediaIds !== []) {
+                        if (is_array($input['files'] ?? null) && $input['files'] !== []) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
+                        $items = $existingMediaResolver->resolve($mediaIds);
+                        return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true];
+                    }
                     $files = $input['files'] ?? [];
                     $manifest = ['status' => 'verified', 'items' => [], 'count' => 0];
                     if (is_array($files) && $files !== []) {
@@ -866,7 +873,9 @@ final class Plugin {
                 new VisualOpportunityDetector(),
                 new VisualSupportRequirementService(new \NHK\Core\Infrastructure\Media\WpdbVisualSupportRequirementRepository($wpdb)),
             );
-            $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest): array {
+            $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
+                $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
+                if ($mediaIds !== []) return ['status' => 'verified', 'items' => $existingMediaResolver->resolve($mediaIds), 'reused' => true];
                 return $imageIngest->ingest((string) ($input['idempotency_key'] ?? '') . ':assets', is_array($input['metadata'] ?? null) ? $input['metadata'] : [], $input['files'] ?? [], is_array($input['items'] ?? null) ? $input['items'] : [], (bool) ($input['_nhk_native_multipart'] ?? false));
             });
             $origin = static function (string $value): string { $parts = wp_parse_url($value); if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return ''; return strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : ''); };

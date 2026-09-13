@@ -1,5 +1,39 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-13 — ChatGPT in-chat image widget transport
+
+CHANGE: Added the bounded ChatGPT MCP Apps image-upload bridge. The reusable
+`TrustedProvidedFileMaterializer` preserves the existing trusted HTTPS
+validation, exact host policy, redirect revalidation, MIME/size checks and
+native file-bag handoff; `ChatGptMcpGateway` delegates to it. The custom MCP
+transport now exposes `nhk.media.widget-upload` and the decoupled
+`nhk.media.upload-widget.open` resource tool. The UI uses the ChatGPT host file
+APIs, never sends signed URLs in model context, and stores authorized file IDs
+plus canonical upload read-back state.
+
+CAPTURE_REUSE: Optional ordered `media_ids` are accepted by the existing
+Capture schema and the registered `ATTACH_ASSETS` continuation. The read-only
+resolver verifies active canonical Media, attachment binding and attachment
+read-back, then reuses the existing reconciliation path without downloading,
+creating an attachment or creating a duplicate Media. `files[]` and
+`media_ids[]` are mutually exclusive for one physical packet.
+
+VERIFICATION: Focused materializer/gateway/widget/MCP Apps/Capture selections
+passed 43 tests / 147 assertions; full NHK Unit passed 1,500 tests / 7,138
+assertions; NHK Contract passed 6 tests / 48 assertions; `composer lint` and
+deterministic documentation generation passed. Guarded WordPress integration
+was invoked with `NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` but
+WordPress stopped before PHPUnit with `Error establishing a database
+connection`; no integration test or database mutation occurred.
+
+CONTRACTS: Active MCP, Media and Capture-control-plane documentation now
+records the widget transport, structured provided-file reference, widget state
+and Media-ID reuse law. No Constitution amendment, schema/migration,
+semantic mutation, deployment, live mutation or Git operation was performed.
+
+STATUS: LOCAL_WIDGET_IMPLEMENTED / GUARDED_INTEGRATION_ENVIRONMENT_BLOCKED /
+DEPLOYMENT_PENDING_USER
+
 # Checkpoint — 2026-09-13 — Explicit Easy MCP public URL reproject exposure
 
 CHANGE: The existing `nhk-v3/public-url-reproject` Ability can now be retained

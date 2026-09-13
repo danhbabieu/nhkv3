@@ -245,7 +245,10 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [];
+    private const EXPLICIT_EXCLUSION_REASONS = [
+        'nhk.media.widget-upload' => 'CUSTOM_MCP_TRANSPORT_TOOL',
+        'nhk.media.upload-widget.open' => 'MCP_APPS_RENDER_TOOL',
+    ];
 
     /** @return list<string> */
     public static function readAbilityNames(): array

@@ -39,7 +39,10 @@ final class McpGovernanceQueueExposureTest extends TestCase
         foreach (McpToolCatalog::tools() as $tool) {
             $name = (string) $tool['name'];
             $ability = McpAbilityRegistration::abilityNameForTool($name);
-            self::assertNotNull($ability, $name);
+            if ($ability === null) {
+                self::assertArrayHasKey($name, McpAbilityRegistration::explicitExclusionReasons(), $name);
+                continue;
+            }
             $catalogAbilityNames[] = $ability;
             if (!SingleEntryPointPolicy::isInternalOnly($name)) {
                 self::assertContains($ability, $allowlist, $name);

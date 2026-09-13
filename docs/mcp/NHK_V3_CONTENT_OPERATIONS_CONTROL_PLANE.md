@@ -186,6 +186,13 @@ subject-scope matching; otherwise the wrong-variant usage is removed and the
 Article remains missing/placeholder. Same addendum payloads replay
 idempotently, while changed payloads conflict.
 
+The ChatGPT image widget may instead pass an ordered `media_ids` array to the
+same `ATTACH_ASSETS` continuation after the physical widget transport has
+completed. Each Media must be active, bound to a readable WordPress attachment
+and read back before Capture reconciliation. This reuse path creates no new
+attachment or Media and is mutually exclusive with `files[]` in the same
+physical input packet; unknown, duplicate or unbound IDs fail closed.
+
 #### Claim selection, trace and connector-exposure rule — 2026-09-09
 
 Graph reachability is discovery only. A relation path may make a Claim a

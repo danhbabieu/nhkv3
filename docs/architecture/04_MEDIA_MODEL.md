@@ -14,6 +14,13 @@ it never creates a second Media store. Standalone Media upload/ingest remains
 internal/admin compatibility or lifecycle tooling only and is not the normal
 operator path.
 
+The ChatGPT MCP Apps image widget is a transport/presentation adapter over the
+same physical owner. Its `nhk.media.widget-upload` tool accepts only trusted
+structured provided-file references, delegates to `ImageIngestEntrypoint`, and
+returns canonical attachment/Media read-back without semantic mutation. The
+widget may hand its ordered canonical `media_ids` to Capture later; that path
+reuses the existing attachment/Media and does not re-download or duplicate it.
+
 An existing-Capture continuation is text-only unless it explicitly declares
 the registered `followup_mode=ATTACH_ASSETS`. That mode accepts native files
 through Capture, appends verified asset metadata to the same Capture, and

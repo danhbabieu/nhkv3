@@ -298,19 +298,21 @@ final class ChatGptMcpGatewayTest extends TestCase
     public function test_gateway_proxy_converges_on_existing_easy_and_nhk_mcp_boundaries(): void
     {
         $gateway = (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/ChatGptMcpGateway.php');
+        $materializer = (string) file_get_contents(__DIR__ . '/../../src/Infrastructure/Mcp/TrustedProvidedFileMaterializer.php');
         $ability = (string) file_get_contents(__DIR__ . '/../../src/Application/Mcp/McpAbilityRegistration.php');
 
         self::assertStringContainsString('proxyRpcWithoutFiles', $gateway);
+        self::assertStringContainsString('TrustedProvidedFileMaterializer::materialize', $gateway);
         self::assertStringContainsString("rest_get_server()->dispatch(\$proxy)", $gateway);
         self::assertStringContainsString("new \\WP_REST_Request('POST', '/nhk/v1/mcp')", $ability);
         self::assertStringContainsString("self::executeMcp(\$toolName, \$input)", $ability);
-        self::assertStringContainsString("'redirection' => 0", $gateway);
-        self::assertStringContainsString('MAX_REDIRECTS', $gateway);
-        self::assertStringContainsString('self::validateUrl($current, $hostPolicy)', $gateway);
+        self::assertStringContainsString("'redirection' => 0", $materializer);
+        self::assertStringContainsString('MAX_REDIRECTS', $materializer);
+        self::assertStringContainsString('self::validateUrl($current, $hostPolicy)', $materializer);
         self::assertStringNotContainsString('wp_upload_media', $gateway);
         self::assertStringNotContainsString('wp_upload_media_from_url', $gateway);
         self::assertStringNotContainsString('base64_decode', $gateway);
-        self::assertStringContainsString("str_starts_with(strtolower(\$reference), 'https://')", $gateway);
+        self::assertStringContainsString("str_starts_with(strtolower(\$reference), 'https://')", $materializer);
         self::assertStringContainsString("unset(\$params['arguments']['files'])", $gateway);
         self::assertStringContainsString('finally {', $gateway);
     }

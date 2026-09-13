@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NHK image uploader</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; padding: 16px; }
+    button, input { font: inherit; }
+    button { cursor: pointer; padding: 8px 12px; }
+    #previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 14px 0; }
+    figure { margin: 0; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 8px; overflow: hidden; }
+    figure img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+    figcaption { padding: 6px; font-size: 12px; overflow-wrap: anywhere; }
+    .status { margin-top: 10px; white-space: pre-wrap; }
+    .success { color: #16803c; } .failure { color: #bb2434; }
+  </style>
+</head>
+<body>
+  <h2>NHK image uploader</h2>
+  <p>Select one or more images. They will be stored as canonical NHK Media.</p>
+  <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
+  <button id="select" type="button" hidden>Select files</button>
+  <button id="upload" type="button" disabled>Upload selected images</button>
+  <button id="use" type="button" disabled>Use these images in chat</button>
+  <div id="summary" aria-live="polite">No images selected.</div>
+  <div id="previews"></div>
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+  <script>
+    (() => {
+      'use strict';
+      const openai = typeof window !== 'undefined' ? window.openai : undefined;
+      const input = document.getElementById('files');
+      const select = document.getElementById('select');
+      const upload = document.getElementById('upload');
+      const use = document.getElementById('use');
+      const summary = document.getElementById('summary');
+      const previews = document.getElementById('previews');
+      const status = document.getElementById('status');
+      let selected = [];
+      let uploaded = [];
+      let requestId = 1;
+      const pending = new Map();
+
+      function setStatus(text, kind) { status.textContent = text; status.className = 'status ' + (kind || ''); }
+      function bytes(value) { return (value / 1048576).toFixed(2) + ' MB'; }
+      function renderSelection() {
+        previews.replaceChildren();
+        let total = 0;
+        selected.forEach((file) => {
+          total += file.size;
+          const figure = document.createElement('figure');
+          const image = document.createElement('img');
+          image.alt = file.name;
+          image.src = URL.createObjectURL(file);
+          figure.append(image);
+          const caption = document.createElement('figcaption');
+          caption.textContent = file.name + ' (' + bytes(file.size) + ')';
+          figure.append(caption);
+          previews.append(figure);
+        });
+        summary.textContent = selected.length + ' image(s), ' + bytes(total);
+        upload.disabled = selected.length === 0 || typeof openai?.uploadFile !== 'function' || typeof openai?.getFileDownloadUrl !== 'function';
+      }
+      function callTool(name, argumentsValue) {
+        if (typeof openai?.callTool === 'function') return openai.callTool(name, argumentsValue);
+        const id = requestId++;
+        window.parent.postMessage({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: argumentsValue } }, '*');
+        return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+      }
+      function followUp(mediaIds) {
+        const params = { role: 'user', content: [{ type: 'text', text: 'Use these uploaded NHK images in the next Capture: ' + mediaIds.join(', ') }] };
+        if (typeof openai?.sendFollowUpMessage === 'function') return openai.sendFollowUpMessage(params);
+        window.parent.postMessage({ jsonrpc: '2.0', id: requestId++, method: 'ui/message', params }, '*');
+      }
+      function saveState() {
+        const ids = uploaded.map((item) => item.file_id).filter(Boolean);
+        const state = { modelContent: { uploaded_media: uploaded.map((item) => ({ media_id: item.media_id, attachment_id: item.attachment_id, public_filename: item.public_filename, status: 'uploaded' })) }, privateContent: { upload_status: 'complete' }, imageIds: ids };
+        if (typeof openai?.setWidgetState === 'function') openai.setWidgetState(state);
+      }
+      async function uploadFiles() {
+        if (typeof openai?.uploadFile !== 'function' || typeof openai?.getFileDownloadUrl !== 'function') { setStatus('This ChatGPT host does not support image file upload.', 'failure'); return; }
+        uploaded = [];
+        const references = [];
+        for (const file of selected) {
+          try {
+            setStatus('Uploading ' + file.name + '…');
+            const result = await openai.uploadFile(file, { library: false });
+            const fileId = result?.fileId;
+            if (!fileId) throw new Error('Upload did not return a file ID.');
+            const download = await openai.getFileDownloadUrl({ fileId });
+            if (!download?.downloadUrl) throw new Error('Download URL was not returned.');
+            references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: file.type, file_name: file.name });
+          } catch (error) { setStatus(file.name + ': ' + String(error?.message || error), 'failure'); return; }
+        }
+        try {
+          const result = await callTool('nhk.media.widget-upload', { idempotency_key: 'chatgpt-widget-' + Date.now() + '-' + Math.random().toString(36).slice(2), files: references });
+          uploaded = Array.isArray(result?.uploads) ? result.uploads : [];
+          uploaded.forEach((item) => { const row = document.createElement('div'); row.textContent = 'Attachment ' + item.attachment_id + ' · Media ' + item.media_id + ' · ' + item.public_filename + ' · uploaded'; row.className = 'success'; status.append(document.createTextNode('\n')); status.append(row); });
+          use.disabled = uploaded.length === 0;
+          saveState();
+        } catch (error) { setStatus('Image upload failed: ' + String(error?.message || error), 'failure'); }
+      }
+      input.addEventListener('change', () => { selected = Array.from(input.files || []).filter((file) => /^image\/(jpeg|png|gif|webp)$/.test(file.type)); renderSelection(); });
+      select.addEventListener('click', async () => { if (typeof openai?.selectFiles !== 'function') return; const files = await openai.selectFiles({ multiple: true, accept: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] }); selected = Array.from(files || []); renderSelection(); });
+      upload.addEventListener('click', uploadFiles);
+      use.addEventListener('click', () => followUp(uploaded.map((item) => item.media_id).filter(Boolean)));
+      if (typeof openai?.selectFiles === 'function') select.hidden = false;
+      window.addEventListener('message', (event) => {
+        if (event.source !== window.parent || event.data?.jsonrpc !== '2.0') return;
+        const message = event.data;
+        if (message.id !== undefined && pending.has(message.id)) { const task = pending.get(message.id); pending.delete(message.id); if (message.error) task.reject(message.error); else task.resolve(message.result); }
+      }, { passive: true });
+      if (typeof openai?.uploadFile !== 'function') setStatus('Select an image to check ChatGPT file upload support.');
+    })();
+  </script>
+</body>
+</html>

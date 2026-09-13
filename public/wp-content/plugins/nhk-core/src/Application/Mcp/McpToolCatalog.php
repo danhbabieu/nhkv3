@@ -56,6 +56,7 @@ final class McpToolCatalog
                 'observations' => ['type' => 'array', 'items' => ['type' => 'object']],
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
+                'media_ids' => ['type' => 'array', 'items' => self::uuidField()],
                 'publish' => ['type' => 'boolean'],
                 'governance' => [
                     'type' => 'object',
@@ -125,6 +126,22 @@ final class McpToolCatalog
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
             ], ['idempotency_key', 'files'], true),
+            self::tool('nhk.media.widget-upload', 'Materialize trusted ChatGPT file references through the canonical image attachment and Media boundary; this tool does not perform semantic reconciliation.', [
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
+                    'type' => 'object',
+                    'description' => 'OpenAI ChatGPT uploaded file reference. The server accepts only a trusted HTTPS download URL and file ID.',
+                    'properties' => [
+                        'download_url' => ['type' => 'string', 'format' => 'uri'],
+                        'file_id' => ['type' => 'string', 'minLength' => 1],
+                        'mime_type' => ['type' => 'string'],
+                        'file_name' => ['type' => 'string'],
+                    ],
+                    'required' => ['download_url', 'file_id'],
+                    'additionalProperties' => false,
+                ]],
+            ], ['idempotency_key', 'files'], true),
+            self::tool('nhk.media.upload-widget.open', 'Open the NHK image uploader UI. Upload results remain physical Media records until a canonical Capture flow reuses their Media IDs.', [], [], false, ['ui' => ['resourceUri' => 'ui://nhk/image-upload.html']]),
             self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or bind one already-uploaded WordPress image attachment into the canonical Media lifecycle without semantic inference.', [
                 'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],
                 'name' => ['type' => 'string', 'minLength' => 1],

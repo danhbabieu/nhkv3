@@ -60,6 +60,38 @@ final class MediaBatchUploadServiceTest extends TestCase
         @unlink($file['tmp_name']);
     }
 
+    public function test_same_key_with_same_payload_replays_without_a_second_attachment(): void
+    {
+        $first = $this->file('one.jpg', 'same-bytes');
+        $second = $this->file('one.jpg', 'same-bytes');
+        $ingestCalls = 0;
+        $ingestor = new class($ingestCalls) implements WordPressMediaAttachmentIngestor {
+            public function __construct(private int &$calls) {}
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array
+            {
+                $this->calls++;
+                return ['attachment_id' => 1, 'canonical_url' => '/image.webp', 'filename' => 'image.webp', 'mime' => 'image/webp', 'filesize' => 3, 'width' => 1, 'height' => 1];
+            }
+            public function read(int $attachmentId): ?array { return ['attachment_id' => $attachmentId]; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public array $records = [];
+            public function find(string $idempotencyKey): ?array { return $this->records[$idempotencyKey] ?? null; }
+            public function save(string $idempotencyKey, array $record): void { $this->records[$idempotencyKey] = $record; }
+        };
+        $service = new MediaBatchUploadService($ingestor, $repository);
+
+        try {
+            $firstResult = $service->upload('same-key-replay', [], ['files' => [$first]], [['client_file_id' => 'one']]);
+            $replay = $service->upload('same-key-replay', [], ['files' => [$second]], [['client_file_id' => 'one']]);
+            self::assertSame($firstResult, $replay);
+            self::assertSame(1, $ingestCalls);
+        } finally {
+            @unlink($first['tmp_name']);
+            @unlink($second['tmp_name']);
+        }
+    }
+
     public function test_atomic_reservation_rejects_a_concurrent_same_key_before_upload(): void
     {
         $file = $this->file('one.jpg', 'one');

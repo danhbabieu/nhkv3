@@ -108,13 +108,15 @@ final class McpTransport
     private function handle(string $method, array $params, bool $modern, array $files = []): array
     {
         return match ($method) {
-            'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0'], 'runtime_identity' => $this->runtimeIdentity()],
-            'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0'], 'runtime_identity' => $this->runtimeIdentity()],
+            'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass(), 'resources' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0'], 'runtime_identity' => $this->runtimeIdentity()],
+            'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass(), 'resources' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0'], 'runtime_identity' => $this->runtimeIdentity()],
             'tools/list' => ['tools' => array_map(static function (array $tool): array {
                 $export = ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']];
                 if (is_array($tool['connectorMeta'] ?? null) && $tool['connectorMeta'] !== []) $export['_meta'] = $tool['connectorMeta'];
                 return $export;
             }, McpToolCatalog::tools())],
+            'resources/list' => McpAppsResourceRegistry::list(),
+            'resources/read' => McpAppsResourceRegistry::read((string) ($params['uri'] ?? '')),
             'tools/call' => $this->callTool($params, $files),
             default => throw new McpMethodNotFound($method),
         };
@@ -138,6 +140,7 @@ final class McpTransport
             'nhk.proposal.create' => 'nhk_create_proposals',
             'nhk.media.ingest' => 'nhk_create_proposals',
             'nhk.media.upload-batch' => 'upload_files',
+            'nhk.media.widget-upload' => 'upload_files',
             'nhk.video.ingest' => 'nhk_create_proposals',
             'nhk.knowledge.ingest', 'nhk.source.ingest', 'nhk.evidence.ingest' => 'nhk_create_proposals',
             'nhk.proposal.submit' => 'nhk_submit_proposals',
@@ -186,6 +189,8 @@ final class McpTransport
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),
             'nhk.media.upload-batch' => $this->batchUpload($arguments, $files),
+            'nhk.media.widget-upload' => $this->widgetUpload($arguments),
+            'nhk.media.upload-widget.open' => ['resourceUri' => McpAppsResourceRegistry::IMAGE_UPLOAD_URI],
             'nhk.media.attachment.get' => $this->read->mediaAttachmentGet((int) ($arguments['attachment_id'] ?? 0)),
             'nhk.video.ingest' => $this->videoIngest($arguments),
             'nhk.video.get' => $this->read->videoGet((string) ($arguments['id'] ?? '')),
@@ -228,9 +233,51 @@ final class McpTransport
         );
     }
 
+    /** @return array<string,mixed> */
+    private function widgetUpload(array $arguments): array
+    {
+        if ($this->imageIngest === null) throw new \RuntimeException('IMAGE_INGEST_UNAVAILABLE');
+        $references = is_array($arguments['files'] ?? null) ? array_values($arguments['files']) : [];
+        $items = [];
+        foreach ($references as $index => $reference) {
+            if (!is_array($reference)) throw new \InvalidArgumentException('Widget upload references must be structured file objects.');
+            $items[] = [
+                'client_file_id' => (string) ($reference['file_id'] ?? ''),
+                'filename' => (string) ($reference['file_name'] ?? ''),
+                'sort_order' => $index,
+            ];
+        }
+        $manifest = $this->imageIngest->ingest(
+            (string) ($arguments['idempotency_key'] ?? ''),
+            ['source' => 'chatgpt_widget'],
+            $references,
+            $items,
+            false,
+        );
+        $uploads = [];
+        foreach (array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array')) as $index => $item) {
+            $reference = is_array($references[$index] ?? null) ? $references[$index] : [];
+            $uploads[] = [
+                'attachment_id' => (int) ($item['attachment_id'] ?? 0),
+                'media_id' => (string) ($item['media_id'] ?? ''),
+                'public_filename' => (string) ($item['filename'] ?? ''),
+                'original_filename' => (string) ($item['original_filename'] ?? ($reference['file_name'] ?? '')),
+                'mime' => (string) ($item['mime_type'] ?? ''),
+                'width' => (int) ($item['width'] ?? 0),
+                'height' => (int) ($item['height'] ?? 0),
+                'filesize' => (int) ($item['byte_size'] ?? 0),
+                'file_id' => (string) ($item['client_file_id'] ?? ($reference['file_id'] ?? '')),
+            ];
+        }
+        return ['uploads' => $uploads, 'errors' => array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array'))];
+    }
+
     private function captureIngest(array $arguments, array $files): array
     {
         if (is_callable($this->runtimeWriteReady) && !(bool) ($this->runtimeWriteReady)()) throw new \RuntimeException('REQUIRED_SCHEMA_NOT_READY');
+        $hasMediaIds = isset($arguments['media_ids']) && (array) $arguments['media_ids'] !== [];
+        $hasProvidedFiles = isset($arguments['files']) && (array) $arguments['files'] !== [];
+        if ($hasMediaIds && ($hasProvidedFiles || $files !== [])) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
         if (is_array($arguments['resume_children'] ?? null) && $arguments['resume_children'] !== [] && !isset($arguments['capture_id'])) {
             throw new \InvalidArgumentException('CAPTURE_RESUME_REQUIRES_CAPTURE_ID');
         }

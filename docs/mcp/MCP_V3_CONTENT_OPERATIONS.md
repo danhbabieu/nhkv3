@@ -623,6 +623,34 @@ derivatives. Checksum is a duplicate candidate only; it never merges canonical
 identities. A suitable existing Media should be reused before creating another
 semantic identity.
 
+### ChatGPT image widget transport — 2026-09-13
+
+The MCP Apps image widget is a presentation/transport adapter, not a Media or
+Capture owner. `nhk.media.upload-widget.open` renders
+`ui://nhk/image-upload.html`; the resource uses the ChatGPT host file APIs to
+obtain a temporary `download_url` and `file_id`, then calls the internal
+`nhk.media.widget-upload` transport tool. Each item must be the structured
+provided-file object with `download_url` and `file_id` (plus optional
+`mime_type` and `file_name`). Opaque IDs, local paths, base64 and arbitrary URLs
+are rejected by the reusable trusted materializer, including redirect
+revalidation and image MIME/size checks.
+
+The widget tool delegates to `ImageIngestEntrypoint`, the existing native
+WordPress attachment lifecycle and canonical Media adoption/read-back. It
+returns only attachment/Media read-back fields and the client `file_id`; signed
+URLs are not returned in model-visible content. The widget state keeps
+`modelContent.uploaded_media`, private upload status and authorized
+`imageIds`. A follow-up action passes Media IDs to the existing Capture flow;
+it never uploads the same physical file again.
+
+`nhk.capture.ingest` accepts optional ordered `media_ids` for already-ingested
+active Media with a verified WordPress attachment binding. The resolver reads
+back every attachment and fails closed on unknown, duplicate or unbound Media;
+it does not download, create an attachment or create a Media. `files[]` and
+`media_ids[]` are mutually exclusive for one physical input packet. The
+registered `ATTACH_ASSETS` continuation may reuse these Media IDs while
+preserving the existing Capture/Post and MediaUsage reconciliation boundary.
+
 Article Ingest reconciliation uses the same `ArticleMediaCoordinator` as the
 WordPress post-created adapter. It returns media state, mandatory-slot
 diagnostics and Blueprint information without copying or reordering Post body

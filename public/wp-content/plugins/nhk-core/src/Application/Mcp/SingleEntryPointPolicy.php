@@ -31,6 +31,7 @@ final class SingleEntryPointPolicy
         'nhk.article.trash',
         'nhk.article.restore',
         'nhk.media.upload-batch',
+        'nhk.media.widget-upload',
         'nhk.media.ingest',
         'nhk.video.ingest',
         'nhk.knowledge.ingest',

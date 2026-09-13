@@ -24,7 +24,7 @@ final class EditorialCaptureContinuationService
         $fingerprint = $this->fingerprint($input);
         $existing = $this->addenda->findByIdempotencyKey($key);
         if ($existing !== null) {
-            if (strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS' && (!isset($input['files']) || (array) $input['files'] === [])) $fingerprint = $this->fingerprint($input, $existing);
+            if (strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS' && (!isset($input['files']) || (array) $input['files'] === []) && (!isset($input['media_ids']) || (array) $input['media_ids'] === [])) $fingerprint = $this->fingerprint($input, $existing);
             if (!hash_equals($existing->requestFingerprint, $fingerprint) || $existing->captureId !== $captureId) return $this->conflict($existing, $captureId, $fingerprint);
             // A governance decision is a continuation of the same addendum,
             // not a new addendum. Re-run the guarded semantic checkpoint with
@@ -68,8 +68,12 @@ final class EditorialCaptureContinuationService
         if (!$capture instanceof CaptureRecord) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_NOT_FOUND', $input);
         if ($capture->stage === CaptureStage::PUBLISHED->value) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_CONTINUATION_NOT_ALLOWED_AFTER_PUBLICATION', $input);
         $assetFollowup = strtoupper(trim((string) ($input['followup_mode'] ?? ''))) === 'ATTACH_ASSETS';
-        if ($assetFollowup && (!isset($input['files']) || (array) $input['files'] === [])) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ASSET_FOLLOWUP_FILES_REQUIRED', $input);
-        if (!$assetFollowup && isset($input['files']) && (array) $input['files'] !== []) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_FILES_NOT_ALLOWED', $input);
+        $hasFiles = isset($input['files']) && (array) $input['files'] !== [];
+        $hasMediaIds = isset($input['media_ids']) && (array) $input['media_ids'] !== [];
+        if ($hasFiles && $hasMediaIds) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_PHYSICAL_INPUT_AMBIGUOUS', $input);
+        if ($assetFollowup && !$hasFiles && !$hasMediaIds) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ASSET_FOLLOWUP_FILES_REQUIRED', $input);
+        if (!$assetFollowup && $hasFiles) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_FILES_NOT_ALLOWED', $input);
+        if (!$assetFollowup && $hasMediaIds) return $this->failed($captureId, $key, $fingerprint, 'CAPTURE_ADDENDUM_MEDIA_IDS_NOT_ALLOWED', $input);
         foreach (['video' => 'CAPTURE_ADDENDUM_VIDEO_NOT_ALLOWED'] as $field => $code) {
             if (isset($input[$field]) && (array) $input[$field] !== []) return $this->failed($captureId, $key, $fingerprint, $code, $input);
         }
@@ -94,7 +98,7 @@ final class EditorialCaptureContinuationService
             if ($resumeChildren !== []) $input['governance'] = ['resume_children' => $resumeChildren] + (is_array($input['governance'] ?? null) ? $input['governance'] : []);
             if ($assetFollowup) {
                 if (!is_callable($this->assetIngest)) throw new \RuntimeException('CAPTURE_ASSET_FOLLOWUP_INGEST_UNAVAILABLE');
-                $manifest = ($this->assetIngest)(['capture_id' => $captureId, 'idempotency_key' => $key . ':assets', 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [], 'files' => $input['files'], 'items' => is_array($input['items'] ?? null) ? $input['items'] : []]);
+                $manifest = ($this->assetIngest)(['capture_id' => $captureId, 'idempotency_key' => $key . ':assets', 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [], 'files' => $input['files'] ?? [], 'media_ids' => $input['media_ids'] ?? [], 'items' => is_array($input['items'] ?? null) ? $input['items'] : []]);
                 $items = array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array'));
                 if ($items === []) throw new \RuntimeException('CAPTURE_ASSET_FOLLOWUP_READBACK_UNAVAILABLE');
                 $input['asset_followup_items'] = $items;
@@ -139,7 +143,8 @@ final class EditorialCaptureContinuationService
         if ($resumeChildren !== []) $payload['resume_children'] = $resumeChildren;
         if (strtoupper(trim((string) ($input['followup_mode'] ?? ''))) === 'ATTACH_ASSETS') {
             $payload['followup_mode'] = 'ATTACH_ASSETS';
-            $payload['asset_fingerprints'] = $this->assetFingerprints((array) ($input['files'] ?? []));
+            $payload['asset_fingerprints'] = ($input['files'] ?? []) !== [] ? $this->assetFingerprints((array) $input['files']) : array_map(static fn (mixed $id): array => ['media_id' => (string) $id], (array) ($input['media_ids'] ?? []));
+            if (($input['media_ids'] ?? []) !== []) $payload['media_ids'] = $this->safeMediaIds((array) $input['media_ids']);
             $payload['items'] = $this->safeItems((array) ($input['items'] ?? []));
             if (is_array($input['visual_context'] ?? null)) $payload['visual_context'] = $input['visual_context'];
         }
@@ -175,6 +180,12 @@ final class EditorialCaptureContinuationService
     private function safeItems(array $items): array
     {
         return array_values(array_map(static function (mixed $item): array { $item = is_array($item) ? $item : []; return array_filter(['client_file_id' => $item['client_file_id'] ?? null, 'sort_order' => $item['sort_order'] ?? null, 'title' => $item['title'] ?? null, 'visual_context' => is_array($item['visual_context'] ?? null) ? $item['visual_context'] : null], static fn (mixed $value): bool => $value !== null && $value !== ''); }, $items));
+    }
+
+    /** @return list<string> */
+    private function safeMediaIds(array $mediaIds): array
+    {
+        return array_values(array_filter(array_map(static fn (mixed $id): string => trim((string) $id), $mediaIds)));
     }
 
     /** @return array<string,mixed> */

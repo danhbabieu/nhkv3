@@ -72,6 +72,8 @@ final class McpContractTest extends TestCase
             'nhk.entity.get',
             'nhk.media.get',
             'nhk.media.upload-batch',
+            'nhk.media.widget-upload',
+            'nhk.media.upload-widget.open',
             'nhk.media.ingest',
             'nhk.media.attachment.get',
             'nhk.video.ingest',
