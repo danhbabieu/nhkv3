@@ -9038,3 +9038,28 @@ LIVE SCOPE: `LIVE_PUBLIC_IDENTITY_NOT_ALLOCATED` and
 Source, Media, Video, Capture, Proposal, Public Identity, route allocation,
 route reprojection, backfill or PR7 operation was performed. The synthetic
 frontend acceptance fixture is in-memory only.
+
+# Checkpoint — 2026-09-13 — Operational Clock Type target gate
+
+TARGET VERIFICATION: Fresh documentation bootstrap and environment read-back
+identify the current connector target as `https://demo.1945.vn`, environment
+`staging`, runtime `0.1.0`, WordPress `7.1`, PHP `8.4.11`, and MariaDB
+`10.11.13-MariaDB-cll-lve-log`. Build identity is
+`0234d70ebc33cfc7d417b42b0903b4582899be4d4f3ec1ea1b80f3b8f4a5d7e8`.
+Documentation version is
+`3c7f58c1b81c8c26e9f7f790309d00888f06ee2c8a3e53286967006c7eb6c31a` and
+manifest hash is
+`12720412ac05c821d96199520587e5425a275d5224d384c20f823dac629ef3d2`.
+
+PERSISTENCE GATE: The current runtime reports `registered_not_live_verified`;
+the sanctioned connector exposes read-only/reconciliation behavior and does
+not expose a verified persistent writable canonical database binding. Database
+server information is available, but database name/binding identity,
+read-after-write capability and semantic-write policy are not proven for this
+target. Staging semantic creation of a new Clock Type is outside the approved
+staging acceptance scope.
+
+DECISION: `OPERATIONAL_TARGET_NOT_WRITABLE`. No exact Clock Type search was
+promoted into a mutation workflow, and no Authority PLAN, Proposal, Graph,
+Knowledge, Public Identity, Article, Media, Video, route, backfill or PR7
+operation was attempted. `NO_SEMANTIC_MUTATION`.
