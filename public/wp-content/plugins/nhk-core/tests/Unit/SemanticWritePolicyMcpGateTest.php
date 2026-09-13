@@ -77,13 +77,16 @@ final class SemanticWritePolicyMcpGateTest extends TestCase
         self::assertSame('PROJECT_BUILD_FORBIDDEN_IN_PRODUCTION', $result['body']['result']['structuredContent']['error']['code']);
     }
 
-    public function test_locked_operational_blocks_project_build_convenience_path(): void
+    public function test_locked_operational_preserves_existing_canonical_governance_path(): void
     {
-        $transport = $this->transport('locked_operational', 'staging', null, static fn (string $capability): bool => true);
+        $transport = $this->transport('locked_operational', 'staging', static fn (): AuthorityCaptureService => new AuthorityCaptureService(
+            new PolicyMcpCaptureRepository(),
+            static fn (): array => ['reuse' => [], 'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [], 'plan_fingerprint' => str_repeat('a', 64)],
+        ), static fn (string $capability): bool => true);
         $result = $this->plan($transport, 'locked-project-build', 'Tạo thương hiệu Hermle.');
 
-        self::assertTrue($result['body']['result']['isError']);
-        self::assertSame('PROJECT_BUILD_MODE_DISABLED', $result['body']['result']['structuredContent']['error']['code']);
+        self::assertFalse($result['body']['result']['isError']);
+        self::assertSame('PLANNED', $result['body']['result']['structuredContent']['status']);
     }
 
     public function test_direct_writer_remains_blocked_in_project_build(): void

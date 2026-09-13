@@ -79,6 +79,12 @@ remain protected by `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`.
 Project Build does not bypass Governance, perform legacy backfill or change
 canonical UUID, stable-key, Graph, Knowledge or Public Identity ownership.
 
+The operational lock-down is config-only: freeze new build mutations, audit
+canonical inventory and duplicates, review unresolved proposals, verify Graph
+integrity and Public Identity collisions, take a backup/snapshot, then switch
+`NHK_SEMANTIC_WRITE_POLICY` to `locked_operational` (or `read_only`). Existing
+UUIDs, stable keys, Graph, routes and Knowledge remain unchanged.
+
 ### Governed Conversational Authority — 2026-09-11
 
 `nhk.capture.ingest` is also the sole normal operator boundary for Authority

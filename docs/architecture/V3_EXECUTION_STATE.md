@@ -9232,7 +9232,11 @@ Authority, Graph, Knowledge, Media, Video, Article or Public Identity mutation
 was performed.
 
 VERIFICATION: Focused policy, MCP gate, Authority planner, audit and Clock Type
-tests pass. Media/Image focused regressions are run unchanged. Full Unit,
-Contract, relevant Integration, PHP lint, composer lint, diff check and
-deterministic documentation parity remain the final verification gates for
-this checkpoint.
+tests pass. Media/Image focused regressions pass unchanged. Full Unit passes
+1483 tests / 7090 assertions; Contract passes 6 tests / 48 assertions; PHP
+lint, composer lint, diff check and deterministic documentation generations
+pass. The final generated manifest identity is recorded in the handoff report
+to avoid a self-referential hash inside this canonical snapshot source.
+Guarded Integration was attempted with `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test` but the environment returned “Error establishing
+a database connection”; default Integration is therefore not claimed PASS.

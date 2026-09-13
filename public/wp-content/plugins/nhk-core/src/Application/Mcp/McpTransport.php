@@ -11,7 +11,7 @@ use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
-use NHK\Core\Application\Runtime\{SemanticWritePolicy, SemanticWritePolicyResolver, SemanticWritePolicyViolation};
+use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
@@ -261,9 +261,6 @@ final class McpTransport
     {
         if ($this->semanticWritePolicy === null) return;
         $decision = $this->semanticWritePolicy->decision(true, $this->can ?? static fn (string $capability): bool => false);
-        if ($this->semanticWritePolicy->resolve() === SemanticWritePolicy::LOCKED_OPERATIONAL) {
-            throw new SemanticWritePolicyViolation('PROJECT_BUILD_MODE_DISABLED', 'Project Build convenience behavior is disabled in LOCKED_OPERATIONAL.', $decision);
-        }
         if (($decision['allowed'] ?? false) !== true) {
             $code = (string) ($decision['code'] ?? 'SEMANTIC_WRITE_POLICY_READ_ONLY');
             throw new SemanticWritePolicyViolation($code, $code, $decision);
