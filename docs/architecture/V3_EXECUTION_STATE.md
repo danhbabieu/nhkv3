@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-13 — ChatGPT image widget guarded verification
+
+VERIFICATION: Focused transport/ImageIngest/Media/Capture/widget selections
+passed 82 tests / 313 assertions. Full NHK Unit passed 1,501 tests / 7,140
+assertions; NHK Contract passed 6 tests / 48 assertions. Full guarded NHK
+Integration passed 125 tests / 1,088 assertions, with 7 guarded skips, one
+existing warning and one existing deprecation. The widget structured-reference
+integration and canonical attachment/Media read-back are covered by the
+guarded suite.
+
+PREFLIGHT: The first run was sandbox-blocked at WordPress DB bootstrap. The
+same canonical commands then ran through local MySQL using only
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test`. The repository-approved
+UP-only `migration-up` maintenance path restored the test ledger to `20/20`,
+and the final deployment preflight passed all 11 checks. No production or
+staging database was used.
+
+SCOPE: The widget remains transport/presentation only; no duplicate storage,
+writer, semantic mutation, schema change, deployment or Git operation was
+performed. Canonical docs were regenerated after this checkpoint; the final
+manifest hash is recorded by the generator output rather than embedded here
+to avoid a self-referential documentation hash.
+
+STATUS: LOCAL_AND_GUARDED_VERIFIED / DEPLOYMENT_PENDING_USER
+
 # Checkpoint — 2026-09-13 — ChatGPT in-chat image widget transport
 
 CHANGE: Added the bounded ChatGPT MCP Apps image-upload bridge. The reusable
