@@ -143,7 +143,7 @@ final class BrandAggregationQueryTest extends TestCase
         $authority = new InMemoryAuthorityRepository(); $service = new AuthorityService($authority, $types);
         $brand = $service->create('brand', 'maker', 'Maker');
         $model = $service->create('model', 'model-1', 'Model 1');
-        $table = $service->create('classification', 'nhk:classification:clock-type.table-clock', 'Đồng hồ để bàn', ['family' => 'clock-type']);
+        $table = $service->create('classification', 'nhk:classification:clock-type.table-clock', 'Đồng hồ để bàn', ['family' => 'clock_type']);
         $origin = $service->create('classification', 'nhk:classification:origin.france', 'Pháp', ['family' => 'origin']);
         $endpoints = new EndpointTypeRegistry();
         $endpoints->register('brand', new FakeEndpointResolver('brand', [$brand->canonicalId]));

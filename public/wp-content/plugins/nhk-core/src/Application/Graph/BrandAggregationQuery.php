@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Graph;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
-use NHK\Core\Application\Entity\{PublicEntityEligibilityPolicy, PublicRouteResolver};
+use NHK\Core\Application\Entity\{EntityProfileResolver, PublicEntityEligibilityPolicy, PublicRouteResolver};
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{GraphEdge, NodeReference};
 
@@ -16,7 +16,7 @@ final class BrandAggregationQuery
         'component' => 'components', 'classification' => 'classifications', 'specimen' => 'specimens', 'product' => 'products',
     ];
 
-    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?PublicRouteResolver $routes = null, private ?PublicEntityEligibilityPolicy $eligibility = null) {}
+    public function __construct(private GraphService $graph, private AuthorityRepository $authority, private EntityTypeRegistry $types, private ?PublicRouteResolver $routes = null, private ?PublicEntityEligibilityPolicy $eligibility = null, private EntityProfileResolver $profiles = new EntityProfileResolver()) {}
 
     /** @return array<string,list<array<string,mixed>>> */
     public function forBrand(string $brandId): array
@@ -119,7 +119,9 @@ final class BrandAggregationQuery
     {
         foreach ($this->edges($source->entityType, $source->canonicalId, true, 'classified_as') as $edge) {
             $classification = $this->entity($edge->target->reference->endpoint_type, $edge->target->reference->endpoint_key);
-            if ($classification === null || $classification->entityType !== 'classification' || (string) ($classification->payload['family'] ?? '') !== 'clock-type') continue;
+            if ($classification === null || $classification->entityType !== 'classification') continue;
+            $profile = $this->profiles->resolveProfile($classification);
+            if ($profile->status !== \NHK\Core\Application\Entity\EntityProfileResolution::RESOLVED || $profile->profileKey !== 'clock_type') continue;
             $membershipPath = [...$path, 'classified_as'];
             $this->add($buckets, $classification, 'DERIVED', $membershipPath);
             $candidate = $this->item($classification, 'DERIVED', $membershipPath);

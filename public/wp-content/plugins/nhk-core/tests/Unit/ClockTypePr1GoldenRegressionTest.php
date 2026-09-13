@@ -91,9 +91,7 @@ final class ClockTypePr1GoldenRegressionTest extends TestCase
         $brand = $authority->create('brand', 'brand:odo', 'Odo');
         $model = $authority->create('model', 'model:36', 'Model 36');
         $variant = $authority->create('variant', 'variant:36-bull', 'Model 36 Vai bò');
-        // This uses the current compatibility spelling; canonical underscore
-        // behavior is asserted separately as a fail-closed gap below.
-        $clockType = $authority->create('classification', 'clock-type:bull', 'Đồng hồ vai bò', ['family' => 'clock-type']);
+        $clockType = $authority->create('classification', 'clock-type:bull', 'Đồng hồ vai bò', ['family' => 'clock_type']);
         $caseForm = $authority->create('classification', 'case-form:bull', 'Dáng vai bò', ['family' => 'case_form']);
 
         $endpoints = new EndpointTypeRegistry();
@@ -118,7 +116,7 @@ final class ClockTypePr1GoldenRegressionTest extends TestCase
         self::assertNotContains('brand', array_map(static fn ($edge): string => $edge->source->reference->endpoint_type, $graphRepo->allEdges()));
     }
 
-    public function test_canonical_underscore_family_is_not_silently_claimed_by_legacy_projection(): void
+    public function test_canonical_underscore_family_is_projected_by_profile_aware_aggregation(): void
     {
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
@@ -133,7 +131,7 @@ final class ClockTypePr1GoldenRegressionTest extends TestCase
         $graph->create(new NodeReference('model', $model->canonicalId), 'model_of', new NodeReference('brand', $brand->canonicalId));
         $graph->create(new NodeReference('model', $model->canonicalId), 'classified_as', new NodeReference('classification', $clockType->canonicalId));
 
-        self::assertSame([], (new BrandAggregationQuery($graph, $authorityRepo, $types))->forBrand($brand->canonicalId)['clock_types']);
+        self::assertSame(['Clock Type'], array_column((new BrandAggregationQuery($graph, $authorityRepo, $types))->forBrand($brand->canonicalId)['clock_types'], 'name'));
     }
 
     public function test_clock_type_context_does_not_rewrite_existing_video_identity_attachment_route_seo_or_sitemap(): void

@@ -34,12 +34,13 @@ final class SemanticProfileComposer
 
         return [
             'identity' => $identity,
-            'hierarchy' => $this->hierarchy($type, $relations),
+            'hierarchy' => $this->hierarchy($type, $relations, is_array($dossier['clock_type_hierarchy'] ?? null) ? $dossier['clock_type_hierarchy'] : []),
             'relation_sections' => $relations,
             'knowledge' => $knowledge,
             'evidence_context' => $this->evidenceContext($knowledge),
             'primary_media' => is_array($dossier['primary_media'] ?? null) ? $dossier['primary_media'] : [],
             'media_gallery' => array_values(is_array($dossier['media_gallery'] ?? null) ? $dossier['media_gallery'] : []),
+            'media_context' => is_array($dossier['media_context'] ?? null) ? $this->publicMediaContext($dossier['media_context']) : [],
             'videos' => $videos,
             'articles' => $articles,
             'navigation' => is_array($dossier['navigation'] ?? null) ? $dossier['navigation'] : [],
@@ -53,8 +54,15 @@ final class SemanticProfileComposer
     }
 
     /** @return array<string,mixed> */
-    private function hierarchy(string $type, array $relations): array
+    private function hierarchy(string $type, array $relations, array $clockTypeHierarchy = []): array
     {
+        if ($type === 'clock_type') {
+            return [
+                'parent' => $this->publicHierarchyItem($clockTypeHierarchy['parent'] ?? []),
+                'children' => array_values(array_filter(array_map(fn (mixed $item): array => $this->publicHierarchyItem(is_array($item) ? $item : []), is_array($clockTypeHierarchy['children'] ?? null) ? $clockTypeHierarchy['children'] : []))),
+                'status' => (string) ($clockTypeHierarchy['status'] ?? 'UNAVAILABLE'),
+            ];
+        }
         $keys = match ($type) {
             'brand' => ['models', 'movements', 'variants'],
             'movement' => ['models', 'variants'],
@@ -63,6 +71,24 @@ final class SemanticProfileComposer
         };
         $result = [];
         foreach ($keys as $key) if (isset($relations[$key]) && is_array($relations[$key]) && $relations[$key] !== []) $result[$key] = $relations[$key];
+        return $result;
+    }
+
+    /** @param array<string,mixed> $item @return array<string,mixed> */
+    private function publicHierarchyItem(array $item): array
+    {
+        if ($item === []) return [];
+        return ['name' => (string) ($item['name'] ?? ''), 'kind' => (string) ($item['kind'] ?? '')];
+    }
+
+    /** @param array<string,mixed> $context @return array<string,mixed> */
+    private function publicMediaContext(array $context): array
+    {
+        $result = [];
+        foreach (['direct', 'derived'] as $kind) {
+            $bucket = is_array($context[$kind] ?? null) ? $context[$kind] : [];
+            $result[$kind] = ['status' => (string) ($bucket['status'] ?? 'UNAVAILABLE'), 'items' => is_array($bucket['items'] ?? null) ? array_values($bucket['items']) : []];
+        }
         return $result;
     }
 

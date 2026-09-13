@@ -36,6 +36,7 @@ final class EntityProfileAdminProjection
         $packet = $this->dossier?->forEntity($entity);
         $packet = is_array($packet) ? $packet : [];
         $relations = is_array($packet['relation_sections'] ?? null) ? $packet['relation_sections'] : [];
+        $hierarchy = is_array($packet['clock_type_hierarchy'] ?? null) ? $packet['clock_type_hierarchy'] : [];
         $profile = $definition->toArray();
         $diagnostics = array_values(array_unique([
             ...((array) ($packet['diagnostics'] ?? [])),
@@ -67,9 +68,9 @@ final class EntityProfileAdminProjection
                 'variants' => $this->section($relations['variants'] ?? null, 'variants'),
                 'specimens' => $this->section($relations['specimens'] ?? null, 'specimens'),
                 'products' => $this->section($relations['products'] ?? null, 'products'),
-                'brands' => $this->section($relations['brands'] ?? null, 'brands'),
-                'subtypes' => $this->section($relations['classifications'] ?? null, 'subtypes'),
-                'parent' => $this->parentSection($entity),
+                'brands' => array_key_exists('clock_type_derived_brands', $packet) ? $this->section($packet['clock_type_derived_brands'], 'brands') : $this->section($relations['brands'] ?? null, 'brands'),
+                'subtypes' => array_key_exists('clock_type_hierarchy', $packet) ? $this->section($hierarchy['children'] ?? [], 'subtypes') : $this->section($relations['classifications'] ?? null, 'subtypes'),
+                'parent' => array_key_exists('clock_type_hierarchy', $packet) ? $this->section($hierarchy['parent'] ?? [], 'parent') : $this->parentSection($entity),
                 'public_identity' => $this->section($packet['identity'] ?? null, 'public_identity'),
                 'seo' => $this->section($packet['seo_projection'] ?? null, 'seo'),
                 'diagnostics' => $this->section($diagnostics, 'diagnostics'),

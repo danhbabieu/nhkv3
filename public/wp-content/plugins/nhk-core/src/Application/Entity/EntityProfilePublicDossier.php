@@ -44,9 +44,9 @@ final class EntityProfilePublicDossier
 
         foreach (['classifications', 'models', 'variants', 'specimens', 'products'] as $group) $sections[$group] = $this->relationStatus($packet, $group);
         if ($profile === 'clock_type') {
-            // Reverse Brand traversal is not available in the current shared
-            // two-hop reader. Empty is not an honest representation of that gap.
-            $sections['brands'] = ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'reason' => 'DERIVED_BRAND_REVERSE_TRAVERSAL_UNAVAILABLE', 'items' => []];
+            $sections['brands'] = array_key_exists('clock_type_derived_brands', $packet)
+                ? $this->projectionStatus($packet['clock_type_derived_brands'])
+                : ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'reason' => 'DERIVED_BRAND_REVERSE_TRAVERSAL_UNAVAILABLE', 'items' => []];
         } else {
             $sections['brands'] = $this->relationStatus($packet, 'brands');
         }
@@ -61,6 +61,17 @@ final class EntityProfilePublicDossier
             return ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'reason' => 'RELATED_PROJECTION_UNAVAILABLE', 'items' => []];
         }
         return $this->itemsStatus(is_array($relations[$group]) ? $relations[$group] : []);
+    }
+
+    /** @return array<string,mixed> */
+    private function projectionStatus(mixed $value): array
+    {
+        if (!is_array($value)) return ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'items' => []];
+        $status = strtoupper((string) ($value['status'] ?? 'UNAVAILABLE_IMPLEMENTATION_GAP'));
+        if ($status === 'BLOCKED') return ['status' => 'BLOCKED', 'items' => []];
+        if ($status === 'UNAVAILABLE' || $status === 'UNAVAILABLE_IMPLEMENTATION_GAP') return ['status' => 'UNAVAILABLE_IMPLEMENTATION_GAP', 'items' => [], 'diagnostics' => (array) ($value['diagnostics'] ?? [])];
+        $items = is_array($value['items'] ?? null) ? array_values($value['items']) : [];
+        return ['status' => $items === [] ? 'AVAILABLE_EMPTY' : 'AVAILABLE_WITH_ITEMS', 'items' => $items, 'count' => count($items), 'diagnostics' => (array) ($value['diagnostics'] ?? [])];
     }
 
     /** @param array<int|string,mixed> $items */

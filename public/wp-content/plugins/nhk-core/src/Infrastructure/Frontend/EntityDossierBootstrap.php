@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Frontend;
 
-use NHK\Core\Application\Entity\{BrandDossierProjection, EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierQuery};
-use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
+use NHK\Core\Application\Entity\{BrandDossierProjection, ClockTypeDossierProjection, EntityMediaProjection, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver, SemanticDossierQuery};
+use NHK\Core\Application\Graph\{BrandAggregationQuery, ClockTypeDerivedRelationshipQuery, ClockTypeHierarchyProjection, GraphService, PredicateTraversalPolicy, RelatedSemanticQuery, StructuralContextQuery};
 use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
@@ -64,10 +64,14 @@ final class EntityDossierBootstrap
             null,
             new PublicMediaGalleryQuery($media, $assets),
         );
+        $clockTypeDossier = new ClockTypeDossierProjection(
+            new ClockTypeHierarchyProjection($authority, $graph),
+            new ClockTypeDerivedRelationshipQuery($graph, $authority),
+        );
         $brandProjection = new BrandDossierProjection();
 
-        add_filter('nhk_v3_entity_detail_projection', static function (array $value, AuthorityEntity $entity) use ($dossier, $brandAggregation, $brandProjection): array {
-            $value['dossier'] = $dossier->forEntity($entity);
+        add_filter('nhk_v3_entity_detail_projection', static function (array $value, AuthorityEntity $entity) use ($dossier, $clockTypeDossier, $brandAggregation, $brandProjection): array {
+            $value['dossier'] = $clockTypeDossier->forEntity($entity, $dossier->forEntity($entity));
             if ($entity->entityType === 'brand' && ($value['dossier']['status'] ?? '') === 'AVAILABLE') {
                 $value['dossier'] = $brandProjection->merge($value['dossier'], $brandAggregation->forBrand($entity->canonicalId));
             }

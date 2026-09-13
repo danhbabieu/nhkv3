@@ -57,6 +57,17 @@ final class EntityProfileAdminProjectionTest extends TestCase
         self::assertSame('FAMILY_NOT_CLOCK_TYPE', $card['diagnostics'][0]);
     }
 
+    public function test_clock_type_admin_projection_reads_profile_aware_hierarchy_and_derived_brands(): void
+    {
+        $card = (new EntityProfileAdminProjection(new EntityProfileRegistry(), new EntityProfileResolver(), new AdminClockTypeDossierReader()))->forEntity($this->entity('classification', 'Đồng hồ công cộng', ['family' => 'clock_type']));
+
+        self::assertSame('AVAILABLE_WITH_ITEMS', $card['sections']['subtypes']['state']);
+        self::assertSame('Đồng hồ tháp', $card['sections']['subtypes']['items'][0]['name']);
+        self::assertSame('AVAILABLE_WITH_ITEMS', $card['sections']['brands']['state']);
+        self::assertSame('Odo', $card['sections']['brands']['items'][0]['title']);
+        self::assertSame('AVAILABLE_EMPTY', $card['sections']['parent']['state']);
+    }
+
     public function test_projection_source_has_no_persistence_or_writer_dependency(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Entity/EntityProfileAdminProjection.php');
@@ -117,6 +128,23 @@ final class AdminProjectionStatesFixtureDossierReader implements EntityDossierRe
             'media_gallery' => [],
             'relation_sections' => ['videos' => ['status' => 'BLOCKED', 'items' => []]],
             'identity' => [],
+            'seo_projection' => null,
+            'diagnostics' => [],
+        ];
+    }
+}
+
+final class AdminClockTypeDossierReader implements EntityDossierReader
+{
+    public function forEntity(AuthorityEntity $entity): array
+    {
+        return [
+            'status' => 'AVAILABLE',
+            'knowledge' => ['status' => 'AVAILABLE', 'facets' => []],
+            'media_gallery' => [],
+            'relation_sections' => ['brands' => [], 'classifications' => [], 'models' => [], 'variants' => [], 'specimens' => [], 'products' => [], 'videos' => [], 'articles' => []],
+            'clock_type_hierarchy' => ['status' => 'AVAILABLE', 'parent' => [], 'children' => [['name' => 'Đồng hồ tháp', 'canonical_id' => 'child']], 'diagnostics' => []],
+            'clock_type_derived_brands' => ['status' => 'AVAILABLE_WITH_ITEMS', 'items' => [['title' => 'Odo', 'canonical_id' => 'brand']], 'diagnostics' => []],
             'seo_projection' => null,
             'diagnostics' => [],
         ];

@@ -50,20 +50,35 @@ final class RemoteDeploymentAdapterTest extends TestCase
 
     public function test_transfer_is_deterministic_and_verified_without_semantic_transport(): void
     {
-        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/nhk-core\nssh_key=/dev/null\n");
+        file_put_contents($this->configPath, "ssh_target=demo.1945.vn\nremote_path=/srv/wp-content/plugins/nhk-core\nssh_key=/dev/null\n");
         $commands = [];
         $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function (array $command) use (&$commands): array { $commands[] = $command; return [0, '', '']; });
 
         $result = $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-3'));
 
         self::assertSame('pass', $result->status);
-        self::assertCount(2, $commands);
-        self::assertSame('rsync', $commands[0][0]);
-        self::assertContains('--checksum', $commands[0]);
-        self::assertContains('--exclude', $commands[0]);
-        self::assertSame('ssh', $commands[1][0]);
-        self::assertSame('test', $commands[1][6]);
-        self::assertStringContainsString('nhk-core.php', implode(' ', $commands[1]));
+        self::assertCount(4, $commands);
+        self::assertSame([
+            'rsync', '--archive', '--delete', '--checksum', '--safe-links',
+            '--exclude', 'tests/', '--exclude', '*.env', '--exclude', '*.pem',
+            '-e', "'ssh' '-o' 'BatchMode=yes' '-i' '/dev/null'",
+            dirname(__DIR__, 6) . '/public/wp-content/plugins/nhk-core/',
+            'demo.1945.vn:/srv/wp-content/plugins/nhk-core/',
+        ], $commands[0]);
+        $muPluginCommands = array_values(array_filter(
+            $commands,
+            static fn (array $command): bool => in_array(dirname(__DIR__, 6) . '/public/wp-content/mu-plugins/nhk-chatgpt-file-transport.php', $command, true),
+        ));
+        self::assertCount(1, $muPluginCommands);
+        self::assertSame('rsync', $muPluginCommands[0][0]);
+        self::assertNotContains('--delete', $muPluginCommands[0]);
+        self::assertContains('demo.1945.vn:/srv/wp-content/mu-plugins/', $muPluginCommands[0]);
+        self::assertSame('ssh', $commands[2][0]);
+        self::assertSame('test', $commands[2][6]);
+        self::assertStringContainsString('nhk-core.php', implode(' ', $commands[2]));
+        self::assertSame('ssh', $commands[3][0]);
+        self::assertSame('test', $commands[3][6]);
+        self::assertStringContainsString('mu-plugins/nhk-chatgpt-file-transport.php', implode(' ', $commands[3]));
         self::assertStringNotContainsString('odo', implode(' ', $commands[0]));
         self::assertNotNull($result->fingerprint);
     }
@@ -75,7 +90,7 @@ final class RemoteDeploymentAdapterTest extends TestCase
         self::assertSame('REMOTE_DEPLOYMENT_FAILED', $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-4'))->reasonCode);
 
         $calls = 0;
-        $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function () use (&$calls): array { $calls++; return $calls === 1 ? [0, '', ''] : [1, '', 'missing']; });
+        $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function () use (&$calls): array { $calls++; return $calls < 3 ? [0, '', ''] : [1, '', 'missing']; });
         self::assertSame('REMOTE_DEPLOYMENT_VERIFICATION_FAILED', $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-5'))->reasonCode);
     }
 

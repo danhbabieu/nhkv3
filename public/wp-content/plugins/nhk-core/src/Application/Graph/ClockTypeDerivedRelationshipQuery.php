@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Graph;
 
 use NHK\Core\Application\Entity\EntityProfileResolver;
+use NHK\Core\Application\Entity\EntityProfileResolution;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Graph\NodeReference;
@@ -49,7 +50,7 @@ final class ClockTypeDerivedRelationshipQuery
     {
         $type = $this->authority->findByCanonicalId($classificationUuid);
         $profile = $type instanceof AuthorityEntity ? $this->profiles->resolveProfile($type) : null;
-        if (!$type instanceof AuthorityEntity || !$type->active() || $type->entityType !== 'classification' || $profile === null || !$profile->resolved() || $profile->profileKey !== 'clock_type') return ['status' => 'UNAVAILABLE', 'items' => [], 'diagnostics' => ['CLOCK_TYPE_NOT_AVAILABLE']];
+        if (!$type instanceof AuthorityEntity || !$type->active() || $type->entityType !== 'classification' || $profile === null || $profile->status !== EntityProfileResolution::RESOLVED || $profile->profileKey !== 'clock_type') return ['status' => 'UNAVAILABLE', 'items' => [], 'diagnostics' => ['CLOCK_TYPE_NOT_AVAILABLE']];
         try {
             $paths = [];
             foreach ($this->items($this->graph->findIncoming(new NodeReference('classification', $classificationUuid), 'classified_as', 0, 200, false, null)) as $classificationEdge) {
@@ -73,7 +74,7 @@ final class ClockTypeDerivedRelationshipQuery
             $target = $this->authority->findByCanonicalId($edge->target->reference->endpoint_key);
             if (!$target instanceof AuthorityEntity || !$target->active() || $target->entityType !== 'classification') continue;
             $profile = $this->profiles->resolveProfile($target);
-            if (!$profile->resolved() || $profile->profileKey !== 'clock_type') continue;
+            if ($profile->status !== EntityProfileResolution::RESOLVED || $profile->profileKey !== 'clock_type') continue;
             $paths[] = ['entity' => $target, 'path' => [...$prefix, ['predicate' => 'classified_as', 'source' => $source->canonicalId, 'target' => $target->canonicalId]]];
         }
         return $paths;
