@@ -9118,3 +9118,36 @@ non-test, non-staging runtime, bind all semantic owners to the same datastore,
 register a dedicated connector, prove identity/restart continuity and
 backup/recovery, then run a PLAN-only governed smoke before any Clock Type
 operation.
+
+# Checkpoint — 2026-09-13 — Operational runtime provisioning handoff package
+
+PACKAGE: The repository-consistent handoff package is now available in
+`docs/architecture/OPERATIONAL_RUNTIME_PROVISIONING_RUNBOOK.md`, with the
+implementation plan in
+`docs/superpowers/plans/2026-09-13-operational-runtime-provisioning-package.md`
+and the non-mutating acceptance command in
+`tools/operational-runtime-acceptance.php`. The package defines the target,
+environment categories, external database/bootstrap sequence, redacted
+connector-to-deployment-to-datastore identity proof, MCP capability checklist,
+acceptance gates A–H, backup/recovery boundary and the first business action.
+
+READ-ONLY TOOLING: The acceptance command uses existing WordPress/NHK Core
+read boundaries (`MigrationStatus`, `McpDocumentationRegistry`, REST route
+registration and executable MCP catalog). It requires explicit external
+expected binding/connector/policy evidence, rejects staging, test, Demo and
+recovery targets, and never provisions infrastructure, runs migrations, calls
+Capture/Proposal, or invokes any semantic writer. The forbidden Demo smoke
+returned `OPERATIONAL_TARGET_FORBIDDEN` with exit code 2.
+
+HANDOFF STATUS: `PROVISIONING_HANDOFF_READY`. This means the infrastructure
+owner has a complete repository-consistent package to provision a qualifying
+runtime; it does not mean that runtime exists. The operational runtime status
+remains `CANONICAL_RUNTIME_NOT_PROVISIONED`. The existing local recovery
+bootstrap remains recovery-only and the current staging connector remains
+read/reconciliation-only.
+
+DOCUMENTATION: Canonical MCP documentation was regenerated only through
+`composer generate:mcp-docs`; the generated manifest is deterministic and its
+fresh version/hash are recorded by the final verification report. No staging
+deployment, snapshot transfer, database mutation, semantic mutation, Clock
+Type creation, PR7 operation or backfill was performed.
