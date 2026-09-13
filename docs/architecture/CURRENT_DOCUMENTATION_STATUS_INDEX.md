@@ -51,6 +51,17 @@ policy and effective Governance state. Changed dependencies require
 `PLAN_REAPPROVAL_REQUIRED` before Proposal creation. The existing Governance
 queue and Controlled Apply remain the only semantic mutation owners.
 
+## 0.2 Runtime semantic-write policy — 2026-09-13
+
+The canonical operator route now resolves `READ_ONLY`, `PROJECT_BUILD` or
+`LOCKED_OPERATIONAL` from runtime configuration. Missing/invalid configuration
+fails closed to `READ_ONLY`; production always rejects Project Build. The
+`PROJECT_BUILD` capability is `nhk_project_build_semantic` and only admits
+canonical Capture Authority planning; existing Governance capabilities remain
+independent. Project Build does not bypass Governance or expose compatibility
+writers. Current implementation is code/test-side only; staging has not been
+enabled and no semantic mutation has been performed.
+
 ## 0.3 Isolated V3 snapshot recovery — 2026-09-12
 
 `V3_SNAPSHOT_RECOVERY_RUNTIME.md` defines the governed logical snapshot

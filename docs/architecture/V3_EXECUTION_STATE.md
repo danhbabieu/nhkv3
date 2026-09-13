@@ -9161,3 +9161,78 @@ Contract invocation exposed one pre-existing suite-order failure in
 WordPress capability context to be absent. The affected test passes when run
 isolated; no unrelated permission behavior was changed. PHP lint, diff check,
 secret review and two deterministic documentation generations pass.
+
+# Checkpoint — 2026-09-13 — Minimal image ingest MVP transport boundary
+
+SCOPE: A new `ImageIngestEntrypoint` accepts only an explicitly marked native
+multipart file bag or the existing structured provided-file object shape. The
+structured path delegates materialization to `ChatGptMcpGateway`; both paths
+delegate physical persistence to the existing `MediaBatchUploadService`,
+WordPress attachment lifecycle and canonical Media adoption. No Capture,
+MediaUsage, Article, Knowledge, Graph, Governance, Video, schema or public
+route semantics were changed.
+
+NAMING: The existing deterministic SEO-safe public filename pipeline remains
+the owner of the public filename. The supplied basename is retained in
+attachment post metadata and canonical MediaAsset metadata, with the existing
+WordPress source-original and generated-derivative lifecycle preserved.
+
+VERIFICATION: Focused image entrypoint, Gateway, batch and MCP contract tests
+pass `73 tests / 596 assertions`; the full Unit suite reaches `1468 tests` but
+has nine unrelated missing `Application\\Runtime` class errors in
+`SemanticWritePolicyTest`. The focused WordPress integration includes native
+and structured one-file attachment/Media read-back coverage but is blocked in
+this checkout because the guarded test database is unavailable; no guard was
+bypassed and no data mutation was performed. PHP lint for all changed files
+and `git diff --check` pass.
+
+# Checkpoint — 2026-09-13 — Guarded one-image integration verification
+
+ENVIRONMENT: The canonical guarded procedure
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` successfully selected the
+exact integration database. MySQL connectivity, WordPress bootstrap and the
+test database guard passed. No production or staging database was used.
+
+FIXTURE: The structured-reference integration test now uses a per-run
+idempotency key and deletes its exact persisted batch option in `finally`,
+preventing a stale manifest from referring to an already-cleaned attachment.
+This is test-fixture isolation only; no application source workaround was
+added.
+
+VERIFICATION: Native and trusted structured one-file image ingestion passed
+`2 tests / 38 assertions`, including attachment creation/read-back, preserved
+original filename metadata, WordPress metadata/derivative generation and
+canonical Media adoption/read-back. The focused transport suite passed
+`73 tests / 596 assertions`. PHP lint and `git diff --check` pass. No Capture,
+MediaUsage, semantic, publication or live mutation was performed.
+
+# Checkpoint — 2026-09-13 — Runtime semantic-write Project Build mode
+
+SCOPE: Implemented the fail-closed runtime policy values `READ_ONLY`,
+`PROJECT_BUILD` and `LOCKED_OPERATIONAL`. The canonical MCP
+`nhk.capture.ingest` Authority path is gated after existing authentication and
+capability resolution. Project Build requires `nhk_project_build_semantic`,
+does not replace Governance approval/apply/publication/internal capabilities,
+and leaves direct compatibility writers blocked.
+
+AUTHORITY: Planning remains registry-driven for the nine registered Authority
+types. Clock Type is only `classification` with exact `family=clock_type`;
+new-write `family=clock-type` is rejected with a typed blocker while existing
+legacy records remain compatibility-read. Search/reuse and ambiguity review
+behavior remain in the planner. Audit context is carried through the existing
+Governance Proposal and Controlled Apply audit owner; no parallel store was
+created.
+
+RUNTIME: Read-only runtime identity exposes environment, semantic policy,
+Project Build enablement and existing documentation/build/manifest identity.
+Missing/invalid config resolves to `READ_ONLY`; production fails closed even
+when Project Build is configured. The local/staging deployment configuration
+was not changed, capability was not granted live, and no Capture, Proposal,
+Authority, Graph, Knowledge, Media, Video, Article or Public Identity mutation
+was performed.
+
+VERIFICATION: Focused policy, MCP gate, Authority planner, audit and Clock Type
+tests pass. Media/Image focused regressions are run unchanged. Full Unit,
+Contract, relevant Integration, PHP lint, composer lint, diff check and
+deterministic documentation parity remain the final verification gates for
+this checkpoint.

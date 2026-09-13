@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Mcp\McpToolCatalog;
 use NHK\Core\Application\Mcp\McpAbilityRegistration;
 use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport, SingleEntryPointPolicy};
+use NHK\Core\Application\Media\ImageIngestEntrypoint;
 use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
@@ -524,6 +525,41 @@ final class McpContractTest extends TestCase
         self::assertArrayHasKey('files', $tool['inputSchema']['properties']);
         self::assertSame('array', $tool['inputSchema']['properties']['files']['type']);
         self::assertSame('binary', $tool['inputSchema']['properties']['files']['items']['format']);
+    }
+
+    public function test_batch_upload_routes_file_bearing_arguments_through_image_ingest_entrypoint(): void
+    {
+        $received = null;
+        $materialized = null;
+        $entrypoint = new ImageIngestEntrypoint(
+            static function (string $key, array $metadata, array $files, array $items) use (&$received): array {
+                $received = [$key, $metadata, $files, $items];
+                return ['items' => [['attachment_id' => 13]]];
+            },
+            static function (mixed $references) use (&$materialized): array {
+                $materialized = $references;
+                return ['files' => ['files' => ['name' => ['route.jpg'], 'type' => ['image/jpeg'], 'tmp_name' => ['/tmp/route.jpg'], 'error' => [UPLOAD_ERR_OK], 'size' => [1]]], 'temporary_paths' => []];
+            },
+        );
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+            imageIngest: $entrypoint,
+        );
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => [
+            'name' => 'nhk.media.upload-batch',
+            'arguments' => [
+                'idempotency_key' => 'entrypoint-route',
+                'files' => [['download_url' => 'https://files.example.test/image', 'file_id' => 'file-13', 'file_name' => 'route.jpg']],
+            ],
+        ]]);
+
+        self::assertSame(200, $response['status']);
+        self::assertSame(13, $response['body']['result']['structuredContent']['items'][0]['attachment_id']);
+        self::assertSame('entrypoint-route', $received[0]);
+        self::assertSame('https://files.example.test/image', $materialized[0]['download_url']);
+        self::assertSame('route.jpg', $received[2]['files']['name'][0]);
     }
 
     public function test_editorial_capture_is_governed_and_accepts_text_only_or_multipart_input(): void

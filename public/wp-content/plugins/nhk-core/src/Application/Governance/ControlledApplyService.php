@@ -27,9 +27,9 @@ final class ControlledApplyService implements ArticleApplyService
                 ProposalSubjectBindingValidator::assertValid($proposal);
                 if($this->eligibility && !($this->eligibility->check($proposalId))->ready)throw new InvalidProposalTransition('Proposal is not eligible for apply.');
                 $attempt=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$this->attempts->nextAttemptNumberLocked($proposalId),'running',null,null,null,$started);
-                $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted(); $this->auditEvent('ApplyStarted',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,['attempt_no'=>$attempt->number]);
+            $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted(); $this->auditEvent('ApplyStarted',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,$this->auditContext($proposal,['attempt_no'=>$attempt->number]));
                 $result=($this->executor)($proposal); $resultId=is_string($result)?$result:(is_object($result)&&property_exists($result,'canonicalId')?$result->canonicalId:(is_object($result)&&property_exists($result,'edge_uuid')?$result->edge_uuid:(is_object($result)&&property_exists($result,'targetUuid')?$result->targetUuid:null))); $readBack = $this->readBack?->verify($proposal, (string) $resultId);
-                $this->hook?->afterAuthorityMutation(); $this->attempts->markSucceeded($attempt->id,$resultId); $this->hook?->beforeProposalApplied(); $this->proposals->save($proposal->transition(ProposalState::APPLIED,$proposal->decisionActor,gmdate('Y-m-d H:i:s.u'))); $this->auditEvent('ApplySucceeded',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,['attempt_no'=>$attempt->number,'result_entity_uuid'=>$resultId]); $this->hook?->beforeCommit();
+            $this->hook?->afterAuthorityMutation(); $this->attempts->markSucceeded($attempt->id,$resultId); $this->hook?->beforeProposalApplied(); $this->proposals->save($proposal->transition(ProposalState::APPLIED,$proposal->decisionActor,gmdate('Y-m-d H:i:s.u'))); $this->auditEvent('ApplySucceeded',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,$this->auditContext($proposal,['attempt_no'=>$attempt->number,'result_entity_uuid'=>$resultId,'target_uuid'=>$resultId,'resulting_revision'=>is_array($readBack)?($readBack['revision']??null):null,'canonical_readback_outcome'=>is_array($readBack)?'VERIFIED':'UNAVAILABLE'])); $this->hook?->beforeCommit();
                 return ['proposal_id'=>$proposalId,'attempt_no'=>$attempt->number,'result_entity_uuid'=>$resultId,'canonical_id'=>$resultId,'canonical_readback'=>$readBack,'idempotent'=>false];
             });
         } catch(\Throwable $error) {
@@ -38,9 +38,12 @@ final class ControlledApplyService implements ArticleApplyService
                 // The proposal row remains the serialization point for the
                 // durable attempt history, including the post-rollback write.
                 $this->proposals->findForUpdate($proposalId)??throw new ProposalNotFound('Proposal not found.');
+                $proposal = $this->proposals->find($proposalId);
                 $n=$this->attempts->nextAttemptNumberLocked($proposalId);
                 $a=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$n,'failed',null,substr((string)$error->getCode(),0,64),substr($error->getMessage(),0,2000),$started,gmdate('Y-m-d H:i:s.u'));
-                $this->attempts->persistFailed($a);$this->auditEvent('ApplyFailed',$proposalId,null,['attempt_no'=>$n,'error_code'=>$a->errorCode]);
+                $context = ['attempt_no' => $n, 'error_code' => $a->errorCode];
+                if ($proposal instanceof \NHK\Core\Domain\Governance\Proposal) $context = $this->auditContext($proposal, $context);
+                $this->attempts->persistFailed($a);$this->auditEvent('ApplyFailed',$proposalId,null,$context);
             });}catch(\Throwable $failure){$error->addSuppressed($failure);}
             throw $error;
         }
@@ -91,13 +94,19 @@ final class ControlledApplyService implements ArticleApplyService
         if ($this->eligibility && !($this->eligibility->check($proposalId))->ready) throw new InvalidProposalTransition('Proposal is not eligible for apply.');
         $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposalId, $this->attempts->nextAttemptNumberLocked($proposalId), 'running', null, null, null, $started);
         $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted();
-        $this->auditEvent('ApplyStarted', $proposalId, $proposal->actor !== null ? (int) $proposal->actor : null, ['attempt_no' => $attempt->number, 'batch' => true]);
+        $this->auditEvent('ApplyStarted', $proposalId, $proposal->actor !== null ? (int) $proposal->actor : null, $this->auditContext($proposal, ['attempt_no' => $attempt->number, 'batch' => true]));
         $result = ($this->executor)($proposal);
         $resultId = is_string($result) ? $result : (is_object($result) && property_exists($result, 'canonicalId') ? $result->canonicalId : (is_object($result) && property_exists($result, 'edge_uuid') ? $result->edge_uuid : (is_object($result) && property_exists($result, 'targetUuid') ? $result->targetUuid : null)));
         $readBack = $this->readBack?->verify($proposal, (string) $resultId);
         $this->hook?->afterAuthorityMutation(); $this->attempts->markSucceeded($attempt->id, $resultId); $this->hook?->beforeProposalApplied();
-        $this->proposals->save($proposal->transition(ProposalState::APPLIED, $proposal->decisionActor, gmdate('Y-m-d H:i:s.u'))); $this->auditEvent('ApplySucceeded', $proposalId, $proposal->actor !== null ? (int) $proposal->actor : null, ['attempt_no' => $attempt->number, 'result_entity_uuid' => $resultId, 'batch' => true]);
+        $this->proposals->save($proposal->transition(ProposalState::APPLIED, $proposal->decisionActor, gmdate('Y-m-d H:i:s.u'))); $this->auditEvent('ApplySucceeded', $proposalId, $proposal->actor !== null ? (int) $proposal->actor : null, $this->auditContext($proposal, ['attempt_no' => $attempt->number, 'result_entity_uuid' => $resultId, 'target_uuid' => $resultId, 'resulting_revision' => is_array($readBack) ? ($readBack['revision'] ?? null) : null, 'canonical_readback_outcome' => is_array($readBack) ? 'VERIFIED' : 'UNAVAILABLE', 'batch' => true]));
         return ['proposal_id' => $proposalId, 'attempt_no' => $attempt->number, 'result_entity_uuid' => $resultId, 'canonical_id' => $resultId, 'canonical_readback' => $readBack, 'idempotent' => false];
     }
     private function auditEvent(string $event,string $id,?int $actor,array $context):void { $this->audit?->recordEvent($event,'proposal',$id,$actor,$context); }
+    private function auditContext(\NHK\Core\Domain\Governance\Proposal $proposal, array $context): array
+    {
+        $project = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
+        if ($project === []) return $context;
+        return array_merge($project, ['proposal_id' => $proposal->id, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'proposal_revision' => $proposal->revision], $context);
+    }
 }

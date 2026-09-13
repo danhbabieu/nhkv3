@@ -42,6 +42,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $maxHeight = self::MAX_LONG_EDGE;
 
         $safeFilename = $this->safeFilename($filename, $title, $source);
+        $originalFilename = $this->originalFilename($filename);
         $work = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         $processed = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         if (!is_string($work) || $work === '' || !is_string($processed) || $processed === '') throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_UNAVAILABLE');
@@ -113,6 +114,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
                 wp_update_attachment_metadata((int) $attachmentId, $metadata);
                 $storedMetadata = wp_get_attachment_metadata((int) $attachmentId);
                 if (!is_array($storedMetadata) || (int) ($storedMetadata['width'] ?? 0) < 1 || (int) ($storedMetadata['height'] ?? 0) < 1) throw new \RuntimeException('WORDPRESS_ATTACHMENT_METADATA_WRITE_FAILED');
+                if (function_exists('update_post_meta')) update_post_meta((int) $attachmentId, '_nhk_original_filename', $originalFilename);
             } finally {
                 WordPressMediaAttachmentWriteGuard::leave();
             }
@@ -187,6 +189,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             'attachment_id' => $attachmentId,
             'canonical_url' => $canonicalUrl,
             'filename' => $filename,
+            'original_filename' => function_exists('get_post_meta') ? (string) get_post_meta($attachmentId, '_nhk_original_filename', true) : '',
             'mime' => $mime,
             'width' => (int) ($metadata['width'] ?? 0),
             'height' => (int) ($metadata['height'] ?? 0),
@@ -224,6 +227,13 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $checksum = hash_file('sha256', $source);
         if (!is_string($checksum) || $checksum === '') throw new \RuntimeException('WORDPRESS_MEDIA_CHECKSUM_FAILED');
         return (new MediaFilenameNormalizer())->normalizeWebp($title, 'image', $filename);
+    }
+
+    private function originalFilename(string $filename): string
+    {
+        $filename = basename(str_replace('\\', '/', trim($filename)));
+        if ($filename === '') throw new \InvalidArgumentException('filename is required.');
+        return $filename;
     }
 
     private function sourceFilename(string $processedFilename, string $mime): string

@@ -6,11 +6,12 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
-use NHK\Core\Application\Media\MediaBatchUploadService;
+use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Runtime\{SemanticWritePolicy, SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
 
 final class McpTransport
@@ -39,6 +40,8 @@ final class McpTransport
         private ?AuthorityCaptureService $authorityCapture = null,
         /** @var callable():bool|null */
         private $runtimeWriteReady = null,
+        private ?ImageIngestEntrypoint $imageIngest = null,
+        private ?SemanticWritePolicyResolver $semanticWritePolicy = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -80,6 +83,12 @@ final class McpTransport
                 'structuredContent' => ['error' => $error->toArray()],
                 'content' => [['type' => 'text', 'text' => $error->reasonCode . ': USE_CANONICAL_CAPTURE_FLOW']],
             ]]];
+        } catch (SemanticWritePolicyViolation $error) {
+            return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
+                'isError' => true,
+                'structuredContent' => ['error' => $error->toArray()],
+                'content' => [['type' => 'text', 'text' => $error->reasonCode]],
+            ]]];
         } catch (McpDocumentationException $error) {
             return ['status' => 200, 'body' => ['jsonrpc' => '2.0', 'id' => $id, 'result' => [
                 'isError' => true,
@@ -99,8 +108,8 @@ final class McpTransport
     private function handle(string $method, array $params, bool $modern, array $files = []): array
     {
         return match ($method) {
-            'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
-            'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0']],
+            'server/discover' => ['protocolVersions' => [self::MODERN_VERSION, self::LEGACY_VERSION], 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0'], 'runtime_identity' => $this->runtimeIdentity()],
+            'initialize' => ['protocolVersion' => $modern ? self::MODERN_VERSION : self::LEGACY_VERSION, 'capabilities' => ['tools' => new \stdClass()], 'serverInfo' => ['name' => 'nhk-v3', 'version' => '3.0.0'], 'runtime_identity' => $this->runtimeIdentity()],
             'tools/list' => ['tools' => array_map(static function (array $tool): array {
                 $export = ['name' => $tool['name'], 'description' => $tool['description'], 'inputSchema' => $tool['inputSchema']];
                 if (is_array($tool['connectorMeta'] ?? null) && $tool['connectorMeta'] !== []) $export['_meta'] = $tool['connectorMeta'];
@@ -200,6 +209,16 @@ final class McpTransport
 
     private function batchUpload(array $arguments, array $files): array
     {
+        if ($this->imageIngest !== null) {
+            $provided = $files !== [] ? $files : ($arguments['files'] ?? null);
+            return $this->imageIngest->ingest(
+                (string) ($arguments['idempotency_key'] ?? ''),
+                is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [],
+                $provided,
+                is_array($arguments['items'] ?? null) ? $arguments['items'] : [],
+                $files !== [],
+            );
+        }
         if ($this->mediaBatchUpload === null) throw new \RuntimeException('MEDIA_BATCH_UPLOAD_UNAVAILABLE');
         return $this->mediaBatchUpload->upload(
             (string) ($arguments['idempotency_key'] ?? ''),
@@ -217,11 +236,15 @@ final class McpTransport
         }
         ($this->documentation ?? new McpDocumentationRegistry())->assertCheckpoint((array) ($arguments['documentation_checkpoint'] ?? []));
         unset($arguments['files']);
-        if ($files !== []) $arguments['files'] = $files;
+        if ($files !== []) {
+            $arguments['files'] = $files;
+            $arguments['_nhk_native_multipart'] = true;
+        }
         $intent = is_array($arguments['authority_intent'] ?? null) ? $arguments['authority_intent'] : [];
         $declaredPurpose = strtoupper(trim((string) ($arguments['purpose'] ?? '')));
         $authorityPacket = in_array($declaredPurpose, ['AUTHORITY', 'MIXED'], true) || in_array((string) ($intent['mode'] ?? ''), ['PLAN', 'APPLY_APPROVED_PLAN'], true);
         if ($authorityPacket) {
+            $this->assertAuthoritySemanticWriteAllowed();
             if ($this->authorityCapture === null) throw new \RuntimeException('AUTHORITY_CAPTURE_UNAVAILABLE');
             if (isset($arguments['capture_id'])) return $this->authorityCapture->continueWithApproval((string) $arguments['capture_id'], $arguments)->toArray();
             return $this->authorityCapture->execute($arguments)->toArray();
@@ -232,6 +255,30 @@ final class McpTransport
             return $this->captureContinuation->execute($arguments);
         }
         return $this->capture->execute($arguments)->toArray();
+    }
+
+    private function assertAuthoritySemanticWriteAllowed(): void
+    {
+        if ($this->semanticWritePolicy === null) return;
+        $decision = $this->semanticWritePolicy->decision(true, $this->can ?? static fn (string $capability): bool => false);
+        if ($this->semanticWritePolicy->resolve() === SemanticWritePolicy::LOCKED_OPERATIONAL) {
+            throw new SemanticWritePolicyViolation('PROJECT_BUILD_MODE_DISABLED', 'Project Build convenience behavior is disabled in LOCKED_OPERATIONAL.', $decision);
+        }
+        if (($decision['allowed'] ?? false) !== true) {
+            $code = (string) ($decision['code'] ?? 'SEMANTIC_WRITE_POLICY_READ_ONLY');
+            throw new SemanticWritePolicyViolation($code, $code, $decision);
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function runtimeIdentity(): array
+    {
+        $identity = ($this->documentation ?? new McpDocumentationRegistry())->runtimeIdentity();
+        if ($this->semanticWritePolicy === null) return $identity;
+        $identity['environment'] = $this->semanticWritePolicy->environment();
+        $identity['semantic_write_policy'] = $this->semanticWritePolicy->resolve()->value;
+        $identity['project_build_enabled'] = $this->semanticWritePolicy->projectBuildEnabled();
+        return $identity;
     }
 
     private function validateArguments(array $schema, array $arguments): void

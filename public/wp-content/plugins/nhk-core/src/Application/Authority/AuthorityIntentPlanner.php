@@ -49,7 +49,36 @@ final class AuthorityIntentPlanner
         if ($this->contains($text, 'pháp') || $this->contains($text, 'france')) $requests[] = ['type' => 'classification', 'name' => 'Pháp', 'family' => 'origin', 'allow_create' => $allowCreate];
         if ($this->contains($text, 'hermle') && !array_filter($requests, static fn (array $item): bool => $item['type'] === 'brand' && strtolower($item['name']) === 'hermle')) $requests[] = ['type' => 'brand', 'name' => 'Hermle', 'allow_create' => $allowCreate];
         foreach ((array) ($input['subject_hints'] ?? []) as $hint) if (is_string($hint) && trim($hint) !== '') $requests[] = ['type' => 'classification', 'name' => trim($hint), 'family' => 'clock_type', 'allow_create' => $allowCreate];
+        foreach ($this->genericTypedRequests($text, $allowCreate) as $request) $requests[] = $request;
         return $this->uniqueRequests($requests);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function genericTypedRequests(string $text, bool $allowCreate): array
+    {
+        $labels = [
+            'brand' => 'brand|thương hiệu',
+            'model' => 'model|mẫu',
+            'variant' => 'variant|phiên bản',
+            'movement' => 'movement|bộ máy',
+            'music' => 'music|bản nhạc',
+            'component' => 'component|linh kiện',
+            'classification' => 'classification|phân loại',
+            'specimen' => 'specimen|mẫu vật',
+            'product' => 'product|sản phẩm',
+        ];
+        $requests = [];
+        foreach ($labels as $type => $labelPattern) {
+            if (preg_match('/(?:tạo|thêm|create|new)\s+(?:một\s+)?(?:' . $labelPattern . ')\s+(.+?)(?:[.!?]|$)/iu', $text, $match) !== 1) continue;
+            $name = trim((string) $match[1]);
+            $family = null;
+            if ($type === 'classification' && preg_match('/^(.*?)\s+family\s*=\s*([a-z_-]+)$/iu', $name, $familyMatch) === 1) {
+                $name = trim((string) $familyMatch[1]);
+                $family = strtolower(trim((string) $familyMatch[2]));
+            }
+            $requests[] = ['type' => $type, 'name' => $name, 'allow_create' => $allowCreate] + ($family === null ? [] : ['family' => $family]);
+        }
+        return $requests;
     }
 
     /** @param list<array<string,mixed>> $requests @return list<array<string,mixed>> */
@@ -67,6 +96,7 @@ final class AuthorityIntentPlanner
         if (!$this->types->has($type)) { $plan['blockers'][] = ['code' => 'UNSUPPORTED_ENTITY_TYPE', 'entity_type' => $type]; return; }
         $name = trim((string) $request['name']);
         $family = (string) ($request['family'] ?? '');
+        if ($type === 'classification' && $family === '') { $plan['blockers'][] = ['code' => 'CLASSIFICATION_FAMILY_REQUIRED', 'entity_type' => $type, 'name' => $name]; return; }
         // Stable keys for CREATE are always derived by the server policy. A
         // caller can identify an existing record by UUID/name/alias, but can
         // never supply the identity that a new canonical record will use.
@@ -87,6 +117,7 @@ final class AuthorityIntentPlanner
         $lexical = $this->boundedLexical($type, $name);
         if ($lexical !== []) { $plan['ambiguities'][] = ['code' => 'IDENTITY_CONFLICT', 'entity_type' => $type, 'name' => $name, 'review_only' => true, 'candidates' => $lexical]; return; }
         if (($request['allow_create'] ?? false) !== true) { $plan['ambiguities'][] = ['code' => 'CANONICAL_NOT_FOUND', 'entity_type' => $type, 'name' => $name, 'review_only' => true]; return; }
+        if ($type === 'classification' && $family === 'clock-type') { $plan['blockers'][] = ['code' => 'LEGACY_CLOCK_TYPE_FAMILY_WRITE_REJECTED', 'entity_type' => $type, 'family' => $family, 'name' => $name]; return; }
         $plan['create_candidates'][] = ['candidate_id' => $this->candidateId('CREATE', $type, $stableKey), 'action' => 'CREATE', 'entity_type' => $type, 'family' => $family !== '' ? $family : null, 'proposed_canonical_name' => $name, 'name' => $name, 'aliases' => [], 'description' => '', 'stable_key_preview' => $stableKey, 'proposed_stable_key' => $stableKey, 'scope' => 'capture', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'ambiguities' => [], 'blockers' => [], 'dependencies' => [], 'review_diagnostics' => []];
     }
 

@@ -15,7 +15,8 @@ final class WpdbAuditSink implements GovernanceAuditSink
     {
         $events = ['created'=>'ProposalCreated','submitted'=>'ProposalSubmitted','approved'=>'ProposalApproved','rejected'=>'ProposalRejected','cancelled'=>'ProposalCancelled','superseded'=>'ProposalSuperseded','applied'=>'ApplySucceeded'];
         $actor = in_array($event, ['approved', 'rejected', 'cancelled', 'superseded'], true) ? $proposal->decisionActor : $proposal->actor;
-        $this->recordEvent($events[$event] ?? $event, 'proposal', $proposal->id, $actor !== null ? (int) $actor : null, ['revision' => $proposal->revision, 'state' => $proposal->state->value, 'fingerprint' => $proposal->contentFingerprint]);
+        $project = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
+        $this->recordEvent($events[$event] ?? $event, 'proposal', $proposal->id, $actor !== null ? (int) $actor : null, array_merge($project, ['proposal_id' => $proposal->id, 'target_uuid' => $proposal->targetUuid, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'revision' => $proposal->revision, 'state' => $proposal->state->value, 'fingerprint' => $proposal->contentFingerprint]));
     }
 
     public function recordEvent(string $eventType, string $objectType, string $objectKey, ?int $actorUserId, array $context = []): void

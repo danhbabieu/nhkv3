@@ -106,7 +106,7 @@ final class AdminShell
     /** @return list<string> */
     public static function capabilityNames(): array
     {
-        $names = ['manage_options', 'edit_posts', 'upload_files', 'nhk_view_governance', 'nhk_ingest_articles', 'nhk_internal_content_operations'];
+        $names = ['manage_options', 'edit_posts', 'upload_files', 'nhk_view_governance', 'nhk_ingest_articles', 'nhk_internal_content_operations', 'nhk_project_build_semantic'];
         foreach (self::GOVERNANCE_ACTION_CAPABILITIES as $capability) $names[] = $capability;
         return array_values(array_unique($names));
     }

@@ -150,6 +150,42 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame('nhk:brand:hermle', $plan['create_candidates'][0]['stable_key_preview']);
     }
 
+    public function test_registered_authority_types_can_all_plan_through_one_generic_request_path(): void
+    {
+        foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'specimen', 'product'] as $type) {
+            $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+                ['text' => 'Tạo ' . $type . ' Build Fixture.', 'authority_intent' => ['mode' => 'PLAN']],
+                ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+            );
+
+            self::assertCount(1, $plan['create_candidates'], $type);
+            self::assertSame($type, $plan['create_candidates'][0]['entity_type']);
+        }
+    }
+
+    public function test_clock_type_fixture_uses_exact_canonical_family_for_plan_only(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Tạo loại Đồng hồ công cộng.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertSame('classification', $plan['create_candidates'][0]['entity_type']);
+        self::assertSame('clock_type', $plan['create_candidates'][0]['family']);
+        self::assertSame('nhk:classification:clock-type.dong-ho-cong-cong', $plan['create_candidates'][0]['proposed_stable_key']);
+    }
+
+    public function test_legacy_clock_type_family_is_a_typed_new_write_blocker(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['text' => 'Tạo classification Legacy Clock family=clock-type.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame('LEGACY_CLOCK_TYPE_FAMILY_WRITE_REJECTED', $plan['blockers'][0]['code']);
+    }
+
     public function test_true_mantel_clock_hierarchy_is_planned_as_subtype_relation(): void
     {
         $repository = new PlannerAuthorityRepository([

@@ -55,6 +55,30 @@ for internal/admin compatibility or lifecycle operations. They are marked
 `USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
 not fall back to one of these writers when Capture is unavailable.
 
+### Runtime semantic-write policy — 2026-09-13
+
+The deployed runtime resolves semantic mutation policy from
+`NHK_SEMANTIC_WRITE_POLICY`; a missing or invalid value is `READ_ONLY`. The
+supported values are `READ_ONLY`, `PROJECT_BUILD` and
+`LOCKED_OPERATIONAL`. The policy is runtime state, independent of URL identity,
+and is exposed read-only as `semantic_write_policy` and
+`project_build_enabled` in runtime identity/bootstrap.
+
+`READ_ONLY` blocks semantic mutation. `PROJECT_BUILD` admits the canonical
+`nhk.capture.ingest` Authority path only when the authenticated actor has
+`nhk_project_build_semantic` and the deployment environment is allowlisted;
+it still requires the existing Proposal, Approval, Eligibility, Controlled
+Apply and canonical read-back Governance lifecycle. This capability does not
+replace approval, apply, publication, Media, Video, Graph or internal
+lifecycle capabilities. `LOCKED_OPERATIONAL` disables Project Build-only
+convenience behavior while preserving normal operational Governance policy.
+
+Production always rejects configured `PROJECT_BUILD` with
+`PROJECT_BUILD_FORBIDDEN_IN_PRODUCTION`. Existing direct/internal writers
+remain protected by `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`.
+Project Build does not bypass Governance, perform legacy backfill or change
+canonical UUID, stable-key, Graph, Knowledge or Public Identity ownership.
+
 ### Governed Conversational Authority — 2026-09-11
 
 `nhk.capture.ingest` is also the sole normal operator boundary for Authority

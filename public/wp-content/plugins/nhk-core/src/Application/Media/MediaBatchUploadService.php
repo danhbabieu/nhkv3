@@ -111,7 +111,7 @@ final class MediaBatchUploadService
     /** @return array<string,mixed> */
     private function manifestItem(array $result, string $checksum, string $clientId): array
     {
-        return ['client_file_id' => $clientId, 'attachment_id' => (int) ($result['attachment_id'] ?? 0), 'media_id' => (string) ($result['media_id'] ?? ''), 'source_url' => (string) ($result['canonical_url'] ?? ''), 'filename' => (string) ($result['filename'] ?? ''), 'mime_type' => (string) ($result['mime'] ?? ''), 'byte_size' => (int) ($result['filesize'] ?? 0), 'width' => (int) ($result['width'] ?? 0), 'height' => (int) ($result['height'] ?? 0), 'checksum_sha256' => $checksum, 'attachment_readback_status' => 'verified', 'reused' => false, 'upload_status' => 'CREATED'];
+        return ['client_file_id' => $clientId, 'attachment_id' => (int) ($result['attachment_id'] ?? 0), 'media_id' => (string) ($result['media_id'] ?? ''), 'source_url' => (string) ($result['canonical_url'] ?? ''), 'filename' => (string) ($result['filename'] ?? ''), 'original_filename' => (string) ($result['original_filename'] ?? ''), 'mime_type' => (string) ($result['mime'] ?? ''), 'byte_size' => (int) ($result['filesize'] ?? 0), 'width' => (int) ($result['width'] ?? 0), 'height' => (int) ($result['height'] ?? 0), 'checksum_sha256' => $checksum, 'attachment_readback_status' => 'verified', 'reused' => false, 'upload_status' => 'CREATED'];
     }
 
     private function uuid(): string

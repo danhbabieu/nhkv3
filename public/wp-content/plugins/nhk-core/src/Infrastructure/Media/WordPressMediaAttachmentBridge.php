@@ -193,12 +193,14 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $checksum = hash_file('sha256', $filePath);
         $byteSize = filesize($filePath);
         if (!is_string($checksum) || $checksum === '' || $byteSize === false || $byteSize < 1) return null;
+        $originalFilename = function_exists('get_post_meta') ? trim((string) get_post_meta($attachmentId, '_nhk_original_filename', true)) : '';
+        if ($originalFilename === '') $originalFilename = basename($relative);
         $sourceRelative = function_exists('get_post_meta') ? trim((string) get_post_meta($attachmentId, '_nhk_source_original_file', true)) : '';
-        $sourceSpec = $this->sourceAssetSpec($sourceRelative);
+        $sourceSpec = $this->sourceAssetSpec($sourceRelative, $originalFilename);
         $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1;
         $canonicalFilename = (new MediaFilenameNormalizer())->normalizeWebp((string) ($post->post_title ?: basename($relative)), 'image', basename($relative));
         $assets = [[
-            'kind' => $sourceSpec !== null ? 'derivative' : 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => basename($relative), 'checksum' => $checksum, 'mime_type' => $mime, 'byte_size' => (int) $byteSize, 'width' => $width, 'height' => $height, 'visibility' => 'PUBLIC', 'metadata' => ['canonical_filename' => $canonicalFilename, 'sizes' => [], 'wordpress_attachment_id' => $attachmentId],
+            'kind' => $sourceSpec !== null ? 'derivative' : 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => $originalFilename, 'checksum' => $checksum, 'mime_type' => $mime, 'byte_size' => (int) $byteSize, 'width' => $width, 'height' => $height, 'visibility' => 'PUBLIC', 'metadata' => ['canonical_filename' => $canonicalFilename, 'original_filename' => $originalFilename, 'sizes' => [], 'wordpress_attachment_id' => $attachmentId],
         ]];
         if ($sourceSpec !== null) array_unshift($assets, $sourceSpec);
         $media = $this->mediaService->ingest('wp-attachment:' . max(1, $blogId) . ':' . $attachmentId, (string) ($post->post_title ?: basename($relative)), 'draft', ['source' => 'wordpress_attachment_adoption', 'wordpress_attachment_id' => $attachmentId], $assets);
@@ -211,7 +213,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return $media->canonicalId;
     }
 
-    private function sourceAssetSpec(string $relative): ?array
+    private function sourceAssetSpec(string $relative, string $originalFilename = ''): ?array
     {
         if ($relative === '' || !function_exists('wp_upload_dir')) return null;
         $upload = wp_upload_dir();
@@ -220,7 +222,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if ($path === '' || !is_file($path) || !is_readable($path)) return null;
         $info = @getimagesize($path); $checksum = hash_file('sha256', $path); $size = filesize($path);
         if (!is_array($info) || !is_string($info['mime'] ?? null) || !is_string($checksum) || $checksum === '' || $size === false || $size < 1) return null;
-        return ['kind' => 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => basename($relative), 'checksum' => $checksum, 'mime_type' => strtolower((string) $info['mime']), 'byte_size' => (int) $size, 'width' => (int) ($info[0] ?? 0), 'height' => (int) ($info[1] ?? 0), 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true, 'sizes' => []]];
+        $originalFilename = $originalFilename !== '' ? $originalFilename : basename($relative);
+        return ['kind' => 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => $originalFilename, 'checksum' => $checksum, 'mime_type' => strtolower((string) $info['mime']), 'byte_size' => (int) $size, 'width' => (int) ($info[0] ?? 0), 'height' => (int) ($info[1] ?? 0), 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true, 'original_filename' => $originalFilename, 'sizes' => []]];
     }
 
     private function completeExistingAttachment(string $mediaId, int $attachmentId): void

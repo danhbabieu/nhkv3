@@ -225,6 +225,14 @@ by design.
 | Search | Unified SearchService abstraction and native WP post query | IN PROGRESS |
 | Admin / MCP | Governed operational workflows and MCP tool contract | PASS for local contract/lifecycle; IN PROGRESS for external/V2 parity |
 
+### 2026-09-13 semantic-write policy note
+
+`READ_ONLY`, `PROJECT_BUILD` and `LOCKED_OPERATIONAL` are implemented as a
+runtime policy gate for the canonical NHK V3 MCP Capture/Authority path. This
+is code-side contract/lifecycle evidence only: the current staging connector
+was not enabled, no capability was granted live, and no parity or production
+cutover claim is made.
+
 ## Data parity inventory
 
 The restored read-only V2 backup contains 800 posts, 1,301 entities, 2

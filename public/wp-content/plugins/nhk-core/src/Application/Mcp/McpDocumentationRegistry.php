@@ -47,10 +47,11 @@ final class McpDocumentationRegistry
         'public-claim-compliance' => ['path' => 'docs/compliance/PUBLIC_CLAIM_ADVERTISING_COMPLIANCE_CONTRACT.md', 'classification' => 'canonical_contract', 'status' => 'ACTIVE', 'domain' => 'governance'],
     ];
 
-    public function __construct(private ?string $sourceRoot = null, private ?string $runtimeVersion = null)
+    public function __construct(private ?string $sourceRoot = null, private ?string $runtimeVersion = null, private ?\NHK\Core\Application\Runtime\SemanticWritePolicyResolver $semanticWritePolicy = null)
     {
         if ($this->sourceRoot !== null) $this->sourceRoot = rtrim($this->sourceRoot, DIRECTORY_SEPARATOR);
         $this->runtimeVersion ??= defined('NHK_CORE_VERSION') ? (string) NHK_CORE_VERSION : 'unknown';
+        $this->semanticWritePolicy ??= new \NHK\Core\Application\Runtime\SemanticWritePolicyResolver();
     }
 
     /** @return list<string> */
@@ -133,16 +134,32 @@ final class McpDocumentationRegistry
     }
 
     /** @return array<string,mixed> */
+    public function runtimeIdentity(): array
+    {
+        $manifest = $this->context()['manifest'];
+        return [
+            'environment' => $this->semanticWritePolicy->environment(),
+            'semantic_write_policy' => $this->semanticWritePolicy->resolve()->value,
+            'project_build_enabled' => $this->semanticWritePolicy->projectBuildEnabled(),
+            'runtime_version' => $manifest['runtime_version'],
+            'build_identity' => $this->buildIdentity(),
+            'documentation_version' => $manifest['documentation_version'],
+            'manifest_hash' => $manifest['manifest_hash'],
+        ];
+    }
+
+    /** @return array<string,mixed> */
     public function bootstrap(): array
     {
-        $context = $this->context(); $manifest = $context['manifest'];
+        $context = $this->context(); $manifest = $context['manifest']; $identity = $this->runtimeIdentity();
         $bootstrapDocuments = [
             $this->get($manifest['entry_point'], 1, 240),
             $this->get($manifest['status_index'], 1, 240),
             $this->get($manifest['execution_state'], 1, 240),
         ];
         return [
-            'runtime_version' => $manifest['runtime_version'], 'documentation_version' => $manifest['documentation_version'], 'manifest_hash' => $manifest['manifest_hash'], 'generated_at' => $manifest['generated_at'], 'build_identity' => $this->buildIdentity(),
+            'runtime_version' => $manifest['runtime_version'], 'documentation_version' => $manifest['documentation_version'], 'manifest_hash' => $manifest['manifest_hash'], 'generated_at' => $manifest['generated_at'], 'build_identity' => $identity['build_identity'],
+            'environment' => $identity['environment'], 'semantic_write_policy' => $identity['semantic_write_policy'], 'project_build_enabled' => $identity['project_build_enabled'],
             'entry_point' => $manifest['entry_point'], 'status_index' => $manifest['status_index'], 'execution_state' => $manifest['execution_state'],
             'read_first' => $bootstrapDocuments[0]['content'], 'documentation_status_index' => $bootstrapDocuments[1]['content'], 'execution_state_content' => $bootstrapDocuments[2]['content'], 'bootstrap_documents' => $bootstrapDocuments,
             'active_documents' => $this->list('ACTIVE')['files'], 'manifest' => $this->list(),

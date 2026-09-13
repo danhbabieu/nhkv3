@@ -16,7 +16,6 @@ final class SemanticWritePolicyResolver
             return $value === false ? null : $value;
         };
         $this->environmentReader ??= static function (): string {
-            if (defined('NHK_RUNTIME_ENVIRONMENT')) return strtolower(trim((string) constant('NHK_RUNTIME_ENVIRONMENT')));
             if (defined('WP_ENVIRONMENT_TYPE')) return strtolower(trim((string) constant('WP_ENVIRONMENT_TYPE')));
             $value = getenv('WP_ENVIRONMENT_TYPE');
             if (is_string($value) && trim($value) !== '') return strtolower(trim($value));

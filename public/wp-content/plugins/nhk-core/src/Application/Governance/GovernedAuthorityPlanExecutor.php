@@ -13,7 +13,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
     public function __construct(private McpGovernanceHandler $governance) {}
 
     /** @param array<string,mixed> $plan @param list<string> $approvedCandidateIds @return array<string,mixed> */
-    public function execute(array $plan, string $approvedFingerprint, string $currentFingerprint, array $approvedCandidateIds, ConversationalAuthorityPolicy $policy, string $actor = '0'): array
+    public function execute(array $plan, string $approvedFingerprint, string $currentFingerprint, array $approvedCandidateIds, ConversationalAuthorityPolicy $policy, string $actor = '0', array $auditContext = []): array
     {
         if (!hash_equals($approvedFingerprint, $currentFingerprint)) return ['status' => 'PLAN_REAPPROVAL_REQUIRED', 'code' => 'PLAN_REAPPROVAL_REQUIRED', 'proposal_ids' => [], 'approved_candidate_ids' => []];
         if ($policy === ConversationalAuthorityPolicy::OFF) return ['status' => 'AUTHORITY_AUTOMATION_DISABLED', 'code' => 'AUTHORITY_AUTOMATION_DISABLED', 'proposal_ids' => [], 'approved_candidate_ids' => []];
@@ -36,7 +36,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
                 $relationCandidates[] = $candidate;
                 continue;
             }
-            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor);
+            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor, $auditContext);
             $proposalIds[] = $proposal->id;
             $authorityProposalIds[] = $proposal->id;
             $authorityProposalCandidates[$proposal->id] = $candidate;
@@ -62,7 +62,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
                 ];
                 throw $error;
             }
-            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor);
+            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor, $auditContext);
             $proposalIds[] = $proposal->id;
             $relationProposalIds[] = $proposal->id;
         }
@@ -76,9 +76,9 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         return isset($candidate['predicate']) || isset($candidate['source_type']);
     }
 
-    private function createAndSubmit(array $candidate, string $fingerprint, string $actor): \NHK\Core\Domain\Governance\Proposal
+    private function createAndSubmit(array $candidate, string $fingerprint, string $actor, array $auditContext = []): \NHK\Core\Domain\Governance\Proposal
     {
-        $proposal = $this->governance->createFromArguments($this->proposalArguments($candidate, $fingerprint, $actor));
+        $proposal = $this->governance->createFromArguments($this->proposalArguments($candidate, $fingerprint, $actor, $auditContext));
         return $proposal->state === ProposalState::DRAFT ? $this->governance->submit($proposal->id) : $proposal;
     }
 
@@ -129,7 +129,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
     }
 
     /** @return array<string,mixed> */
-    private function proposalArguments(array $candidate, string $planFingerprint, string $actor): array
+    private function proposalArguments(array $candidate, string $planFingerprint, string $actor, array $auditContext = []): array
     {
         $action = strtoupper((string) ($candidate['action'] ?? 'CREATE'));
         $isRelation = isset($candidate['predicate']) || isset($candidate['source_type']);
@@ -138,6 +138,17 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         $payload = $candidate;
         $payload['candidate_id'] = (string) ($candidate['candidate_id'] ?? '');
         if (!$isRelation) $payload = ['candidate_id' => $payload['candidate_id'], 'stable_key' => (string) ($candidate['proposed_stable_key'] ?? $candidate['stable_key_preview'] ?? ''), 'name' => (string) ($candidate['name'] ?? $candidate['proposed_canonical_name'] ?? ''), 'entity_payload' => array_filter(['family' => $candidate['family'] ?? null, 'aliases' => $candidate['aliases'] ?? null, 'description' => $candidate['description'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== [])];
+        if ($auditContext !== []) $payload['project_build_audit'] = [
+            'capture_id' => trim((string) ($auditContext['capture_id'] ?? '')),
+            'policy_mode' => strtoupper(trim((string) ($auditContext['policy_mode'] ?? ''))),
+            'approval_mode' => strtoupper(trim((string) ($auditContext['approval_mode'] ?? ''))),
+            'plan_fingerprint' => $planFingerprint,
+            'actor' => $actor,
+            'target_uuid' => trim((string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $candidate['target_uuid'] ?? '')),
+            'entity_type' => $entityType,
+            'operation' => $operation,
+            'previous_revision' => (int) ($candidate['canonical_revision'] ?? $candidate['source_revision'] ?? $candidate['target_revision'] ?? 0),
+        ];
         $contentFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
         $dependencyIds = array_values(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? []))));
         return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? ''), 'actor' => $actor];
