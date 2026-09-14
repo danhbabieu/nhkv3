@@ -2,8 +2,8 @@
 
 # Checkpoint — 2026-09-14 — Pre-master P0 closeout gate
 
-WORKTREE: Clean at `cb2b9bb0abcce600ed683fab6f489650fcb20ea5`. The readiness
-and presentation changes were already committed in this tree; no dirty or
+WORKTREE: Clean readiness tree. The readiness and presentation changes were
+already committed in this tree; no dirty or
 untracked user files were found, so no stash or restoration was required.
 
 BOOTSTRAP ROOT CAUSE: WordPress itself was not the defect. The local MySQL
