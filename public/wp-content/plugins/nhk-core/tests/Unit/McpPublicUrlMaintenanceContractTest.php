@@ -36,7 +36,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
     {
         $ability = 'nhk-v3/public-url-reproject';
 
-        self::assertSame([$ability], McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
+        self::assertSame([$ability, 'nhk-v3/media-widget-upload'], McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
         self::assertNotContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
         self::assertContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));
         self::assertNotContains('nhk-v3/media-ingest', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([$ability]));

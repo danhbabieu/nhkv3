@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-13 — Easy MCP widget Ability exposure
+
+CHANGE: Registered the existing `nhk.media.widget-upload` and
+`nhk.media.upload-widget.open` custom transport tools on the WordPress Ability
+surface as `nhk-v3/media-widget-upload` and
+`nhk-v3/media-upload-widget-open`. Both callbacks delegate through the
+existing MCP transport; no Media/Capture/UI writer or second storage path was
+introduced.
+
+EXPOSURE: The open Ability is read-only and operator-enableable. The upload
+Ability remains `internal_admin_only`, requires
+`nhk_internal_content_operations` plus its existing upload capability, and is
+visible to the Ability admin surface for explicit enablement. `capture-ingest`
+remains operator-enableable. The existing `media-ingest` and
+`media-upload-batch` internal/hidden guards remain unchanged.
+
+VERIFICATION: TDD RED failed on both missing widget mappings, then the focused
+widget exposure/contract tests passed. Guarded WordPress registry verification
+passed its Ability-registration assertions against `nhk_v3_test`; the Easy MCP
+serializer assertion was skipped because that plugin is not installed in the
+local test runtime. No source or data bypass was used.
+
+SCOPE: Only `McpAbilityRegistration`, focused/integration exposure tests and
+the active MCP/status documentation changed. No deployment, publication,
+semantic mutation, schema change or Git operation was performed.
+
 # Checkpoint — 2026-09-13 — ChatGPT image widget guarded verification
 
 VERIFICATION: Focused transport/ImageIngest/Media/Capture/widget selections

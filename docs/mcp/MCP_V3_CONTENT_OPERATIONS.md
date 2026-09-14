@@ -54,10 +54,11 @@ for internal/admin compatibility or lifecycle operations. They are marked
 `nhk_internal_content_operations`, and return `DIRECT_WRITE_BLOCKED` with
 `USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
 not fall back to one of these writers when Capture is unavailable. The existing
-Easy MCP bridge has one explicit internal/admin opt-in for the bounded
-`nhk-v3/public-url-reproject` Ability; it remains non-public, is never added
-by `PROJECT_BUILD`, and retains the internal capability and public-URL
-management guards.
+Easy MCP bridge has explicit internal/admin opt-ins for the bounded
+`nhk-v3/public-url-reproject` and physical `nhk-v3/media-widget-upload`
+Abilities. Both remain capability guarded and are never added by
+`PROJECT_BUILD`; the widget upload is visible in the Ability admin surface for
+explicit enablement.
 
 ### Runtime semantic-write policy — 2026-09-13
 
@@ -642,6 +643,13 @@ URLs are not returned in model-visible content. The widget state keeps
 `modelContent.uploaded_media`, private upload status and authorized
 `imageIds`. A follow-up action passes Media IDs to the existing Capture flow;
 it never uploads the same physical file again.
+
+The same widget tools are also registered on the WordPress Ability surface as
+`nhk-v3/media-widget-upload` and `nhk-v3/media-upload-widget-open`. The upload
+Ability remains `internal_admin_only` and delegates to the existing
+`/nhk/v1/mcp` transport; the open Ability is read-only and points to the same
+UI resource. The existing `nhk-v3/media-ingest` and
+`nhk-v3/media-upload-batch` internal guards and hidden metadata are unchanged.
 
 `nhk.capture.ingest` accepts optional ordered `media_ids` for already-ingested
 active Media with a verified WordPress attachment binding. The resolver reads

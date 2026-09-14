@@ -72,6 +72,16 @@ final class McpTransportIntegrationTest extends TestCase
         $mediaSchema = $media->get_input_schema();
         self::assertArrayHasKey('assets', $mediaSchema['properties']);
         self::assertArrayHasKey('wordpress_attachment_id', $mediaSchema['properties']['assets']['items']['properties']);
+        $widgetUpload = wp_get_ability('nhk-v3/media-widget-upload');
+        self::assertNotNull($widgetUpload);
+        self::assertTrue($widgetUpload->get_meta_item('public'));
+        self::assertTrue($widgetUpload->get_meta_item('show_in_rest'));
+        self::assertSame('internal_admin_only', $widgetUpload->get_meta_item('surface'));
+        $widgetOpen = wp_get_ability('nhk-v3/media-upload-widget-open');
+        self::assertNotNull($widgetOpen);
+        self::assertTrue($widgetOpen->get_meta_item('public'));
+        self::assertTrue($widgetOpen->get_meta_item('show_in_rest'));
+        self::assertSame(['readonly' => true, 'destructive' => false, 'idempotent' => true], $widgetOpen->get_meta_item('annotations'));
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
         self::assertArrayHasKey('attachment_id', $tools['nhk.media.attachment.get']['inputSchema']['properties']);
 
@@ -119,6 +129,10 @@ final class McpTransportIntegrationTest extends TestCase
                 self::assertArrayHasKey('approved_candidate_ids', $captureSchema['properties']['authority_intent']['properties']);
                 self::assertArrayHasKey('title', $captureSchema['properties']);
                 self::assertArrayHasKey('excerpt', $captureSchema['properties']);
+            } elseif ($abilityName === 'nhk-v3/media-widget-upload') {
+                self::assertTrue($ability->get_meta_item('public'));
+                self::assertTrue($ability->get_meta_item('show_in_rest'));
+                self::assertSame('internal_admin_only', $ability->get_meta_item('surface'));
             } elseif (in_array($abilityName, [
                 'nhk-v3/article-publish-review',
                 'nhk-v3/article-publish-approve',

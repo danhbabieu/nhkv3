@@ -107,11 +107,12 @@ verification. Existing records remain readable and maintainable through their
 owner/lifecycle boundaries; this inventory changes the creation route, not
 canonical identity or historical data.
 
-The existing Easy MCP bridge permits one explicit internal/admin lifecycle
-opt-in, `nhk-v3/public-url-reproject`, for bounded URL maintenance. This
-Ability remains `internal_admin_only`, is not auto-enabled by normal operator
-reconciliation or `PROJECT_BUILD`, and retains both the
-`nhk_internal_content_operations` and public-URL management capability guards.
+The existing Easy MCP bridge permits explicit internal/admin lifecycle
+opt-ins for `nhk-v3/public-url-reproject` and the physical widget upload
+`nhk-v3/media-widget-upload`. Both remain capability guarded and are not
+auto-enabled by `PROJECT_BUILD`; the widget upload is visible to the Ability
+admin surface for explicit enablement. The existing `nhk-v3/media-ingest` and
+`nhk-v3/media-upload-batch` internal metadata and guards remain unchanged.
 
 Every MCP ingest domain uses this bounded deep reconciliation, including
 Media, Video, Knowledge, Source, Evidence and Authority entities. “Maximize

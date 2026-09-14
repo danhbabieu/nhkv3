@@ -20,6 +20,7 @@ final class McpAbilityRegistration
     /** @var list<string> Explicit internal/admin lifecycle opt-ins only. */
     private const EASY_MCP_EXPLICIT_INTERNAL_ABILITIES = [
         'nhk-v3/public-url-reproject',
+        'nhk-v3/media-widget-upload',
     ];
 
     public static function bootstrapRegistry(): void
@@ -200,6 +201,7 @@ final class McpAbilityRegistration
         'nhk.entity.get' => 'nhk-v3/entity-get',
         'nhk.media.get' => 'nhk-v3/media-get',
         'nhk.media.attachment.get' => 'nhk-v3/media-attachment-get',
+        'nhk.media.upload-widget.open' => 'nhk-v3/media-upload-widget-open',
         'nhk.video.get' => 'nhk-v3/video-get',
         'nhk.knowledge.get' => 'nhk-v3/knowledge-get',
         'nhk.source.get' => 'nhk-v3/source-get',
@@ -233,6 +235,7 @@ final class McpAbilityRegistration
         'nhk.video.ingest' => 'nhk-v3/video-ingest',
         'nhk.media.ingest' => 'nhk-v3/media-ingest',
         'nhk.media.upload-batch' => 'nhk-v3/media-upload-batch',
+        'nhk.media.widget-upload' => 'nhk-v3/media-widget-upload',
         'nhk.knowledge.ingest' => 'nhk-v3/knowledge-ingest',
         'nhk.source.ingest' => 'nhk-v3/source-ingest',
         'nhk.evidence.ingest' => 'nhk-v3/evidence-ingest',
@@ -245,10 +248,7 @@ final class McpAbilityRegistration
     ];
 
     /** @var array<string,string> */
-    private const EXPLICIT_EXCLUSION_REASONS = [
-        'nhk.media.widget-upload' => 'CUSTOM_MCP_TRANSPORT_TOOL',
-        'nhk.media.upload-widget.open' => 'MCP_APPS_RENDER_TOOL',
-    ];
+    private const EXPLICIT_EXCLUSION_REASONS = [];
 
     /** @return list<string> */
     public static function readAbilityNames(): array
@@ -367,8 +367,13 @@ final class McpAbilityRegistration
                 'execute_callback' => static fn (mixed $input = null): mixed => self::executeMcp($toolName, $input),
                 'permission_callback' => static fn (): bool => self::canGoverned($toolName),
                 'meta' => [
-                    'public' => !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
-                    'show_in_rest' => !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    // The widget upload remains capability-gated and
+                    // internal-only, but must be discoverable by the Easy MCP
+                    // admin surface so an administrator can explicitly enable
+                    // it. Existing internal writers retain their hidden REST
+                    // metadata.
+                    'public' => $toolName === 'nhk.media.widget-upload' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
                     'surface' => SingleEntryPointPolicy::surface($toolName),
                     'annotations' => [
                         'readonly' => false,
@@ -522,6 +527,7 @@ final class McpAbilityRegistration
                 'nhk.entity.neighborhood' => $read->entityNeighborhood((string) ($input['type'] ?? ''), (string) ($input['id'] ?? ''), (string) ($input['profile'] ?? ''), (int) ($input['max_hops'] ?? 2), (int) ($input['limit'] ?? 50)),
                 'nhk.article.preflight' => self::executeMcp($tool, $input),
                 'nhk.category.resolve' => self::executeMcp($tool, $input),
+                'nhk.media.upload-widget.open' => self::executeMcp($tool, $input),
                 'nhk.entity.get' => $read->entityGet((string) ($input['type'] ?? ''), (string) ($input['id'] ?? '')),
                 'nhk.media.get' => $read->mediaGet((string) ($input['id'] ?? '')),
                 'nhk.video.get' => $read->videoGet((string) ($input['id'] ?? '')),
@@ -581,6 +587,8 @@ final class McpAbilityRegistration
             'nhk.article.trash' => 'NHK Article Trash',
             'nhk.article.restore' => 'NHK Article Restore',
             'nhk.media.ingest' => 'NHK Image Intake / Upload Normalization',
+            'nhk.media.widget-upload' => 'NHK Widget Image Upload',
+            'nhk.media.upload-widget.open' => 'NHK Image Upload Widget',
             'nhk.knowledge.ingest' => 'NHK Knowledge Ingest',
             'nhk.source.ingest' => 'NHK Source Ingest',
             'nhk.evidence.ingest' => 'NHK Evidence Ingest',
