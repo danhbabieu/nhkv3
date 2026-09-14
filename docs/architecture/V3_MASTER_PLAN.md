@@ -31,6 +31,16 @@ weak/speculative edges remain rejected. Code-side batch/idempotency
 implementation exists; live multipart acceptance and target runtime read-back
 remain pending.
 
+Site-wide presentation checkpoint (2026-09-14): the shared read-side ordering
+and relationship presentation seams now cover public entity collections,
+related content, generic dossier relations, Home, Media, Video, Knowledge and
+semantic Search. The profile-driven Clock Type surface presents as “Nhóm đồng
+hồ” while retaining `clock_type` and `/loai-dong-ho/`; the fallback navigation
+and homepage group cards are data-driven and readiness-filtered. No semantic
+backfill or live mutation was performed. Full page-family migration, guarded
+integration/runtime evidence, deployment and live frontend acceptance remain
+open.
+
 Video recovery runtime checkpoint (2026-09-12): the actual V3-1309 target was
 proven as read-only staging, so it was not mutated. The repository now has a
 bounded immutable Video editorial enrichment context/service and a deterministic

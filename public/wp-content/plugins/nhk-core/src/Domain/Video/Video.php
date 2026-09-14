@@ -16,6 +16,8 @@ final readonly class Video
         public ?string $thumbnailMediaId = null,
         public bool $active = true,
         public int $revision = 1,
+        public ?string $createdAt = null,
+        public ?string $updatedAt = null,
     ) {
         if (!UuidCodec::isValid($canonicalId) || $platform === '' || $externalVideoId === '' || filter_var($canonicalUrl, FILTER_VALIDATE_URL) === false) throw new InvalidVideoReference('Video identity is invalid.');
         if ($revision < 1) throw new InvalidVideoReference('Video revision must be positive.');

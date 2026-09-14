@@ -29,6 +29,29 @@ final class MediaVideoPageQueryTest extends TestCase
         self::assertSame(['Reference'], array_column($query->videoArchive(1, 10)['items'], 'title'));
     }
 
+    public function test_video_archive_is_newest_first_by_published_at_with_created_order_fallback(): void
+    {
+        $old = Video::fromUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Cũ', [
+            'public_identity' => ['current_slug' => 'cu'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-01-01T00:00:00Z'],
+            'editorial' => ['title' => 'Cũ', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+        $middle = Video::fromUrl('https://www.youtube.com/watch?v=9bZkp7q19f0', 'Giữa', [
+            'public_identity' => ['current_slug' => 'giua'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-02-01T00:00:00Z'],
+            'editorial' => ['title' => 'Giữa', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+        $new = Video::fromUrl('https://www.youtube.com/watch?v=aqz-KE-bpKQ', 'Mới', [
+            'public_identity' => ['current_slug' => 'moi'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-03-01T00:00:00Z'],
+            'editorial' => ['title' => 'Mới', 'summary' => 'Tóm tắt'], 'hub' => ['primary' => '01'], 'provenance' => ['kind' => 'TEST'], 'semantic_attachments' => [['target_id' => '22222222-2222-4222-8222-222222222222']],
+        ]);
+
+        $query = $this->query([], [$old, $new, $middle]);
+
+        self::assertSame(['Mới', 'Giữa', 'Cũ'], array_merge(array_column($query->videoArchive(1, 2)['items'], 'title'), array_column($query->videoArchive(2, 2)['items'], 'title')));
+    }
+
     public function test_media_detail_contains_assets_and_usages_but_video_detail_keeps_external_reference(): void
     {
         $mediaId = UuidCodec::newV7();

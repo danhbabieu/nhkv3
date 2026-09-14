@@ -46,6 +46,8 @@ final class ClockTypeFrontendAcceptanceTest extends TestCase
         foreach (['clock-type-hierarchy', 'profile_key', 'Liên quan trực tiếp', 'Mở rộng từ quan hệ nền'] as $marker) self::assertStringContainsString($marker, $entity);
         self::assertStringContainsString('profile_badge', $index);
         self::assertStringContainsString('if ($profile === \'clock_type\')', $functions);
+        self::assertStringContainsString('Nhóm đồng hồ', $functions);
+        self::assertStringContainsString('/loai-dong-ho/', $functions);
         self::assertStringNotContainsString('01a09872-6af8-7890-90b7-f913fab7bee4', $entity . $index . $functions);
         self::assertStringNotContainsString('nhk:classification:clock-type.dong-ho-cong-cong', $entity . $index . $functions);
     }

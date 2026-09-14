@@ -26,6 +26,8 @@ final class FrontendPresentationContractTest extends TestCase
     {
         $source = $this->read('front-page.php');
         foreach (['image_url', 'thumbnail_url', "['knowledge']", "['dictionary']", '/thu-vien/', '/video/', '/tu-dien/'] as $needle) self::assertStringContainsString($needle, $source);
+        self::assertStringContainsString('Khám phá theo nhóm đồng hồ', $source);
+        self::assertStringContainsString('$hubLabel', $source);
     }
 
     public function test_entity_detail_renders_dossier_knowledge_gallery_and_path_aware_related_content(): void
@@ -38,6 +40,7 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('Liên quan trực tiếp', $source);
         self::assertStringContainsString('Mở rộng từ quan hệ nền', $source);
         self::assertStringContainsString('nhk_v3_public_dictionary_terms_for_text', $source);
+        self::assertStringContainsString('Nhóm con', $source);
     }
 
     public function test_collector_profile_uses_collector_first_facet_order_and_keeps_makers_last(): void

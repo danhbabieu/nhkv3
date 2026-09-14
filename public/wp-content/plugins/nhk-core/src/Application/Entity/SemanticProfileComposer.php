@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
+use NHK\Core\Application\Presentation\LatestFirstOrder;
+
 /**
  * Maps an assembled dossier to the stable, reader-safe profile consumed by
  * public templates. It does not query or mutate any canonical owner.
@@ -79,7 +81,10 @@ final class SemanticProfileComposer
     private function publicHierarchyItem(array $item): array
     {
         if ($item === []) return [];
-        return ['name' => (string) ($item['name'] ?? ''), 'kind' => (string) ($item['kind'] ?? '')];
+        $result = ['name' => (string) ($item['name'] ?? ''), 'kind' => (string) ($item['kind'] ?? '')];
+        $url = trim((string) ($item['url'] ?? ''));
+        if ($url !== '' && str_starts_with($url, '/')) $result['url'] = $url;
+        return $result;
     }
 
     /** @param array<string,mixed> $context @return array<string,mixed> */
@@ -132,11 +137,23 @@ final class SemanticProfileComposer
                 if (!isset($unique[$identity]) || $this->rank($item) < $this->rank($unique[$identity])) $unique[$identity] = $item;
             }
             $items = array_values($unique);
-            usort($items, function (array $a, array $b): int {
-                return [$this->rank($a), (string) ($a['title'] ?? ''), (int) ($a['_position'] ?? 0)] <=> [$this->rank($b), (string) ($b['title'] ?? ''), (int) ($b['_position'] ?? 0)];
-            });
+            $buckets = [];
+            foreach ($items as $item) $buckets[implode(':', $this->rank($item))][] = $item;
+            uksort($buckets, static fn (string $a, string $b): int => $a <=> $b);
+            $items = [];
+            foreach ($buckets as $bucket) {
+                $bucket = LatestFirstOrder::sort(
+                    $bucket,
+                    static fn (array $item): ?string => $item['_published_at'] ?? null,
+                    static fn (array $item): ?string => $item['_created_at'] ?? null,
+                    static fn (array $item): string => (string) ($item['_stable_key'] ?? $item['canonical_id'] ?? $item['url'] ?? $item['title'] ?? ''),
+                    null,
+                    static fn (array $item): ?string => $item['_updated_at'] ?? null,
+                );
+                foreach ($bucket as $item) $items[] = $item;
+            }
             foreach ($items as &$item) {
-                unset($item['_position'], $item['_identity'], $item['canonical_id'], $item['stable_key']);
+                unset($item['_position'], $item['_identity'], $item['canonical_id'], $item['stable_key'], $item['_published_at'], $item['_created_at'], $item['_updated_at'], $item['_stable_key']);
             }
             unset($item);
         }

@@ -33,7 +33,7 @@ add_action('wp_enqueue_scripts', 'nhk_v3_assets');
 
 function nhk_v3_nav_fallback(): void
 {
-    $items = ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/thuong-hieu/', 'Mẫu' => '/mau/', 'Bộ máy' => '/bo-may/', 'Bản nhạc' => '/ban-nhac/', 'So sánh' => '/so-sanh/', 'Linh kiện' => '/linh-kien/', 'Hiện vật' => '/hien-vat/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
+    $items = ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/thuong-hieu/', 'Nhóm đồng hồ' => '/loai-dong-ho/', 'Mẫu' => '/mau/', 'Bộ máy' => '/bo-may/', 'Bản nhạc' => '/ban-nhac/', 'So sánh' => '/so-sanh/', 'Linh kiện' => '/linh-kien/', 'Hiện vật' => '/hien-vat/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
     echo '<ul class="nav-list">';
     foreach ($items as $label => $path) printf('<li><a href="%s">%s</a></li>', esc_url(home_url($path)), esc_html($label));
     echo '</ul>';
@@ -120,13 +120,13 @@ function nhk_v3_excerpt(): string { return wp_trim_words(wp_strip_all_tags(get_t
 
 function nhk_v3_entity_label(string $type, string $profile = ''): string
 {
-    if ($profile === 'clock_type') return 'loại đồng hồ';
+    if ($profile === 'clock_type') return 'nhóm đồng hồ';
     return ['brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm'][$type] ?? 'hồ sơ';
 }
 
 function nhk_v3_public_type(string $type, string $profile = ''): string
 {
-    if ($profile === 'clock_type') return 'loại đồng hồ';
+    if ($profile === 'clock_type') return 'nhóm đồng hồ';
     return ['wp_post' => 'bài viết', 'post' => 'bài viết', 'brand' => 'thương hiệu', 'model' => 'mẫu đồng hồ', 'variant' => 'biến thể', 'movement' => 'bộ máy', 'music' => 'bản nhạc', 'component' => 'linh kiện', 'classification' => 'phân loại', 'specimen' => 'hiện vật', 'product' => 'sản phẩm', 'media' => 'hình ảnh', 'video' => 'video', 'knowledge' => 'tri thức', 'source' => 'nguồn', 'evidence' => 'bằng chứng', 'publication' => 'ấn phẩm', 'website' => 'website', 'archive' => 'lưu trữ', 'catalog' => 'catalogue', 'interview' => 'phỏng vấn', 'fact' => 'dữ kiện', 'technical' => 'kỹ thuật', 'specification' => 'thông số'][$type] ?? 'nội dung liên quan';
 }
 

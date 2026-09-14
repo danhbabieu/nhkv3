@@ -43,11 +43,19 @@ final class SemanticDossierQueryTest extends TestCase
             'provenance' => ['kind' => 'TEST_SOURCE'],
             'semantic_attachments' => [['target_id' => $movement->canonicalId]],
         ]);
+        $newVideo = new Video($newVideoId = UuidCodec::newV7(), 'youtube', 'jNQXAC9IVRw', 'https://www.youtube.com/watch?v=jNQXAC9IVRw', 'Video mới', [
+            'public_identity' => ['current_slug' => 'video-moi'],
+            'source_snapshot' => ['availability' => 'available', 'embeddable' => true, 'published_at' => '2026-09-12T00:00:00Z', 'thumbnail_urls' => ['https://img.example.test/new-video.jpg']],
+            'editorial' => ['title' => 'Video mới', 'summary' => 'Video mới nhất liên quan.'],
+            'hub' => ['primary' => 'movement'],
+            'provenance' => ['kind' => 'TEST_SOURCE'],
+            'semantic_attachments' => [['target_id' => $movement->canonicalId]],
+        ], null, true, 1, '2026-09-12T00:00:00Z');
 
         $endpoints = new EndpointTypeRegistry();
         foreach (['brand' => $brand, 'model' => $model, 'variant' => $variant, 'movement' => $movement, 'music' => $music] as $type => $entity) $endpoints->register($type, new FakeEndpointResolver($type, [$entity->canonicalId]));
         $endpoints->register('media', new FakeEndpointResolver('media', [$mediaId]));
-        $endpoints->register('video', new FakeEndpointResolver('video', [$videoId]));
+        $endpoints->register('video', new FakeEndpointResolver('video', [$videoId, $newVideoId]));
         $predicates = new PredicateRegistry();
         $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, $predicates, new InMemoryAuditSink());
         $graph->create(new NodeReference('model', $model->canonicalId), 'model_of', new NodeReference('brand', $brand->canonicalId));
@@ -55,6 +63,8 @@ final class SemanticDossierQueryTest extends TestCase
         $graph->create(new NodeReference('variant', $variant->canonicalId), 'uses_movement', new NodeReference('movement', $movement->canonicalId));
         $graph->create(new NodeReference('movement', $movement->canonicalId), 'supports_music', new NodeReference('music', $music->canonicalId));
         $graph->create(new NodeReference('movement', $movement->canonicalId), 'about', new NodeReference('video', $videoId));
+        $graph->create(new NodeReference('movement', $movement->canonicalId), 'about', new NodeReference('video', $newVideoId));
+
 
         $source = new Source(UuidCodec::newV7(), 'source-a', 'Tư liệu kỹ thuật', 'archive', 'box-1', ['visibility' => 'PUBLIC']);
         $claim1 = new KnowledgeClaim($claim1Id = UuidCodec::newV7(), 'movement-construction', 'Khác biệt nằm ở bộ thoát.', 'technical', ['metadata' => ['subject_id' => $movement->canonicalId, 'facet' => 'movement', 'scope' => 'movement']]);
@@ -64,7 +74,7 @@ final class SemanticDossierQueryTest extends TestCase
         $mediaRepo = $this->mediaRepository([$media]);
         $assetRepo = $this->assetRepository([$asset]);
         $usageRepo = $this->usageRepository([$usage]);
-        $videoRepo = $this->videoRepository([$video]);
+        $videoRepo = $this->videoRepository([$video, $newVideo]);
         $routes = new PublicRouteResolver($authorityRepo, $types);
         $eligibility = new PublicEntityEligibilityPolicy($authorityRepo, $types, $routes);
         $dossier = new SemanticDossierQuery(
@@ -93,7 +103,8 @@ final class SemanticDossierQueryTest extends TestCase
         self::assertSame(2, $result['relation_sections']['models'][0]['origin']['hop_count'] ?? null);
         self::assertSame(['uses_movement', 'variant_of'], $result['relation_sections']['models'][0]['origin']['predicates'] ?? null);
         self::assertSame('DIRECT', $result['relation_sections']['music'][0]['origin']['kind'] ?? null);
-        self::assertSame('https://img.example.test/video.jpg', $result['relation_sections']['videos'][0]['thumbnail_url'] ?? null);
+        self::assertSame('Video mới', $result['relation_sections']['videos'][0]['title'] ?? null);
+        self::assertSame('https://img.example.test/new-video.jpg', $result['relation_sections']['videos'][0]['thumbnail_url'] ?? null);
         self::assertStringContainsString('/anh/movement-front.webp', (string) ($result['primary_media']['url'] ?? ''));
         self::assertSame(2, $result['knowledge']['claim_count']);
         self::assertSame(1, $result['knowledge']['coverage']['sourced_claim_count']);

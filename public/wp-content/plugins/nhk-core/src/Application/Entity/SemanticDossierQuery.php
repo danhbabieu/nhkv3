@@ -8,6 +8,7 @@ use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoThumbnailSelector, VideoUrlPolicy};
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Entity\EntityDossierReader;
 use NHK\Core\Contracts\Media\MediaRepository;
@@ -104,6 +105,7 @@ final class SemanticDossierQuery implements EntityDossierReader
             ],
         ];
         $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose($entity->entityType, $dossier);
+        $dossier['relation_sections'] = $this->withoutOrderingMetadata($sections);
         return $dossier;
     }
 
@@ -143,6 +145,7 @@ final class SemanticDossierQuery implements EntityDossierReader
             ],
         ];
         $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose('wp_post', $dossier);
+        $dossier['relation_sections'] = $this->withoutOrderingMetadata($sections);
         return $dossier;
     }
 
@@ -192,6 +195,7 @@ final class SemanticDossierQuery implements EntityDossierReader
             ],
         ];
         $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose('video', $dossier);
+        $dossier['relation_sections'] = $this->withoutOrderingMetadata($sections);
         return $dossier;
     }
 
@@ -210,11 +214,29 @@ final class SemanticDossierQuery implements EntityDossierReader
             $sections[$group][] = $item;
         }
         foreach ($sections as &$items) {
-            usort($items, static function(array $a, array $b): int {
-                $ak = (($a['origin']['kind'] ?? '') === 'DIRECT' ? 0 : 1);
-                $bk = (($b['origin']['kind'] ?? '') === 'DIRECT' ? 0 : 1);
-                return [$ak, (int) ($a['origin']['hop_count'] ?? 99), (string) ($a['title'] ?? '')] <=> [$bk, (int) ($b['origin']['hop_count'] ?? 99), (string) ($b['title'] ?? '')];
-            });
+            $buckets = [];
+            foreach ($items as $item) {
+                $origin = $item['origin'] ?? [];
+                $bucket = (($origin['kind'] ?? '') === 'DIRECT' ? '0' : '1') . ':' . (int) ($origin['hop_count'] ?? 99);
+                $buckets[$bucket][] = $item;
+            }
+            uksort($buckets, static fn (string $a, string $b): int => $a <=> $b);
+            $ordered = [];
+            foreach ($buckets as $bucket) {
+                $bucket = LatestFirstOrder::sort(
+                    $bucket,
+                    static fn (array $item): ?string => $item['_published_at'] ?? null,
+                    static fn (array $item): ?string => $item['_created_at'] ?? null,
+                    static fn (array $item): string => (string) ($item['_stable_key'] ?? $item['url'] ?? $item['title'] ?? ''),
+                    null,
+                    static fn (array $item): ?string => $item['_updated_at'] ?? null,
+                );
+                if ($this->hasChronology($bucket) === false) {
+                    usort($bucket, static fn (array $a, array $b): int => [(string) ($a['title'] ?? ''), (string) ($a['url'] ?? '')] <=> [(string) ($b['title'] ?? ''), (string) ($b['url'] ?? '')]);
+                }
+                foreach ($bucket as $item) $ordered[] = $item;
+            }
+            $items = $ordered;
         }
         unset($items);
         return $sections;
@@ -234,7 +256,7 @@ final class SemanticDossierQuery implements EntityDossierReader
             if ($path === null) return null;
             $url = (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $path, 'public_eligible' => true], ['type' => 'Entity'])['internal_link'] ?? null;
             if (!is_string($url) || $url === '') return null;
-            $item = ['type' => $type, 'title' => $entity->canonicalName, 'url' => $url, 'origin' => $origin];
+            $item = ['type' => $type, 'title' => $entity->canonicalName, 'url' => $url, 'origin' => $origin, '_created_at' => $entity->createdAt, '_updated_at' => $entity->updatedAt, '_stable_key' => $entity->canonicalId];
             $profile = (new EntityProfileResolver())->resolveProfile($entity);
             if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
                 $definition = (new EntityProfileRegistry())->get((string) $profile->profileKey);
@@ -246,7 +268,7 @@ final class SemanticDossierQuery implements EntityDossierReader
         if ($type === 'media') {
             $media = $this->media->findByCanonicalId($id);
             if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
-            $value = ['type' => 'media', 'title' => $media->canonicalName, 'origin' => $origin];
+            $value = ['type' => 'media', 'title' => $media->canonicalName, 'origin' => $origin, '_created_at' => $media->createdAt, '_updated_at' => $media->updatedAt, '_stable_key' => $media->canonicalId];
             $visual = $this->mediaGallery?->forMedia($media->canonicalId);
             if (is_array($visual)) {
                 $value['image_url'] = $visual['image_url'] ?? null;
@@ -269,13 +291,13 @@ final class SemanticDossierQuery implements EntityDossierReader
             $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null;
             if (!is_string($url) || $url === '') return null;
             $thumbnail = (new VideoThumbnailSelector())->fromSource($source);
-            return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail['url'] ?? null, 'thumbnail' => $thumbnail, 'deferred_embed' => true, 'origin' => $origin];
+            return ['type' => 'video', 'title' => $title, 'url' => $url, 'thumbnail_url' => $thumbnail['url'] ?? null, 'thumbnail' => $thumbnail, 'deferred_embed' => true, 'origin' => $origin, '_published_at' => $source['published_at'] ?? null, '_created_at' => $video->createdAt, '_updated_at' => $video->updatedAt, '_stable_key' => $video->canonicalId];
         }
 
         if ($type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {
             $post = $this->projectPost((int) $match[1]);
             if ($post === null || trim((string) ($post['url'] ?? '')) === '') return null;
-            return ['type' => 'wp_post', 'title' => (string) ($post['title'] ?? ''), 'url' => (string) $post['url'], 'origin' => $origin];
+            return ['type' => 'wp_post', 'title' => (string) ($post['title'] ?? ''), 'url' => (string) $post['url'], 'origin' => $origin, '_published_at' => $post['published_at'] ?? null, '_created_at' => $post['created_at'] ?? null, '_updated_at' => $post['updated_at'] ?? null, '_stable_key' => (string) $match[1]];
         }
 
         return null;
@@ -303,6 +325,26 @@ final class SemanticDossierQuery implements EntityDossierReader
             'predicates' => $predicates,
             'via_types' => $viaTypes,
         ];
+    }
+
+    /** @param list<array<string,mixed>> $items */
+    private function hasChronology(array $items): bool
+    {
+        foreach ($items as $item) {
+            if (trim((string) ($item['_published_at'] ?? '')) !== '' || trim((string) ($item['_created_at'] ?? '')) !== '') return true;
+        }
+        return false;
+    }
+
+    /** @param array<string,list<array<string,mixed>>> $sections @return array<string,list<array<string,mixed>>> */
+    private function withoutOrderingMetadata(array $sections): array
+    {
+        foreach ($sections as &$items) {
+            foreach ($items as &$item) unset($item['_published_at'], $item['_created_at'], $item['_updated_at'], $item['_stable_key']);
+            unset($item);
+        }
+        unset($items);
+        return $sections;
     }
 
     /** @return array{0:?array<string,mixed>,1:list<array<string,mixed>>} */
@@ -345,6 +387,9 @@ final class SemanticDossierQuery implements EntityDossierReader
             'title' => (string) get_the_title($post),
             'url' => (string) get_permalink($post),
             'excerpt' => function_exists('get_the_excerpt') ? (string) get_the_excerpt($post) : '',
+            'published_at' => $post->post_date_gmt ?: $post->post_date,
+            'created_at' => $post->post_date_gmt ?: $post->post_date,
+            'updated_at' => $post->post_modified_gmt ?: $post->post_modified,
         ];
     }
 

@@ -18,6 +18,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Application\Video\{VideoUrlPolicy, VideoPublicContextSelector};
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class RelatedContentQuery
 {
@@ -65,6 +66,10 @@ final class RelatedContentQuery
                 $queue[] = [$node, $depth + 1];
             }
         }
+        foreach ($groups as $group => $items) {
+            $ordered = LatestFirstOrder::sort($items, static fn (array $item): ?string => $item['_published_at'] ?? null, static fn (array $item): ?string => $item['_created_at'] ?? null, static fn (array $item): string => (string) ($item['_stable_key'] ?? $item['id'] ?? $item['url'] ?? $item['title'] ?? ''), null, static fn (array $item): ?string => $item['_updated_at'] ?? null);
+            $groups[$group] = array_map(static function (array $item): array { unset($item['_published_at'], $item['_created_at'], $item['_updated_at'], $item['_stable_key']); return $item; }, $ordered);
+        }
         return $groups;
     }
 
@@ -78,17 +83,17 @@ final class RelatedContentQuery
             $entity = $this->authority->findByCanonicalId($node->endpoint_key);
             if (!$entity || !$entity->active()) return null;
             if ($this->eligibility !== null && !$this->eligibility->evaluate($entity)->eligible) return null;
-            return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity)]];
+            return ['group' => 'entities', 'value' => ['type' => $entity->entityType, 'title' => $entity->canonicalName, 'url' => $this->entityUrl($entity), '_created_at' => $entity->createdAt, '_updated_at' => $entity->updatedAt, '_stable_key' => $entity->canonicalId]];
         }
         if ($node->endpoint_type === 'media') { $media = $this->media->findByCanonicalId($node->endpoint_key); return $media && $media->active && $media->readiness === 'ready' ? ['group' => 'media', 'value' => $this->mediaValue($media)] : null; }
         if ($node->endpoint_type === 'video') { $video = $this->videos->findByCanonicalId($node->endpoint_key); return $video && $video->active && $video->hasValidPublicReference() ? ['group' => 'videos', 'value' => $this->videoValue($video)] : null; }
         if ($node->endpoint_type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $node->endpoint_key, $match) === 1 && function_exists('get_post')) {
             $post = get_post((int) $match[1]);
-            if ($post instanceof \WP_Post && get_post_status($post) === 'publish') return ['group' => 'articles', 'value' => ['type' => 'post', 'id' => (string) $post->ID, 'title' => get_the_title($post), 'url' => get_permalink($post)]];
+            if ($post instanceof \WP_Post && get_post_status($post) === 'publish') return ['group' => 'articles', 'value' => ['type' => 'post', 'id' => (string) $post->ID, 'title' => get_the_title($post), 'url' => get_permalink($post), '_published_at' => $post->post_date_gmt ?: $post->post_date, '_created_at' => $post->post_date_gmt ?: $post->post_date, '_updated_at' => $post->post_modified_gmt ?: $post->post_modified, '_stable_key' => (string) $post->ID]];
         }
         return null;
     }
-    private function mediaValue(Media $media): array { return ['type' => 'media', 'title' => $media->canonicalName, 'url' => '']; }
-    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link']; return ['type' => 'video', 'title' => $title, 'url' => $url ?? '', 'source_url' => $video->canonicalUrl]; }
+    private function mediaValue(Media $media): array { return ['type' => 'media', 'title' => $media->canonicalName, 'url' => '', '_created_at' => $media->createdAt, '_updated_at' => $media->updatedAt, '_stable_key' => $media->canonicalId]; }
+    private function videoValue(Video $video): array { $metadata = is_array($video->metadata) ? $video->metadata : []; $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []); $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : []; $title = trim((string) ($editorial['title'] ?? '')) ?: $video->title; $url = (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($video, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link']; return ['type' => 'video', 'title' => $title, 'url' => $url ?? '', 'source_url' => $video->canonicalUrl, '_published_at' => $source['published_at'] ?? null, '_created_at' => $video->createdAt, '_updated_at' => $video->updatedAt, '_stable_key' => $video->canonicalId]; }
     private function entityUrl(AuthorityEntity $entity): string { $path = (new PublicRouteResolver($this->authority, $this->types))->path($entity); return $path === null ? '' : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'readiness' => SeoReadinessResult::READY, 'canonical_url' => $path, 'public_eligible' => true], ['type' => 'Entity'])['internal_link'] ?? ''; }
 }

@@ -71,6 +71,22 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertContains('CATEGORY_MISSING', $result->warnings);
     }
 
+    public function test_text_article_without_provided_media_keeps_optional_visual_support_as_a_warning(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'a', 'type' => 'brand', 'name' => 'NHK']],
+            static fn (array $context): array => ['status' => 'available', 'posts' => [], 'categories' => [['slug' => 'tri-thuc']], 'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [], 'article_media' => ['media_complete' => false, 'requirement' => 'OPTIONAL_VISUAL_SUPPORT']],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Lịch sử NHK', ['name' => 'NHK']);
+
+        self::assertTrue($result->readyForDraft);
+        self::assertFalse($result->seoBlueprint['media_complete']);
+        self::assertContains('MEDIA_PLACEHOLDER_OR_UNAVAILABLE', $result->warnings);
+        self::assertNotContains('MEDIA_PIPELINE_FAILURE', $result->blockers);
+    }
+
     public function test_new_factual_claim_without_applied_evidence_is_a_hard_preflight_blocker(): void
     {
         $service = new ArticleResearchPreflight(

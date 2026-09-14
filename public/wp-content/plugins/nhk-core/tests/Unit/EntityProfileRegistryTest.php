@@ -18,6 +18,7 @@ final class EntityProfileRegistryTest extends TestCase
         self::assertSame(['brand', 'clock_type'], $registry->keys());
         self::assertSame('brand', $registry->get('brand')->matchingRule['entity_type']);
         self::assertSame('clock_type', $registry->get('clock_type')->matchingRule['family']);
+        self::assertSame('Nhóm đồng hồ', $registry->get('clock_type')->visitorLabel);
         self::assertSame('classification', $registry->get('clock_type')->matchingRule['entity_type']);
         self::assertSame('clock-type-entity-hub-v1', $registry->get('clock_type')->relationQueryRecipe);
         self::assertSame(['clock-type'], $registry->get('clock_type')->readFamilyAliases);

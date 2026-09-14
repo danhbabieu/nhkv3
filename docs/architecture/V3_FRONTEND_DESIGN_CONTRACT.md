@@ -170,6 +170,37 @@ Semantic search uses a profile archive when its route intent is distinct from
 the generic entity archive. Clock-Type results therefore require persisted
 Public Identity and retain the profile badge; they are not reintroduced through
 generic classification fallback when that identity is unavailable.
+
+## Site-wide relationship-driven presentation V1 — 2026-09-14
+
+The public label for the `clock_type` profile is **Nhóm đồng hồ**. The
+canonical runtime vocabulary remains `classification` + `family=clock_type`,
+and the archive route remains `/loai-dong-ho/`; this is presentation naming,
+not a semantic rename or route migration.
+
+Public entity collections and related-content projections use the shared,
+read-only presentation boundaries. Relationship origin is retained internally
+as direct or bounded derived traversal (including subtype/object/article
+provenance) and is never replaced by a persisted convenience edge. Clock-Type
+cards are filtered by presentation readiness independently of semantic ACTIVE
+state, so an active entity may remain `INCOMPLETE` until it has a public route
+and usable descriptive/visual content.
+
+Dynamic public feeds use the shared `LatestFirstOrder` contract before
+pagination: explicit pinned items, then `published_at DESC`, `created_at DESC`
+and a stable descending tie-breaker. “Mới cập nhật” may opt into
+`updated_at DESC`. Hierarchy, explicit A–Z, historical and sequence-dependent
+lists remain structural exceptions. Internal ordering metadata is removed
+before public serialization.
+
+The homepage and fallback global navigation now include the data-driven
+**Nhóm đồng hồ** entry. The homepage preview consumes the profile archive and
+renders only presentation-ready group cards; `/loai-dong-ho/` and entity detail
+continue through the generic Entity/Profile/Dossier query seams. No Authority,
+Graph, Public Identity, Article, Media, Video or Knowledge mutation is part of
+this presentation slice. Brand, Model, Movement, Melody, Parts, Specimen and
+Article migrations remain shared-foundation work and are listed as pending
+until their route/readiness/data evidence is complete.
 # Semantic Claim Ledger — 2026-09-08
 
 Entity detail pages consume `ClaimProjectionService` for the shared

@@ -1,6 +1,6 @@
 # NHK V3 Current Documentation Status Index
 
-> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-13.**
+> **NON-NORMATIVE ROUTER / STATUS INDEX — 2026-09-14.**
 > This file is not a second Constitution and does not create semantic vocabulary,
 > operations, predicates, storage, routes or data. Its purpose is to tell
 > downstream systems which sources are current law/contract, which sources are
@@ -8,6 +8,14 @@
 >
 > If anything here conflicts with `docs/constitution/NHK_V3_CONSTITUTION.md`,
 > the Constitution controls.
+
+## 0.0.1 Pre-master readiness — 2026-09-14
+
+The runtime documentation registry and immutable snapshot include all
+`READ_FIRST.md` references. Public Entity, Public Identity, Public Route, SEO,
+and shared feed ordering contracts are retrievable through the canonical
+documentation reader. This closes the code-side `DOC_PATH_NOT_ALLOWED` gap;
+deployed/live parity still requires a fresh deployment read-back.
 
 ## 0. MCP documentation bootstrap — 2026-09-09
 

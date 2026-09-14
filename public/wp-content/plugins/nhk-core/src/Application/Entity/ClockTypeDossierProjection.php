@@ -26,7 +26,7 @@ final class ClockTypeDossierProjection
         if ($entity->entityType !== 'classification' || $profile->status !== 'RESOLVED' || $profile->profileKey !== 'clock_type') return $dossier;
         if (($dossier['status'] ?? '') !== 'AVAILABLE') return $dossier;
 
-        $hierarchy = $this->hierarchy->project($entity->canonicalId);
+        $hierarchy = $this->withPublicHierarchyLinks($this->hierarchy->project($entity->canonicalId));
         $sections = is_array($dossier['relation_sections'] ?? null) ? $dossier['relation_sections'] : [];
         $derivedBrandResult = $this->derivedBrands->forClockType($entity->canonicalId);
         $brands = $this->brandItems($derivedBrandResult);
@@ -87,6 +87,26 @@ final class ClockTypeDossierProjection
     private function authorityFind(string $id): ?AuthorityEntity
     {
         return $this->authority?->findByCanonicalId($id);
+    }
+
+    /** @param array<string,mixed> $hierarchy @return array<string,mixed> */
+    private function withPublicHierarchyLinks(array $hierarchy): array
+    {
+        if ($this->routes === null || $this->identities === null || $this->authority === null) return $hierarchy;
+        foreach (['parent', 'children'] as $slot) {
+            $items = $slot === 'parent' ? [$hierarchy[$slot] ?? []] : (array) ($hierarchy[$slot] ?? []);
+            foreach ($items as $index => $item) {
+                if (!is_array($item)) continue;
+                $id = trim((string) ($item['canonical_id'] ?? ''));
+                $candidate = $id === '' ? null : $this->authority->findByCanonicalId($id);
+                if (!$candidate instanceof AuthorityEntity || $this->identities->resolvePersisted($candidate) === null) continue;
+                $path = $this->routes->path($candidate);
+                if ($path !== null) $items[$index]['url'] = $path;
+            }
+            if ($slot === 'parent') $hierarchy[$slot] = $items[0] ?? [];
+            else $hierarchy[$slot] = array_values($items);
+        }
+        return $hierarchy;
     }
 
     /** @param list<mixed> $existing @param list<array<string,mixed>> $incoming @return list<array<string,mixed>> */

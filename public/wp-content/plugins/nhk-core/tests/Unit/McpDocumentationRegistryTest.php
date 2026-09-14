@@ -26,6 +26,42 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('mcp', $keys);
     }
 
+    public function test_every_read_first_document_reference_is_allowlisted_and_retrievable(): void
+    {
+        $readFirst = file_get_contents(dirname(__DIR__, 6) . '/docs/constitution/READ_FIRST.md');
+        self::assertIsString($readFirst);
+        preg_match_all('/docs\/[A-Za-z0-9_.\/-]+\.md/', $readFirst, $matches);
+        $paths = array_values(array_unique($matches[0] ?? []));
+        $registry = new McpDocumentationRegistry();
+        $allowlist = McpDocumentationRegistry::documentPaths();
+
+        foreach ($paths as $path) {
+            self::assertContains($path, $allowlist, 'READ_FIRST reference is outside the MCP documentation allowlist: ' . $path);
+            self::assertSame($path, $registry->get($path)['path']);
+        }
+    }
+
+    public function test_public_entity_identity_route_and_seo_contracts_are_retrievable(): void
+    {
+        $registry = new McpDocumentationRegistry();
+        $paths = [
+            'docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md',
+            'docs/architecture/V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md',
+            'docs/architecture/V3_PUBLIC_ROUTE_AUDIT.md',
+            'docs/seo/ENTITY_SEO_PROJECTION_CONTRACT.md',
+            'docs/seo/MEDIA_IMAGE_SEO_PROJECTION_CONTRACT.md',
+            'docs/seo/NHK_V3_SEO_CORE_CONTRACT.md',
+            'docs/seo/PUBLIC_URL_SLUG_CONTRACT.md',
+            'docs/seo/SITEMAP_INDEXABILITY_CONTRACT.md',
+        ];
+
+        foreach ($paths as $path) {
+            $document = $registry->get($path);
+            self::assertSame('ACTIVE', $document['status'], $path);
+            self::assertNotSame('', trim((string) $document['content']), $path);
+        }
+    }
+
     public function test_clock_type_entity_profile_contract_is_active_and_readable(): void
     {
         $document = (new McpDocumentationRegistry())->get('entity-profile-clock-type');

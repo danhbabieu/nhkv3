@@ -8,6 +8,27 @@ The local development apply checkpoint has run after the read-only inventory,
 backup/restore rehearsal and dry-run. It is not a live or production
 migration, and unresolved rows remain explicit in the ledger.
 
+## SITE-WIDE RELATIONSHIP-DRIVEN PRESENTATION V1 — 2026-09-14
+
+This additive presentation checkpoint does not migrate or mutate semantic data.
+
+| Concern | Current decision/evidence |
+|---|---|
+| Public display naming | `Nhóm đồng hồ`; internal `clock_type` and `classification` remain unchanged |
+| Route policy | Keep `/loai-dong-ho/`; existing profile-driven detail routes remain governed by Public Identity |
+| Relationship presentation | Shared bounded read projections preserve direct/derived origin and provenance; no convenience Graph edge is persisted |
+| Visual policy | Homepage Clock Group cards, entity media galleries and video cards consume existing public-safe projections; no fake media relation is created |
+| Ordering | Shared `LatestFirstOrder`: pinned → published DESC → created DESC → stable tie-breaker DESC; updated mode is explicit; hierarchy/A–Z/history/sequence are exceptions |
+| Readiness | Semantic ACTIVE is independent from presentation readiness; incomplete groups stay out of homepage preview without deleting the Entity |
+| Implemented read paths | Entity collection, related content, generic dossier relation sections, Home, Media, Video, Knowledge and semantic Search |
+| Page migration status | Clock Group naming/home/hub seam and generic dossier foundation are implemented; Brand/Model/Variant/Movement/Melody/Parts/Specimen/Article visual migration remains partial/pending evidence |
+| Data/relation mutations | None in this checkpoint; Public Clock/Turret/Post and prepared assets were not written or backfilled |
+| Deployment/live acceptance | Not complete: current worktree is dirty and local WordPress DB bootstrap is unavailable; canonical deployment wrapper was not bypassed |
+
+This section records implementation status only. It does not authorize a
+semantic acceptance mutation, Public Identity allocation/reprojection, media
+upload, article write, or production cutover.
+
 ## Canonical token migration boundary — 2026-09-03
 
 The canonical token is `odo`; `o-do` is a legacy transliteration of the

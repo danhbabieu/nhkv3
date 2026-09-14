@@ -31,17 +31,17 @@ final class EntityProfileRegistry
             ),
             'clock_type' => new EntityProfileDefinition(
                 'clock_type',
-                'Loại đồng hồ',
+                'Nhóm đồng hồ',
                 'Clock Type',
                 ['entity_type' => 'classification', 'family' => 'clock_type'],
                 ['identity', 'public_identity', 'knowledge', 'media', 'video', 'article_relations', 'related_entities', 'representative_media', 'specimen_context', 'product_context', 'brand_context', 'subtype_context', 'seo'],
                 'clock-type-entity-hub-v1',
                 ['knowledge', 'media', 'video', 'models', 'variants', 'specimens', 'products', 'brands', 'classifications'],
                 ['clock-type'],
-                ['archive_path' => '/loai-dong-ho/', 'navigation_label' => 'Loại đồng hồ'],
+                ['archive_path' => '/loai-dong-ho/', 'navigation_label' => 'Nhóm đồng hồ'],
                 ['kind' => 'root_public_identity', 'enabled' => false, 'route_owner' => 'public_identity', 'resolution' => 'read_foundation', 'allocation' => 'governed_only', 'route_prefix' => 'dong-ho-', 'strip_lexical_prefix' => 'Đồng hồ '],
                 ['dossier_read', 'related_read', 'knowledge_read', 'media_read', 'video_read', 'specimen_read', 'product_read', 'brand_derived_read', 'subtype_read', 'seo_read'],
-                ['section_order' => ['identity', 'knowledge', 'classifications', 'brands', 'models', 'variants', 'specimens', 'products', 'media', 'video', 'articles'], 'section_labels' => ['knowledge' => 'Tri thức', 'brands' => 'Thương hiệu liên quan'], 'empty_state' => 'Chưa có nội dung công khai cho loại đồng hồ này.'],
+                ['section_order' => ['identity', 'knowledge', 'classifications', 'brands', 'models', 'variants', 'specimens', 'products', 'media', 'video', 'articles'], 'section_labels' => ['knowledge' => 'Tri thức', 'brands' => 'Thương hiệu liên quan'], 'empty_state' => 'Chưa có nội dung công khai cho nhóm đồng hồ này.'],
             ),
         ];
     }

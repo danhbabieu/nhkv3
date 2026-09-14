@@ -5,6 +5,7 @@ namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 /**
  * Read-only visitor projection for real public image assets.
@@ -28,7 +29,8 @@ final class PublicMediaGalleryQuery
         $page = max(1, $page);
         $perPage = min(100, max(1, $perPage));
         $items = [];
-        foreach ($this->media->list() as $media) {
+        $mediaItems = LatestFirstOrder::sort($this->media->list(), static fn (Media $item): ?string => null, static fn (Media $item): ?string => $item->createdAt, static fn (Media $item): string => $item->canonicalId);
+        foreach ($mediaItems as $media) {
             $item = $this->card($media);
             if ($item !== null) $items[] = $item;
         }

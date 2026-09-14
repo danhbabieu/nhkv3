@@ -25,6 +25,6 @@ final class NHK_V3_Home_Page_Query
     /** @return list<WP_Post> */
     private function posts(array $args): array
     {
-        return (new WP_Query(array_merge(['post_type' => 'post', 'post_status' => 'publish'], $args))->posts ?: []);
+        return (new WP_Query(array_merge(['post_type' => 'post', 'post_status' => 'publish', 'orderby' => ['date' => 'DESC', 'ID' => 'DESC']], $args))->posts ?: []);
     }
 }

@@ -7,7 +7,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 
 final readonly class KnowledgeClaim
 {
-    public function __construct(public string $canonicalId, public string $stableKey, public string $claimText, public string $claimType = 'fact', public array $provenance = [], public bool $active = true, public int $revision = 1)
+    public function __construct(public string $canonicalId, public string $stableKey, public string $claimText, public string $claimType = 'fact', public array $provenance = [], public bool $active = true, public int $revision = 1, public ?string $createdAt = null, public ?string $updatedAt = null)
     {
         if (!UuidCodec::isValid($canonicalId) || !preg_match('/^[a-z0-9][a-z0-9._:-]{0,190}$/', $stableKey) || trim($claimText) === '') throw new KnowledgeException('Knowledge claim identity or text is invalid.');
         if (!in_array($claimType, ['fact', 'specification', 'history', 'technical', 'provenance', 'other'], true) || $revision < 1) throw new KnowledgeException('Knowledge claim type or revision is invalid.');

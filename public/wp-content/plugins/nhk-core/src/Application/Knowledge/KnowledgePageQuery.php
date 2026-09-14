@@ -8,6 +8,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Entity\PublicRouteResolver;
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class KnowledgePageQuery
 {
@@ -31,7 +32,8 @@ final class KnowledgePageQuery
     public function archive(int $page = 1, int $perPage = 24): array
     {
         if (!$this->available()) return ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'items' => []];
-        $items = array_map(fn (KnowledgeClaim $claim): array => ['text' => $claim->claimText, 'type' => $claim->claimType], array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic())));
+        $claims = LatestFirstOrder::sort(array_values(array_filter($this->claims->list(), static fn (KnowledgeClaim $claim): bool => $claim->active && $claim->isPublic())), static fn (KnowledgeClaim $claim): ?string => null, static fn (KnowledgeClaim $claim): ?string => $claim->createdAt, static fn (KnowledgeClaim $claim): string => $claim->canonicalId);
+        $items = array_map(fn (KnowledgeClaim $claim): array => ['text' => $claim->claimText, 'type' => $claim->claimType], $claims);
         $page = max(1, $page); $perPage = min(100, max(1, $perPage));
         return ['page' => $page, 'per_page' => $perPage, 'total' => count($items), 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }

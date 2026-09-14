@@ -14,6 +14,7 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class HomeSemanticQuery
 {
@@ -31,9 +32,24 @@ final class HomeSemanticQuery
 
     public function extend(array $modules): array
     {
-        foreach (['entities','media','videos','knowledge','hubs','explore_next'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
+        foreach (['entities','media','videos','knowledge','hubs','clock_groups','explore_next'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
 
         if ($this->ready('authority')) {
+            $clockGroups = $this->collection()->archiveProfile('clock_type', 1, 6);
+            if ((int) ($clockGroups['total'] ?? 0) > 0) {
+                $modules['hubs'][] = ['type' => 'clock_type', 'label' => 'Nhóm đồng hồ', 'total' => (int) $clockGroups['total'], 'url' => $this->routes()->archivePathForProfile('clock_type')];
+                foreach ((array) ($clockGroups['items'] ?? []) as $item) {
+                    if (!is_array($item) || ($item['presentation_readiness']['status'] ?? '') !== 'READY') continue;
+                    $modules['clock_groups'][] = [
+                        'type' => 'clock_type',
+                        'title' => (string) ($item['name'] ?? ''),
+                        'description' => (string) ($item['description'] ?? ''),
+                        'url' => (string) ($item['url'] ?? ''),
+                        'image_url' => $item['media']['representative']['url'] ?? null,
+                        'image_alt' => $item['media']['representative']['alt'] ?? ($item['name'] ?? ''),
+                    ];
+                }
+            }
             foreach ($this->types->all() as $definition) {
                 $archive = $this->collection()->archive($definition->type, 1, 6);
                 $archivePath = $this->routes()->archivePath($definition->type);
@@ -53,7 +69,8 @@ final class HomeSemanticQuery
 
         if ($this->ready('media') && $this->gallery !== null) {
             $modules['media'] = [];
-            foreach ($this->media->list() as $item) {
+            $mediaItems = LatestFirstOrder::sort($this->media->list(), static fn (\NHK\Core\Domain\Media\Media $item): ?string => null, static fn (\NHK\Core\Domain\Media\Media $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Media\Media $item): string => $item->canonicalId);
+            foreach ($mediaItems as $item) {
                 if (!$item->active || $item->readiness !== 'ready' || $item->isSystemPlaceholder()) continue;
                 $visual = $this->gallery->forMedia($item->canonicalId);
                 if (!is_array($visual)) continue;
@@ -63,7 +80,8 @@ final class HomeSemanticQuery
         }
 
         if ($this->ready('video')) {
-            foreach ($this->videos->list() as $item) {
+            $videoItems = LatestFirstOrder::sort($this->videos->list(), fn (\NHK\Core\Domain\Video\Video $item): ?string => $this->videoPublishedAt($item), fn (\NHK\Core\Domain\Video\Video $item): ?string => $item->createdAt, fn (\NHK\Core\Domain\Video\Video $item): string => $item->canonicalId);
+            foreach ($videoItems as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
                 $metadata = is_array($item->metadata) ? $item->metadata : [];
                 $source = is_array($metadata['source_snapshot'] ?? null)
@@ -109,5 +127,12 @@ final class HomeSemanticQuery
     private function collection(): PublicEntityCollectionQuery
     {
         return $this->collection ??= new PublicEntityCollectionQuery($this->authority, $this->types, new PublicIdentityContract($this->types), new PublicEntityEligibilityPolicy($this->authority, $this->types, $this->routes()), $this->routes());
+    }
+
+    private function videoPublishedAt(\NHK\Core\Domain\Video\Video $video): ?string
+    {
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
+        return isset($source['published_at']) && is_string($source['published_at']) ? $source['published_at'] : null;
     }
 }

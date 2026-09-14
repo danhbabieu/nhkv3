@@ -12,6 +12,8 @@ use NHK\Core\Application\Entity\{EntityProfileRegistry, PublicEntityCollectionQu
 use NHK\Core\Application\Video\VideoSearchDocument;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Application\Presentation\LatestFirstOrder;
+use NHK\Core\Domain\Video\Video;
 
 final class SearchSemanticQuery
 {
@@ -26,8 +28,8 @@ final class SearchSemanticQuery
             return $groups;
         }
         if ($this->ready('authority')) foreach ($this->entityItemsForSearch($term) as $item) $groups['entities'][] = $item;
-        if ($this->ready('media')) foreach ($this->media->list() as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'canonical_url' => $path, 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'ImageObject'])['search']];
-        if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority); foreach ($this->videos->list() as $item) {
+        if ($this->ready('media')) foreach (LatestFirstOrder::sort($this->media->list(), static fn (\NHK\Core\Domain\Media\Media $item): ?string => null, static fn (\NHK\Core\Domain\Media\Media $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Media\Media $item): string => $item->canonicalId) as $item) if ($item->active && $item->readiness === 'ready' && ($path = PublicRouteResolver::existingSemanticPath('media', $item->canonicalId)) !== null && $this->matches($term, $item->canonicalName, $item->stableKey)) $groups['media'][] = ['type' => 'media', 'title' => $item->canonicalName, 'url' => (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true, 'canonical_url' => $path, 'readiness' => 'READY', 'public_eligible' => true], ['type' => 'ImageObject'])['search']];
+        if ($this->ready('video')) { $videoSearch = new VideoSearchDocument($this->authority); foreach (LatestFirstOrder::sort($this->videos->list(), fn (Video $item): ?string => $this->videoPublishedAt($item), fn (Video $item): ?string => $item->createdAt, fn (Video $item): string => $item->canonicalId) as $item) {
             if (!$item->active || !$item->hasValidPublicReference() || !$videoSearch->isDiscoverable($item)) continue;
             $title = $videoSearch->title($item); $path = $videoSearch->publicUrl($item); $url = $path === null ? null : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'VideoObject'])['search'];
             if ($url !== null && $this->matches($term, ...$videoSearch->values($item))) $groups['videos'][] = ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url];
@@ -35,7 +37,7 @@ final class SearchSemanticQuery
         }
         if ($this->ready('knowledge')) {
             $owners = [];
-            foreach ($this->claims->list() as $item) {
+            foreach (LatestFirstOrder::sort($this->claims->list(), static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $item): ?string => null, static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Knowledge\KnowledgeClaim $item): string => $item->canonicalId) as $item) {
                 if (!$item->active || !$item->isPublic() || !$this->matches($term, $item->claimText, $item->stableKey)) continue;
                 $path = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;
                 if (!is_string($path) || trim($path) === '' || isset($owners[$path])) continue;
@@ -66,6 +68,13 @@ final class SearchSemanticQuery
 
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
     private function json(array $value): string { return function_exists('wp_json_encode') ? (string) wp_json_encode($value) : (string) json_encode($value); }
+
+    private function videoPublishedAt(Video $video): ?string
+    {
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
+        return isset($source['published_at']) && is_string($source['published_at']) ? $source['published_at'] : null;
+    }
 
     private function collection(): PublicEntityCollectionQuery
     {

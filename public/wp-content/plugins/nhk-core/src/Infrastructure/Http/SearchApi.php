@@ -14,6 +14,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Application\Entity\{EntityProfileRegistry, PublicEntityCollectionQuery, PublicRouteResolver};
 use NHK\Core\Application\Video\VideoSearchDocument;
 use NHK\Core\Application\Seo\PublicSeoProjection;
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 use NHK\Core\Shared\Migration\MigrationStatus;
 
 final class SearchApi
@@ -31,17 +32,18 @@ final class SearchApi
         $length = function_exists('mb_strlen') ? mb_strlen($term) : strlen($term);
         if ($length < 2 || $length > 120) return new \WP_Error('nhk_search_term_invalid', 'Search term must contain 2–120 characters.', ['status' => 400]);
         $page = max(1, (int) $request['page']); $perPage = min(50, max(1, (int) $request['per_page']));
-        $posts = new \WP_Query(['post_type' => 'post', 'post_status' => 'publish', 's' => $term, 'posts_per_page' => $perPage, 'paged' => $page, 'ignore_sticky_posts' => true]);
+        $posts = new \WP_Query(['post_type' => 'post', 'post_status' => 'publish', 's' => $term, 'posts_per_page' => $perPage, 'paged' => $page, 'ignore_sticky_posts' => true, 'orderby' => ['date' => 'DESC', 'ID' => 'DESC']]);
         $groups = ['posts' => array_map(static fn (\WP_Post $post): array => ['type' => 'post', 'id' => (string) $post->ID, 'title' => get_the_title($post), 'url' => get_permalink($post), 'excerpt' => wp_trim_words(wp_strip_all_tags(get_the_excerpt($post)), 28), 'date' => get_the_date('c', $post)], $posts->posts)];
         $groups['entities'] = [];
         if (!$this->status || $this->status->authorityStorageReady()) foreach ($this->entityItemsForSearch($term) as $item) $groups['entities'][] = $item;
-        $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter($this->media->list(), fn (Media $item): bool => $item->active && $item->readiness === 'ready' && $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
+        $groups['media'] = !$this->status || $this->status->mediaStorageReady() ? array_map($this->media(...), array_values(array_filter(LatestFirstOrder::sort($this->media->list(), static fn (Media $item): ?string => null, static fn (Media $item): ?string => $item->createdAt, static fn (Media $item): string => $item->canonicalId), fn (Media $item): bool => $item->active && $item->readiness === 'ready' && $this->matches($term, $item->canonicalName, $item->stableKey)))) : [];
         $videoSearch = new VideoSearchDocument($this->authority);
-        $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($this->videos->list(), fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $videoSearch->isDiscoverable($item) && $this->matches($term, ...$videoSearch->values($item))))) : [];
+        $videos = LatestFirstOrder::sort($this->videos->list(), fn (Video $item): ?string => $this->videoPublishedAt($item), fn (Video $item): ?string => $item->createdAt, fn (Video $item): string => $item->canonicalId);
+        $groups['videos'] = !$this->status || $this->status->videoStorageReady() ? array_map($this->video(...), array_values(array_filter($videos, fn (Video $item): bool => $item->active && $item->hasValidPublicReference() && $videoSearch->isDiscoverable($item) && $this->matches($term, ...$videoSearch->values($item))))) : [];
         $groups['knowledge'] = [];
         if (!$this->status || $this->status->knowledgeStorageReady()) {
             $owners = [];
-            foreach ($this->claims->list() as $item) {
+            foreach (LatestFirstOrder::sort($this->claims->list(), static fn (KnowledgeClaim $item): ?string => null, static fn (KnowledgeClaim $item): ?string => $item->createdAt, static fn (KnowledgeClaim $item): string => $item->canonicalId) as $item) {
                 if (!$item->active || !$item->isPublic() || !$this->matches($term, $item->claimText, $item->stableKey)) continue;
                 $claim = $this->claim($item);
                 if ($claim === null || isset($owners[$claim['url']])) continue;
@@ -61,6 +63,7 @@ final class SearchApi
     private function matches(string $term, string ...$values): bool { foreach ($values as $value) if ((function_exists('mb_stripos') ? mb_stripos($value, $term) : stripos($value, $term)) !== false) return true; return false; }
     private function media(Media $item): array { return ['type' => 'media', 'title' => $item->canonicalName]; }
     private function video(Video $item): array { $search = new VideoSearchDocument($this->authority); $title = $search->title($item); $path = $search->publicUrl($item); $url = $path === null ? null : (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'VideoObject'])['search']; return ['type' => 'video', 'title' => $title, 'platform' => $item->platform, 'url' => $url === null ? '' : (function_exists('home_url') ? home_url($url) : $url)]; }
+    private function videoPublishedAt(Video $video): ?string { $metadata = is_array($video->metadata) ? $video->metadata : []; $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []); return isset($source['published_at']) && is_string($source['published_at']) ? $source['published_at'] : null; }
     private function claim(KnowledgeClaim $item): ?array
     {
         $url = is_callable($this->claimOwnerUrl) ? ($this->claimOwnerUrl)($item) : null;

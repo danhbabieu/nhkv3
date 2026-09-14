@@ -15,15 +15,16 @@ get_header();
     </div>
     <aside class="hero-index" aria-label="Lối vào nhanh">
       <a href="<?php echo esc_url(home_url('/thuong-hieu/')); ?>"><span>01</span><strong>Thương hiệu</strong></a>
-      <a href="<?php echo esc_url(home_url('/mau/')); ?>"><span>02</span><strong>Mẫu & biến thể</strong></a>
-      <a href="<?php echo esc_url(home_url('/bo-may/')); ?>"><span>03</span><strong>Bộ máy</strong></a>
-      <a href="<?php echo esc_url(home_url('/ban-nhac/')); ?>"><span>04</span><strong>Bản nhạc</strong></a>
-      <a href="<?php echo esc_url(home_url('/linh-kien/')); ?>"><span>05</span><strong>Linh kiện</strong></a>
-      <a href="<?php echo esc_url(home_url('/hien-vat/')); ?>"><span>06</span><strong>Hiện vật</strong></a>
-      <a href="<?php echo esc_url(home_url('/so-sanh/')); ?>"><span>07</span><strong>So sánh</strong></a>
-      <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>"><span>08</span><strong>Hình ảnh</strong></a>
-      <a href="<?php echo esc_url(home_url('/video/')); ?>"><span>09</span><strong>Video</strong></a>
-      <a href="<?php echo esc_url(home_url('/tu-dien/')); ?>"><span>10</span><strong>Từ điển</strong></a>
+      <a href="<?php echo esc_url(home_url('/loai-dong-ho/')); ?>"><span>02</span><strong>Nhóm đồng hồ</strong></a>
+      <a href="<?php echo esc_url(home_url('/mau/')); ?>"><span>03</span><strong>Mẫu & biến thể</strong></a>
+      <a href="<?php echo esc_url(home_url('/bo-may/')); ?>"><span>04</span><strong>Bộ máy</strong></a>
+      <a href="<?php echo esc_url(home_url('/ban-nhac/')); ?>"><span>05</span><strong>Bản nhạc</strong></a>
+      <a href="<?php echo esc_url(home_url('/linh-kien/')); ?>"><span>06</span><strong>Linh kiện</strong></a>
+      <a href="<?php echo esc_url(home_url('/hien-vat/')); ?>"><span>07</span><strong>Hiện vật</strong></a>
+      <a href="<?php echo esc_url(home_url('/so-sanh/')); ?>"><span>08</span><strong>So sánh</strong></a>
+      <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>"><span>09</span><strong>Hình ảnh</strong></a>
+      <a href="<?php echo esc_url(home_url('/video/')); ?>"><span>10</span><strong>Video</strong></a>
+      <a href="<?php echo esc_url(home_url('/tu-dien/')); ?>"><span>11</span><strong>Từ điển</strong></a>
     </aside>
   </section>
 
@@ -31,11 +32,22 @@ get_header();
   <section class="home-semantic-section home-hubs">
     <div class="section-head"><div><p class="eyebrow">Duyệt theo cấu trúc</p><h2>Đi sâu vào kho dữ liệu</h2></div></div>
     <div class="home-hub-grid">
-      <?php foreach ($hubs as $hub): $url = nhk_v3_public_url($hub['url'] ?? null); if ($url === '') continue; ?>
+      <?php foreach ($hubs as $hub): $url = nhk_v3_public_url($hub['url'] ?? null); if ($url === '') continue; $hubLabel = trim((string) ($hub['label'] ?? '')) ?: nhk_v3_public_type((string) ($hub['type'] ?? '')); ?>
       <a class="hub-card" href="<?php echo esc_url($url); ?>">
-        <span><?php echo esc_html(nhk_v3_public_type((string) ($hub['type'] ?? ''))); ?></span>
+        <span><?php echo esc_html($hubLabel); ?></span>
         <strong><?php echo esc_html((string) ($hub['total'] ?? 0)); ?> hồ sơ</strong>
       </a>
+      <?php endforeach; ?>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <?php $clockGroups = is_array($semantic['clock_groups'] ?? null) ? $semantic['clock_groups'] : []; if ($clockGroups !== []): ?>
+  <section class="home-semantic-section clock-groups-home">
+    <div class="section-head"><div><p class="eyebrow">Nhóm đồng hồ</p><h2>Khám phá theo nhóm đồng hồ</h2></div><a class="text-link" href="<?php echo esc_url(home_url('/loai-dong-ho/')); ?>">Khám phá tất cả nhóm đồng hồ →</a></div>
+    <div class="visual-card-grid clock-group-grid">
+      <?php foreach ($clockGroups as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $image = trim((string) ($item['image_url'] ?? '')) ?: $fallback; ?>
+      <a class="visual-card" href="<?php echo esc_url($url); ?>"><span class="visual-frame"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['image_alt'] ?? $item['title'] ?? '')); ?>" loading="lazy"></span><span class="visual-card-body"><small>Nhóm đồng hồ</small><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong><?php if (trim((string) ($item['description'] ?? '')) !== ''): ?><span><?php echo esc_html(wp_trim_words((string) $item['description'], 18)); ?></span><?php endif; ?></span></a>
       <?php endforeach; ?>
     </div>
   </section>

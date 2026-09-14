@@ -4,10 +4,11 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Home\HomeSemanticQuery;
+use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
-use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Domain\Authority\{AuthorityEntity, AuthorityState, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -21,7 +22,7 @@ final class HomeSemanticQueryTest extends TestCase
         $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $this->media([]), $this->videos([]), new EntityTypeRegistry()))
             ->extend([]);
 
-        self::assertSame(['entities', 'media', 'videos', 'knowledge', 'hubs', 'explore_next'], array_keys($modules));
+        self::assertSame(['entities', 'media', 'videos', 'knowledge', 'hubs', 'clock_groups', 'explore_next'], array_keys($modules));
         self::assertSame([], $modules['entities']);
         self::assertSame([], $modules['explore_next']);
         self::assertArrayNotHasKey('odo', json_decode(json_encode($modules), true));
@@ -50,6 +51,31 @@ final class HomeSemanticQueryTest extends TestCase
         self::assertStringContainsString('/anh/front.webp', (string) ($modules['media'][0]['image_url'] ?? ''));
         self::assertArrayNotHasKey('url', $modules['media'][0]);
         self::assertSame('https://img.example.test/video.jpg', $modules['videos'][0]['thumbnail_url'] ?? null);
+    }
+
+    public function test_home_clock_groups_are_profile_driven_and_skip_incomplete_presentation_records(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $authority = new InMemoryAuthorityRepository();
+        $clockType = new AuthorityEntity(UuidCodec::newV7(), 'classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', 1, ['family' => 'clock_type', 'description' => 'Nhóm các đồng hồ phục vụ không gian công cộng.'], AuthorityState::ACTIVE, 1, '2026-01-01 00:00:00');
+        $incomplete = new AuthorityEntity(UuidCodec::newV7(), 'classification', 'nhk:classification:clock-type.empty', 'Đồng hồ chưa đủ nội dung', 1, ['family' => 'clock_type'], AuthorityState::ACTIVE, 1, '2026-02-01 00:00:00');
+        $authority->create($clockType);
+        $authority->create($incomplete);
+        $routes = new PublicRouteResolver($authority, $types);
+        $identity = new class implements \NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository {
+            public function allocate(array $record, string $idempotencyKey): array { return []; }
+            public function change(array $record, string $oldPath, int $expectedRevision, string $idempotencyKey): array { return []; }
+            public function findCurrentById(string $identityId): ?array { return null; }
+            public function findCurrentByOwner(string $ownerKind, string $ownerId, string $routeType): ?array { return ['current_slug' => 'dong-ho-cong-cong']; }
+            public function slugExists(string $routeType, string $scope, string $slug, ?string $excludeIdentityId = null): bool { return false; }
+            public function resolveHistoric(string $path): array { return []; }
+        };
+        $collection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types, $identity), new PublicEntityEligibilityPolicy($authority, $types, $routes), $routes);
+        $modules = (new HomeSemanticQuery($authority, $this->media([]), $this->videos([]), $types, null, $routes, $collection))->extend([]);
+
+        self::assertSame(['Đồng hồ công cộng'], array_column($modules['clock_groups'], 'title'));
+        self::assertSame('Nhóm đồng hồ', $modules['hubs'][0]['label']);
     }
 
     private function media(array $items): MediaRepository

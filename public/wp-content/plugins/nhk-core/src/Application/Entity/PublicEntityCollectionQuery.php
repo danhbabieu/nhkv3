@@ -8,6 +8,8 @@ use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Application\Presentation\LatestFirstOrder;
+use NHK\Core\Application\Presentation\PresentationReadiness;
 
 final class PublicEntityCollectionQuery
 {
@@ -42,6 +44,8 @@ final class PublicEntityCollectionQuery
             $item = $this->item($entity, $query, false, true, $resolution);
             if ($item !== null) $items[] = $item;
         }
+        $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => null, static fn (array $item): ?string => $item['_created_at'] ?? null, static fn (array $item): string => (string) ($item['canonical_id'] ?? $item['url'] ?? $item['name'] ?? ''));
+        $items = array_map(static function (array $item): array { unset($item['_created_at']); return $item; }, $items);
         $empty['available'] = true;
         $empty['total'] = count($items);
         $empty['items'] = array_slice($items, ($page - 1) * $perPage, $perPage);
@@ -57,6 +61,8 @@ final class PublicEntityCollectionQuery
             $item = $this->item($entity, $query, false);
             if ($item !== null) $items[] = $item;
         }
+        $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => null, static fn (array $item): ?string => $item['_created_at'] ?? null, static fn (array $item): string => (string) ($item['canonical_id'] ?? $item['url'] ?? $item['name'] ?? ''));
+        $items = array_map(static function (array $item): array { unset($item['_created_at']); return $item; }, $items);
         return ['available' => true, 'type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => count($items), 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
 
@@ -65,7 +71,8 @@ final class PublicEntityCollectionQuery
     {
         if (!$this->isAvailable() || !$this->types->has($type)) return null;
         $entity = $this->resolvePublicSlug($type, $key);
-        return $entity === null ? null : $this->item($entity, '', true);
+        $item = $entity === null ? null : $this->item($entity, '', true);
+        return $item === null ? null : $this->withoutOrderingMetadata($item);
     }
 
     public function publicPath(AuthorityEntity $entity): ?string { return $this->routes->path($entity); }
@@ -91,7 +98,8 @@ final class PublicEntityCollectionQuery
     public function detailForEntity(AuthorityEntity $entity): ?array
     {
         if (!$this->isAvailable() || !$this->types->has($entity->entityType)) return null;
-        return $this->item($entity, '', true);
+        $item = $this->item($entity, '', true);
+        return $item === null ? null : $this->withoutOrderingMetadata($item);
     }
 
     /** @param list<string> $segments */
@@ -116,7 +124,7 @@ final class PublicEntityCollectionQuery
         $payload = $this->identity->payload($entity);
         if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($payload))) return null;
         $url = (new PublicSeoProjection())->project(['path' => $path, 'eligible' => true], ['type' => 'Entity'])['card'];
-        $item = [...$identity, 'payload' => $payload, 'url' => $url];
+        $item = [...$identity, 'payload' => $payload, 'url' => $url, '_created_at' => $entity->createdAt];
         $profile = $profileResolution ?? (new EntityProfileResolver())->resolveProfile($entity);
         if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
             $definition = (new EntityProfileRegistry())->get((string) $profile->profileKey);
@@ -129,6 +137,16 @@ final class PublicEntityCollectionQuery
                 'evidence' => array_values(array_filter(array_map(fn(array $entry): ?array => $this->publicMediaItem($entry), $media['evidence'] ?? []))),
                 'gallery' => array_values(array_filter(array_map(fn(array $entry): ?array => $this->publicMediaItem($entry), $media['gallery'] ?? []))),
             ];
+        }
+        $description = trim((string) ($payload['description'] ?? $payload['summary'] ?? ''));
+        $item['description'] = $description;
+        if ($profile->profileKey === 'clock_type') {
+            $hasRepresentative = is_array($item['media']['representative'] ?? null) && trim((string) ($item['media']['representative']['url'] ?? '')) !== '';
+            $readiness = PresentationReadiness::evaluate(
+                ['active' => $entity->active()],
+                ['route' => $path, 'content' => ['description' => $description, 'representative_media' => $hasRepresentative], 'public_eligible' => $decision->eligible],
+            );
+            $item['presentation_readiness'] = ['status' => $readiness->presentationStatus(), 'reasons' => $readiness->reasons()];
         }
         if ($detail && $this->entityKnowledge !== null) $item['knowledge'] = $this->entityKnowledge->forSubject($entity->canonicalId);
         if ($detail && $this->aggregation !== null && $entity->entityType === 'brand') $item['aggregation'] = $this->aggregation->forBrand($entity->canonicalId);
@@ -143,6 +161,13 @@ final class PublicEntityCollectionQuery
             'alt' => (string) ($item['alt'] ?? ''),
             'role' => (string) ($item['role'] ?? ''),
         ];
+    }
+
+    /** @param array<string,mixed> $item @return array<string,mixed> */
+    private function withoutOrderingMetadata(array $item): array
+    {
+        unset($item['_created_at']);
+        return $item;
     }
 
     private function isAvailable(): bool { return $this->availability === null || (bool) ($this->availability)(); }

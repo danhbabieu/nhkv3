@@ -12,6 +12,7 @@ use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Migration\MigrationStatus;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoSeoProjection, VideoUrlPolicy};
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class MediaVideoPageQuery
 {
@@ -76,8 +77,9 @@ final class MediaVideoPageQuery
 
     public function videoArchive(int $page = 1, int $perPage = 12): array
     {
+        $videos = LatestFirstOrder::sort($this->available('video') ? $this->videos->list() : [], fn (Video $item): mixed => $this->publishedAt($item), fn (Video $item): mixed => $item->createdAt, fn (Video $item): string => $item->canonicalId);
         return $this->archive(
-            $this->available('video') ? $this->videos->list() : [],
+            $videos,
             $page,
             $perPage,
             fn (Video $item): array => $this->video($item),
@@ -92,6 +94,13 @@ final class MediaVideoPageQuery
     {
         $result = (new VideoUrlPolicy())->project($video, new VideoPublicContextSelector());
         return $result['eligible'] && is_string($result['path']) && $result['path'] !== '';
+    }
+
+    private function publishedAt(Video $video): ?string
+    {
+        $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $source = is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
+        return isset($source['published_at']) && is_string($source['published_at']) ? $source['published_at'] : null;
     }
 
     private function asset(MediaAsset $asset): array

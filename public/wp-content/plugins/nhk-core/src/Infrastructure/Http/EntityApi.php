@@ -8,6 +8,7 @@ use NHK\Core\Application\Entity\PublicEntityCollectionQuery;
 use NHK\Core\Application\Entity\PublicIdentityContract;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class EntityApi
 {
@@ -36,7 +37,7 @@ final class EntityApi
         if (!$this->types->has($type)) return new \WP_Error('nhk_entity_type_unknown', 'Entity type was not found.', ['status' => 404]);
         $page = max(1, (int) $request['page']); $perPage = min(100, max(1, (int) $request['per_page']));
         if ($this->collection !== null) return $this->collection->archive($type, $page, $perPage);
-        $all = array_values(array_filter($this->authority->listByType($type), static fn (AuthorityEntity $entity): bool => $entity->active()));
+        $all = LatestFirstOrder::sort(array_values(array_filter($this->authority->listByType($type), static fn (AuthorityEntity $entity): bool => $entity->active())), static fn (AuthorityEntity $entity): ?string => null, static fn (AuthorityEntity $entity): ?string => $entity->createdAt, static fn (AuthorityEntity $entity): string => $entity->canonicalId);
         $items = array_slice($all, ($page - 1) * $perPage, $perPage);
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => count($all), 'items' => array_map($this->serialize(...), $items)];
     }

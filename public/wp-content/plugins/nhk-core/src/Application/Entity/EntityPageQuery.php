@@ -8,6 +8,7 @@ use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
+use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 final class EntityPageQuery
 {
@@ -74,6 +75,8 @@ final class EntityPageQuery
             if ($query !== '' && !$this->matches($query, $entity->canonicalName, $entity->stableKey, $this->json($publicPayload))) continue;
             $items[] = $this->serialize($entity);
         }
+        $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => null, static fn (array $item): ?string => $item['_created_at'] ?? null, static fn (array $item): string => (string) ($item['canonical_id'] ?? $item['url'] ?? $item['name'] ?? ''));
+        $items = array_map(static function (array $item): array { unset($item['_created_at']); return $item; }, $items);
         $page = max(1, $page); $perPage = min(100, max(1, $perPage)); $total = count($items);
         return ['type' => $type, 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'query' => $query, 'items' => array_slice($items, ($page - 1) * $perPage, $perPage)];
     }
@@ -86,13 +89,14 @@ final class EntityPageQuery
             $enriched = apply_filters('nhk_v3_entity_detail_projection', $item, $entity);
             if (is_array($enriched)) $item = $enriched;
         }
+        unset($item['_created_at'], $item['_updated_at']);
         return $item;
     }
 
     private function serialize(AuthorityEntity $entity): array
     {
         $payload = (new PublicIdentityContract($this->types))->payload($entity);
-        $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload];
+        $item = ['type' => $entity->entityType, 'name' => $entity->canonicalName, 'payload' => $payload, '_created_at' => $entity->createdAt];
         $path = $this->publicPath($entity);
         if ($path !== null) {
             $item['url'] = (new PublicSeoProjection())->project([

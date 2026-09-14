@@ -99,7 +99,7 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertSame(1, $archive['total']);
         self::assertSame($clockType->canonicalName, $archive['items'][0]['name']);
         self::assertSame('clock_type', $archive['items'][0]['profile_key']);
-        self::assertSame('Loại đồng hồ', $archive['items'][0]['profile_label']);
+        self::assertSame('Nhóm đồng hồ', $archive['items'][0]['profile_label']);
         self::assertSame('[LOẠI ĐỒNG HỒ]', $archive['items'][0]['profile_badge']);
         self::assertArrayNotHasKey('canonical_id', $archive['items'][0]);
         self::assertArrayNotHasKey('stable_key', $archive['items'][0]);

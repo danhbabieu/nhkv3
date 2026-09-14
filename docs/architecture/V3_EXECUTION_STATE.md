@@ -1,5 +1,86 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — Pre-master readiness foundation
+
+SCOPE: No new site-wide frontend architecture, semantic data mutation, bulk
+ingest, V2/production write, or public URL reproject was performed.
+
+ERR-016: The MCP documentation registry now includes every Markdown reference
+from `docs/constitution/READ_FIRST.md`, including Public Entity, Public
+Identity, Public Route and SEO contracts. Historical MCP ability exposure is
+classified `HISTORICAL`; it is retrievable but is not promoted to active law.
+The immutable snapshot was regenerated with 50 files.
+
+ERR-005: The Article SEO gate now distinguishes optional missing visual support
+(`OPTIONAL_MEDIA_MISSING` warning), invalid media blueprints
+(`INVALID_MEDIA_BLUEPRINT` blocker), and media pipeline failures
+(`MEDIA_PIPELINE_FAILURE` blocker). Text Article research with no provided
+media remains draft-ready when the owning requirement is optional.
+
+ORDERING: The shared `LatestFirstOrder` service is applied before pagination to
+public Media, Video, Knowledge, Authority directory fallback, search,
+homepage semantic modules, related content and native Article search/feed
+queries. Default order is published, created, stable identity descending;
+updated mode is updated, created, stable identity descending. Structural and
+hierarchy traversal remains outside this feed contract.
+
+PRESENTATION READINESS: Added a read-only generic readiness concept that keeps
+`SEMANTIC_ACTIVE` independent from route/content `READY`, `INCOMPLETE`,
+`BLOCKED` and `UNAVAILABLE`; the Clock Type public collection consumes it.
+It never deactivates an entity because presentation data is absent.
+
+ACCEPTANCE: Live read-only admin evidence shows 52 NHK catalog tools, 30
+enabled, and active ChatGPT OAuth grants. Fresh ChatGPT tools/list was not
+independently proven for a connector named `v3-19`. The exact live
+`/dong-ho-cong-cong/` read-back returned 404, so the requested PC-ROOT route
+was not mutated. Media one-file and Video live acceptance were not run: the
+workspace has no approved exact media mutation scope, native file transport
+remains unavailable to the connector, and local WordPress/MySQL bootstrap is
+unavailable.
+
+VERIFICATION: Focused readiness/MCP/query tests pass (103 tests / 890
+assertions after the Article research regression was added), full PHP lint
+passes, docs generation passes, and `git diff --check` is clean. Full suite and
+integration acceptance remain blocked by the local WordPress/MySQL bootstrap
+plus pre-existing unrelated contract failures.
+
+# Checkpoint — 2026-09-14 — Site-wide relationship-driven presentation V1
+
+IMPLEMENTATION: Added the shared `LatestFirstOrder` presentation boundary to
+public entity collections, related content, dossier relation sections, Home,
+Media, Video, Knowledge and semantic search/archive read paths. Ordering is
+applied before pagination and preserves structural relation priority (direct
+then bounded derived hop) while sorting content within each bucket by
+`published_at DESC`, `created_at DESC` and a stable tie-breaker. Timestamp-less
+fixtures preserve their owner order rather than inferring chronology.
+
+PRESENTATION: The existing profile-driven `classification/family=clock_type`
+surface now presents as **Nhóm đồng hồ** while the internal vocabulary and
+`/loai-dong-ho/` route remain unchanged. The fallback global navigation and
+homepage are data-driven through the existing profile archive; homepage group
+cards require presentation readiness and use the existing media projection,
+with a neutral fallback only when no representative visual exists. Generic
+dossier hierarchy links preserve safe public routes and no canonical IDs are
+added to the public projection.
+
+SAFETY: No semantic record, relation, Public Identity, Article, Media, Video or
+Knowledge mutation was performed. No Proposal, public URL reproject, Media
+upload or deployment was performed in this checkpoint. Existing dirty changes
+outside this slice were preserved.
+
+VERIFICATION: Focused presentation/dossier/archive tests passed (21 tests /
+91 assertions); full NHK Unit passes (1,533 tests / 7,393 assertions), NHK
+Contract passes (6 tests / 48 assertions), PHP lint passes and `git diff
+--check` passes. Canonical MCP documentation generation is deterministic across
+two runs (50 files); the current manifest hash is reported by the generator at
+verification time and is intentionally not embedded here to avoid a
+self-referential documentation hash.
+The read-only preflight reports five WordPress-runtime failures because local
+database bootstrap is unavailable. Canonical staging deployment was not
+attempted beyond its fail-closed wrapper check: the wrapper stopped at
+`WORKTREE_NOT_CLEAN`, so no remote files or data were changed. Live frontend
+acceptance remains blocked by those environment gates.
+
 # Checkpoint — 2026-09-14 — Scoped single-owner Public URL reproject
 
 DECISION: Extend the existing canonical `nhk.public-url.audit` and

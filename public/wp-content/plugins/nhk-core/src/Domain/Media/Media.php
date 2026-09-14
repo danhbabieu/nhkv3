@@ -14,6 +14,8 @@ final readonly class Media
         public array $provenance = [],
         public bool $active = true,
         public int $revision = 1,
+        public ?string $createdAt = null,
+        public ?string $updatedAt = null,
     ) {
         if (!UuidCodec::isValid($canonicalId)) throw new InvalidMedia('Media canonical UUID is invalid.');
         if (!preg_match('/^[a-z0-9][a-z0-9._:-]{0,190}$/', $stableKey) || $canonicalName === '') throw new InvalidMedia('Media identity is invalid.');

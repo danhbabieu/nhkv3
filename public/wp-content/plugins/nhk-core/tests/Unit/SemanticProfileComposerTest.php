@@ -66,6 +66,23 @@ final class SemanticProfileComposerTest extends TestCase
         }
     }
 
+    public function test_clock_type_hierarchy_preserves_public_links_without_internal_identity(): void
+    {
+        $profile = (new SemanticProfileComposer())->compose('clock_type', [
+            'identity' => ['type' => 'classification', 'name' => 'Nhóm đồng hồ', 'url' => '/dong-ho-cong-cong/'],
+            'clock_type_hierarchy' => [
+                'status' => 'AVAILABLE',
+                'parent' => ['name' => 'Nhóm gốc', 'kind' => 'PARENT_TYPE', 'url' => '/nhom-goc/', 'canonical_id' => 'private'],
+                'children' => [['name' => 'Nhóm con', 'kind' => 'CHILD_TYPE', 'url' => '/nhom-con/', 'canonical_id' => 'private']],
+            ],
+            'relation_sections' => [],
+        ]);
+
+        self::assertSame('/nhom-goc/', $profile['hierarchy']['parent']['url']);
+        self::assertSame('/nhom-con/', $profile['hierarchy']['children'][0]['url']);
+        self::assertArrayNotHasKey('canonical_id', $profile['hierarchy']['children'][0]);
+    }
+
     public function test_keeps_unavailable_dependency_distinct_from_empty_available_profile(): void
     {
         $composer = new SemanticProfileComposer();

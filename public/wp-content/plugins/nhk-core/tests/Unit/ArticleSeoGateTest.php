@@ -24,4 +24,44 @@ final class ArticleSeoGateTest extends TestCase
         self::assertTrue($result['ready']);
         self::assertSame('/a/', $result['canonical_url']);
     }
+
+    public function test_text_article_without_optional_visual_support_is_not_system_blocked(): void
+    {
+        $result = (new ArticleSeoGate())->evaluate([
+            'intent' => 'history',
+            'subject' => ['id' => 'a'],
+            'canonical_url' => '/a/',
+            'indexable' => true,
+            'title' => 'A',
+            'h1' => 'A',
+            'media_complete' => false,
+            'media_requirement' => 'OPTIONAL_VISUAL_SUPPORT',
+            'media_status' => 'missing',
+            'media_blueprint_status' => 'valid',
+            'media_pipeline_status' => 'not_requested',
+            'compliance' => 'PASS',
+        ]);
+
+        self::assertTrue($result['ready']);
+        self::assertSame(['OPTIONAL_MEDIA_MISSING'], $result['warnings']);
+        self::assertNotContains('MEDIA_INCOMPLETE', $result['blockers']);
+        self::assertNotContains('SYSTEM_BLOCKED', $result['blockers']);
+    }
+
+    public function test_invalid_blueprint_and_pipeline_failure_are_distinct_blockers(): void
+    {
+        $base = [
+            'intent' => 'history', 'subject' => ['id' => 'a'], 'canonical_url' => '/a/',
+            'indexable' => true, 'title' => 'A', 'h1' => 'A', 'media_complete' => false,
+            'media_requirement' => 'OPTIONAL_VISUAL_SUPPORT', 'compliance' => 'PASS',
+        ];
+
+        $invalid = (new ArticleSeoGate())->evaluate($base + ['media_blueprint_status' => 'invalid', 'media_pipeline_status' => 'not_requested']);
+        self::assertContains('INVALID_MEDIA_BLUEPRINT', $invalid['blockers']);
+        self::assertNotContains('MEDIA_PIPELINE_FAILURE', $invalid['blockers']);
+
+        $failed = (new ArticleSeoGate())->evaluate($base + ['media_blueprint_status' => 'valid', 'media_pipeline_status' => 'failed']);
+        self::assertContains('MEDIA_PIPELINE_FAILURE', $failed['blockers']);
+        self::assertNotContains('INVALID_MEDIA_BLUEPRINT', $failed['blockers']);
+    }
 }
