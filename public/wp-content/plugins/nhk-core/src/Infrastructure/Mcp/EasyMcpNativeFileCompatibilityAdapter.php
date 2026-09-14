@@ -393,6 +393,13 @@ final class EasyMcpNativeFileCompatibilityAdapter
             if (($tool['name'] ?? null) !== 'nhk.media.upload-widget.open') continue;
             $uri = $tool['connectorMeta']['ui']['resourceUri'] ?? null;
             if (!is_string($uri) || $uri === '') return null;
+            // Easy MCP/ChatGPT validates the final JSON Schema, where an
+            // empty PHP array serializes as JSON [] rather than {} and an
+            // empty required list is rejected by stricter validators.
+            $tool['inputSchema'] = [
+                'type' => 'object',
+                'properties' => new \stdClass(),
+            ];
             $tool['connectorMeta']['openai/outputTemplate'] = $uri;
             return $tool;
         }

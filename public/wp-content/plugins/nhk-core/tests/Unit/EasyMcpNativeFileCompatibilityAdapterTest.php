@@ -174,6 +174,35 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame('ui://nhk/image-upload.html', $widget['_meta']['openai/outputTemplate']);
     }
 
+    public function test_final_serialized_open_widget_descriptor_uses_valid_minimal_no_argument_schema(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'result' => ['tools' => [[
+                'name' => 'wp_ability_nhk_v3_media_upload_widget_open',
+                'description' => 'Easy MCP serialized descriptor',
+                'inputSchema' => ['type' => 'object', 'properties' => new \stdClass()],
+                'annotations' => ['title' => 'NHK Image Upload Widget'],
+            ]]],
+        ];
+
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+        $encoded = json_encode($final['result']['tools'][0], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $descriptor = json_decode($encoded, false, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            '{"type":"object","properties":{}}',
+            json_encode($descriptor->inputSchema, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+        );
+        self::assertSame('ui://nhk/image-upload.html', $descriptor->_meta->ui->resourceUri);
+        self::assertSame('ui://nhk/image-upload.html', $descriptor->_meta->{'openai/outputTemplate'});
+    }
+
     public function test_easy_mcp_resources_list_projects_the_nhk_widget_resource(): void
     {
         $request = new class {

@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — Easy MCP open-widget no-argument schema repair
+
+ROOT_CAUSE: The final Easy MCP compatibility projection reused the catalog's
+PHP empty arrays for the no-argument `nhk.media.upload-widget.open` input
+schema. The serialized tools/list descriptor therefore emitted both
+`required: []` and `properties: []`; the latter is a JSON array rather than
+the required JSON object shape. The invalid boundary was descriptor
+serialization, before any widget upload, ImageIngestEntrypoint, Capture or
+Media behavior.
+
+BEFORE_INPUT_SCHEMA: `{"type":"object","properties":[],"required":[],"additionalProperties":false}`.
+INVALID_FIELD: `required: []` is rejected by the target strict validator; the
+empty PHP `properties` array also serialized to invalid `properties: []`.
+
+CHANGE: The existing Easy MCP final descriptor projection now emits only the
+minimal valid no-argument schema `{"type":"object","properties":{}}` for
+`wp_ability_nhk_v3_media_upload_widget_open`. The descriptor still carries
+`_meta.ui.resourceUri` and `openai/outputTemplate`, both set to
+`ui://nhk/image-upload.html`. No upload backend, ImageIngestEntrypoint,
+Capture/Media semantic behavior, resource owner or database path changed.
+
+VERIFICATION: TDD RED reproduced the exact serialized schema failure; GREEN
+passed the focused Easy MCP/widget/MCP contract selection (65 tests / 610
+assertions), full Unit (1,534 tests / 7,396 assertions, existing
+warnings/deprecations) and Contract (6 tests / 48 assertions). Guarded
+Integration was invoked with the exact `nhk_v3_test` guard but WordPress
+stopped before PHPUnit with `Error establishing a database connection`; this
+is environment-blocked, not a pass. PHP lint and `git diff --check` pass.
+Canonical docs generation passed for 50 files; its manifest was generated
+before the final workspace re-apply with the same documentation source.
+No upload, staging mutation, deployment, push or pull was performed.
+
 # Checkpoint — 2026-09-14 — Pre-master readiness foundation
 
 SCOPE: No new site-wide frontend architecture, semantic data mutation, bulk
