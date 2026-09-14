@@ -14,8 +14,17 @@
 The runtime documentation registry and immutable snapshot include all
 `READ_FIRST.md` references. Public Entity, Public Identity, Public Route, SEO,
 and shared feed ordering contracts are retrievable through the canonical
-documentation reader. This closes the code-side `DOC_PATH_NOT_ALLOWED` gap;
-deployed/live parity still requires a fresh deployment read-back.
+documentation reader. This closes the code-side `DOC_PATH_NOT_ALLOWED` gap.
+
+The local WordPress/MySQL bootstrap is now green: `nhk_v3` and the guarded
+integration database `nhk_v3_test` are at schema target 20 and deployment
+preflight is 11/11. Unit, Contract and guarded Integration/P4 suites pass;
+the documented warnings, deprecations and skips remain non-failing. The live
+server is reachable and exposes 52 registered MCP descriptors, but its
+documentation bootstrap requires an authenticated grant and it still serves
+the previous build. Canonical staging deployment was rejected before remote
+write by the execution policy, so deployed/live parity, the exact PC-ROOT
+route lifecycle, and live Media/Video/readiness/order acceptance remain open.
 
 ## 0. MCP documentation bootstrap — 2026-09-09
 

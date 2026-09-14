@@ -23,7 +23,7 @@ This additive presentation checkpoint does not migrate or mutate semantic data.
 | Implemented read paths | Entity collection, related content, generic dossier relation sections, Home, Media, Video, Knowledge and semantic Search |
 | Page migration status | Clock Group naming/home/hub seam and generic dossier foundation are implemented; Brand/Model/Variant/Movement/Melody/Parts/Specimen/Article visual migration remains partial/pending evidence |
 | Data/relation mutations | None in this checkpoint; Public Clock/Turret/Post and prepared assets were not written or backfilled |
-| Deployment/live acceptance | Not complete: current worktree is dirty and local WordPress DB bootstrap is unavailable; canonical deployment wrapper was not bypassed |
+| Deployment/live acceptance | Not complete: worktree is clean and local WordPress/MySQL preflight is 11/11 after guarded `nhk_v3_test` schema migration 8→20; canonical external SSH/rsync deployment was rejected before remote write, so live identity/route/media/video acceptance remains open |
 
 This section records implementation status only. It does not authorize a
 semantic acceptance mutation, Public Identity allocation/reprojection, media

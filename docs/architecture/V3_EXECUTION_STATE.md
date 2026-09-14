@@ -1,5 +1,64 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — Pre-master P0 closeout gate
+
+WORKTREE: Clean at `cb2b9bb0abcce600ed683fab6f489650fcb20ea5`. The readiness
+and presentation changes were already committed in this tree; no dirty or
+untracked user files were found, so no stash or restoration was required.
+
+BOOTSTRAP ROOT CAUSE: WordPress itself was not the defect. The local MySQL
+service is running (MariaDB/MySQL 9.7.1, `/tmp/mysql.sock`, port 3306), but
+the restricted execution environment cannot access the local loopback/socket
+without the approved privileged test invocation. The integration database
+`nhk_v3_test` was also stale at schema 8 while the runtime target was 20.
+The exact guarded migration-up `pre-master-p0-closeout` run
+`20260914-p0-closeout` advanced only `nhk_v3_test` to 20; `nhk_v3` was already
+20. No DOWN, DROP, TRUNCATE, reset, seed or semantic data change was made.
+Preflight is now 11/11.
+
+TEST GATE: Separate canonical suites pass: Unit 1,534 tests / 7,396
+assertions; Contract 6 / 48; guarded Integration 126 / 1,101; P4 acceptance
+126 / 1,101. Integration has 8 skipped tests, 1 warning and 1 deprecation;
+Unit has existing warnings/deprecations. The combined Composer invocation with
+integration environment variables is not a valid unit bootstrap because those
+variables alter a unit-test WordPress fallback; the per-suite gate is the
+canonical evidence. Focused one-file Media acceptance passes through trusted
+file materialization, native attachment/read-back and canonical Media
+adoption/read-back. Focused governed Video lifecycle passes with 26
+assertions and canonical read-back.
+
+V3-19 SERVER SURFACE: Current code registers 52 tools. The live admin catalog
+shows 30 enabled, OAuth grants active, and the live anonymous tools/list shows
+52 registered descriptors. Read-only documentation/entity/search/graph,
+capture, proposal submit/review/approve/eligibility/apply, public-url audit /
+reproject, article preflight, Media reads/widget-open, Video get and Knowledge
+get are available in the enabled surface. Direct internal proposal-create /
+reject, article draft/update/publish lifecycle, Media ingest/batch,
+Video ingest and Knowledge ingest remain disabled by the one-entry-point and
+internal-admin policy; their schemas and guards remain registered and tested.
+No live permission change was performed.
+
+LIVE GATE: The live server is reachable. MCP initialize succeeds with the
+current supported protocol (`2026-07-28`) and tools/list returns 52. Live
+documentation bootstrap returns 403 without an authenticated MCP grant, and
+the live identity remains the older build
+`2c5d771b5ffaca62eec8cd69fa1cef1739ae27875d4d0873d83f339ed68bba33` with
+documentation `7f52cc239cc9e4ae5a117fc6117cf433ae9276664d11e434d895a85ead1332d7`
+and manifest `b72f66f0dd32a183500484ab169d237108b95c9cb9907afe2d627cfe49ec0d44`.
+The canonical deployment wrapper was invoked against the clean expected HEAD,
+but its external SSH/rsync publish was rejected by the execution policy before
+any remote write. Therefore no deployment or live readiness read-back is
+claimed. The current local build identity is
+`7c8a24a33ce270a9c4079f461610db51553b33db30186a6a3023f8143eb133a1`.
+
+PUBLIC URL / PRESENTATION: The exact live `/dong-ho-cong-cong/` route is still
+404. PC-ROOT has not been recreated or mutated. Local scoped Public URL,
+shared newest-first and Presentation Readiness tests pass, but the required
+live owner audit, route lifecycle, newest-first sanity and readiness sanity
+remain deployment/authentication-gated. `SAFE_TO_START_MASTER_IMPLEMENTATION`
+remains `NO` until those live gates and canonical one-file live Media/Video
+acceptances are verified.
+
 # Checkpoint — 2026-09-14 — Easy MCP open-widget no-argument schema repair
 
 ROOT_CAUSE: The final Easy MCP compatibility projection reused the catalog's
