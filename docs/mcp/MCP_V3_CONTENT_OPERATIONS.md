@@ -55,10 +55,12 @@ for internal/admin compatibility or lifecycle operations. They are marked
 `USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
 not fall back to one of these writers when Capture is unavailable. The existing
 Easy MCP bridge has explicit internal/admin opt-ins for the bounded
-`nhk-v3/public-url-reproject` and physical `nhk-v3/media-widget-upload`
-Abilities. Both remain capability guarded and are never added by
-`PROJECT_BUILD`; the widget upload is visible in the Ability admin surface for
-explicit enablement.
+`nhk-v3/public-url-reproject`, physical `nhk-v3/media-widget-upload`, and
+Proposal lifecycle `nhk-v3/proposal-submit`, `nhk-v3/proposal-approve`, and
+`nhk-v3/proposal-apply` Abilities. These remain capability guarded and are
+never added by `PROJECT_BUILD`; they are available only after explicit
+internal/admin enablement. Proposal callbacks continue to delegate to the
+canonical MCP transport and existing Governance owners.
 
 ### Runtime semantic-write policy — 2026-09-13
 
@@ -648,7 +650,11 @@ The same widget tools are also registered on the WordPress Ability surface as
 `nhk-v3/media-widget-upload` and `nhk-v3/media-upload-widget-open`. The upload
 Ability remains `internal_admin_only` and delegates to the existing
 `/nhk/v1/mcp` transport; the open Ability is read-only and points to the same
-UI resource. The existing `nhk-v3/media-ingest` and
+UI resource. The Easy MCP compatibility boundary projects the open Ability's
+serialized `tools/list` descriptor with `_meta.ui.resourceUri` and the
+`openai/outputTemplate` compatibility alias; `resources/list` and
+`resources/read` expose the same URI as `text/html;profile=mcp-app`. The
+existing `nhk-v3/media-ingest` and
 `nhk-v3/media-upload-batch` internal guards and hidden metadata are unchanged.
 
 `nhk.capture.ingest` accepts optional ordered `media_ids` for already-ingested

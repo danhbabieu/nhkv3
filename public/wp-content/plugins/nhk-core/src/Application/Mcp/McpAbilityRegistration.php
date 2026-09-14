@@ -21,6 +21,9 @@ final class McpAbilityRegistration
     private const EASY_MCP_EXPLICIT_INTERNAL_ABILITIES = [
         'nhk-v3/public-url-reproject',
         'nhk-v3/media-widget-upload',
+        'nhk-v3/proposal-submit',
+        'nhk-v3/proposal-approve',
+        'nhk-v3/proposal-apply',
     ];
 
     public static function bootstrapRegistry(): void

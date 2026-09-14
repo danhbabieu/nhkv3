@@ -37,6 +37,21 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame([$tool], EasyMcpNativeFileCompatibilityAdapter::projectTools([$tool]));
     }
 
+    public function test_open_widget_descriptor_projects_mcp_apps_resource_metadata(): void
+    {
+        $tools = [[
+            'name' => 'wp_ability_nhk_v3_media_upload_widget_open',
+            'description' => 'stale Easy MCP description',
+            'inputSchema' => ['type' => 'object', 'properties' => []],
+            'annotations' => ['title' => 'Widget'],
+        ]];
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools($tools);
+
+        self::assertSame('ui://nhk/image-upload.html', $projected[0]['_meta']['ui']['resourceUri']);
+        self::assertSame('ui://nhk/image-upload.html', $projected[0]['_meta']['openai/outputTemplate']);
+    }
+
     public function test_final_easy_mcp_1716_pipeline_projects_canonical_capture_descriptor(): void
     {
         $catalog = array_column(McpToolCatalog::tools(), null, 'name');
@@ -134,6 +149,66 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertArrayHasKey('approved_plan_fingerprint', $properties['authority_intent']['properties']);
         self::assertArrayHasKey('approved_candidate_ids', $properties['authority_intent']['properties']);
         self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
+    }
+
+    public function test_final_easy_mcp_descriptor_links_open_widget_to_registered_resource(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'result' => ['tools' => [[
+                'name' => 'wp_ability_nhk_v3_media_upload_widget_open',
+                'description' => 'stale Easy MCP description',
+                'inputSchema' => ['type' => 'object', 'properties' => []],
+                'annotations' => ['title' => 'Widget'],
+            ]]],
+        ];
+
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+        $widget = $final['result']['tools'][0];
+
+        self::assertSame('ui://nhk/image-upload.html', $widget['_meta']['ui']['resourceUri']);
+        self::assertSame('ui://nhk/image-upload.html', $widget['_meta']['openai/outputTemplate']);
+    }
+
+    public function test_easy_mcp_resources_list_projects_the_nhk_widget_resource(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'resources/list', 'params' => []]; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'result' => ['resources' => []],
+        ];
+
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+        $resources = array_column($final['result']['resources'], null, 'uri');
+
+        self::assertSame('text/html;profile=mcp-app', $resources['ui://nhk/image-upload.html']['mimeType']);
+    }
+
+    public function test_easy_mcp_resources_read_projects_the_nhk_widget_html(): void
+    {
+        $request = new class {
+            public function get_route(): string { return '/easy-mcp-ai/v1/mcp'; }
+            public function get_json_params(): array { return ['jsonrpc' => '2.0', 'id' => 3, 'method' => 'resources/read', 'params' => ['uri' => 'ui://nhk/image-upload.html']]; }
+        };
+        $response = [
+            'jsonrpc' => '2.0',
+            'id' => 3,
+            'error' => ['code' => -32004, 'message' => 'Resource not found'],
+        ];
+
+        $final = EasyMcpNativeFileCompatibilityAdapter::projectFinalToolsListDescriptor($response, null, $request);
+
+        self::assertSame('ui://nhk/image-upload.html', $final['result']['contents'][0]['uri']);
+        self::assertSame('text/html;profile=mcp-app', $final['result']['contents'][0]['mimeType']);
+        self::assertStringContainsString('<input', $final['result']['contents'][0]['text']);
     }
 
     /**

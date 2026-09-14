@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Mcp;
 
-use NHK\Core\Application\Mcp\McpToolCatalog;
+use NHK\Core\Application\Mcp\{McpAppsResourceRegistry, McpToolCatalog};
 
 /**
  * Narrow compatibility boundary for Easy MCP versions that do not forward
@@ -18,6 +18,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
 {
     private const ENDPOINT = '/easy-mcp-ai/v1/mcp';
     private const TARGET_TOOL = 'wp_ability_nhk_v3_capture_ingest';
+    private const WIDGET_OPEN_TOOL = 'wp_ability_nhk_v3_media_upload_widget_open';
 
     /** @var list<string> */
     private const SUPPORTED_VERSIONS = ['1.7.16', '1.7.17'];
@@ -62,11 +63,15 @@ final class EasyMcpNativeFileCompatibilityAdapter
     /** @param list<array<string,mixed>> $tools @return list<array<string,mixed>> */
     public static function projectTools(array $tools): array
     {
-        $canonical = self::captureDefinition();
-        if ($canonical === null) return $tools;
-
         foreach ($tools as $index => $tool) {
-            if (!is_array($tool) || (string) ($tool['name'] ?? '') !== self::TARGET_TOOL) continue;
+            if (!is_array($tool)) continue;
+            $name = (string) ($tool['name'] ?? '');
+            $canonical = match ($name) {
+                self::TARGET_TOOL => self::captureDefinition(),
+                self::WIDGET_OPEN_TOOL => self::widgetOpenDefinition(),
+                default => null,
+            };
+            if ($canonical === null) continue;
 
             // Keep Easy MCP's tool presence, filtering and annotations. Replace
             // only the NHK-owned descriptor fields that its serializer omitted.
@@ -83,12 +88,16 @@ final class EasyMcpNativeFileCompatibilityAdapter
     {
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $response;
         $rpc = self::requestRpc($request);
-        if ($rpc !== null && ($rpc['method'] ?? null) !== 'tools/list') return $response;
+        if ($rpc !== null && !in_array(($rpc['method'] ?? null), ['tools/list', 'resources/list', 'resources/read'], true)) return $response;
         if (!is_object($response) || !method_exists($response, 'get_data') || !method_exists($response, 'set_data')) return $response;
 
         $data = $response->get_data();
         if (!is_array($data)) return $response;
-        $projected = self::projectToolsListData($data);
+        $projected = match ($rpc['method'] ?? 'tools/list') {
+            'resources/list' => self::projectResourceListData($data),
+            'resources/read' => self::projectResourceReadData($data, $rpc),
+            default => self::projectToolsListData($data),
+        };
         if ($projected !== $data) $response->set_data($projected);
         return $response;
     }
@@ -201,7 +210,12 @@ final class EasyMcpNativeFileCompatibilityAdapter
     public static function projectFinalToolsListDescriptor(mixed $data, mixed $server, mixed $request): mixed
     {
         if (!is_object($request) || !method_exists($request, 'get_route') || rtrim((string) $request->get_route(), '/') !== rtrim(self::ENDPOINT, '/')) return $data;
-        return self::projectToolsListData($data);
+        $rpc = self::requestRpc($request);
+        return match ($rpc['method'] ?? 'tools/list') {
+            'resources/list' => self::projectResourceListData($data),
+            'resources/read' => self::projectResourceReadData($data, $rpc),
+            default => self::projectToolsListData($data),
+        };
     }
 
     /** @param mixed $data @return mixed */
@@ -210,8 +224,36 @@ final class EasyMcpNativeFileCompatibilityAdapter
         if (!is_array($data)) return $data;
         $result = is_array($data['result'] ?? null) ? $data['result'] : [];
         if (!is_array($result['tools'] ?? null)) return $data;
-        if (!array_filter($result['tools'], static fn (mixed $tool): bool => is_array($tool) && (string) ($tool['name'] ?? '') === self::TARGET_TOOL)) return $data;
+        if (!array_filter($result['tools'], static function (mixed $tool): bool {
+            if (!is_array($tool)) return false;
+            return in_array((string) ($tool['name'] ?? ''), [self::TARGET_TOOL, self::WIDGET_OPEN_TOOL], true);
+        })) return $data;
         $data['result']['tools'] = self::projectTools($result['tools']);
+        return $data;
+    }
+
+    /** @param array<string,mixed> $data @return array<string,mixed> */
+    private static function projectResourceListData(array $data): array
+    {
+        $result = is_array($data['result'] ?? null) ? $data['result'] : [];
+        if (!is_array($result['resources'] ?? null)) return $data;
+
+        $resource = McpAppsResourceRegistry::list()['resources'][0] ?? null;
+        if (!is_array($resource)) return $data;
+        $hasResource = array_filter($result['resources'], static fn (mixed $candidate): bool => is_array($candidate) && ($candidate['uri'] ?? null) === $resource['uri']);
+        if ($hasResource === []) $result['resources'][] = $resource;
+        $data['result'] = $result;
+        return $data;
+    }
+
+    /** @param array<string,mixed> $data @param array<string,mixed> $rpc @return array<string,mixed> */
+    private static function projectResourceReadData(array $data, array $rpc): array
+    {
+        $params = is_array($rpc['params'] ?? null) ? $rpc['params'] : [];
+        $uri = (string) ($params['uri'] ?? '');
+        if ($uri !== McpAppsResourceRegistry::IMAGE_UPLOAD_URI) return $data;
+        $data['result'] = McpAppsResourceRegistry::read($uri);
+        unset($data['error']);
         return $data;
     }
 
@@ -340,6 +382,19 @@ final class EasyMcpNativeFileCompatibilityAdapter
     {
         foreach (McpToolCatalog::tools() as $tool) {
             if (($tool['name'] ?? null) === 'nhk.capture.ingest') return $tool;
+        }
+        return null;
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function widgetOpenDefinition(): ?array
+    {
+        foreach (McpToolCatalog::tools() as $tool) {
+            if (($tool['name'] ?? null) !== 'nhk.media.upload-widget.open') continue;
+            $uri = $tool['connectorMeta']['ui']['resourceUri'] ?? null;
+            if (!is_string($uri) || $uri === '') return null;
+            $tool['connectorMeta']['openai/outputTemplate'] = $uri;
+            return $tool;
         }
         return null;
     }

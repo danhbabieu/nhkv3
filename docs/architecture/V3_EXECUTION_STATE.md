@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — ERR-015 Proposal lifecycle connector exposure
+
+ROOT CAUSE: The runtime catalog, WordPress Ability registration and canonical
+MCP transport already contained `nhk.proposal.submit`,
+`nhk.proposal.approve`, and `nhk.proposal.apply`. Easy MCP exposure is a
+separate enabled-Ability boundary. `McpAbilityRegistration` excluded these
+three `internal_admin_only` abilities from the operator allowlist and its
+explicit internal/admin opt-in list contained only Public URL reproject and
+Media Widget upload, so the connector could not discover the Proposal actions.
+
+CHANGE: Added the three existing Proposal Ability IDs to the explicit
+internal/admin Easy MCP opt-in list. No Ability, schema, Governance flow,
+semantic policy, writer or data path was added. Existing `SingleEntryPointPolicy`
+and action-specific capability guards remain unchanged.
+
+VERIFICATION: TDD RED reproduced the empty Proposal explicit opt-in subset;
+GREEN passed the focused Proposal, Governance queue, Public URL, Widget and
+MCP contract tests (50 tests / 800 assertions), plus PHP syntax checks. The
+guarded WordPress/Easy MCP integration selection is present but skipped locally
+because `NHK_WP_TEST_PATH` and the Easy MCP package are unavailable. No deploy,
+live mutation, proposal approval, proposal apply or semantic creation occurred.
+
+SCOPE: `McpAbilityRegistration`, Proposal exposure tests, guarded MCP
+integration assertion, and current MCP/execution-state documentation only.
+
+# Checkpoint — 2026-09-14 — Easy MCP widget render descriptor
+
+CHANGE: The existing Easy MCP compatibility boundary now projects the
+serialized `wp_ability_nhk_v3_media_upload_widget_open` tools/list entry with
+the canonical MCP Apps `_meta.ui.resourceUri` and the
+`openai/outputTemplate` compatibility alias. It also projects only the exact
+NHK URI into Easy MCP `resources/list` and `resources/read`, because Easy MCP
+1.7.17 auto-discovers only its own built-in resource classes. It does not
+create a new Ability, resource registry, uploader, or storage path.
+
+RESOURCE: The existing `ui://nhk/image-upload.html` registry remains the sole
+resource owner and already returns actual HTML with MIME
+`text/html;profile=mcp-app` from `resources/list` and `resources/read`.
+
+VERIFICATION: RED reproduced the omitted open-tool metadata and missing NHK
+resource at the Easy MCP serialized boundary; focused projection/resource
+tests, full Unit (1,513 tests / 7,205 assertions), Contract (6 / 48), and
+bounded WordPress MCP integration (25 tests / 356 assertions, 5 guarded
+skips) passed after the descriptor/resource projection addition. Easy MCP's
+local serializer package was unavailable, so its package-native assertions
+remain guarded/skipped; the published 1.7.17 source was inspected read-only.
+No deploy or live mutation occurred.
+
+SCOPE: Only the Easy MCP descriptor projection, its tests and active status
+documentation changed. Image transport, ImageIngestEntrypoint, Capture,
+Media, UI implementation, schema and database were not changed.
+
 # Checkpoint — 2026-09-13 — Easy MCP widget Ability exposure
 
 CHANGE: Registered the existing `nhk.media.widget-upload` and

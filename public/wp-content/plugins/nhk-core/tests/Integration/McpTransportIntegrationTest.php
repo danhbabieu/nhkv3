@@ -233,6 +233,36 @@ final class McpTransportIntegrationTest extends TestCase
         self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
     }
 
+    public function test_easy_mcp_tools_list_serializes_explicit_proposal_lifecycle_abilities(): void
+    {
+        if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {
+            self::markTestSkipped('Easy MCP AI is required for the Proposal lifecycle bridge assertion.');
+        }
+
+        $previous = get_option('easy_mcp_ai_enabled_abilities', []);
+        $explicit = [
+            'nhk-v3/proposal-submit',
+            'nhk-v3/proposal-approve',
+            'nhk-v3/proposal-apply',
+        ];
+        update_option('easy_mcp_ai_enabled_abilities', array_values(array_unique(array_merge((array) $previous, $explicit))), false);
+
+        try {
+            $registry = new \Easy_MCP_AI\Tools\Tool_Registry();
+            (new \Easy_MCP_AI\Tools\Dynamic_Tool_Registrar())->register_to($registry);
+            $tools = array_column($registry->get_all_definitions(), null, 'name');
+
+            self::assertSame(['id'], $tools['wp_ability_nhk_v3_proposal_submit']['inputSchema']['required']);
+            self::assertSame(['id', 'content_fingerprint', 'dependency_fingerprint'], $tools['wp_ability_nhk_v3_proposal_approve']['inputSchema']['required']);
+            self::assertSame(['id'], $tools['wp_ability_nhk_v3_proposal_apply']['inputSchema']['required']);
+            foreach (['submit', 'approve', 'apply'] as $action) {
+                self::assertSame('object', $tools['wp_ability_nhk_v3_proposal_' . $action]['inputSchema']['type'], $action);
+            }
+        } finally {
+            update_option('easy_mcp_ai_enabled_abilities', $previous, false);
+        }
+    }
+
     public function test_easy_mcp_export_diagnostic_is_clean_for_media_and_video(): void
     {
         if (!class_exists('Easy_MCP_AI\\Tools\\Tool_Registry') || !class_exists('Easy_MCP_AI\\Tools\\Dynamic_Tool_Registrar')) {

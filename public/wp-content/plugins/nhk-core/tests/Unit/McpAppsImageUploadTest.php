@@ -17,6 +17,10 @@ final class McpAppsImageUploadTest extends TestCase
 {
     public function test_image_resource_is_listed_and_read_as_mcp_app_html(): void
     {
+        $listed = McpAppsResourceRegistry::list();
+        self::assertSame('ui://nhk/image-upload.html', $listed['resources'][0]['uri']);
+        self::assertSame('text/html;profile=mcp-app', $listed['resources'][0]['mimeType']);
+
         $resource = McpAppsResourceRegistry::read('ui://nhk/image-upload.html');
         self::assertSame('ui://nhk/image-upload.html', $resource['contents'][0]['uri']);
         self::assertSame('text/html;profile=mcp-app', $resource['contents'][0]['mimeType']);
