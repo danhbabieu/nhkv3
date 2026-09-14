@@ -69,7 +69,7 @@ final class SearchSemanticQueryTest extends TestCase
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
         $authorityRepository = new InMemoryAuthorityRepository();
-        $clockType = (new AuthorityService($authorityRepository, $types))->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $clockType = (new AuthorityService($authorityRepository, $types))->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Nhóm đồng hồ phục vụ không gian công cộng.']);
         $identities = new SearchFixtureIdentityRepository(['authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong']]);
         $routes = new PublicRouteResolver($authorityRepository, $types, null, null, $identities);
         $collection = new PublicEntityCollectionQuery($authorityRepository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($authorityRepository, $types, $routes), $routes);

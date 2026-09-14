@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Entity;
 
 use NHK\Core\Application\Graph\{ClockTypeDerivedRelationshipQuery, ClockTypeHierarchyProjection};
+use NHK\Core\Application\Presentation\EntityPresentationViewModel;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\AuthorityEntity;
 
@@ -47,6 +48,7 @@ final class ClockTypeDossierProjection
         $diagnostics = [...$diagnostics, ...((array) ($hierarchy['diagnostics'] ?? []))];
         $dossier['diagnostics'] = array_values(array_unique($diagnostics));
         $dossier['profile'] = (new SemanticProfileComposer())->compose('clock_type', $dossier);
+        $dossier['presentation'] = EntityPresentationViewModel::fromDossier('clock_type', $dossier);
         return $dossier;
     }
 

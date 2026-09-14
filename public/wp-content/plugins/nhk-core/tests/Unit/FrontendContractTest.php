@@ -22,6 +22,7 @@ final class FrontendContractTest extends TestCase
     {
         $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
         $functions = (string) file_get_contents($theme . '/functions.php');
+        $header = (string) file_get_contents($theme . '/header.php');
         $home = (string) file_get_contents($theme . '/front-page.php');
         $sidebar = (string) file_get_contents($theme . '/sidebar.php');
         self::assertStringContainsString("'Thương hiệu' => '/thuong-hieu/'", $functions);
@@ -196,6 +197,55 @@ final class FrontendContractTest extends TestCase
 
         foreach (['front-page.php', 'index.php', 'single.php', 'entity.php', 'knowledge.php', 'media.php', 'video.php', 'comparison.php', '404.php'] as $template) {
             self::assertStringContainsString('id="main-content"', (string) file_get_contents($theme . '/' . $template), $template . ' must expose the skip-link target');
+        }
+    }
+
+    public function test_shared_presentation_layer_is_wired_across_home_and_dossiers(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $frontPage = (string) file_get_contents($theme . '/front-page.php');
+        $entity = (string) file_get_contents($theme . '/entity.php');
+        $functions = (string) file_get_contents($theme . '/functions.php');
+        $header = (string) file_get_contents($theme . '/header.php');
+        $dossier = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Entity/SemanticDossierQuery.php');
+
+        self::assertStringContainsString('template-parts/presentation/entity-card', $frontPage);
+        self::assertStringContainsString('template-parts/presentation/media-card', $frontPage);
+        self::assertStringContainsString('template-parts/presentation/video-card', $frontPage);
+        foreach (['breadcrumbs', 'entity-hero', 'local-section-nav', 'hierarchy-nav', 'visual-rail'] as $partial) {
+            self::assertStringContainsString('template-parts/presentation/' . $partial, $entity);
+            self::assertFileExists($theme . '/template-parts/presentation/' . $partial . '.php');
+        }
+        self::assertStringContainsString('EntityPresentationViewModel', $dossier);
+        self::assertStringContainsString('function nhk_v3_navigation_items', $functions);
+        self::assertStringContainsString("'Nhóm đồng hồ' => '/loai-dong-ho/'", $functions);
+        self::assertStringContainsString('nhk_v3_nav_fallback()', $header);
+    }
+
+    public function test_visual_preview_ctas_are_data_driven_and_do_not_render_dead_links(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $home = (string) file_get_contents($theme . '/front-page.php');
+        $query = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Home/HomeSemanticQuery.php');
+
+        foreach (['clock_groups_total', 'media_total', 'videos_total'] as $total) {
+            self::assertStringContainsString($total, $query);
+            self::assertStringContainsString($total, $home);
+        }
+        self::assertStringContainsString('template-parts/presentation/media-card', $home);
+        self::assertStringContainsString('template-parts/presentation/video-card', $home);
+        self::assertStringContainsString('>Hình ảnh từ dữ liệu đã lưu<', $home);
+        self::assertStringNotContainsString('Hình ảnh<br> <em>Xem tất cả', $home);
+    }
+
+    public function test_profile_driven_dossiers_have_central_preview_limits_for_supported_families(): void
+    {
+        $composer = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Entity/SemanticProfileComposer.php');
+        foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $family) {
+            self::assertStringContainsString("'{$family}' =>", $composer);
+        }
+        foreach (['articles', 'media', 'videos', 'knowledge', 'specimens', 'models', 'variants'] as $limit) {
+            self::assertStringContainsString("'{$limit}' =>", $composer);
         }
     }
 

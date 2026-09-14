@@ -28,12 +28,18 @@ function nhk_v3_allow_semantic_search_pages(mixed $handled, \WP_Query $query): m
 }
 add_filter('pre_handle_404', 'nhk_v3_allow_semantic_search_pages', 10, 2);
 
-function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.2.0'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.4'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); if (is_singular('post')) wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.0.0', true); }
+function nhk_v3_assets(): void { wp_enqueue_style('nhk-v3-style', get_stylesheet_uri(), [], '1.2.0'); wp_enqueue_style('nhk-v3-entity', get_theme_file_uri('entity.css'), ['nhk-v3-style'], '1.0.4'); wp_enqueue_style('nhk-v3-media-video', get_theme_file_uri('media-video.css'), ['nhk-v3-entity'], '1.0.1'); wp_enqueue_style('nhk-v3-knowledge', get_theme_file_uri('knowledge.css'), ['nhk-v3-media-video'], '1.0.0'); wp_enqueue_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.0'); wp_enqueue_script('nhk-v3-navigation', get_theme_file_uri('navigation.js'), [], '1.0.0', true); if (is_singular('post')) wp_enqueue_script('nhk-v3-album', get_theme_file_uri('album.js'), [], '1.0.0', true); }
 add_action('wp_enqueue_scripts', 'nhk_v3_assets');
+
+/** @return array<string,string> */
+function nhk_v3_navigation_items(): array
+{
+    return ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/thuong-hieu/', 'Nhóm đồng hồ' => '/loai-dong-ho/', 'Mẫu' => '/mau/', 'Bộ máy' => '/bo-may/', 'Bản nhạc' => '/ban-nhac/', 'So sánh' => '/so-sanh/', 'Linh kiện' => '/linh-kien/', 'Hiện vật' => '/hien-vat/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
+}
 
 function nhk_v3_nav_fallback(): void
 {
-    $items = ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/thuong-hieu/', 'Nhóm đồng hồ' => '/loai-dong-ho/', 'Mẫu' => '/mau/', 'Bộ máy' => '/bo-may/', 'Bản nhạc' => '/ban-nhac/', 'So sánh' => '/so-sanh/', 'Linh kiện' => '/linh-kien/', 'Hiện vật' => '/hien-vat/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
+    $items = nhk_v3_navigation_items();
     echo '<ul class="nav-list">';
     foreach ($items as $label => $path) printf('<li><a href="%s">%s</a></li>', esc_url(home_url($path)), esc_html($label));
     echo '</ul>';

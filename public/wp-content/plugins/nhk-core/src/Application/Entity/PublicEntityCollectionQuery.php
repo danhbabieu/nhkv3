@@ -42,7 +42,9 @@ final class PublicEntityCollectionQuery
             $resolution = $resolver->resolveProfile($entity);
             if (!$entity->active() || $resolution->profileKey !== $profileKey || !in_array($resolution->status, ['RESOLVED', EntityProfileResolution::COMPATIBILITY_READ], true)) continue;
             $item = $this->item($entity, $query, false, true, $resolution);
-            if ($item !== null) $items[] = $item;
+            if ($item === null) continue;
+            if ($profileKey === 'clock_type' && ($item['presentation_readiness']['status'] ?? '') !== 'READY') continue;
+            $items[] = $item;
         }
         $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => null, static fn (array $item): ?string => $item['_created_at'] ?? null, static fn (array $item): string => (string) ($item['canonical_id'] ?? $item['url'] ?? $item['name'] ?? ''));
         $items = array_map(static function (array $item): array { unset($item['_created_at']); return $item; }, $items);

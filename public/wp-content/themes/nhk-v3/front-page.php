@@ -44,11 +44,9 @@ get_header();
 
   <?php $clockGroups = is_array($semantic['clock_groups'] ?? null) ? $semantic['clock_groups'] : []; if ($clockGroups !== []): ?>
   <section class="home-semantic-section clock-groups-home">
-    <div class="section-head"><div><p class="eyebrow">Nhóm đồng hồ</p><h2>Khám phá theo nhóm đồng hồ</h2></div><a class="text-link" href="<?php echo esc_url(home_url('/loai-dong-ho/')); ?>">Khám phá tất cả nhóm đồng hồ →</a></div>
+    <div class="section-head"><div><p class="eyebrow">Nhóm đồng hồ</p><h2>Khám phá theo nhóm đồng hồ</h2></div><?php if ((int) ($semantic['clock_groups_total'] ?? count($clockGroups)) > count($clockGroups)): ?><a class="text-link" href="<?php echo esc_url(home_url('/loai-dong-ho/')); ?>">Khám phá tất cả nhóm đồng hồ →</a><?php endif; ?></div>
     <div class="visual-card-grid clock-group-grid">
-      <?php foreach ($clockGroups as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $image = trim((string) ($item['image_url'] ?? '')) ?: $fallback; ?>
-      <a class="visual-card" href="<?php echo esc_url($url); ?>"><span class="visual-frame"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['image_alt'] ?? $item['title'] ?? '')); ?>" loading="lazy"></span><span class="visual-card-body"><small>Nhóm đồng hồ</small><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong><?php if (trim((string) ($item['description'] ?? '')) !== ''): ?><span><?php echo esc_html(wp_trim_words((string) $item['description'], 18)); ?></span><?php endif; ?></span></a>
-      <?php endforeach; ?>
+      <?php foreach ($clockGroups as $item): get_template_part('template-parts/presentation/entity-card', null, ['item' => ['title' => $item['title'] ?? '', 'url' => $item['url'] ?? null, 'image_url' => $item['image_url'] ?? null, 'image_alt' => $item['image_alt'] ?? '', 'description' => $item['description'] ?? '', 'profile_label' => 'Nhóm đồng hồ']]); endforeach; ?>
     </div>
   </section>
   <?php endif; ?>
@@ -96,15 +94,15 @@ get_header();
 
   <?php $mediaItems = is_array($semantic['media'] ?? null) ? $semantic['media'] : []; if ($mediaItems !== []): ?>
   <section class="home-semantic-section visual-archive-section">
-    <div class="section-head"><div><p class="eyebrow">Kho hình ảnh</p><h2>Hình ảnh từ dữ liệu đã lưu</h2></div><a class="text-link" href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Mở thư viện →</a></div>
-    <div class="media-mosaic"><?php foreach ($mediaItems as $item): $image = trim((string) ($item['image_url'] ?? '')) ?: $fallback; ?><figure class="media-figure"><img src="<?php echo esc_url($image); ?>" alt="<?php echo esc_attr((string) ($item['alt'] ?? $item['title'] ?? '')); ?>" loading="lazy"><figcaption><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? 'Hình ảnh'))); ?></figcaption></figure><?php endforeach; ?></div>
+    <div class="section-head"><div><p class="eyebrow">Kho hình ảnh</p><h2>Hình ảnh từ dữ liệu đã lưu</h2></div><?php if ((int) ($semantic['media_total'] ?? count($mediaItems)) > count($mediaItems)): ?><a class="text-link" href="<?php echo esc_url(home_url('/thu-vien/')); ?>">Mở thư viện →</a><?php endif; ?></div>
+    <div class="media-mosaic"><?php foreach ($mediaItems as $item): get_template_part('template-parts/presentation/media-card', null, ['item' => $item]); endforeach; ?></div>
   </section>
   <?php endif; ?>
 
   <?php $videos = is_array($semantic['videos'] ?? null) ? $semantic['videos'] : []; if ($videos !== []): ?>
   <section class="home-semantic-section">
-    <div class="section-head"><div><p class="eyebrow">Video</p><h2>Xem và nghe hiện vật</h2></div><a class="text-link" href="<?php echo esc_url(home_url('/video/')); ?>">Xem tất cả →</a></div>
-    <div class="video-card-grid"><?php foreach ($videos as $item): $url = nhk_v3_public_url($item['url'] ?? null); if ($url === '') continue; $thumb = trim((string) ($item['thumbnail_url'] ?? '')) ?: $fallback; $thumbMeta = is_array($item['thumbnail'] ?? null) ? $item['thumbnail'] : []; ?><a class="video-card" href="<?php echo esc_url($url); ?>"><span class="visual-frame video-thumb"><img src="<?php echo esc_url($thumb); ?>" alt="" loading="lazy"<?php echo !empty($thumbMeta['width']) ? ' width="' . esc_attr((string) $thumbMeta['width']) . '"' : ''; ?><?php echo !empty($thumbMeta['height']) ? ' height="' . esc_attr((string) $thumbMeta['height']) . '"' : ''; ?>><span class="play-mark" aria-hidden="true">▶</span></span><span class="visual-card-body"><small>Video</small><strong><?php echo esc_html(nhk_v3_public_brand_text((string) ($item['title'] ?? ''))); ?></strong></span></a><?php endforeach; ?></div>
+    <div class="section-head"><div><p class="eyebrow">Video</p><h2>Xem và nghe hiện vật</h2></div><?php if ((int) ($semantic['videos_total'] ?? count($videos)) > count($videos)): ?><a class="text-link" href="<?php echo esc_url(home_url('/video/')); ?>">Xem tất cả →</a><?php endif; ?></div>
+    <div class="video-card-grid"><?php foreach ($videos as $item): get_template_part('template-parts/presentation/video-card', null, ['item' => $item]); endforeach; ?></div>
   </section>
   <?php endif; ?>
 

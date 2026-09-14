@@ -28,7 +28,7 @@ final class McpAppsImageUploadTest extends TestCase
         self::assertStringContainsString('getFileDownloadUrl', $resource['contents'][0]['text']);
         self::assertStringContainsString('setWidgetState', $resource['contents'][0]['text']);
         self::assertStringContainsString('sendFollowUpMessage', $resource['contents'][0]['text']);
-        self::assertStringContainsString("type: 'text', text: 'Use these uploaded NHK images", $resource['contents'][0]['text']);
+        self::assertStringContainsString('Use these uploaded NHK images in the next Capture', $resource['contents'][0]['text']);
     }
 
     public function test_mcp_transport_exposes_resource_methods_and_render_tool(): void

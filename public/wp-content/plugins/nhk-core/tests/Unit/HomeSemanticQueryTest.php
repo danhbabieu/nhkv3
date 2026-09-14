@@ -22,7 +22,7 @@ final class HomeSemanticQueryTest extends TestCase
         $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $this->media([]), $this->videos([]), new EntityTypeRegistry()))
             ->extend([]);
 
-        self::assertSame(['entities', 'media', 'videos', 'knowledge', 'hubs', 'clock_groups', 'explore_next'], array_keys($modules));
+        self::assertSame(['entities', 'media', 'videos', 'knowledge', 'hubs', 'clock_groups', 'explore_next', 'clock_groups_total', 'media_total', 'videos_total'], array_keys($modules));
         self::assertSame([], $modules['entities']);
         self::assertSame([], $modules['explore_next']);
         self::assertArrayNotHasKey('odo', json_decode(json_encode($modules), true));

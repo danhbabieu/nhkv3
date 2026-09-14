@@ -88,7 +88,7 @@ final class PublicEntityCollectionQueryTest extends TestCase
         CanonicalEntityTypeCatalog::registerInto($types);
         $repository = new InMemoryAuthorityRepository();
         $authority = new AuthorityService($repository, $types);
-        $clockType = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $clockType = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Nhóm đồng hồ phục vụ không gian công cộng.']);
         $authority->create('classification', 'nhk:classification:case-form.public', 'Đồng hồ công cộng', ['family' => 'case_form']);
         $routes = new PublicRouteResolver($repository, $types);
         $identity = new FixturePublicIdentityRepository(['authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong']]);

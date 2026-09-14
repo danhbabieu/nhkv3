@@ -25,7 +25,10 @@ final class FrontendPresentationContractTest extends TestCase
     public function test_homepage_exposes_visual_media_video_knowledge_and_dictionary_modules(): void
     {
         $source = $this->read('front-page.php');
-        foreach (['image_url', 'thumbnail_url', "['knowledge']", "['dictionary']", '/thu-vien/', '/video/', '/tu-dien/'] as $needle) self::assertStringContainsString($needle, $source);
+        $videoCard = $this->read('template-parts/presentation/video-card.php');
+        foreach (['image_url', "['knowledge']", "['dictionary']", '/thu-vien/', '/video/', '/tu-dien/'] as $needle) self::assertStringContainsString($needle, $source);
+        self::assertStringContainsString('thumbnail_url', $videoCard);
+        self::assertStringContainsString('template-parts/presentation/video-card', $source);
         self::assertStringContainsString('Khám phá theo nhóm đồng hồ', $source);
         self::assertStringContainsString('$hubLabel', $source);
     }

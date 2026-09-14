@@ -11,6 +11,17 @@ use NHK\Core\Application\Presentation\LatestFirstOrder;
  */
 final class SemanticProfileComposer
 {
+    /** @var array<string,int> */
+    public const PREVIEW_LIMITS = [
+        'articles' => 5,
+        'media' => 6,
+        'videos' => 4,
+        'knowledge' => 5,
+        'specimens' => 5,
+        'models' => 6,
+        'variants' => 6,
+    ];
+
     /** @var array<string,list<string>> */
     private const SECTION_ORDER = [
         'brand' => [
@@ -18,10 +29,19 @@ final class SemanticProfileComposer
             'components', 'classifications', 'specimens', 'products', 'knowledge',
             'evidence_context', 'media_gallery', 'media', 'videos', 'articles', 'navigation',
         ],
+        'model' => ['identity', 'parent_context', 'summary', 'variants', 'movements', 'music', 'components', 'knowledge', 'media_gallery', 'videos', 'articles', 'navigation'],
         'movement' => ['identity', 'parent_context', 'related_movements', 'technical_configuration', 'music', 'components', 'recognition', 'variants', 'knowledge', 'evidence_context', 'media_gallery', 'videos', 'articles', 'navigation'],
         'variant' => ['identity', 'parent_context', 'configuration', 'music', 'components', 'recognition', 'evidence_context', 'nearby_variants', 'media_gallery', 'videos', 'articles', 'navigation'],
+        'music' => ['identity', 'summary', 'historical_context', 'movements', 'models', 'variants', 'brands', 'knowledge', 'media_gallery', 'videos', 'articles', 'navigation'],
+        'component' => ['identity', 'summary', 'technical_configuration', 'movements', 'models', 'variants', 'classifications', 'knowledge', 'media_gallery', 'videos', 'articles', 'navigation'],
         'clock_type' => ['identity', 'knowledge', 'classifications', 'brands', 'models', 'variants', 'specimens', 'products', 'media_gallery', 'videos', 'articles', 'navigation'],
+        'classification' => ['identity', 'summary', 'related_entities', 'knowledge', 'media_gallery', 'videos', 'articles', 'navigation'],
+        'specimen' => ['identity', 'parent_context', 'measurements', 'provenance', 'knowledge', 'articles', 'media_gallery', 'videos', 'related_entities', 'navigation'],
+        'product' => ['identity', 'object_context', 'brand_context', 'model_context', 'variant_context', 'media_gallery', 'videos', 'articles', 'knowledge', 'navigation'],
     ];
+
+    /** @return array<string,int> */
+    public static function previewLimits(): array { return self::PREVIEW_LIMITS; }
 
     /** @return array<string,mixed> */
     public function compose(string $type, array $dossier): array
@@ -115,6 +135,12 @@ final class SemanticProfileComposer
             'brand' => ['models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'],
             'movement' => ['models', 'movements', 'music', 'components', 'variants', 'media', 'videos', 'articles'],
             'variant' => ['models', 'movements', 'music', 'components', 'variants', 'media', 'videos', 'articles'],
+            'model' => ['variants', 'movements', 'music', 'components', 'specimens', 'products', 'media', 'videos', 'articles'],
+            'music' => ['movements', 'models', 'variants', 'brands', 'media', 'videos', 'articles'],
+            'component' => ['movements', 'models', 'variants', 'classifications', 'media', 'videos', 'articles'],
+            'classification' => ['brands', 'models', 'variants', 'movements', 'specimens', 'products', 'media', 'videos', 'articles'],
+            'specimen' => ['brands', 'models', 'variants', 'movements', 'music', 'components', 'classifications', 'products', 'media', 'videos', 'articles'],
+            'product' => ['brands', 'models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'media', 'videos', 'articles'],
             default => ['brands', 'models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'],
         };
     }

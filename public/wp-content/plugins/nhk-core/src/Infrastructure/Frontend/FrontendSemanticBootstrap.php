@@ -113,7 +113,11 @@ final class FrontendSemanticBootstrap
         (new SemanticDossierCoverageAdminPage($coverageAudit, new CollectorCoverageAudit($authority, $collectorProfile), new \NHK\Core\Application\Collector\CollectorAuthoritySeedReconciler($authority)))->register();
 
         add_filter('nhk_v3_home_semantic_modules', static function(array $modules) use ($status, $gallery, $knowledgeArchive): array {
-            if ($status->mediaStorageReady()) $modules['media'] = $gallery->archive(1, 8)['items'];
+            if ($status->mediaStorageReady()) {
+                $mediaArchive = $gallery->archive(1, 8);
+                $modules['media'] = $mediaArchive['items'];
+                $modules['media_total'] = (int) ($mediaArchive['total'] ?? count($modules['media']));
+            }
             if ($status->knowledgeStorageReady()) {
                 $modules['knowledge'] = [];
                 foreach (($knowledgeArchive->archive(1, 6)['items'] ?? []) as $item) {

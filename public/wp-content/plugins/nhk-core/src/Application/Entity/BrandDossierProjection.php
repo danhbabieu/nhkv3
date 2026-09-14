@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Entity;
 
+use NHK\Core\Application\Presentation\EntityPresentationViewModel;
+
 /**
  * Read-only bridge between the explicit Brand structural recipe and the
  * generic semantic dossier. It never changes Graph/Authority ownership.
@@ -37,6 +39,7 @@ final class BrandDossierProjection
         $coverage['article_count'] = count(is_array($sections['articles'] ?? null) ? $sections['articles'] : []);
         $dossier['coverage'] = $coverage;
         $dossier['profile'] = (new SemanticProfileComposer())->compose('brand', $dossier);
+        $dossier['presentation'] = EntityPresentationViewModel::fromDossier('brand', $dossier);
         return $dossier;
     }
 

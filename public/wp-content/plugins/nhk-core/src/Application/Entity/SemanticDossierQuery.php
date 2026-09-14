@@ -9,6 +9,7 @@ use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Application\Seo\PublicSeoProjection;
 use NHK\Core\Application\Video\{VideoPublicContextSelector, VideoThumbnailSelector, VideoUrlPolicy};
 use NHK\Core\Application\Presentation\LatestFirstOrder;
+use NHK\Core\Application\Presentation\EntityPresentationViewModel;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Entity\EntityDossierReader;
 use NHK\Core\Contracts\Media\MediaRepository;
@@ -106,6 +107,7 @@ final class SemanticDossierQuery implements EntityDossierReader
         ];
         $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose($entity->entityType, $dossier);
         $dossier['relation_sections'] = $this->withoutOrderingMetadata($sections);
+        $dossier['presentation'] = EntityPresentationViewModel::fromDossier($entity->entityType, $dossier);
         return $dossier;
     }
 
@@ -146,6 +148,7 @@ final class SemanticDossierQuery implements EntityDossierReader
         ];
         $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose('wp_post', $dossier);
         $dossier['relation_sections'] = $this->withoutOrderingMetadata($sections);
+        $dossier['presentation'] = EntityPresentationViewModel::fromDossier('wp_post', $dossier);
         return $dossier;
     }
 
@@ -196,6 +199,7 @@ final class SemanticDossierQuery implements EntityDossierReader
         ];
         $dossier['profile'] = ($this->profileComposer ?? new SemanticProfileComposer())->compose('video', $dossier);
         $dossier['relation_sections'] = $this->withoutOrderingMetadata($sections);
+        $dossier['presentation'] = EntityPresentationViewModel::fromDossier('video', $dossier);
         return $dossier;
     }
 

@@ -1,5 +1,31 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — Official MCP Apps image-upload View lifecycle
+
+CHANGE: The NHK image-upload View now uses the official
+`@modelcontextprotocol/ext-apps` `App` lifecycle. The View registers
+`app.ontoolresult` before `await app.connect()`, enables interaction only after
+CONNECTING reaches READY, and calls the exact live tool
+`nhk.media.widget-upload` through `app.callServerTool`.
+
+RESOURCE: The bounded source is under `tools/mcp-apps/image-upload/` and Vite
+produces the single bundled resource at
+`public/wp-content/plugins/nhk-core/resources/ui/image-upload.html`. The
+resource registry and MIME remain unchanged:
+`text/html;profile=mcp-app`.
+
+HOST ACCEPTANCE: A local reference-style MCP Apps host exercised the real SDK
+initialize/initialized lifecycle, initial tool result delivery, READY render,
+ChatGPT file-extension mocks, and the App.callServerTool path. One-image and
+multi-image result mappings preserve Attachment ID, Media ID, public filename
+and status while omitting signed download URLs from rendered/model-visible
+state. Unsupported file APIs produce an explicit widget error state.
+
+SCOPE: No backend, Capture or Media production code changed. No deploy, push,
+pull or staging mutation was performed. Full Unit remains subject to two
+unrelated concurrent presentation-worktree failures; focused widget/backend,
+Contract and guarded Integration evidence is recorded in the handoff.
+
 # Checkpoint — 2026-09-14 — Pre-master P0 closeout gate
 
 WORKTREE: Clean readiness tree. The readiness and presentation changes were
@@ -9637,3 +9663,33 @@ PLAN/fingerprint is stale. The old Capture
 `1f443294dc55ca76c81153a82ef1051f5775033f97ac57773e1bc6947271b0c2` must not
 be applied. After deployment, rerun Search/Reuse → PLAN and continue through
 the existing Governance lifecycle.
+
+# Checkpoint — 2026-09-14 — Final frontend / presentation pass
+
+SCOPE: Completed the read-only presentation seam for the official NHK V3
+workspace. Added a reader-safe `EntityPresentationViewModel`, relation-origin
+normalization, section status handling, derived readiness, centralized preview
+limits, and post-enrichment refreshes for Brand and Clock Type projections.
+Clock Type archive collection now excludes only non-ready presentation items;
+semantic ACTIVE state is not changed. The public label remains `Nhóm đồng hồ`,
+the internal family remains `clock_type`, and `/loai-dong-ho/` remains stable.
+
+THEME: Added shared breadcrumbs, entity hero, entity cards, media/video cards,
+media grid, hierarchy navigation, local section navigation, empty state and
+visual rail partials. Homepage previews are visual-first and data-driven with
+dead CTA suppression. Canonical navigation is shared by desktop/mobile and
+includes `Nhóm đồng hồ` between `Thương hiệu` and `Mẫu`. Responsive/focus and
+semantic landmark styles are in the existing theme token chain.
+
+VERIFICATION: Full Unit suite passes `1541 tests / 7455 assertions`; Contract
+suite passes in isolation `6 tests / 48 assertions`; focused presentation and
+collection suites pass `78 tests / 763 assertions`. PHP lint, `git diff
+--check` and scoped secret review pass. Read-only frontend route smoke is
+`ENVIRONMENT_BLOCKED` because localhost:80 has no server; no server was
+started. Combined Unit + Contract remains affected by the existing suite-order
+`current_user_can()` helper collision; the isolated Contract suite passes.
+
+BOUNDARY: No Authority, Graph, Public Identity, Knowledge, Media, Video,
+Article, Proposal, Apply, publication, URL mutation, deployment or Git
+operation was performed. Existing unrelated local changes, including the
+MCP-app image-upload resource, were preserved.

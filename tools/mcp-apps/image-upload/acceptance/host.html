@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NHK MCP Apps local acceptance host</title>
+    <style>
+      body { font: 16px system-ui, sans-serif; margin: 24px; max-width: 960px; }
+      #checks { display: grid; gap: 4px; margin: 16px 0; }
+      #view { border: 1px solid #999; min-height: 420px; width: 100%; }
+      code { font-family: ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <h1>NHK MCP Apps local acceptance</h1>
+    <div id="checks" aria-live="polite">
+      <div>APP_CONNECT_PASS=<span id="connect">PENDING</span></div>
+      <div>VIEW_RENDER_PASS=<span id="render">PENDING</span></div>
+      <div>UPLOAD_BUTTON_VISIBLE=<span id="button">PENDING</span></div>
+      <div>CALL_SERVER_TOOL_PATH=<span id="call">PENDING</span></div>
+    </div>
+    <iframe id="view" title="NHK image uploader view"></iframe>
+    <script>
+      (() => {
+        const frame = document.getElementById('view');
+        const connect = document.getElementById('connect');
+        const render = document.getElementById('render');
+        const button = document.getElementById('button');
+        const call = document.getElementById('call');
+        const resourceUrl = '/public/wp-content/plugins/nhk-core/resources/ui/image-upload.html';
+        function reply(event, id, result) {
+          event.source.postMessage({ jsonrpc: '2.0', id, result }, event.origin || '*');
+        }
+
+        window.addEventListener('message', (event) => {
+          if (event.source !== frame.contentWindow || !event.data || event.data.jsonrpc !== '2.0') return;
+          const message = event.data;
+          if (message.method === 'ui/initialize') {
+            connect.textContent = 'YES';
+            reply(event, message.id, {
+              protocolVersion: '2026-01-26',
+              hostInfo: { name: 'NHK Local Acceptance Host', version: '1.0.0' },
+              hostCapabilities: {},
+              hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline'] },
+            });
+            return;
+          }
+          if (message.method === 'ui/notifications/initialized') {
+            render.textContent = frame.contentDocument?.getElementById('state')?.textContent === 'READY' ? 'YES' : 'PENDING';
+            button.textContent = frame.contentDocument?.getElementById('upload') ? 'YES' : 'NO';
+            setTimeout(() => frame.contentWindow.postMessage({
+              jsonrpc: '2.0',
+              method: 'ui/notifications/tool-result',
+              params: { content: [{ type: 'text', text: JSON.stringify({ resourceUri: 'ui://nhk/image-upload.html' }) }] },
+            }, '*'), 0);
+            return;
+          }
+          if (message.method === 'tools/call') {
+            const name = message.params?.name;
+            call.textContent = `${name} via App.callServerTool`;
+            const files = message.params?.arguments?.files || [];
+            reply(event, message.id, {
+              content: [{ type: 'text', text: JSON.stringify({ uploads: files.map((file, index) => ({
+                attachment_id: 900 + index,
+                media_id: `acceptance-media-${index + 1}`,
+                public_filename: `accepted-${index + 1}.webp`,
+                file_id: file.file_id,
+                status: 'uploaded',
+              })) }) }],
+              structuredContent: { uploads: files.map((file, index) => ({
+                attachment_id: 900 + index,
+                media_id: `acceptance-media-${index + 1}`,
+                public_filename: `accepted-${index + 1}.webp`,
+                file_id: file.file_id,
+                status: 'uploaded',
+              })) },
+            });
+          }
+        });
+
+        async function loadView() {
+          const html = await fetch(resourceUrl).then((response) => response.text());
+          const noUploadApis = new URLSearchParams(location.search).has('no-upload');
+          const mock = noUploadApis ? '<scr' + 'ipt>window.openai = {};</scr' + 'ipt>' : [
+            '<scr', 'ipt>',
+            'window.openai = {',
+            'selectFiles: async () => [new File(["one"], "one.jpg", { type: "image/jpeg" }), new File(["two"], "two.png", { type: "image/png" })],',
+            'uploadFile: async (file) => ({ fileId: "mock-" + file.name }),',
+            'getFileDownloadUrl: async ({ fileId }) => ({ downloadUrl: "https://files.openai.test/signed/" + fileId }),',
+            'setWidgetState: (state) => { window.__widgetState = state; },',
+            'sendFollowUpMessage: async (message) => { window.__followUp = message; },',
+            '};',
+            '<', '/scr', 'ipt>',
+          ].join('');
+          frame.srcdoc = html.replace('</head>', `${mock}</head>`);
+        }
+
+        void loadView().catch((error) => {
+          connect.textContent = `ERROR: ${error.message}`;
+          render.textContent = 'NO';
+          button.textContent = 'NO';
+        });
+      })();
+    </script>
+  </body>
+</html>

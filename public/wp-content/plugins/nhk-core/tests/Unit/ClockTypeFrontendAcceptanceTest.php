@@ -17,7 +17,7 @@ final class ClockTypeFrontendAcceptanceTest extends TestCase
         CanonicalEntityTypeCatalog::registerInto($types);
         $authorityRepository = new InMemoryAuthorityRepository();
         $authority = new AuthorityService($authorityRepository, $types);
-        $clockType = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $clockType = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Nhóm đồng hồ phục vụ không gian công cộng.']);
         $authority->create('classification', 'nhk:classification:case-form.public', 'Đồng hồ công cộng', ['family' => 'case_form']);
         $identities = new ClockTypeFrontendFixtureIdentityRepository([
             'authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong'],

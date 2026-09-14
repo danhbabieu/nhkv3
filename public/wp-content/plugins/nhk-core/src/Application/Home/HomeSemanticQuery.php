@@ -33,10 +33,12 @@ final class HomeSemanticQuery
     public function extend(array $modules): array
     {
         foreach (['entities','media','videos','knowledge','hubs','clock_groups','explore_next'] as $key) if (!isset($modules[$key]) || !is_array($modules[$key])) $modules[$key] = [];
+        foreach (['clock_groups_total', 'media_total', 'videos_total'] as $key) if (!isset($modules[$key])) $modules[$key] = 0;
 
         if ($this->ready('authority')) {
             $clockGroups = $this->collection()->archiveProfile('clock_type', 1, 6);
             if ((int) ($clockGroups['total'] ?? 0) > 0) {
+                $modules['clock_groups_total'] = (int) $clockGroups['total'];
                 $modules['hubs'][] = ['type' => 'clock_type', 'label' => 'Nhóm đồng hồ', 'total' => (int) $clockGroups['total'], 'url' => $this->routes()->archivePathForProfile('clock_type')];
                 foreach ((array) ($clockGroups['items'] ?? []) as $item) {
                     if (!is_array($item) || ($item['presentation_readiness']['status'] ?? '') !== 'READY') continue;
@@ -69,9 +71,11 @@ final class HomeSemanticQuery
 
         if ($this->ready('media') && $this->gallery !== null) {
             $modules['media'] = [];
+            $modules['media_total'] = 0;
             $mediaItems = LatestFirstOrder::sort($this->media->list(), static fn (\NHK\Core\Domain\Media\Media $item): ?string => null, static fn (\NHK\Core\Domain\Media\Media $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Media\Media $item): string => $item->canonicalId);
             foreach ($mediaItems as $item) {
                 if (!$item->active || $item->readiness !== 'ready' || $item->isSystemPlaceholder()) continue;
+                $modules['media_total']++;
                 $visual = $this->gallery->forMedia($item->canonicalId);
                 if (!is_array($visual)) continue;
                 $modules['media'][] = $visual;
@@ -80,6 +84,8 @@ final class HomeSemanticQuery
         }
 
         if ($this->ready('video')) {
+            $modules['videos'] = [];
+            $modules['videos_total'] = 0;
             $videoItems = LatestFirstOrder::sort($this->videos->list(), fn (\NHK\Core\Domain\Video\Video $item): ?string => $this->videoPublishedAt($item), fn (\NHK\Core\Domain\Video\Video $item): ?string => $item->createdAt, fn (\NHK\Core\Domain\Video\Video $item): string => $item->canonicalId);
             foreach ($videoItems as $item) {
                 if (!$item->active || !$item->hasValidPublicReference()) continue;
@@ -88,6 +94,7 @@ final class HomeSemanticQuery
                     ? $metadata['source_snapshot']
                     : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
                 if (isset($source['availability']) && !in_array($source['availability'], ['available','unknown'], true)) continue;
+                $modules['videos_total']++;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
                 $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
