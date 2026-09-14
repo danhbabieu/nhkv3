@@ -77,6 +77,15 @@ final class CanonicalPublicSlugPolicyTest extends TestCase
         self::assertSame('dong-ho-co', $policy->resolve('Đồng hồ cổ', ['1978', 'model-36'], static fn(string $slug): bool => false));
     }
 
+    public function test_clock_type_route_profile_strips_one_leading_lexical_prefix_and_namespaces_the_slug(): void
+    {
+        $policy = new CanonicalPublicSlugPolicy();
+
+        self::assertSame('dong-ho-vai-bo', $policy->resolveForRoute('Vai bò', [], static fn(string $slug): bool => false, 'dong-ho-', 'Đồng hồ '));
+        self::assertSame('dong-ho-cong-cong', $policy->resolveForRoute('Đồng hồ công cộng', [], static fn(string $slug): bool => false, 'dong-ho-', 'Đồng hồ '));
+        self::assertSame('dong-ho-dong-ho-cong-cong', $policy->resolveForRoute('Đồng hồ Đồng hồ công cộng', [], static fn(string $slug): bool => false, 'dong-ho-', 'Đồng hồ '));
+    }
+
     public function test_real_collision_uses_first_meaningful_available_qualifier(): void
     {
         $policy = new CanonicalPublicSlugPolicy();

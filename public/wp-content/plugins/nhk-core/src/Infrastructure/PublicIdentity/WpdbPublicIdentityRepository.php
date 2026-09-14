@@ -121,6 +121,7 @@ final class WpdbPublicIdentityRepository implements PublicIdentityRepository, Ro
             $parent = $this->scopeParent($scope, 'model');
             return $parent === null ? null : $this->pathForRow($parent) . $slug . '/';
         }
+        if ($type === 'classification' && str_starts_with($slug, (string) \NHK\Core\Application\Entity\PublicRouteResolver::routePrefixForProfile('clock_type'))) return '/' . $slug . '/';
         $prefix = match($type){'video'=>'/video/','movement'=>'/bo-may/','music'=>'/ban-nhac/','component'=>'/linh-kien/','classification'=>'/phan-loai/','specimen'=>'/hien-vat/','product'=>'/san-pham/',default=>null};
         return $prefix === null ? null : $prefix . $slug . '/';
     }

@@ -58,9 +58,14 @@ final class PublicUrlReprojectionPlanner
 
             $keyPrefix = $routeType . '|' . $scope . '|';
             try {
-                $desired = $this->slugs->resolve($name, $qualifiers, function(string $candidate) use (&$reserved, $keyPrefix, $item, $externallyOccupied): bool {
+                $routePrefix = trim((string) ($item['route_prefix'] ?? ''));
+                $stripLexicalPrefix = (string) ($item['strip_lexical_prefix'] ?? '');
+                $isTaken = function(string $candidate) use (&$reserved, $keyPrefix, $item, $externallyOccupied): bool {
                     return isset($reserved[$keyPrefix . $candidate]) || $externallyOccupied($item, $candidate);
-                });
+                };
+                $desired = $routePrefix !== '' || $stripLexicalPrefix !== ''
+                    ? $this->slugs->resolveForRoute($name, $qualifiers, $isTaken, $routePrefix, $stripLexicalPrefix)
+                    : $this->slugs->resolve($name, $qualifiers, $isTaken);
             } catch (\RuntimeException $error) {
                 $planned['blocker'] = $error->getMessage() === 'PUBLIC_SLUG_COLLISION_REQUIRES_RECONCILIATION'
                     ? 'COLLISION_REQUIRES_RECONCILIATION'

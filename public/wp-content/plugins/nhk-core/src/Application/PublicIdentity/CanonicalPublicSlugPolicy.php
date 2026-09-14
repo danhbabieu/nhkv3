@@ -80,6 +80,28 @@ final class CanonicalPublicSlugPolicy
     }
 
     /**
+     * Resolve a route-profile slug without making the profile a semantic
+     * identity. The lexical prefix is stripped only once, when it is present
+     * at the beginning of the display name, then the configured route prefix
+     * is applied to every candidate before collision checks.
+     *
+     * @param list<string> $meaningfulQualifiers
+     */
+    public function resolveForRoute(string $value, array $meaningfulQualifiers, callable $isTaken, string $routePrefix = '', string $stripLexicalPrefix = ''): string
+    {
+        $baseValue = $stripLexicalPrefix !== '' && str_starts_with($value, $stripLexicalPrefix)
+            ? substr($value, strlen($stripLexicalPrefix))
+            : $value;
+        $candidates = self::candidates($baseValue, $meaningfulQualifiers);
+        if ($candidates === []) throw new \InvalidArgumentException('PUBLIC_SLUG_INVALID');
+        foreach ($candidates as $candidate) {
+            $routed = $routePrefix . $candidate;
+            if (!$isTaken($routed)) return $routed;
+        }
+        throw new \RuntimeException('PUBLIC_SLUG_COLLISION_REQUIRES_RECONCILIATION');
+    }
+
+    /**
      * Build shortest-first public slug candidates from meaningful domain data.
      * Callers remain responsible for checking route-scope availability.
      *

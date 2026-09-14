@@ -1,5 +1,40 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — Scoped single-owner Public URL reproject
+
+DECISION: Extend the existing canonical `nhk.public-url.audit` and
+`nhk.public-url.reproject` lifecycle with an exact UUID `owner_id` selector.
+The Easy MCP-facing reproject schema requires `owner_id`; omission is invalid
+and cannot select the retained internal global/batch service behavior.
+
+IMPLEMENTATION: Scoped audit filters the registered Public URL inventory to
+one owner, independently of global audit status. Scoped reproject re-plans
+immediately before apply, checks the current decision, collision,
+idempotency/revision guards, delegates to the existing Public Identity
+maintenance service and returns canonical read-back evidence. The existing
+`internal_admin_only`, `nhk_internal_content_operations` and
+`nhk_manage_public_urls` guards remain independent; `PROJECT_BUILD` alone does
+not grant URL maintenance access.
+
+CLOCK TYPE: Profile-driven routing uses `entity_type=classification`,
+`family=clock_type`, exact one-prefix stripping and the `dong-ho-` route
+prefix. The test fixture `Đồng hồ chim cúc cu` resolves to
+`/dong-ho-chim-cuc-cu/`; no Clock Type, Public Identity or semantic record was
+created or applied.
+
+INVARIANTS: Semantic UUID, stable key, Graph and Knowledge are unchanged.
+Existing Public Identities are not mass-rewritten. Global blockers do not
+authorize global reproject and do not prevent an eligible clean owner from
+being maintained through the bounded flow.
+
+VERIFICATION: Code and tests only. No live reproject, no allocation of
+`/dong-ho-chim-cuc-cu/`, no `Đồng hồ chim cúc cu` creation and no semantic
+mutation were performed.
+
+DOCUMENTATION: Deterministic snapshot generation was run twice with identical
+output; the current documentation version and manifest hash are reported from
+the generated snapshot at verification time.
+
 # Checkpoint — 2026-09-14 — ERR-015 Proposal lifecycle connector exposure
 
 ROOT CAUSE: The runtime catalog, WordPress Ability registration and canonical

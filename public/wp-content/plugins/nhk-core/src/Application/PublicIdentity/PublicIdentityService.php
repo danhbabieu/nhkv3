@@ -3,17 +3,19 @@ declare(strict_types=1);
 namespace NHK\Core\Application\PublicIdentity;
 
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Core\Contracts\PublicIdentity\RootPublicIdentityReader;
 
 final class PublicIdentityService
 {
     public function __construct(private object $repository, private \Closure $nativeRouteExists) {}
 
-    public function allocate(string $ownerKind, string $ownerId, string $routeType, string $scope, string $slug, string $idempotencyKey): array
+    public function allocate(string $ownerKind, string $ownerId, string $routeType, string $scope, string $slug, string $idempotencyKey, ?string $routeNamespace = null): array
     {
         if ($ownerKind === '' || !UuidCodec::isValid($ownerId) || $routeType === '' || $scope === '' || $idempotencyKey === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
         $slug = CanonicalPublicSlugPolicy::normalize($slug);
         if ($slug === '' || ($this->nativeRouteExists)($slug)) throw new \RuntimeException('NATIVE_ROUTE_CONFLICT');
-        return $this->repository->allocate($this->record($ownerKind, $ownerId, $routeType, $scope, $slug), $idempotencyKey);
+        if ($routeNamespace === 'root' && $this->rootCollision($slug, $ownerId)) throw new \RuntimeException('PUBLIC_IDENTITY_ROUTE_COLLISION');
+        return $this->repository->allocate($this->record($ownerKind, $ownerId, $routeType, $scope, $slug, $routeNamespace), $idempotencyKey);
     }
 
     /** @param list<string> $meaningfulQualifiers */
@@ -45,7 +47,7 @@ final class PublicIdentityService
     }
 
     /** Pre-public URL projection maintenance; semantic identity is unchanged. */
-    public function reproject(string $identityId, string $publicName, string $scope, int $expectedRevision, string $idempotencyKey): array
+    public function reproject(string $identityId, string $publicName, string $scope, int $expectedRevision, string $idempotencyKey, ?string $routeNamespace = null): array
     {
         if (trim($scope) === '' || $identityId === '' || $expectedRevision < 1 || $idempotencyKey === '') throw new \InvalidArgumentException('PUBLIC_IDENTITY_INPUT_INVALID');
         $current = $this->repository->findCurrentById($identityId);
@@ -54,21 +56,33 @@ final class PublicIdentityService
         $slug = CanonicalPublicSlugPolicy::normalize($publicName);
         if ($slug === '') throw new \InvalidArgumentException('PUBLIC_SLUG_INVALID');
         if (($this->nativeRouteExists)($slug)) throw new \RuntimeException('NATIVE_ROUTE_CONFLICT');
+        if ($routeNamespace === 'root' && $this->rootCollision($slug, (string) ($current['owner_id'] ?? ''))) throw new \RuntimeException('PUBLIC_IDENTITY_ROUTE_COLLISION');
         $record = $current;
         $record['current_slug'] = $slug;
+        $record['current_path'] = $this->path((string) $current['route_type'], $slug, $routeNamespace);
         $record['collision_scope'] = trim($scope);
         $record['route_policy_version'] = '2';
         return $this->repository->change($record, (string) $current['current_path'], $expectedRevision, $idempotencyKey);
     }
 
-    private function record(string $ownerKind, string $ownerId, string $routeType, string $scope, string $slug): array
+    private function record(string $ownerKind, string $ownerId, string $routeType, string $scope, string $slug, ?string $routeNamespace = null): array
     {
-        return ['owner_kind' => $ownerKind, 'owner_id' => $ownerId, 'route_type' => $routeType, 'collision_scope' => $scope, 'current_slug' => $slug, 'current_path' => $this->path($routeType, $slug), 'route_policy_version' => '2'];
+        return ['owner_kind' => $ownerKind, 'owner_id' => $ownerId, 'route_type' => $routeType, 'collision_scope' => $scope, 'current_slug' => $slug, 'current_path' => $this->path($routeType, $slug, $routeNamespace), 'route_policy_version' => '2'];
     }
 
-    private function path(string $routeType, string $slug): string
+    private function path(string $routeType, string $slug, ?string $routeNamespace = null): string
     {
+        if ($routeNamespace === 'root') return '/' . $slug . '/';
         $prefix = match ($routeType) { 'video' => '/video/', 'movement' => '/bo-may/', 'music' => '/ban-nhac/', 'component' => '/linh-kien/', 'classification' => '/phan-loai/', 'specimen' => '/hien-vat/', 'product' => '/san-pham/', default => '/' };
         return $prefix . $slug . '/';
+    }
+
+    private function rootCollision(string $slug, string $ownerId): bool
+    {
+        if (!$this->repository instanceof RootPublicIdentityReader) return false;
+        foreach ($this->repository->findCurrentByRootSlug($slug) as $identity) {
+            if ((string) ($identity['owner_id'] ?? '') !== $ownerId) return true;
+        }
+        return false;
     }
 }

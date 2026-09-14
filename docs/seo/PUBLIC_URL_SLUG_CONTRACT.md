@@ -98,6 +98,17 @@ records revision/history as required and performs read-back/collision checks.
 The current `CanaryPublicIdentityProjection` is read-only and therefore cannot
 be treated as authorization for bulk mutation.
 
+The existing governed maintenance boundary also supports a bounded
+single-owner reproject. The exposed request must carry the exact Public URL
+owner UUID; omission is not a global batch request. The service takes a fresh
+scoped audit, confirms the owner decision is still current, checks collision and
+revision/idempotency guards, delegates to `PublicUrlMaintenanceService` and
+performs canonical read-back. A globally blocked audit does not by itself block
+an otherwise clean owner, and it never authorizes reprojection of all owners.
+This lifecycle changes only the selected Public Identity projection; it does
+not change semantic UUID, stable key, Graph, Knowledge or unrelated persisted
+identities.
+
 ## 8. Acceptance
 
 Regression evidence must cover Vietnamese NFC/NFD normalization, separator

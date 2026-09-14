@@ -86,6 +86,28 @@ remain protected by `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`.
 Project Build does not bypass Governance, perform legacy backfill or change
 canonical UUID, stable-key, Graph, Knowledge or Public Identity ownership.
 
+### Scoped Public URL maintenance — 2026-09-14
+
+`nhk.public-url.audit` remains read-only and accepts an optional exact
+`owner_id` UUID. An unscoped audit may be `BLOCKED` because another owner is
+unresolved; that global result is not scoped eligibility evidence. A scoped
+audit plans only the registered Public URL owner selected by that UUID, so a
+clean owner may be eligible while unrelated global blockers remain.
+
+The Easy MCP-facing `nhk-v3/public-url-reproject` Ability requires
+`owner_id`, `idempotency_key` and `pre_public_confirmed=true`. Omission of
+`owner_id` is invalid and never means “reproject everything”. The lifecycle is
+`audit(owner) → clean scoped receipt → explicit owner confirmation → scoped
+reprojection → canonical read-back`. The service re-plans immediately before
+apply, verifies collision/idempotency/revision guards and delegates to the
+existing Public Identity maintenance service. It can change only the selected
+owner; it never rekeys semantic UUID/stable-key or rewrites other identities.
+
+The Ability remains `internal_admin_only` and independently requires
+`nhk_internal_content_operations` and `nhk_manage_public_urls`. `PROJECT_BUILD`
+does not grant either capability, and URL maintenance remains an internal/admin
+lifecycle operation rather than a generic writer or Governance bypass.
+
 The operational lock-down is config-only: freeze new build mutations, audit
 canonical inventory and duplicates, review unresolved proposals, verify Graph
 integrity and Public Identity collisions, take a backup/snapshot, then switch

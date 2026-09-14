@@ -8,9 +8,10 @@ use NHK\Core\Application\Media\{PublicMediaAssetDelivery, PublicMediaAssetUrlRes
 use NHK\Core\Application\PublicIdentity\{PublicIdentityService, PublicUrlMaintenanceService};
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
-use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
+use NHK\Core\Contracts\PublicIdentity\{PublicIdentityRepository, RootPublicIdentityReader};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
+use NHK\Core\Application\Entity\EntityProfileRegistry;
 use NHK\Core\Domain\Media\MediaAsset;
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
@@ -69,7 +70,7 @@ final class WordPressPublicUrlMaintenanceRuntime
                 if (!$entity instanceof AuthorityEntity || !$entity->active()) continue;
                 $scope = $this->authorityScope($entity);
                 $current = $this->identities->findCurrentByOwner('authority', $entity->canonicalId, $entity->entityType);
-                $items[] = [
+                $items[] = array_merge([
                     'kind' => 'authority',
                     'owner_id' => $entity->canonicalId,
                     'route_type' => $entity->entityType,
@@ -80,7 +81,7 @@ final class WordPressPublicUrlMaintenanceRuntime
                     'identity_id' => is_array($current) ? (string) ($current['identity_id'] ?? '') : '',
                     'revision' => is_array($current) ? (int) ($current['revision'] ?? 0) : 0,
                     'qualifiers' => $this->meaningfulAuthorityQualifiers($entity),
-                ];
+                ], $this->authorityRouteIntent($entity));
             }
         }
 
@@ -219,6 +220,11 @@ final class WordPressPublicUrlMaintenanceRuntime
         $ownerId = (string) ($item['owner_id'] ?? '');
 
         if ($kind === 'authority' && $routeType === 'brand') return $this->nativeRootOccupied($candidate, null);
+        if (($item['route_namespace'] ?? null) === 'root' && $this->identities instanceof RootPublicIdentityReader) {
+            foreach ($this->identities->findCurrentByRootSlug($candidate) as $identity) {
+                if ((string) ($identity['owner_id'] ?? '') !== $ownerId) return true;
+            }
+        }
         if (in_array($kind, ['wp_post'], true)) {
             if ($this->nativeRootOccupied($candidate, ctype_digit($ownerId) ? (int) $ownerId : null)) return true;
             foreach ($this->authority->listByType('brand') as $brand) {
@@ -256,9 +262,9 @@ final class WordPressPublicUrlMaintenanceRuntime
             if ($kind === 'authority' && $routeType === 'brand' && $this->nativeRootOccupied($desired, null)) throw new \RuntimeException('NATIVE_ROUTE_CONFLICT');
             $identityId = trim((string) ($item['identity_id'] ?? ''));
             if ($identityId === '') {
-                $this->identityService->allocate($kind === 'video' ? 'video' : 'authority', $ownerId, $routeType, $scope, $desired, $idempotencyKey);
+                $this->identityService->allocate($kind === 'video' ? 'video' : 'authority', $ownerId, $routeType, $scope, $desired, $idempotencyKey, isset($item['route_namespace']) ? (string) $item['route_namespace'] : null);
             } else {
-                $this->identityService->reproject($identityId, $desired, $scope, (int) ($item['revision'] ?? 0), $idempotencyKey);
+                $this->identityService->reproject($identityId, $desired, $scope, (int) ($item['revision'] ?? 0), $idempotencyKey, isset($item['route_namespace']) ? (string) $item['route_namespace'] : null);
             }
             return;
         }
@@ -290,5 +296,20 @@ final class WordPressPublicUrlMaintenanceRuntime
         }
 
         throw new \RuntimeException('PUBLIC_URL_OWNER_UNSUPPORTED');
+    }
+
+    /** @return array<string,string> */
+    private function authorityRouteIntent(AuthorityEntity $entity): array
+    {
+        if ($entity->entityType !== 'classification' || (string) ($entity->payload['family'] ?? '') !== 'clock_type') return [];
+        $profile = (new EntityProfileRegistry())->get('clock_type');
+        if ($profile === null) return [];
+        $intent = $profile->rootDetailRouteIntent;
+        return [
+            'route_profile' => 'clock_type',
+            'route_prefix' => trim((string) ($intent['route_prefix'] ?? '')),
+            'strip_lexical_prefix' => (string) ($intent['strip_lexical_prefix'] ?? ''),
+            'route_namespace' => 'root',
+        ];
     }
 }

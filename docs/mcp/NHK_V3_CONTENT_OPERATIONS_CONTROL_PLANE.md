@@ -107,6 +107,32 @@ verification. Existing records remain readable and maintainable through their
 owner/lifecycle boundaries; this inventory changes the creation route, not
 canonical identity or historical data.
 
+### Scoped Public URL lifecycle — 2026-09-14
+
+The canonical URL maintenance sequence is:
+
+```text
+nhk.public-url.audit(owner_id)
+→ clean owner receipt
+→ explicit confirmation
+→ nhk-v3/public-url-reproject(owner_id, idempotency_key, pre_public_confirmed)
+→ canonical Public Identity read-back
+```
+
+`owner_id` is an exact UUID selector. The Easy MCP Ability requires it, so
+missing input cannot select a global/batch operation. A global audit and a
+scoped audit have different eligibility: unrelated global blockers neither
+authorize a global reproject nor prevent a clean single-owner maintenance
+operation. The scoped service reuses the existing Public URL planning,
+collision, idempotency, revision/CAS and Public Identity maintenance owners;
+only the selected owner may be allocated or changed.
+
+The Ability remains `internal_admin_only` and requires both
+`nhk_internal_content_operations` and `nhk_manage_public_urls`. Project Build
+capability alone is insufficient. URL maintenance does not create semantic
+data, bypass Governance, expose a generic writer or rewrite existing Public
+Identities en masse.
+
 The existing Easy MCP bridge permits explicit internal/admin lifecycle
 opt-ins for `nhk-v3/public-url-reproject` and the physical widget upload
 `nhk-v3/media-widget-upload`. Both remain capability guarded and are not

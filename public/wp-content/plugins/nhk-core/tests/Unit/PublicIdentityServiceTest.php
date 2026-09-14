@@ -39,6 +39,19 @@ final class PublicIdentityServiceTest extends TestCase
         self::assertStringNotContainsString($ownerId, $identity['current_path']);
     }
 
+    public function test_profile_route_namespace_is_persisted_without_changing_semantic_owner(): void
+    {
+        $repository = new FakeIdentityRepository();
+        $service = new PublicIdentityService($repository, static fn (string $slug): bool => false);
+        $ownerId = '01a06815-1e51-7964-b004-1ba79e488ad1';
+
+        $identity = $service->allocate('authority', $ownerId, 'classification', 'root', 'dong-ho-chim-cuc-cu', 'clock-url-1', 'root');
+
+        self::assertSame($ownerId, $identity['owner_id']);
+        self::assertSame('classification', $identity['route_type']);
+        self::assertSame('/dong-ho-chim-cuc-cu/', $identity['current_path']);
+    }
+
     public function test_stale_revision_and_native_collision_fail_closed(): void
     {
         $repository = new FakeIdentityRepository();
@@ -77,7 +90,7 @@ final class FakeIdentityRepository
         if (isset($this->idempotency[$key])) return $this->idempotency[$key];
         $record['identity_id'] = 'identity-1';
         $record['revision'] = 1;
-        $record['current_path'] = '/' . $record['current_slug'] . '/';
+        $record['current_path'] ??= '/' . $record['current_slug'] . '/';
         $this->identity = $record;
         return $this->idempotency[$key] = $record;
     }
@@ -87,7 +100,7 @@ final class FakeIdentityRepository
         if (isset($this->idempotency[$key])) return $this->idempotency[$key];
         if ($expectedRevision !== $this->identity['revision']) throw new \RuntimeException('STALE_REVISION');
         $record['revision'] = $expectedRevision + 1;
-        $record['current_path'] = '/' . $record['current_slug'] . '/';
+        $record['current_path'] ??= '/' . $record['current_slug'] . '/';
         $this->identity = $record;
         $this->history[] = $oldPath;
         return $this->idempotency[$key] = $record;

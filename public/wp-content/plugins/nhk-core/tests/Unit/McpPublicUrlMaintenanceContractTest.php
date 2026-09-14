@@ -16,6 +16,8 @@ use PHPUnit\Framework\TestCase;
 
 final class McpPublicUrlMaintenanceContractTest extends TestCase
 {
+    private const OWNER_CLOCK_TYPE = '01a07614-832d-7f27-959c-74eb0cd63f3e';
+
     public function test_catalog_and_ability_bridge_expose_bounded_public_url_actions(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
@@ -28,7 +30,8 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
         self::assertArrayHasKey('nhk.public-url.reproject', $tools);
         self::assertSame('mutation', $tools['nhk.public-url.reproject']['kind']);
         self::assertTrue($tools['nhk.public-url.reproject']['governed']);
-        self::assertSame(['idempotency_key', 'pre_public_confirmed'], $tools['nhk.public-url.reproject']['inputSchema']['required']);
+        self::assertSame(['owner_id', 'idempotency_key', 'pre_public_confirmed'], $tools['nhk.public-url.reproject']['inputSchema']['required']);
+        self::assertSame('uuid', $tools['nhk.public-url.audit']['inputSchema']['properties']['owner_id']['format']);
         self::assertSame('nhk-v3/public-url-reproject', McpAbilityRegistration::abilityNameForTool('nhk.public-url.reproject'));
     }
 
@@ -58,6 +61,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
         );
 
         $response = $transport->dispatch($this->call('nhk.public-url.reproject', [
+            'owner_id' => self::OWNER_CLOCK_TYPE,
             'idempotency_key' => 'url-capability-absent',
             'pre_public_confirmed' => true,
         ]));
@@ -75,7 +79,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
             static function () use (&$currentSlug): array {
                 return [[
                     'kind' => 'video',
-                    'owner_id' => 'video-1',
+                    'owner_id' => self::OWNER_CLOCK_TYPE,
                     'route_type' => 'video',
                     'scope' => 'root',
                     'name' => 'Tuổi',
@@ -102,12 +106,13 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
             publicUrls: $service,
         );
 
-        $audit = $transport->dispatch($this->call('nhk.public-url.audit', []));
+        $audit = $transport->dispatch($this->call('nhk.public-url.audit', ['owner_id' => self::OWNER_CLOCK_TYPE]));
         self::assertSame(200, $audit['status']);
         self::assertSame('READY', $audit['body']['result']['structuredContent']['status'] ?? null);
         self::assertSame(0, $writes);
 
         $apply = $transport->dispatch($this->call('nhk.public-url.reproject', [
+            'owner_id' => self::OWNER_CLOCK_TYPE,
             'idempotency_key' => 'url-cutover-1',
             'pre_public_confirmed' => true,
         ]));
@@ -115,6 +120,26 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
         self::assertSame('APPLIED', $apply['body']['result']['structuredContent']['status'] ?? null);
         self::assertSame(1, $writes);
         self::assertContains('nhk_manage_public_urls', $seenCapabilities);
+    }
+
+    public function test_easy_mcp_reproject_omission_is_invalid_and_cannot_mean_global_batch(): void
+    {
+        $service = new PublicUrlMaintenanceService(static fn(): array => [], static fn(array $item, string $candidate): bool => false, static function(): void {});
+        $transport = new McpTransport(
+            $this->read(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn(string $capability): bool => true,
+            null,
+            publicUrls: $service,
+        );
+
+        $response = $transport->dispatch($this->call('nhk.public-url.reproject', [
+            'idempotency_key' => 'global-omission',
+            'pre_public_confirmed' => true,
+        ]));
+
+        self::assertSame(400, $response['status']);
+        self::assertSame(-32602, $response['body']['error']['code']);
     }
 
     private function call(string $name, array $arguments): array

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\PublicIdentity;
 
+use NHK\Core\Shared\Uuid\UuidCodec;
+
 final class PublicUrlMaintenanceService
 {
     private PublicUrlReprojectionPlanner $planner;
@@ -24,12 +26,23 @@ final class PublicUrlMaintenanceService
     }
 
     /** @return array<string,mixed> */
-    public function audit(): array
+    public function audit(?string $ownerId = null): array
     {
+        if ($ownerId !== null) {
+            $ownerId = trim($ownerId);
+            if ($ownerId === '') return $this->ownerFailure('PUBLIC_URL_OWNER_REQUIRED');
+            if (!UuidCodec::isValid($ownerId)) return $this->ownerFailure('PUBLIC_URL_OWNER_INVALID');
+        }
         try {
             $inventory = ($this->inventory)();
             if (!is_array($inventory)) return ['status'=>'UNAVAILABLE','reason_code'=>'PUBLIC_URL_INVENTORY_UNAVAILABLE','items'=>[],'counts'=>['total'=>0,'change'=>0,'keep'=>0,'blocked'=>0]];
-            $plan = $this->planner->plan(array_values($inventory), $this->externallyOccupied);
+            $inventory = array_values($inventory);
+            if ($ownerId !== null) {
+                $inventory = array_values(array_filter($inventory, static fn (mixed $item): bool => is_array($item) && (string) ($item['owner_id'] ?? '') === $ownerId));
+                if (count($inventory) === 0) return $this->ownerFailure('PUBLIC_URL_OWNER_NOT_FOUND');
+                if (count($inventory) > 1) return $this->ownerFailure('PUBLIC_URL_OWNER_AMBIGUOUS');
+            }
+            $plan = $this->planner->plan($inventory, $this->externallyOccupied);
             foreach ($plan['items'] as $index => $item) {
                 if (($item['kind'] ?? '') !== 'media_asset') continue;
                 $action = (string) ($item['action'] ?? 'BLOCKED');
@@ -43,6 +56,8 @@ final class PublicUrlMaintenanceService
                     ? ['status' => 'UNVERIFIED', 'reason_code' => 'BINARY_DELIVERY_VERIFIER_UNAVAILABLE']
                     : ($this->deliveryVerifier)($item);
             }
+            $plan['owner_id'] = $ownerId;
+            $plan['plan_fingerprint'] = $this->fingerprint($plan['items']);
             return $plan;
         } catch (\Throwable) {
             return ['status'=>'UNAVAILABLE','reason_code'=>'PUBLIC_URL_INVENTORY_UNAVAILABLE','items'=>[],'counts'=>['total'=>0,'change'=>0,'keep'=>0,'blocked'=>0]];
@@ -50,10 +65,12 @@ final class PublicUrlMaintenanceService
     }
 
     /** @return array<string,mixed> */
-    public function reproject(string $idempotencyKey, bool $prePublicConfirmed): array
+    public function reproject(string $idempotencyKey, bool $prePublicConfirmed, ?string $ownerId = null): array
     {
         if (!$prePublicConfirmed) return ['status'=>'BLOCKED','reason_code'=>'PRE_PUBLIC_CONFIRMATION_REQUIRED','mutation_count'=>0];
         if (trim($idempotencyKey) === '') return ['status'=>'BLOCKED','reason_code'=>'IDEMPOTENCY_KEY_REQUIRED','mutation_count'=>0];
+
+        if ($ownerId !== null) return $this->reprojectOwner($idempotencyKey, $ownerId);
 
         $plan = $this->audit();
         if (($plan['status'] ?? '') !== 'READY') return [...$plan, 'mutation_count'=>0];
@@ -81,5 +98,101 @@ final class PublicUrlMaintenanceService
         }
 
         return ['status'=>'APPLIED','mutation_count'=>$mutationCount,'plan'=>$plan,'readback'=>$readback];
+    }
+
+    /** @return array<string,mixed> */
+    private function reprojectOwner(string $idempotencyKey, string $ownerId): array
+    {
+        $ownerId = trim($ownerId);
+        if ($ownerId === '') return $this->ownerFailure('PUBLIC_URL_OWNER_REQUIRED', ['mutation_count' => 0]);
+        if (!UuidCodec::isValid($ownerId)) return $this->ownerFailure('PUBLIC_URL_OWNER_INVALID', ['mutation_count' => 0]);
+
+        $plan = $this->audit($ownerId);
+        if (($plan['status'] ?? '') !== 'READY') return [...$plan, 'mutation_count' => 0];
+        if ((int) ($plan['counts']['total'] ?? 0) !== 1 || !isset($plan['items'][0]) || !is_array($plan['items'][0])) {
+            return $this->ownerFailure('PUBLIC_URL_OWNER_NOT_FOUND', ['mutation_count' => 0]);
+        }
+
+        // The receipt is deliberately re-planned immediately before apply. A
+        // global audit is not a prerequisite: only this owner's deterministic
+        // decision and current revision can authorize the scoped mutation.
+        $currentPlan = $this->audit($ownerId);
+        if (($currentPlan['status'] ?? '') !== 'READY' || ($currentPlan['plan_fingerprint'] ?? '') !== ($plan['plan_fingerprint'] ?? '')) {
+            return ['status' => 'BLOCKED', 'reason_code' => 'PUBLIC_URL_DECISION_STALE', 'mutation_count' => 0, 'plan' => $plan, 'current_plan' => $currentPlan, 'blockers' => $this->blockers($currentPlan)];
+        }
+
+        $item = $currentPlan['items'][0];
+        $action = (string) ($item['action'] ?? 'BLOCKED');
+        if (!in_array($action, ['KEEP', 'ALLOCATE', 'CHANGE'], true)) {
+            return ['status' => 'BLOCKED', 'reason_code' => 'PUBLIC_URL_SCOPED_DECISION_INELIGIBLE', 'mutation_count' => 0, 'plan' => $currentPlan, 'blockers' => $this->blockers($currentPlan)];
+        }
+
+        $mutationCount = 0;
+        if (in_array($action, ['ALLOCATE', 'CHANGE'], true)) {
+            try {
+                ($this->apply)($item, $idempotencyKey);
+                $mutationCount = 1;
+            } catch (\Throwable $error) {
+                $reason = $this->scopedWriteFailureCode($error);
+                return ['status' => 'BLOCKED', 'reason_code' => $reason, 'mutation_count' => 0, 'plan' => $currentPlan, 'blockers' => [$reason]];
+            }
+        }
+
+        $readback = $this->audit($ownerId);
+        $readbackItem = isset($readback['items'][0]) && is_array($readback['items'][0]) ? $readback['items'][0] : [];
+        if (($readback['status'] ?? '') !== 'READY' || (int) ($readback['counts']['total'] ?? 0) !== 1 || !in_array((string) ($readbackItem['action'] ?? ''), ['KEEP'], true)) {
+            return ['status' => 'FAILED', 'reason_code' => 'PUBLIC_URL_REPROJECTION_READBACK_FAILED', 'mutation_count' => $mutationCount, 'plan' => $currentPlan, 'readback' => $readback, 'blockers' => $this->blockers($readback)];
+        }
+
+        return [
+            'status' => 'APPLIED',
+            'action' => $action,
+            'owner_id' => $ownerId,
+            'identity_id' => (string) ($readbackItem['identity_id'] ?? ''),
+            'route_type' => (string) ($readbackItem['route_type'] ?? $item['route_type'] ?? ''),
+            'previous_path' => (string) ($item['current_path'] ?? ''),
+            'previous_slug' => (string) ($item['current_slug'] ?? ''),
+            'final_path' => (string) ($readbackItem['current_path'] ?? ''),
+            'final_slug' => (string) ($readbackItem['current_slug'] ?? ''),
+            'revision' => (int) ($readbackItem['revision'] ?? 0),
+            'idempotency_key' => $idempotencyKey,
+            'canonical_read_back' => $readbackItem,
+            'blockers' => [],
+            'mutation_count' => $mutationCount,
+            'plan' => $currentPlan,
+            'readback' => $readback,
+        ];
+    }
+
+    /** @param array<string,mixed> $extra @return array<string,mixed> */
+    private function ownerFailure(string $reason, array $extra = []): array
+    {
+        return array_merge(['status' => 'BLOCKED', 'reason_code' => $reason, 'owner_id' => null, 'items' => [], 'counts' => ['total' => 0, 'change' => 0, 'keep' => 0, 'blocked' => 1], 'blockers' => [$reason]], $extra);
+    }
+
+    /** @param list<array<string,mixed>> $items */
+    private function fingerprint(array $items): string
+    {
+        return hash('sha256', (string) json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
+    }
+
+    /** @param array<string,mixed> $plan @return list<string> */
+    private function blockers(array $plan): array
+    {
+        $blockers = [];
+        foreach ((array) ($plan['items'] ?? []) as $item) {
+            if (is_array($item) && trim((string) ($item['blocker'] ?? '')) !== '') $blockers[] = (string) $item['blocker'];
+        }
+        return array_values(array_unique($blockers));
+    }
+
+    private function scopedWriteFailureCode(\Throwable $error): string
+    {
+        return match ($error->getMessage()) {
+            'STALE_REVISION', 'CAS_MISMATCH' => 'PUBLIC_URL_REVISION_CAS_MISMATCH',
+            'NATIVE_ROUTE_CONFLICT', 'PUBLIC_SLUG_COLLISION' => 'COLLISION_REQUIRES_RECONCILIATION',
+            'IDEMPOTENCY_KEY_CONFLICT', 'IDEMPOTENCY_CONFLICT' => 'IDEMPOTENCY_CONFLICT',
+            default => 'PUBLIC_URL_REPROJECTION_WRITE_FAILED',
+        };
     }
 }
