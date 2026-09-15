@@ -15,6 +15,8 @@ final class ChatGptFileAllowlistConfigTest extends TestCase
         self::assertStringContainsString("!function_exists('wp_get_environment_type') || wp_get_environment_type() !== 'staging'", $config);
         self::assertStringContainsString('oaisdmntpraustraliaeast.blob.core.windows.net', $config);
         self::assertStringContainsString('sdmntpraustraliaeast.oaiusercontent.com', $config);
+        self::assertStringContainsString('oaisdmntprcentralus.blob.core.windows.net', $config);
+        self::assertStringContainsString('sdmntprcentralus.oaiusercontent.com', $config);
         self::assertStringNotContainsString('*.oaiusercontent.com', $config);
         self::assertStringNotContainsString("'oaiusercontent.com'", $config);
     }

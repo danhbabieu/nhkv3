@@ -8,5 +8,7 @@ add_filter('nhk_chatgpt_file_allowed_hosts', static function (mixed $hosts): arr
     if (!function_exists('wp_get_environment_type') || wp_get_environment_type() !== 'staging') return $hosts;
     $hosts[] = 'oaisdmntpraustraliaeast.blob.core.windows.net';
     $hosts[] = 'sdmntpraustraliaeast.oaiusercontent.com';
+    $hosts[] = 'oaisdmntprcentralus.blob.core.windows.net';
+    $hosts[] = 'sdmntprcentralus.oaiusercontent.com';
     return array_values(array_unique($hosts));
 }, 10, 1);

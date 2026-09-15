@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — ChatGPT file-host allowlist root-cause closure
+
+ROOT_CAUSE: The live Capture/widget materializer received a trusted ChatGPT
+reference hosted at `sdmntprcentralus.oaiusercontent.com`, while the staging
+MU allowlist contained only the previously observed Australia East pair. The
+request failed closed as `CHATGPT_FILE_HOST_NOT_ALLOWED` before attachment or
+Media persistence; no semantic mutation or orphan asset was created.
+
+CHANGE: Added the exact Central US blob and oaiusercontent hosts to the
+staging-only allowlist and extended the generic allowlist regression test. No
+wildcard parent domain, arbitrary URL import, direct writer or new gateway was
+introduced.
+
+VERIFICATION: The pre-fix Capture continuation returned the typed host policy
+error. Focused trusted-file/allowlist tests now pass (23 tests, 80 assertions)
+with the existing exact-host and private-host rejection coverage intact.
+
+DEPLOYMENT: The previous canonical deployment wrapper stopped at
+`MCP_BOOTSTRAP_UNAVAILABLE` after transferring the plugin/theme bundle; remote
+plugin/theme hash checks matched the workspace, but connector bootstrap still
+requires fresh runtime verification after this allowlist change.
+
+LIVE GATE: No attachment, Media, Article, Knowledge or route mutation has yet
+been completed in this checkpoint. The next bounded action is wrapper deploy,
+fresh connector/widget discovery, then one real licensed image through the
+canonical widget/materializer/read-back chain.
+
 # Checkpoint — 2026-09-15 — Public Clock horizontal acceptance gate
 
 CONNECTOR: Fresh authenticated `@v3-18` runtime read-back succeeded. The
