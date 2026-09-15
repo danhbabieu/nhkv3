@@ -57,7 +57,7 @@ final class RemoteDeploymentAdapterTest extends TestCase
         $result = $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-3'));
 
         self::assertSame('pass', $result->status);
-        self::assertCount(4, $commands);
+        self::assertCount(6, $commands);
         self::assertSame([
             'rsync', '--archive', '--delete', '--checksum', '--safe-links',
             '--exclude', 'tests/', '--exclude', '*.env', '--exclude', '*.pem',
@@ -73,12 +73,19 @@ final class RemoteDeploymentAdapterTest extends TestCase
         self::assertSame('rsync', $muPluginCommands[0][0]);
         self::assertNotContains('--delete', $muPluginCommands[0]);
         self::assertContains('demo.1945.vn:/srv/wp-content/mu-plugins/', $muPluginCommands[0]);
-        self::assertSame('ssh', $commands[2][0]);
-        self::assertSame('test', $commands[2][6]);
-        self::assertStringContainsString('nhk-core.php', implode(' ', $commands[2]));
+        self::assertSame('rsync', $commands[2][0]);
+        self::assertContains(dirname(__DIR__, 6) . '/public/wp-content/themes/nhk-v3/', $commands[2]);
+        self::assertContains('demo.1945.vn:/srv/wp-content/themes/nhk-v3/', $commands[2]);
+        self::assertContains('--delete', $commands[2]);
         self::assertSame('ssh', $commands[3][0]);
         self::assertSame('test', $commands[3][6]);
-        self::assertStringContainsString('mu-plugins/nhk-chatgpt-file-transport.php', implode(' ', $commands[3]));
+        self::assertStringContainsString('nhk-core.php', implode(' ', $commands[3]));
+        self::assertSame('ssh', $commands[4][0]);
+        self::assertSame('test', $commands[4][6]);
+        self::assertStringContainsString('mu-plugins/nhk-chatgpt-file-transport.php', implode(' ', $commands[4]));
+        self::assertSame('ssh', $commands[5][0]);
+        self::assertSame('test', $commands[5][6]);
+        self::assertStringContainsString('themes/nhk-v3/style.css', implode(' ', $commands[5]));
         self::assertStringNotContainsString('odo', implode(' ', $commands[0]));
         self::assertNotNull($result->fingerprint);
     }
@@ -90,7 +97,7 @@ final class RemoteDeploymentAdapterTest extends TestCase
         self::assertSame('REMOTE_DEPLOYMENT_FAILED', $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-4'))->reasonCode);
 
         $calls = 0;
-        $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function () use (&$calls): array { $calls++; return $calls < 3 ? [0, '', ''] : [1, '', 'missing']; });
+        $adapter = RemoteDeploymentAdapter::fromEnvironment(dirname(__DIR__, 6), static function () use (&$calls): array { $calls++; return $calls < 4 ? [0, '', ''] : [1, '', 'missing']; });
         self::assertSame('REMOTE_DEPLOYMENT_VERIFICATION_FAILED', $adapter->deploy(new DemoCutoverContext('demo.1945.vn', 'odo', 'abc123', 'run-5'))->reasonCode);
     }
 

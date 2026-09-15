@@ -61,10 +61,14 @@ final class RemoteDeploymentAdapter
 
         $source = $this->root . '/public/wp-content/plugins/nhk-core/';
         $muPluginSource = $this->root . '/public/wp-content/mu-plugins/nhk-chatgpt-file-transport.php';
+        $themeSource = $this->root . '/public/wp-content/themes/nhk-v3/';
         if (!is_file($muPluginSource) || !is_readable($muPluginSource)) {
             return StageResult::blocked('CHATGPT_MU_PLUGIN_ARTIFACT_UNAVAILABLE');
         }
-        $fingerprint = $this->artifactFingerprint($source, $muPluginSource);
+        if (!is_dir($themeSource) || !is_readable($themeSource)) {
+            return StageResult::blocked('NHK_THEME_ARTIFACT_UNAVAILABLE');
+        }
+        $fingerprint = $this->artifactFingerprint($source, $muPluginSource, $themeSource);
         if ($fingerprint === null) {
             return StageResult::blocked('NHK_CORE_ARTIFACT_INVALID');
         }
@@ -83,12 +87,22 @@ final class RemoteDeploymentAdapter
         if ($muPluginTransfer[0] !== 0) {
             return StageResult::failed('REMOTE_DEPLOYMENT_FAILED');
         }
+        $remoteThemePath = dirname(dirname(rtrim($config['remote_path'], '/'))) . '/themes/nhk-v3';
+        $themeRsync = ['rsync', '--archive', '--delete', '--checksum', '--safe-links', '--exclude', '*.env', '--exclude', '*.pem', '-e', implode(' ', array_map('escapeshellarg', $ssh)), $themeSource, $config['ssh_target'] . ':' . $remoteThemePath . '/'];
+        $themeTransfer = ($this->executor)($themeRsync);
+        if ($themeTransfer[0] !== 0) {
+            return StageResult::failed('REMOTE_DEPLOYMENT_FAILED');
+        }
         $verification = ($this->executor)(array_merge($ssh, [$config['ssh_target'], 'test', '-f', rtrim($config['remote_path'], '/') . '/nhk-core.php']));
         if ($verification[0] !== 0) {
             return StageResult::failed('REMOTE_DEPLOYMENT_VERIFICATION_FAILED');
         }
         $muPluginVerification = ($this->executor)(array_merge($ssh, [$config['ssh_target'], 'test', '-f', $remoteMuPluginPath . '/nhk-chatgpt-file-transport.php']));
         if ($muPluginVerification[0] !== 0) {
+            return StageResult::failed('REMOTE_DEPLOYMENT_VERIFICATION_FAILED');
+        }
+        $themeVerification = ($this->executor)(array_merge($ssh, [$config['ssh_target'], 'test', '-f', $remoteThemePath . '/style.css']));
+        if ($themeVerification[0] !== 0) {
             return StageResult::failed('REMOTE_DEPLOYMENT_VERIFICATION_FAILED');
         }
         return StageResult::pass('nhk-core:' . $fingerprint, $fingerprint);
@@ -113,7 +127,7 @@ final class RemoteDeploymentAdapter
         return ['ssh_target' => $target, 'remote_path' => $remotePath, 'ssh_key' => is_string($key) && $key !== '' ? $key : null];
     }
 
-    private function artifactFingerprint(string $directory, string $muPluginSource): ?string
+    private function artifactFingerprint(string $directory, string $muPluginSource, string $themeDirectory): ?string
     {
         $files = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS));
@@ -135,6 +149,17 @@ final class RemoteDeploymentAdapter
             return null;
         }
         $files['mu-plugins/nhk-chatgpt-file-transport.php'] = $muPluginHash;
+        $themeIterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($themeDirectory, \FilesystemIterator::SKIP_DOTS));
+        foreach ($themeIterator as $file) {
+            if (!$file->isFile()) {
+                continue;
+            }
+            $relative = substr($file->getPathname(), strlen($themeDirectory));
+            if (preg_match('/(^|\/)(?:\.env|.*\.pem)$/i', $relative) === 1) {
+                return null;
+            }
+            $files['theme/nhk-v3/' . $relative] = hash_file('sha256', $file->getPathname());
+        }
         ksort($files);
         return hash('sha256', json_encode($files, JSON_THROW_ON_ERROR));
     }
