@@ -61,6 +61,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('$dossier === null && $type === \'brand\' && is_array($entity[\'aggregation\'] ?? null)', $source);
     }
 
+    public function test_detail_bootstrap_enriches_the_existing_generic_dossier_instead_of_replacing_it(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Frontend/EntityDossierBootstrap.php');
+
+        self::assertStringContainsString("\$value['dossier'] ?? null", $source);
+        self::assertStringContainsString('clockTypeDossier->forEntity($entity, $baseDossier)', $source);
+    }
+
     public function test_entity_relation_sections_are_not_rendered_when_all_items_lack_public_urls(): void
     {
         $source = $this->read('entity.php');

@@ -84,7 +84,7 @@
           const mock = noUploadApis ? '<scr' + 'ipt>window.openai = {};</scr' + 'ipt>' : [
             '<scr', 'ipt>',
             'window.openai = {',
-            'selectFiles: async () => [new File(["one"], "one.jpg", { type: "image/jpeg" }), new File(["two"], "two.png", { type: "image/png" })],',
+            'selectFiles: async () => [{ fileId: "library-one", fileName: "one.jpg", mimeType: "image/jpeg" }, { fileId: "library-two", fileName: "two.png", mimeType: "image/png" }],',
             'uploadFile: async (file) => ({ fileId: "mock-" + file.name }),',
             'getFileDownloadUrl: async ({ fileId }) => ({ downloadUrl: "https://files.openai.test/signed/" + fileId }),',
             'setWidgetState: (state) => { window.__widgetState = state; },',

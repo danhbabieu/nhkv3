@@ -12006,6 +12006,17 @@ class l extends Protocol {
     }
   }
 }
+function normalizeSelectedFiles(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const reference = item;
+    if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
+    if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
+    if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
+    return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
+  });
+}
 function extractUploads(result) {
   const structured = result.structuredContent;
   if (structured && typeof structured === "object" && Array.isArray(structured.uploads)) {
@@ -12036,7 +12047,6 @@ function buildWidgetState(items) {
 }
 const SERVER_TOOL_NAME = "nhk.media.widget-upload";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
-const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing widget element: ${id}`);
@@ -12079,15 +12089,20 @@ async function start() {
   function renderSelection() {
     previews.replaceChildren();
     let total = 0;
-    selected.forEach((file) => {
-      total += file.size;
+    selected.forEach((item) => {
+      const file = item.kind === "local" ? item.file : null;
+      const fileName = item.kind === "local" ? item.file.name : item.fileName;
+      const fileSize = file?.size ?? 0;
+      total += fileSize;
       const figure = document.createElement("figure");
-      const image = document.createElement("img");
-      image.alt = file.name;
-      image.src = URL.createObjectURL(file);
-      figure.append(image);
+      if (file) {
+        const image = document.createElement("img");
+        image.alt = file.name;
+        image.src = URL.createObjectURL(file);
+        figure.append(image);
+      }
       const caption = document.createElement("figcaption");
-      caption.textContent = `${file.name} (${(file.size / 1048576).toFixed(2)} MB)`;
+      caption.textContent = file ? `${fileName} (${(fileSize / 1048576).toFixed(2)} MB)` : `${fileName} (ChatGPT Library)`;
       figure.append(caption);
       previews.append(figure);
     });
@@ -12128,14 +12143,14 @@ async function start() {
     setState("UPLOADING", "Uploading selected images…");
     const references = [];
     try {
-      for (const file of selected) {
-        setState("UPLOADING", `Uploading ${file.name}…`);
-        const uploadedFile = await host.uploadFile(file, { library: false });
-        const fileId = uploadedFile.fileId;
-        if (!fileId) throw new Error(`Upload did not return a file ID for ${file.name}.`);
+      for (const item of selected) {
+        const fileName = item.kind === "local" ? item.file.name : item.fileName;
+        setState("UPLOADING", `Uploading ${fileName}…`);
+        const fileId = item.kind === "local" ? (await host.uploadFile(item.file, { library: false })).fileId : item.fileId;
+        if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
         const download = await host.getFileDownloadUrl({ fileId });
-        if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${file.name}.`);
-        references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: file.type, file_name: file.name });
+        if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
+        references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
       }
       const result = await app.callServerTool({
         name: SERVER_TOOL_NAME,
@@ -12166,13 +12181,13 @@ async function start() {
   app.ontoolresult = (result) => handleToolResult(result);
   app.onerror = (error2) => setState("ERROR", `MCP Apps connection error: ${errorMessage(error2)}`);
   input.addEventListener("change", () => {
-    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type));
+    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", file }));
     renderSelection();
   });
   select.addEventListener("click", async () => {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
-      selected = asFiles(await host.selectFiles({ multiple: true, accept: IMAGE_ACCEPT }));
+      selected = normalizeSelectedFiles(await host.selectFiles());
       renderSelection();
     } catch (error2) {
       setState("ERROR", `File selection failed: ${errorMessage(error2)}`);

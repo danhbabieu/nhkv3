@@ -43,7 +43,7 @@ final class PublicEntityCollectionQuery
             if (!$entity->active() || $resolution->profileKey !== $profileKey || !in_array($resolution->status, ['RESOLVED', EntityProfileResolution::COMPATIBILITY_READ], true)) continue;
             $item = $this->item($entity, $query, false, true, $resolution);
             if ($item === null) continue;
-            if ($profileKey === 'clock_type' && ($item['presentation_readiness']['status'] ?? '') !== 'READY') continue;
+            if (($item['presentation_readiness']['status'] ?? '') !== 'READY') continue;
             $items[] = $item;
         }
         $items = LatestFirstOrder::sort($items, static fn (array $item): ?string => null, static fn (array $item): ?string => $item['_created_at'] ?? null, static fn (array $item): string => (string) ($item['canonical_id'] ?? $item['url'] ?? $item['name'] ?? ''));
@@ -142,11 +142,14 @@ final class PublicEntityCollectionQuery
         }
         $description = trim((string) ($payload['description'] ?? $payload['summary'] ?? ''));
         $item['description'] = $description;
-        if ($profile->profileKey === 'clock_type') {
+        if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
             $hasRepresentative = is_array($item['media']['representative'] ?? null) && trim((string) ($item['media']['representative']['url'] ?? '')) !== '';
+            $content = $profile->profileKey === 'clock_type'
+                ? ['description' => $description, 'representative_media' => $hasRepresentative]
+                : ['name' => $entity->canonicalName, 'description' => $description];
             $readiness = PresentationReadiness::evaluate(
                 ['active' => $entity->active()],
-                ['route' => $path, 'content' => ['description' => $description, 'representative_media' => $hasRepresentative], 'public_eligible' => $decision->eligible],
+                ['route' => $path, 'content' => $content, 'public_eligible' => $decision->eligible],
             );
             $item['presentation_readiness'] = ['status' => $readiness->presentationStatus(), 'reasons' => $readiness->reasons()];
         }

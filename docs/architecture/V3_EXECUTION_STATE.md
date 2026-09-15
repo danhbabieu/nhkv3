@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-14 — ChatGPT library-selection contract repair
+
+ROOT_CAUSE: On the real ChatGPT Web host, `window.openai.selectFiles()` opened
+the Library picker and returned the documented authorized references
+`{fileId,fileName,mimeType}`, not browser `File` objects. The View treated those
+references as `File` objects and called `URL.createObjectURL`, producing the
+observed `File selection failed: ... Overload resolution failed` error before
+upload.
+
+CHANGE: The View now normalizes library references without creating object URLs,
+resolves each selected `fileId` through `getFileDownloadUrl` for the current
+operation, and sends the resulting structured references to the exact
+`nhk.media.widget-upload` MCP Apps tool. Local native `File` selection still
+uses `uploadFile`; no backend, ImageIngestEntrypoint, Capture, Media or
+multipart path changed. The local reference host mock now uses the official
+library-reference shape.
+
+VERIFICATION: TDD RED reproduced the missing normalization export; GREEN passed
+the focused mapping test, widget tests, TypeScript typecheck and Vite single
+file build. The local reference-style host showed
+`APP_CONNECT_PASS=YES`, `VIEW_RENDER_PASS=YES`, `UPLOAD_BUTTON_VISIBLE=YES`,
+`CALL_SERVER_TOOL_PATH=nhk.media.widget-upload via App.callServerTool`, and
+`SUCCESS` with ordered mock Attachment/Media results. Real ChatGPT Web showed
+the iframe, `READY`, visible controls and Library picker; the pre-fix failure
+was reproduced exactly.
+
+LIVE GATE: No staging deploy or live data mutation has been performed for this
+repair. The canonical deployment wrapper is currently blocked before remote
+write because `NHK_DEMO_DEPLOY_CONFIG` is unset; no SSH/rsync bypass was used.
+
 # Checkpoint — 2026-09-14 — Official MCP Apps image-upload View lifecycle
 
 CHANGE: The NHK image-upload View now uses the official
@@ -9693,3 +9723,66 @@ BOUNDARY: No Authority, Graph, Public Identity, Knowledge, Media, Video,
 Article, Proposal, Apply, publication, URL mutation, deployment or Git
 operation was performed. Existing unrelated local changes, including the
 MCP-app image-upload resource, were preserved.
+
+# Checkpoint — 2026-09-14 — V3-18 Proposal approve/apply live exposure
+
+SCOPE: Verified only Easy MCP exposure, enabled state, connector
+discoverability and the already-approved Proposal lifecycle. No Proposal or
+Capture was created. No generic WordPress/relation writer, Governance bypass,
+capability change, schema/policy change, or unrelated public/media/article/
+video/knowledge/frontend scope was used.
+
+RUNTIME: Fresh `https://demo.1945.vn` MCP initialize returned NHK V3 runtime
+identity with `environment=staging`, `semantic_write_policy=PROJECT_BUILD`,
+`project_build_enabled=true`, and server `nhk-v3` version `3.0.0`. The custom
+MCP `tools/list` serialized 52 descriptors, including
+`nhk.proposal.approve` and `nhk.proposal.apply` with internal/admin-only
+metadata and strict schemas. Easy MCP AI live version is `1.7.17`; the
+authenticated enabled-state surface reported 30/52 NHK-v3 abilities enabled.
+The exact Proposal lifecycle enabled state is submit=1, review=1, approve=1,
+eligibility=1, apply=1, while proposal-create=0.
+
+CONNECTOR: A fresh v3-18 Try-in-chat session reported submit, review, approve,
+eligibility and apply all callable; reconnect was not required. This confirms
+the four separate layers: runtime registration, WordPress Ability
+registration, Easy MCP enabled state and serialized connector tools/list.
+
+GOVERNED ACCEPTANCE: Existing Proposal
+`01a09ef0-6b3c-78c9-bb15-e8c0e1cd7ebc` completed review PASS, approve PASS
+(revision 3), eligibility PASS (`ready=true`) and apply PASS (attempt 1).
+Canonical read-back returned Entity
+`01a09f73-0aad-79b3-9aaf-5f02cb33a9d1`, revision 1, stable key
+`nhk:classification:clock-type.dong-ho-thap`. Stable-key verification across
+2,086 canonical records returned `DUPLICATE_COUNT=1`. No new Proposal or
+Capture was created; semantic bypass was not used.
+
+VERIFICATION: Focused Proposal exposure, Governance queue, MCP contract,
+Easy MCP adapter and MCP transport tests pass: 91 tests / 840 assertions,
+with 1 deprecation and 26 guarded skips. PHP lint for the exposure
+registration, `git diff --check`, exact registration/transport inspection and
+scoped secret review pass. No code change or deployment was required because
+the live build already contained the exposure fix and live enabled state.
+
+# Checkpoint — 2026-09-14 — Final frontend presentation reconciliation
+
+SCOPE: Completed the final read-only frontend reconciliation. Generic
+presentation profiles now cover the registered Authority entity types; the
+public view model retains direct/derived origin and relation depth; archive
+readiness is derived without mutating semantic activity; and the dossier
+bootstrap enriches the existing generic dossier rather than replacing it.
+
+THEME: Canonical public navigation is shared by desktop, mobile and homepage
+quick links. Entity, media and video cards remain shared presentation parts;
+video archive rendering now uses the shared poster card. Breadcrumb, active
+navigation, count badges, focus-visible, stable visual ratios, reduced-motion
+and responsive visual rail rules were completed in the existing token chain.
+
+VERIFICATION: Unit suite passes 1,547 tests / 7,504 assertions. Contract suite
+passes in isolation with 6 tests / 48 assertions. Composer PHP lint, `git diff
+--check` and scoped secret review pass. No local server was started, so live
+route smoke and runtime query-count inspection remain environment-dependent.
+
+BOUNDARY: No Authority, Graph, Public Identity, Knowledge, Media, Video,
+Article, Proposal, Apply, publication, URL mutation, deployment or Git
+operation was performed. Remaining work after this checkpoint is DATA /
+RELATION / LIVE ACCEPTANCE ONLY.

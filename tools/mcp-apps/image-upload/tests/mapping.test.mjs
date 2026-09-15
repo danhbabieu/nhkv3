@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildWidgetState, extractUploads } from "../src/contract.ts";
+import { buildWidgetState, extractUploads, normalizeSelectedFiles } from "../src/contract.ts";
+
+test("normalizes ChatGPT library selections as authorized file references", () => {
+  assert.deepEqual(normalizeSelectedFiles([
+    { fileId: "file-one", fileName: "one.png", mimeType: "image/png" },
+    { fileId: "file-two", fileName: "two.webp", mimeType: "image/webp" },
+  ]), [
+    { kind: "library", fileId: "file-one", fileName: "one.png", mimeType: "image/png" },
+    { kind: "library", fileId: "file-two", fileName: "two.webp", mimeType: "image/webp" },
+  ]);
+});
 
 test("maps one widget-upload result without exposing its signed URL", () => {
   const result = extractUploads({

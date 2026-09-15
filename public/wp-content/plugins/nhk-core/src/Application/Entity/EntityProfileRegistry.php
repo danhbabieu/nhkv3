@@ -44,6 +44,19 @@ final class EntityProfileRegistry
                 ['section_order' => ['identity', 'knowledge', 'classifications', 'brands', 'models', 'variants', 'specimens', 'products', 'media', 'video', 'articles'], 'section_labels' => ['knowledge' => 'Tri thức', 'brands' => 'Thương hiệu liên quan'], 'empty_state' => 'Chưa có nội dung công khai cho nhóm đồng hồ này.'],
             ),
         ];
+
+        foreach ([
+            'model' => ['Mẫu đồng hồ', '/mau/', ['variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'], ['identity', 'parent_context', 'summary', 'variants', 'movements', 'music', 'knowledge', 'media', 'videos', 'articles']],
+            'variant' => ['Biến thể', '/bien-the/', ['models', 'movements', 'music', 'components', 'classifications', 'specimens', 'media', 'videos', 'articles'], ['identity', 'parent_context', 'summary', 'configuration', 'movement', 'music', 'knowledge', 'media', 'videos', 'articles']],
+            'movement' => ['Bộ máy', '/bo-may/', ['brands', 'models', 'variants', 'music', 'components', 'specimens', 'media', 'videos', 'articles'], ['identity', 'summary', 'technical_configuration', 'models', 'variants', 'music', 'knowledge', 'media', 'videos', 'articles']],
+            'music' => ['Bản nhạc', '/ban-nhac/', ['brands', 'models', 'variants', 'movements', 'specimens', 'media', 'videos', 'articles'], ['identity', 'summary', 'historical_context', 'movements', 'models', 'variants', 'brands', 'knowledge', 'media', 'videos', 'articles']],
+            'component' => ['Linh kiện', '/linh-kien/', ['brands', 'models', 'variants', 'movements', 'classifications', 'media', 'videos', 'articles'], ['identity', 'summary', 'technical_configuration', 'movements', 'models', 'variants', 'knowledge', 'media', 'videos', 'articles']],
+            'classification' => ['Phân loại', '/phan-loai/', ['brands', 'models', 'variants', 'movements', 'classifications', 'specimens', 'products', 'media', 'videos', 'articles'], ['identity', 'summary', 'related_entities', 'knowledge', 'media', 'videos', 'articles']],
+            'specimen' => ['Hiện vật', '/hien-vat/', ['brands', 'models', 'variants', 'movements', 'music', 'components', 'classifications', 'products', 'media', 'videos', 'articles'], ['identity', 'parent_context', 'measurements', 'provenance', 'knowledge', 'articles', 'media', 'videos', 'related_entities']],
+            'product' => ['Sản phẩm', '/san-pham/', ['brands', 'models', 'variants', 'movements', 'music', 'components', 'classifications', 'specimens', 'media', 'videos', 'articles'], ['identity', 'object_context', 'brand_context', 'model_context', 'variant_context', 'media', 'videos', 'articles', 'knowledge']],
+        ] as $key => [$label, $archivePath, $targets, $sectionOrder]) {
+            $this->definitions[$key] = $this->generic($key, $label, $archivePath, $targets, $sectionOrder);
+        }
     }
 
     /** @return list<string> */
@@ -53,4 +66,23 @@ final class EntityProfileRegistry
     public function all(): array { return array_values($this->definitions); }
 
     public function get(string $key): ?EntityProfileDefinition { return $this->definitions[$key] ?? null; }
+
+    /** @param list<string> $targets @param list<string> $sectionOrder */
+    private function generic(string $key, string $label, string $archivePath, array $targets, array $sectionOrder): EntityProfileDefinition
+    {
+        return new EntityProfileDefinition(
+            $key,
+            $label,
+            $key,
+            ['entity_type' => $key],
+            array_values(array_unique(['identity', 'public_identity', 'knowledge', 'media', 'video', 'article_relations', 'related_entities', 'representative_media', 'seo', ...$sectionOrder])),
+            $key . '-entity-dossier-v1',
+            $targets,
+            [],
+            ['archive_path' => $archivePath, 'navigation_label' => $label],
+            ['kind' => 'root_public_identity', 'enabled' => false, 'route_owner' => 'public_identity', 'resolution' => 'read_foundation', 'allocation' => 'governed_only'],
+            ['dossier_read', 'related_read', 'knowledge_read', 'media_read', 'video_read', 'seo_read'],
+            ['section_order' => $sectionOrder, 'preview_limits' => ['articles' => 5, 'media' => 6, 'videos' => 4, 'knowledge' => 5]],
+        );
+    }
 }

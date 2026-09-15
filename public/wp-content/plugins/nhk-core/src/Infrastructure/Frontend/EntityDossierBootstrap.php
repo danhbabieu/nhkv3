@@ -74,11 +74,12 @@ final class EntityDossierBootstrap
         $brandProjection = new BrandDossierProjection();
 
         add_filter('nhk_v3_entity_detail_projection', static function (array $value, AuthorityEntity $entity) use ($dossier, $clockTypeDossier, $brandAggregation, $brandProjection): array {
-            $value['dossier'] = $clockTypeDossier->forEntity($entity, $dossier->forEntity($entity));
+            $baseDossier = is_array($value['dossier'] ?? null) ? $value['dossier'] : $dossier->forEntity($entity);
+            $value['dossier'] = $clockTypeDossier->forEntity($entity, $baseDossier);
             if ($entity->entityType === 'brand' && ($value['dossier']['status'] ?? '') === 'AVAILABLE') {
                 $value['dossier'] = $brandProjection->merge($value['dossier'], $brandAggregation->forBrand($entity->canonicalId));
             }
             return $value;
-        }, 10, 2);
+        }, 20, 2);
     }
 }

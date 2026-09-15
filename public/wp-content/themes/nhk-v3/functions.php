@@ -34,14 +34,26 @@ add_action('wp_enqueue_scripts', 'nhk_v3_assets');
 /** @return array<string,string> */
 function nhk_v3_navigation_items(): array
 {
+    if (class_exists('NHK\\Core\\Application\\Presentation\\PublicNavigationDefinition')) {
+        $items = [];
+        foreach (\NHK\Core\Application\Presentation\PublicNavigationDefinition::items() as $item) {
+            if (!is_array($item) || trim((string) ($item['label'] ?? '')) === '' || trim((string) ($item['path'] ?? '')) === '') continue;
+            $items[(string) $item['label']] = (string) $item['path'];
+        }
+        if ($items !== []) return $items;
+    }
     return ['Tri thức' => '/tri-thuc/', 'Thương hiệu' => '/thuong-hieu/', 'Nhóm đồng hồ' => '/loai-dong-ho/', 'Mẫu' => '/mau/', 'Bộ máy' => '/bo-may/', 'Bản nhạc' => '/ban-nhac/', 'So sánh' => '/so-sanh/', 'Linh kiện' => '/linh-kien/', 'Hiện vật' => '/hien-vat/', 'Video' => '/video/', 'Góc chia sẻ' => '/goc-chia-se/'];
 }
 
 function nhk_v3_nav_fallback(): void
 {
     $items = nhk_v3_navigation_items();
+    $requestPath = (string) wp_parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
     echo '<ul class="nav-list">';
-    foreach ($items as $label => $path) printf('<li><a href="%s">%s</a></li>', esc_url(home_url($path)), esc_html($label));
+    foreach ($items as $label => $path) {
+        $isCurrent = rtrim($requestPath, '/') === rtrim((string) $path, '/') || ($path === '/' && $requestPath === '/');
+        printf('<li%s><a href="%s"%s>%s</a></li>', $isCurrent ? ' class="current-menu-item"' : '', esc_url(home_url($path)), $isCurrent ? ' aria-current="page"' : '', esc_html($label));
+    }
     echo '</ul>';
 }
 

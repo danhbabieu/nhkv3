@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Home\HomeSemanticQuery;
+use NHK\Core\Application\Presentation\PublicNavigationDefinition;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Media\PublicMediaGalleryQuery;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository};
@@ -76,6 +77,50 @@ final class HomeSemanticQueryTest extends TestCase
 
         self::assertSame(['Đồng hồ công cộng'], array_column($modules['clock_groups'], 'title'));
         self::assertSame('Nhóm đồng hồ', $modules['hubs'][0]['label']);
+    }
+
+    public function test_home_counts_only_media_with_a_usable_public_visual(): void
+    {
+        $media = new Media(UuidCodec::newV7(), 'no-asset', 'Không có ảnh', 'ready');
+        $mediaRepo = $this->media([$media]);
+        $gallery = new PublicMediaGalleryQuery($mediaRepo, $this->assets([]));
+
+        $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $mediaRepo, $this->videos([]), new EntityTypeRegistry(), null, null, null, $gallery))
+            ->extend(['entities' => [], 'media' => [], 'videos' => []]);
+
+        self::assertSame(0, $modules['media_total']);
+        self::assertSame([], $modules['media']);
+    }
+
+    public function test_home_hub_order_follows_public_navigation_without_entity_specific_exceptions(): void
+    {
+        $ordered = PublicNavigationDefinition::sortHubItems([
+            ['type' => 'model', 'label' => 'Mẫu', 'url' => '/mau/'],
+            ['type' => 'clock_type', 'label' => 'Nhóm đồng hồ', 'url' => '/loai-dong-ho/'],
+            ['type' => 'brand', 'label' => 'Thương hiệu', 'url' => '/thuong-hieu/'],
+        ]);
+
+        self::assertSame(['brand', 'clock_type', 'model'], array_column($ordered, 'type'));
+    }
+
+    public function test_home_video_preview_keeps_newest_first_while_counting_the_full_filtered_source(): void
+    {
+        $videos = [];
+        for ($index = 0; $index < 7; $index++) {
+            $externalId = 'abcde12345' . (string) $index;
+            $videos[] = Video::fromUrl(
+                'https://www.youtube.com/watch?v=' . $externalId,
+                'Video ' . (string) $index,
+                ['source_snapshot' => ['availability' => 'available', 'published_at' => '2026-01-' . str_pad((string) (7 - $index), 2, '0', STR_PAD_LEFT) . ' 00:00:00']],
+            );
+        }
+
+        $modules = (new HomeSemanticQuery(new InMemoryAuthorityRepository(), $this->media([]), $this->videos($videos), new EntityTypeRegistry()))
+            ->extend(['entities' => [], 'media' => [], 'videos' => []]);
+
+        self::assertSame(7, $modules['videos_total']);
+        self::assertCount(6, $modules['videos']);
+        self::assertSame('Video 0', $modules['videos'][0]['title']);
     }
 
     private function media(array $items): MediaRepository

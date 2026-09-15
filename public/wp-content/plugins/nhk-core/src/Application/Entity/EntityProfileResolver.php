@@ -12,13 +12,10 @@ final class EntityProfileResolver
 
     public function resolveProfile(AuthorityEntity $entity): EntityProfileResolution
     {
-        if ($entity->entityType === 'brand') {
-            if (!$this->profiles->get('brand') instanceof EntityProfileDefinition) return $this->unresolved('PROFILE_REGISTRY_UNAVAILABLE');
-            return new EntityProfileResolution(EntityProfileResolution::RESOLVED, 'brand', 'not_applicable');
-        }
-
         if ($entity->entityType !== 'classification') {
-            return $this->unresolved('PROFILE_NOT_REGISTERED');
+            $profile = $this->profiles->get($entity->entityType);
+            if (!$profile instanceof EntityProfileDefinition) return $this->unresolved('PROFILE_NOT_REGISTERED');
+            return new EntityProfileResolution(EntityProfileResolution::RESOLVED, $profile->key, 'not_applicable');
         }
 
         $profile = $this->profiles->get('clock_type');

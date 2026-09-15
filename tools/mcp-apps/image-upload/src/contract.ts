@@ -8,6 +8,23 @@ export type UploadedItem = {
   download_url?: string;
 };
 
+export type SelectedImage =
+  | { kind: "local"; file: File }
+  | { kind: "library"; fileId: string; fileName: string; mimeType: string };
+
+export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item): SelectedImage[] => {
+    if (!item || typeof item !== "object") return [];
+    const reference = item as { fileId?: unknown; fileName?: unknown; mimeType?: unknown };
+    if (typeof reference.fileId !== "string" || reference.fileId === "") return [];
+    if (typeof reference.fileName !== "string" || reference.fileName === "") return [];
+    if (typeof reference.mimeType !== "string" || reference.mimeType === "") return [];
+    return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
+  });
+}
+
 type ToolResult = {
   structuredContent?: unknown;
   content?: Array<{ type?: string; text?: string }>;

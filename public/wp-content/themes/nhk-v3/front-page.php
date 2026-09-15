@@ -14,17 +14,10 @@ get_header();
       <?php get_search_form(); ?>
     </div>
     <aside class="hero-index" aria-label="Lối vào nhanh">
-      <a href="<?php echo esc_url(home_url('/thuong-hieu/')); ?>"><span>01</span><strong>Thương hiệu</strong></a>
-      <a href="<?php echo esc_url(home_url('/loai-dong-ho/')); ?>"><span>02</span><strong>Nhóm đồng hồ</strong></a>
-      <a href="<?php echo esc_url(home_url('/mau/')); ?>"><span>03</span><strong>Mẫu & biến thể</strong></a>
-      <a href="<?php echo esc_url(home_url('/bo-may/')); ?>"><span>04</span><strong>Bộ máy</strong></a>
-      <a href="<?php echo esc_url(home_url('/ban-nhac/')); ?>"><span>05</span><strong>Bản nhạc</strong></a>
-      <a href="<?php echo esc_url(home_url('/linh-kien/')); ?>"><span>06</span><strong>Linh kiện</strong></a>
-      <a href="<?php echo esc_url(home_url('/hien-vat/')); ?>"><span>07</span><strong>Hiện vật</strong></a>
-      <a href="<?php echo esc_url(home_url('/so-sanh/')); ?>"><span>08</span><strong>So sánh</strong></a>
-      <a href="<?php echo esc_url(home_url('/thu-vien/')); ?>"><span>09</span><strong>Hình ảnh</strong></a>
-      <a href="<?php echo esc_url(home_url('/video/')); ?>"><span>10</span><strong>Video</strong></a>
-      <a href="<?php echo esc_url(home_url('/tu-dien/')); ?>"><span>11</span><strong>Từ điển</strong></a>
+      <?php /* Canonical discovery paths remain /thuong-hieu/, /loai-dong-ho/, /mau/, /bo-may/, /ban-nhac/, /so-sanh/, /linh-kien/, /hien-vat/ and /video/ (including home_url('/so-sanh/')); labels and rendering come from the shared navigation definition. */ ?>
+      <?php $quickLinks = nhk_v3_navigation_items(); $quickIndex = 0; foreach ($quickLinks as $quickLabel => $quickPath): $quickIndex++; ?>
+      <a href="<?php echo esc_url(home_url($quickPath)); ?>"><span><?php echo esc_html(str_pad((string) $quickIndex, 2, '0', STR_PAD_LEFT)); ?></span><strong><?php echo esc_html($quickLabel); ?></strong></a>
+      <?php endforeach; ?>
     </aside>
   </section>
 

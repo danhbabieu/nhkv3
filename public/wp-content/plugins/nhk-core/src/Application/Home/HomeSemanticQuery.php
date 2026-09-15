@@ -14,7 +14,7 @@ use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Seo\SeoReadinessResult;
 use NHK\Core\Shared\Migration\MigrationStatus;
-use NHK\Core\Application\Presentation\LatestFirstOrder;
+use NHK\Core\Application\Presentation\{LatestFirstOrder, PublicNavigationDefinition};
 
 final class HomeSemanticQuery
 {
@@ -75,11 +75,10 @@ final class HomeSemanticQuery
             $mediaItems = LatestFirstOrder::sort($this->media->list(), static fn (\NHK\Core\Domain\Media\Media $item): ?string => null, static fn (\NHK\Core\Domain\Media\Media $item): ?string => $item->createdAt, static fn (\NHK\Core\Domain\Media\Media $item): string => $item->canonicalId);
             foreach ($mediaItems as $item) {
                 if (!$item->active || $item->readiness !== 'ready' || $item->isSystemPlaceholder()) continue;
-                $modules['media_total']++;
                 $visual = $this->gallery->forMedia($item->canonicalId);
-                if (!is_array($visual)) continue;
-                $modules['media'][] = $visual;
-                if (count($modules['media']) >= 8) break;
+                if (!is_array($visual) || trim((string) ($visual['image_url'] ?? '')) === '' || ($visual['has_real_image'] ?? false) !== true) continue;
+                $modules['media_total']++;
+                if (count($modules['media']) < 8) $modules['media'][] = $visual;
             }
         }
 
@@ -94,18 +93,20 @@ final class HomeSemanticQuery
                     ? $metadata['source_snapshot']
                     : (is_array($metadata['source'] ?? null) ? $metadata['source'] : []);
                 if (isset($source['availability']) && !in_array($source['availability'], ['available','unknown'], true)) continue;
-                $modules['videos_total']++;
                 $editorial = is_array($metadata['editorial'] ?? null) ? $metadata['editorial'] : [];
                 $title = trim((string) ($editorial['title'] ?? '')) ?: ($item->title ?: 'Video');
                 $thumbnail = (new \NHK\Core\Application\Video\VideoThumbnailSelector())->fromSource($source);
+                $modules['videos_total']++;
+                if (count($modules['videos']) >= 6) continue;
                 $modules['videos'][] = [
                     'title' => $title,
                     'platform' => $item->platform,
-                    'url' => (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($item, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'],
+                    'url' => (new PublicSeoProjection())->project((new VideoUrlPolicy())->project($item, new VideoPublicContextSelector()), ['type' => 'VideoObject'])['internal_link'] ?? null,
                     'thumbnail_url' => $thumbnail['url'] ?? null,
                     'thumbnail' => $thumbnail,
+                    'published_at' => $this->videoPublishedAt($item),
+                    'subject_context' => trim((string) ($editorial['subject_context'] ?? $editorial['summary'] ?? '')),
                 ];
-                if (count($modules['videos']) >= 6) break;
             }
         }
 
@@ -115,6 +116,7 @@ final class HomeSemanticQuery
                 $modules['knowledge'][] = ['text' => (string) $item['text'], 'type' => (string) ($item['type'] ?? '')];
             }
         }
+        $modules['hubs'] = PublicNavigationDefinition::sortHubItems($modules['hubs']);
         return $modules;
     }
 

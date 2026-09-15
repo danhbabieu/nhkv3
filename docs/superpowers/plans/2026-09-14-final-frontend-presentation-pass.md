@@ -1,167 +1,130 @@
 # NHK V3 Final Frontend Presentation Pass Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (recommended) or superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Complete the read-only relationship-driven presentation system across the existing NHK V3 public surfaces without changing semantic ownership, routes, data, or deployment state.
+**Goal:** Complete the read-only NHK V3 presentation seam so all public entity families use generic profiles, relationship-aware view models, visual-first previews, deterministic ordering, and shared responsive templates.
 
-**Architecture:** Keep WordPress posts, Authority, Graph, Knowledge, Media, MediaAsset, MediaUsage and Video as the existing owners. Add one shared presentation assembler/view-model seam over existing query services, expand only presentation profiles for registered families, and make the theme a thin profile-driven renderer composed from shared partials.
+**Architecture:** Preserve Authority, Graph, Knowledge, Media, Video and WordPress ownership. Extend the existing profile registry/resolver and dossier composer, make the two frontend bootstraps compose one dossier instead of replacing one another, and keep templates consuming `presentation`/profile packets rather than traversing Graph. Use existing route services, media abstractions, and WordPress native post queries.
 
-**Tech Stack:** PHP 8.x, WordPress theme PHP/CSS/vanilla JS, PHPUnit, existing NHK V3 application/query services and runtime registries.
+**Tech Stack:** PHP 8.1+, WordPress theme templates/CSS, PHPUnit 11, existing NHK V3 application/query services.
 
-**Spec:** User-provided NHK V3 Final Frontend / Presentation Pass requirements plus `docs/architecture/V3_FRONTEND_DESIGN_CONTRACT.md`, `docs/architecture/PUBLIC_ENTITY_DOSSIER_PROJECTION_CONTRACT.md`, `docs/architecture/RELATED_SEMANTIC_PROJECTION_CONTRACT.md` and `docs/architecture/SHARED_FEED_ORDERING_CONTRACT.md`.
+**Spec:** User-provided “NHK V3 — FINAL FRONTEND / PRESENTATION PASS”.
 
 ## Global Constraints
 
-- `clock_type` remains internal `classification` family vocabulary; public label remains `Nhóm đồng hồ`.
-- `/loai-dong-ho/` remains the Clock Group archive route.
-- No Authority, Graph, Knowledge, Media, Video, Product/Specimen or WordPress semantic mutation.
-- No proposal, apply, ingest, article publication, public URL mutation or deployment.
-- Templates consume application contexts only; no raw database queries or semantic inference in theme code.
-- Direct and derived relation origins remain reader-safe internally and are never persisted as shortcut relations.
-- Dynamic feeds use `published_at DESC → created_at DESC → canonical tie-breaker DESC` before slicing; updated views opt into `updated_at`.
-- Empty, unavailable, blocked and unsupported branches remain distinguishable.
-- Existing tokens, palette, fonts, routes and brand tone remain the design basis.
+- `clock_type` remains the internal classification family and public copy is `Nhóm đồng hồ`.
+- `/loai-dong-ho/` remains unchanged.
+- Presentation is read-only; no Entity, Proposal, Apply, relation, Media, Video, Article, public URL, deployment, or Git mutation.
+- Direct and derived relation origin/path remains in the view model but is not exposed as developer terminology.
+- Dynamic feeds use published/created/stable descending order; `updated_at` is reserved for “Mới cập nhật”.
+- Preview cards precede “Xem tất cả”; empty/unavailable sections fail soft and do not fabricate prose.
+- Public templates contain Vietnamese visitor copy and no UUID, stable key, revision, Authority, Graph, projector, Proposal, or readiness terminology.
 
 ---
 
-### Task 1: Lock presentation behavior with failing tests
-
-**Files:**
-- Create: `public/wp-content/plugins/nhk-core/tests/Unit/PresentationViewModelTest.php`
-- Modify: `public/wp-content/plugins/nhk-core/tests/Unit/FrontendContractTest.php`
-- Modify: `public/wp-content/plugins/nhk-core/tests/Unit/SemanticProfileComposerTest.php` if present
-
-**Interfaces:**
-- Consumes: existing `PresentationReadiness`, `LatestFirstOrder`, `SemanticProfileComposer`, entity profiles and dossier arrays.
-- Produces: executable expectations for shared presentation fields, section states, origin precedence, readiness exclusion, and profile coverage.
-
-- [ ] **Step 1: Write failing tests** for: direct origin outranking derived origin; same item deduplicating once while retaining strongest origin; Clock Group hierarchy preserving parent/children order; active-without-route being excluded from presentation-ready archive output; dynamic newest ordering being applied before page slicing; and every registered Authority family resolving a presentation profile without exposing internal labels.
-- [ ] **Step 2: Run the focused PHPUnit tests** and confirm they fail for missing behavior rather than fixture/bootstrap errors.
-- [ ] **Step 3: Keep the tests as the contract** while implementing Tasks 2–5.
-
-### Task 2: Normalize the shared presentation read model
-
-**Files:**
-- Create: `public/wp-content/plugins/nhk-core/src/Application/Presentation/EntityPresentationViewModel.php`
-- Create: `public/wp-content/plugins/nhk-core/src/Application/Presentation/RelationOrigin.php`
-- Create: `public/wp-content/plugins/nhk-core/src/Application/Presentation/SectionStatus.php`
-- Create: `public/wp-content/plugins/nhk-core/src/Application/Presentation/PresentationProfile.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/SemanticProfileComposer.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/SemanticDossierQuery.php`
-
-**Interfaces:**
-- `EntityPresentationViewModel::fromDossier(string $type, array $dossier): array` returns reader-safe `identity`, `route`, `title`, `subtitle`, `summary`, `description`, `hero_media`, `breadcrumbs`, `parent`, `children`, `siblings`, `knowledge`, `articles`, `media`, `videos`, `models`, `variants`, `movements`, `melodies`, `parts`, `specimens`, `products`, `derived_brands`, `related_entities`, `counts`, `section_status`, `presentation_readiness`, `relation_origin`, `relation_depth`, `timestamps` where available.
-- `RelationOrigin::normalize(array $origin): array` preserves `DIRECT` or bounded `DERIVED`, hop count and ordered path metadata, and computes a presentation-only provenance bucket such as `DERIVED_VIA_SUBTYPE`, `DERIVED_VIA_MODEL`, `DERIVED_VIA_VARIANT`, `DERIVED_VIA_SPECIMEN`, `DERIVED_VIA_PRODUCT` or `DERIVED_VIA_ARTICLE` from existing path evidence only.
-- `SectionStatus::forItems(array $items, string $ownerStatus = 'AVAILABLE'): array` maps successful populated/empty branches and owner-unavailable branches without collapsing failures into empty.
-
-- [ ] **Step 1: Add the smallest implementation** that maps existing dossier/profile packets without introducing new Graph vocabulary or storage.
-- [ ] **Step 2: Add bounded deduplication** using canonical identity when present, then existing public URL/title fallback only for reader-safe non-canonical resources; choose direct, then lower hop count, then existing feed ordering.
-- [ ] **Step 3: Preserve ordering metadata only inside the application assembler** and remove it before the theme-facing packet is returned.
-- [ ] **Step 4: Make `SemanticProfileComposer` delegate normalization** and retain existing keys for compatibility so current templates/tests do not break while the shared renderer migrates.
-- [ ] **Step 5: Run the focused tests and all existing entity/profile tests.**
-
-### Task 3: Expand profile-driven page families and public collection readiness
+### Task 1: Extend the generic profile registry and resolver
 
 **Files:**
 - Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/EntityProfileRegistry.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/EntityProfileDefinition.php` only if presentation defaults need a typed accessor
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/PublicEntityCollectionQuery.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Home/HomeSemanticQuery.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/EntityPageQuery.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/EntityProfileResolver.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/EntityProfileRegistryTest.php`
+
+**Interfaces:**
+- Produces profiles for `brand`, `model`, `variant`, `movement`, `music`, `component`, `classification`, `specimen`, `product`, and `clock_type`.
+- Resolver returns a resolved generic profile for registered non-classification entity types and keeps family matching fail-closed for classifications.
+
+- [ ] Add failing assertions that every registered Authority type has a profile, with Vietnamese label, section order, relation targets, and no semantic vocabulary added.
+- [ ] Run the focused registry test and observe the missing-profile failure.
+- [ ] Add profile definitions using only presentation behavior (labels, sections, limits/layout hints, relation target groups, route/archive intent).
+- [ ] Update resolver to resolve all registered non-classification types through the profile registry while retaining exact `clock_type` family matching.
+- [ ] Run the focused registry/resolver tests and the existing profile tests.
+
+### Task 2: Make dossier composition generic and single-pass
+
+**Files:**
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Entity/SemanticProfileComposer.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Presentation/EntityPresentationViewModel.php`
 - Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Frontend/EntityDossierBootstrap.php`
-- Modify: `public/wp-content/plugins/nhk-core/src/Infrastructure/Frontend/FrontendSemanticBootstrap.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/EntityPresentationViewModelTest.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/EntityProfilePublicDossierTest.php`
 
 **Interfaces:**
-- Consumes: registered nine Authority types, existing route/eligibility services, existing Graph/query readers and Task 2 view model.
-- Produces: presentation-only profiles for `brand`, `clock_type`, `model`, `variant`, `movement`, `music`, `component`, `classification`, `specimen`, `product`; shared archive/detail packets with readiness and section limits.
+- `SemanticProfileComposer::compose()` remains the single profile-to-view-model boundary.
+- `EntityPresentationViewModel::fromDossier()` preserves safe identity, section status, relation origin, relation depth, counts, and bounded items.
 
-- [ ] **Step 1: Add profiles only for registered types** with Vietnamese visitor labels, existing canonical archive paths, section order, visual priority and centralized preview limits. Do not add an Authority type, relation, route or field.
-- [ ] **Step 2: Make archive items use the same readiness policy** where a profile requires usable route/identity/content/media, while leaving semantic ACTIVE untouched.
-- [ ] **Step 3: Ensure Clock Group archive cards expose representative media, summary and only non-zero counts from the same query source.**
-- [ ] **Step 4: Ensure HomeSemanticQuery requests bounded media/video/article/entity previews once, newest-first before slicing, and does not build per-page relation logic.**
-- [ ] **Step 5: Add/update tests for profile coverage, readiness exclusion, hierarchy, representative media precedence, counts and latest-first page boundaries.**
+- [ ] Add failing tests for generic model/variant profile readiness and direct-over-derived deduplication across relation groups.
+- [ ] Run the focused tests and observe the failure caused by unresolved generic profiles or duplicate bootstrap composition.
+- [ ] Normalize profile section names/labels, preserve `relation_origin`/`relation_depth`, derive counts from emitted filtered items, and keep visual media separate from relation text.
+- [ ] Change the detail bootstrap filter to enrich the dossier already produced by `FrontendSemanticBootstrap`, falling back to its own reader only when no dossier exists; never replace a complete dossier with a second read.
+- [ ] Run presentation, dossier, brand, clock hierarchy, and profile tests.
 
-### Task 4: Create shared theme presentation partials and converge dossier rendering
+### Task 3: Fix homepage/archive read projections and CTA/order semantics
 
 **Files:**
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/breadcrumbs.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/entity-hero.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/local-section-nav.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/hierarchy-nav.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/section-header.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/empty-state.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/entity-card.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/article-card.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/media-card.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/video-card.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/media-grid.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/relationship-section.php`
-- Create: `public/wp-content/themes/nhk-v3/template-parts/presentation/visual-rail.php`
-- Modify: `public/wp-content/themes/nhk-v3/entity.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Home/HomeSemanticQuery.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Media/PublicMediaGalleryQuery.php`
+- Modify: `public/wp-content/plugins/nhk-core/src/Application/Media/MediaVideoPageQuery.php`
+- Modify: `public/wp-content/themes/nhk-v3/inc/class-nhk-home-page-query.php`
 - Modify: `public/wp-content/themes/nhk-v3/front-page.php`
-- Modify: `public/wp-content/themes/nhk-v3/index.php`
-- Modify: `public/wp-content/themes/nhk-v3/single.php`
-- Modify: `public/wp-content/themes/nhk-v3/media.php`
-- Modify: `public/wp-content/themes/nhk-v3/video.php`
-- Modify: `public/wp-content/themes/nhk-v3/knowledge.php`
-- Modify: `public/wp-content/themes/nhk-v3/comparison.php`
-- Modify: `public/wp-content/themes/nhk-v3/404.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/entity-card.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/media-card.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/video-card.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/HomeSemanticQueryTest.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/MediaVideoPageQueryTest.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/FrontendPresentationContractTest.php`
 
 **Interfaces:**
-- Consumes: one theme-facing view model/context, existing `nhk_core_*_context` globals and native WP post loop.
-- Produces: semantic, reusable presentation markup with one H1, relationship-aware links, available-section navigation, visual previews before CTAs and honest empty states.
+- Homepage semantic modules remain the existing filter shape, with hubs ordered by the canonical public navigation and clock groups limited to presentation-ready records.
+- Media/video totals count the same public-filtered source used to render previews.
 
-- [ ] **Step 1: Extract shared partials** using only escaped reader-safe values and `nhk_v3_public_url()`/existing route projections for links.
-- [ ] **Step 2: Make `entity.php` a coordinator** that selects profile sections and invokes shared partials; remove inline graph traversal, duplicated cards and entity-name special cases.
-- [ ] **Step 3: Render Clock Group hierarchy from projected parent/children/siblings** and never treat editorial context labels as subtype children.
-- [ ] **Step 4: Render direct/derived labels only where useful to public discovery, never raw origin identifiers; keep internal origin/path available to tests/debug serialization.
-- [ ] **Step 5: Convert media/video modules to preview cards and only show “Xem tất cả” when total exceeds preview limit; defer iframe creation to interaction/viewport using existing JS policy.
-- [ ] **Step 6: Keep Product and Specimen identity distinct; hide unsupported Product–Specimen linkage rather than using `specimen_uuid` or broad `about` as a semantic shortcut.
-- [ ] **Step 7: Add structural template tests** for hub cards, dossier section visibility, empty states, local nav, hierarchy, visual rail, image/video preview and CTA rules.
+- [ ] Add failing tests for media totals excluding records with no usable public image, video previews carrying newest-first publication data, and homepage hub order placing Brand before Nhóm đồng hồ.
+- [ ] Run focused tests and observe the expected ordering/count failures.
+- [ ] Filter/count media and video only after public visual/route projection is available; include `published_at`, subject context, and representative metadata in cards.
+- [ ] Replace hard-coded homepage hub order with a canonical presentation navigation definition while keeping the existing route paths.
+- [ ] Add optional count badges to the shared entity card and keep CTA output conditional on `total > preview_count`.
+- [ ] Run homepage/media/video/order tests.
 
-### Task 5: Finish navigation, responsive/accessibility styling and archive ordering
+### Task 4: Consolidate shared dossier rendering and navigation
 
 **Files:**
-- Modify: `public/wp-content/themes/nhk-v3/functions.php`
+- Modify: `public/wp-content/themes/nhk-v3/entity.php`
 - Modify: `public/wp-content/themes/nhk-v3/header.php`
 - Modify: `public/wp-content/themes/nhk-v3/footer.php`
-- Modify: `public/wp-content/themes/nhk-v3/navigation.js`
-- Modify: `public/wp-content/themes/nhk-v3/style.css`
-- Modify: `public/wp-content/themes/nhk-v3/entity.css`
-- Modify: `public/wp-content/themes/nhk-v3/media-video.css`
-- Modify: `public/wp-content/themes/nhk-v3/knowledge.css`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/hierarchy-nav.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/local-section-nav.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/visual-rail.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/breadcrumbs.php`
+- Modify: `public/wp-content/themes/nhk-v3/template-parts/presentation/empty-state.php`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/FrontendPresentationContractTest.php`
 
 **Interfaces:**
-- Consumes: one canonical navigation definition, existing token source, shared partial class names and current WordPress shell.
-- Produces: synchronized desktop/mobile nav, responsive dossier layout, consistent card variants, visible focus states, stable image ratios, accessible video affordances and no horizontal overflow.
+- Desktop uses the existing three-column semantic layout when width permits; mobile collapses hierarchy and moves visual modules below main content.
+- Desktop and mobile both call the same `nhk_v3_navigation_items()` definition.
 
-- [ ] **Step 1: Replace fallback-only nav duplication** with a single visitor-facing definition consumed by fallback and registered-menu rendering, placing `Nhóm đồng hồ` after `Thương hiệu` and before `Mẫu`.
-- [ ] **Step 2: Preserve configured WordPress menu behavior** while ensuring the responsive menu exposes the same required item when the fallback/registry path is used.
-- [ ] **Step 3: Add/normalize shared CSS for `wide-content`, `dossier-grid`, `visual-rail`, card variants, image containers, scroll-snap strips and mobile hierarchy disclosure using existing tokens and breakpoints.
-- [ ] **Step 4: Ensure keyboard toggle state/ARIA, landmarks, heading order, alt text, focus-visible, touch targets and lazy/deferred media remain valid.
-- [ ] **Step 5: Add/update theme contract tests** for nav order, mobile parity, class/token reuse, heading/landmark/empty behavior and media/video visibility.
+- [ ] Add failing structural assertions for generic hierarchy/local-nav usage and shared visual rails.
+- [ ] Run the focused contract test and observe missing shared seam assertions.
+- [ ] Make breadcrumb inputs relationship-aware when the projector supplies them, with page-family fallback only when no relationship path is available.
+- [ ] Render dossier sections from profile order/status, use shared Entity/Media/Video cards, and remove duplicated inline relation card markup where the shared part can express the role.
+- [ ] Add family-aware left hierarchy fallback for model/variant/brand data without treating context as subtype and without inventing links.
+- [ ] Keep empty/blocked/unavailable states fail-soft and public-safe.
+- [ ] Run all theme contract tests.
 
-### Task 6: Verification, audit report and execution-state evidence
+### Task 5: Responsive/accessibility presentation pass and acceptance matrix
 
 **Files:**
-- Modify: `docs/architecture/V3_EXECUTION_STATE.md` with a dated read-only frontend checkpoint only
-- Create: `docs/architecture/FINAL_FRONTEND_PRESENTATION_PASS_2026-09-14.md`
+- Modify: `public/wp-content/themes/nhk-v3/presentation.css`
+- Modify: `public/wp-content/themes/nhk-v3/entity.css`
+- Modify: `public/wp-content/themes/nhk-v3/media-video.css`
+- Modify: `docs/architecture/V3_EXECUTION_STATE.md`
+- Create: `docs/architecture/FINAL_FRONTEND_PRESENTATION_PASS_REPORT.md`
+- Test: `public/wp-content/plugins/nhk-core/tests/Unit/FrontendPresentationContractTest.php`
 
 **Interfaces:**
-- Consumes: all implementation/test results and current page-family acceptance matrix.
-- Produces: evidence-backed final report with `COMPLETE`, `PARTIAL`, `EMPTY_BY_DATA`, or `NOT_APPLICABLE`, explicit missing data/relations, and the required no-mutation/no-deploy declarations.
+- CSS reuses current tokens/breakpoints and provides stable image ratios, focus-visible states, scroll-safe local navigation, and mobile visual previews.
+- The report records family status, code-complete/data-empty distinctions, missing relations, and explicit no-mutation/no-deploy scope.
 
-- [ ] **Step 1: Run focused presentation/unit tests and the full Unit suite** with no database mutation.
-- [ ] **Step 2: Run PHP lint across changed PHP files, `git diff --check`, and repository secret review.**
-- [ ] **Step 3: Run the existing read-only frontend route smoke and, if the local server is available, responsive/visual checks at practical widths without creating or changing data.
-- [ ] **Step 4: Read back `V3_EXECUTION_STATE.md` and `V2_V3_PARITY_MATRIX.md`, then record only evidence actually observed.**
-- [ ] **Step 5: Write the final report in the exact requested format and stop frontend work. Do not deploy, mutate, ingest, publish, allocate routes, or perform Git cleanup.**
-
-## Self-review
-
-- The plan reuses the existing query/projector seams and does not create semantic types, predicates, relations, entities or persistence.
-- Product–Specimen remains fail-closed because the Constitution records the relation mechanism as a registry gap.
-- Media detail remains delivery-oriented; no standalone indexable Media entity route is invented.
-- Missing live Video/Media/identity data is reported as data/runtime evidence, not fabricated content.
-- Sorting and pagination are centralized at query/application boundaries, never in templates after slicing.
-- All public visitor copy stays Vietnamese-first and internal identifiers remain hidden.
+- [ ] Add failing CSS/template assertions for focus-visible, image object-fit, mobile visual retention, and semantic navigation labels.
+- [ ] Run the focused contract test and observe failures.
+- [ ] Add the smallest shared CSS rules needed for card variants, three-column collapse, visual preview grids, keyboard focus, and 360–430px layouts.
+- [ ] Run PHP lint, focused PHPUnit, full PHPUnit, `git diff --check`, and a secret scan over changed files.
+- [ ] Write the acceptance matrix and exact data gaps to the frontend report; update execution state without changing semantic/runtime data.

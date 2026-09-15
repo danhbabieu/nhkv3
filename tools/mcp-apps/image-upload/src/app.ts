@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { buildWidgetState, extractUploads, type UploadedItem } from "./contract";
+import { buildWidgetState, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem } from "./contract";
 
 const SERVER_TOOL_NAME = "nhk.media.widget-upload";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
@@ -14,7 +14,7 @@ type ToolResult = {
 };
 
 type ChatGptFileApi = {
-  selectFiles?: (options: { multiple: boolean; accept: string[] }) => Promise<File[] | FileList>;
+  selectFiles?: () => Promise<unknown>;
   uploadFile?: (file: File, options?: { library?: boolean }) => Promise<{ fileId?: string }>;
   getFileDownloadUrl?: (options: { fileId: string }) => Promise<{ downloadUrl?: string }>;
   setWidgetState?: (state: unknown) => void | Promise<void>;
@@ -57,7 +57,7 @@ async function start(): Promise<void> {
   const app = new App({ name: "NHK Image Upload", version: "1.0.0" });
   let connected = false;
   let uploading = false;
-  let selected: File[] = [];
+  let selected: SelectedImage[] = [];
   let uploaded: UploadedItem[] = [];
 
   function setState(next: WidgetState, message: string): void {
@@ -74,15 +74,22 @@ async function start(): Promise<void> {
   function renderSelection(): void {
     previews.replaceChildren();
     let total = 0;
-    selected.forEach((file) => {
-      total += file.size;
+    selected.forEach((item) => {
+      const file = item.kind === "local" ? item.file : null;
+      const fileName = item.kind === "local" ? item.file.name : item.fileName;
+      const fileSize = file?.size ?? 0;
+      total += fileSize;
       const figure = document.createElement("figure");
-      const image = document.createElement("img");
-      image.alt = file.name;
-      image.src = URL.createObjectURL(file);
-      figure.append(image);
+      if (file) {
+        const image = document.createElement("img");
+        image.alt = file.name;
+        image.src = URL.createObjectURL(file);
+        figure.append(image);
+      }
       const caption = document.createElement("figcaption");
-      caption.textContent = `${file.name} (${(file.size / 1048576).toFixed(2)} MB)`;
+      caption.textContent = file
+        ? `${fileName} (${(fileSize / 1048576).toFixed(2)} MB)`
+        : `${fileName} (ChatGPT Library)`;
       figure.append(caption);
       previews.append(figure);
     });
@@ -128,14 +135,16 @@ async function start(): Promise<void> {
     const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string }> = [];
 
     try {
-      for (const file of selected) {
-        setState("UPLOADING", `Uploading ${file.name}…`);
-        const uploadedFile = await host!.uploadFile!(file, { library: false });
-        const fileId = uploadedFile.fileId;
-        if (!fileId) throw new Error(`Upload did not return a file ID for ${file.name}.`);
+      for (const item of selected) {
+        const fileName = item.kind === "local" ? item.file.name : item.fileName;
+        setState("UPLOADING", `Uploading ${fileName}…`);
+        const fileId = item.kind === "local"
+          ? (await host!.uploadFile!(item.file, { library: false })).fileId
+          : item.fileId;
+        if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
         const download = await host!.getFileDownloadUrl!({ fileId });
-        if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${file.name}.`);
-        references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: file.type, file_name: file.name });
+        if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
+        references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
       }
 
       const result = await app.callServerTool({
@@ -169,13 +178,15 @@ async function start(): Promise<void> {
   app.ontoolresult = (result) => handleToolResult(result as ToolResult);
   app.onerror = (error) => setState("ERROR", `MCP Apps connection error: ${errorMessage(error)}`);
   input.addEventListener("change", () => {
-    selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type));
+    selected = asFiles(input.files)
+      .filter((file) => IMAGE_TYPES.test(file.type))
+      .map((file) => ({ kind: "local" as const, file }));
     renderSelection();
   });
   select.addEventListener("click", async () => {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
-      selected = asFiles(await host.selectFiles({ multiple: true, accept: IMAGE_ACCEPT }));
+      selected = normalizeSelectedFiles(await host.selectFiles());
       renderSelection();
     } catch (error) {
       setState("ERROR", `File selection failed: ${errorMessage(error)}`);

@@ -38,6 +38,11 @@ final class EntityPresentationViewModel
         $sections['knowledge'] = SectionStatus::forItems(self::knowledgeItems($knowledge), $knowledgeStatus === 'NOT_APPLICABLE' ? 'EMPTY' : $knowledgeStatus);
 
         $hierarchy = self::hierarchy($profile, $dossier);
+        $breadcrumbs = self::safeItems(is_array($profile['breadcrumbs'] ?? null) ? $profile['breadcrumbs'] : (is_array($dossier['breadcrumbs'] ?? null) ? $dossier['breadcrumbs'] : []));
+        if ($breadcrumbs === []) {
+            if ($hierarchy['parent'] !== []) $breadcrumbs[] = $hierarchy['parent'];
+            if (($identity['name'] ?? '') !== '') $breadcrumbs[] = ['name' => (string) $identity['name'], 'url' => ''];
+        }
         $counts = is_array($profile['coverage'] ?? null) ? $profile['coverage'] : (is_array($dossier['coverage'] ?? null) ? $dossier['coverage'] : []);
         foreach (['models', 'variants', 'movements', 'music', 'components', 'specimens', 'products', 'articles', 'media', 'videos'] as $group) {
             $counts[$group === 'music' ? 'melody_count' : rtrim($group, 's') . '_count'] = $sections[$group]['count'];
@@ -53,7 +58,7 @@ final class EntityPresentationViewModel
             'summary' => self::text($payload['summary'] ?? $payload['description'] ?? $identity['excerpt'] ?? ''),
             'description' => self::text($payload['description'] ?? $payload['summary'] ?? ''),
             'hero_media' => self::safeMedia($primaryMedia),
-            'breadcrumbs' => self::safeItems(is_array($profile['breadcrumbs'] ?? null) ? $profile['breadcrumbs'] : (is_array($dossier['breadcrumbs'] ?? null) ? $dossier['breadcrumbs'] : [])),
+            'breadcrumbs' => $breadcrumbs,
             'parent' => $hierarchy['parent'],
             'children' => $hierarchy['children'],
             'siblings' => $hierarchy['siblings'],

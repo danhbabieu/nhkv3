@@ -37,3 +37,14 @@
 @media(max-width:64rem){.semantic-layout{grid-template-columns:minmax(0,1fr) minmax(210px,250px)}.hierarchy-rail{grid-column:1 / -1;padding-top:26px}.hierarchy-nav ul{display:flex;flex-wrap:wrap;gap:8px}.hierarchy-nav li{border:1px solid var(--nhk-border);padding:7px 10px}.hierarchy-nav .hierarchy-parent{display:inline-block;margin-right:12px}}
 @media(max-width:48rem){.semantic-layout{display:block}.hierarchy-rail{padding-top:20px}.context-rail{padding-top:32px}.visual-rail{grid-template-columns:repeat(2,minmax(0,1fr))}.local-section-nav ul{gap:14px}}
 @media(max-width:36rem){.visual-rail{grid-template-columns:1fr}}
+.count-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.count-badges span{display:inline-flex;padding:4px 7px;border:1px solid var(--nhk-border);color:var(--nhk-muted);font-size:.72rem;line-height:1.2}
+.nav-list a[aria-current="page"]{color:var(--nhk-accent);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}
+.local-section-nav a:focus-visible,.hierarchy-nav a:focus-visible,.context-box a:focus-visible,.count-badges:focus-visible{outline:3px solid var(--nhk-accent-secondary);outline-offset:3px}
+.local-section-nav ul{scroll-snap-type:x proximity}
+.local-section-nav li{scroll-snap-align:start}
+.visual-card img,.video-poster img{display:block;width:100%;height:100%;object-fit:cover}
+.video-poster{display:block;position:relative;aspect-ratio:16/9;overflow:hidden;background:#e9e1d7}
+.video-play{position:absolute;inset:auto auto 14px 14px;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,253,249,.94);color:var(--nhk-accent);box-shadow:0 5px 18px rgba(57,41,28,.15)}
+@media(max-width:48rem){.local-section-nav{margin-inline:calc(-1 * var(--nhk-gutter, 14px));padding-inline:var(--nhk-gutter, 14px)}.local-section-nav ul{overflow-x:auto;padding-bottom:2px}.entity-card-body{padding:15px}.visual-rail{gap:14px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}

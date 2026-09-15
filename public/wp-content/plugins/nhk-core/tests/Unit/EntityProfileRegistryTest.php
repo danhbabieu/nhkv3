@@ -15,7 +15,9 @@ final class EntityProfileRegistryTest extends TestCase
     {
         $registry = new EntityProfileRegistry();
 
-        self::assertSame(['brand', 'clock_type'], $registry->keys());
+        self::assertContains('brand', $registry->keys());
+        self::assertContains('clock_type', $registry->keys());
+        self::assertContains('model', $registry->keys());
         self::assertSame('brand', $registry->get('brand')->matchingRule['entity_type']);
         self::assertSame('clock_type', $registry->get('clock_type')->matchingRule['family']);
         self::assertSame('Nhóm đồng hồ', $registry->get('clock_type')->visitorLabel);
@@ -64,6 +66,32 @@ final class EntityProfileRegistryTest extends TestCase
 
         self::assertSame('RESOLVED', $resolution->status);
         self::assertSame('brand', $resolution->profileKey);
+        self::assertSame('not_applicable', $resolution->familyState);
+    }
+
+    public function test_all_registered_authority_types_have_generic_presentation_profiles(): void
+    {
+        $types = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
+        \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($types);
+        $registry = new EntityProfileRegistry();
+
+        foreach ($types->all() as $definition) {
+            $profile = $registry->get($definition->type);
+            self::assertNotNull($profile, $definition->type);
+            self::assertNotSame('', $profile->visitorLabel, $definition->type);
+            self::assertNotSame([], $profile->supportedDossierSections, $definition->type);
+            self::assertNotSame([], $profile->presentation, $definition->type);
+        }
+    }
+
+    public function test_registered_model_resolves_without_using_payload_family_or_name_fallback(): void
+    {
+        $entity = $this->entity('model', 'Mẫu 36', ['description' => 'Mẫu đã có hồ sơ']);
+
+        $resolution = (new EntityProfileResolver())->resolveProfile($entity);
+
+        self::assertSame('RESOLVED', $resolution->status);
+        self::assertSame('model', $resolution->profileKey);
         self::assertSame('not_applicable', $resolution->familyState);
     }
 
