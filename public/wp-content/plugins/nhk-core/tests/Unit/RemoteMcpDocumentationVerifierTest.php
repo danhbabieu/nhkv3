@@ -52,6 +52,28 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('DOC_MANIFEST_MISMATCH', $result->reasonCode);
     }
 
+    public function test_optional_read_grant_is_forwarded_without_changing_the_endpoint(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $calls = [];
+        $verifier = new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use (&$calls, $expected): array {
+            $calls[] = [$url, $method, $headers, $body];
+            $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            return match ($request['method'] ?? null) {
+                'initialize' => ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)],
+                'tools/list' => ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list']]]], JSON_THROW_ON_ERROR)],
+                'tools/call' => $this->jsonResponse($expected),
+                default => ['status' => 404, 'body' => ''],
+            };
+        }, 'Basic dXNlcjpwYXNz');
+
+        $result = $verifier->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('pass', $result->status);
+        self::assertCount(4, $calls);
+        foreach ($calls as $call) self::assertContains('Authorization: Basic dXNlcjpwYXNz', $call[2]);
+    }
+
     public function test_old_build_identity_is_not_reported_as_active(): void
     {
         $expected = $this->expectedBootstrap();

@@ -11,7 +11,10 @@ use NHK\Core\Application\Mcp\McpTransport;
 final class RemoteMcpDocumentationVerifier
 {
     /** @param Closure(string,string,array<string>,string): array{status:int,body:string} $request */
-    public function __construct(private readonly Closure $request) {}
+    public function __construct(
+        private readonly Closure $request,
+        private readonly ?string $authorizationHeader = null,
+    ) {}
 
     /** @param array<string,mixed> $expectedBootstrap */
     public function verify(string $baseUrl, array $expectedBootstrap, string $expectedBuildIdentity): StageResult
@@ -63,7 +66,9 @@ final class RemoteMcpDocumentationVerifier
     /** @return list<string> */
     private function headers(): array
     {
-        return ['Content-Type: application/json', 'Accept: application/json, text/event-stream', 'MCP-Protocol-Version: ' . McpTransport::MODERN_VERSION];
+        $headers = ['Content-Type: application/json', 'Accept: application/json, text/event-stream', 'MCP-Protocol-Version: ' . McpTransport::MODERN_VERSION];
+        if (is_string($this->authorizationHeader) && str_starts_with($this->authorizationHeader, 'Basic ')) $headers[] = 'Authorization: ' . $this->authorizationHeader;
+        return $headers;
     }
 
     private function endpoint(string $baseUrl): ?string

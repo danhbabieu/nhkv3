@@ -77,6 +77,12 @@ if (!$deployment->isPass()) finish(['status' => $deployment->status, 'reason_cod
 // identities and are verified independently below.
 if ((string) $deployment->fingerprint === '') finish(['status' => 'failed', 'reason_code' => 'DEPLOYMENT_IDENTITY_UNAVAILABLE'], $json, 2);
 
+$authorizationHeader = null;
+$wpUser = getenv('NHK_DEMO_WP_USER');
+$wpAppToken = getenv('NHK_DEMO_WP_APP_TOKEN');
+if (is_string($wpUser) && $wpUser !== '' && is_string($wpAppToken) && $wpAppToken !== '') {
+    $authorizationHeader = 'Basic ' . base64_encode($wpUser . ':' . $wpAppToken);
+}
 $verifier = new RemoteMcpDocumentationVerifier(static function (string $url, string $method, array $headers, string $body): array {
     if (!function_exists('curl_init')) return ['status' => 0, 'body' => ''];
     $handle = curl_init($url);
@@ -95,7 +101,7 @@ $verifier = new RemoteMcpDocumentationVerifier(static function (string $url, str
     $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
     curl_close($handle);
     return ['status' => $status, 'body' => is_string($response) ? $response : ''];
-});
+}, $authorizationHeader);
 $verification = $verifier->verify($baseUrl, $expectedManifest, $expectedBuildIdentity);
 if (!$verification->isPass()) {
     finish([
