@@ -45,6 +45,8 @@ final class GovernedCaptureContinuationService
         private ?VideoRelationCandidatePlanner $videoRelations = null,
         private ?VideoEditorialResumePlanner $videoEditorialResume = null,
         private ?VideoCompletenessReconciliationService $videoCompleteness = null,
+        /** @var callable(Proposal,array<string,mixed>,array<string,mixed>):array<string,mixed>|null */
+        private $proposalReconciliation = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -590,7 +592,14 @@ final class GovernedCaptureContinuationService
         }
         $eligibility = $this->governance->eligibility($proposal->id);
         $lifecycle[] = 'ELIGIBILITY';
-        if (($eligibility['ready'] ?? false) !== true) return ['proposal_id' => $proposal->id, 'status' => 'SYSTEM_BLOCKED', 'blockers' => array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])))];
+        if (($eligibility['ready'] ?? false) !== true) {
+            $reasons = array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])));
+            if ($this->proposalReconciliation !== null && in_array('TARGET_REVISION_CHANGED', $reasons, true)) {
+                $reconciled = ($this->proposalReconciliation)($proposal, $eligibility, $control);
+                if (is_array($reconciled) && ($reconciled['status'] ?? '') !== '') return $reconciled;
+            }
+            return ['proposal_id' => $proposal->id, 'status' => 'SYSTEM_BLOCKED', 'blockers' => $reasons];
+        }
         $applied = ($this->apply)($proposal->id);
         $lifecycle[] = 'CONTROLLED_APPLY';
         return $this->applied($proposal, $applied);

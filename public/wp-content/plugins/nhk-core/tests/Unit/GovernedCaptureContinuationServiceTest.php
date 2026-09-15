@@ -133,6 +133,43 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($proposalId, $result['writes'][0]['proposal_id']);
     }
 
+    public function test_stale_relation_binding_reenters_generic_governed_reconciliation_boundary(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $replacementId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, '1:485', 'relation_create', [
+            'source_type' => 'wp_post', 'source_uuid' => '1:485',
+            'target_type' => 'classification', 'target_uuid' => UuidCodec::newV7(),
+            'predicate' => 'about', 'source_revision' => 1, 'target_revision' => 1,
+        ], 'content', null, 'dependency', ProposalState::APPROVED, entityType: 'relation');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'approved', 'entity_type' => 'relation', 'operation' => 'relation_create',
+            'subject_id' => '1:485', 'payload' => $proposal->payload,
+            'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency', 'revision' => 1,
+        ]);
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn([
+            'ready' => false, 'reasons' => ['TARGET_REVISION_CHANGED'],
+        ]);
+        $reconciled = false;
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new \LogicException('stale relation must not apply'),
+            $this->policies(['relation']),
+            static fn (string $capability): bool => true,
+            proposalReconciliation: static function (Proposal $stale, array $eligibility, array $control) use (&$reconciled, $proposalId, $replacementId): array {
+                $reconciled = true;
+                return ['proposal_id' => $replacementId, 'status' => 'APPLIED', 'replaced_proposal_id' => $proposalId, 'canonical_id' => 'edge-1', 'canonical_readback' => ['canonical_id' => 'edge-1', 'active' => true]];
+            },
+        );
+
+        $result = $service->execute('capture-485', 'continuation', [], ['proposal_ids' => [$proposalId]]);
+
+        self::assertTrue($reconciled);
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame($replacementId, $result['writes'][0]['proposal_id']);
+    }
+
     public function test_existing_supported_claim_is_reused_before_continuation_proposal_creation(): void
     {
         $governance = $this->createMock(GovernedLifecycle::class);

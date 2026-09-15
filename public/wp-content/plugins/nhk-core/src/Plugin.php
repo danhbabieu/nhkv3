@@ -25,7 +25,7 @@ use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService};
-use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService};
+use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
@@ -501,6 +501,15 @@ final class Plugin {
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence', 'relation'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
+            $relationProposalReconciliation = new RelationProposalReconciliationService(
+                $mcpGovernance,
+                $governance,
+                $endpoints,
+                static fn (string $proposalId): array => $mcpGovernance->apply($proposalId),
+                $automationResolver,
+                static fn (string $capability): bool => current_user_can($capability),
+                static fn (): string => function_exists('get_current_user_id') ? (string) get_current_user_id() : '0',
+            );
             $clockTypeLifecycle = new \NHK\Core\Application\Authority\ClockTypeCreationLifecycle(
                 new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types),
                 new \NHK\Core\Application\Governance\GovernedAuthorityPlanExecutor($mcpGovernance),
@@ -554,6 +563,9 @@ final class Plugin {
                 videoRelations: $videoRelationCandidates,
                 videoEditorialResume: $videoEditorialResume,
                 videoCompleteness: $videoCompleteness,
+                proposalReconciliation: static function (\NHK\Core\Domain\Governance\Proposal $proposal, array $eligibility, array $control) use ($relationProposalReconciliation): array {
+                    return $relationProposalReconciliation->reconcile($proposal, $control);
+                },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
