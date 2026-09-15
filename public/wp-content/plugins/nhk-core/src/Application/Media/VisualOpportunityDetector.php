@@ -37,7 +37,15 @@ final class VisualOpportunityDetector
             foreach ((array) ($interpretation[$key] ?? []) as $candidate) if (is_array($candidate)) $parts[] = (string) ($candidate['text'] ?? $candidate['value'] ?? '');
         }
         $haystack = $this->lower(implode("\n", $parts));
-        $scope = $subjectType === 'specimen' ? 'specimen_observation' : $subjectType;
+        // Visual-support scope follows the registered Knowledge facet scope,
+        // while the subject packet preserves the exact Authority endpoint
+        // type. Classification endpoints are semantic entities rather than a
+        // separate facet scope.
+        $scope = match ($subjectType) {
+            'specimen' => 'specimen_observation',
+            'classification' => 'entity',
+            default => $subjectType,
+        };
         $found = [];
         foreach (self::FEATURES as $feature) {
             if (!in_array($feature['feature_key'], MediaDetailTypeRegistry::all(), true)) continue;

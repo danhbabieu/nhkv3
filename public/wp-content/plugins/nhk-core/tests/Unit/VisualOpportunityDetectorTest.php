@@ -49,4 +49,20 @@ final class VisualOpportunityDetectorTest extends TestCase
         self::assertSame('specimen_observation', $opportunities[0]['scope']);
         self::assertStringContainsString('phong vũ biểu', $opportunities[0]['reason']);
     }
+
+    public function test_maps_classification_subjects_to_the_registered_entity_visual_scope(): void
+    {
+        $detector = new VisualOpportunityDetector();
+
+        $opportunities = $detector->detect(
+            'Mặt số lớn giúp công bố thời gian trong không gian chung.',
+            [],
+            ['status' => 'resolved', 'primary' => ['id' => self::SUBJECT, 'type' => 'classification', 'name' => 'Nhóm đồng hồ']],
+        );
+
+        self::assertCount(1, $opportunities);
+        self::assertSame('classification', $opportunities[0]['subject']['type']);
+        self::assertSame('entity', $opportunities[0]['scope']);
+        self::assertSame('recognition', $opportunities[0]['facet']);
+    }
 }
