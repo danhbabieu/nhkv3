@@ -38,4 +38,26 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
         self::assertSame('NO_OVERLAP', $evidence['fresh_overlap']['classification']);
         self::assertFalse($evidence['claim_compliance_acceptable']);
     }
+
+    public function test_article_media_result_shape_is_translated_to_publication_media_evidence(): void
+    {
+        $research = new ArticleResearchResult(
+            ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            ['status' => 'available'], ['classification' => 'NO_OVERLAP'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [],
+            ['status' => 'EXISTING', 'category' => ['id' => 4]], [], [], ['slug_intent' => 'clock'], ['status' => 'PASS'], [], [], true,
+        );
+        $media = [
+            'state' => 'MEDIA_COMPLETE',
+            'slot_media' => ['featured_primary' => 'media-1', 'inline_primary' => 'media-1'],
+            'slots' => [
+                'featured_primary' => ['placeholder' => false, 'state' => 'MEDIA_COMPLETE'],
+                'inline_primary' => ['placeholder' => false, 'state' => 'MEDIA_COMPLETE'],
+            ],
+        ];
+
+        $evidence = (new CaptureArticlePreflightHandoff())->build($research, $media, ['status' => 'APPLIED'], ['slug' => 'clock', 'permalink' => '/clock/']);
+
+        self::assertTrue($evidence['media_usage_complete']);
+        self::assertTrue($evidence['real_image_requirements_met']);
+    }
 }
