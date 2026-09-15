@@ -1,0 +1,11 @@
+.album-slide>a{display:block}
+.album-slide>a:focus-visible{outline:3px solid var(--nhk-accent);outline-offset:4px}
+.nhk-album dialog{border:0;max-width:min(94vw,1200px);max-height:92vh;padding:48px 56px 24px;background:#171512;color:#fff}
+.nhk-album dialog::backdrop{background:rgba(0,0,0,.82)}
+.nhk-album dialog figure{margin:0;text-align:center}
+.nhk-album dialog img{display:block;max-width:82vw;max-height:74vh;width:auto;height:auto;margin:auto}
+.nhk-album dialog figcaption{margin-top:12px;color:#fff}
+.nhk-album dialog button{border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;padding:8px 12px;cursor:pointer}
+.nhk-album dialog [data-album-close]{position:absolute;top:12px;right:12px}
+.nhk-album dialog [data-album-dialog-prev],.nhk-album dialog [data-album-dialog-next]{position:absolute;top:50%;transform:translateY(-50%);font-size:1.4rem}
+.nhk-album dialog [data-album-dialog-prev]{left:12px}.nhk-album dialog [data-album-dialog-next]{right:12px}

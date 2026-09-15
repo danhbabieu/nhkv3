@@ -94,6 +94,21 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertStringContainsString('object-fit:contain', $css);
     }
 
+    public function test_article_album_has_direct_webp_fallback_and_accessible_progressive_lightbox(): void
+    {
+        $theme = dirname(__DIR__, 4) . '/themes/nhk-v3';
+        $template = (string) file_get_contents($theme . '/single.php');
+        $script = (string) file_get_contents($theme . '/album.js');
+
+        self::assertStringContainsString('data-album-open', $template);
+        self::assertStringContainsString('<dialog data-album-dialog', $template);
+        self::assertStringContainsString('data-album-dialog-image', $template);
+        self::assertStringContainsString('showModal()', $script);
+        self::assertStringContainsString("event.key === 'Escape'", $script);
+        self::assertStringContainsString('invoker.focus()', $script);
+        self::assertStringContainsString('event.key !== \'Tab\'', $script);
+    }
+
     private function mediaRepository(array $items): MediaRepository
     {
         return new class($items) implements MediaRepository {

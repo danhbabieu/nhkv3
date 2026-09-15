@@ -63,7 +63,9 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
               if ($caption === '') $caption = 'Ảnh tư liệu trong bài viết.';
             ?>
               <figure class="album-slide<?php echo $index === 0 ? ' is-active' : ''; ?>" data-album-slide aria-hidden="<?php echo $index === 0 ? 'false' : 'true'; ?>">
-                <img src="<?php echo esc_url((string) $item['url']); ?>" alt="<?php echo esc_attr($alt); ?>" loading="<?php echo $index === 0 ? 'eager' : 'lazy'; ?>"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>>
+                <a href="<?php echo esc_url((string) $item['url']); ?>" data-album-open aria-label="Mở ảnh <?php echo esc_attr((string) ($index + 1)); ?> ở kích thước đầy đủ">
+                  <img src="<?php echo esc_url((string) $item['url']); ?>" alt="<?php echo esc_attr($alt); ?>" loading="<?php echo $index === 0 ? 'eager' : 'lazy'; ?>"<?php if (!empty($item['width'])): ?> width="<?php echo esc_attr((string) $item['width']); ?>"<?php endif; ?><?php if (!empty($item['height'])): ?> height="<?php echo esc_attr((string) $item['height']); ?>"<?php endif; ?>>
+                </a>
                 <figcaption><strong>Ảnh <?php echo esc_html((string) ($index + 1)); ?> / <?php echo esc_html((string) count($galleryImages)); ?></strong><?php echo esc_html($caption); ?></figcaption>
               </figure>
             <?php endforeach; ?>
@@ -73,6 +75,12 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
             <span class="album-status" data-album-status aria-live="polite">Ảnh 1 / <?php echo esc_html((string) count($galleryImages)); ?></span>
             <button type="button" data-album-next aria-label="Xem ảnh tiếp theo">Ảnh tiếp →</button>
           </div>
+          <dialog data-album-dialog aria-label="Xem ảnh lớn">
+            <button type="button" data-album-close aria-label="Đóng ảnh lớn">Đóng</button>
+            <button type="button" data-album-dialog-prev aria-label="Ảnh trước">←</button>
+            <figure><img data-album-dialog-image alt=""><figcaption data-album-dialog-caption></figcaption></figure>
+            <button type="button" data-album-dialog-next aria-label="Ảnh tiếp theo">→</button>
+          </dialog>
         </div>
       </section>
       <?php endif; ?>

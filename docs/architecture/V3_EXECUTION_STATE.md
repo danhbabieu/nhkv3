@@ -10153,3 +10153,58 @@ REMOTE_RECHECK: The final local fetch observed `origin/main` at
 `cdbc5b0b23781313ea60e50b6039401ed7b1cf9e`; the exact remote target branch
 remained at `744704f5cdbacce0be5f7e9bb71b33df4946b516`. The local target branch
 was intentionally not rebased or merged, and the server remained untouched.
+
+# Checkpoint — 2026-09-15 — Unified Capture local implementation vertical
+
+SCOPE: Owner-authorized local implementation began from exact plan commit
+`f14cc31032f6ecc7d89782c87e3502c590483cf2` on branch
+`codex/unified-capture-media-editorial-implementation-20260915`. No server,
+staging or production operation was performed.
+
+IMPLEMENTED: Registered `MEDIA_ENRICHMENT` with explicit image validation,
+MCP schema parity, media-only Capture reconciliation and owner completion;
+implemented the narrow single-real-image `IMAGE_ARTICLE` exception; added
+contextual MediaUsage title plus optimistic revision persistence through the
+additive local UP migration `MediaUsageMetadataMigration021`; and added a
+progressive direct-WebP fallback/lightbox with keyboard focus handling.
+
+VERIFICATION: Focused TDD and the complete Unit suite pass, including 1,564
+tests / 7,582 assertions before the final implementation additions and all
+focused post-addition suites. PHP lint, JavaScript syntax check and frontend
+contract checks pass. Integration migration checks remain guarded by the
+exact `nhk_v3_test` environment and are not run against staging/production.
+
+BOUNDARY: External research provider, structural Gutenberg managed-section
+parser, live connector/client parity and all live acceptance/deployment remain
+separate gates. Server status is preserved as
+`SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED`.
+
+# Checkpoint — 2026-09-15 — Unified Capture local implementation stop gate
+
+SELF-REVIEW: The owner-authorized local implementation is complete for the
+currently executable slices. The registry and MCP schema now expose
+`MEDIA_ENRICHMENT`; Capture routes it through Media-only reconciliation with
+canonical read-back and no Article creation. `IMAGE_ARTICLE` permits one real
+eligible Media to satisfy both mandatory Article image usages only when the
+explicit single-real-image exception is present. Contextual image title and
+optimistic MediaUsage revision are persisted through additive UP migration 021.
+The public Article gallery has a direct canonical WebP fallback and an
+accessible progressive dialog lightbox with keyboard navigation and focus
+return.
+
+VERIFICATION: `vendor/bin/phpunit --configuration phpunit.xml.dist
+public/wp-content/plugins/nhk-core/tests/Unit` passed with 1,564 tests and
+7,585 assertions. Full PHP lint, changed-file PHP lint, JavaScript syntax
+check and `git diff --check` passed. Guarded migration/media integration tests
+were skipped because `NHK_WP_TEST_PATH` is unavailable; no test database,
+staging or production runtime was mutated.
+
+KNOWN GATES: External research provider integration, structural Gutenberg
+managed-section parsing, full decoded-resource/privacy runtime proof, live
+connector parity, live acceptance and deployment remain explicitly
+stop-gated runtime work from the approved plan. They were not invented or
+silently enabled in this local implementation.
+
+BOUNDARY: No server access or server worktree operation was performed. The
+server remains `SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED`; no deploy,
+SSH, rsync, staging/production migration or live-data mutation occurred.
