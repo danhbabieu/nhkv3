@@ -1,5 +1,90 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Public Clock horizontal acceptance gate
+
+CONNECTOR: Fresh authenticated `@v3-18` runtime read-back succeeded. The
+deployed documentation bootstrap reports staging, build identity
+`4c50a79baababceb242254829ca9a117bf409df381a679c3be96ff0075cb8915`, and the
+five required Proposal lifecycle tools are callable. Easy MCP admin read-back
+shows exactly those five abilities enabled; no broad internal-writer enablement
+was performed.
+
+CANONICAL READ-BACK: Public Clock root remains the single ACTIVE classification
+`01a09e44-539a-7f1a-938a-d7d91bb689a3` with stable key
+`nhk:classification:clock-type.dong-ho-cong-cong`, revision 1. The existing
+Turret Clock Proposal
+`01a09ef0-6b3c-78c9-bb15-e8c0e1cd7ebc` is already `applied`; its canonical
+classification is the single ACTIVE record
+`01a09f73-0aad-79b3-9aaf-5f02cb33a9d1`, stable key
+`nhk:classification:clock-type.dong-ho-thap`, revision 1. No duplicate Entity,
+Capture or Proposal was created. Exact scoped Public URL audits return KEEP for
+`/dong-ho-cong-cong/` and `/dong-ho-thap/`.
+
+BLOCKER: A governed, idempotent Authority plan for the requested
+`subtype_of` edge was created as a separate Capture plan, but APPLY was rejected
+before mutation because this staging semantic mutation is outside the approved
+acceptance scope in `AGENTS.md`. Full Graph pagination read-back confirms zero
+edges involving either Clock Type, so no fake or shortcut relation was added.
+Resume requires explicit approval to expand the approved staging acceptance
+scope, then reuse Capture `01a0a2c2-a605-7d6a-82bf-85ad98d65117` with plan
+fingerprint `40c61892fc96a7fd416526054f1bc1edfe4864a12cf1ab556fef91f3e25c9276`
+and candidate `candidate-6ce8fa5545030874555b`.
+
+PUBLIC READ-BACK: Saving the existing WordPress permalink structure made
+`/loai-dong-ho/` live with the Vietnamese clock-group heading, but it remains
+empty because no Clock Type is presentation-ready. Both detail paths currently
+serve the homepage rather than an entity dossier. Local generic route/template
+code exists; no deployment bypass or hard-coded route workaround was attempted.
+
+EDITORIAL/DATA GATES: Posts 485 and 487 remain drafts, uncategorized and
+unbound, with no slug or featured media. Post 487 contains internal developer
+language and both posts use paragraph-wrapped Markdown headings. Scoped search
+found no canonical Media or Video for either subject. Existing Morbier
+Knowledge `9473b1a7-615d-4e4b-a409-318c944d9ffc` and Strike Mechanism
+classification `01a07cc0-0916-7e2b-8f5c-e5539b9c0b75` were confirmed for reuse;
+no new Knowledge, Media, Video, Article or Public Identity mutation was made.
+
+LIVE GATE: The currently exposed v3-18 surface has read-only Article preflight,
+Knowledge/Media/Video reads and Media widget open, but no callable governed
+Article update/publish, Knowledge ingest, Media ingest or Video ingest ability.
+No generic WordPress writer was used. This checkpoint is not COMPLETE.
+
+# Checkpoint — 2026-09-15 — ChatGPT image widget naming/read-back/diagnostics repair
+
+ROOT_CAUSE: The local widget already used the official MCP Apps lifecycle and
+the exact `nhk.media.widget-upload` tool, but it had no operator naming-context
+field or structured stage diagnostics. The upload service also invented
+`NHK media <file-id>` when no trustworthy context existed, and the widget
+response omitted canonical URL/read-back fields. These gaps made a successful
+transport path insufficient evidence for the required Media contract.
+
+CHANGE: The widget now requires the existing Media metadata `description` as
+operator-provided naming context, sends it through the structured-reference
+tool, and fails closed when it is absent. The fallback generated title was
+removed. Widget results now project canonical URL, attachment read-back
+status, MIME, byte size and dimensions; multi-file result mapping is keyed by
+the returned `file_id`. The Vietnamese-first View records BOOT through
+READY_FOR_USE diagnostics, sanitizes error URLs before display/state, and keeps
+signed ChatGPT URLs out of model-visible/persisted state.
+
+VERIFICATION: Frontend TypeScript typecheck, Vite single-file build and 9
+frontend tests pass. Focused MCP/Media PHP tests pass (106 tests, 734
+assertions); full Unit passes 1,549 tests and 7,511 assertions; Contract passes
+6 tests and 48 assertions; touched PHP files pass lint; `git diff --check`
+passes. The guarded WordPress integration attempt with the exact
+`nhk_v3_test` selector stopped at WordPress bootstrap with `Error establishing
+a database connection`, before the suite could run; no semantic or staging
+mutation occurred.
+
+LIVE GATE: The canonical cutover command for `demo.1945.vn`/`odo` still fails
+closed with `status=blocked` and
+`reason_code=REMOTE_DEPLOYMENT_CONFIG_REQUIRED`. `NHK_DEMO_DEPLOY_CONFIG` is
+unset, so the repaired bundle is not deployed and the required real ChatGPT
+JPEG upload, attachment/Media read-back, HTTP read-back, refresh/reconnect and
+second-upload evidence cannot yet be collected. Do not mark the live repair
+complete until authorized deployment configuration and the live acceptance
+chain are available.
+
 # Checkpoint — 2026-09-14 — ChatGPT library-selection contract repair
 
 ROOT_CAUSE: On the real ChatGPT Web host, `window.openai.selectFiles()` opened

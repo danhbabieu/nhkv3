@@ -56,3 +56,19 @@ test("the View keeps signed download URLs out of visible and persisted state", a
   assert.doesNotMatch(html, /download_url[^\n]*setWidgetState/);
   assert.doesNotMatch(html, /downloadUrl[^\n]*setWidgetState/);
 });
+
+test("the View requires operator naming context and emits the required diagnostics stages", async () => {
+  const html = await resource();
+  const view = await source();
+
+  assert.match(html, /id="context"/);
+  assert.match(html, /Ngữ cảnh đặt tên/);
+  for (const stage of [
+    "BOOT", "RESOURCE_LOADED", "HOST_CAPABILITIES_READ", "FILE_SELECTED",
+    "FILE_PREVIEW_READY", "HOST_FILE_UPLOAD_START", "HOST_FILE_UPLOAD_DONE",
+    "TRUSTED_FILE_REF_READY", "SERVER_TOOL_CALL_START", "SERVER_TOOL_CALL_RESULT",
+    "ATTACHMENT_READBACK_START", "ATTACHMENT_READBACK_DONE", "MEDIA_READBACK_DONE",
+    "READY_FOR_USE", "ERROR",
+  ]) assert.match(view, new RegExp(stage));
+  assert.match(view, /metadata:\s*\{\s*description:/);
+});

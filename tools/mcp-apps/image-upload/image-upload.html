@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NHK image uploader</title>
+    <title>Trình tải ảnh NHK</title>
     <style>
       :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
       body { margin: 0; padding: 16px; }
@@ -18,23 +18,27 @@
       #state { font-weight: 700; }
       #status { margin-top: 10px; white-space: pre-wrap; }
       #results { display: grid; gap: 4px; margin-top: 8px; }
+      #diagnostics { display: grid; gap: 2px; margin-top: 12px; font: 11px ui-monospace, monospace; opacity: .8; }
       .success { color: #16803c; } .failure { color: #bb2434; }
     </style>
   </head>
   <body>
-    <h2>NHK image uploader</h2>
-    <p>Select one or more images. They will be stored as canonical NHK Media.</p>
-    <p>State: <span id="state">CONNECTING</span></p>
+    <h2>Trình tải ảnh NHK</h2>
+    <p>Chọn một hoặc nhiều ảnh. Ảnh sẽ được lưu thành Media chuẩn của NHK.</p>
+    <p>Trạng thái: <span id="state">CONNECTING</span></p>
+    <label for="context">Ngữ cảnh đặt tên (bắt buộc)</label>
+    <input id="context" type="text" maxlength="500" placeholder="Ví dụ: Mặt trước đồng hồ Odo 36/10" autocomplete="off" />
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
-      <button id="select" type="button" hidden disabled>Select files</button>
-      <button id="upload" type="button" disabled>Upload selected images</button>
-      <button id="use" type="button" disabled>Use these images in chat</button>
+      <button id="select" type="button" hidden disabled>Chọn ảnh trong Library</button>
+      <button id="upload" type="button" disabled>Tải ảnh đã chọn</button>
+      <button id="use" type="button" disabled>Dùng ảnh trong chat</button>
     </div>
-    <div id="summary" aria-live="polite">No images selected.</div>
+    <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>
-    <div id="status" role="status" aria-live="polite">CONNECTING</div>
+    <div id="status" role="status" aria-live="polite">ĐANG KẾT NỐI</div>
     <div id="results" aria-live="polite"></div>
+    <div id="diagnostics" aria-live="polite" aria-label="Chẩn đoán widget"></div>
     <script type="module" src="/src/app.ts"></script>
   </body>
 </html>

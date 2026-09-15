@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NHK image uploader</title>
+    <title>Trình tải ảnh NHK</title>
     <style>
       :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
       body { margin: 0; padding: 16px; }
@@ -18,6 +18,7 @@
       #state { font-weight: 700; }
       #status { margin-top: 10px; white-space: pre-wrap; }
       #results { display: grid; gap: 4px; margin-top: 8px; }
+      #diagnostics { display: grid; gap: 2px; margin-top: 12px; font: 11px ui-monospace, monospace; opacity: .8; }
       .success { color: #16803c; } .failure { color: #bb2434; }
     </style>
     <script type="module" crossorigin>var _a2, _b, _c, _d, _e, _f;
@@ -12031,7 +12032,10 @@ function extractUploads(result) {
     return [];
   }
 }
-function buildWidgetState(items) {
+function redactDiagnostic(value) {
+  return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
+}
+function buildWidgetState(items, diagnostics = [], uploadStatus = items.length > 0 ? "complete" : "idle") {
   return {
     modelContent: {
       uploaded_media: items.map((item) => ({
@@ -12041,11 +12045,18 @@ function buildWidgetState(items) {
         status: item.status || "uploaded"
       }))
     },
-    privateContent: { upload_status: "complete" },
+    privateContent: {
+      upload_status: uploadStatus,
+      diagnostics: diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        ...diagnostic.error ? { error: redactDiagnostic(diagnostic.error) } : {}
+      }))
+    },
     imageIds: items.map((item) => item.file_id).filter((id) => Boolean(id))
   };
 }
 const SERVER_TOOL_NAME = "nhk.media.widget-upload";
+const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 function byId(id) {
   const element = document.getElementById(id);
@@ -12054,6 +12065,13 @@ function byId(id) {
 }
 function errorMessage(error2) {
   return error2 instanceof Error ? error2.message : String(error2);
+}
+function safeErrorMessage(error2) {
+  return errorMessage(error2).replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
+}
+function diagnosticCode(error2) {
+  const match = errorMessage(error2).match(/^[A-Z][A-Z0-9_]{2,}/);
+  return match?.[0] ?? "UPLOAD_FAILED";
 }
 function asFiles(value) {
   return Array.from(value ?? []);
@@ -12071,12 +12089,36 @@ async function start() {
   const state = byId("state");
   const status = byId("status");
   const results = byId("results");
+  const context = byId("context");
+  const diagnosticsView = byId("diagnostics");
   const host = window.openai;
   const app = new l({ name: "NHK Image Upload", version: "1.0.0" });
   let connected = false;
   let uploading = false;
   let selected = [];
   let uploaded = [];
+  let diagnostics = [];
+  let uploadStatus = "idle";
+  function renderDiagnostics() {
+    diagnosticsView.replaceChildren();
+    diagnostics.slice(-12).forEach((diagnostic) => {
+      const row = document.createElement("div");
+      row.textContent = [diagnostic.stage, diagnostic.status, diagnostic.code].filter(Boolean).join(" · ");
+      diagnosticsView.append(row);
+    });
+  }
+  function recordDiagnostic(stage, statusValue, code, error2) {
+    diagnostics.push({
+      stage,
+      status: statusValue,
+      code,
+      ...error2 ? { error: safeErrorMessage(error2) } : {},
+      uri: RESOURCE_URI,
+      tool: SERVER_TOOL_NAME
+    });
+    renderDiagnostics();
+    if (connected) saveWidgetState();
+  }
   function setState(next, message) {
     state.textContent = next;
     status.dataset.state = next;
@@ -12106,7 +12148,7 @@ async function start() {
       figure.append(caption);
       previews.append(figure);
     });
-    summary.textContent = `${selected.length} image(s), ${(total / 1048576).toFixed(2)} MB`;
+    summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
     upload.disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
   }
   function renderUploads(items) {
@@ -12115,54 +12157,75 @@ async function start() {
       const row = document.createElement("div");
       row.className = "success";
       const filename = item.public_filename || item.original_filename || "(unnamed image)";
-      row.textContent = `Attachment ${item.attachment_id ?? "—"} · Media ${item.media_id ?? "—"} · ${filename} · ${item.status || "uploaded"}`;
+      row.textContent = `Đính kèm ${item.attachment_id ?? "—"} · Media ${item.media_id ?? "—"} · ${filename} · ${item.status || "đã tải"}`;
       results.append(row);
     });
   }
   function saveWidgetState() {
     if (!connected || typeof host?.setWidgetState !== "function") return;
-    void host.setWidgetState(buildWidgetState(uploaded));
+    void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
   }
   function handleToolResult(result) {
     if (result.isError) {
-      setState("ERROR", "The NHK image tool returned an error.");
-      return;
+      throw new Error("SERVER_TOOL_ERROR");
     }
     const items = extractUploads(result);
     if (items.length > 0) {
       uploaded = items;
       renderUploads(uploaded);
     }
+    return items;
   }
   async function uploadFiles() {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
+    const namingContext = context.value.trim();
+    if (namingContext === "") {
+      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
+      setState("ERROR", "Nhập ngữ cảnh đặt tên trước khi tải ảnh.");
+      return;
+    }
     uploading = true;
+    uploadStatus = "idle";
     uploaded = [];
     renderUploads([]);
     renderSelection();
-    setState("UPLOADING", "Uploading selected images…");
+    setState("UPLOADING", "Đang tải ảnh đã chọn…");
     const references = [];
     try {
       for (const item of selected) {
         const fileName = item.kind === "local" ? item.file.name : item.fileName;
-        setState("UPLOADING", `Uploading ${fileName}…`);
+        recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
+        setState("UPLOADING", `Đang tải ${fileName}…`);
         const fileId = item.kind === "local" ? (await host.uploadFile(item.file, { library: false })).fileId : item.fileId;
         if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
+        recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
         const download = await host.getFileDownloadUrl({ fileId });
         if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
         references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
+        recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
       }
+      recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
       const result = await app.callServerTool({
         name: SERVER_TOOL_NAME,
-        arguments: { idempotency_key: createIdempotencyKey(), files: references }
+        arguments: { idempotency_key: createIdempotencyKey(), metadata: { description: namingContext }, files: references }
       });
-      handleToolResult(result);
-      if (uploaded.length === 0) throw new Error("The NHK image tool returned no uploaded images.");
+      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+      const returned = handleToolResult(result);
+      if (returned.length === 0) throw new Error("SERVER_TOOL_EMPTY_RESULT");
+      recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
+      if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
+      recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
+      if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
+      recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
       use.disabled = typeof host?.sendFollowUpMessage !== "function";
+      uploadStatus = "complete";
       saveWidgetState();
-      setState("SUCCESS", `${uploaded.length} image(s) uploaded successfully.`);
+      recordDiagnostic("READY_FOR_USE", "DONE", "WIDGET_READY_FOR_USE");
+      setState("SUCCESS", `Đã tải thành công ${uploaded.length} ảnh.`);
     } catch (error2) {
-      setState("ERROR", `Image upload failed: ${errorMessage(error2)}`);
+      uploadStatus = "error";
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
+      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error2)}`);
     } finally {
       uploading = false;
       renderSelection();
@@ -12170,32 +12233,50 @@ async function start() {
   }
   async function useImagesInChat() {
     if (!connected || uploaded.length === 0 || typeof host?.sendFollowUpMessage !== "function") {
-      setState("ERROR", "This ChatGPT host does not support sending a follow-up message.");
+      setState("ERROR", "ChatGPT host này không hỗ trợ gửi tiếp tin nhắn.");
       return;
     }
     await host.sendFollowUpMessage({
       role: "user",
-      content: [{ type: "text", text: `Use these uploaded NHK images in the next Capture: ${uploaded.map((item) => item.media_id).filter(Boolean).join(", ")}` }]
+      content: [{ type: "text", text: `Dùng các ảnh NHK đã tải trong Capture tiếp theo: ${uploaded.map((item) => item.media_id).filter(Boolean).join(", ")}` }]
     });
   }
-  app.ontoolresult = (result) => handleToolResult(result);
-  app.onerror = (error2) => setState("ERROR", `MCP Apps connection error: ${errorMessage(error2)}`);
+  app.ontoolresult = (result) => {
+    try {
+      handleToolResult(result);
+    } catch (error2) {
+      recordDiagnostic("ERROR", "ERROR", "SERVER_TOOL_RESULT_INVALID", error2);
+      setState("ERROR", `Kết quả MCP không hợp lệ: ${safeErrorMessage(error2)}`);
+    }
+  };
+  app.onerror = (error2) => {
+    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECTION_ERROR", error2);
+    setState("ERROR", `Kết nối MCP Apps thất bại: ${safeErrorMessage(error2)}`);
+  };
   input.addEventListener("change", () => {
     selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", file }));
+    recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
+    recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
   });
   select.addEventListener("click", async () => {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
       selected = normalizeSelectedFiles(await host.selectFiles());
+      recordDiagnostic("FILE_SELECTED", "DONE", "LIBRARY_FILE_SELECTED");
+      recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
       renderSelection();
     } catch (error2) {
-      setState("ERROR", `File selection failed: ${errorMessage(error2)}`);
+      recordDiagnostic("ERROR", "ERROR", "FILE_SELECTION_FAILED", error2);
+      setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error2)}`);
     }
   });
   upload.addEventListener("click", () => void uploadFiles());
   use.addEventListener("click", () => void useImagesInChat());
-  setState("CONNECTING", "Connecting to the MCP Apps host…");
+  setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
+  recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
+  recordDiagnostic("RESOURCE_LOADED", "DONE", "RESOURCE_READY");
+  recordDiagnostic("HOST_CAPABILITIES_READ", "DONE", supportsFileUpload() ? "HOST_FILE_APIS_AVAILABLE" : "HOST_FILE_APIS_UNAVAILABLE");
   try {
     await app.connect();
     connected = true;
@@ -12203,7 +12284,7 @@ async function start() {
     select.hidden = typeof host?.selectFiles !== "function";
     select.disabled = typeof host?.selectFiles !== "function";
     use.disabled = true;
-    setState("READY", supportsFileUpload() ? "Ready. Select one or more images to upload." : "Connected, but this host does not support uploadFile and getFileDownloadUrl.");
+    setState("READY", supportsFileUpload() ? "Sẵn sàng. Chọn ảnh và nhập ngữ cảnh đặt tên để tải lên." : "Đã kết nối nhưng host không hỗ trợ uploadFile và getFileDownloadUrl.");
     renderSelection();
   } catch (error2) {
     connected = false;
@@ -12211,25 +12292,29 @@ async function start() {
     select.disabled = true;
     upload.disabled = true;
     use.disabled = true;
-    setState("ERROR", `Could not connect to the MCP Apps host: ${errorMessage(error2)}`);
+    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error2);
+    setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error2)}`);
   }
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start(), { once: true });
 else void start();</script>
   </head>
   <body>
-    <h2>NHK image uploader</h2>
-    <p>Select one or more images. They will be stored as canonical NHK Media.</p>
-    <p>State: <span id="state">CONNECTING</span></p>
+    <h2>Trình tải ảnh NHK</h2>
+    <p>Chọn một hoặc nhiều ảnh. Ảnh sẽ được lưu thành Media chuẩn của NHK.</p>
+    <p>Trạng thái: <span id="state">CONNECTING</span></p>
+    <label for="context">Ngữ cảnh đặt tên (bắt buộc)</label>
+    <input id="context" type="text" maxlength="500" placeholder="Ví dụ: Mặt trước đồng hồ Odo 36/10" autocomplete="off" />
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
-      <button id="select" type="button" hidden disabled>Select files</button>
-      <button id="upload" type="button" disabled>Upload selected images</button>
-      <button id="use" type="button" disabled>Use these images in chat</button>
+      <button id="select" type="button" hidden disabled>Chọn ảnh trong Library</button>
+      <button id="upload" type="button" disabled>Tải ảnh đã chọn</button>
+      <button id="use" type="button" disabled>Dùng ảnh trong chat</button>
     </div>
-    <div id="summary" aria-live="polite">No images selected.</div>
+    <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>
-    <div id="status" role="status" aria-live="polite">CONNECTING</div>
+    <div id="status" role="status" aria-live="polite">ĐANG KẾT NỐI</div>
     <div id="results" aria-live="polite"></div>
+    <div id="diagnostics" aria-live="polite" aria-label="Chẩn đoán widget"></div>
   </body>
 </html>

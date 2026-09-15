@@ -51,7 +51,7 @@ final class MediaBatchUploadService
                 if ($totalBytes > self::MAX_BATCH_BYTES) throw new \InvalidArgumentException('BATCH_SIZE_LIMIT');
                 $item = $normalizedItems[$index];
                 $title = trim((string) ($item['title'] ?? $metadata['description'] ?? ''));
-                if ($title === '') $title = 'NHK media ' . $clientId;
+                if ($title === '') throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
                 $filename = trim((string) ($item['filename'] ?? $file['name'] ?? ''));
                 $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
                 if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) throw new \InvalidArgumentException('FILE_EXTENSION_INVALID');

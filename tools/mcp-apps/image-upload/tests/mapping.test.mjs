@@ -32,12 +32,42 @@ test("maps one widget-upload result without exposing its signed URL", () => {
     file_id: "file-one",
     download_url: "https://files.openai.test/signed/one",
   }]);
-  assert.deepEqual(buildWidgetState(result), {
+  assert.deepEqual(buildWidgetState(result, [{
+    stage: "MEDIA_READBACK_DONE",
+    status: "DONE",
+    code: "MEDIA_READBACK_VERIFIED",
+    uri: "ui://nhk/image-upload.html",
+    tool: "nhk.media.widget-upload",
+  }]), {
     modelContent: { uploaded_media: [{ attachment_id: 41, media_id: "media-one", public_filename: "one.webp", status: "uploaded" }] },
-    privateContent: { upload_status: "complete" },
+    privateContent: {
+      upload_status: "complete",
+      diagnostics: [{
+        stage: "MEDIA_READBACK_DONE",
+        status: "DONE",
+        code: "MEDIA_READBACK_VERIFIED",
+        uri: "ui://nhk/image-upload.html",
+        tool: "nhk.media.widget-upload",
+      }],
+    },
     imageIds: ["file-one"],
   });
   assert.equal(JSON.stringify(buildWidgetState(result)).includes("download"), false);
+});
+
+test("keeps diagnostic error messages safe and never persists signed URLs", () => {
+  const state = buildWidgetState([], [{
+    stage: "ERROR",
+    status: "ERROR",
+    code: "SERVER_TOOL_ERROR",
+    error: "https://files.openai.test/signed/secret?token=redacted",
+    uri: "ui://nhk/image-upload.html",
+    tool: "nhk.media.widget-upload",
+  }]);
+
+  assert.equal(JSON.stringify(state).includes("files.openai.test"), false);
+  assert.equal(JSON.stringify(state).includes("secret"), false);
+  assert.equal(state.privateContent.diagnostics[0].error, "[redacted-url]");
 });
 
 test("preserves multi-image upload order in rendered and persisted mapping", () => {

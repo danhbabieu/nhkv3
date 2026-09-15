@@ -1,7 +1,8 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { buildWidgetState, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem } from "./contract";
+import { buildWidgetState, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 const SERVER_TOOL_NAME = "nhk.media.widget-upload";
+const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "ERROR"] as const;
@@ -35,6 +36,15 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function safeErrorMessage(error: unknown): string {
+  return errorMessage(error).replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
+}
+
+function diagnosticCode(error: unknown): string {
+  const match = errorMessage(error).match(/^[A-Z][A-Z0-9_]{2,}/);
+  return match?.[0] ?? "UPLOAD_FAILED";
+}
+
 function asFiles(value: File[] | FileList | null | undefined): File[] {
   return Array.from(value ?? []);
 }
@@ -53,12 +63,38 @@ async function start(): Promise<void> {
   const state = byId<HTMLSpanElement>("state");
   const status = byId<HTMLDivElement>("status");
   const results = byId<HTMLDivElement>("results");
+  const context = byId<HTMLInputElement>("context");
+  const diagnosticsView = byId<HTMLDivElement>("diagnostics");
   const host = window.openai;
   const app = new App({ name: "NHK Image Upload", version: "1.0.0" });
   let connected = false;
   let uploading = false;
   let selected: SelectedImage[] = [];
   let uploaded: UploadedItem[] = [];
+  let diagnostics: WidgetDiagnostic[] = [];
+  let uploadStatus: WidgetUploadStatus = "idle";
+
+  function renderDiagnostics(): void {
+    diagnosticsView.replaceChildren();
+    diagnostics.slice(-12).forEach((diagnostic) => {
+      const row = document.createElement("div");
+      row.textContent = [diagnostic.stage, diagnostic.status, diagnostic.code].filter(Boolean).join(" · ");
+      diagnosticsView.append(row);
+    });
+  }
+
+  function recordDiagnostic(stage: string, statusValue: WidgetDiagnostic["status"], code: string, error?: unknown): void {
+    diagnostics.push({
+      stage,
+      status: statusValue,
+      code,
+      ...(error ? { error: safeErrorMessage(error) } : {}),
+      uri: RESOURCE_URI,
+      tool: SERVER_TOOL_NAME,
+    });
+    renderDiagnostics();
+    if (connected) saveWidgetState();
+  }
 
   function setState(next: WidgetState, message: string): void {
     state.textContent = next;
@@ -93,7 +129,7 @@ async function start(): Promise<void> {
       figure.append(caption);
       previews.append(figure);
     });
-    summary.textContent = `${selected.length} image(s), ${(total / 1048576).toFixed(2)} MB`;
+    summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
     upload.disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
   }
 
@@ -103,61 +139,82 @@ async function start(): Promise<void> {
       const row = document.createElement("div");
       row.className = "success";
       const filename = item.public_filename || item.original_filename || "(unnamed image)";
-      row.textContent = `Attachment ${item.attachment_id ?? "—"} · Media ${item.media_id ?? "—"} · ${filename} · ${item.status || "uploaded"}`;
+      row.textContent = `Đính kèm ${item.attachment_id ?? "—"} · Media ${item.media_id ?? "—"} · ${filename} · ${item.status || "đã tải"}`;
       results.append(row);
     });
   }
 
   function saveWidgetState(): void {
     if (!connected || typeof host?.setWidgetState !== "function") return;
-    void host.setWidgetState(buildWidgetState(uploaded));
+    void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
   }
 
-  function handleToolResult(result: ToolResult): void {
+  function handleToolResult(result: ToolResult): UploadedItem[] {
     if (result.isError) {
-      setState("ERROR", "The NHK image tool returned an error.");
-      return;
+      throw new Error("SERVER_TOOL_ERROR");
     }
     const items = extractUploads(result);
     if (items.length > 0) {
       uploaded = items;
       renderUploads(uploaded);
     }
+    return items;
   }
 
   async function uploadFiles(): Promise<void> {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
+    const namingContext = context.value.trim();
+    if (namingContext === "") {
+      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
+      setState("ERROR", "Nhập ngữ cảnh đặt tên trước khi tải ảnh.");
+      return;
+    }
     uploading = true;
+    uploadStatus = "idle";
     uploaded = [];
     renderUploads([]);
     renderSelection();
-    setState("UPLOADING", "Uploading selected images…");
+    setState("UPLOADING", "Đang tải ảnh đã chọn…");
     const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string }> = [];
 
     try {
       for (const item of selected) {
         const fileName = item.kind === "local" ? item.file.name : item.fileName;
-        setState("UPLOADING", `Uploading ${fileName}…`);
+        recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
+        setState("UPLOADING", `Đang tải ${fileName}…`);
         const fileId = item.kind === "local"
           ? (await host!.uploadFile!(item.file, { library: false })).fileId
           : item.fileId;
         if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
+        recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
         const download = await host!.getFileDownloadUrl!({ fileId });
         if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
         references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
+        recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
       }
 
+      recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
       const result = await app.callServerTool({
         name: SERVER_TOOL_NAME,
-        arguments: { idempotency_key: createIdempotencyKey(), files: references },
+        arguments: { idempotency_key: createIdempotencyKey(), metadata: { description: namingContext }, files: references },
       });
-      handleToolResult(result as ToolResult);
-      if (uploaded.length === 0) throw new Error("The NHK image tool returned no uploaded images.");
+      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+      const returned = handleToolResult(result as ToolResult);
+      if (returned.length === 0) throw new Error("SERVER_TOOL_EMPTY_RESULT");
+      recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
+      if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
+      recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
+      if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
+      recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
       use.disabled = typeof host?.sendFollowUpMessage !== "function";
+      uploadStatus = "complete";
       saveWidgetState();
-      setState("SUCCESS", `${uploaded.length} image(s) uploaded successfully.`);
+      recordDiagnostic("READY_FOR_USE", "DONE", "WIDGET_READY_FOR_USE");
+      setState("SUCCESS", `Đã tải thành công ${uploaded.length} ảnh.`);
     } catch (error) {
-      setState("ERROR", `Image upload failed: ${errorMessage(error)}`);
+      uploadStatus = "error";
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
+      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error)}`);
     } finally {
       uploading = false;
       renderSelection();
@@ -166,36 +223,52 @@ async function start(): Promise<void> {
 
   async function useImagesInChat(): Promise<void> {
     if (!connected || uploaded.length === 0 || typeof host?.sendFollowUpMessage !== "function") {
-      setState("ERROR", "This ChatGPT host does not support sending a follow-up message.");
+      setState("ERROR", "ChatGPT host này không hỗ trợ gửi tiếp tin nhắn.");
       return;
     }
     await host.sendFollowUpMessage({
       role: "user",
-      content: [{ type: "text", text: `Use these uploaded NHK images in the next Capture: ${uploaded.map((item) => item.media_id).filter(Boolean).join(", ")}` }],
+      content: [{ type: "text", text: `Dùng các ảnh NHK đã tải trong Capture tiếp theo: ${uploaded.map((item) => item.media_id).filter(Boolean).join(", ")}` }],
     });
   }
 
-  app.ontoolresult = (result) => handleToolResult(result as ToolResult);
-  app.onerror = (error) => setState("ERROR", `MCP Apps connection error: ${errorMessage(error)}`);
+  app.ontoolresult = (result) => {
+    try { handleToolResult(result as ToolResult); } catch (error) {
+      recordDiagnostic("ERROR", "ERROR", "SERVER_TOOL_RESULT_INVALID", error);
+      setState("ERROR", `Kết quả MCP không hợp lệ: ${safeErrorMessage(error)}`);
+    }
+  };
+  app.onerror = (error) => {
+    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECTION_ERROR", error);
+    setState("ERROR", `Kết nối MCP Apps thất bại: ${safeErrorMessage(error)}`);
+  };
   input.addEventListener("change", () => {
     selected = asFiles(input.files)
       .filter((file) => IMAGE_TYPES.test(file.type))
       .map((file) => ({ kind: "local" as const, file }));
+    recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
+    recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
     renderSelection();
   });
   select.addEventListener("click", async () => {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
       selected = normalizeSelectedFiles(await host.selectFiles());
+      recordDiagnostic("FILE_SELECTED", "DONE", "LIBRARY_FILE_SELECTED");
+      recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
       renderSelection();
     } catch (error) {
-      setState("ERROR", `File selection failed: ${errorMessage(error)}`);
+      recordDiagnostic("ERROR", "ERROR", "FILE_SELECTION_FAILED", error);
+      setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error)}`);
     }
   });
   upload.addEventListener("click", () => void uploadFiles());
   use.addEventListener("click", () => void useImagesInChat());
 
-  setState("CONNECTING", "Connecting to the MCP Apps host…");
+  setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
+  recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
+  recordDiagnostic("RESOURCE_LOADED", "DONE", "RESOURCE_READY");
+  recordDiagnostic("HOST_CAPABILITIES_READ", "DONE", supportsFileUpload() ? "HOST_FILE_APIS_AVAILABLE" : "HOST_FILE_APIS_UNAVAILABLE");
   try {
     await app.connect();
     connected = true;
@@ -204,8 +277,8 @@ async function start(): Promise<void> {
     select.disabled = typeof host?.selectFiles !== "function";
     use.disabled = true;
     setState("READY", supportsFileUpload()
-      ? "Ready. Select one or more images to upload."
-      : "Connected, but this host does not support uploadFile and getFileDownloadUrl.");
+      ? "Sẵn sàng. Chọn ảnh và nhập ngữ cảnh đặt tên để tải lên."
+      : "Đã kết nối nhưng host không hỗ trợ uploadFile và getFileDownloadUrl.");
     renderSelection();
   } catch (error: unknown) {
     connected = false;
@@ -213,7 +286,8 @@ async function start(): Promise<void> {
     select.disabled = true;
     upload.disabled = true;
     use.disabled = true;
-    setState("ERROR", `Could not connect to the MCP Apps host: ${errorMessage(error)}`);
+    recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error);
+    setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error)}`);
   }
 }
 

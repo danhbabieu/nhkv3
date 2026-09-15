@@ -238,25 +238,36 @@ final class McpTransport
     {
         if ($this->imageIngest === null) throw new \RuntimeException('IMAGE_INGEST_UNAVAILABLE');
         $references = is_array($arguments['files'] ?? null) ? array_values($arguments['files']) : [];
+        $metadata = is_array($arguments['metadata'] ?? null) ? $arguments['metadata'] : [];
+        $description = trim((string) ($metadata['description'] ?? ''));
+        if ($description === '') throw new \InvalidArgumentException('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED');
         $items = [];
         foreach ($references as $index => $reference) {
             if (!is_array($reference)) throw new \InvalidArgumentException('Widget upload references must be structured file objects.');
             $items[] = [
                 'client_file_id' => (string) ($reference['file_id'] ?? ''),
                 'filename' => (string) ($reference['file_name'] ?? ''),
+                'title' => $description,
                 'sort_order' => $index,
             ];
         }
         $manifest = $this->imageIngest->ingest(
             (string) ($arguments['idempotency_key'] ?? ''),
-            ['source' => 'chatgpt_widget'],
+            ['source' => 'chatgpt_widget', 'description' => $description],
             $references,
             $items,
             false,
         );
+        $itemsByFileId = [];
+        foreach (array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array')) as $item) {
+            $itemsByFileId[(string) ($item['client_file_id'] ?? '')] = $item;
+        }
         $uploads = [];
-        foreach (array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array')) as $index => $item) {
-            $reference = is_array($references[$index] ?? null) ? $references[$index] : [];
+        foreach ($references as $reference) {
+            if (!is_array($reference)) continue;
+            $fileId = (string) ($reference['file_id'] ?? '');
+            $item = $itemsByFileId[$fileId] ?? null;
+            if (!is_array($item)) continue;
             $uploads[] = [
                 'attachment_id' => (int) ($item['attachment_id'] ?? 0),
                 'media_id' => (string) ($item['media_id'] ?? ''),
@@ -266,7 +277,9 @@ final class McpTransport
                 'width' => (int) ($item['width'] ?? 0),
                 'height' => (int) ($item['height'] ?? 0),
                 'filesize' => (int) ($item['byte_size'] ?? 0),
-                'file_id' => (string) ($item['client_file_id'] ?? ($reference['file_id'] ?? '')),
+                'canonical_url' => (string) ($item['source_url'] ?? ''),
+                'attachment_readback_status' => (string) ($item['attachment_readback_status'] ?? ''),
+                'file_id' => (string) ($item['client_file_id'] ?? $fileId),
             ];
         }
         return ['uploads' => $uploads, 'errors' => array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array'))];

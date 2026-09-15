@@ -126,7 +126,7 @@ final class McpToolCatalog
                 'metadata' => ['type' => 'object'],
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
             ], ['idempotency_key', 'files'], true),
-            self::tool('nhk.media.widget-upload', 'Materialize trusted ChatGPT file references through the canonical image attachment and Media boundary; this tool does not perform semantic reconciliation.', [
+            self::tool('nhk.media.widget-upload', 'Materialize trusted ChatGPT file references through the canonical image attachment and Media boundary; a trustworthy operator naming context is required and this tool does not perform semantic reconciliation.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
                     'type' => 'object',
@@ -140,7 +140,13 @@ final class McpToolCatalog
                     'required' => ['download_url', 'file_id'],
                     'additionalProperties' => false,
                 ]],
-            ], ['idempotency_key', 'files'], true),
+                'metadata' => [
+                    'type' => 'object',
+                    'properties' => ['description' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 500]],
+                    'required' => ['description'],
+                    'additionalProperties' => false,
+                ],
+            ], ['idempotency_key', 'files', 'metadata'], true),
             self::tool('nhk.media.upload-widget.open', 'Open the NHK image uploader UI. Upload results remain physical Media records until a canonical Capture flow reuses their Media IDs.', [], [], false, ['ui' => ['resourceUri' => 'ui://nhk/image-upload.html']]),
             self::tool('nhk.media.ingest', 'Ingest governed Media metadata, or bind one already-uploaded WordPress image attachment into the canonical Media lifecycle without semantic inference.', [
                 'stable_key' => ['type' => 'string', 'minLength' => 1, 'pattern' => '^[a-z0-9][a-z0-9._:-]{0,190}$'],

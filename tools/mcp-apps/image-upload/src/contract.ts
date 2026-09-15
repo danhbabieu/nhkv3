@@ -5,8 +5,24 @@ export type UploadedItem = {
   original_filename?: string;
   file_id?: string;
   status?: string;
-  download_url?: string;
+  canonical_url?: string;
+  attachment_readback_status?: string;
+  mime?: string;
+  filesize?: number;
+  width?: number;
+  height?: number;
 };
+
+export type WidgetDiagnostic = {
+  stage: string;
+  status: "START" | "DONE" | "ERROR";
+  code?: string;
+  error?: string;
+  uri?: string;
+  tool?: string;
+};
+
+export type WidgetUploadStatus = "idle" | "complete" | "error";
 
 export type SelectedImage =
   | { kind: "local"; file: File }
@@ -48,9 +64,13 @@ export function extractUploads(result: ToolResult): UploadedItem[] {
   }
 }
 
-export function buildWidgetState(items: UploadedItem[]): {
+function redactDiagnostic(value: string): string {
+  return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
+}
+
+export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagnostic[] = [], uploadStatus: WidgetUploadStatus = items.length > 0 ? "complete" : "idle"): {
   modelContent: { uploaded_media: Array<Record<string, unknown>> };
-  privateContent: { upload_status: "complete" };
+  privateContent: { upload_status: WidgetUploadStatus; diagnostics: WidgetDiagnostic[] };
   imageIds: string[];
 } {
   return {
@@ -62,7 +82,13 @@ export function buildWidgetState(items: UploadedItem[]): {
         status: item.status || "uploaded",
       })),
     },
-    privateContent: { upload_status: "complete" },
+    privateContent: {
+      upload_status: uploadStatus,
+      diagnostics: diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        ...(diagnostic.error ? { error: redactDiagnostic(diagnostic.error) } : {}),
+      })),
+    },
     imageIds: items.map((item) => item.file_id).filter((id): id is string => Boolean(id)),
   };
 }

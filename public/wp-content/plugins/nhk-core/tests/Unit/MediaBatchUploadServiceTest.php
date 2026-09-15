@@ -40,6 +40,27 @@ final class MediaBatchUploadServiceTest extends TestCase
         @unlink($first['tmp_name']); @unlink($second['tmp_name']);
     }
 
+    public function test_missing_trustworthy_filename_context_is_reported_per_file(): void
+    {
+        $file = $this->file('IMG_0001.jpg', 'bytes');
+        $ingestor = new class implements WordPressMediaAttachmentIngestor {
+            public function ingest(array $file, string $filename, string $title, int $maxWidth, int $maxHeight, int $quality): array { return []; }
+            public function read(int $attachmentId): ?array { return null; }
+        };
+        $repository = new class implements MediaBatchUploadRepository {
+            public function find(string $idempotencyKey): ?array { return null; }
+            public function save(string $idempotencyKey, array $record): void {}
+        };
+
+        try {
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('missing-context', [], ['files' => [$file]]);
+            self::assertSame(0, $result['succeeded']);
+            self::assertSame('TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED', $result['errors'][0]['code']);
+        } finally {
+            @unlink($file['tmp_name']);
+        }
+    }
+
     public function test_same_key_with_changed_payload_is_a_deterministic_conflict(): void
     {
         $file = $this->file('one.jpg', 'one');
@@ -53,7 +74,7 @@ final class MediaBatchUploadServiceTest extends TestCase
             public function save(string $idempotencyKey, array $record): void { $this->records[$idempotencyKey] = $record; }
         };
         $service = new MediaBatchUploadService($ingestor, $repository);
-        $service->upload('same-key', [], ['files' => [$file]], [['client_file_id' => 'one']]);
+        $service->upload('same-key', ['description' => 'clock'], ['files' => [$file]], [['client_file_id' => 'one']]);
         file_put_contents($file['tmp_name'], 'changed');
         $this->expectExceptionMessage('IDEMPOTENCY_CONFLICT');
         $service->upload('same-key', [], ['files' => [$file]], [['client_file_id' => 'one']]);
@@ -82,8 +103,8 @@ final class MediaBatchUploadServiceTest extends TestCase
         $service = new MediaBatchUploadService($ingestor, $repository);
 
         try {
-            $firstResult = $service->upload('same-key-replay', [], ['files' => [$first]], [['client_file_id' => 'one']]);
-            $replay = $service->upload('same-key-replay', [], ['files' => [$second]], [['client_file_id' => 'one']]);
+            $firstResult = $service->upload('same-key-replay', ['description' => 'clock'], ['files' => [$first]], [['client_file_id' => 'one']]);
+            $replay = $service->upload('same-key-replay', ['description' => 'clock'], ['files' => [$second]], [['client_file_id' => 'one']]);
             self::assertSame($firstResult, $replay);
             self::assertSame(1, $ingestCalls);
         } finally {
@@ -137,7 +158,7 @@ final class MediaBatchUploadServiceTest extends TestCase
         };
 
         try {
-            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('twenty-files', [], ['files' => $files]);
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('twenty-files', ['description' => 'ordered image set'], ['files' => $files]);
             self::assertSame(20, $result['total_files']);
             self::assertSame(20, $result['succeeded']);
             self::assertSame(array_map(static fn (int $index): string => 'file-' . $index, range(1, 20)), array_column($result['items'], 'client_file_id'));
@@ -183,7 +204,7 @@ final class MediaBatchUploadServiceTest extends TestCase
         };
 
         try {
-            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('over-fifty-megabytes', [], ['files' => [$first, $second]]);
+            $result = (new MediaBatchUploadService($ingestor, $repository))->upload('over-fifty-megabytes', ['description' => 'large image set'], ['files' => [$first, $second]]);
             self::assertSame(2, $result['total_files']);
             self::assertSame(1, $result['succeeded']);
             self::assertSame('BATCH_SIZE_LIMIT', $result['errors'][0]['code']);
@@ -209,9 +230,9 @@ final class MediaBatchUploadServiceTest extends TestCase
         $service = new MediaBatchUploadService($ingestor, $repository);
 
         try {
-            $service->upload('filename-is-payload', [], ['files' => [$first]]);
+            $service->upload('filename-is-payload', ['description' => 'same image'], ['files' => [$first]]);
             $this->expectExceptionMessage('IDEMPOTENCY_CONFLICT');
-            $service->upload('filename-is-payload', [], ['files' => [$second]]);
+            $service->upload('filename-is-payload', ['description' => 'same image'], ['files' => [$second]]);
         } finally {
             @unlink((string) $first['tmp_name']);
             @unlink((string) $second['tmp_name']);
