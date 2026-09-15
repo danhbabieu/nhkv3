@@ -10257,3 +10257,28 @@ BOUNDARY: The server remains exactly
 `SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED`. Server worktree mutation:
 NO. Staging mutation: NO. Production mutation: NO. Deployment: NO. SSH,
 rsync, remote Git, migration and runtime/data mutation: NONE.
+
+# Checkpoint — 2026-09-15 — Local unified-capture blocker resolution
+
+SCOPE: Continued directly on local `main` after readiness review commit
+`84a999a6`; no branch/worktree was created. The server remained
+`SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED`.
+
+IMPLEMENTED: Article-scoped stable MediaUsage placement keys and full-length
+anchors; repeat-placement-safe usage reconciliation; structured NHK-managed
+section markers with projected and dependency fingerprints; targeted
+editorial conflict detection before native WordPress update; fail-closed
+ambiguous multi-Article gallery linking; decoded dimension/pixel limits;
+private source-original storage outside the public document root; and a
+bounded read-only external research provider port. MediaMigration004 and
+MediaUsageMetadataMigration021 now converge on the placement-aware schema.
+
+VERIFICATION: Unit suite PASS — 1,584 tests / 7,679 assertions, with only
+existing warnings/deprecations. Contract suite PASS — 6 tests / 48 assertions.
+Composer PHP lint PASS, JavaScript syntax check PASS, and `git diff --check`
+PASS. Exact local `nhk_v3_test` P6 and maintenance migration contracts PASS;
+the real-file private-source ingest PASS. Remaining live CAS/HTTP/connector
+proof is environment-gated and was not reclassified as source-only success.
+
+COMMITS: `96eecc98` local blocker implementation and `daebe02c` explicit
+multi-image convergence contract test. No push or deployment was attempted.
