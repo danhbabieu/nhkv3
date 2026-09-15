@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Capture provenance metadata propagation
+
+ROOT_CAUSE: The governed continuation planner accepted provenance packets, but
+the Editorial Capture coordinator did not copy
+`metadata.provenance_packets` into the semantic context. A valid Source or
+Evidence continuation therefore reached the canonical Capture boundary with
+no provenance plans and failed closed as if no semantic delta existed.
+
+FIX: The generic coordinator now preserves the bounded provenance packet
+structure for every Capture continuation. A regression test proves the packet
+reaches the semantic write-back boundary; no direct writer or subject-specific
+branch was added.
+
+VERIFICATION: Focused Capture continuation and governed continuation suites
+pass `35 tests / 189 assertions` with existing deprecations; PHP lint and
+`git diff --check` pass. Deployment and live Capture read-back remain pending.
+
 # Checkpoint — 2026-09-15 — Generic Capture provenance packet boundary
 
 ROOT_CAUSE: Existing Capture continuation supported governed Knowledge claim

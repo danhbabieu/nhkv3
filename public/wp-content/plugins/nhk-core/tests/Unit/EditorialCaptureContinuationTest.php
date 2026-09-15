@@ -14,6 +14,26 @@ use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureContinuationTest extends TestCase
 {
+    public function test_existing_capture_continuation_preserves_governed_provenance_packets(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'provenance-packets-continuation',
+            'intent' => 'KNOWLEDGE_DELTA',
+            'text' => '',
+            'metadata' => ['provenance_packets' => ['sources' => [['stable_key' => 'nhk:source:test']]]],
+        ]);
+
+        self::assertSame(['sources' => [['stable_key' => 'nhk:source:test']]], $events['provenance_packets']);
+    }
+
     public function test_addendum_reuses_same_capture_and_article_without_replaying_physical_phase(): void
     {
         $captures = new ContinuationCaptureRepository();
@@ -532,7 +552,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             new TextInputInterpreter(),
             new SubjectResolutionService(static fn (string $hint): array => []),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            $semantic ?? static function (array $context) use (&$events): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; $events['merged_text'] = $context['raw_input']; return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
+            $semantic ?? static function (array $context) use (&$events): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; $events['merged_text'] = $context['raw_input']; $events['provenance_packets'] = $context['provenance_packets'] ?? null; return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
             new ArticleComposer(),
             static function (array $context) use (&$events): array { $events['media'] = ($events['media'] ?? 0) + 1; return ['status' => 'RECONCILED']; },
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
