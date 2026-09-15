@@ -202,6 +202,42 @@ final class GovernedCaptureContinuationService
         $articleId = (int) ($context['article_id'] ?? 0);
         $articleEndpoint = trim((string) ($context['article_endpoint_key'] ?? ''));
         $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : ($subjects[0] ?? []);
+        // Provenance packets are an explicit Capture continuation boundary.
+        // They are intentionally separate from the claim text: Source and
+        // Evidence remain governed canonical records, and an evidence packet
+        // must name already-resolved claim/source UUIDs. A source packet can
+        // be submitted first; its canonical read-back is then used by a later
+        // idempotent continuation for evidence packets.
+        foreach ((array) ($context['provenance_packets']['sources'] ?? []) as $source) {
+            if (!is_array($source)) continue;
+            $stableKey = trim((string) ($source['stable_key'] ?? ''));
+            $title = trim((string) ($source['title'] ?? ''));
+            if ($stableKey === '' || $title === '') continue;
+            $payload = [
+                'stable_key' => $stableKey,
+                'title' => $title,
+                'source_type' => trim((string) ($source['source_type'] ?? 'website')) ?: 'website',
+                'locator' => isset($source['locator']) ? (string) $source['locator'] : null,
+                'metadata' => is_array($source['metadata'] ?? null) ? $source['metadata'] : [],
+            ];
+            $plans[] = $this->arguments('source', 'ingest', $stableKey, $payload, 'capture:' . $captureId . ':source:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
+        }
+        foreach ((array) ($context['provenance_packets']['evidence'] ?? []) as $evidence) {
+            if (!is_array($evidence)) continue;
+            $claimId = trim((string) ($evidence['claim_id'] ?? ''));
+            $sourceId = trim((string) ($evidence['source_id'] ?? ''));
+            $excerpt = trim((string) ($evidence['excerpt'] ?? ''));
+            if (!UuidCodec::isValid($claimId) || !UuidCodec::isValid($sourceId) || $excerpt === '') continue;
+            $payload = [
+                'claim_id' => $claimId,
+                'source_id' => $sourceId,
+                'excerpt' => $excerpt,
+                'relation' => trim((string) ($evidence['relation'] ?? 'supports')) ?: 'supports',
+                'locator' => isset($evidence['locator']) ? (string) $evidence['locator'] : null,
+                'metadata' => is_array($evidence['metadata'] ?? null) ? $evidence['metadata'] : [],
+            ];
+            $plans[] = $this->arguments('evidence', 'ingest', $claimId, $payload, 'capture:' . $captureId . ':evidence:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
+        }
         if ($includeSemanticChildren && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
             // Article subject binding is a normal governed Graph child. The
             // stable idempotency key is owner/subject based so a later

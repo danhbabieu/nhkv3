@@ -87,6 +87,42 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('about', $planned[0]['payload']['predicate']);
     }
 
+    public function test_capture_provenance_packets_plan_source_and_resolved_evidence_without_reparsing_claim_text(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = (new \ReflectionMethod($service, 'plans'));
+        $plans->setAccessible(true);
+        $claimId = UuidCodec::newV7();
+        $sourceId = UuidCodec::newV7();
+        $planned = $plans->invoke($service, 'capture-knowledge', 'continuation', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'provenance_packets' => [
+                'sources' => [[
+                    'stable_key' => 'nhk:source:public-clock:ahs-turret-group',
+                    'title' => 'AHS Turret Clock Group',
+                    'source_type' => 'website',
+                    'locator' => 'https://www.ahsoc.org/groups/turret-clock-group/about-the-turret-clock-group/',
+                    'metadata' => ['visibility' => 'PUBLIC'],
+                ]],
+                'evidence' => [[
+                    'claim_id' => $claimId,
+                    'source_id' => $sourceId,
+                    'excerpt' => 'The source describes turret clocks and public timekeeping.',
+                    'relation' => 'supports',
+                    'locator' => 'https://www.ahsoc.org/groups/turret-clock-group/about-the-turret-clock-group/',
+                    'metadata' => ['visibility' => 'PUBLIC'],
+                ]],
+            ],
+            'subject_resolution' => ['resolved' => []],
+        ], false);
+
+        self::assertCount(2, $planned);
+        self::assertSame(['source', 'evidence'], array_column($planned, 'entity_type'));
+        self::assertSame('nhk:source:public-clock:ahs-turret-group', $planned[0]['payload']['stable_key']);
+        self::assertSame($claimId, $planned[1]['payload']['claim_id']);
+        self::assertSame($sourceId, $planned[1]['payload']['source_id']);
+    }
+
     public function test_video_review_required_exposes_governance_and_canonical_identity_separately(): void
     {
         $videoId = UuidCodec::newV7();

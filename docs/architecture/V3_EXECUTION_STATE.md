@@ -1,5 +1,26 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Generic Capture provenance packet boundary
+
+ROOT_CAUSE: Existing Capture continuation supported governed Knowledge claim
+ingest and Article subject binding, but had no normal Capture branch for an
+explicit Source/Evidence reconciliation packet. Article publication therefore
+failed closed with `PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE` even after the
+existing claims and MediaUsage were canonical.
+
+FIX: Governed Capture continuation now accepts bounded, caller-supplied
+`metadata.provenance_packets.sources[]` and `metadata.provenance_packets.evidence[]`.
+It plans Source and Evidence as ordinary governed child proposals, requires
+resolved claim/source UUIDs for Evidence, preserves exact packet scope and
+idempotency, and leaves the existing direct Source/Evidence writers internal.
+No article/post/subject-specific branch was added. A source packet must be
+applied and read back before a later evidence packet references its canonical
+UUID.
+
+VERIFICATION: Focused continuation suite passes `18 tests / 103 assertions`
+with existing deprecations; PHP lint and `git diff --check` pass. Deployment
+and staging read-back remain pending this checkpoint.
+
 # Checkpoint — 2026-09-15 — ChatGPT widget Ability result-envelope mapping
 
 ROOT_CAUSE: The live widget reached `SERVER_TOOL_CALL_RESULT` after the
