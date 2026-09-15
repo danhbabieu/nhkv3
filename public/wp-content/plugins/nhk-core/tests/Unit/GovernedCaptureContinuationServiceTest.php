@@ -372,6 +372,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $method->setAccessible(true);
         $result = $method->invoke($service, ['entity_type' => 'video'], new \NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid('changed diagnostic wording'));
         self::assertSame('SYSTEM_BLOCKED', $result['status']);
+        self::assertSame('changed diagnostic wording', $result['error']);
     }
 
     private function policies(array $types = ['knowledge'], array $stored = []): GovernanceAutomationPolicyResolver

@@ -621,7 +621,7 @@ final class GovernedCaptureContinuationService
                 $error instanceof ProposalBindingConflict => 'PROPOSAL_BINDING_CONFLICT',
                 default => 'PROPOSAL_GOVERNANCE_CONTRACT_INVALID',
             };
-            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => [$reason]];
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'SYSTEM_BLOCKED', 'blockers' => [$reason], 'error' => $error->getMessage()];
         }
         if ($error instanceof VideoRelationEvidenceRequired) {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'REVIEW_REQUIRED', 'blockers' => [VideoRelationEvidenceRequired::ERROR_CODE]];
