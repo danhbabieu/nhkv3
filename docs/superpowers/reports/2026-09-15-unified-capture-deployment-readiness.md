@@ -5,7 +5,7 @@ Workspace: `/Users/imac24-2125d/Developer/nhk-v3`
 Branch: `main`
 Canonical design: `d39d8393`
 Implementation plan: `f14cc310`
-Current HEAD: `2e01052a` (local blocker-resolution stop gate)
+Current HEAD: local blocker-resolution stop gate (final verification commit)
 
 ## Decision
 
