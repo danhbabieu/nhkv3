@@ -197,6 +197,23 @@ final class GovernedCaptureContinuationService
         $subjects = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== ''));
         $variants = array_values(array_filter($subjects, static fn (array $item): bool => ($item['type'] ?? '') === 'variant'));
         $plans = [];
+        $articleId = (int) ($context['article_id'] ?? 0);
+        $articleEndpoint = trim((string) ($context['article_endpoint_key'] ?? ''));
+        $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : ($subjects[0] ?? []);
+        if ($includeSemanticChildren && $articleId > 0 && $articleEndpoint !== '' && in_array($intent, ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true) && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') {
+            // Article subject binding is a normal governed Graph child. The
+            // stable idempotency key is owner/subject based so a later
+            // continuation reuses the same edge/proposal instead of opening a
+            // duplicate relation.
+            $plans[] = $this->arguments('relation', 'relation_create', 'relation', [
+                'source_type' => 'wp_post',
+                'source_uuid' => $articleEndpoint,
+                'target_type' => (string) $primary['type'],
+                'target_uuid' => (string) $primary['id'],
+                'predicate' => 'about',
+                'origin' => 'CAPTURE_ARTICLE_SUBJECT_BINDING',
+            ], 'capture:article-about:' . $articleEndpoint . ':' . (string) $primary['type'] . ':' . (string) $primary['id']);
+        }
         if ($includeSemanticChildren && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent)) !== null) {
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
             $candidates = $deltaText !== ''
@@ -765,7 +782,7 @@ final class GovernedCaptureContinuationService
     {
         if (!is_array($applied['canonical_readback'] ?? null)) throw new \RuntimeException('CANONICAL_READBACK_VERIFICATION_FAILED');
         $canonicalId = (string) ($applied['canonical_id'] ?? $applied['result_entity_uuid'] ?? ($applied['canonical_readback']['canonical_id'] ?? ''));
-        return ['proposal_id' => $proposal->id, 'status' => 'APPLIED', 'canonical_id' => $canonicalId !== '' ? $canonicalId : null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false), 'completion' => $this->completion->finalize($proposal->entityType, $canonicalId, ['proposal_state' => 'applied', 'canonical_readback' => $applied['canonical_readback']])];
+        return ['proposal_id' => $proposal->id, 'entity_type' => $proposal->entityType, 'operation' => $proposal->operation, 'status' => 'APPLIED', 'canonical_id' => $canonicalId !== '' ? $canonicalId : null, 'canonical_readback' => $applied['canonical_readback'], 'idempotent' => (bool) ($applied['idempotent'] ?? false), 'completion' => $this->completion->finalize($proposal->entityType, $canonicalId, ['proposal_state' => 'applied', 'canonical_readback' => $applied['canonical_readback']])];
     }
 
     /** @param list<array<string,mixed>> $writes @return list<array<string,mixed>> */

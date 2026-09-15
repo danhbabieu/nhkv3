@@ -66,6 +66,27 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
     }
 
+    public function test_article_continuation_plans_one_governed_about_relation_for_exact_primary_subject(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = (new \ReflectionMethod($service, 'plans'));
+        $plans->setAccessible(true);
+        $subject = UuidCodec::newV7();
+        $planned = $plans->invoke($service, 'capture-article', 'continuation', [
+            'article_id' => 485,
+            'article_endpoint_key' => '1:485',
+            'content_intent' => ['intent' => 'TEXT_ARTICLE'],
+            'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'classification'], 'resolved' => [['id' => $subject, 'type' => 'classification']]],
+        ], true);
+
+        self::assertCount(1, $planned);
+        self::assertSame('relation', $planned[0]['entity_type']);
+        self::assertSame('relation_create', $planned[0]['operation']);
+        self::assertSame('1:485', $planned[0]['payload']['source_uuid']);
+        self::assertSame($subject, $planned[0]['payload']['target_uuid']);
+        self::assertSame('about', $planned[0]['payload']['predicate']);
+    }
+
     public function test_video_review_required_exposes_governance_and_canonical_identity_separately(): void
     {
         $videoId = UuidCodec::newV7();

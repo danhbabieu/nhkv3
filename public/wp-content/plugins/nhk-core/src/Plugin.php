@@ -806,8 +806,27 @@ final class Plugin {
                     $post = $articleEditorial->read($articleId);
                     return $post === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'post' => $post->snapshot()];
                 },
-                static function (array $context) use ($draftGateway): array {
-                    return $draftGateway->update((int) ($context['article_id'] ?? 0), (array) ($context['fields'] ?? []), (string) ($context['expected_state_token'] ?? ''), (string) ($context['capture_id'] ?? ''));
+                static function (array $context) use ($draftGateway, $categoryGateway): array {
+                    $postId = (int) ($context['article_id'] ?? 0);
+                    $updated = $draftGateway->update($postId, (array) ($context['fields'] ?? []), (string) ($context['expected_state_token'] ?? ''), (string) ($context['capture_id'] ?? ''));
+                    if (($updated['ok'] ?? false) !== true) return $updated;
+                    $metadata = is_array($context['metadata'] ?? null) ? $context['metadata'] : [];
+                    $categoryName = trim((string) ($metadata['category_name'] ?? ''));
+                    $categorySlug = trim((string) ($metadata['category_slug'] ?? ''));
+                    if ($categoryName !== '' || $categorySlug !== '') {
+                        $resolved = $categoryGateway->resolve(array_filter(['name' => $categoryName, 'slug' => $categorySlug], static fn (string $value): bool => $value !== ''));
+                        if (($resolved['ok'] ?? false) !== true) return ['ok' => false, 'reason' => (string) ($resolved['reason'] ?? 'CATEGORY_NOT_FOUND'), 'post' => $updated['post'] ?? null, 'state_token' => $updated['state_token'] ?? ''];
+                        $categoryId = (int) ($resolved['category']['id'] ?? 0);
+                        if ($categoryId < 1) return ['ok' => false, 'reason' => 'CATEGORY_READBACK_UNAVAILABLE', 'post' => $updated['post'] ?? null, 'state_token' => $updated['state_token'] ?? ''];
+                        $assigned = function_exists('wp_get_post_categories') ? array_map('intval', (array) wp_get_post_categories($postId, ['fields' => 'ids'])) : [];
+                        foreach ($assigned as $termId) {
+                            if ($termId === $categoryId) continue;
+                            $term = function_exists('get_term') ? get_term($termId, 'category') : null;
+                            if ($term instanceof \WP_Term && in_array(strtolower((string) $term->slug), ['uncategorized', 'chua-phan-loai'], true)) $categoryGateway->unassign($postId, $termId);
+                        }
+                        $categoryGateway->assign($postId, $categoryId);
+                    }
+                    return $updated;
                 },
                 static function (array $context) use ($attachmentBridge, $media): array {
                     $mediaId = $attachmentBridge->adoptAttachment((int) ($context['attachment_id'] ?? 0));

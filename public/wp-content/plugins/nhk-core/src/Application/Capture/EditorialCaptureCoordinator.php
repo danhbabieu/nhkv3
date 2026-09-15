@@ -93,7 +93,15 @@ final class EditorialCaptureCoordinator
         $continuation = is_array($record->context['continuation_state'] ?? null) ? $record->context['continuation_state'] : [];
         $original = trim((string) ($continuation['raw_input'] ?? $record->context['raw_input'] ?? ''));
         $addendum = trim((string) ($input['text'] ?? $input['content'] ?? ''));
-        $input['text'] = trim(implode("\n\n", array_values(array_filter([$original, $addendum], static fn (string $value): bool => $value !== ''))));
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        $replacement = ($metadata['editorial_replacement'] ?? false) === true
+            && in_array(strtoupper(trim((string) ($input['intent'] ?? 'TEXT_ARTICLE'))), ['TEXT_ARTICLE', 'IMAGE_ARTICLE'], true);
+        // An editorial replacement is a governed continuation for an existing
+        // draft whose public body must be replaced atomically (for example to
+        // remove internal jargon). Knowledge deltas remain append-only.
+        $input['text'] = $replacement
+            ? $addendum
+            : trim(implode("\n\n", array_values(array_filter([$original, $addendum], static fn (string $value): bool => $value !== ''))));
         $newSubjectHints = is_array($input['subject_hints'] ?? null) ? array_values(array_filter(array_map('strval', $input['subject_hints']), static fn (string $hint): bool => trim($hint) !== '')) : [];
         // An explicit continuation subject is a correction/clarification for
         // this bounded rerun. Do not keep a stale prior variant in the
@@ -303,7 +311,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['visual_opportunities'] = $visualOpportunities;
             $diagnostics['visual_support'] = ['status' => $visualRequirements === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements];
 
-            $semanticContext = ['capture_id' => $record->captureId, 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
+            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
             $this->beginPhase('KNOWLEDGE_RETRIEVED');
             $retrieved = $this->claims->retrieve($semanticContext);
             $diagnostics['claim_retrieval'] = $retrieved;
@@ -355,10 +363,12 @@ final class EditorialCaptureCoordinator
                     'capture_id' => $record->captureId,
                     'article_id' => $record->articleId,
                     'expected_state_token' => $record->articleStateToken,
+                    'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
                     'fields' => [
                         'post_title' => $composition['title'],
                         'post_content' => $composition['content'],
                         'post_excerpt' => $composition['excerpt'],
+                        ...$this->editorialFields($input),
                     ],
                 ]);
                 if (($updatedDraft['ok'] ?? false) !== true) throw new \RuntimeException((string) ($updatedDraft['reason'] ?? 'ARTICLE_DRAFT_UPDATE_FAILED'));
@@ -540,6 +550,14 @@ final class EditorialCaptureCoordinator
         $governance = is_array($input['governance'] ?? null) ? $input['governance'] : [];
         $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($governance['resume_children'] ?? [])))));
         return $children === ['video'];
+    }
+
+    /** @return array<string,string> */
+    private function editorialFields(array $input): array
+    {
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        $slug = trim((string) ($metadata['desired_slug'] ?? ''));
+        return $slug === '' ? [] : ['post_name' => $slug];
     }
 
     /**

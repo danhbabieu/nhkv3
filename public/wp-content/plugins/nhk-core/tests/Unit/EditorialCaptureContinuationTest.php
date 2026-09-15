@@ -115,6 +115,29 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertTrue($first['capture']['revision'] < $second['capture']['revision']);
     }
 
+    public function test_editorial_replacement_continuation_replaces_prior_body_without_appending_it(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $replacement = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'article-replacement',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Bản bài viết công khai mới.',
+            'metadata' => ['editorial_replacement' => true],
+        ]);
+
+        self::assertSame('COMPLETED', $replacement['addendum']['status']);
+        self::assertSame('Bản bài viết công khai mới.', $events['merged_text']);
+        self::assertSame('Bản bài viết công khai mới.', $replacement['capture']['context']['continuation_state']['raw_input']);
+        self::assertSame(true, $replacement['addendum']['payload']['metadata']['editorial_replacement']);
+    }
+
     public function test_replaying_completed_addendum_does_not_append_duplicate_audit_or_revision(): void
     {
         $captures = new ContinuationCaptureRepository();

@@ -120,7 +120,10 @@ final class EditorialCaptureContinuationService
                 'subject_hints' => is_array($continued->context['continuation_state']['subject_hints'] ?? null) ? $continued->context['continuation_state']['subject_hints'] : (array) ($continued->context['subject_hints'] ?? []),
                 'observations' => is_array($continued->context['continuation_state']['observations'] ?? null) ? $continued->context['continuation_state']['observations'] : (array) ($continued->context['observations'] ?? []),
             ];
-            $continuationState['raw_input'] = trim(implode("\n\n", array_values(array_filter([$continuationState['raw_input'], (string) ($payload['text'] ?? '')], static fn (string $value): bool => trim($value) !== ''))));
+            $replacement = ($payload['metadata']['editorial_replacement'] ?? false) === true;
+            $continuationState['raw_input'] = $replacement
+                ? trim((string) ($payload['text'] ?? ''))
+                : trim(implode("\n\n", array_values(array_filter([$continuationState['raw_input'], (string) ($payload['text'] ?? '')], static fn (string $value): bool => trim($value) !== ''))));
             if (is_array($payload['subject_hints'] ?? null) && $payload['subject_hints'] !== []) $continuationState['subject_hints'] = array_values(array_unique(array_map('strval', $payload['subject_hints'])));
             $continuationState['observations'] = array_merge($continuationState['observations'], is_array($payload['observations'] ?? null) ? $payload['observations'] : []);
             $updatedContext = $context;
