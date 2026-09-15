@@ -26,7 +26,11 @@ final class ProposalEligibilityService
         }
         $reasons = [];
         $isCreation = in_array($proposal->operation, ['create', 'ingest'], true) && $proposal->targetUuid === null;
-        if (!$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
+        // relation_create carries typed endpoint keys in its payload. A
+        // WordPress endpoint key such as 1:487 is not an Authority UUID, so
+        // do not send it through the generic canonical-target check before
+        // the relation-specific revision checks below.
+        if ($proposal->operation !== 'relation_create' && !$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
         if ($proposal->operation === 'merge') {
             $sourceRevision = (int) ($proposal->payload['source_revision'] ?? $proposal->expectedRevision);
             $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);

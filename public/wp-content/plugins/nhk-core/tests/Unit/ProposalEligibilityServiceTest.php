@@ -69,7 +69,22 @@ final class ProposalEligibilityServiceTest extends TestCase
         self::assertNotContains('SUBJECT_UNRESOLVED', $reasons);
     }
 
-    private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null): ProposalEligibilityService
+    public function test_relation_create_skips_uuid_target_check_for_typed_wordpress_source(): void
+    {
+        $relation = new Proposal(self::ID, '1:487', 'relation_create', [
+            'source_type' => 'wp_post', 'source_uuid' => '1:487', 'target_type' => 'classification',
+            'target_uuid' => self::SUBJECT, 'source_revision' => 1789459547, 'target_revision' => 1,
+        ], 'relation-content', null, 'relation-dependency', ProposalState::APPROVED, idempotencyKey: 'wp-post-relation', entityType: 'relation');
+        $service = $this->service($relation, relationReader: new class implements EligibilityReader {
+            public function isApplied(string $dependencyUuid): bool { return true; }
+            public function targetRevision(string $targetUuid): ?int { return $targetUuid === '1:487' ? 1789459547 : 1; }
+            public function targetExists(string $targetUuid): bool { throw new \LogicException('typed relation must not use generic targetExists'); }
+        });
+
+        self::assertTrue($service->check($relation->id)->ready);
+    }
+
+    private function service(Proposal $proposal, ?SubjectResolutionService $subjectResolver = null, ?EligibilityReader $relationReader = null): ProposalEligibilityService
     {
         $repository = new class($proposal) implements ProposalRepository {
             public function __construct(private Proposal $proposal) {}
@@ -118,7 +133,7 @@ final class ProposalEligibilityServiceTest extends TestCase
             public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
             public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
         };
-        $reader = new class implements EligibilityReader {
+        $reader = $relationReader ?? new class implements EligibilityReader {
             public function isApplied(string $dependencyUuid): bool { return true; }
             public function targetRevision(string $targetUuid): ?int { return 1; }
             public function targetExists(string $targetUuid): bool { return true; }

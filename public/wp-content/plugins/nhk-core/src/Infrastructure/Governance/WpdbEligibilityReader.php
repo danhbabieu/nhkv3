@@ -9,10 +9,13 @@ use NHK\Core\Contracts\Graph\GraphRepository;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Media\MediaRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Contracts\Graph\EndpointRevisionReader;
+use NHK\Core\Domain\Graph\NodeReference;
+use NHK\Core\Infrastructure\Graph\WpPostEndpointResolver;
 
 final class WpdbEligibilityReader implements EligibilityReader
 {
-    public function __construct(private AuthorityRepository $authority, private ProposalRepository $proposals, private ?GraphRepository $graph = null, private ?MediaRepository $media = null, private ?VideoRepository $videos = null, private ?KnowledgeRepository $claims = null, private ?SourceRepository $sources = null, private ?EvidenceRepository $evidence = null) {}
+    public function __construct(private AuthorityRepository $authority, private ProposalRepository $proposals, private ?GraphRepository $graph = null, private ?MediaRepository $media = null, private ?VideoRepository $videos = null, private ?KnowledgeRepository $claims = null, private ?SourceRepository $sources = null, private ?EvidenceRepository $evidence = null, private ?EndpointRevisionReader $wpPosts = null) {}
 
     public function isApplied(string $dependencyUuid): bool
     {
@@ -21,6 +24,10 @@ final class WpdbEligibilityReader implements EligibilityReader
 
     public function targetRevision(string $targetUuid): ?int
     {
+        if (preg_match('/^[1-9][0-9]*:[1-9][0-9]*$/', trim($targetUuid)) === 1) {
+            $resolver = $this->wpPosts ?? new WpPostEndpointResolver();
+            return $resolver->revision(new NodeReference('wp_post', trim($targetUuid)));
+        }
         foreach ([
             $this->authority->findByCanonicalId($targetUuid),
             $this->graph?->findByUuid($targetUuid),
