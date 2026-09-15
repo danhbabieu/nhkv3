@@ -10,6 +10,7 @@ use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Contracts\Article\{OwnerPublicationService, PublicationPrincipal};
 use NHK\Core\Application\Capture\CaptureEditorialWriteGuard;
+use NHK\Core\Application\Semantic\{ManagedArticleSectionConflict, ManagedArticleSectionParser};
 
 final class EditorialDraftGateway
 {
@@ -41,6 +42,12 @@ final class EditorialDraftGateway
         $current = $this->posts->read($postId); if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
         if (!hash_equals($expectedStateToken, $current->token)) return ['ok' => false, 'reason' => 'EDITORIAL_STATE_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token];
         if ($current->status !== 'draft') return ['ok' => false, 'reason' => 'EDITORIAL_UPDATE_NOT_ELIGIBLE'];
+        $managedExpectations = is_array($fields['managed_section_expectations'] ?? null) ? $fields['managed_section_expectations'] : [];
+        unset($fields['managed_section_expectations']);
+        if ($managedExpectations !== []) {
+            try { (new ManagedArticleSectionParser())->removeOwned($current->content, array_values(array_filter($managedExpectations, 'is_array'))); }
+            catch (ManagedArticleSectionConflict $error) { return ['ok' => false, 'reason' => 'EDITORIAL_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token, 'conflict' => $error->getMessage()]; }
+        }
         $captureOwned = trim($captureId) !== '';
         if ($captureOwned) CaptureEditorialWriteGuard::enter();
         try {

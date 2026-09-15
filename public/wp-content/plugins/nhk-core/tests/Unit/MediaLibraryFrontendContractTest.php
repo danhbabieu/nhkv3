@@ -48,6 +48,23 @@ final class MediaLibraryFrontendContractTest extends TestCase
         self::assertNull($item['article_url']);
     }
 
+    public function test_gallery_does_not_choose_one_article_when_two_published_targets_are_equally_valid(): void
+    {
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'ambiguous', 'Ảnh dùng chung', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'uploads/ambiguous.webp', hash('sha256', 'image'), 'image/webp', 5, 1200, 800, 'PUBLIC', ['canonical_filename' => 'ambiguous.webp']);
+        $usages = [
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:42', 'featured', 0),
+            new MediaUsage(UuidCodec::newV7(), $mediaId, 'wp_post', '1:43', 'featured', 1),
+        ];
+        $item = (new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), null, $this->usageRepository($usages), new PublicMediaArticleLinkResolver(
+            static fn (int $postId): object => (object) ['ID' => $postId, 'post_status' => 'publish', 'post_type' => 'post'],
+            static fn (object $post): string => '/bai-viet/' . $post->ID . '/',
+        )))->archive()['items'][0];
+
+        self::assertNull($item['article_url']);
+    }
+
     public function test_gallery_uses_short_fallback_summary_without_inventing_semantics(): void
     {
         $mediaId = UuidCodec::newV7();

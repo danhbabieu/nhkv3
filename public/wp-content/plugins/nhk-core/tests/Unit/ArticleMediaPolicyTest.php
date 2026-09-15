@@ -22,6 +22,8 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_PLACEHOLDER', $first->state);
         self::assertNotSame($first->slotMedia['featured_primary'], $first->slotMedia['inline_primary']);
         self::assertSame($first->slotMedia, $second->slotMedia);
+        self::assertSame($first->slots['featured_primary']['placement_anchor'], $second->slots['featured_primary']['placement_anchor']);
+        self::assertNotSame($first->slots['featured_primary']['placement_anchor'], $first->slots['inline_primary']['placement_anchor']);
         self::assertCount(2, $usages->listByEndpoint('wp_post', '1:42'));
         self::assertCount(2, $blueprints->listByPost(42));
         self::assertCount(2, array_filter($media->items, static fn (Media $item): bool => $item->isSystemPlaceholder()));
@@ -336,6 +338,26 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame($item->canonicalId, $result->slotMedia['inline_primary']);
         self::assertFalse($result->slots['inline_primary']['placeholder']);
         self::assertNotContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->diagnostics, 'code'));
+    }
+
+    public function test_repeated_supporting_media_requires_explicit_unique_placements_and_converges_without_binary_duplication(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $item = $service->create('repeated-supporting', 'Repeated supporting image', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/repeated.webp', hash('sha256', 'repeated'), 'image/webp', 3, 1200, 800, 'PUBLIC');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(46, [], [], [
+            ['media_id' => $item->canonicalId, 'placement_key' => 'paragraph-a', 'sort_order' => 3],
+            ['media_id' => $item->canonicalId, 'placement_key' => 'paragraph-b', 'sort_order' => 1],
+        ]);
+        $supporting = $usages->listByEndpoint('wp_post', '1:46', 'inline_supporting');
+
+        usort($supporting, static fn (MediaUsage $left, MediaUsage $right): int => $left->sortOrder <=> $right->sortOrder);
+        self::assertCount(2, $supporting);
+        self::assertSame(['paragraph-b', 'paragraph-a'], array_column($supporting, 'placementKey'));
+        self::assertNotSame($supporting[0]->placementAnchor(), $supporting[1]->placementAnchor());
+        self::assertSame('MEDIA_COMPLETE', $result->state);
     }
 
     public function test_same_media_supports_different_contextual_usage_text_without_binary_duplication(): void

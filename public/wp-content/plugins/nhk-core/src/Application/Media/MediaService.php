@@ -75,9 +75,11 @@ final class MediaService
                 (string) ($spec['caption'] ?? ''),
                 is_array($spec['keyword_groups'] ?? null) ? array_values(array_map('strval', $spec['keyword_groups'])) : [],
                 (string) ($spec['title'] ?? ''),
+                (int) ($spec['revision'] ?? 1),
+                (string) ($spec['placement_key'] ?? ''),
             );
             $existing = null;
-            foreach ($existingUsages as $usage) if ($usage->endpointType === $candidate->endpointType && $usage->endpointKey === $candidate->endpointKey && $usage->role === $candidate->role) { $existing = $usage; break; }
+            foreach ($existingUsages as $usage) if ($usage->endpointType === $candidate->endpointType && $usage->endpointKey === $candidate->endpointKey && $usage->role === $candidate->role && $usage->placementKey === $candidate->placementKey) { $existing = $usage; break; }
             if ($existing !== null) {
                 $existingUsages[] = $this->upsertUsage($existing, $candidate);
                 continue;
@@ -154,12 +156,12 @@ final class MediaService
         }
     }
 
-    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = ''): MediaUsage
+    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = '', string $placementKey = ''): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title);
+        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title, 1, $placementKey);
         foreach ($this->usages->listByMediaId($mediaId) as $existing) {
-            if ($existing->endpointType !== $candidate->endpointType || $existing->endpointKey !== $candidate->endpointKey || $existing->role !== $candidate->role) continue;
+            if ($existing->endpointType !== $candidate->endpointType || $existing->endpointKey !== $candidate->endpointKey || $existing->role !== $candidate->role || $existing->placementKey !== $candidate->placementKey) continue;
             if ($this->sameUsage($existing, $candidate)) return $existing;
             return $this->upsertUsage($existing, $candidate);
         }
@@ -193,12 +195,13 @@ final class MediaService
             && $left->altText === $right->altText
             && $left->caption === $right->caption
             && $left->keywordGroups === $right->keywordGroups
-            && $left->title === $right->title;
+            && $left->title === $right->title
+            && $left->placementKey === $right->placementKey;
     }
 
     private function upsertUsage(MediaUsage $existing, MediaUsage $candidate): MediaUsage
     {
-        $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision);
+        $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey);
         if ($this->usages instanceof MediaUsageUpdater) return $this->usages->update($updated);
         throw new MediaException('Media usage update capability is unavailable.');
     }
@@ -234,7 +237,7 @@ final class MediaService
         }
         $storageKey = (string) ($spec['storage_key'] ?? '');
         $original = (string) ($spec['original_filename'] ?? basename($storageKey));
-        if ($original !== '' && preg_match('/^(IMG|DSC|DSCF|PXL)[-_]?/i', $original) === 1) {
+        if (($metadata['source_original'] ?? false) !== true && $original !== '' && preg_match('/^(IMG|DSC|DSCF|PXL)[-_]?/i', $original) === 1) {
             $view = (string) ($metadata['view'] ?? $metadata['detail_type'] ?? 'image');
             $normalized = (new MediaFilenameNormalizer())->normalize($subject, $view, $original, isset($metadata['filename_suffix']) ? (string) $metadata['filename_suffix'] : null);
             $directory = trim(str_replace('\\', '/', dirname($storageKey)), './');

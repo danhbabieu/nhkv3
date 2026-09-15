@@ -70,23 +70,25 @@ final class ArticleMediaCoordinator
             if ($candidate === null && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
             if ($candidate === null && $allowHistoricalSubjectReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia), $subjectScopeLocked, !$enforceDistinctMandatoryMedia);
             if ($candidate === null) $candidate = $this->placeholder($slot);
-            $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint);
+            $usage = $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint, 'article:' . $endpointKey . ':' . $slot);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
             if ($candidate->isSystemPlaceholder()) $diagnostics[] = ['code' => $slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING', 'slot' => $slot, 'media_id' => $candidate->canonicalId];
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, $state);
             $this->blueprints->save($blueprint);
             $slotMedia[$slot] = $candidate->canonicalId;
-            $slots[$slot] = ['media_id' => $candidate->canonicalId, 'placeholder' => $candidate->isSystemPlaceholder(), 'state' => $state, 'blueprint' => $blueprint->toArray()];
+            $slots[$slot] = ['media_id' => $candidate->canonicalId, 'placeholder' => $candidate->isSystemPlaceholder(), 'state' => $state, 'placement_key' => $usage->placementKey, 'placement_anchor' => $usage->placementAnchor(), 'blueprint' => $blueprint->toArray()];
         }
-        foreach ($supportingMediaIds as $index => $mediaId) {
-            $supportingId = (string) $mediaId;
+        $supportingPlacements = $this->normalizeSupportingPlacements($supportingMediaIds);
+        foreach ($supportingPlacements as $placement) {
+            $index = $placement['sort_order'];
+            $supportingId = $placement['media_id'];
             $supportingRequiresScope = $subjectScopeLocked && !($captureMediaContext && in_array($supportingId, $captureOwnedMediaIds, true));
             $candidate = $this->usableMedia($supportingId, MediaSeoBlueprint::forPost($postId, MediaUsageRoleRegistry::INLINE_PRIMARY, $context), $supportingRequiresScope);
-            if ($candidate !== null) $this->mediaService->addUsage($candidate->canonicalId, 'wp_post', $endpointKey, MediaUsageRoleRegistry::INLINE_SUPPORTING, $index);
+            if ($candidate !== null) $this->mediaService->addUsage($candidate->canonicalId, 'wp_post', $endpointKey, MediaUsageRoleRegistry::INLINE_SUPPORTING, $index, '', '', [], '', $placement['placement_key']);
         }
         $desiredUsages = [];
-        foreach ($slotMedia as $role => $mediaId) $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
-        foreach ($supportingMediaIds as $index => $mediaId) $desiredUsages[] = ['role' => MediaUsageRoleRegistry::INLINE_SUPPORTING, 'media_id' => (string) $mediaId, 'sort_order' => $index];
+        foreach ($slotMedia as $role => $mediaId) $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'placement_key' => (string) ($slots[$role]['placement_key'] ?? ''), 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
+        foreach ($supportingPlacements as $placement) $desiredUsages[] = ['role' => MediaUsageRoleRegistry::INLINE_SUPPORTING, 'media_id' => $placement['media_id'], 'sort_order' => $placement['sort_order'], 'placement_key' => $placement['placement_key']];
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
         $state = array_filter($slots, static fn (array $slot): bool => $slot['placeholder']) !== [] ? MediaSeoStateRegistry::PLACEHOLDER : (in_array('MEDIA_LOW_RESOLUTION', array_column($diagnostics, 'code'), true) ? MediaSeoStateRegistry::LOW_RESOLUTION : MediaSeoStateRegistry::COMPLETE);
@@ -283,28 +285,45 @@ final class ArticleMediaCoordinator
         ];
     }
 
-    private function reconcileUsage(string $endpointKey, string $slot, string $mediaId, \NHK\Core\Domain\Media\MediaSeoBlueprint $blueprint): void
+    private function reconcileUsage(string $endpointKey, string $slot, string $mediaId, \NHK\Core\Domain\Media\MediaSeoBlueprint $blueprint, string $placementKey = ''): \NHK\Core\Domain\Media\MediaUsage
     {
         $existing = $this->usages->listByEndpoint('wp_post', $endpointKey, $slot);
         foreach ($existing as $usage) {
             if ($usage->mediaId !== $mediaId) continue;
-            $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision);
-            if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title) return;
+            $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision, $usage->placementKey !== '' ? $usage->placementKey : $placementKey);
+            if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title && $usage->placementKey === $candidate->placementKey) return $usage;
             if ($this->usages instanceof MediaUsageUpdater) {
-                $this->usages->update($candidate);
-                return;
+                return $this->usages->update($candidate);
             }
             throw new \RuntimeException('ARTICLE_MEDIA_USAGE_UPDATE_UNAVAILABLE');
         }
         if ($existing !== []) {
             $current = $existing[0];
-            $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $current->revision);
+            $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $current->revision, $current->placementKey !== '' ? $current->placementKey : $placementKey);
             if ($this->usages instanceof MediaUsageUpdater) {
-                $this->usages->update($candidate);
-                return;
+                return $this->usages->update($candidate);
             }
             if ($this->usages instanceof MutableMediaUsageRepository) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_REPLACEMENT_UNAVAILABLE');
         }
-        $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle);
+        return $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $placementKey);
+    }
+
+    /** @param list<mixed> $placements @return list<array{media_id:string,placement_key:string,sort_order:int}> */
+    private function normalizeSupportingPlacements(array $placements): array
+    {
+        $seen = [];
+        $normalized = [];
+        foreach (array_values($placements) as $index => $placement) {
+            $mediaId = is_array($placement) ? trim((string) ($placement['media_id'] ?? '')) : trim((string) $placement);
+            if ($mediaId === '') continue;
+            $explicitKey = is_array($placement) ? trim((string) ($placement['placement_key'] ?? '')) : '';
+            if (isset($seen[$mediaId]) && $explicitKey === '') throw new \InvalidArgumentException('MEDIA_PLACEMENT_KEY_REQUIRED');
+            $key = $explicitKey !== '' ? $explicitKey : 'supporting:' . hash('sha256', $mediaId);
+            if (isset($seen[$mediaId . "\0" . $key])) throw new \InvalidArgumentException('MEDIA_PLACEMENT_KEY_DUPLICATE');
+            $seen[$mediaId] = true;
+            $seen[$mediaId . "\0" . $key] = true;
+            $normalized[] = ['media_id' => $mediaId, 'placement_key' => $key, 'sort_order' => is_array($placement) && isset($placement['sort_order']) ? max(0, (int) $placement['sort_order']) : $index];
+        }
+        return $normalized;
     }
 }

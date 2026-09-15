@@ -11,6 +11,8 @@ final class TrustedProvidedFileMaterializer
 {
     public const MAX_FILES = 20;
     public const MAX_TOTAL_BYTES = 52428800;
+    public const MAX_DECODED_PIXELS = 40000000;
+    public const MAX_DIMENSION = 10000;
     private const TIMEOUT_SECONDS = 15;
     private const MAX_REDIRECTS = 3;
     private const REFERENCE_FIELDS = ['download_url', 'file_id', 'mime_type', 'file_name'];
@@ -66,6 +68,7 @@ final class TrustedProvidedFileMaterializer
                 $mime = self::sniffMime($path);
                 if (!in_array($mime, self::ALLOWED_MIME_TYPES, true)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file is not a supported image.');
                 if ($declaredMime !== '' && strtolower($declaredMime) !== $mime) throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_MISMATCH', 'The uploaded file MIME type does not match its bytes.');
+                self::assertImageResourceBudget($path, $mime);
                 $fileBag['files']['name'][] = self::safeFilename($providedName, $url, $mime);
                 $fileBag['files']['type'][] = $mime;
                 $fileBag['files']['tmp_name'][] = $path;
@@ -162,6 +165,21 @@ final class TrustedProvidedFileMaterializer
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
         if (!is_string($mime) || $mime === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file MIME type could not be verified.');
         return strtolower($mime);
+    }
+
+    private static function assertImageResourceBudget(string $path, string $mime): void
+    {
+        if ($mime === 'image/svg+xml') throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'Active image formats are not accepted.');
+        $info = @getimagesize($path);
+        if (!is_array($info)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODE_FAILED', 'The uploaded image could not be decoded.');
+        $width = (int) ($info[0] ?? 0);
+        $height = (int) ($info[1] ?? 0);
+        if ($width < 1 || $height < 1 || $width > self::MAX_DIMENSION || $height > self::MAX_DIMENSION) {
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODED_DIMENSION_LIMIT', 'The uploaded image dimensions exceed the safe decoder budget.');
+        }
+        if ($width > intdiv(self::MAX_DECODED_PIXELS, max(1, $height))) {
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODED_PIXEL_LIMIT', 'The uploaded image exceeds the safe decoded-pixel budget.');
+        }
     }
 
     private static function safeFilename(string $provided, string $url, string $mime): string

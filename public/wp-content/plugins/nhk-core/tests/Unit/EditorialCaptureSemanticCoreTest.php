@@ -97,6 +97,31 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertStringContainsString('Bổ sung lần ba.', $third['content']);
     }
 
+    public function test_managed_claim_has_structural_identity_and_dependency_fingerprint(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Ghi chú biên tập.',
+            [],
+            [['claim_id' => 'claim-1', 'revision' => 2, 'text' => 'Cấu hình này dùng bộ máy được ghi nhận trong hồ sơ.', 'provenance' => 'CATALOG_SUPPORTED']],
+            ['dependency_context' => ['media_usage' => [['id' => 'usage-1', 'revision' => 3]]]],
+        );
+
+        self::assertStringContainsString('nhk-managed-section', $result['content']);
+        self::assertSame('nhk-managed-' . hash('sha256', 'claim-context:claim-1:2'), $result['managed_sections'][0]['section_id']);
+        self::assertSame(64, strlen($result['managed_sections'][0]['dependency_fingerprint']));
+    }
+
+    public function test_material_human_edit_inside_managed_section_fails_closed_and_does_not_reproject(): void
+    {
+        $claims = [['claim_id' => 'claim-1', 'revision' => 2, 'text' => 'Cấu hình này dùng bộ máy được ghi nhận trong hồ sơ.', 'provenance' => 'CATALOG_SUPPORTED']];
+        $composer = new ArticleComposer();
+        $first = $composer->compose('Ghi chú biên tập.', [], $claims);
+        $edited = str_replace('Trong bối cảnh hồ sơ đã được kiểm chứng', 'Biên tập viên đã sửa nội dung', $first['content']);
+
+        $this->expectException(\NHK\Core\Application\Semantic\ManagedArticleSectionConflict::class);
+        $composer->compose($edited . "\n\nĐoạn do biên tập viên thêm.", [], $claims, ['prior_composition' => $first]);
+    }
+
     public function test_explicit_title_and_excerpt_survive_text_continuation(): void
     {
         $result = (new ArticleComposer())->compose(

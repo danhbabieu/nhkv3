@@ -85,18 +85,21 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             if ($attachmentId < 1) throw new \RuntimeException('WORDPRESS_INLINE_ATTACHMENT_UNAVAILABLE');
             $inlineIds = $this->inlineAttachmentIds($content);
             $managedId = $this->managedInlineAttachmentId($content);
+            $placementAnchor = trim((string) ($slots['inline_primary']['placement_anchor'] ?? ''));
             if (!in_array($attachmentId, $inlineIds, true)) {
-                $image = $this->renderImage($attachmentId, (string) ($slots['inline_primary']['blueprint']['planned_alt_intent'] ?? ''));
+                $image = $this->renderImage($attachmentId, (string) ($slots['inline_primary']['blueprint']['planned_alt_intent'] ?? ''), $placementAnchor);
                 if ($managedId > 0) {
-                    $content = $this->replaceManagedBlock($content, $image, $attachmentId);
+                    $content = $this->replaceManagedBlock($content, $image, $attachmentId, $placementAnchor);
                 } elseif (($result['force_inline_reconcile'] ?? false) === true && $inlineIds !== []) {
-                    $content = $this->replaceFirstImageBlock($content, $image, $attachmentId);
+                    $content = $this->replaceFirstImageBlock($content, $image, $attachmentId, $placementAnchor);
                 } elseif ($this->hasMappedInlineMedia($inlineIds, (string) ($current['featured_media_id'] ?? ''))) {
                     // A human-selected, mapped inline image already satisfies
                     // the mandatory editorial role. Never reorder it.
                 } else {
-                    $content = rtrim($content) . ($content === '' ? '' : "\n\n") . $this->managedBlock($attachmentId, $image);
+                    $content = rtrim($content) . ($content === '' ? '' : "\n\n") . $this->managedBlock($attachmentId, $image, $placementAnchor);
                 }
+            } elseif ($placementAnchor !== '') {
+                $content = $this->ensurePlacementAnchor($content, $attachmentId, $placementAnchor);
             }
             if (($result['force_inline_reconcile'] ?? false) === true) {
                 // Capture reconciliation owns the mandatory inline slot. Once
@@ -215,15 +218,13 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
 
     private function sourceAssetSpec(string $relative, string $originalFilename = ''): ?array
     {
-        if ($relative === '' || !function_exists('wp_upload_dir')) return null;
-        $upload = wp_upload_dir();
-        $baseDir = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
-        $path = $baseDir !== '' ? $baseDir . '/' . ltrim($relative, '/') : '';
-        if ($path === '' || !is_file($path) || !is_readable($path)) return null;
+        if ($relative === '' || !str_starts_with($relative, 'private/')) return null;
+        $path = PrivateMediaSourceStorage::fromWordPress()->path($relative);
+        if ($path === null || !is_readable($path)) return null;
         $info = @getimagesize($path); $checksum = hash_file('sha256', $path); $size = filesize($path);
         if (!is_array($info) || !is_string($info['mime'] ?? null) || !is_string($checksum) || $checksum === '' || $size === false || $size < 1) return null;
         $originalFilename = $originalFilename !== '' ? $originalFilename : basename($relative);
-        return ['kind' => 'original', 'storage_key' => 'uploads/' . ltrim($relative, '/'), 'original_filename' => $originalFilename, 'checksum' => $checksum, 'mime_type' => strtolower((string) $info['mime']), 'byte_size' => (int) $size, 'width' => (int) ($info[0] ?? 0), 'height' => (int) ($info[1] ?? 0), 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true, 'original_filename' => $originalFilename, 'sizes' => []]];
+        return ['kind' => 'original', 'storage_key' => $relative, 'original_filename' => $originalFilename, 'checksum' => $checksum, 'mime_type' => strtolower((string) $info['mime']), 'byte_size' => (int) $size, 'width' => (int) ($info[0] ?? 0), 'height' => (int) ($info[1] ?? 0), 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true, 'original_filename' => $originalFilename, 'sizes' => []]];
     }
 
     private function completeExistingAttachment(string $mediaId, int $attachmentId): void
@@ -275,7 +276,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if (!is_object($post) || (string) ($post->post_type ?? '') !== 'attachment') throw new \RuntimeException('WORDPRESS_MEDIA_ATTACHMENT_UNAVAILABLE');
     }
 
-    private function renderImage(int $attachmentId, string $alt): string
+    private function renderImage(int $attachmentId, string $alt, string $anchor = ''): string
     {
         if (function_exists('wp_get_attachment_image')) {
             $html = (string) wp_get_attachment_image($attachmentId, 'large', false, ['alt' => $alt, 'loading' => 'lazy']);
@@ -287,19 +288,24 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 $html = (string) preg_replace('/\ssrc="[^"]*"/i', ' src="' . esc_url($absolute) . '"', $html);
                 $html = (string) preg_replace('/\ssrcset="[^"]*"/i', ' srcset="' . esc_url($absolute) . ' ' . (int) ($asset->width ?? 0) . 'w"', $html);
             }
+            if ($anchor !== '') {
+                $safeAnchor = function_exists('esc_attr') ? esc_attr($anchor) : htmlspecialchars($anchor, ENT_QUOTES, 'UTF-8');
+                $html = (string) preg_replace('/<img\b/i', '<img id="' . $safeAnchor . '"', $html, 1);
+            }
             return $html;
         }
         return '';
     }
 
-    private function managedBlock(int $attachmentId, string $image): string
+    private function managedBlock(int $attachmentId, string $image, string $anchor = ''): string
     {
-        return '<!-- wp:image {"id":' . $attachmentId . ',"sizeSlug":"large","linkDestination":"none","className":"nhk-managed-inline-primary"} -->' . $image . '<!-- /wp:image -->';
+        $anchorJson = $anchor !== '' ? ',"anchor":"' . addslashes($anchor) . '"' : '';
+        return '<!-- wp:image {"id":' . $attachmentId . ',"sizeSlug":"large","linkDestination":"none","className":"nhk-managed-inline-primary"' . $anchorJson . '} -->' . $image . '<!-- /wp:image -->';
     }
 
-    private function replaceManagedBlock(string $content, string $image, int $attachmentId): string
+    private function replaceManagedBlock(string $content, string $image, int $attachmentId, string $anchor = ''): string
     {
-        $replacement = $this->managedBlock($attachmentId, $image);
+        $replacement = $this->managedBlock($attachmentId, $image, $anchor);
         $updated = preg_replace('/<!-- wp:image\b[^>]*nhk-managed-inline-primary[^>]*-->.*?<!-- \/wp:image -->/is', $replacement, $content, 1);
         return is_string($updated) ? $updated : $content;
     }
@@ -346,10 +352,21 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return is_string($updated) ? trim($updated) : trim($content);
     }
 
-    private function replaceFirstImageBlock(string $content, string $image, int $attachmentId): string
+    private function replaceFirstImageBlock(string $content, string $image, int $attachmentId, string $anchor = ''): string
     {
-        $replacement = $this->managedBlock($attachmentId, $image);
+        $replacement = $this->managedBlock($attachmentId, $image, $anchor);
         $updated = preg_replace('/<!-- wp:image\b.*?<!-- \/wp:image -->/is', $replacement, $content, 1);
+        return is_string($updated) ? $updated : $content;
+    }
+
+    private function ensurePlacementAnchor(string $content, int $attachmentId, string $anchor): string
+    {
+        $safeAnchor = function_exists('esc_attr') ? esc_attr($anchor) : htmlspecialchars($anchor, ENT_QUOTES, 'UTF-8');
+        $pattern = '/<img\b(?=[^>]*(?:wp-image-' . preg_quote((string) $attachmentId, '/') . '|data-id=["\']' . preg_quote((string) $attachmentId, '/') . '["\']))[^>]*>/i';
+        $updated = preg_replace_callback($pattern, static function (array $match) use ($safeAnchor): string {
+            if (preg_match('/\bid=["\'][^"\']+["\']/i', $match[0]) === 1) return (string) preg_replace('/\bid=["\'][^"\']+["\']/i', 'id="' . $safeAnchor . '"', $match[0], 1);
+            return (string) preg_replace('/<img\b/i', '<img id="' . $safeAnchor . '"', $match[0], 1);
+        }, $content, 1);
         return is_string($updated) ? $updated : $content;
     }
 

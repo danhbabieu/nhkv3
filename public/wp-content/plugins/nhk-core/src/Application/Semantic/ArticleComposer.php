@@ -8,14 +8,15 @@ use NHK\Core\Application\Compliance\PublicEditorialCopyGuard;
 /** Deterministic editorial composer. Canonical Claim text is never dumped verbatim. */
 final class ArticleComposer
 {
-    public function __construct(private ?PublicEditorialCopyGuard $publicCopyGuard = null) {}
+    public function __construct(private ?PublicEditorialCopyGuard $publicCopyGuard = null, private ?ManagedArticleSectionParser $sectionParser = null) {}
 
     /** @param list<array<string,mixed>> $observations @param list<array<string,mixed>> $selectedClaims @return array<string,mixed> */
     public function compose(string $userInput, array $observations, array $selectedClaims, array $context = []): array
     {
         $userInput = trim($userInput);
         $priorSections = array_values(array_filter((array) ($context['prior_composition']['managed_sections'] ?? []), 'is_array'));
-        $userInput = $this->removeOwnedSections($userInput, $priorSections);
+        $sectionParser = $this->sectionParser ?? new ManagedArticleSectionParser();
+        $userInput = $sectionParser->removeOwned($userInput, $priorSections);
         $title = trim((string) ($context['title'] ?? ''));
         if ($title === '') $title = $this->title($userInput);
         $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
@@ -42,6 +43,7 @@ final class ArticleComposer
             if ($text !== '') $paragraphs[] = 'Quan sát từ tư liệu gửi kèm cho thấy ' . rtrim($text, '.!?') . '.';
         }
         $seenClaims = [];
+        $dependencyFingerprint = $this->dependencyFingerprint($selectedClaims, $observations, $context);
         foreach ($usableClaims as $claim) {
             if (!is_array($claim)) continue;
             $claimId = trim((string) ($claim['claim_id'] ?? $claim['id'] ?? ''));
@@ -52,8 +54,11 @@ final class ArticleComposer
             $summary = $this->claimSummary((string) ($claim['text'] ?? ''));
             if ($summary !== '') {
                 $content = 'Trong bối cảnh hồ sơ đã được kiểm chứng, nội dung này được đặt cạnh ghi nhận rằng ' . $summary . '.';
-                $paragraphs[] = $content;
-                $managedSections[] = ['semantic_key' => $semanticKey !== '' ? $semanticKey : 'claim-context:' . hash('sha256', $content), 'origin' => 'CANONICAL_CLAIM', 'fingerprint' => hash('sha256', $content), 'content' => $content];
+                $semanticKey = $semanticKey !== '' ? $semanticKey : 'claim-context:' . hash('sha256', $content);
+                $fingerprint = hash('sha256', $content);
+                $sectionId = 'nhk-managed-' . hash('sha256', $semanticKey);
+                $paragraphs[] = $sectionParser->wrap($sectionId, $fingerprint, $dependencyFingerprint, $content);
+                $managedSections[] = ['section_id' => $sectionId, 'semantic_key' => $semanticKey, 'origin' => 'CANONICAL_CLAIM', 'fingerprint' => $fingerprint, 'dependency_fingerprint' => $dependencyFingerprint, 'content' => $content];
             }
         }
         if ($paragraphs === []) $paragraphs[] = 'Nội dung đang chờ bổ sung dữ liệu biên tập.';
@@ -90,20 +95,24 @@ final class ArticleComposer
             'managed_sections' => $managedSections,
             'origin_ownership' => ['user_authored' => $userInput !== '', 'managed_origins' => array_values(array_unique(array_map(static fn (array $section): string => (string) ($section['origin'] ?? 'SYSTEM_DERIVED'), $managedSections)))],
             'claim_trace' => $trace,
-            'research_snapshot' => ['claims' => array_map(static fn (array $item): array => ['claim_id' => $item['claim_id'], 'revision' => $item['claim_revision']], $trace), 'composer_revision' => 1],
-            'composition_revision' => 1,
+            'research_snapshot' => ['claims' => array_map(static fn (array $item): array => ['claim_id' => $item['claim_id'], 'revision' => $item['claim_revision']], $trace), 'composer_revision' => max(1, (int) ($context['prior_composition']['research_snapshot']['composer_revision'] ?? 0) + 1)],
+            'dependency_fingerprint' => $dependencyFingerprint,
+            'composition_revision' => max(1, (int) ($context['prior_composition']['composition_revision'] ?? 0) + 1),
         ];
     }
 
-    /** Remove only prior structured managed sections; all other user text remains intact. */
-    private function removeOwnedSections(string $input, array $sections): string
+    private function dependencyFingerprint(array $claims, array $observations, array $context): string
     {
-        foreach ($sections as $section) {
-            $owned = trim((string) ($section['content'] ?? ''));
-            if ($owned === '') continue;
-            $input = str_replace(["\n\n" . $owned, $owned . "\n\n", $owned], ['', '', ''], $input);
-        }
-        return trim(preg_replace('/\n{3,}/', "\n\n", $input) ?? $input);
+        if (isset($context['dependency_fingerprint']) && is_string($context['dependency_fingerprint']) && $context['dependency_fingerprint'] !== '') return $context['dependency_fingerprint'];
+        $dependencies = [
+            'claims' => array_values(array_map(static fn (mixed $claim): array => is_array($claim) ? ['id' => (string) ($claim['claim_id'] ?? $claim['id'] ?? ''), 'revision' => max(1, (int) ($claim['claim_revision'] ?? $claim['revision'] ?? 1))] : [], $claims)),
+            'observations' => $observations,
+            'media_usages' => $context['media_usages'] ?? [],
+            'visual_support' => $context['visual_support'] ?? [],
+            'public_identity' => $context['public_identity'] ?? [],
+            'editorial_state_token' => (string) ($context['editorial_state_token'] ?? ''),
+        ];
+        return hash('sha256', json_encode($dependencies, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 
     private function title(string $input): string

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaService, PublicImageSizingPolicy};
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor};
+use NHK\Core\Infrastructure\Media\{PrivateMediaSourceStorage, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor};
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGateway;
 use NHK\Core\Infrastructure\Migration\{MediaAssetMetadataMigration008, MediaMigration004};
 use NHK\Tests\Support\TestDatabaseGuard;
@@ -71,6 +71,8 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertContains('PUBLIC', array_map(static fn ($asset): string => $asset->visibility, $mediaAssets));
             $sourceRelative = (string) get_post_meta($attachmentId, '_nhk_source_original_file', true);
             self::assertNotSame('', $sourceRelative);
+            self::assertStringStartsWith('private/', $sourceRelative);
+            self::assertNotNull(PrivateMediaSourceStorage::fromWordPress()->path($sourceRelative));
             self::assertSame('source-original.png', (string) get_post_meta($attachmentId, '_nhk_original_filename', true));
             $sourceAsset = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'original'))[0] ?? null;
             self::assertNotNull($sourceAsset);
@@ -83,12 +85,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
                 $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE media_id=%d", $internalId));
                 $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE id=%d", $internalId));
             }
-            if ($sourceRelative !== '' && function_exists('wp_upload_dir')) {
-                $upload = wp_upload_dir();
-                $baseDir = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
-                $sourcePath = $baseDir !== '' ? $baseDir . '/' . ltrim($sourceRelative, '/') : '';
-                if ($sourcePath !== '' && is_file($sourcePath)) unlink($sourcePath);
-            }
+            if ($sourceRelative !== '') try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceRelative); } catch (\Throwable) { }
             if ($source !== false && is_file($source)) unlink($source);
         }
     }
@@ -143,6 +140,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertNotNull($ingestor->read($attachmentId));
             self::assertNotEmpty($assets->listByMediaId($mediaId));
             $sourceRelative = (string) get_post_meta($attachmentId, '_nhk_source_original_file', true);
+            self::assertStringStartsWith('private/', $sourceRelative);
         } finally {
             if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
             if ($mediaId !== '') {
@@ -151,12 +149,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
                 $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE media_id=%d", $internalId));
                 $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE id=%d", $internalId));
             }
-            if ($sourceRelative !== '' && function_exists('wp_upload_dir')) {
-                $upload = wp_upload_dir();
-                $baseDir = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
-                $sourcePath = $baseDir !== '' ? $baseDir . '/' . ltrim($sourceRelative, '/') : '';
-                if ($sourcePath !== '' && is_file($sourcePath)) unlink($sourcePath);
-            }
+            if ($sourceRelative !== '') try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceRelative); } catch (\Throwable) { }
             if (function_exists('delete_option')) delete_option('nhk_media_upload_batch_' . hash('sha256', $idempotencyKey));
         }
     }

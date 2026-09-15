@@ -17,6 +17,8 @@ use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor as WordPressMediaA
 final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachmentIngestorContract
 {
     public const MAX_LONG_EDGE = PublicImageSizingPolicy::MAX_LONG_EDGE;
+    public const MAX_DECODED_PIXELS = 40000000;
+    public const MAX_DIMENSION = 10000;
 
     public function __construct(private ?WordPressArticleMediaAdapter $semanticMedia = null) {}
 
@@ -47,7 +49,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $processed = function_exists('wp_tempnam') ? wp_tempnam($safeFilename) : tempnam(sys_get_temp_dir(), 'nhk-media-');
         if (!is_string($work) || $work === '' || !is_string($processed) || $processed === '') throw new \RuntimeException('WORDPRESS_MEDIA_WORKFILE_UNAVAILABLE');
         $uploadedPath = null;
-        $sourceUploadedPath = null;
+        $sourceStorageKey = null;
         $processedPath = null;
         $attachmentId = 0;
         $completed = false;
@@ -56,6 +58,7 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             $sourceInfo = @getimagesize($work);
             if (!is_array($sourceInfo) || !is_string($sourceInfo['mime'] ?? null)) throw new \InvalidArgumentException('File attachment is not a supported image.');
             $this->allowedMime((string) $sourceInfo['mime']);
+            $this->assertResourceBudget((int) ($sourceInfo[0] ?? 0), (int) ($sourceInfo[1] ?? 0));
 
             // EXIF orientation is applied before dimensions are measured and
             // before the aspect-preserving resize.
@@ -120,12 +123,11 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             }
             $sourceContents = file_get_contents($source);
             if (!is_string($sourceContents)) throw new \RuntimeException('WORDPRESS_MEDIA_SOURCE_READ_FAILED');
-            $sourceFilename = $this->sourceFilename($safeFilename, (string) ($sourceInfo['mime'] ?? 'image/jpeg'));
-            $sourceUpload = wp_upload_bits($sourceFilename, null, $sourceContents);
-            if (!is_array($sourceUpload) || !empty($sourceUpload['error']) || !is_string($sourceUpload['file'] ?? null)) throw new \RuntimeException('WORDPRESS_MEDIA_SOURCE_PERSIST_FAILED');
-            $sourceUploadedPath = (string) $sourceUpload['file'];
-            $sourceRelative = $this->relativeUploadPath($sourceUploadedPath);
-            if (function_exists('update_post_meta')) update_post_meta((int) $attachmentId, '_nhk_source_original_file', $sourceRelative);
+            $sourceExtension = match (strtolower((string) ($sourceInfo['mime'] ?? 'image/jpeg'))) {
+                'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', default => 'jpg',
+            };
+            $sourceStorageKey = (new PrivateMediaSourceStorage($this->privateStorageRoot()))->store($sourceContents, $sourceExtension);
+            if (function_exists('update_post_meta')) update_post_meta((int) $attachmentId, '_nhk_source_original_file', $sourceStorageKey);
             $mediaId = null;
             if ($this->semanticMedia !== null) $mediaId = $this->semanticMedia->adoptAttachment((int) $attachmentId);
             $result = $this->read((int) $attachmentId);
@@ -139,7 +141,9 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             if (is_string($processedPath) && $processedPath !== $processed && is_file($processedPath)) @unlink($processedPath);
             if (!$completed) {
                 if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
-                if ($sourceUploadedPath !== null && is_file($sourceUploadedPath)) @unlink($sourceUploadedPath);
+                if ($sourceStorageKey !== null) {
+                    try { (new PrivateMediaSourceStorage($this->privateStorageRoot()))->delete($sourceStorageKey); } catch (\Throwable) { }
+                }
                 if ($uploadedPath !== null && is_file($uploadedPath)) @unlink($uploadedPath);
             }
         }
@@ -236,21 +240,11 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         return $filename;
     }
 
-    private function sourceFilename(string $processedFilename, string $mime): string
+    private function privateStorageRoot(): string
     {
-        $extension = match (strtolower($mime)) {
-            'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', default => 'jpg',
-        };
-        return preg_replace('/\.webp$/i', '-original.' . $extension, $processedFilename) ?: 'media-original.' . $extension;
-    }
-
-    private function relativeUploadPath(string $path): string
-    {
-        $upload = function_exists('wp_upload_dir') ? wp_upload_dir() : [];
-        $base = is_array($upload) ? realpath((string) ($upload['basedir'] ?? '')) : false;
-        $real = realpath($path);
-        if ($base === false || $real === false || !$this->within($base, $real)) throw new \RuntimeException('WORDPRESS_MEDIA_UPLOAD_PATH_INVALID');
-        return ltrim(str_replace('\\', '/', substr($real, strlen($base))), '/');
+        $configured = getenv('NHK_PRIVATE_MEDIA_STORAGE_ROOT');
+        if (is_string($configured) && trim($configured) !== '') return trim($configured);
+        return defined('ABSPATH') ? dirname(rtrim((string) ABSPATH, '/\\')) . '/.nhk-private-media' : sys_get_temp_dir() . '/nhk-private-media';
     }
 
     private function allowedMime(string $mime): string
@@ -258,6 +252,12 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
         $mime = strtolower(trim($mime));
         if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) throw new \InvalidArgumentException('Only JPEG, PNG, GIF and WebP images are supported.');
         return $mime;
+    }
+
+    private function assertResourceBudget(int $width, int $height): void
+    {
+        if ($width < 1 || $height < 1) throw new \InvalidArgumentException('Image dimensions are unavailable.');
+        if ($width > self::MAX_DIMENSION || $height > self::MAX_DIMENSION || $width > intdiv(self::MAX_DECODED_PIXELS, max(1, $height))) throw new \InvalidArgumentException('IMAGE_DECODED_RESOURCE_LIMIT');
     }
 
     private function within(string $root, string $path): bool

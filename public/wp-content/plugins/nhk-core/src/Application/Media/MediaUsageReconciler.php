@@ -18,11 +18,12 @@ final class MediaUsageReconciler
      */
     public function plan(string $endpointType, string $endpointKey, array $current, array $desired): array
     {
-        $currentByRole = [];
+        $currentByIdentity = [];
         foreach ($current as $usage) {
             if (!$usage instanceof MediaUsage || $usage->endpointType !== $endpointType || $usage->endpointKey !== $endpointKey) continue;
-            if (isset($currentByRole[$usage->role])) return $this->review('DUPLICATE_CURRENT_USAGE', $usage->role);
-            $currentByRole[$usage->role] = $usage;
+            $identity = $usage->role . "\0" . $usage->placementKey;
+            if (isset($currentByIdentity[$identity])) return $this->review('DUPLICATE_CURRENT_USAGE', $usage->role);
+            $currentByIdentity[$identity] = $usage;
         }
 
         $desiredByRole = [];
@@ -31,9 +32,8 @@ final class MediaUsageReconciler
             $role = trim((string) ($spec['role'] ?? ''));
             $mediaId = trim((string) ($spec['media_id'] ?? ''));
             if ($role === '' || $mediaId === '') return $this->review('INVALID_DESIRED_USAGE', $role);
-            if (isset($desiredByRole[$role])) return $this->review('DUPLICATE_DESIRED_USAGE', $role);
             try {
-                $desiredByRole[$role] = new MediaUsage(
+                $desired = new MediaUsage(
                     \NHK\Core\Shared\Uuid\UuidCodec::newV7(),
                     $mediaId,
                     $endpointType,
@@ -44,17 +44,22 @@ final class MediaUsageReconciler
                     (string) ($spec['caption'] ?? ''),
                     is_array($spec['keyword_groups'] ?? null) ? array_values(array_map('strval', $spec['keyword_groups'])) : [],
                     (string) ($spec['title'] ?? ''),
+                    1,
+                    (string) ($spec['placement_key'] ?? ''),
                 );
+                $identity = $role . "\0" . $desired->placementKey;
+                if (isset($desiredByRole[$identity])) return $this->review('DUPLICATE_DESIRED_USAGE', $role);
+                $desiredByRole[$identity] = $desired;
             } catch (\Throwable) {
                 return $this->review('INVALID_DESIRED_USAGE', $role);
             }
         }
 
         $actions = [];
-        foreach ($desiredByRole as $role => $wanted) {
-            $existing = $currentByRole[$role] ?? null;
+        foreach ($desiredByRole as $identity => $wanted) {
+            $existing = $currentByIdentity[$identity] ?? null;
             if (!$existing instanceof MediaUsage) {
-                $actions[] = ['action' => 'ADD', 'role' => $role, 'media_id' => $wanted->mediaId];
+                $actions[] = ['action' => 'ADD', 'role' => $wanted->role, 'placement_key' => $wanted->placementKey, 'media_id' => $wanted->mediaId];
                 continue;
             }
             $same = $existing->mediaId === $wanted->mediaId
@@ -63,10 +68,10 @@ final class MediaUsageReconciler
                 && $existing->caption === $wanted->caption
                 && $existing->keywordGroups === $wanted->keywordGroups
                 && $existing->title === $wanted->title;
-            $actions[] = ['action' => $same ? 'KEEP' : 'UPDATE', 'role' => $role, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId];
+            $actions[] = ['action' => $same ? 'KEEP' : 'UPDATE', 'role' => $wanted->role, 'placement_key' => $wanted->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId];
         }
-        foreach ($currentByRole as $role => $existing) {
-            if (!isset($desiredByRole[$role])) $actions[] = ['action' => 'RETIRE', 'role' => $role, 'usage_id' => $existing->usageId, 'media_id' => $existing->mediaId];
+        foreach ($currentByIdentity as $identity => $existing) {
+            if (!isset($desiredByRole[$identity])) $actions[] = ['action' => 'RETIRE', 'role' => $existing->role, 'placement_key' => $existing->placementKey, 'usage_id' => $existing->usageId, 'media_id' => $existing->mediaId];
         }
         usort($actions, static fn (array $left, array $right): int => (($left['role'] ?? '') <=> ($right['role'] ?? '')) ?: (($left['action'] ?? '') <=> ($right['action'] ?? '')));
         return ['status' => 'PLANNED', 'actions' => $actions];

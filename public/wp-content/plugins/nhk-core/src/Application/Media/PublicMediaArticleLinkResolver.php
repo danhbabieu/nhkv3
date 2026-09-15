@@ -26,11 +26,12 @@ final class PublicMediaArticleLinkResolver
     public function firstPublished(array $usages): ?string
     {
         usort($usages, static fn (MediaUsage $left, MediaUsage $right): int => [$left->sortOrder, $left->usageId] <=> [$right->sortOrder, $right->usageId]);
+        $resolved = [];
         foreach ($usages as $usage) {
             $url = $this->resolve($usage);
-            if ($url !== null) return $url;
+            if ($url !== null) $resolved[$url] = true;
         }
-        return null;
+        return count($resolved) === 1 ? (string) array_key_first($resolved) : null;
     }
 
     public function resolve(MediaUsage $usage): ?string

@@ -9,6 +9,7 @@ use NHK\Core\Contracts\WordPress\EditorialPostStore;
 use NHK\Core\Domain\Article\{ArticleIngestOutcome, ArticleOperationReceipt, EditorialPostState};
 use NHK\Core\Application\Capture\CaptureEditorialWriteGuard;
 use PHPUnit\Framework\TestCase;
+use NHK\Core\Application\Semantic\ManagedArticleSectionParser;
 
 final class EditorialDraftGatewayTest extends TestCase
 {
@@ -63,6 +64,20 @@ final class EditorialDraftGatewayTest extends TestCase
             self::assertNotSame('sibling-attachment', $write['featured_media']);
             self::assertStringNotContainsString('sibling-attachment', $write['content']);
         }
+    }
+
+    public function test_managed_section_expectation_blocks_a_human_edit_before_native_update(): void
+    {
+        $parser = new ManagedArticleSectionParser();
+        $section = ['section_id' => 'nhk-managed-section-1', 'fingerprint' => hash('sha256', 'Canonical copy'), 'dependency_fingerprint' => hash('sha256', 'deps'), 'content' => 'Canonical copy'];
+        $posts = new FakeEditorialStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+        $created = $gateway->create(['idempotency_key' => 'managed-1', 'content' => $parser->wrap($section['section_id'], $section['fingerprint'], $section['dependency_fingerprint'], $section['content'])]);
+        $posts->rows[1] = new EditorialPostState(1, '1:1', 'post', 'draft', '', str_replace('Canonical copy', 'Human edit', $posts->rows[1]->content), '', '', '/?p=1', 0, 1);
+
+        $result = $gateway->update(1, ['post_content' => 'replacement', 'managed_section_expectations' => [$section]], $posts->rows[1]->token);
+        self::assertFalse($result['ok']);
+        self::assertSame('EDITORIAL_CONFLICT', $result['reason']);
     }
 }
 
