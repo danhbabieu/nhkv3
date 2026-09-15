@@ -113,6 +113,15 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertContains('nhk.docs.bootstrap', $bootstrap['runtime_status']['registered_tools']);
     }
 
+    public function test_deployed_plugin_snapshot_precedes_stale_repository_docs(): void
+    {
+        $method = new \ReflectionMethod(McpDocumentationRegistry::class, 'roots');
+        $method->setAccessible(true);
+        $roots = $method->invoke(new McpDocumentationRegistry(null, '0.1.0'));
+
+        self::assertStringEndsWith('/resources/canonical-docs', $roots[0]);
+    }
+
     public function test_manifest_list_get_and_bootstrap_are_deterministic_and_paginated(): void
     {
         $directory = sys_get_temp_dir() . '/nhk-docs-' . bin2hex(random_bytes(5));

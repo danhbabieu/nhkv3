@@ -219,7 +219,12 @@ final class McpDocumentationRegistry
     {
         if ($this->sourceRoot !== null) return [$this->sourceRoot];
         $repoRoot = dirname(__DIR__, 7); $pluginRoot = dirname(__DIR__, 3);
-        return [$repoRoot, $pluginRoot . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'canonical-docs', $pluginRoot . DIRECTORY_SEPARATOR . 'resources'];
+        // A deployed plugin carries an immutable, manifest-verified snapshot.
+        // Prefer it over a possibly stale repository checkout at the hosting
+        // root; deployment transfers the plugin artifact, not that checkout.
+        $snapshot = $pluginRoot . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'canonical-docs';
+        if ($this->runtimeVersion === 'unknown') return [$repoRoot, $snapshot, $pluginRoot . DIRECTORY_SEPARATOR . 'resources'];
+        return [$snapshot, $repoRoot, $pluginRoot . DIRECTORY_SEPARATOR . 'resources'];
     }
 
     /** @return array<string,mixed> */
