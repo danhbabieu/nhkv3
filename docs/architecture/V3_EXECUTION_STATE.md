@@ -10212,3 +10212,48 @@ SSH, rsync, staging/production migration or live-data mutation occurred.
 PUBLISHING: The implementation branch remains local. A single normal push
 attempt was rejected by the execution security policy as external publishing;
 no workaround or indirect publish was attempted.
+
+# Checkpoint — 2026-09-15 — Unified Capture deployment-readiness review stop gate
+
+SCOPE: Completed the independent local implementation review requested for the
+Unified Capture design and implementation plan. The full review report is
+`docs/superpowers/reports/2026-09-15-unified-capture-deployment-readiness.md`.
+No production PHP/JS/CSS behavior was changed by the review except the
+explicit accessibility contract fix adding `aria-modal="true"` to the
+progressive Article gallery dialog, with its matching unit assertion.
+
+BRANCH_AND_HEAD: The working branch is `main`, at
+`6ea3e704beb755c097babec90063451da0c32bcc`, equal to `origin/main` at review
+time. The implementation branch points to the same commit. The historical
+expected `9ada380b` is not the current tip because the implementation was
+fast-forwarded/rebased onto the current main; the implementation tree remains
+present in rewritten commits.
+
+REQUIREMENTS: All 67 plan cases were classified in the report: PASS 49,
+ENVIRONMENT_BLOCKED 8, NOT_IMPLEMENTED 10, NOT_APPLICABLE 0. The review does
+not promote absent runtime proof or explicit plan gaps to PASS.
+
+VERIFICATION: Unit suite PASS — 1,573 tests / 7,622 assertions, with 13
+warnings and 14 deprecations. Composer PHP lint PASS. JavaScript syntax check
+PASS. `git diff --check` PASS. Deployment preflight is fail-closed with 5 of
+11 checks failing because WordPress cannot bootstrap. Exact local integration
+was attempted only with `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`; MySQL/WordPress authentication/bootstrap is
+unavailable. `NHK_DEMO_DEPLOY_CONFIG` is unset.
+
+SECURITY_GATE: Decoded-pixel/resource enforcement and runtime metadata
+stripping remain unproven; source-original handling currently marks the asset
+PRIVATE semantically but stores the copied source beneath public uploads. This
+is a deployment blocker requiring an approved storage/delivery contract. No
+new architecture was invented during review.
+
+READINESS: `NO-GO`. One-JPEG and multi-image acceptance are not ready. The
+remaining gates include the exact local integration runtime, private source
+storage/read-back, managed-section and stable-anchor contracts, explicit
+multi-image convergence, multi-target gallery behavior, and deployment
+handoff safety.
+
+BOUNDARY: The server remains exactly
+`SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED`. Server worktree mutation:
+NO. Staging mutation: NO. Production mutation: NO. Deployment: NO. SSH,
+rsync, remote Git, migration and runtime/data mutation: NONE.
