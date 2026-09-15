@@ -5,7 +5,7 @@ Workspace: `/Users/imac24-2125d/Developer/nhk-v3`
 Branch: `main`
 Canonical design: `d39d8393`
 Implementation plan: `f14cc310`
-Current HEAD: `478907d1` (local blocker-resolution stop gate)
+Current HEAD: `2e01052a` (local blocker-resolution stop gate)
 
 ## Decision
 
@@ -25,11 +25,17 @@ implementation commits now contained in `main`.
 - Required Constitution chain and relevant contracts were reread before this
   review; the Constitution remains the sole normative authority.
 - Full implementation diff reviewed: blocker-resolution commits after
-  `84a999a6`; task-owned files were committed while unrelated local
-  mu-plugin/test edits remain preserved and unstaged.
+  `84a999a6`; task-owned files are committed and the final worktree contains
+  no unrelated changes.
 - Design and plan ancestry: PASS.
 - Unit suite: PASS — 1,584 tests, 7,654 assertions; 13 warnings and 14
   deprecations are existing test-suite issues, not failures.
+- Combined `composer test`: ENVIRONMENT_BLOCKED — the default run has 34
+  WordPress bootstrap errors and 15 environment-gated failures; the exact
+  local test-database rerun reaches a pre-existing cross-suite
+  `sanitize_key()` redeclaration when a unit mock is followed by WordPress
+  bootstrap. Focused Unit/Contract suites remain green, and no test was
+  weakened or skipped to conceal this boundary.
 - `composer lint`: PASS — all PHP files reported no syntax errors.
 - `git diff --check`: PASS.
 - `album.js`: syntax checked successfully with Node.
