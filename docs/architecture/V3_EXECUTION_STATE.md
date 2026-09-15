@@ -10086,3 +10086,36 @@ change the internal/admin-only surface, semantic workflow, or public
 identity. Focused adapter/widget tests pass `27 tests / 95 assertions`; PHP
 lint and `git diff --check` pass. Deployment and fresh connector/widget
 retest are the next checkpoint gates.
+
+# Checkpoint — 2026-09-15 — Unified Capture / Media / Editorial design canonicalized
+
+SCOPE: Completed the design-only canonicalization for the unified Capture
+workflow across image, video, text, knowledge and media enrichment. The
+canonical spec is
+`docs/superpowers/specs/2026-09-15-unified-capture-media-editorial-design.md`.
+The base design and deep-review addendum were merged into one owner-review
+artifact; no code, deployment, staging mutation, legacy import or production
+cutover was performed.
+
+INVENTORY: Read-only inspection confirmed that the current Content Intent
+registry has four intents and no `MEDIA_ENRICHMENT`; the widget is a physical
+transport/presentation adapter rather than Capture completion; Capture,
+Article, Media and Visual Support have separate revision/idempotency/CAS
+boundaries; MediaUsage has no contextual title or revision; and the public
+gallery, image route, Gutenberg-managed sections and lightbox still require
+the contract work described by the spec.
+
+DESIGN: The spec defines the single Capture state machine, partial
+multi-upload and resumable recovery, cross-owner/CAS rules, canonical Media
+identity and contextual-title ownership, Article-scoped anchors, managed
+section fingerprints, evidence and rights boundaries, upload security and
+remote-import exclusion, auto-public capability gates, public image delivery,
+accessibility and failure vocabulary. The proposed `MEDIA_ENRICHMENT` intent
+and the single-real-image publication exception remain explicit owner and
+constitutional gates before implementation.
+
+VERIFICATION: Target branch is
+`codex/unified-capture-media-editorial-design-20260915`, based on verified
+`origin/main` `744704f5cdbacce0be5f7e9bb71b33df4946b516`. Documentation scope
+was checked read-only against the required Constitution and contracts; final
+diff, secret review and commit verification remain part of this checkpoint.
