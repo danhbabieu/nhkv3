@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
@@ -40,6 +41,27 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame([['owner_type' => 'wp_post', 'owner_id' => '']], $first->diagnostics['completion']['required_owners']);
         self::assertContains('ARTICLE_NOT_PUBLISHED', $first->diagnostics['completion']['blockers']);
         self::assertNotContains('MEDIA_REQUIRED', $first->diagnostics['completion']['blockers']);
+    }
+
+    public function test_media_only_multi_image_submission_converges_to_one_image_article_with_ordered_children(): void
+    {
+        $assets = [
+            ['client_file_id' => 'front', 'media_id' => 'media-front', 'sort_order' => 2, 'upload_status' => 'CREATED'],
+            ['client_file_id' => 'dial', 'media_id' => 'media-dial', 'sort_order' => 1, 'upload_status' => 'CREATED'],
+            ['client_file_id' => 'back', 'media_id' => 'media-back', 'sort_order' => 3, 'upload_status' => 'CREATED'],
+        ];
+        $route = (new ContentIntentRouter())->route(
+            ['intent' => 'IMAGE_ARTICLE', 'title' => 'Album hội tụ', 'text' => 'Ba góc chụp của cùng hiện vật.'],
+            [],
+            $assets,
+        );
+        usort($assets, static fn (array $left, array $right): int => $left['sort_order'] <=> $right['sort_order']);
+
+        self::assertSame('IMAGE_ARTICLE', $route['intent']);
+        self::assertTrue($route['article_required']);
+        self::assertCount(3, $assets);
+        self::assertSame(['media-dial', 'media-front', 'media-back'], array_column($assets, 'media_id'));
+        self::assertCount(3, array_unique(array_column($assets, 'client_file_id')));
     }
 
     public function test_knowledge_delta_without_image_has_no_article_and_is_not_semantically_complete_when_pending(): void
