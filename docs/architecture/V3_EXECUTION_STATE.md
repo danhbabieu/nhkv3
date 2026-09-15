@@ -1,5 +1,30 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Public Clock live route consumer read-back
+
+LIVE ROUTES: After the repository-approved deployment wrapper transferred the
+bundle and WordPress Permalinks was saved to flush rewrite rules,
+`/dong-ho-cong-cong/` rendered a real dossier with H1 `Đồng hồ công cộng`,
+Clock Type identity and the single `Đồng hồ tháp` child; `/dong-ho-thap/`
+rendered a real dossier with H1 `Đồng hồ tháp` and parent link to Public Clock.
+`/loai-dong-ho/` rendered `Khám phá theo nhóm đồng hồ` and an honest empty
+state. No homepage fallback remained on these three routes.
+
+PUBLIC URL READ-BACK: Exact audits remain `READY` / `KEEP` for both existing
+owners, with identities `01a0a2ba-7edc-7338-b81b-0416444e262f` and
+`01a0a2bc-d904-7c95-a94b-992e90d40fb0`; no reproject was performed.
+
+CURRENT COVERAGE: Entity reads confirm both classifications ACTIVE at revision
+1 and the fresh widget Media search finds one canonical Media. The dossier
+pages honestly show zero Knowledge, Article, image and Video items for these
+subjects because governed Capture continuation and publication have not run.
+Video remains `EMPTY_BY_DATA`; no Video ability was opened.
+
+DEPLOYMENT: The official verifier still returns
+`MCP_BOOTSTRAP_UNAVAILABLE` at the direct `/wp-json/nhk/v1/mcp` verifier after
+transfer. Live browser route read-back proves the deployed route consumer is
+active, but the verifier/build identity contract remains unresolved.
+
 # Checkpoint — 2026-09-15 — Public Clock continuation safety gate and route consumer fix
 
 MEDIA PIPELINE: The fresh authenticated @v3-18 widget surface completed the
