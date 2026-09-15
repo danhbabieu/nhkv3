@@ -35,8 +35,8 @@ final class RemoteMcpDocumentationVerifier
             $bootstrap = $this->tool($url, 'nhk.documentation.bootstrap', 3);
             $list = $this->tool($url, 'nhk.documentation.list', 4);
             if (!hash_equals($expectedBuildIdentity, (string) ($bootstrap['build_identity'] ?? ''))) return StageResult::blocked('DEPLOYMENT_NOT_ACTIVE');
-            if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($bootstrap['files'], $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
-            if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'], $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'] ?? null, $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
         } catch (\Throwable) {
             return StageResult::failed('MCP_BOOTSTRAP_UNAVAILABLE');
         }
@@ -101,6 +101,12 @@ final class RemoteMcpDocumentationVerifier
         $actualMap = $this->fileMap($actual);
         $expectedMap = $this->fileMap($expected);
         return $actualMap !== null && $expectedMap !== null && $actualMap === $expectedMap;
+    }
+
+    /** @param array<string,mixed> $bootstrap */
+    private function filesFromBootstrap(array $bootstrap): mixed
+    {
+        return $bootstrap['files'] ?? ($bootstrap['manifest']['files'] ?? null);
     }
 
     /** @param mixed $files @return array<string,string>|null */

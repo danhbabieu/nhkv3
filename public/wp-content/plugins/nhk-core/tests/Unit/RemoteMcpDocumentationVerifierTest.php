@@ -74,6 +74,25 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         foreach ($calls as $call) self::assertContains('Authorization: Basic dXNlcjpwYXNz', $call[2]);
     }
 
+    public function test_bootstrap_accepts_the_canonical_nested_manifest_shape(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $verifier = new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($expected): array {
+            $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list']]]], JSON_THROW_ON_ERROR)];
+            if (($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap') {
+                $bootstrap = $expected;
+                $bootstrap['manifest'] = ['files' => $expected['files']];
+                unset($bootstrap['files']);
+                return $this->jsonResponse($bootstrap);
+            }
+            return $this->jsonResponse(['documentation_version' => $expected['documentation_version'], 'manifest_hash' => $expected['manifest_hash'], 'files' => $expected['files']]);
+        });
+
+        self::assertSame('pass', $verifier->verify('https://demo.example', $expected, str_repeat('f', 64))->status);
+    }
+
     public function test_old_build_identity_is_not_reported_as_active(): void
     {
         $expected = $this->expectedBootstrap();
