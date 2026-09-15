@@ -10273,7 +10273,7 @@ private source-original storage outside the public document root; and a
 bounded read-only external research provider port. MediaMigration004 and
 MediaUsageMetadataMigration021 now converge on the placement-aware schema.
 
-VERIFICATION: Unit suite PASS — 1,584 tests / 7,679 assertions, with only
+VERIFICATION: Unit suite PASS — 1,584 tests / 7,654 assertions, with only
 existing warnings/deprecations. Contract suite PASS — 6 tests / 48 assertions.
 Composer PHP lint PASS, JavaScript syntax check PASS, and `git diff --check`
 PASS. Exact local `nhk_v3_test` P6 and maintenance migration contracts PASS;

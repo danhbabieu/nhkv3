@@ -28,7 +28,7 @@ implementation commits now contained in `main`.
   `84a999a6`; task-owned files were committed while unrelated local
   mu-plugin/test edits remain preserved and unstaged.
 - Design and plan ancestry: PASS.
-- Unit suite: PASS — 1,584 tests, 7,679 assertions; 13 warnings and 14
+- Unit suite: PASS — 1,584 tests, 7,654 assertions; 13 warnings and 14
   deprecations are existing test-suite issues, not failures.
 - `composer lint`: PASS — all PHP files reported no syntax errors.
 - `git diff --check`: PASS.
@@ -180,7 +180,7 @@ remains exactly:
 
 No command in this task inspected or mutated that server. No deployment,
 remote Git operation, SSH, rsync, staging mutation, production mutation or
-migration was performed.
+staging/production migration was performed.
 
 ### Current local blocker-resolution checkpoint
 
