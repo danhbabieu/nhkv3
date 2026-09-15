@@ -9900,3 +9900,21 @@ BOUNDARY: No Authority, Graph, Public Identity, Knowledge, Media, Video,
 Article, Proposal, Apply, publication, URL mutation, deployment or Git
 operation was performed. Remaining work after this checkpoint is DATA /
 RELATION / LIVE ACCEPTANCE ONLY.
+
+# Checkpoint — 2026-09-15 — Widget upload runtime-name/schema closure
+
+ROOT_CAUSE: Live Easy MCP tools/list exposed the internal widget boundary as
+`wp_ability_nhk_v3_media_widget_upload` while the MCP App called
+`nhk.media.widget-upload`; Easy MCP also omitted the required
+`metadata.description` schema. The App therefore failed at
+`SERVER_TOOL_CALL` with `MCP Resource not found`, before attachment or Media
+materialization. Admin inspection confirmed only the intended widget ability
+was enabled; direct Article/Knowledge/Media/Video writers remain disabled.
+
+FIX: The generic Easy MCP compatibility adapter now restores the canonical
+widget schema while preserving Easy MCP's registered runtime tool name, and
+the shared uploader calls that exact tools/list identifier. This does not
+change the internal/admin-only surface, semantic workflow, or public
+identity. Focused adapter/widget tests pass `27 tests / 95 assertions`; PHP
+lint and `git diff --check` pass. Deployment and fresh connector/widget
+retest are the next checkpoint gates.

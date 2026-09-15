@@ -19,6 +19,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
     private const ENDPOINT = '/easy-mcp-ai/v1/mcp';
     private const TARGET_TOOL = 'wp_ability_nhk_v3_capture_ingest';
     private const WIDGET_OPEN_TOOL = 'wp_ability_nhk_v3_media_upload_widget_open';
+    private const WIDGET_UPLOAD_TOOL = 'wp_ability_nhk_v3_media_widget_upload';
 
     /** @var list<string> */
     private const SUPPORTED_VERSIONS = ['1.7.16', '1.7.17'];
@@ -69,6 +70,7 @@ final class EasyMcpNativeFileCompatibilityAdapter
             $canonical = match ($name) {
                 self::TARGET_TOOL => self::captureDefinition(),
                 self::WIDGET_OPEN_TOOL => self::widgetOpenDefinition(),
+                self::WIDGET_UPLOAD_TOOL => self::widgetUploadDefinition(),
                 default => null,
             };
             if ($canonical === null) continue;
@@ -401,6 +403,20 @@ final class EasyMcpNativeFileCompatibilityAdapter
                 'properties' => new \stdClass(),
             ];
             $tool['connectorMeta']['openai/outputTemplate'] = $uri;
+            return $tool;
+        }
+        return null;
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function widgetUploadDefinition(): ?array
+    {
+        foreach (McpToolCatalog::tools() as $tool) {
+            if (($tool['name'] ?? null) !== 'nhk.media.widget-upload') continue;
+
+            // Easy MCP invokes registered WordPress abilities by their runtime
+            // tool name. Preserve that name while restoring the complete NHK
+            // contract that Easy MCP's serializer omits (notably metadata).
             return $tool;
         }
         return null;

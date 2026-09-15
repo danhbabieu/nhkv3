@@ -12055,7 +12055,10 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
     imageIds: items.map((item) => item.file_id).filter((id) => Boolean(id))
   };
 }
-const SERVER_TOOL_NAME = "nhk.media.widget-upload";
+// Easy MCP exposes this internal/admin boundary under the registered
+// WordPress ability name. callServerTool must use the exact identifier from
+// tools/list; the canonical NHK name remains the server-side catalog name.
+const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 function byId(id) {

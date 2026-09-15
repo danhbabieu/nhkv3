@@ -52,6 +52,27 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame('ui://nhk/image-upload.html', $projected[0]['_meta']['openai/outputTemplate']);
     }
 
+    public function test_widget_upload_descriptor_restores_catalog_schema_without_changing_runtime_name(): void
+    {
+        $tools = [[
+            'name' => 'wp_ability_nhk_v3_media_widget_upload',
+            'description' => 'stale Easy MCP description',
+            'inputSchema' => ['type' => 'object', 'properties' => [
+                'idempotency_key' => ['type' => 'string'],
+                'files' => ['type' => 'array'],
+            ], 'required' => ['idempotency_key', 'files']],
+            'annotations' => ['title' => 'Widget upload'],
+        ]];
+
+        $projected = EasyMcpNativeFileCompatibilityAdapter::projectTools($tools);
+        $widget = $projected[0];
+
+        self::assertSame('wp_ability_nhk_v3_media_widget_upload', $widget['name']);
+        self::assertSame(['idempotency_key', 'files', 'metadata'], $widget['inputSchema']['required']);
+        self::assertSame(['description'], $widget['inputSchema']['properties']['metadata']['required']);
+        self::assertSame(['download_url', 'file_id'], $widget['inputSchema']['properties']['files']['items']['required']);
+    }
+
     public function test_final_easy_mcp_1716_pipeline_projects_canonical_capture_descriptor(): void
     {
         $catalog = array_column(McpToolCatalog::tools(), null, 'name');
