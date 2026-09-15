@@ -697,7 +697,8 @@ final class FrontendContractTest extends TestCase
     {
         $routes = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/PublicEntityRoutes.php');
         self::assertStringContainsString('name=$matches[1]&nhk_public_entity_type=brand', $routes);
-        self::assertStringContainsString('nhk_public_entity_type=classification&nhk_public_entity_a=$matches[1]', $routes);
+        self::assertStringContainsString('nhk_public_entity_type=classification', $routes);
+        self::assertStringContainsString("profileDetailRouteKey('clock_type', '\$matches[1]')", $routes);
         self::assertStringContainsString('preserveNativeRootRoute', $routes);
         self::assertStringContainsString('return $template;', $routes);
         self::assertStringContainsString("'code' => self::ROOT_IDENTITY_CONFLICT", $routes);
