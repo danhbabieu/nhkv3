@@ -44,21 +44,29 @@ export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
 type ToolResult = {
   structuredContent?: unknown;
   content?: Array<{ type?: string; text?: string }>;
+  result?: unknown;
 };
 
-export function extractUploads(result: ToolResult): UploadedItem[] {
-  const structured = result.structuredContent;
-  if (structured && typeof structured === "object" && Array.isArray((structured as { uploads?: unknown }).uploads)) {
-    return (structured as { uploads: UploadedItem[] }).uploads;
+function uploadsFromValue(value: unknown): UploadedItem[] | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as { uploads?: unknown; structuredContent?: unknown; result?: unknown };
+  if (Array.isArray(record.uploads)) return record.uploads as UploadedItem[];
+  for (const nested of [record.structuredContent, record.result]) {
+    const uploads = uploadsFromValue(nested);
+    if (uploads !== null) return uploads;
   }
+  return null;
+}
+
+export function extractUploads(result: ToolResult): UploadedItem[] {
+  const structuredUploads = uploadsFromValue(result.structuredContent) ?? uploadsFromValue(result.result) ?? uploadsFromValue(result);
+  if (structuredUploads !== null) return structuredUploads;
 
   const text = result.content?.find((item) => item.type === "text")?.text;
   if (!text) return [];
   try {
     const parsed: unknown = JSON.parse(text);
-    return parsed && typeof parsed === "object" && Array.isArray((parsed as { uploads?: unknown }).uploads)
-      ? (parsed as { uploads: UploadedItem[] }).uploads
-      : [];
+    return uploadsFromValue(parsed) ?? [];
   } catch {
     return [];
   }

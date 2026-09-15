@@ -12018,16 +12018,24 @@ function normalizeSelectedFiles(value) {
     return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
   });
 }
-function extractUploads(result) {
-  const structured = result.structuredContent;
-  if (structured && typeof structured === "object" && Array.isArray(structured.uploads)) {
-    return structured.uploads;
+function uploadsFromValue(value) {
+  if (!value || typeof value !== "object") return null;
+  const record2 = value;
+  if (Array.isArray(record2.uploads)) return record2.uploads;
+  for (const nested of [record2.structuredContent, record2.result]) {
+    const uploads = uploadsFromValue(nested);
+    if (uploads !== null) return uploads;
   }
+  return null;
+}
+function extractUploads(result) {
+  const structuredUploads = uploadsFromValue(result.structuredContent) ?? uploadsFromValue(result.result) ?? uploadsFromValue(result);
+  if (structuredUploads !== null) return structuredUploads;
   const text = result.content?.find((item) => item.type === "text")?.text;
   if (!text) return [];
   try {
     const parsed = JSON.parse(text);
-    return parsed && typeof parsed === "object" && Array.isArray(parsed.uploads) ? parsed.uploads : [];
+    return uploadsFromValue(parsed) ?? [];
   } catch {
     return [];
   }

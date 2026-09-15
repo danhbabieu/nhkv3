@@ -55,6 +55,28 @@ test("maps one widget-upload result without exposing its signed URL", () => {
   assert.equal(JSON.stringify(buildWidgetState(result)).includes("download"), false);
 });
 
+test("maps the server result envelope returned by the Ability bridge", () => {
+  const result = extractUploads({
+    result: {
+      structuredContent: {
+        uploads: [{
+          attachment_id: 42,
+          media_id: "media-envelope",
+          public_filename: "envelope.webp",
+          file_id: "file-envelope",
+        }],
+      },
+    },
+  });
+
+  assert.deepEqual(result, [{
+    attachment_id: 42,
+    media_id: "media-envelope",
+    public_filename: "envelope.webp",
+    file_id: "file-envelope",
+  }]);
+});
+
 test("keeps diagnostic error messages safe and never persists signed URLs", () => {
   const state = buildWidgetState([], [{
     stage: "ERROR",

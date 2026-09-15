@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — ChatGPT widget Ability result-envelope mapping
+
+ROOT_CAUSE: The live widget reached `SERVER_TOOL_CALL_RESULT` after the
+trusted-file request completed, but the View's `extractUploads()` only accepted
+`structuredContent.uploads` or a text block containing that object directly.
+The WordPress Ability callback delegates through MCP and returns the structured
+payload; the Easy MCP/host boundary may deliver that payload inside the server
+result envelope (`result.structuredContent`). The View therefore converted a
+successful upload response into `SERVER_TOOL_EMPTY_RESULT` even though no UI
+resource, trusted-file materializer, resolver or endpoint registration was
+missing.
+
+TDD: A regression test was added for the Ability result envelope and observed
+RED before the implementation (`10 tests, 9 passed, 1 failed`; actual `[]`).
+The minimal widget-only mapping now unwraps the bounded MCP/Ability result and
+preserves the existing direct structured-content and text fallbacks. The
+trusted file reference remains request-only; no Capture, Media, Governance,
+Public URL, content-data or alternate download path changed.
+
+VERIFICATION: Frontend tests pass `10/10`, TypeScript typecheck passes, the
+single-file Vite build regenerates the served widget artifact, focused PHP
+MCP/widget tests pass `7/7` with `42` assertions, PHP lint and secret review
+pass, and `git diff --check` passes. Deployment was not attempted because
+`NHK_DEMO_DEPLOY_CONFIG` is unset and the wrapper requires a clean committed
+checkout. Live reconnect and real-JPEG acceptance remain pending; do not mark
+this repair complete until the deployed ChatGPT widget proves `SUCCESS` with
+attachment/Media/WebP/name/read-back evidence.
+
 # Checkpoint — 2026-09-15 — ChatGPT widget post-ingest resource-resolution boundary
 
 LIVE REPRODUCTION: On the authenticated `@v3-18` ChatGPT widget, Library and
