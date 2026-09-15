@@ -193,17 +193,19 @@ final class GovernedCaptureContinuationService
             $priorResolved = is_array($priorSubjects['resolved'] ?? null) ? $priorSubjects['resolved'] : (is_array($priorSubjects['subjects'] ?? null) ? $priorSubjects['subjects'] : []);
             if ($priorResolved !== []) $resolved = $priorResolved;
         }
-        $variants = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && ($item['type'] ?? '') === 'variant' && UuidCodec::isValid((string) ($item['id'] ?? ''))));
+        $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
+        $subjects = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== ''));
+        $variants = array_values(array_filter($subjects, static fn (array $item): bool => ($item['type'] ?? '') === 'variant'));
         $plans = [];
-        if ($includeSemanticChildren && count($variants) === 1) {
-            $variant = $variants[0];
+        if ($includeSemanticChildren && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent)) !== null) {
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
             $candidates = $deltaText !== ''
                 ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]
                 : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
             foreach ($candidates as $candidate) {
                 if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
-                $scope = trim((string) ($candidate['scope'] ?? 'variant')) ?: 'variant';
+                $scope = $this->knowledgeScope((string) ($subject['type'] ?? ''), (string) ($candidate['scope'] ?? ''));
+                if ($scope === null) continue;
                 $facet = trim((string) ($candidate['facet'] ?? 'identity')) ?: 'identity';
                 try {
                     new KnowledgeFacetProfile($facet, $scope);
@@ -212,19 +214,19 @@ final class GovernedCaptureContinuationService
                     // not silently coerce it into another semantic facet.
                     continue;
                 }
-                if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $variant['id'], 'scope' => $scope], $this->retrievedClaims($context)) !== null) continue;
+                if ($this->claimReuse?->find(['text' => (string) $candidate['text'], 'subject_id' => (string) $subject['id'], 'scope' => $scope], $this->retrievedClaims($context)) !== null) continue;
                 $payload = [
-                    'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $variant['id'], trim((string) $candidate['text'])])),
+                    'stable_key' => 'nhk:knowledge:capture.' . hash('sha256', CommandCanonicalizer::canonicalize([$captureId, $subject['id'], trim((string) $candidate['text'])])),
                     'text' => trim((string) $candidate['text']), 'claim_type' => 'fact',
-                    'provenance' => ['metadata' => ['facet' => $facet, 'scope' => $scope, 'version' => 1, 'subject_id' => $variant['id'], 'subject_type' => 'variant'], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
+                    'provenance' => ['metadata' => ['facet' => $facet, 'scope' => $scope, 'version' => 1, 'subject_id' => $subject['id'], 'subject_type' => $subject['type']], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
                 ];
-                $plans[] = $this->arguments('knowledge', 'ingest', (string) $variant['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
+                $plans[] = $this->arguments('knowledge', 'ingest', (string) $subject['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
             }
             foreach ((array) ($context['observations'] ?? []) as $observation) {
                 if (!is_array($observation)) continue;
                 $componentId = trim((string) ($observation['component_id'] ?? ''));
                 if (!UuidCodec::isValid($componentId)) continue;
-                $payload = ['source_type' => 'variant', 'source_uuid' => (string) $variant['id'], 'target_type' => 'component', 'target_uuid' => $componentId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'];
+                $payload = ['source_type' => (string) $subject['type'], 'source_uuid' => (string) $subject['id'], 'target_type' => 'component', 'target_uuid' => $componentId, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'];
                 $plans[] = $this->arguments('relation', 'relation_create', 'relation', $payload, 'capture:' . $captureId . ':component:' . $componentId);
             }
         }
@@ -262,6 +264,29 @@ final class GovernedCaptureContinuationService
             $plans[] = $this->arguments($entityType, $operation, $subjectId, $payload, 'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
         }
         return $plans;
+    }
+
+    /** @param list<array<string,mixed>> $subjects @param list<array<string,mixed>> $variants */
+    private function knowledgeSubject(array $subjects, array $variants, string $intent): ?array
+    {
+        if ($intent === 'KNOWLEDGE_DELTA') return $subjects[0] ?? null;
+        return count($variants) === 1 ? $variants[0] : null;
+    }
+
+    private function knowledgeScope(string $subjectType, string $candidateScope): ?string
+    {
+        $default = match (strtolower(trim($subjectType))) {
+            'classification', 'entity', 'product' => 'entity',
+            'brand' => 'brand',
+            'model' => 'model',
+            'variant' => 'variant',
+            'movement' => 'movement',
+            'specimen' => 'specimen_observation',
+            default => null,
+        };
+        if ($default === null) return null;
+        $candidateScope = trim($candidateScope);
+        return $candidateScope === '' || $candidateScope === $default ? $default : null;
     }
 
     /** @param array<string,mixed> $provenancePlan @param list<array<string,mixed>> $writes @param list<string> $lifecycle */

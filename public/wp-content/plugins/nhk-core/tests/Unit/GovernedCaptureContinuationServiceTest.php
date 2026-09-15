@@ -36,6 +36,36 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
     }
 
+    public function test_knowledge_delta_supports_exact_classification_subject_with_entity_scope(): void
+    {
+        $subject = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $subject, 'ingest', ['text' => 'Đồng hồ công cộng phục vụ nhiều người.'], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'continuation:classification-knowledge', entityType: 'knowledge');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static function (array $arguments) use ($subject): bool {
+            return ($arguments['entity_type'] ?? '') === 'knowledge'
+                && ($arguments['subject_id'] ?? '') === $subject
+                && ($arguments['payload']['provenance']['metadata']['subject_type'] ?? '') === 'classification'
+                && ($arguments['payload']['provenance']['metadata']['scope'] ?? '') === 'entity';
+        }))->willReturn($proposal);
+        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->expects(self::once())->method('submit')->with($proposal->id)->willReturn($proposal->transition(ProposalState::SUBMITTED));
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-classification', 'continuation:classification', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $subject, 'type' => 'classification']]],
+            'continuation_delta_text' => 'Đồng hồ công cộng phục vụ nhiều người.',
+            'interpretation' => [],
+            'observations' => [],
+        ]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame($proposal->id, $result['writes'][0]['proposal_id']);
+    }
+
     public function test_video_review_required_exposes_governance_and_canonical_identity_separately(): void
     {
         $videoId = UuidCodec::newV7();

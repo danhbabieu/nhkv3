@@ -173,7 +173,8 @@ final class EditorialCaptureCoordinator
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
-            $articleRequired = ($intent['article_required'] ?? false) === true || $record->articleId !== null;
+            $knowledgeOnlyContinuation = strtoupper((string) ($intent['intent'] ?? '')) === 'KNOWLEDGE_DELTA' && ($input['existing_capture_continuation'] ?? false) === true;
+            $articleRequired = ($intent['article_required'] ?? false) === true || ($record->articleId !== null && !$knowledgeOnlyContinuation);
             if ($articleRequired && $record->articleId === null) {
                 $this->beginPhase('DRAFT_CREATED');
                 $draft = ($this->draftCreator)([
