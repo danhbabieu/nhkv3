@@ -493,7 +493,12 @@ final class Plugin {
             $graphInventory = new GraphInventoryService($graphRepository, $endpoints, $predicates);
             $relationBackfill = self::relationBackfill($canonicalInventory, $graphInventory);
             $mcpRead = new McpReadHandler($authority, $types, $media, $assets, $usages, $videos, $claims, $evidence, new MigrationStatus(), $sources, null, new McpSemanticContextResolver($authority, $types), $wordpressAttachments, $mcpNeighborhood, $canonicalInventory, $graphInventory, $relationBackfill);
-            $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence'])));
+            // Relations are governed semantic children of Capture article
+            // reconciliation (for example, a post --about--> classification
+            // binding). Register the existing relation boundary alongside
+            // the other runtime types so Capture never fails merely because
+            // its typed Governance plan is a relation.
+            $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence', 'relation'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
             $clockTypeLifecycle = new \NHK\Core\Application\Authority\ClockTypeCreationLifecycle(
