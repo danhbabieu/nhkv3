@@ -100,4 +100,18 @@ final class PluginBootWiringTest extends TestCase
         self::assertStringContainsString("'subject_resolution' => \$context['subject_resolution'] ?? []", $plugin);
         self::assertStringContainsString("'subject_resolved' =>", $plugin);
     }
+
+    public function test_capture_media_adoption_updates_the_canonical_media_object(): void
+    {
+        $plugin = (string) file_get_contents(__DIR__ . '/../../src/Plugin.php');
+
+        self::assertStringContainsString(
+            '$media->update(new \\NHK\\Core\\Domain\\Media\\Media($current->canonicalId, $current->stableKey',
+            $plugin
+        );
+        self::assertStringNotContainsString(
+            '$media->update($current->canonicalId, $current->canonicalName',
+            $plugin
+        );
+    }
 }

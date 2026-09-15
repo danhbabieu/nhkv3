@@ -820,7 +820,7 @@ final class Plugin {
                             foreach ($visualContexts as $visualContext) if (!in_array($visualContext, $declared, true)) $declared[] = $visualContext;
                             if ($declared !== (array) ($provenance['visual_support_contexts'] ?? [])) {
                                 $provenance['visual_support_contexts'] = array_values($declared);
-                                $media->update($current->canonicalId, $current->canonicalName, $current->readiness, $provenance, $current->revision);
+                                $media->update(new \NHK\Core\Domain\Media\Media($current->canonicalId, $current->stableKey, $current->canonicalName, $current->readiness, $provenance, $current->active, $current->revision), $current->revision);
                             }
                         }
                     }
