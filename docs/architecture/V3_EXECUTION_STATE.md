@@ -10119,3 +10119,37 @@ VERIFICATION: Target branch is
 `origin/main` `744704f5cdbacce0be5f7e9bb71b33df4946b516`. Documentation scope
 was checked read-only against the required Constitution and contracts; final
 diff, secret review and commit verification remain part of this checkpoint.
+
+# Checkpoint — 2026-09-15 — Unified Capture implementation plan completed
+
+SCOPE: Created the executable implementation plan
+`docs/superpowers/plans/2026-09-15-unified-capture-media-editorial-implementation-plan.md`
+from the canonical Unified Capture design. The plan is documentation-only and
+does not authorize implementation, migration, deployment, server access or
+runtime/data mutation.
+
+PLAN: The plan places the two constitutional amendments before code, separates
+widget physical transport from Capture completion, defines partial multi-image
+recovery, cross-owner receipts, CAS/revision boundaries, MediaUsage contextual
+title and Article-scoped anchors, shared semantic owner adapters, external
+research/evidence limits, representative and Visual Support reconciliation,
+managed-section fingerprints, security/privacy, rights, SEO/publication,
+public WebP/lightbox accessibility, observability and deployment gates. All 67
+canonical design/review acceptance cases map to a RED test, implementation
+owner and PASS evidence.
+
+GAPS: `MEDIA_ENRICHMENT`, MediaUsage title/revision/repeated placement,
+structural managed-section parsing, external research provider, end-to-end
+resource/metadata enforcement, safe multi-Article gallery target and full
+lightbox behavior remain explicit implementation gaps. The server remains
+`SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED` and untouched.
+
+VERIFICATION: Local worktree had no pre-existing modifications before the plan;
+only the plan and this required execution checkpoint are intended for the
+documentation commit. TODO/TBD-style unresolved placeholders, accidental
+secrets, source-code scope and diff whitespace are checked before commit.
+
+REMOTE_RECHECK: The final local fetch observed `origin/main` at
+`cdbc5b0b23781313ea60e50b6039401ed7b1cf9e`; the exact remote target branch
+remained at `744704f5cdbacce0be5f7e9bb71b33df4946b516`. The local target branch
+was intentionally not rebased or merged, and the server remained untouched.
