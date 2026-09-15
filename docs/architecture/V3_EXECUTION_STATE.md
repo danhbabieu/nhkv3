@@ -10208,3 +10208,7 @@ silently enabled in this local implementation.
 BOUNDARY: No server access or server worktree operation was performed. The
 server remains `SERVER_WORKTREE_DIRTY — OUT_OF_SCOPE — PRESERVED`; no deploy,
 SSH, rsync, staging/production migration or live-data mutation occurred.
+
+PUBLISHING: The implementation branch remains local. A single normal push
+attempt was rejected by the execution security policy as external publishing;
+no workaround or indirect publish was attempted.
