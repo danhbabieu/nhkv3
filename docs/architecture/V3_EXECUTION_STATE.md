@@ -1,5 +1,47 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Local-only staging deployment stop gate
+
+SCOPE: This checkpoint is local-only on `main`. No staging semantic mutation,
+media ingest, allowlist change, deploy, connector reconnect or live read-back
+is authorized for this task. The existing canonical Public Clock owners,
+Captures, Media and relations remain unchanged.
+
+BLOCKER: `STAGING_FILE_TRANSPORT_ALLOWLIST_NEW_HOST_REQUIRED`
+
+LAYER: staging runtime/deployment file transport.
+
+ROOT_CAUSE: The staging ChatGPT file materializer observed the exact external
+shard host `sdmntprjapaneast.oaiusercontent.com`, which is not present in the
+deployed exact-host allowlist. The next retry observed
+`sdmntprnortheu.oaiusercontent.com` as well. The allowlist is fail-closed and
+must not be broadened by wildcard or changed in this local-only task.
+
+LOCAL STATUS: The local MU-plugin boundary is filter/config-driven at the
+transport boundary and retains exact observed hosts only. No new staging host
+was added to local or deployed configuration. Local implementation and test
+work may proceed; staging deployment-preflight is deferred until the owner
+pushes `main` and authorizes a separate exact-host review.
+
+WHAT ALREADY SUCCEEDED: The official deployment verifier passed for the
+previous exact-host staging build, and the canonical Media/Capture owners were
+not recreated. The interrupted media continuation must be treated as pending
+until a later read-only audit confirms whether any server-side receipt exists.
+
+NEXT ACTION: After owner push, run a separate deployment-preflight for the
+exact staging host set, then reconnect and perform bounded live acceptance only
+under a newly confirmed deployment scope.
+
+LOCAL VERIFICATION: Unit PHPUnit passes `1584 tests / 7654 assertions` with
+13 warnings and 14 PHP deprecations. Widget tests pass `10/10`, TypeScript
+typecheck passes, the widget production build passes, and the PHP lint/diff
+checks pass. Full PHPUnit remains non-green only because the local integration
+bootstrap cannot establish its configured database connection, and the full
+mixed-suite run also exposes one order-dependent Collector Profile contract
+failure after that partial WordPress bootstrap; its standalone suite passes
+`4 tests / 31 assertions`. This local main is `OWNER_PUSH_READY`; no staging
+action was performed in this task.
+
 # Checkpoint — 2026-09-15 — Capture provenance metadata propagation
 
 ROOT_CAUSE: The governed continuation planner accepted provenance packets, but
