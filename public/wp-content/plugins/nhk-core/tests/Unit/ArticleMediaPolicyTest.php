@@ -330,7 +330,7 @@ final class ArticleMediaPolicyTest extends TestCase
         $service->addAsset($item->canonicalId, 'original', 'uploads/one.jpg', hash('sha256', 'one'), 'image/jpeg', 3, 1200, 800, 'PUBLIC');
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
 
-        $result = $coordinator->ensureForPost(44, [], ['featured_primary' => $item->canonicalId, 'inline_primary' => $item->canonicalId]);
+        $result = $coordinator->ensureForPost(44, ['content_intent' => ['intent' => 'IMAGE_ARTICLE'], 'single_real_image_exception' => true], ['featured_primary' => $item->canonicalId, 'inline_primary' => $item->canonicalId]);
 
         self::assertSame($item->canonicalId, $result->slotMedia['featured_primary']);
         self::assertSame($item->canonicalId, $result->slotMedia['inline_primary']);

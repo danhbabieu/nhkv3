@@ -29,7 +29,7 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, Med
             if ($existing->sortOrder === $usage->sortOrder) return $existing;
             throw new MediaException('Media usage identity already exists.');
         }
-        $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (usage_uuid,media_id,endpoint_type,endpoint_key,usage_role,sort_order,alt_text,caption,keyword_groups_json,created_at) VALUES (%s,%d,%s,%s,%s,%d,%s,%s,%s,%s)", UuidCodec::toBinary($usage->usageId), $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, wp_json_encode($usage->keywordGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), gmdate('Y-m-d H:i:s.u')));
+        $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (usage_uuid,media_id,endpoint_type,endpoint_key,usage_role,sort_order,alt_text,caption,title,keyword_groups_json,revision,created_at) VALUES (%s,%d,%s,%s,%s,%d,%s,%s,%s,%s,%d,%s)", UuidCodec::toBinary($usage->usageId), $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->title, wp_json_encode($usage->keywordGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $usage->revision, gmdate('Y-m-d H:i:s.u')));
         if ($ok === false) {
             $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE media_id=%d AND endpoint_type=%s AND endpoint_key=%s AND usage_role=%s LIMIT 1", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role), ARRAY_A);
             if (is_array($existing)) { $hydrated = $this->hydrate($existing); if ($hydrated !== null && $hydrated->sortOrder === $usage->sortOrder) return $hydrated; }
@@ -65,8 +65,9 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, Med
         if ($mediaId === null) throw new MediaException('Media parent not found.');
         $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE usage_uuid=%s LIMIT 1", UuidCodec::toBinary($usage->usageId)), ARRAY_A);
         if (!is_array($existing)) throw new MediaException('Media usage not found.');
-        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET media_id=%d,endpoint_type=%s,endpoint_key=%s,usage_role=%s,sort_order=%d,alt_text=%s,caption=%s,keyword_groups_json=%s WHERE usage_uuid=%s", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, wp_json_encode($usage->keywordGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), UuidCodec::toBinary($usage->usageId)));
-        if ($ok === false) throw new MediaException('Media usage update conflict.');
+        $nextRevision = $usage->revision + 1;
+        $ok = $this->database->query($this->database->prepare("UPDATE {$this->table} SET media_id=%d,endpoint_type=%s,endpoint_key=%s,usage_role=%s,sort_order=%d,alt_text=%s,caption=%s,title=%s,keyword_groups_json=%s,revision=%d WHERE usage_uuid=%s AND revision=%d", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->title, wp_json_encode($usage->keywordGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $nextRevision, UuidCodec::toBinary($usage->usageId), $usage->revision));
+        if ($ok !== 1) throw new MediaException('Media usage update conflict.');
         $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE usage_uuid=%s LIMIT 1", UuidCodec::toBinary($usage->usageId)), ARRAY_A);
         $readback = is_array($row) ? $this->hydrate($row) : null;
         if (!$readback instanceof MediaUsage) throw new MediaException('Media usage read-back failed.');
@@ -85,7 +86,7 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, Med
         try {
             $groups = json_decode((string) ($row['keyword_groups_json'] ?? '[]'), true, 512, JSON_THROW_ON_ERROR);
             if (!is_array($groups) || !array_is_list($groups)) return null;
-            return new MediaUsage(UuidCodec::fromBinary($row['usage_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['endpoint_type'], (string) $row['endpoint_key'], (string) $row['usage_role'], (int) $row['sort_order'], (string) ($row['alt_text'] ?? ''), (string) ($row['caption'] ?? ''), array_values(array_map('strval', $groups)));
+            return new MediaUsage(UuidCodec::fromBinary($row['usage_uuid']), UuidCodec::fromBinary($mediaUuid), (string) $row['endpoint_type'], (string) $row['endpoint_key'], (string) $row['usage_role'], (int) $row['sort_order'], (string) ($row['alt_text'] ?? ''), (string) ($row['caption'] ?? ''), array_values(array_map('strval', $groups)), (string) ($row['title'] ?? ''), (int) ($row['revision'] ?? 1));
         } catch (\Throwable) { return null; }
     }
 

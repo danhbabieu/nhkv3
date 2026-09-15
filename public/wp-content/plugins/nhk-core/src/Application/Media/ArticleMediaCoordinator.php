@@ -36,6 +36,9 @@ final class ArticleMediaCoordinator
         $subjectIds = array_values(array_filter(array_map('strval', (array) ($context['subject_ids'] ?? [])), static fn (string $id): bool => trim($id) !== ''));
         $subjectScopeLocked = $subjectIds !== [] && (($context['subject_scope_locked'] ?? true) === true);
         $captureMediaContext = array_key_exists('capture_has_physical_assets', $context) || array_key_exists('capture_id', $context);
+        $singleRealImageException = ($context['single_real_image_exception'] ?? false) === true;
+        $contentIntent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
+        $enforceDistinctMandatoryMedia = $contentIntent !== '' && !$singleRealImageException;
         $allowHistoricalReuse = !$captureMediaContext
             ? (($context['allow_unscoped_reuse'] ?? true) === true)
             : ($subjectScopeLocked && (($context['allow_scoped_reuse'] ?? false) === true || ($context['allow_unscoped_reuse'] ?? false) === true));
@@ -60,11 +63,12 @@ final class ArticleMediaCoordinator
             $blueprint = MediaSeoBlueprint::forPost($postId, $slot, $context, MediaSeoStateRegistry::PLACEHOLDER);
             $existing = $this->existingSlotMedia($endpointKey, $slot);
             $candidateId = trim((string) ($selectedMediaBySlot[$slot] ?? ''));
+            if ($slot === MediaUsageRoleRegistry::INLINE_PRIMARY && $enforceDistinctMandatoryMedia && $candidateId !== '' && $candidateId === ($slotMedia[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) $candidateId = '';
             $candidateIsCaptureOwned = $candidateId !== '' && in_array($candidateId, $captureOwnedMediaIds, true);
             $candidateRequiresScope = $subjectScopeLocked && !($captureMediaContext && $candidateIsCaptureOwned);
             $candidate = $candidateId !== '' ? $this->usableMedia($candidateId, $blueprint, $candidateRequiresScope) : null;
             if ($candidate === null && $allowHistoricalSubjectReuse && $existing !== null && !in_array($existing->canonicalId, array_values($slotMedia), true)) $candidate = $this->usableMedia($existing->canonicalId, $blueprint, $subjectScopeLocked);
-            if ($candidate === null && $allowHistoricalSubjectReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia), $subjectScopeLocked);
+            if ($candidate === null && $allowHistoricalSubjectReuse) $candidate = $this->findReusable($blueprint, array_values($slotMedia), $subjectScopeLocked, !$enforceDistinctMandatoryMedia);
             if ($candidate === null) $candidate = $this->placeholder($slot);
             $this->reconcileUsage($endpointKey, $slot, $candidate->canonicalId, $blueprint);
             $state = $candidate->isSystemPlaceholder() ? ($slot === MediaUsageRoleRegistry::FEATURED_PRIMARY ? MediaSeoStateRegistry::INCOMPLETE_FEATURED : MediaSeoStateRegistry::INCOMPLETE_INLINE) : MediaSeoStateRegistry::COMPLETE;
@@ -81,7 +85,7 @@ final class ArticleMediaCoordinator
             if ($candidate !== null) $this->mediaService->addUsage($candidate->canonicalId, 'wp_post', $endpointKey, MediaUsageRoleRegistry::INLINE_SUPPORTING, $index);
         }
         $desiredUsages = [];
-        foreach ($slotMedia as $role => $mediaId) $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
+        foreach ($slotMedia as $role => $mediaId) $desiredUsages[] = ['role' => $role, 'media_id' => $mediaId, 'sort_order' => 0, 'alt_text' => (string) ($slots[$role]['blueprint']['planned_alt_intent'] ?? ''), 'title' => (string) ($slots[$role]['blueprint']['planned_title'] ?? ''), 'keyword_groups' => (array) ($slots[$role]['blueprint']['keyword_groups'] ?? [])];
         foreach ($supportingMediaIds as $index => $mediaId) $desiredUsages[] = ['role' => MediaUsageRoleRegistry::INLINE_SUPPORTING, 'media_id' => (string) $mediaId, 'sort_order' => $index];
         $usagePlan = (new MediaUsageReconciler())->plan('wp_post', $endpointKey, $this->usages->listByEndpoint('wp_post', $endpointKey), $desiredUsages);
         $diagnostics[] = ['code' => 'MEDIA_USAGE_RECONCILIATION', 'status' => $usagePlan['status'], 'actions' => $usagePlan['actions']];
@@ -189,7 +193,7 @@ final class ArticleMediaCoordinator
     }
 
     /** @param list<string> $used */
-    private function findReusable(MediaSeoBlueprint $blueprint, array $used, bool $requireSubjectScope = false): ?Media
+    private function findReusable(MediaSeoBlueprint $blueprint, array $used, bool $requireSubjectScope = false, bool $allowReuseOfUsed = false): ?Media
     {
         $best = null; $bestScore = -1;
         foreach ($this->media->list() as $media) {
@@ -197,6 +201,7 @@ final class ArticleMediaCoordinator
             // to satisfy both mandatory editorial roles when it is the only
             // eligible image. Never broaden this fallback beyond the subject
             // scope carried by the blueprint.
+            if (!$allowReuseOfUsed && in_array($media->canonicalId, $used, true)) continue;
             $reusePenalty = in_array($media->canonicalId, $used, true) ? -1 : 0;
             $candidate = $this->usableMedia($media->canonicalId, $blueprint, $requireSubjectScope);
             if ($candidate === null) continue;
@@ -283,8 +288,8 @@ final class ArticleMediaCoordinator
         $existing = $this->usages->listByEndpoint('wp_post', $endpointKey, $slot);
         foreach ($existing as $usage) {
             if ($usage->mediaId !== $mediaId) continue;
-            $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups);
-            if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups) return;
+            $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision);
+            if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title) return;
             if ($this->usages instanceof MediaUsageUpdater) {
                 $this->usages->update($candidate);
                 return;
@@ -293,13 +298,13 @@ final class ArticleMediaCoordinator
         }
         if ($existing !== []) {
             $current = $existing[0];
-            $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups);
+            $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $current->revision);
             if ($this->usages instanceof MediaUsageUpdater) {
                 $this->usages->update($candidate);
                 return;
             }
             if ($this->usages instanceof MutableMediaUsageRepository) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_REPLACEMENT_UNAVAILABLE');
         }
-        $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups);
+        $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle);
     }
 }

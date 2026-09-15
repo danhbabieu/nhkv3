@@ -71,6 +71,12 @@ final class P6PersistenceTest extends TestCase
         self::assertCount(1, $service->assets($created->canonicalId));
         self::assertCount(1, $service->usages($created->canonicalId));
 
+        $articleTitleA = $service->addUsage($created->canonicalId, 'wp_post', '1:43', 'featured', 0, 'Alt A', 'Caption A', [], 'Tiêu đề ảnh A');
+        $articleTitleB = $service->addUsage($created->canonicalId, 'wp_post', '1:44', 'featured', 0, 'Alt B', 'Caption B', [], 'Tiêu đề ảnh B');
+        self::assertSame('Tiêu đề ảnh A', $articleTitleA->title);
+        self::assertSame('Tiêu đề ảnh B', $articleTitleB->title);
+        self::assertSame('Odo front', $media->items[$created->canonicalId]->canonicalName);
+
         $packet = [
             ['kind' => 'original', 'storage_key' => 'uploads/fast-media.jpg', 'checksum' => hash('sha256', 'fast-media'), 'mime_type' => 'image/jpeg', 'byte_size' => 9, 'width' => 900, 'height' => 600, 'metadata' => ['source' => 'mcp']],
         ];

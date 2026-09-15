@@ -8,7 +8,8 @@
 ## Single entry point for new media submissions — 2026-09-09
 
 New image input is submitted through `nhk.capture.ingest`, including one image
-or multiple images attached to text or knowledge-only context. The Capture
+or multiple images attached to text, a `MEDIA_ENRICHMENT` submission, or
+knowledge-only context. The Capture
 physical phase delegates to the canonical Media/MediaAsset/MediaUsage owner;
 it never creates a second Media store. Standalone Media upload/ingest remains
 internal/admin compatibility or lifecycle tooling only and is not the normal
@@ -20,6 +21,12 @@ structured provided-file references, delegates to `ImageIngestEntrypoint`, and
 returns canonical attachment/Media read-back without semantic mutation. The
 widget may hand its ordered canonical `media_ids` to Capture later; that path
 reuses the existing attachment/Media and does not re-download or duplicate it.
+
+Article-scoped image title, alt text and caption are contextual placement
+metadata. They belong to the Article-owned MediaUsage/managed placement and do
+not overwrite the canonical Media name or the global WordPress attachment
+title. MediaUsage updates use its optimistic revision; stale placement writes
+fail closed.
 
 An existing-Capture continuation is text-only unless it explicitly declares
 the registered `followup_mode=ATTACH_ASSETS`. That mode accepts native files

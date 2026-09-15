@@ -74,6 +74,7 @@ final class MediaService
                 (string) ($spec['alt_text'] ?? ''),
                 (string) ($spec['caption'] ?? ''),
                 is_array($spec['keyword_groups'] ?? null) ? array_values(array_map('strval', $spec['keyword_groups'])) : [],
+                (string) ($spec['title'] ?? ''),
             );
             $existing = null;
             foreach ($existingUsages as $usage) if ($usage->endpointType === $candidate->endpointType && $usage->endpointKey === $candidate->endpointKey && $usage->role === $candidate->role) { $existing = $usage; break; }
@@ -153,10 +154,10 @@ final class MediaService
         }
     }
 
-    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = []): MediaUsage
+    public function addUsage(string $mediaId, string $endpointType, string $endpointKey, string $role, int $sortOrder = 0, string $altText = '', string $caption = '', array $keywordGroups = [], string $title = ''): MediaUsage
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
-        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups);
+        $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title);
         foreach ($this->usages->listByMediaId($mediaId) as $existing) {
             if ($existing->endpointType !== $candidate->endpointType || $existing->endpointKey !== $candidate->endpointKey || $existing->role !== $candidate->role) continue;
             if ($this->sameUsage($existing, $candidate)) return $existing;
@@ -191,12 +192,13 @@ final class MediaService
             && $left->sortOrder === $right->sortOrder
             && $left->altText === $right->altText
             && $left->caption === $right->caption
-            && $left->keywordGroups === $right->keywordGroups;
+            && $left->keywordGroups === $right->keywordGroups
+            && $left->title === $right->title;
     }
 
     private function upsertUsage(MediaUsage $existing, MediaUsage $candidate): MediaUsage
     {
-        $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups);
+        $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision);
         if ($this->usages instanceof MediaUsageUpdater) return $this->usages->update($updated);
         throw new MediaException('Media usage update capability is unavailable.');
     }

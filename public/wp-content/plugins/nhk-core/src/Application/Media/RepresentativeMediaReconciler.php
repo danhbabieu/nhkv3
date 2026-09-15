@@ -45,7 +45,7 @@ final class RepresentativeMediaReconciler
         $actions = [];
         if ($current instanceof MediaUsage) {
             if (!$this->usages instanceof MediaUsageUpdater) return ['status' => 'OWNER_REVIEW_REQUIRED', 'media_id' => $current->mediaId, 'candidate_media_id' => $best['media_id'], 'actions' => [['action' => 'DEMOTE', 'usage_id' => $current->usageId]]];
-            $this->usages->update(new MediaUsage($current->usageId, $current->mediaId, $current->endpointType, $current->endpointKey, MediaUsageRoleRegistry::TECHNICAL_DETAIL, $current->sortOrder, $current->altText, $current->caption, $current->keywordGroups));
+            $this->usages->update(new MediaUsage($current->usageId, $current->mediaId, $current->endpointType, $current->endpointKey, MediaUsageRoleRegistry::TECHNICAL_DETAIL, $current->sortOrder, $current->altText, $current->caption, $current->keywordGroups, $current->title, $current->revision));
             $actions[] = ['action' => 'DEMOTE', 'usage_id' => $current->usageId, 'to_role' => MediaUsageRoleRegistry::TECHNICAL_DETAIL];
         }
         $usage = $this->mediaService->addUsage($best['media_id'], $endpointType, $endpointKey, MediaUsageRoleRegistry::REPRESENTATIVE, 0, (string) ($best['alt_text'] ?? ''), (string) ($best['caption'] ?? ''));

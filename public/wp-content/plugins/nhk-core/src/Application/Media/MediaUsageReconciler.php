@@ -43,6 +43,7 @@ final class MediaUsageReconciler
                     (string) ($spec['alt_text'] ?? ''),
                     (string) ($spec['caption'] ?? ''),
                     is_array($spec['keyword_groups'] ?? null) ? array_values(array_map('strval', $spec['keyword_groups'])) : [],
+                    (string) ($spec['title'] ?? ''),
                 );
             } catch (\Throwable) {
                 return $this->review('INVALID_DESIRED_USAGE', $role);
@@ -60,7 +61,8 @@ final class MediaUsageReconciler
                 && $existing->sortOrder === $wanted->sortOrder
                 && $existing->altText === $wanted->altText
                 && $existing->caption === $wanted->caption
-                && $existing->keywordGroups === $wanted->keywordGroups;
+                && $existing->keywordGroups === $wanted->keywordGroups
+                && $existing->title === $wanted->title;
             $actions[] = ['action' => $same ? 'KEEP' : 'UPDATE', 'role' => $role, 'usage_id' => $existing->usageId, 'media_id' => $wanted->mediaId];
         }
         foreach ($currentByRole as $role => $existing) {

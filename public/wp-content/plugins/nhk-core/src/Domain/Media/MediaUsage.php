@@ -17,6 +17,8 @@ final readonly class MediaUsage
         public string $caption = '',
         /** @var list<string> */
         public array $keywordGroups = [],
+        public string $title = '',
+        public int $revision = 1,
     ) {
         if (!UuidCodec::isValid($usageId) || !UuidCodec::isValid($mediaId)) throw new InvalidMedia('Media usage identity is invalid.');
         if (!preg_match('/^[a-z][a-z0-9_]{0,63}$/', $endpointType) || $endpointKey === '' || $sortOrder < 0) throw new InvalidMedia('Media usage is invalid.');
@@ -27,5 +29,6 @@ final readonly class MediaUsage
             throw new InvalidMedia($error->getMessage(), (int) $error->getCode(), $error);
         }
         if (strlen($altText) > 1000 || strlen($caption) > 2000) throw new InvalidMedia('Media usage contextual SEO text is too long.');
+        if (strlen($title) > 255 || $revision < 1) throw new InvalidMedia('Media usage title or revision is invalid.');
     }
 }
