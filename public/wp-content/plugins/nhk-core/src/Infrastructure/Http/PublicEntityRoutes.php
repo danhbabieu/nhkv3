@@ -54,7 +54,7 @@ final class PublicEntityRoutes
         add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/([a-z0-9-]+)/([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=variant&nhk_public_entity_a=$matches[1]&nhk_public_entity_b=$matches[2]&nhk_public_entity_c=$matches[3]', 'top');
         add_rewrite_rule('^(?!' . $reserved . ')([a-z0-9-]+)/([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=model&nhk_public_entity_a=$matches[1]&nhk_public_entity_b=$matches[2]', 'top');
         $clockTypePrefix = PublicRouteResolver::routePrefixForProfile('clock_type');
-        if ($clockTypePrefix !== null) add_rewrite_rule('^' . preg_quote($clockTypePrefix, '#') . '([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=classification&nhk_public_entity_a=$matches[1]', 'top');
+        if ($clockTypePrefix !== null) add_rewrite_rule('^' . preg_quote($clockTypePrefix, '#') . '([a-z0-9-]+)/?$', 'index.php?nhk_public_entity_type=classification&nhk_public_entity_a=' . self::profileDetailRouteKey('clock_type', '$matches[1]'), 'top');
         // Keep the native slug query attached to the root request. WP_Query
         // can therefore resolve a Post before NHK decides whether a Brand
         // route is actually claimable.
@@ -151,6 +151,18 @@ final class PublicEntityRoutes
         if ($canonicalPath === null || $canonicalPath === '') return null;
         $normalize = static fn (string $path): string => rtrim('/' . trim($path, '/'), '/');
         return $normalize($requestPath) === $normalize($canonicalPath) ? null : $canonicalPath;
+    }
+
+    public static function profileDetailRouteKey(string $profileKey, string $capturedSegment): string
+    {
+        $segment = trim($capturedSegment, " /\t\n\r\0\x0B");
+        if ($segment === '') return '';
+        return self::profileDetailRoutePrefix($profileKey) . $segment;
+    }
+
+    private static function profileDetailRoutePrefix(string $profileKey): string
+    {
+        return PublicRouteResolver::routePrefixForProfile($profileKey) ?? '';
     }
 
     private function seo(?string $path): array

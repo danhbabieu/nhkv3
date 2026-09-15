@@ -28,4 +28,11 @@ final class PublicEntityRoutesTest extends TestCase
         self::assertNull(LegacyUrlRedirects::filterCanonicalRedirect('https://demo.1945.vn/odo-10-con-10-bua-chuong-kep/', '/odo/', 'brand'));
         self::assertSame('https://demo.1945.vn/other/', LegacyUrlRedirects::filterCanonicalRedirect('https://demo.1945.vn/other/', '/odo/article/', 'brand'));
     }
+
+    public function test_profile_detail_rewrite_preserves_the_registered_route_prefix_for_resolution(): void
+    {
+        self::assertSame('dong-ho-cong-cong', PublicEntityRoutes::profileDetailRouteKey('clock_type', 'cong-cong'));
+        self::assertSame('dong-ho-thap', PublicEntityRoutes::profileDetailRouteKey('clock_type', 'thap'));
+        self::assertSame('', PublicEntityRoutes::profileDetailRouteKey('clock_type', ''));
+    }
 }

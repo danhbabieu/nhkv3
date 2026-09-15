@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Public Clock continuation safety gate and route consumer fix
+
+MEDIA PIPELINE: The fresh authenticated @v3-18 widget surface completed the
+official Library → trusted file materialization → native attachment → canonical
+Media adoption/read-back chain. Attachment `489` and Media
+`01a0a36c-3332-7083-85fd-43dbc2a80810` were returned with a 1200×900 WebP
+asset. No MediaUsage was persisted because the subsequent existing-Capture
+attachment continuation was rejected fail-closed by the workspace staging
+policy: the currently approved mutation scope is Video-only. No direct Media,
+Article or WordPress writer was used.
+
+ROUTE ROOT CAUSE: The generic `clock_type` rewrite captured only the suffix
+(`cong-cong`) while `PublicRouteResolver` correctly resolves the full
+profile-prefixed route key (`dong-ho-cong-cong`). The rewrite now preserves the
+registered profile route prefix before resolution; the regression test covers
+both Public Clock and Turret-style suffixes and empty input. No UUID or subject
+slug is hard-coded.
+
+VERIFICATION: The new route regression and existing `PublicEntityRoutesTest`
+pass (4 tests, 11 assertions); the touched route file passes PHP lint and
+`git diff --check` passes. Live route read-back remains pending deployment of
+this fix and data publication remains blocked by the staging-scope gate.
+
+BLOCKERS: `STAGING_SCOPE_POLICY_BLOCK` on governed Capture continuation for
+existing Article #485 / Media attachment. Dependent Article, Knowledge Delta,
+MediaUsage and publication mutations must not proceed until the user/workspace
+authorizes the exact bounded Public Clock scope. Deployment verification also
+remains `MCP_BOOTSTRAP_UNAVAILABLE` at the direct verifier endpoint.
+
 # Checkpoint — 2026-09-15 — ChatGPT file-host allowlist root-cause closure
 
 ROOT_CAUSE: The live Capture/widget materializer received a trusted ChatGPT
