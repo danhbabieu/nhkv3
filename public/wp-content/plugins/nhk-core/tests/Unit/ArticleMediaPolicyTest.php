@@ -54,6 +54,24 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame('MEDIA_PLACEHOLDER', $result->state);
     }
 
+    public function test_empty_subject_uses_resolved_canonical_subject_for_blueprint_generation(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+
+        $result = (new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1))->ensureForPost(45, [
+            'subject' => '',
+            'subject_ids' => ['subject-45'],
+            'subject_context' => ['subject' => '', 'subject_ids' => ['subject-45']],
+            'subject_resolution' => [
+                'status' => 'resolved',
+                'primary' => ['id' => 'subject-45', 'type' => 'classification', 'name' => 'Đồng hồ tháp'],
+            ],
+        ]);
+
+        self::assertSame('MEDIA_PLACEHOLDER', $result->state);
+        self::assertSame('Đồng hồ tháp', $blueprints->findByPostAndSlot(45, 'featured_primary')?->subjectContext['subject']);
+    }
+
     public function test_suitable_existing_media_is_reused_without_duplicate_identity(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

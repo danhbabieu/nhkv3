@@ -22,6 +22,12 @@ final class ArticleMediaCoordinator
     public function ensureForPost(int $postId, array $context = [], array $selectedMediaBySlot = [], array $supportingMediaIds = []): ArticleMediaResult
     {
         if ($postId < 1) throw new \InvalidArgumentException('WordPress Post ID must be positive.');
+        // Capture/media adapters may carry the resolved subject only inside
+        // the canonical resolution packet. Normalize that packet once at the
+        // boundary so every downstream blueprint receives the same exact
+        // subject context; an explicit empty value must not produce an
+        // invalid blueprint or silently fall back to a generic article label.
+        $context = $this->normalizeSubjectContext($context);
         $endpointKey = $this->endpointKey($postId);
         $slotMedia = [];
         $slots = [];
@@ -119,6 +125,28 @@ final class ArticleMediaCoordinator
             $result = new ArticleMediaResult($postId, $endpointKey, $state, $slotMedia, $slots, $diagnostics, (string) ($readback['state_token'] ?? ''), $this->guidance($slots, $context));
         }
         return $result;
+    }
+
+    /** @param array<string,mixed> $context @return array<string,mixed> */
+    private function normalizeSubjectContext(array $context): array
+    {
+        $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
+        $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        $subject = trim((string) ($context['subject'] ?? ''));
+        $resolvedName = trim((string) ($primary['name'] ?? ''));
+        if ($subject === '' && ($resolution['status'] ?? '') === 'resolved' && $resolvedName !== '') $context['subject'] = $resolvedName;
+
+        $subjectContext = is_array($context['subject_context'] ?? null) ? $context['subject_context'] : [];
+        if (trim((string) ($subjectContext['subject'] ?? '')) === '' && trim((string) ($context['subject'] ?? '')) !== '') $subjectContext['subject'] = (string) $context['subject'];
+        $resolvedId = trim((string) ($primary['id'] ?? ''));
+        $subjectIds = array_values(array_filter(array_map('strval', (array) ($context['subject_ids'] ?? [])), static fn (string $id): bool => trim($id) !== ''));
+        if ($subjectIds === [] && ($resolution['status'] ?? '') === 'resolved' && $resolvedId !== '') $subjectIds = [$resolvedId];
+        if ($subjectIds !== []) {
+            $context['subject_ids'] = $subjectIds;
+            $subjectContext['subject_ids'] = $subjectIds;
+        }
+        if ($subjectContext !== []) $context['subject_context'] = $subjectContext;
+        return $context;
     }
 
     /** Read-only preview for preflight/diagnostics; it never creates placeholders or usages. */
