@@ -82,6 +82,25 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(-32602, $response['body']['error']['code']);
     }
 
+    public function test_widget_upload_does_not_echo_chatgpt_transport_uri_into_model_visible_result(): void
+    {
+        $calls = [];
+        $materializerCalls = 0;
+        $transport = $this->transport($calls, $materializerCalls);
+        $result = $this->call($transport, [
+            'idempotency_key' => 'widget-sediment-result',
+            'metadata' => ['description' => 'Đồng hồ cổ'],
+            'files' => [[
+                'download_url' => 'https://oaiusercontent.example/raw/image',
+                'file_id' => 'sediment://file_000000008f2081f5bc1831c3f65480f7',
+                'file_name' => 'IMG_0001.jpg',
+            ]],
+        ]);
+
+        self::assertArrayNotHasKey('file_id', $result['uploads'][0]);
+        self::assertSame(1, $materializerCalls);
+    }
+
     private function transport(array &$calls, int &$materializerCalls): McpTransport
     {
         $entrypoint = new ImageIngestEntrypoint(

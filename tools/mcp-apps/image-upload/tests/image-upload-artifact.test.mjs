@@ -29,7 +29,7 @@ test("the View uses the official server-tool call path and live tool name", asyn
   const html = await resource();
 
   assert.match(html, /callServerTool/);
-  assert.match(html, /nhk\.media\.widget-upload/);
+  assert.match(html, /wp_ability_nhk_v3_media_widget_upload/);
   assert.doesNotMatch(html, /function\s+callTool/);
   assert.doesNotMatch(html, /openai\.callTool/);
 });

@@ -662,8 +662,9 @@ revalidation and image MIME/size checks.
 
 The widget tool delegates to `ImageIngestEntrypoint`, the existing native
 WordPress attachment lifecycle and canonical Media adoption/read-back. It
-returns only attachment/Media read-back fields and the client `file_id`; signed
-URLs are not returned in model-visible content. The widget state keeps
+returns only attachment/Media read-back fields and a safe opaque client
+`file_id` when one is available; session-scoped URI transport references and
+signed URLs are not returned in model-visible content. The widget state keeps
 `modelContent.uploaded_media`, private upload status and authorized
 `imageIds`. A follow-up action passes Media IDs to the existing Capture flow;
 it never uploads the same physical file again.

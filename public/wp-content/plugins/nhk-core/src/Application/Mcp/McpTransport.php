@@ -268,7 +268,7 @@ final class McpTransport
             $fileId = (string) ($reference['file_id'] ?? '');
             $item = $itemsByFileId[$fileId] ?? null;
             if (!is_array($item)) continue;
-            $uploads[] = [
+            $upload = [
                 'attachment_id' => (int) ($item['attachment_id'] ?? 0),
                 'media_id' => (string) ($item['media_id'] ?? ''),
                 'public_filename' => (string) ($item['filename'] ?? ''),
@@ -279,10 +279,23 @@ final class McpTransport
                 'filesize' => (int) ($item['byte_size'] ?? 0),
                 'canonical_url' => (string) ($item['source_url'] ?? ''),
                 'attachment_readback_status' => (string) ($item['attachment_readback_status'] ?? ''),
-                'file_id' => (string) ($item['client_file_id'] ?? $fileId),
             ];
+            $modelVisibleFileId = self::modelVisibleWidgetFileId((string) ($item['client_file_id'] ?? $fileId));
+            if ($modelVisibleFileId !== null) $upload['file_id'] = $modelVisibleFileId;
+            $uploads[] = $upload;
         }
         return ['uploads' => $uploads, 'errors' => array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array'))];
+    }
+
+    private static function modelVisibleWidgetFileId(string $fileId): ?string
+    {
+        // ChatGPT may identify a trusted upload with a session-scoped URI such
+        // as sediment://.... Echoing that URI in structuredContent makes the
+        // host treat it as an MCP resource and attempt resources/read after
+        // the canonical ingest has already succeeded. Keep transport refs in
+        // the request only; expose ordinary opaque IDs when they are safe to
+        // serialize as result metadata.
+        return $fileId !== '' && !str_contains($fileId, '://') ? $fileId : null;
     }
 
     private function captureIngest(array $arguments, array $files): array

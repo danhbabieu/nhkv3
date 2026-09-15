@@ -1,5 +1,53 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — ChatGPT widget post-ingest resource-resolution boundary
+
+LIVE REPRODUCTION: On the authenticated `@v3-18` ChatGPT widget, Library and
+local selection both reached `HOST_FILE_UPLOAD_DONE`,
+`TRUSTED_FILE_REF_READY` and `SERVER_TOOL_CALL_START`, then displayed
+`MCP Resource not found`. The iframe had already loaded
+`ui://nhk/image-upload.html` and completed `READY`; the UI resource was not
+missing.
+
+RUNTIME EVIDENCE: Live tools/list exposed the runtime server tool
+`wp_ability_nhk_v3_media_widget_upload`, mapped to Ability
+`nhk-v3/media-widget-upload` and canonical tool `nhk.media.widget-upload`.
+The open descriptor and resources/read both resolved
+`ui://nhk/image-upload.html` with `text/html;profile=mcp-app`. WordPress Easy
+MCP audit `audit-12864` recorded the real widget call as `OK` with trusted
+`file_id` value shaped as a `sediment://...` session URI; attachment 489 and
+canonical Media `01a0a36c-3332-7083-85fd-43dbc2a80810` were created and read
+back. The audit has no server exception/stack trace for this call because the
+server response status was `OK`; the visible error is therefore after server
+ingest, at the host result/resource-resolution boundary.
+
+ROOT_CAUSE: The widget transport echoed ChatGPT's session-scoped
+`sediment://...` trusted reference into model-visible `structuredContent`.
+The host then treated the echoed URI as an MCP resource and attempted a
+resource read against the NHK resource registry, which only owns the UI
+resource. This is distinct from UI resource loading, trusted-file
+materialization, resolver allowlisting, and tool registration.
+
+CHANGE: `McpTransport::widgetUpload` now keeps the trusted reference only in
+the request/materializer path and omits URI-scoped transport IDs from the
+model-visible result, while preserving ordinary opaque IDs. The widget source
+and generated artifact both call the live Ability tool name. No Proposal,
+Capture, Public URL or content-data path changed.
+
+VERIFICATION: TDD regression was observed RED (5 tests, 1 failure) before the
+transport change and GREEN afterward (5 tests, 26 assertions). Frontend tests
+pass 9/9, TypeScript typecheck passes, PHP lint passes, focused PHP MCP/widget
+tests pass 33/33, `git diff --check` passes. Full PHPUnit remains environment
+blocked by existing WordPress integration bootstrap/DB prerequisites and one
+unrelated contract failure.
+
+LIVE GATE: The fix is local and not deployed because
+`NHK_DEMO_DEPLOY_CONFIG` is unset. The canonical deployment wrapper must run,
+then the connector must be reconnected and a fresh real ChatGPT image upload
+must prove UI `SUCCESS`, attachment creation, canonical Media read-back and
+filename normalization. Do not mark this repair complete until that live
+acceptance evidence exists.
+
 # Checkpoint — 2026-09-15 — Public Clock live route consumer read-back
 
 LIVE ROUTES: After the repository-approved deployment wrapper transferred the

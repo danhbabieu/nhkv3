@@ -1,7 +1,10 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 import { buildWidgetState, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
-const SERVER_TOOL_NAME = "nhk.media.widget-upload";
+// Easy MCP exposes the internal/admin boundary under the registered
+// WordPress Ability name. callServerTool must use that exact runtime name;
+// the canonical NHK name remains the server-side catalog name.
+const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
 const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
