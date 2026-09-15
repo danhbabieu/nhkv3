@@ -65,12 +65,44 @@ after the Constitution.
   - no generic WordPress writer, direct database write, or Governance bypass is used;
   - the operation is idempotent and canonical read-back is performed after mutation;
   - if runtime state differs from the approved scope, stop fail-closed.
-- Current approved staging acceptance scope:
-  - Capture: 01a096c0-97cc-7192-acf2-4735f9bf6582
-  - Article: 467
-  - Variant: 7301f50c-ef0d-4e95-a581-39e5063d4648
-  - External Video: VwP1AH9E3HA
-  - Allowed operation: resume the existing Video child through nhk.capture.ingest and complete the governed Proposal → Approval → Eligibility → Controlled Apply → canonical read-back lifecycle.
+- `STAGING_ACCEPTANCE_SCOPE` is the bounded, fail-closed project-local
+  authorization contract for an explicitly approved staging run. It is scoped
+  by exact existing IDs and operation families; it never grants unrestricted
+  semantic writes or direct-writer access.
+- Current approved staging acceptance scope for this run supersedes the prior
+  Video-only package:
+  - environment: `staging`
+  - allowed_capture_ids:
+    - `01a09aa3-59a2-74c0-9c6a-1a6867eb7f59`
+    - `01a09aa4-9ecc-758b-854d-5d44bb176267`
+  - allowed_owner_ids:
+    - `01a09e44-539a-7f1a-938a-d7d91bb689a3`
+    - `01a09f73-0aad-79b3-9aaf-5f02cb33a9d1`
+  - allowed_post_ids: `[485, 487]`
+  - allowed_media_ids: `[01a0a36c-3332-7083-85fd-43dbc2a80810]`
+  - allowed_attachment_ids: `[489]`
+  - allowed_asset_ids: `[01a0a36c-3338-7ac0-ba72-a7c87c4e6b5e]`
+  - allowed_relation_ids:
+    - `01a0a344-da4d-7653-b7e8-75ffdd80ac38`
+  - allowed_operation_families:
+    - capture_continuation
+    - knowledge_delta
+    - source_evidence_reconciliation
+    - semantic_subject_binding
+    - governed_relation_reconciliation
+    - article_reconciliation
+    - article_body_correction
+    - category_slug_seo_reconciliation
+    - article_publication
+    - media_usage_reconciliation
+    - presentation_readiness
+    - frontend_projection_readback
+    - governed_proposal_lifecycle
+    - canonical_readback
+  - fail_closed_outside_scope: `true`
+- The previously approved Video Capture `01a096c0-97cc-7192-acf2-4735f9bf6582`
+  package remains historical evidence and is not part of this Public Clock
+  run. Future content families require a newly authorized bounded package.
 
 
 

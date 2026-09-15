@@ -6,6 +6,7 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Graph\RelationRevisionBinder;
 use NHK\Core\Contracts\Graph\EndpointRevisionReader;
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference};
+use NHK\Core\Infrastructure\Graph\WpPostEndpointResolver;
 use PHPUnit\Framework\TestCase;
 
 final class RelationRevisionBindingTest extends TestCase
@@ -34,6 +35,31 @@ final class RelationRevisionBindingTest extends TestCase
         yield 'brand' => ['brand'];
         yield 'model' => ['model'];
         yield 'variant' => ['variant'];
+    }
+
+    public function test_binds_wp_post_revision_from_native_modified_timestamp(): void
+    {
+        $post = (object) [
+            'ID' => 487,
+            'post_modified_gmt' => '2026-09-15 07:56:04',
+            'post_modified' => '2026-09-15 14:56:04',
+        ];
+        $resolver = new WpPostEndpointResolver(
+            static fn (int $postId): object|null => $postId === 487 ? $post : null,
+            static fn (): int => 1,
+        );
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', $resolver);
+        $endpoints->register('classification', new RevisionedResolver('classification', ['classification-1' => 1]));
+
+        $bound = (new RelationRevisionBinder($endpoints))->bind([
+            'source_type' => 'wp_post', 'source_uuid' => '1:487',
+            'target_type' => 'classification', 'target_uuid' => 'classification-1',
+            'predicate' => 'about',
+        ]);
+
+        self::assertSame(strtotime('2026-09-15 07:56:04 UTC'), $bound['source_revision']);
+        self::assertSame(1, $bound['target_revision']);
     }
 
 }
