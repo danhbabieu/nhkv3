@@ -48,7 +48,7 @@ final class EntityPresentationViewModel
             $counts[$group === 'music' ? 'melody_count' : rtrim($group, 's') . '_count'] = $sections[$group]['count'];
         }
 
-        $readiness = is_array($profile['presentation_readiness'] ?? null) ? $profile['presentation_readiness'] : (is_array($dossier['presentation_readiness'] ?? null) ? $dossier['presentation_readiness'] : self::deriveReadiness($dossier, $identity, $payload, $primaryMedia));
+        $readiness = is_array($profile['presentation_readiness'] ?? null) ? $profile['presentation_readiness'] : (is_array($dossier['presentation_readiness'] ?? null) ? $dossier['presentation_readiness'] : self::deriveReadiness($dossier, $identity, $payload, $primaryMedia, $sections));
         return [
             'type' => $type,
             'identity' => $identity,
@@ -177,21 +177,37 @@ final class EntityPresentationViewModel
     private static function text(mixed $value): string { return is_scalar($value) ? trim((string) $value) : ''; }
 
     /** @return array{status:string,reasons:list<string>} */
-    private static function deriveReadiness(array $dossier, array $identity, array $payload, array $primaryMedia): array
+    private static function deriveReadiness(array $dossier, array $identity, array $payload, array $primaryMedia, array $sections): array
     {
         $readiness = PresentationReadiness::evaluate(
             ['active' => ($dossier['status'] ?? '') === 'AVAILABLE'],
             [
                 'route' => (string) ($identity['url'] ?? ''),
-                'content' => [
-                    'name' => (string) ($identity['name'] ?? $identity['title'] ?? ''),
-                    'description' => (string) ($payload['description'] ?? $payload['summary'] ?? ''),
-                    'representative_media' => $primaryMedia !== [],
+                'public_signals' => [
+                    'summary' => (string) ($payload['description'] ?? $payload['summary'] ?? ''),
+                    'representative_media' => self::safeMedia($primaryMedia) !== null,
+                    'knowledge' => ['claim_count' => (int) ($dossier['knowledge']['claim_count'] ?? 0)],
+                    'article' => count($sections['articles']['items'] ?? []),
+                    'hierarchy' => self::hasHierarchySignal($dossier),
                 ],
                 'public_eligible' => ($dossier['status'] ?? '') === 'AVAILABLE',
             ],
         );
         return ['status' => $readiness->presentationStatus(), 'reasons' => $readiness->reasons()];
+    }
+
+    private static function hasHierarchySignal(array $dossier): bool
+    {
+        $hierarchy = self::hierarchy(is_array($dossier['profile'] ?? null) ? $dossier['profile'] : [], $dossier);
+        foreach (['parent', 'children'] as $slot) {
+            $items = $slot === 'parent' ? [$hierarchy['parent']] : $hierarchy['children'];
+            foreach ($items as $item) {
+                if (!is_array($item) || trim((string) ($item['name'] ?? '')) === '') continue;
+                $url = trim((string) ($item['url'] ?? ''));
+                if ($url !== '' && str_starts_with($url, '/')) return true;
+            }
+        }
+        return false;
     }
 
     /** @return array<string,mixed> */

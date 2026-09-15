@@ -1,5 +1,68 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-15 — Public Clock generic readiness and bounded read-back
+
+SCOPE: The explicitly approved bounded Public Clock completion scope was used
+for read-back and existing-Capture continuations only. No Entity, Capture,
+Proposal, Knowledge, Media or relation duplicate was created.
+
+GENERIC PRESENTATION READINESS: Added a public-signal contract for collection
+and dossier projections. An ACTIVE entity must still have a valid public route
+and public eligibility; readiness now accepts any substantive signal among
+summary/description, representative Media, eligible Knowledge, Article content
+or public hierarchy context. Identity-only fields do not count, and no
+Clock-Type-specific exception was added. The collection path is wired to the
+existing EntityKnowledgeProjection, while the dossier path includes existing
+Article and hierarchy signals.
+
+REGRESSION COVERAGE: Added the Clock Type archive regression proving an ACTIVE
+canonical entity with persisted public identity and one public Knowledge claim
+is READY without description or representative Media. Added identity-only
+negative coverage and Article-signal coverage. Focused presentation, entity,
+route, home and search suites pass `53 tests / 180 assertions`; all changed
+PHP files lint clean and `git diff --check` passes.
+
+CANONICAL READ-BACK: Documentation bootstrap is fresh and reports staging,
+documentation version `03b4aa0d747817a7fda7e10b8c76f65bc17021d5e96f17bd14965d25d9ed9c17`,
+manifest `6d66239245128b37ad063f1604fdfd0e703ba5bc6787dc5b047726a48318ffd0`,
+and build identity `4e57739f2a4271384f9823765766842b5d451cd071b511621184a9956a2eec72`.
+The existing owners remain ACTIVE with their public routes. Inventory confirms
+7 ACTIVE/PUBLIC Knowledge claims for Public Clock and 9 ACTIVE/PUBLIC claims
+for Turret, all entity-scoped. The existing hierarchy remains one Turret child
+of Public Clock. Existing Media `01a0a36c-3332-7083-85fd-43dbc2a80810` remains
+readable with eligible derivative asset
+`01a0a36c-3338-7ac0-ba72-a7c87c4e6b5e` and attachment 489.
+
+ARTICLE/CAPTURE READ-BACK: Existing Capture continuation for Article #485
+reached the existing Article and retained title, slug, category 4 and featured
+attachment 489, but its receipt is `FAILED_RETRYABLE` with typed
+`MEDIA_USAGE_UPDATE_CONFLICT_`; no publication occurred. Existing Capture
+continuation for Article #487 persisted the approved editorial replacement
+body and exact title/slug/category, removing the internal workflow language
+from the public base prose, but its receipt is also `FAILED_RETRYABLE` with
+the same typed MediaUsage conflict; the Post remains draft and has no eligible
+Turret Media. The validator was not weakened and no generic WordPress writer
+was used.
+
+FRONTEND READ-BACK: `/dong-ho-cong-cong/` currently renders the real root
+dossier with H1 `Đồng hồ công cộng`, 7 knowledge records and child link
+`/dong-ho-thap/`. `/dong-ho-thap/` renders the real Turret dossier with H1
+`Đồng hồ tháp`, 9 knowledge records and parent link `/dong-ho-cong-cong/`.
+`/loai-dong-ho/` still renders the honest empty state `Chưa có hồ sơ phù hợp`;
+the required card `Đồng hồ công cộng` → `/dong-ho-cong-cong/` is therefore not
+present. The deployed pages also expose existing PHP warnings at
+`FrontendSemanticBootstrap.php:185`; this checkpoint does not broaden scope to
+that unrelated deployed warning.
+
+HARD BLOCKER: The generic readiness fix is local and has not reached the live
+consumer. `NHK_DEMO_DEPLOY_CONFIG` is unset and deployment preflight fails the
+WordPress bootstrap, NHK Core bootstrap, schema migration, authority hydration
+and REST bootstrap checks. The two bounded Capture continuations additionally
+fail closed at `MEDIA_USAGE_UPDATE_CONFLICT_`. Public Clock completion is not
+COMPLETE because live archive read-back cannot prove the required card and the
+Articles are not publicly published. No `OWNER_PUSH_READY` or production
+cutover claim is made.
+
 # Checkpoint — 2026-09-15 — Local-only staging deployment stop gate
 
 SCOPE: This checkpoint is local-only on `main`. No staging semantic mutation,

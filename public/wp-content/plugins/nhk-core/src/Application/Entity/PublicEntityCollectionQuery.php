@@ -23,6 +23,7 @@ final class PublicEntityCollectionQuery
         private ?\Closure $availability = null,
         private ?EntityMediaProjection $entityMedia = null,
         private ?EntityKnowledgeProjection $entityKnowledge = null,
+        private ?\Closure $presentationSignals = null,
     ) {}
 
     public function types(): EntityTypeRegistry { return $this->types; }
@@ -144,12 +145,19 @@ final class PublicEntityCollectionQuery
         $item['description'] = $description;
         if ($profile->resolved() || $profile->status === EntityProfileResolution::COMPATIBILITY_READ) {
             $hasRepresentative = is_array($item['media']['representative'] ?? null) && trim((string) ($item['media']['representative']['url'] ?? '')) !== '';
-            $content = $profile->profileKey === 'clock_type'
-                ? ['description' => $description, 'representative_media' => $hasRepresentative]
-                : ['name' => $entity->canonicalName, 'description' => $description];
+            $knowledge = $this->entityKnowledge?->forSubject($entity->canonicalId) ?? [];
+            $signals = [
+                'summary' => $description,
+                'representative_media' => $hasRepresentative,
+                'knowledge' => ['claim_count' => (int) ($knowledge['claim_count'] ?? 0)],
+            ];
+            if ($this->presentationSignals !== null) {
+                $extraSignals = ($this->presentationSignals)($entity, $profile);
+                if (is_array($extraSignals)) $signals = array_replace_recursive($signals, $extraSignals);
+            }
             $readiness = PresentationReadiness::evaluate(
                 ['active' => $entity->active()],
-                ['route' => $path, 'content' => $content, 'public_eligible' => $decision->eligible],
+                ['route' => $path, 'public_signals' => $signals, 'public_eligible' => $decision->eligible],
             );
             $item['presentation_readiness'] = ['status' => $readiness->presentationStatus(), 'reasons' => $readiness->reasons()];
         }

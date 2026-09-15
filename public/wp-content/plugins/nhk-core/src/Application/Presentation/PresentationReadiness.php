@@ -31,7 +31,7 @@ final readonly class PresentationReadiness
 
         $contentStatus = strtolower(trim((string) ($projection['content_status'] ?? '')));
         if ($contentStatus === 'unavailable') return new self($semanticState, 'UNAVAILABLE', ['PRESENTATION_CONTENT_UNAVAILABLE']);
-        $content = $projection['content'] ?? null;
+        $content = $projection['public_signals'] ?? ($projection['content'] ?? null);
         $hasContent = self::hasContent($content);
         if ($contentStatus === 'empty' || !$hasContent) return new self($semanticState, 'INCOMPLETE', ['PRESENTATION_CONTENT_MISSING']);
 
@@ -48,10 +48,14 @@ final readonly class PresentationReadiness
     private static function hasContent(mixed $content): bool
     {
         if (is_array($content)) {
-            foreach ($content as $value) if (self::hasContent($value)) return true;
+            foreach ($content as $key => $value) {
+                if (is_string($key) && in_array($key, ['name', 'title', 'label', 'slug', 'url', 'type'], true)) continue;
+                if (self::hasContent($value)) return true;
+            }
             return false;
         }
         if (is_bool($content)) return $content;
+        if (is_int($content) || is_float($content)) return $content > 0;
         return $content !== null && trim((string) $content) !== '';
     }
 }

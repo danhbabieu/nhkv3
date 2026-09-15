@@ -6,8 +6,12 @@ namespace NHK\Tests\Unit;
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
 use NHK\Core\Application\Graph\{BrandAggregationQuery, GraphService};
+use NHK\Core\Application\Knowledge\EntityKnowledgeProjection;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, FakeEndpointResolver, NodeReference, PredicateRegistry};
+use NHK\Core\Domain\Knowledge\KnowledgeClaim;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Infrastructure\Graph\InMemoryAuditSink;
 use NHK\Tests\Support\{InMemoryAuthorityRepository, InMemoryGraphRepository};
 use PHPUnit\Framework\TestCase;
@@ -119,6 +123,50 @@ final class PublicEntityCollectionQueryTest extends TestCase
 
         self::assertSame(0, $archive['total']);
         self::assertSame([], $archive['items']);
+    }
+
+    public function test_clock_type_archive_is_ready_from_public_knowledge_without_description_or_representative_media(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $authority = new AuthorityService($repository, $types);
+        $clockType = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $identity = new FixturePublicIdentityRepository([
+            'authority|' . $clockType->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong'],
+        ]);
+        $claim = new KnowledgeClaim(
+            UuidCodec::newV7(),
+            'clock-type-public-signal',
+            'Một nhóm đồng hồ được đặt trong không gian công cộng.',
+            'fact',
+            ['metadata' => ['subject_id' => $clockType->canonicalId, 'facet' => 'chronology', 'scope' => 'entity']],
+        );
+        $claims = self::createStub(KnowledgeRepository::class);
+        $claims->method('list')->willReturn([$claim]);
+        $knowledge = new EntityKnowledgeProjection(
+            $claims,
+            self::createStub(EvidenceRepository::class),
+            self::createStub(SourceRepository::class),
+        );
+        $routes = new PublicRouteResolver($repository, $types);
+        $query = new PublicEntityCollectionQuery(
+            $repository,
+            $types,
+            new PublicIdentityContract($types, $identity),
+            new PublicEntityEligibilityPolicy($repository, $types, $routes),
+            $routes,
+            null,
+            null,
+            null,
+            $knowledge,
+        );
+
+        $archive = $query->archiveProfile('clock_type');
+
+        self::assertSame(1, $archive['total']);
+        self::assertSame('READY', $archive['items'][0]['presentation_readiness']['status']);
+        self::assertSame('/dong-ho-cong-cong/', $archive['items'][0]['url']);
     }
 
     public function test_brand_detail_can_include_graph_aggregation_without_changing_public_identity(): void

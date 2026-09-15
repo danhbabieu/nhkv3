@@ -39,4 +39,34 @@ final class PresentationReadinessTest extends TestCase
         );
         self::assertSame('UNAVAILABLE', $unavailable->presentationStatus());
     }
+
+    public function test_substantive_public_knowledge_signal_makes_an_active_route_ready_without_summary_or_media(): void
+    {
+        $ready = PresentationReadiness::evaluate(
+            ['active' => true],
+            [
+                'route' => '/dong-ho-cong-cong/',
+                'public_eligible' => true,
+                'public_signals' => ['knowledge' => ['claim_count' => 7]],
+            ],
+        );
+
+        self::assertSame('READY', $ready->presentationStatus());
+        self::assertSame([], $ready->reasons());
+    }
+
+    public function test_identity_only_is_not_a_public_presentation_signal(): void
+    {
+        $incomplete = PresentationReadiness::evaluate(
+            ['active' => true],
+            [
+                'route' => '/dong-ho-cong-cong/',
+                'public_eligible' => true,
+                'content' => ['name' => 'Đồng hồ công cộng'],
+            ],
+        );
+
+        self::assertSame('INCOMPLETE', $incomplete->presentationStatus());
+        self::assertSame(['PRESENTATION_CONTENT_MISSING'], $incomplete->reasons());
+    }
 }

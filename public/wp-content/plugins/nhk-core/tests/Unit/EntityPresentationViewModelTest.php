@@ -75,7 +75,7 @@ final class EntityPresentationViewModelTest extends TestCase
         self::assertArrayNotHasKey('canonical_id', $view['identity']);
     }
 
-    public function test_derives_readiness_from_public_route_and_content_when_projector_does_not_supply_a_flag(): void
+    public function test_derives_readiness_from_substantive_public_signals_when_projector_does_not_supply_a_flag(): void
     {
         $view = EntityPresentationViewModel::fromDossier('model', [
             'status' => 'AVAILABLE',
@@ -84,7 +84,7 @@ final class EntityPresentationViewModelTest extends TestCase
             'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => []],
         ]);
 
-        self::assertSame('READY', $view['presentation_readiness']['status']);
+        self::assertSame('INCOMPLETE', $view['presentation_readiness']['status']);
 
         $incomplete = EntityPresentationViewModel::fromDossier('model', [
             'status' => 'AVAILABLE',
@@ -92,5 +92,19 @@ final class EntityPresentationViewModelTest extends TestCase
             'relation_sections' => [],
         ]);
         self::assertSame('INCOMPLETE', $incomplete['presentation_readiness']['status']);
+    }
+
+    public function test_derives_readiness_from_a_published_article_signal_without_summary_or_media(): void
+    {
+        $view = EntityPresentationViewModel::fromDossier('clock_type', [
+            'status' => 'AVAILABLE',
+            'identity' => ['name' => 'Đồng hồ công cộng', 'url' => '/dong-ho-cong-cong/'],
+            'relation_sections' => [
+                'articles' => [['title' => 'Bài viết công khai', 'url' => '/bai-viet-cong-khai/']],
+            ],
+            'knowledge' => ['status' => 'NOT_APPLICABLE', 'facets' => []],
+        ]);
+
+        self::assertSame('READY', $view['presentation_readiness']['status']);
     }
 }
