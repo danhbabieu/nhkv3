@@ -3,8 +3,8 @@
 # Checkpoint — 2026-09-15 — Public Clock horizontal acceptance gate
 
 CONNECTOR: Fresh authenticated `@v3-18` runtime read-back succeeded. The
-deployed documentation bootstrap reports staging, build identity
-`4c50a79baababceb242254829ca9a117bf409df381a679c3be96ff0075cb8915`, and the
+latest documentation bootstrap reports staging, build identity
+`87070859cdeda3ccdda81d80c5d6a6b6a0fc2fab9ec1d24c628dd9d896c7a296`, and the
 five required Proposal lifecycle tools are callable. Easy MCP admin read-back
 shows exactly those five abilities enabled; no broad internal-writer enablement
 was performed.
@@ -20,21 +20,22 @@ classification is the single ACTIVE record
 Capture or Proposal was created. Exact scoped Public URL audits return KEEP for
 `/dong-ho-cong-cong/` and `/dong-ho-thap/`.
 
-BLOCKER: A governed, idempotent Authority plan for the requested
-`subtype_of` edge was created as a separate Capture plan, but APPLY was rejected
-before mutation because this staging semantic mutation is outside the approved
-acceptance scope in `AGENTS.md`. Full Graph pagination read-back confirms zero
-edges involving either Clock Type, so no fake or shortcut relation was added.
-Resume requires explicit approval to expand the approved staging acceptance
-scope, then reuse Capture `01a0a2c2-a605-7d6a-82bf-85ad98d65117` with plan
-fingerprint `40c61892fc96a7fd416526054f1bc1edfe4864a12cf1ab556fef91f3e25c9276`
-and candidate `candidate-6ce8fa5545030874555b`.
+HIERARCHY APPLY: After explicit scope approval, the existing Capture
+`01a0a2c2-a605-7d6a-82bf-85ad98d65117` resumed with plan fingerprint
+`40c61892fc96a7fd416526054f1bc1edfe4864a12cf1ab556fef91f3e25c9276` and
+candidate `candidate-6ce8fa5545030874555b`. The single relation Proposal
+`01a0a344-4272-7f5a-81fe-3f5737972748` completed review, approval, eligibility
+(`ready=true`) and apply. Canonical edge read-back is
+`01a0a344-da4d-7653-b7e8-75ffdd80ac38`, ACTIVE revision 1, Turret
+`subtype_of` Public Clock. Full Graph pagination (559 edges) and both bounded
+neighborhoods confirm one direct edge, no duplicate and no cycle diagnostic.
 
 PUBLIC READ-BACK: Saving the existing WordPress permalink structure made
 `/loai-dong-ho/` live with the Vietnamese clock-group heading, but it remains
 empty because no Clock Type is presentation-ready. Both detail paths currently
 serve the homepage rather than an entity dossier. Local generic route/template
-code exists; no deployment bypass or hard-coded route workaround was attempted.
+tests pass (28 tests / 105 assertions); no deployment bypass or hard-coded route
+workaround was attempted.
 
 EDITORIAL/DATA GATES: Posts 485 and 487 remain drafts, uncategorized and
 unbound, with no slug or featured media. Post 487 contains internal developer
@@ -42,7 +43,8 @@ language and both posts use paragraph-wrapped Markdown headings. Scoped search
 found no canonical Media or Video for either subject. Existing Morbier
 Knowledge `9473b1a7-615d-4e4b-a409-318c944d9ffc` and Strike Mechanism
 classification `01a07cc0-0916-7e2b-8f5c-e5539b9c0b75` were confirmed for reuse;
-no new Knowledge, Media, Video, Article or Public Identity mutation was made.
+no new Knowledge, Media, Video, Article or Public Identity mutation was made in
+this checkpoint.
 
 LIVE GATE: The currently exposed v3-18 surface has read-only Article preflight,
 Knowledge/Media/Video reads and Media widget open, but no callable governed
