@@ -61,6 +61,19 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame(2, $result['claim_trace'][0]['claim_revision']);
     }
 
+    public function test_composer_does_not_project_internal_claim_text_into_public_copy(): void
+    {
+        $result = (new ArticleComposer())->compose(
+            'Một bài viết công khai về đồng hồ tháp.',
+            [],
+            [['claim_id' => 'claim-internal', 'revision' => 1, 'text' => 'Knowledge facets và Model/Variant/Specimen là cấu trúc nội bộ.', 'relation_path' => [], 'provenance' => 'CATALOG_SUPPORTED', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE']],
+        );
+
+        self::assertStringContainsString('Một bài viết công khai', $result['content']);
+        self::assertStringNotContainsString('Knowledge facets', $result['content']);
+        self::assertSame([], $result['claim_trace']);
+    }
+
     public function test_repeated_resume_replaces_same_managed_claim_section_instead_of_appending(): void
     {
         $claims = [

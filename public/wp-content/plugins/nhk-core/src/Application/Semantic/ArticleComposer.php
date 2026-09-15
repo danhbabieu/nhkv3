@@ -18,6 +18,16 @@ final class ArticleComposer
         $userInput = $this->removeOwnedSections($userInput, $priorSections);
         $title = trim((string) ($context['title'] ?? ''));
         if ($title === '') $title = $this->title($userInput);
+        $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
+        // Canonical claims remain available to compliance/research, but only
+        // reader-safe claims may be projected into public prose. An unsafe
+        // legacy claim must not poison an otherwise safe editorial rewrite.
+        $usableClaims = array_values(array_filter($selectedClaims, static function (mixed $claim) use ($guard): bool {
+            if (!is_array($claim)) return false;
+            $text = trim((string) ($claim['text'] ?? ''));
+            if ($text === '') return false;
+            try { $guard->assertSafe($text); return true; } catch (\Throwable) { return false; }
+        }));
         $paragraphs = [];
         $managedSections = [];
         if ($userInput !== '') $paragraphs[] = $userInput;
@@ -32,7 +42,7 @@ final class ArticleComposer
             if ($text !== '') $paragraphs[] = 'Quan sát từ tư liệu gửi kèm cho thấy ' . rtrim($text, '.!?') . '.';
         }
         $seenClaims = [];
-        foreach ($selectedClaims as $claim) {
+        foreach ($usableClaims as $claim) {
             if (!is_array($claim)) continue;
             $claimId = trim((string) ($claim['claim_id'] ?? $claim['id'] ?? ''));
             $claimRevision = max(1, (int) ($claim['claim_revision'] ?? $claim['revision'] ?? 1));
@@ -49,7 +59,7 @@ final class ArticleComposer
         if ($paragraphs === []) $paragraphs[] = 'Nội dung đang chờ bổ sung dữ liệu biên tập.';
         $trace = [];
         $traceKeys = [];
-        foreach ($selectedClaims as $claim) {
+        foreach ($usableClaims as $claim) {
             if (!is_array($claim)) continue;
             $claimId = (string) ($claim['claim_id'] ?? $claim['id'] ?? '');
             $claimRevision = max(1, (int) ($claim['claim_revision'] ?? $claim['revision'] ?? 1));
@@ -70,7 +80,6 @@ final class ArticleComposer
         }
         $explicitExcerpt = trim((string) ($context['excerpt'] ?? ''));
         $content = implode("\n\n", $paragraphs);
-        $guard = $this->publicCopyGuard ?? new PublicEditorialCopyGuard();
         $guard->assertSafe($title);
         $guard->assertSafe($explicitExcerpt !== '' ? $explicitExcerpt : $this->excerpt($paragraphs[0]));
         $guard->assertSafe($content);
