@@ -169,6 +169,52 @@ final class PublicEntityCollectionQueryTest extends TestCase
         self::assertSame('/dong-ho-cong-cong/', $archive['items'][0]['url']);
     }
 
+    public function test_clock_type_archive_returns_a_knowledge_root_once_when_it_has_a_child_and_no_media(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $authority = new AuthorityService($repository, $types);
+        $root = $authority->create('classification', 'nhk:classification:clock-type.public', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $authority->create('classification', 'nhk:classification:clock-type.turret', 'Đồng hồ tháp', ['family' => 'clock_type']);
+        $identity = new FixturePublicIdentityRepository([
+            'authority|' . $root->canonicalId . '|classification' => ['current_slug' => 'dong-ho-cong-cong'],
+        ]);
+        $claim = new KnowledgeClaim(
+            UuidCodec::newV7(),
+            'clock-type-public-root-signal',
+            'Một nhóm đồng hồ được đặt trong không gian công cộng.',
+            'fact',
+            ['metadata' => ['subject_id' => $root->canonicalId, 'facet' => 'chronology', 'scope' => 'entity']],
+        );
+        $claims = self::createStub(KnowledgeRepository::class);
+        $claims->method('list')->willReturn([$claim]);
+        $knowledge = new EntityKnowledgeProjection(
+            $claims,
+            self::createStub(EvidenceRepository::class),
+            self::createStub(SourceRepository::class),
+        );
+        $routes = new PublicRouteResolver($repository, $types);
+        $query = new PublicEntityCollectionQuery(
+            $repository,
+            $types,
+            new PublicIdentityContract($types, $identity),
+            new PublicEntityEligibilityPolicy($repository, $types, $routes),
+            $routes,
+            null,
+            null,
+            null,
+            $knowledge,
+        );
+
+        $archive = $query->archiveProfile('clock_type');
+
+        self::assertSame(1, $archive['total']);
+        self::assertCount(1, array_filter($archive['items'], static fn (array $item): bool => $item['name'] === 'Đồng hồ công cộng'));
+        self::assertSame('READY', $archive['items'][0]['presentation_readiness']['status']);
+        self::assertArrayNotHasKey('media', $archive['items'][0]);
+    }
+
     public function test_brand_detail_can_include_graph_aggregation_without_changing_public_identity(): void
     {
         $types = new EntityTypeRegistry();

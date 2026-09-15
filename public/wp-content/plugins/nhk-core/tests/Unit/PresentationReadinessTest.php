@@ -69,4 +69,56 @@ final class PresentationReadinessTest extends TestCase
         self::assertSame('INCOMPLETE', $incomplete->presentationStatus());
         self::assertSame(['PRESENTATION_CONTENT_MISSING'], $incomplete->reasons());
     }
+
+    public function test_hierarchy_is_a_meaningful_public_presentation_signal(): void
+    {
+        $ready = PresentationReadiness::evaluate(
+            ['active' => true],
+            ['route' => '/dong-ho-thap/', 'public_eligible' => true, 'public_signals' => ['hierarchy' => true]],
+        );
+
+        self::assertSame('READY', $ready->presentationStatus());
+    }
+
+    public function test_published_article_is_a_meaningful_public_presentation_signal(): void
+    {
+        $ready = PresentationReadiness::evaluate(
+            ['active' => true],
+            ['route' => '/dong-ho-cong-cong/', 'public_eligible' => true, 'public_signals' => ['article' => 1]],
+        );
+
+        self::assertSame('READY', $ready->presentationStatus());
+    }
+
+    public function test_representative_media_is_a_meaningful_public_presentation_signal(): void
+    {
+        $ready = PresentationReadiness::evaluate(
+            ['active' => true],
+            ['route' => '/dong-ho-cong-cong/', 'public_eligible' => true, 'public_signals' => ['representative_media' => true]],
+        );
+
+        self::assertSame('READY', $ready->presentationStatus());
+    }
+
+    public function test_unknown_public_signal_does_not_make_an_active_route_ready(): void
+    {
+        $incomplete = PresentationReadiness::evaluate(
+            ['active' => true],
+            ['route' => '/dong-ho-cong-cong/', 'public_eligible' => true, 'public_signals' => ['internal_revision' => 2]],
+        );
+
+        self::assertSame('INCOMPLETE', $incomplete->presentationStatus());
+        self::assertSame(['PRESENTATION_CONTENT_MISSING'], $incomplete->reasons());
+    }
+
+    public function test_public_signal_requires_a_route_even_when_knowledge_exists(): void
+    {
+        $incomplete = PresentationReadiness::evaluate(
+            ['active' => true],
+            ['public_eligible' => true, 'public_signals' => ['knowledge' => ['claim_count' => 1]]],
+        );
+
+        self::assertSame('INCOMPLETE', $incomplete->presentationStatus());
+        self::assertSame(['PUBLIC_ROUTE_MISSING'], $incomplete->reasons());
+    }
 }

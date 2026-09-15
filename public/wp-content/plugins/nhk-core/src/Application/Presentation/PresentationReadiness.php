@@ -31,8 +31,9 @@ final readonly class PresentationReadiness
 
         $contentStatus = strtolower(trim((string) ($projection['content_status'] ?? '')));
         if ($contentStatus === 'unavailable') return new self($semanticState, 'UNAVAILABLE', ['PRESENTATION_CONTENT_UNAVAILABLE']);
-        $content = $projection['public_signals'] ?? ($projection['content'] ?? null);
-        $hasContent = self::hasContent($content);
+        $hasContent = array_key_exists('public_signals', $projection)
+            ? self::hasPublicSignal($projection['public_signals'])
+            : self::hasContent($projection['content'] ?? null);
         if ($contentStatus === 'empty' || !$hasContent) return new self($semanticState, 'INCOMPLETE', ['PRESENTATION_CONTENT_MISSING']);
 
         return new self($semanticState, 'READY');
@@ -57,5 +58,26 @@ final readonly class PresentationReadiness
         if (is_bool($content)) return $content;
         if (is_int($content) || is_float($content)) return $content > 0;
         return $content !== null && trim((string) $content) !== '';
+    }
+
+    private static function hasPublicSignal(mixed $signals): bool
+    {
+        if (!is_array($signals)) return false;
+        $summary = $signals['summary'] ?? ($signals['description'] ?? '');
+        if (self::hasText($summary)) return true;
+        if (($signals['representative_media'] ?? false) === true) return true;
+        $knowledge = $signals['knowledge'] ?? null;
+        if (is_array($knowledge) && (int) ($knowledge['claim_count'] ?? 0) > 0) return true;
+        if (is_int($knowledge) || is_float($knowledge)) if ($knowledge > 0) return true;
+        $article = $signals['article'] ?? null;
+        if (is_bool($article) && $article) return true;
+        if ((is_int($article) || is_float($article)) && $article > 0) return true;
+        if (($signals['hierarchy'] ?? false) === true) return true;
+        return false;
+    }
+
+    private static function hasText(mixed $value): bool
+    {
+        return is_scalar($value) && trim((string) $value) !== '';
     }
 }

@@ -287,25 +287,44 @@ final class ArticleMediaCoordinator
 
     private function reconcileUsage(string $endpointKey, string $slot, string $mediaId, \NHK\Core\Domain\Media\MediaSeoBlueprint $blueprint, string $placementKey = ''): \NHK\Core\Domain\Media\MediaUsage
     {
-        $existing = $this->usages->listByEndpoint('wp_post', $endpointKey, $slot);
-        foreach ($existing as $usage) {
-            if ($usage->mediaId !== $mediaId) continue;
-            $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision, $usage->placementKey !== '' ? $usage->placementKey : $placementKey);
-            if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title && $usage->placementKey === $candidate->placementKey) return $usage;
-            if ($this->usages instanceof MediaUsageUpdater) {
-                return $this->usages->update($candidate);
+        $conflictRetries = 0;
+        while (true) {
+            $existing = $this->usages->listByEndpoint('wp_post', $endpointKey, $slot);
+            usort($existing, static fn (\NHK\Core\Domain\Media\MediaUsage $left, \NHK\Core\Domain\Media\MediaUsage $right): int => $left->usageId <=> $right->usageId);
+            foreach ($existing as $usage) {
+                if ($usage->mediaId !== $mediaId) continue;
+                $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision, $usage->placementKey !== '' ? $usage->placementKey : $placementKey);
+                if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title && $usage->placementKey === $candidate->placementKey) return $usage;
+                if (!$this->usages instanceof MediaUsageUpdater) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_UPDATE_UNAVAILABLE');
+                try {
+                    return $this->usages->update($candidate);
+                } catch (\NHK\Core\Domain\Media\MediaException $error) {
+                    if (!$this->isUsageUpdateConflict($error) || $conflictRetries >= 1) throw $error;
+                    ++$conflictRetries;
+                    continue 2;
+                }
             }
-            throw new \RuntimeException('ARTICLE_MEDIA_USAGE_UPDATE_UNAVAILABLE');
-        }
-        if ($existing !== []) {
-            $current = $existing[0];
-            $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $current->revision, $current->placementKey !== '' ? $current->placementKey : $placementKey);
-            if ($this->usages instanceof MediaUsageUpdater) {
-                return $this->usages->update($candidate);
+            if ($existing !== []) {
+                $current = $existing[0];
+                $candidate = new \NHK\Core\Domain\Media\MediaUsage($current->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $current->revision, $current->placementKey !== '' ? $current->placementKey : $placementKey);
+                if ($this->usages instanceof MediaUsageUpdater) {
+                    try {
+                        return $this->usages->update($candidate);
+                    } catch (\NHK\Core\Domain\Media\MediaException $error) {
+                        if (!$this->isUsageUpdateConflict($error) || $conflictRetries >= 1) throw $error;
+                        ++$conflictRetries;
+                        continue;
+                    }
+                }
+                if ($this->usages instanceof MutableMediaUsageRepository) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_REPLACEMENT_UNAVAILABLE');
             }
-            if ($this->usages instanceof MutableMediaUsageRepository) throw new \RuntimeException('ARTICLE_MEDIA_USAGE_REPLACEMENT_UNAVAILABLE');
+            return $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $placementKey);
         }
-        return $this->mediaService->addUsage($mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $placementKey);
+    }
+
+    private function isUsageUpdateConflict(\NHK\Core\Domain\Media\MediaException $error): bool
+    {
+        return strtolower(trim($error->getMessage())) === 'media usage update conflict.';
     }
 
     /** @param list<mixed> $placements @return list<array{media_id:string,placement_key:string,sort_order:int}> */

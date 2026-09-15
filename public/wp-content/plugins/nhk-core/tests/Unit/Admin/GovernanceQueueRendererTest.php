@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 namespace {
+    if (getenv('NHK_WP_TEST_PATH') === false) {
     if (!function_exists('esc_html')) { function esc_html($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }
     if (!function_exists('esc_attr')) { function esc_attr($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }
     if (!function_exists('esc_url')) { function esc_url($value) { return esc_attr($value); } }
@@ -9,6 +10,7 @@ namespace {
     if (!function_exists('add_query_arg')) { function add_query_arg($args, $url = '') { return (string) $url . '?' . http_build_query((array) $args); } }
     if (!function_exists('selected')) { function selected($selected, $current, $echo = true) { $value = (string) $selected === (string) $current ? ' selected="selected"' : ''; if ($echo) echo $value; return $value; } }
     if (!function_exists('wp_nonce_field')) { function wp_nonce_field($action) { echo '<input type="hidden" name="_wpnonce" value="nonce">'; } }
+    }
 }
 
 namespace NHK\Tests\Unit\Admin {

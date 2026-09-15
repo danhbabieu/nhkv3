@@ -2,7 +2,8 @@
 declare(strict_types=1);
 
 namespace {
-    if (!function_exists('current_user_can')) { function current_user_can($capability) { return $GLOBALS['nhk_test_caps'][$capability] ?? true; } }
+    if (getenv('NHK_WP_TEST_PATH') === false) {
+    if (!function_exists('current_user_can')) { function current_user_can($capability) { return $GLOBALS['nhk_test_caps'][$capability] ?? false; } }
     if (!function_exists('wp_die')) { function wp_die($message, $title = '', $args = []) { throw new \RuntimeException((string) $message, (int) ($args['response'] ?? 500)); } }
     if (!function_exists('check_admin_referer')) { function check_admin_referer($action) { if (($GLOBALS['nhk_test_nonce'] ?? true) !== true) throw new \RuntimeException('nonce', 403); return 1; } }
     if (!function_exists('wp_safe_redirect')) { function wp_safe_redirect($location) { throw new \NHK\Tests\Unit\Admin\Redirected((string) $location); } }
@@ -21,6 +22,7 @@ namespace {
     if (!function_exists('esc_attr')) { function esc_attr($value) { return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); } }
     if (!function_exists('esc_url')) { function esc_url($value) { return esc_attr($value); } }
     if (!function_exists('selected')) { function selected($selected, $current, $echo = true) { $value = (string) $selected === (string) $current ? ' selected="selected"' : ''; if ($echo) echo $value; return $value; } }
+    }
 }
 
 namespace NHK\Tests\Unit\Admin {
@@ -43,7 +45,12 @@ final class GovernanceQueueAdminPageTest extends TestCase
         $_GET = [];
         $_POST = [];
         $_SERVER['REQUEST_METHOD'] = 'GET';
-        $GLOBALS['nhk_test_caps'] = [];
+        $GLOBALS['nhk_test_caps'] = [
+            'nhk_view_governance' => true,
+            'nhk_submit_proposals' => true,
+            'nhk_approve_proposals' => true,
+            'nhk_apply_proposals' => true,
+        ];
         $GLOBALS['nhk_test_nonce'] = true;
         $GLOBALS['wpdb'] = (object) [];
         GovernanceQueueAdminPage::resetTestSeams();
@@ -54,6 +61,7 @@ final class GovernanceQueueAdminPageTest extends TestCase
         GovernanceQueueAdminPage::resetTestSeams();
         $_GET = [];
         $_POST = [];
+        $GLOBALS['nhk_test_caps'] = [];
     }
 
     public function test_get_rendering_invokes_only_query_and_never_action_service(): void

@@ -182,7 +182,7 @@ final class FrontendSemanticBootstrap
                     $video = $videos->findByCanonicalId($id);
                     if ($video !== null && $video->active && $video->hasValidPublicReference()) $groups['videos'][$id] = ['type' => 'video', 'uuid' => $id, 'title' => $video->title];
                 } elseif ($type === 'wp_post' && preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', $id, $match) === 1) {
-                    $postId = (int) $match[2];
+                    $postId = (int) $match[1];
                     if (function_exists('get_post_status') && get_post_status($postId) === 'publish') $groups['articles'][$id] = ['type' => 'wp_post', 'uuid' => $id, 'title' => function_exists('get_the_title') ? (string) get_the_title($postId) : ''];
                 }
             }

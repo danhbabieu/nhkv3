@@ -48,6 +48,17 @@ final class FrontendContractTest extends TestCase
         self::assertStringNotContainsString('01a09872-6af8-7890-90b7-f913fab7bee4', $entity);
     }
 
+    public function test_collector_branch_reader_uses_the_post_id_capture_from_wordpress_stable_keys(): void
+    {
+        $bootstrap = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Frontend/FrontendSemanticBootstrap.php');
+        $match = [];
+
+        self::assertSame(1, preg_match('/^[1-9][0-9]*:([1-9][0-9]*)$/', '1:487', $match));
+        self::assertSame(487, (int) $match[1]);
+        self::assertStringContainsString('$postId = (int) $match[1];', $bootstrap);
+        self::assertStringNotContainsString('$postId = (int) $match[2];', $bootstrap);
+    }
+
     public function test_discovery_consumers_are_wired_to_one_public_collection_query(): void
     {
         $plugin = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Plugin.php');

@@ -201,9 +201,27 @@ final class MediaService
 
     private function upsertUsage(MediaUsage $existing, MediaUsage $candidate): MediaUsage
     {
-        $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey);
-        if ($this->usages instanceof MediaUsageUpdater) return $this->usages->update($updated);
-        throw new MediaException('Media usage update capability is unavailable.');
+        if (!$this->usages instanceof MediaUsageUpdater) throw new MediaException('Media usage update capability is unavailable.');
+        $attempts = 0;
+        while (true) {
+            $updated = new MediaUsage($existing->usageId, $candidate->mediaId, $candidate->endpointType, $candidate->endpointKey, $candidate->role, $candidate->sortOrder, $candidate->altText, $candidate->caption, $candidate->keywordGroups, $candidate->title, $existing->revision, $candidate->placementKey);
+            try {
+                return $this->usages->update($updated);
+            } catch (MediaException $error) {
+                if (strtolower(trim($error->getMessage())) !== 'media usage update conflict.' || $attempts >= 1) throw $error;
+                ++$attempts;
+                $refreshed = null;
+                foreach ($this->usages->listByMediaId($candidate->mediaId) as $current) {
+                    if ($current->endpointType === $candidate->endpointType && $current->endpointKey === $candidate->endpointKey && $current->role === $candidate->role && $current->placementKey === $candidate->placementKey) {
+                        $refreshed = $current;
+                        break;
+                    }
+                }
+                if (!$refreshed instanceof MediaUsage) throw $error;
+                if ($this->sameUsage($refreshed, $candidate)) return $refreshed;
+                $existing = $refreshed;
+            }
+        }
     }
 
     private function changeState(string $id, int $revision, bool $active): Media
