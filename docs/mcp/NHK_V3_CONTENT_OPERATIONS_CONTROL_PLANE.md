@@ -70,7 +70,8 @@ contract.
 The operator-facing creation flow is `nhk.capture.ingest` only. Text, images,
 Video and knowledge-only input share one Capture coordinator. Capture resolves
 Content Intent before mapping to an Article draft: `IMAGE_ARTICLE` and
-`TEXT_ARTICLE` create one draft, while `VIDEO` and `KNOWLEDGE_DELTA` do not
+`TEXT_ARTICLE` create one draft, while `VIDEO`, `KNOWLEDGE_DELTA` and
+`MEDIA_ENRICHMENT` do not
 create an Article unless a valid explicit Article intent is supplied. Direct Media, Video, Knowledge, Source/Evidence,
 Article, relation and publication mutations are not normal operator paths.
 They remain available only for explicitly bounded internal/admin lifecycle
@@ -153,6 +154,8 @@ unavailable outcomes are intermediate and cannot be reported as complete.
 
 `nhk.capture.ingest` is the single-submission coordinator for editorial text
 and optional images. One idempotency key maps to one durable Capture; the
+media-only `MEDIA_ENRICHMENT` intent reconciles supplied Media without creating
+an Article and requires canonical Media read-back; the
 resolved Article intents map to at most one native WordPress draft. The
 resumable phases are:
 

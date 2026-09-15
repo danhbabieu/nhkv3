@@ -64,7 +64,8 @@ For Editorial Capture specifically, treat the coordinator as orchestration over
 existing owners, never as a new semantic owner. The accepted shared path is
 text-only, multipart images or the registered Video adapter: one new submission
 → one durable Capture → Content Intent resolution → an Article draft only when
-the intent is `IMAGE_ARTICLE` or `TEXT_ARTICLE`. `VIDEO` and `KNOWLEDGE_DELTA`
+the intent is `IMAGE_ARTICLE` or `TEXT_ARTICLE`. `VIDEO`, `KNOWLEDGE_DELTA` and
+`MEDIA_ENRICHMENT`
 do not create an Article unless a valid explicit Article intent is supplied;
 each physical image and external Video keeps its own canonical identity and
 owner boundary. Knowledge-only text uses the same Capture path and does not

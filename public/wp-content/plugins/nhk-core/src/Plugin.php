@@ -19,7 +19,7 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
-use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, VisualSupportRequirementMigration019};
+use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
@@ -85,7 +85,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', GovernanceSubjectBindingMigration020::VERSION, false);
+        update_option('nhk_core_migration_target', MediaUsageMetadataMigration021::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
             global $wpdb;
@@ -746,6 +746,23 @@ final class Plugin {
                 static function (array $context) use ($articleMedia): array {
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
+                    if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
+                        $incomplete = [];
+                        foreach ($assets as $asset) {
+                            if (!is_array($asset)) continue;
+                            $mediaId = trim((string) ($asset['media_id'] ?? ''));
+                            if ($mediaId === '') $incomplete[] = 'MEDIA_CANONICAL_ID_MISSING';
+                            if (($asset['attachment_readback_status'] ?? 'verified') !== 'verified') $incomplete[] = 'MEDIA_ATTACHMENT_READBACK_REQUIRED';
+                        }
+                        return [
+                            'status' => $incomplete === [] && $mediaIds !== [] ? 'RECONCILED' : 'PARTIAL',
+                            'media_ids' => array_values(array_unique($mediaIds)),
+                            'media_complete' => $incomplete === [],
+                            'blockers' => array_values(array_unique($incomplete)),
+                            'frontend_verified' => null,
+                            'canonical_readback' => ['media_ids' => array_values(array_unique($mediaIds))],
+                        ];
+                    }
                     $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
                     $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : null;
                     $mediaSubjectIds = $primary !== null && trim((string) ($primary['id'] ?? '')) !== '' && ($resolution['status'] ?? '') === 'resolved' ? [trim((string) $primary['id'])] : [];
@@ -768,6 +785,8 @@ final class Plugin {
                         'force_inline_reconcile' => true,
                         'capture_has_physical_assets' => $mediaIds !== [],
                         'capture_owned_media_ids' => $mediaIds,
+                        'content_intent' => $context['content_intent'] ?? [],
+                        'single_real_image_exception' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'IMAGE_ARTICLE' && count(array_values(array_unique($mediaIds))) === 1,
                         'subject_scope_locked' => $mediaSubjectIds !== [],
                         'allow_unscoped_reuse' => false,
                         'allow_scoped_reuse' => true,
@@ -999,12 +1018,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < EditorialCaptureAddendumMigration018::VERSION || !EditorialCaptureAddendumMigration018::schemaReady($wpdb)) (new EditorialCaptureAddendumMigration018())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < VisualSupportRequirementMigration019::VERSION || !VisualSupportRequirementMigration019::schemaReady($wpdb)) (new VisualSupportRequirementMigration019())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < GovernanceSubjectBindingMigration020::VERSION || !GovernanceSubjectBindingMigration020::schemaReady($wpdb)) (new GovernanceSubjectBindingMigration020())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < MediaUsageMetadataMigration021::VERSION || !MediaUsageMetadataMigration021::schemaReady($wpdb)) (new MediaUsageMetadataMigration021())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', GovernanceSubjectBindingMigration020::VERSION, '', false);
+        add_option('nhk_core_migration_target', MediaUsageMetadataMigration021::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

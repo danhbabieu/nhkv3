@@ -229,9 +229,9 @@ Media completion a dependency of non-Article work.
 **WHAT LAW CHANGES:** `nhk.capture.ingest` remains the sole canonical new
 submission boundary and still creates exactly one durable Capture. Before any
 Article draft is created, Capture must resolve a registered Content Intent:
-`VIDEO`, `IMAGE_ARTICLE`, `TEXT_ARTICLE` or `KNOWLEDGE_DELTA`. `IMAGE_ARTICLE`
-and `TEXT_ARTICLE` create at most one native WordPress Article draft and then
-follow the Article/Media rules. `VIDEO` preserves or resolves the canonical
+`VIDEO`, `IMAGE_ARTICLE`, `TEXT_ARTICLE`, `KNOWLEDGE_DELTA` or
+`MEDIA_ENRICHMENT`. `IMAGE_ARTICLE` and `TEXT_ARTICLE` create at most one
+native WordPress Article draft and then follow the Article/Media rules. `VIDEO` preserves or resolves the canonical
 Video owner and does not create an Article unless a valid explicit Article
 intent is supplied. `KNOWLEDGE_DELTA` resolves and reuses the canonical
 Knowledge/Source/Evidence/Graph boundaries and does not create an Article or
@@ -242,7 +242,10 @@ The intent router is orchestration only. It does not become an Article,
 Video, Media or Knowledge owner, does not copy Article body into Knowledge,
 does not create duplicate canonical identities and does not bypass Governance.
 Article composition, MediaUsage reconciliation and publication gating run only
-when an Article owner exists or the resolved intent requires one. All paths
+when an Article owner exists or the resolved intent requires one. A
+`MEDIA_ENRICHMENT` intent is media-only: it accepts one or more validated
+Media references, never creates an Article, and completes only after Media
+semantic/readiness reconciliation and canonical Media read-back. All paths
 retain idempotency, revision, provenance, typed relation, readiness and final
 canonical-owner read-back invariants.
 
@@ -390,8 +393,12 @@ WordPress, MCP, Admin and future bulk/Product/Specimen adapters.
 
 **WHAT:** Approve the normative Media Ingest, Image SEO and Article Media Law
 in §13.1.1. Every new WordPress Post receives exactly one
-`FEATURED_PRIMARY` and one `INLINE_PRIMARY` usage at creation time; those
-usages must reference different Media identities. When real Media is not
+`FEATURED_PRIMARY` and one `INLINE_PRIMARY` usage at creation time. A single
+eligible real Media may satisfy both roles for an `IMAGE_ARTICLE`; this narrow
+exception is allowed only when exactly one real image is available and does
+not permit a fake second Media, placeholder substitution or repeated body
+image. When two or more real images are available, normal multi-image
+placement rules apply. When real Media is not
 available, distinct system placeholder Media identities are bound and the
 result remains incomplete. Existing Media is reused before a new identity is
 created. SEO Blueprint, detail/view vocabulary, keyword vocabulary, state and
@@ -1335,16 +1342,19 @@ Mỗi **new WordPress Post**, ngay sau native Post creation, phải có:
 
 - đúng một `FEATURED_PRIMARY`;
 - đúng một `INLINE_PRIMARY`;
-- không trùng canonical Media identity giữa hai slot;
+- hai slot có thể cùng trỏ tới một canonical Media identity chỉ trong
+  exception `IMAGE_ARTICLE` có đúng một eligible real Media;
 - `INLINE_SUPPORTING` từ 0..N.
 
 Invariant này áp dụng từ lúc Post được tạo, không đợi publish. WordPress vẫn là
 owner của `featured_media`, block ordering và editorial placement. MediaUsage
 chỉ index và giải thích placement. Create/update reconciliation phải
 idempotent; khi editor bỏ slot bắt buộc, hệ thống chọn replacement hợp lệ hoặc
-bind placeholder, không để usage bắt buộc biến mất. Placeholder phải là hai
-Media identity khác nhau nếu hai slot cùng cần placeholder, không được tính là
-real Media completeness và phải tạo incomplete diagnostic.
+bind placeholder, không để usage bắt buộc biến mất. Exception single-real-image
+không được tạo Media giả, placeholder thứ hai hoặc lặp lại ảnh trong body chỉ
+để đạt cardinality. Nếu hai slot cùng cần placeholder, chúng vẫn phải dùng hai
+Media identity placeholder khác nhau, không được tính là real Media completeness
+và phải tạo incomplete diagnostic.
 
 Before creating a Media, the policy searches reusable active Media using
 subject/context, detail/view, rights/public eligibility, resolution, aspect
@@ -2152,7 +2162,8 @@ editorial, semantic and verification stages.
 38. Media, MediaAsset và MediaUsage giữ identity/persistence riêng biệt.
 39. Batch context không phải semantic entity và không tạo Graph truth.
 40. Mọi new WordPress Post có đúng một FEATURED_PRIMARY và một INLINE_PRIMARY.
-41. Hai mandatory Article slot luôn trỏ tới hai Media identity khác nhau.
+41. Hai mandatory Article slot chỉ được dùng chung một real Media trong
+    narrow single-real-image IMAGE_ARTICLE exception.
 42. Thiếu real Media dùng placeholder và phát incomplete diagnostic.
 43. Placeholder không phải Evidence, Graph truth, sitemap member hoặc preferred structured-data image.
 44. Suitable existing Media được reuse trước khi tạo semantic Media mới.
@@ -2206,7 +2217,7 @@ editorial, semantic and verification stages.
 92. Text-only, image, multi-image, Video và knowledge-only input đều phải đi qua cùng Capture orchestration boundary.
 93. Direct Media/Video/Knowledge/Source/Evidence/Article/Graph/publication mutation chỉ được internal/admin với capability guard riêng hoặc bị block fail-closed.
 94. Direct mutation bị block phải trả `DIRECT_WRITE_BLOCKED` và `USE_CANONICAL_CAPTURE_FLOW`, không tạo partial semantic/editorial side effect.
-95. Một submission mới tạo đúng một Capture; chỉ `IMAGE_ARTICLE` và `TEXT_ARTICLE` tạo native Article draft, còn `VIDEO` và `KNOWLEDGE_DELTA` không tạo Article nếu không có explicit Article intent; physical Media/Video identities vẫn do owner riêng sở hữu.
+95. Một submission mới tạo đúng một Capture; chỉ `IMAGE_ARTICLE` và `TEXT_ARTICLE` tạo native Article draft, còn `VIDEO`, `KNOWLEDGE_DELTA` và `MEDIA_ENRICHMENT` không tạo Article nếu không có explicit Article intent; physical Media/Video identities vẫn do owner riêng sở hữu.
 96. Publication là chặng cuối của Capture; direct publish không phải entry point cho submission mới.
 97. Một visually explainable semantic feature có requirement exact, và requirement thiếu ảnh được giữ durable ở `MISSING` hoặc `REVIEW_REQUIRED`.
 98. Feature-level technical/contextual visual support không bị đồng nhất với node-level representative image.
@@ -2239,7 +2250,7 @@ khác không được dùng như decision authority song song.
 | Product commercial claims | Listing copy không phải canonical fact | Không tự promote Product copy thành Knowledge, Source/Evidence hoặc Graph relation; promotion qua evidence và Governance |
 | Media distinctions | Semantic meaning, binary và placement có lifecycle khác nhau | Media/Asset/Usage tách persistence; checksum không merge |
 | Canonical Media Ingest boundary | Every intake channel must enforce the same Media policy and diagnostics | Admin, MCP, Article Ingest, bulk, Product and Specimen adapters delegate to one application boundary; no parallel semantic write path |
-| Article two-image invariant | New editorial Posts need honest visual completeness from creation | Exactly one FEATURED_PRIMARY and one INLINE_PRIMARY use distinct Media; missing real media binds distinct placeholders and remains incomplete |
+| Article media invariant | New editorial Posts need honest visual completeness from creation | Exactly one FEATURED_PRIMARY and one INLINE_PRIMARY; one eligible real Media may fill both only for single-real-image IMAGE_ARTICLE, otherwise normal multi-image rules apply; placeholders remain incomplete |
 | Reuse before duplicate | Existing semantic Media should survive context reuse without identity multiplication | Match editorial evidence before creating Media; checksum is only a duplicate candidate |
 | Contextual image SEO | Alt/caption and SEO intent vary by page context | Blueprint and contextual metadata live at MediaUsage scope; keyword groups never become semantic truth or meta keywords |
 | Placeholder semantics | Editorial creation must remain available without fabricating SEO or evidence completeness | Placeholder is reusable system Media, excluded from sitemap/structured-data preference and always diagnostic |

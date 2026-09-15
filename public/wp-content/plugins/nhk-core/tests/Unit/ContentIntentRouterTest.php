@@ -65,6 +65,28 @@ final class ContentIntentRouterTest extends TestCase
         self::assertTrue($route['article_required']);
     }
 
+    public function test_explicit_media_enrichment_requires_media_but_not_an_article(): void
+    {
+        $route = (new ContentIntentRouter())->route(
+            ['intent' => 'MEDIA_ENRICHMENT', 'text' => 'Bổ sung tư liệu hình ảnh cho thực thể.'],
+            (new TextInputInterpreter())->interpret('Bổ sung tư liệu hình ảnh cho thực thể.'),
+            [['kind' => 'image', 'media_id' => 'media-1']],
+        );
+
+        self::assertSame('resolved', $route['status']);
+        self::assertSame('MEDIA_ENRICHMENT', $route['intent']);
+        self::assertFalse($route['article_required']);
+        self::assertTrue($route['media_required']);
+    }
+
+    public function test_media_enrichment_fails_closed_without_media(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('MEDIA_ENRICHMENT_REQUIRES_IMAGE');
+
+        (new ContentIntentRouter())->route(['intent' => 'MEDIA_ENRICHMENT', 'text' => 'Bổ sung tư liệu hình ảnh.'], [], []);
+    }
+
     public function test_image_with_standalone_editorial_content_defaults_to_image_article(): void
     {
         $route = (new ContentIntentRouter())->route(
@@ -150,6 +172,40 @@ final class ContentIntentRouterTest extends TestCase
         self::assertNull($result->articleId);
         self::assertSame('KNOWLEDGE_DELTA', $result->toArray()['content_intent']['intent']);
         self::assertSame(['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 1], $calls);
+    }
+
+    public function test_media_enrichment_skips_article_stages_and_reconciles_media(): void
+    {
+        $calls = ['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $coordinator = new EditorialCaptureCoordinator(
+            new IntentCaptureRepository(),
+            static fn (array $input): array => ['items' => [['kind' => 'image', 'media_id' => 'media-1', 'attachment_readback_status' => 'verified']]],
+            static function (array $input) use (&$calls): array { ++$calls['draft']; return ['post_id' => 902, 'state_token' => 'token']; },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'COMPLETED', 'writes' => []],
+            new ArticleComposer(),
+            static function (array $context) use (&$calls): array { ++$calls['media']; return ['status' => 'RECONCILED', 'media_ids' => ['media-1'], 'media_complete' => true]; },
+            static function (array $context) use (&$calls): array { ++$calls['publication']; return ['eligible' => true]; },
+            static function (array $context) use (&$calls): array { ++$calls['final']; return ['status' => 'verified']; },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new ContentIntentRouter(),
+        );
+
+        $result = $coordinator->execute(['idempotency_key' => 'media-enrichment-no-article', 'intent' => 'MEDIA_ENRICHMENT', 'text' => 'Bổ sung tư liệu hình ảnh.']);
+
+        self::assertNull($result->articleId);
+        self::assertSame('MEDIA_ENRICHMENT', $result->toArray()['content_intent']['intent']);
+        self::assertSame(['draft' => 0, 'media' => 1, 'publication' => 0, 'final' => 1], $calls);
+        self::assertSame('RECONCILED', $result->diagnostics['media_enrichment']['status']);
     }
 
     public function test_video_replay_keeps_one_capture_and_does_not_create_an_article(): void

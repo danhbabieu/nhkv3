@@ -87,7 +87,9 @@ final class ContentIntentRouter
                 throw new \InvalidArgumentException('VIDEO_INTENT_REQUIRES_VALID_YOUTUBE_URL');
             }
         }
-        if ($intent === ContentIntent::IMAGE_ARTICLE && $assets === []) throw new \InvalidArgumentException('IMAGE_ARTICLE_REQUIRES_IMAGE');
+        if (in_array($intent, [ContentIntent::IMAGE_ARTICLE, ContentIntent::MEDIA_ENRICHMENT], true) && $assets === []) {
+            throw new \InvalidArgumentException($intent === ContentIntent::IMAGE_ARTICLE ? 'IMAGE_ARTICLE_REQUIRES_IMAGE' : 'MEDIA_ENRICHMENT_REQUIRES_IMAGE');
+        }
         if ($intent->requiresArticle() && trim((string) ($input['text'] ?? $input['content'] ?? $input['title'] ?? '')) === '') {
             throw new \InvalidArgumentException('ARTICLE_INTENT_REQUIRES_EDITORIAL_CONTENT');
         }
@@ -101,6 +103,7 @@ final class ContentIntentRouter
             'intent' => $intent->value,
             'source' => $source,
             'article_required' => $intent->requiresArticle(),
+            'media_required' => $intent->requiresMedia(),
             'diagnostics' => [],
             'signals' => $signals,
         ];

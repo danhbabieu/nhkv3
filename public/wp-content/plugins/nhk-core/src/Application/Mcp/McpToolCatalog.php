@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Core\Application\Mcp;
 
+use NHK\Core\Domain\Capture\ContentIntent;
+
 final class McpToolCatalog
 {
     /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool,surface:string,connectorMeta?:array}> */
@@ -38,7 +40,7 @@ final class McpToolCatalog
                     'items' => ['type' => 'string', 'enum' => ['video']],
                 ],
                 'purpose' => ['type' => 'string', 'enum' => ['EDITORIAL', 'AUTHORITY', 'MIXED']],
-                'intent' => ['type' => 'string', 'enum' => ['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA']],
+                'intent' => ['type' => 'string', 'enum' => ContentIntent::values()],
                 'authority_intent' => [
                     'type' => 'object',
                     'properties' => [

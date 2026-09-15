@@ -182,7 +182,8 @@ All new content submissions use one entry point: `nhk.capture.ingest` and its
 `EditorialCaptureCoordinator`. Text-only, knowledge-only text, text plus one or
 more images, and the registered Video adapter all create one durable Capture.
 Capture resolves Content Intent; only `IMAGE_ARTICLE` and `TEXT_ARTICLE` create
-one native WordPress draft, then share the sequence
+one native WordPress draft, while `MEDIA_ENRICHMENT` reconciles Media without
+an Article, then share the sequence
 `physical ingest when applicable → interpret → Content Intent resolution →
 resolve → Graph discovery → Claim retrieval → governed semantic write-back/apply/read-back → Article composition and
 publication gate when Article intent requires it → final read-back`.

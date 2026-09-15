@@ -349,7 +349,31 @@ final class EditorialCaptureCoordinator
             $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities);
 
             if (!$articleRequired && $record->articleId === null) {
-                return $this->finishNonArticleIntent($record, $assets, $diagnostics, $receipts, $intent, $retrieved, $writes, $videoPublication, $resolution);
+                $media = [];
+                if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
+                    if (!is_callable($this->mediaReconcile)) throw new \RuntimeException('MEDIA_ENRICHMENT_RECONCILIATION_UNAVAILABLE');
+                    $this->beginPhase('MEDIA_RECONCILED');
+                    $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED');
+                    $assets = $record->assets;
+                    $diagnostics = $record->diagnostics;
+                    $receipts = $record->phaseReceipts;
+                    $media = ($this->mediaReconcile)([
+                        'capture' => $record->toArray(),
+                        'article_id' => null,
+                        'assets' => $assets,
+                        'subject_resolution' => $resolution,
+                        'content_intent' => $intent,
+                        'semantic' => $retrieved,
+                        'semantic_write_back' => $writes,
+                    ]);
+                    $diagnostics['media_enrichment'] = $this->withoutBody($media);
+                    $mediaStatus = strtoupper(trim((string) ($media['status'] ?? '')));
+                    $record = $this->save($record, 'MEDIA_RECONCILED', $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED', $record->articleId, $record->articleStateToken, $mediaStatus === 'RECONCILED' ? 'COMPLETED' : 'PARTIAL');
+                    $assets = $record->assets;
+                    $diagnostics = $record->diagnostics;
+                    $receipts = $record->phaseReceipts;
+                }
+                return $this->finishNonArticleIntent($record, $assets, $diagnostics, $receipts, $intent, $retrieved, $writes, $videoPublication, $resolution, $media);
             }
 
             $videoThumbnailFallback = $this->eligibleVideoThumbnailFallback($assets, $videoPublication);
@@ -378,7 +402,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
+            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);
@@ -513,7 +537,7 @@ final class EditorialCaptureCoordinator
      * @param array<string,mixed> $videoPublication
      * @param array<string,mixed> $resolution
      */
-    private function finishNonArticleIntent(CaptureRecord $record, array $assets, array $diagnostics, array $receipts, array $intent, array $retrieved, array $writes, array $videoPublication, array $resolution): CaptureRecord
+    private function finishNonArticleIntent(CaptureRecord $record, array $assets, array $diagnostics, array $receipts, array $intent, array $retrieved, array $writes, array $videoPublication, array $resolution, array $media = []): CaptureRecord
     {
         $this->beginPhase('FINAL_READBACK');
         $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'FINAL_READBACK');
@@ -526,13 +550,14 @@ final class EditorialCaptureCoordinator
             'content_intent' => $intent,
             'semantic' => $retrieved,
             'semantic_write_back' => $writes,
+            'media' => $media,
             'video_publication' => $videoPublication,
             'subject_resolution' => $resolution,
         ]);
         $diagnostics['final_read_back'] = $this->withoutBody($final);
         if (($final['status'] ?? '') !== 'verified') throw new \RuntimeException('CAPTURE_FINAL_READBACK_UNAVAILABLE');
 
-        $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, [], $videoPublication, [], $final, false), [
+        $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, $media, $videoPublication, [], $final, false), [
             'canonical_state' => 'COMPLETE',
             'required_owners' => $this->requiredOwners($intent, $record, $assets, [], $videoPublication),
         ]);
@@ -578,6 +603,7 @@ final class EditorialCaptureCoordinator
             'VIDEO' => [['owner_type' => 'video']],
             'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
             'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post']],
+            'MEDIA_ENRICHMENT' => [['owner_type' => 'media']],
             default => [],
         };
         if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'IMAGE_ARTICLE' && $assets !== []) $required[] = ['owner_type' => 'media'];
@@ -799,8 +825,12 @@ final class EditorialCaptureCoordinator
                 : ['owner_type' => $type, 'owner_id' => (string) ($write['canonical_id'] ?? ''), 'canonical_readback' => $write['canonical_readback'] ?? null, 'dependency_state' => ($write['status'] ?? '') === 'APPLIED' ? 'COMPLETE' : 'PARTIAL', 'blockers' => (array) ($write['blockers'] ?? [])];
         }
         foreach ((array) ($videoPublication['items'] ?? []) as $video) if (is_array($video) && is_array($video['completion'] ?? null)) $children[] = ['completion' => $video['completion']];
-        $mediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
-        if ($mediaId !== '') $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => ($media['status'] ?? '') === 'RECONCILED' ? ['id' => $mediaId] : null, 'relation_or_usage_state' => ($media['status'] ?? '') === 'RECONCILED' ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true, 'frontend_verified' => ($media['frontend_verified'] ?? null), 'blockers' => (array) ($media['blockers'] ?? [])];
+        $mediaIds = array_values(array_unique(array_filter(array_map('strval', (array) ($media['media_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
+        $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
+        if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
+        foreach (array_values(array_unique($mediaIds)) as $mediaId) {
+            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => ($media['status'] ?? '') === 'RECONCILED' ? ['id' => $mediaId] : null, 'relation_or_usage_state' => ($media['status'] ?? '') === 'RECONCILED' ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && ($media['status'] ?? '') === 'RECONCILED'), 'frontend_verified' => ($media['frontend_verified'] ?? null), 'blockers' => (array) ($media['blockers'] ?? [])];
+        }
         return $children;
     }
 }

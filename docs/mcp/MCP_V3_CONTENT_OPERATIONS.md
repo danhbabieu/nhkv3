@@ -39,10 +39,11 @@ fields, operations, taxonomy or data population.
 It accepts text-only, knowledge-only text, text with one or more multipart
 images, and the registered Video adapter. Capture resolves Content Intent before
 creating an Article: `TEXT_ARTICLE` and `IMAGE_ARTICLE` create one native draft;
-`VIDEO` and `KNOWLEDGE_DELTA` do not create an Article unless a valid explicit
-Article intent is supplied. All intents then follow the shared semantic and
+`VIDEO`, `KNOWLEDGE_DELTA` and `MEDIA_ENRICHMENT` do not create an Article
+unless a valid explicit Article intent is supplied. All intents then follow the shared semantic and
 final read-back boundary, with Article composition/publication only when
-required by the resolved intent.
+required by the resolved intent. `MEDIA_ENRICHMENT` requires Media
+reconciliation/read-back without an Article owner.
 `physical ingest when applicable → interpret → Content Intent resolution →
 resolve → Graph discovery → Claim retrieval → governed semantic write-back/apply/read-back → Article composition when
 required → publication gate when applicable → final read-back`.
@@ -267,6 +268,7 @@ present and verified. The receipt records `required_owners`,
 `missing_required_owners`, per-owner completion packets and bounded
 `resume_hints`; a child failure after another owner succeeds is `PARTIAL`, never
 `COMPLETE`. For `KNOWLEDGE_DELTA`, Article and image branches are not required;
+for `MEDIA_ENRICHMENT`, the Media branch is required and the Article branch is not;
 for Article intents the native Post is required, and `IMAGE_ARTICLE` also
 requires the canonical Media branch. This is a completion/read-back boundary,
 not a new semantic owner or mutation path.
