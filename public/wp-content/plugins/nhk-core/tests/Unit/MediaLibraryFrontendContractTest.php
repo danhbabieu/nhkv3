@@ -102,6 +102,7 @@ final class MediaLibraryFrontendContractTest extends TestCase
 
         self::assertStringContainsString('data-album-open', $template);
         self::assertStringContainsString('<dialog data-album-dialog', $template);
+        self::assertStringContainsString('aria-modal="true"', $template);
         self::assertStringContainsString('data-album-dialog-image', $template);
         self::assertStringContainsString('showModal()', $script);
         self::assertStringContainsString("event.key === 'Escape'", $script);

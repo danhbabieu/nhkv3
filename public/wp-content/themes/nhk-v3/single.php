@@ -75,7 +75,7 @@ $relationLabels = ['brands' => 'Thương hiệu', 'models' => 'Mẫu đồng h�
             <span class="album-status" data-album-status aria-live="polite">Ảnh 1 / <?php echo esc_html((string) count($galleryImages)); ?></span>
             <button type="button" data-album-next aria-label="Xem ảnh tiếp theo">Ảnh tiếp →</button>
           </div>
-          <dialog data-album-dialog aria-label="Xem ảnh lớn">
+          <dialog data-album-dialog aria-modal="true" aria-label="Xem ảnh lớn">
             <button type="button" data-album-close aria-label="Đóng ảnh lớn">Đóng</button>
             <button type="button" data-album-dialog-prev aria-label="Ảnh trước">←</button>
             <figure><img data-album-dialog-image alt=""><figcaption data-album-dialog-caption></figcaption></figure>
