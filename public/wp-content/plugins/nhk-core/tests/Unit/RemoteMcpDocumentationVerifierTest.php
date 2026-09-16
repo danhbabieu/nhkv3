@@ -21,11 +21,9 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
                 'tools/list' => ['status' => 200, 'body' => json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => ['tools' => [
                     ['name' => 'nhk.documentation.bootstrap'],
                     ['name' => 'nhk.documentation.get'],
-                    ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review'],
+                    ['name' => 'nhk.documentation.list'], ['name' => 'nhk.docs.bootstrap'], ['name' => 'nhk.article.publish.review'],
                 ]]], JSON_THROW_ON_ERROR)],
-                'tools/call' => ($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap'
-                    ? $this->jsonResponse($expected)
-                    : $this->jsonResponse(['documentation_version' => $expected['documentation_version'], 'manifest_hash' => $expected['manifest_hash'], 'files' => $expected['files']]),
+                'tools/call' => $this->jsonResponse($this->payloadFor($expected, (string) ($request['params']['name'] ?? ''))),
                 default => ['status' => 404, 'body' => ''],
             };
         });
@@ -35,7 +33,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('pass', $result->status, (string) $result->reasonCode);
         self::assertSame('mcp-documentation-verified', $result->identifier);
         self::assertSame(str_repeat('f', 64), $result->fingerprint);
-        self::assertCount(5, $calls);
+        self::assertCount(6, $calls);
         self::assertSame('https://demo.example/wp-json/nhk/v1/mcp', $calls[0][0]);
         self::assertSame('POST', $calls[0][1]);
         self::assertContains('MCP-Protocol-Version: 2026-07-28', $calls[0][2]);
@@ -62,8 +60,8 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             return match ($request['method'] ?? null) {
                 'initialize' => ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)],
-                'tools/list' => ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)],
-                'tools/call' => $this->jsonResponse($expected),
+                'tools/list' => ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.docs.bootstrap'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)],
+                'tools/call' => $this->jsonResponse($this->payloadFor($expected, (string) ($request['params']['name'] ?? ''))),
                 default => ['status' => 404, 'body' => ''],
             };
         }, 'Basic dXNlcjpwYXNz');
@@ -71,7 +69,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         $result = $verifier->verify('https://demo.example', $expected, str_repeat('f', 64));
 
         self::assertSame('pass', $result->status);
-        self::assertCount(5, $calls);
+        self::assertCount(6, $calls);
         foreach ($calls as $call) self::assertContains('Authorization: Basic dXNlcjpwYXNz', $call[2]);
     }
 
@@ -81,14 +79,14 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         $verifier = new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($expected): array {
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
-            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
-            if (($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap') {
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.docs.bootstrap'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
+            if (in_array($request['params']['name'] ?? '', ['nhk.documentation.bootstrap', 'nhk.docs.bootstrap'], true)) {
                 $bootstrap = $expected;
                 $bootstrap['manifest'] = ['files' => $expected['files']];
                 unset($bootstrap['files']);
                 return $this->jsonResponse($bootstrap);
             }
-            return $this->jsonResponse(['documentation_version' => $expected['documentation_version'], 'manifest_hash' => $expected['manifest_hash'], 'files' => $expected['files']]);
+            return $this->jsonResponse($this->payloadFor($expected, (string) ($request['params']['name'] ?? '')));
         });
 
         self::assertSame('pass', $verifier->verify('https://demo.example', $expected, str_repeat('f', 64))->status);
@@ -136,10 +134,10 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
             if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [
-                ['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review'],
+                ['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.docs.bootstrap'], ['name' => 'nhk.article.publish.review'],
             ]]], JSON_THROW_ON_ERROR)];
             if (($request['params']['name'] ?? '') === 'nhk.article.publish.review') return ['status' => 200, 'body' => json_encode(['jsonrpc' => '2.0', 'id' => 5, 'error' => ['code' => -32601, 'message' => 'Unknown tool']], JSON_THROW_ON_ERROR)];
-            return $this->jsonResponse($expected);
+            return $this->jsonResponse($this->payloadFor($expected, (string) ($request['params']['name'] ?? '')));
         });
 
         self::assertSame('MCP_CAPABILITY_PARITY_MISMATCH', $verifier->verify('https://demo.example', $expected, str_repeat('f', 64))->reasonCode);
@@ -157,12 +155,23 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         return new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($actual): array {
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
-            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
-            $payload = ($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap'
-                ? $actual
-                : ['documentation_version' => $actual['documentation_version'], 'manifest_hash' => $actual['manifest_hash'], 'files' => $actual['files']];
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.docs.bootstrap'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
+            $payload = ($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap' ? $actual : $this->payloadFor($actual, (string) ($request['params']['name'] ?? ''));
             return ['status' => 200, 'body' => json_encode(['result' => ['structuredContent' => $payload, 'isError' => false]], JSON_THROW_ON_ERROR)];
         });
+    }
+
+    /** @param array<string,mixed> $expected @return array<string,mixed> */
+    private function payloadFor(array $expected, string $tool): array
+    {
+        if ($tool === 'nhk.documentation.get') return $this->documentPayload($expected);
+        return ['documentation_version' => $expected['documentation_version'], 'manifest_hash' => $expected['manifest_hash'], 'files' => $expected['files']] + $expected;
+    }
+
+    /** @param array<string,mixed> $expected @return array<string,mixed> */
+    private function documentPayload(array $expected): array
+    {
+        return ['path' => 'AGENTS.md', 'document_key' => 'agents', 'sha256' => $expected['files'][0]['sha256'], 'documentation_version' => $expected['documentation_version'], 'manifest_hash' => $expected['manifest_hash']];
     }
 
     /** @return array<string,mixed> */

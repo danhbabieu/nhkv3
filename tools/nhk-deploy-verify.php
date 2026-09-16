@@ -66,8 +66,9 @@ try {
     $expectedManifest = is_array($localBootstrap['manifest'] ?? null) ? $localBootstrap['manifest'] : [];
     $expectedBuildIdentity = (string) ($localBootstrap['build_identity'] ?? '');
     if ($expectedManifest === [] || !preg_match('/^[a-f0-9]{64}$/', $expectedBuildIdentity)) throw new RuntimeException('DOC_MANIFEST_INVALID');
-} catch (Throwable) {
-    finish(['status' => 'failed', 'reason_code' => 'DOC_BUILD_FAILED'], $json, 2);
+    if (!hash_equals($head, (string) ($localBootstrap['source_revision'] ?? ''))) throw new RuntimeException('DOC_BUILD_STALE');
+} catch (Throwable $e) {
+    finish(['status' => 'failed', 'reason_code' => $e->getMessage() ?? 'DOC_BUILD_FAILED'], $json, 2);
 }
 
 $deployment = RemoteDeploymentAdapter::fromEnvironment($root)->deploy(new DemoCutoverContext($target, 'deployment', $head, bin2hex(random_bytes(8))));

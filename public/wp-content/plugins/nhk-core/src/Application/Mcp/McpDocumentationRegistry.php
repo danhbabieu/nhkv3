@@ -87,7 +87,7 @@ final class McpDocumentationRegistry
         $destination = rtrim($destination, DIRECTORY_SEPARATOR);
         if (!is_dir($destination) && !mkdir($destination, 0755, true) && !is_dir($destination)) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
         $entries = [];
-        foreach (self::DOCUMENTS as $definition) {
+        foreach (self::DOCUMENTS as $key => $definition) {
             $source = self::safeFile($sourceRoot, $definition['path'], false);
             if ($source === null) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
             $target = $destination . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $definition['path']);
@@ -98,7 +98,7 @@ final class McpDocumentationRegistry
             if (is_file($target)) @chmod($target, 0644);
             if (file_put_contents($target, $content, LOCK_EX) === false) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
             @chmod($target, 0444);
-            $entries[] = self::entry($definition, $definition['path'], $content);
+            $entries[] = self::entry($key, $definition, $definition['path'], $content);
         }
         usort($entries, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
         $manifest = self::manifest($entries, $runtimeVersion, $generatedAt ?? self::generatedAt(), self::readSourceRevision($sourceRoot));
@@ -115,22 +115,22 @@ final class McpDocumentationRegistry
         $context = $this->context();
         $entry = $this->entryForPath($path, $context['manifest']);
         $absolute = $this->resolveEntry($context['root'], $entry['path']);
-        if ($absolute === null) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
+        if ($absolute === null) self::invalidManifest('document_file_missing_or_unsafe', ['path' => $entry['path']]);
         $content = file_get_contents($absolute);
         $hash = is_string($content) ? hash('sha256', $content) : '';
-        if (!is_string($content) || preg_match('//u', $content) !== 1 || !hash_equals((string) $entry['sha256'], $hash)) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
+        if (!is_string($content) || preg_match('//u', $content) !== 1 || !hash_equals((string) $entry['sha256'], $hash)) self::invalidManifest('document_hash_mismatch', ['path' => $entry['path']]);
         $startLine ??= 1;
         if ($startLine < 1) throw new McpDocumentationException('DOC_LINE_RANGE_INVALID');
         if ($lineCount !== null && ($lineCount < 1 || $lineCount > self::MAX_LINE_COUNT)) throw new McpDocumentationException('DOC_LINE_LIMIT');
         $lines = preg_split('/\R/u', $content);
-        if ($lines === false) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
+        if ($lines === false) self::invalidManifest('document_line_split_failed', ['path' => $entry['path']]);
         if ($lines !== [] && end($lines) === '') array_pop($lines);
         $total = count($lines);
         $offset = min($startLine - 1, $total);
         $selected = $lineCount === null ? array_slice($lines, $offset) : array_slice($lines, $offset, $lineCount);
         $endLine = $selected === [] ? $offset : $offset + count($selected);
         return [
-            'path' => $entry['path'], 'document_key' => $this->keyForPath($entry['path']), 'status' => $entry['status'], 'domain' => $entry['domain'], 'classification' => $entry['classification'],
+            'path' => $entry['path'], 'document_key' => $entry['document_key'] ?? $this->keyForPath($entry['path']), 'status' => $entry['status'], 'domain' => $entry['domain'], 'classification' => $entry['classification'],
             'sha256' => $hash, 'document_hash' => $hash, 'documentation_version' => $context['manifest']['documentation_version'], 'manifest_hash' => $context['manifest']['manifest_hash'],
             'content' => implode("\n", $selected) . ($selected === [] ? '' : "\n"), 'start_line' => $selected === [] ? $startLine : $offset + 1, 'end_line' => $endLine, 'has_more' => $endLine < $total,
             'source_revision' => $context['manifest']['source_revision'] ?? null,
@@ -237,10 +237,10 @@ final class McpDocumentationRegistry
     private function manifestForSource(string $root): array
     {
         $entries = [];
-        foreach (self::DOCUMENTS as $definition) {
+        foreach (self::DOCUMENTS as $key => $definition) {
             $file = self::safeFile($root, $definition['path'], false); if ($file === null) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
             $content = file_get_contents($file); if (!is_string($content) || preg_match('//u', $content) !== 1 || strlen($content) > self::MAX_DOCUMENT_BYTES) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
-            $entries[] = self::entry($definition, $definition['path'], $content);
+            $entries[] = self::entry($key, $definition, $definition['path'], $content);
         }
         usort($entries, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
         return self::manifest($entries, $this->runtimeVersion, self::generatedAt(), self::readSourceRevision($root));
@@ -249,17 +249,87 @@ final class McpDocumentationRegistry
     /** @return array<string,mixed> */
     private function readManifest(string $manifestPath, string $root): array
     {
-        $decoded = json_decode((string) file_get_contents($manifestPath), true);
-        if (!is_array($decoded) || (int) ($decoded['schema_version'] ?? 0) !== self::MANIFEST_SCHEMA_VERSION || !is_array($decoded['files'] ?? null) || !hash_equals((string) ($decoded['manifest_hash'] ?? ''), self::manifestHash($decoded))) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
-        if ((string) ($decoded['runtime_version'] ?? '') === '' || (string) $decoded['runtime_version'] !== $this->runtimeVersion) throw new McpDocumentationException('DOC_RUNTIME_MISMATCH');
-        $known = array_fill_keys(self::documentPaths(), true); $seen = [];
-        foreach ($decoded['files'] as $entry) {
-            if (!is_array($entry) || !isset($entry['path'], $entry['sha256'], $entry['status'], $entry['domain'], $entry['classification']) || !in_array($entry['status'], ['ACTIVE', 'SUPERSEDED', 'HISTORICAL', 'DEPRECATED'], true) || !isset($known[$entry['path']]) || isset($seen[$entry['path']]) || $this->isTraversal((string) $entry['path'])) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
-            $seen[$entry['path']] = true; $file = $this->resolveEntry($root, (string) $entry['path']);
-            if ($file === null || !hash_equals((string) $entry['sha256'], hash_file('sha256', $file) ?: '')) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
+        $raw = file_get_contents($manifestPath);
+        if (!is_string($raw)) self::invalidManifest('manifest_unreadable');
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            self::invalidManifest('manifest_json_invalid');
         }
-        if (count($seen) !== count(self::DOCUMENTS)) throw new McpDocumentationException('DOC_MANIFEST_INVALID');
+        if (!is_array($decoded)) self::invalidManifest('manifest_shape');
+
+        $required = ['schema_version', 'documentation_version', 'runtime_version', 'source_revision', 'generated_at', 'entry_point', 'status_index', 'execution_state', 'files', 'manifest_hash'];
+        $missing = array_values(array_diff($required, array_keys($decoded)));
+        if ($missing !== []) self::invalidManifest('manifest_field_missing', ['fields' => $missing]);
+        $unexpected = array_values(array_diff(array_keys($decoded), $required));
+        if ($unexpected !== []) self::invalidManifest('manifest_field_unexpected', ['fields' => $unexpected]);
+        if ((int) $decoded['schema_version'] !== self::MANIFEST_SCHEMA_VERSION) self::invalidManifest('schema_version_mismatch', ['expected' => self::MANIFEST_SCHEMA_VERSION, 'actual' => $decoded['schema_version']]);
+        if (!is_string($decoded['documentation_version']) || preg_match('/^[a-f0-9]{64}$/i', $decoded['documentation_version']) !== 1) self::invalidManifest('documentation_version_invalid');
+        if (!is_string($decoded['runtime_version']) || $decoded['runtime_version'] === '') self::invalidManifest('runtime_version_missing');
+        if ($decoded['runtime_version'] !== $this->runtimeVersion) throw new McpDocumentationException('DOC_RUNTIME_MISMATCH', null, ['diagnostic' => 'runtime_version_mismatch', 'expected' => $this->runtimeVersion, 'actual' => $decoded['runtime_version']]);
+        if ($decoded['source_revision'] !== null && (!is_string($decoded['source_revision']) || preg_match('/^[a-f0-9]{40}$/i', $decoded['source_revision']) !== 1)) self::invalidManifest('source_revision_invalid');
+        $sourceRevision = self::readSourceRevision($root);
+        if ($sourceRevision !== null && $decoded['source_revision'] !== $sourceRevision) self::invalidManifest('source_revision_mismatch', ['expected' => $sourceRevision, 'actual' => $decoded['source_revision']]);
+        if (!is_string($decoded['generated_at']) || strtotime($decoded['generated_at']) === false) self::invalidManifest('generated_at_invalid');
+        foreach (['entry_point' => 'docs/constitution/READ_FIRST.md', 'status_index' => 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md', 'execution_state' => 'docs/architecture/V3_EXECUTION_STATE.md'] as $field => $expected) {
+            if ($decoded[$field] !== $expected) self::invalidManifest('canonical_path_mismatch', ['field' => $field, 'expected' => $expected, 'actual' => $decoded[$field]]);
+        }
+        if (!is_array($decoded['files']) || !array_is_list($decoded['files'])) self::invalidManifest('files_shape');
+        $expectedPaths = self::documentPaths();
+        usort($expectedPaths, 'strcmp');
+        $actualPaths = [];
+        $seenKeys = [];
+        foreach ($decoded['files'] as $index => $entry) {
+            if (!is_array($entry)) self::invalidManifest('file_entry_shape', ['index' => $index]);
+            $entryFields = ['document_key', 'path', 'sha256', 'status', 'domain', 'classification'];
+            $entryMissing = array_values(array_diff($entryFields, array_keys($entry)));
+            if ($entryMissing !== []) self::invalidManifest('file_entry_field_missing', ['index' => $index, 'fields' => $entryMissing]);
+            $entryUnexpected = array_values(array_diff(array_keys($entry), $entryFields));
+            if ($entryUnexpected !== []) self::invalidManifest('file_entry_field_unexpected', ['index' => $index, 'fields' => $entryUnexpected]);
+            $path = $entry['path'];
+            if (!is_string($path) || $path === '' || $this->isTraversal($path)) self::invalidManifest('document_path_invalid', ['index' => $index]);
+            $definition = self::definitionForPath($path);
+            if ($definition === null) self::invalidManifest('document_path_not_allowlisted', ['path' => $path]);
+            if (isset($seenKeys[$path])) self::invalidManifest('duplicate_document_path', ['path' => $path]);
+            $key = self::keyForDefinitionPath($path);
+            $declaredKey = $entry['document_key'];
+            if (!is_string($declaredKey) || isset($seenKeys[$declaredKey])) self::invalidManifest('duplicate_document_key', ['document_key' => $declaredKey]);
+            if ($key === null || $declaredKey !== $key) self::invalidManifest('document_key_mismatch', ['path' => $path, 'expected' => $key, 'actual' => $declaredKey]);
+            $seenKeys[$path] = true;
+            $seenKeys[$key] = true;
+            if ($entry['status'] !== $definition['status'] || $entry['domain'] !== $definition['domain'] || $entry['classification'] !== $definition['classification']) self::invalidManifest('document_metadata_mismatch', ['document_key' => $key, 'path' => $path]);
+            if (!is_string($entry['sha256']) || preg_match('/^[a-f0-9]{64}$/i', $entry['sha256']) !== 1) self::invalidManifest('document_hash_invalid', ['document_key' => $key]);
+            $actualPaths[] = $path;
+            $file = $this->resolveEntry($root, $path);
+            if ($file === null) self::invalidManifest('document_file_missing_or_unsafe', ['document_key' => $key, 'path' => $path]);
+            $actualHash = hash_file('sha256', $file) ?: '';
+            if (!hash_equals($entry['sha256'], $actualHash)) self::invalidManifest('document_hash_mismatch', ['document_key' => $key, 'path' => $path, 'expected' => $entry['sha256'], 'actual' => $actualHash]);
+        }
+        sort($actualPaths);
+        if ($actualPaths !== $expectedPaths) self::invalidManifest('document_inventory_mismatch', ['missing' => array_values(array_diff($expectedPaths, $actualPaths)), 'unexpected' => array_values(array_diff($actualPaths, $expectedPaths))]);
+        if (!hash_equals($decoded['documentation_version'], hash('sha256', self::json($decoded['files'])))) self::invalidManifest('documentation_version_mismatch');
+        if (!is_string($decoded['manifest_hash']) || preg_match('/^[a-f0-9]{64}$/i', $decoded['manifest_hash']) !== 1) self::invalidManifest('manifest_hash_invalid');
+        if (!hash_equals($decoded['manifest_hash'], self::manifestHash($decoded))) self::invalidManifest('manifest_hash_mismatch');
         return $decoded;
+    }
+
+    /** @return array{path:string,classification:string,status:string,domain:string}|null */
+    private static function definitionForPath(string $path): ?array
+    {
+        foreach (self::DOCUMENTS as $definition) if ($definition['path'] === $path) return $definition;
+        return null;
+    }
+
+    private static function keyForDefinitionPath(string $path): ?string
+    {
+        foreach (self::DOCUMENTS as $key => $definition) if ($definition['path'] === $path) return $key;
+        return null;
+    }
+
+    /** @param array<string,mixed> $details */
+    private static function invalidManifest(string $diagnostic, array $details = []): never
+    {
+        throw new McpDocumentationException('DOC_MANIFEST_INVALID', null, ['diagnostic' => $diagnostic] + $details);
     }
 
     /** @param array<string,mixed> $manifest */
@@ -273,7 +343,7 @@ final class McpDocumentationRegistry
     }
 
     /** @param array{path:string,classification:string,status:string,domain:string} $definition @return array<string,mixed> */
-    private static function entry(array $definition, string $path, string $content): array { return ['path' => $path, 'sha256' => hash('sha256', $content), 'status' => $definition['status'], 'domain' => $definition['domain'], 'classification' => $definition['classification']]; }
+    private static function entry(string $key, array $definition, string $path, string $content): array { return ['document_key' => $key, 'path' => $path, 'sha256' => hash('sha256', $content), 'status' => $definition['status'], 'domain' => $definition['domain'], 'classification' => $definition['classification']]; }
 
     /** @param array<string,mixed> $manifest @return array<string,mixed> */
     private function entryForPath(string $path, array $manifest): array
@@ -347,7 +417,8 @@ final class McpDocumentationRegistry
 
 final class McpDocumentationException extends \RuntimeException
 {
-    public function __construct(public readonly string $reasonCode, ?string $message = null) { parent::__construct($message ?? $reasonCode); }
-    /** @return array<string,string> */
-    public function toArray(): array { return ['code' => $this->reasonCode, 'reason' => $this->reasonCode]; }
+    /** @param array<string,mixed> $details */
+    public function __construct(public readonly string $reasonCode, ?string $message = null, public readonly array $details = []) { parent::__construct($message ?? $reasonCode); }
+    /** @return array<string,mixed> */
+    public function toArray(): array { return ['code' => $this->reasonCode, 'reason' => $this->reasonCode, 'details' => $this->details]; }
 }

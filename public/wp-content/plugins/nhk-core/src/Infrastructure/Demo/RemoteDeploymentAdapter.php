@@ -6,6 +6,7 @@ namespace NHK\Core\Infrastructure\Demo;
 use Closure;
 use NHK\Core\Application\Demo\DemoCutoverContext;
 use NHK\Core\Application\Demo\StageResult;
+use NHK\Core\Application\Mcp\McpDocumentationRegistry;
 
 /** Generic, target-allowlisted transport for the nhk-core artifact only. */
 final class RemoteDeploymentAdapter
@@ -129,6 +130,14 @@ final class RemoteDeploymentAdapter
 
     private function artifactFingerprint(string $directory, string $muPluginSource, string $themeDirectory): ?string
     {
+        $pluginVersion = PluginHeaderVersionReader::read($directory . 'nhk-core.php');
+        $snapshot = $directory . 'resources/canonical-docs';
+        if ($pluginVersion === null || !is_file($snapshot . '/manifest.json')) return null;
+        try {
+            (new McpDocumentationRegistry($snapshot, $pluginVersion))->bootstrap();
+        } catch (\Throwable) {
+            return null;
+        }
         $files = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS));
         foreach ($iterator as $file) {

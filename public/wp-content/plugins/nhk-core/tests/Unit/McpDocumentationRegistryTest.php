@@ -186,4 +186,85 @@ final class McpDocumentationRegistryTest extends TestCase
         try { (new McpDocumentationRegistry($directory, 'runtime-a'))->bootstrap(); self::fail('Expected symlink rejection.'); }
         catch (\RuntimeException $error) { self::assertSame('DOC_MANIFEST_INVALID', $error->getMessage()); }
     }
+
+    public function test_manifest_invariants_fail_closed_with_specific_diagnostics(): void
+    {
+        $scenarios = [
+            'missing-file' => static function (array $manifest, string $directory): array {
+                unlink($directory . '/AGENTS.md');
+                return $manifest;
+            },
+            'duplicate-path' => static function (array $manifest): array {
+                $manifest['files'][] = $manifest['files'][0];
+                return $manifest;
+            },
+            'duplicate-key' => static function (array $manifest): array {
+                $manifest['files'][1]['document_key'] = $manifest['files'][0]['document_key'];
+                return $manifest;
+            },
+            'hash-mismatch' => static function (array $manifest): array {
+                $manifest['files'][0]['sha256'] = str_repeat('0', 64);
+                return $manifest;
+            },
+            'version-mismatch' => static function (array $manifest): array {
+                $manifest['documentation_version'] = str_repeat('f', 64);
+                return $manifest;
+            },
+        ];
+
+        $expectedDiagnostics = [
+            'missing-file' => 'document_file_missing_or_unsafe',
+            'duplicate-path' => 'duplicate_document_path',
+            'duplicate-key' => 'duplicate_document_key',
+            'hash-mismatch' => 'document_hash_mismatch',
+            'version-mismatch' => 'documentation_version_mismatch',
+        ];
+
+        foreach ($scenarios as $name => $mutator) {
+            $directory = sys_get_temp_dir() . '/nhk-docs-invariant-' . $name . '-' . bin2hex(random_bytes(5));
+            self::assertTrue(mkdir($directory, 0755, true));
+            $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', '2026-09-09T00:00:00+00:00');
+            $updated = $mutator($manifest, $directory);
+            $this->writeManifest($directory . '/manifest.json', $updated);
+
+            try {
+                (new McpDocumentationRegistry($directory, 'runtime-a'))->bootstrap();
+                self::fail('Expected manifest rejection for ' . $name);
+            } catch (\RuntimeException $error) {
+                self::assertSame('DOC_MANIFEST_INVALID', $error->getMessage(), $name);
+                self::assertSame($expectedDiagnostics[$name], $error->details['diagnostic'] ?? null, $name);
+            }
+        }
+    }
+
+    public function test_source_revision_mismatch_is_rejected_when_manifest_is_read_from_repository_root(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-source-revision-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        $manifest = McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', '2026-09-09T00:00:00+00:00');
+        $manifest['source_revision'] = str_repeat('0', 40);
+        $this->writeManifest($directory . '/manifest.json', $manifest);
+        self::assertTrue(symlink(dirname(__DIR__, 6) . '/.git', $directory . '/.git'));
+
+        $registry = new McpDocumentationRegistry($directory, 'runtime-a');
+        try {
+            $registry->bootstrap();
+            self::fail('Expected source revision rejection.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('DOC_MANIFEST_INVALID', $error->getMessage());
+            self::assertSame('source_revision_mismatch', $error->details['diagnostic'] ?? null);
+        }
+    }
+
+    /** @param array<string,mixed> $manifest */
+    private function writeManifest(string $path, array $manifest): void
+    {
+        chmod($path, 0644);
+        $manifest['manifest_hash'] = null;
+        $hashInput = $manifest;
+        unset($hashInput['manifest_hash'], $hashInput['generated_at']);
+        $manifest['manifest_hash'] = hash('sha256', json_encode($hashInput, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        self::assertNotFalse(file_put_contents($path, json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n"));
+        chmod($path, 0444);
+    }
 }

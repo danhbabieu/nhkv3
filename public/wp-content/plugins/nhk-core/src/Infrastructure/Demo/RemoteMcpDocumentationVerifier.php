@@ -28,15 +28,18 @@ final class RemoteMcpDocumentationVerifier
 
             $tools = $this->call($url, 'tools/list', [], 2);
             $toolNames = array_values(array_filter(array_map(static fn (mixed $tool): string => is_array($tool) ? (string) ($tool['name'] ?? '') : '', is_array($tools['tools'] ?? null) ? $tools['tools'] : [])));
-            foreach (['nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.article.publish.review'] as $requiredTool) {
+            foreach (['nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.article.publish.review'] as $requiredTool) {
                 if (!in_array($requiredTool, $toolNames, true)) return StageResult::failed('MCP_BOOTSTRAP_UNAVAILABLE');
             }
 
             $bootstrap = $this->tool($url, 'nhk.documentation.bootstrap', 3);
             $list = $this->tool($url, 'nhk.documentation.list', 4);
+            $document = $this->tool($url, 'nhk.documentation.get', 5, ['path' => 'AGENTS.md', 'start_line' => 1, 'line_count' => 1]);
+            $alias = $this->tool($url, 'nhk.docs.bootstrap', 6);
             if (!hash_equals($expectedBuildIdentity, (string) ($bootstrap['build_identity'] ?? ''))) return StageResult::blocked('DEPLOYMENT_NOT_ACTIVE');
             if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
             if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'] ?? null, $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameIdentity($alias, $expectedBootstrap) || ($document['path'] ?? null) !== 'AGENTS.md' || !$this->sameDocumentHash($document, $expectedBootstrap['files'], 'AGENTS.md')) return StageResult::failed('DOC_MANIFEST_MISMATCH');
             if (!$this->sameReleaseIdentity($bootstrap, $expectedBootstrap)) return StageResult::failed('RELEASE_TUPLE_MISMATCH');
             if (!$this->callableProbe($url)) return StageResult::failed('MCP_CAPABILITY_PARITY_MISMATCH');
         } catch (\Throwable) {
@@ -58,9 +61,9 @@ final class RemoteMcpDocumentationVerifier
     }
 
     /** @return array<string,mixed> */
-    private function tool(string $url, string $name, int $id): array
+    private function tool(string $url, string $name, int $id, array $arguments = []): array
     {
-        $result = $this->call($url, 'tools/call', ['name' => $name, 'arguments' => []], $id);
+        $result = $this->call($url, 'tools/call', ['name' => $name, 'arguments' => $arguments], $id);
         if (!is_array($result['structuredContent'] ?? null)) throw new \RuntimeException('MCP_TOOL_RESPONSE_INVALID');
         return $result['structuredContent'];
     }
@@ -125,6 +128,14 @@ final class RemoteMcpDocumentationVerifier
         $actualMap = $this->fileMap($actual);
         $expectedMap = $this->fileMap($expected);
         return $actualMap !== null && $expectedMap !== null && $actualMap === $expectedMap;
+    }
+
+    /** @param mixed $document @param mixed $files */
+    private function sameDocumentHash(mixed $document, mixed $files, string $path): bool
+    {
+        if (!is_array($document) || !is_string($document['sha256'] ?? null)) return false;
+        $map = $this->fileMap($files);
+        return $map !== null && isset($map[$path]) && hash_equals($map[$path], strtolower($document['sha256']));
     }
 
     /** @param array<string,mixed> $bootstrap */
