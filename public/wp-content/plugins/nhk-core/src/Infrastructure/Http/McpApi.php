@@ -6,10 +6,14 @@ namespace NHK\Core\Infrastructure\Http;
 use NHK\Core\Application\Mcp\McpReadHandler;
 use NHK\Core\Application\Mcp\McpGovernanceHandler;
 use NHK\Core\Application\Mcp\McpTransport;
+use NHK\Core\Application\Mcp\RecoveryMcpRuntimeBinding;
 
 final class McpApi
 {
-    public function __construct(private McpTransport $transport) {}
+    public function __construct(
+        private McpTransport $transport,
+        private ?RecoveryMcpRuntimeBinding $recoveryBinding = null,
+    ) {}
 
     public function register(): void
     {
@@ -39,6 +43,31 @@ final class McpApi
 
     private function dispatch(\WP_REST_Request $request): \WP_REST_Response
     {
+        if ($this->recoveryBinding !== null) {
+            $binding = $this->recoveryBinding->check();
+            if (!$binding['ok']) {
+                return new \WP_REST_Response([
+                    'jsonrpc' => '2.0',
+                    'error' => [
+                        'code' => -32003,
+                        'message' => 'Recovery MCP runtime binding failed.',
+                        'data' => ['reason_code' => $binding['reason_code']],
+                    ],
+                ], 503);
+            }
+
+            if (!current_user_can('read')) {
+                $loggedIn = function_exists('is_user_logged_in') && is_user_logged_in();
+                return new \WP_REST_Response([
+                    'jsonrpc' => '2.0',
+                    'error' => [
+                        'code' => -32001,
+                        'message' => $loggedIn ? 'Recovery MCP authentication is forbidden.' : 'Recovery MCP authentication is required.',
+                    ],
+                ], $loggedIn ? 403 : 401);
+            }
+        }
+
         $body = $request->get_json_params();
         if (!is_array($body) || $body === []) {
             foreach (['request', 'json', 'payload'] as $field) {
