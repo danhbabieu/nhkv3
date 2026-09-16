@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Live image upload trusted-host completion gate
+
+SCOPE: Close the exact ChatGPT file-host policy gap for the live one-image
+`MEDIA_ENRICHMENT` acceptance without broadening trust or changing the Media,
+Capture or Governance owners.
+
+FIX: The staging MU-plugin allowlist now includes the two evidenced exact hosts
+`sdmntprjapaneast.oaiusercontent.com` and
+`oaisdmntprnznorth.blob.core.windows.net`, alongside the previously observed
+exact hosts. Matching remains centralized at the trusted-file materializer
+boundary with HTTPS-only URLs, exact host equality, DNS/IP public-range checks,
+private/loopback/link-local rejection and redirect revalidation. Wildcards and
+broad parent domains remain absent.
+
+LOCAL_VERIFICATION: Focused trusted-file/MCP/Capture/media tests PASS (111
+tests / 909 assertions); full Unit PASS (1,629 / 7,988); Contract PASS (6 / 48);
+widget tests PASS (17), TypeScript check PASS, production widget build PASS,
+PHP lint PASS, `album.js` syntax check PASS, documentation snapshot generation
+PASS and secret/diff checks PASS. Generated widget contains exactly “Tải ảnh
+lên” and “Tạo bài viết”; the Capture schema contains all five registered
+intents including `MEDIA_ENRICHMENT`.
+
+DEPLOYMENT: The canonical `./scripts/nhk-deploy-verify` wrapper was run against
+`demo.1945.vn` at source HEAD after the worktree was made clean. It stopped
+fail-closed before transfer with `REMOTE_DEPLOYMENT_CONFIG_REQUIRED` because
+`NHK_DEMO_DEPLOY_CONFIG` is absent. No approved deploy INI/template was found
+in the repository or local operator environment, and no remote mutation was
+attempted. Live documentation/bootstrap, reconnect and real `IMG_4335.jpg`
+acceptance therefore remain pending the approved deployment configuration.
+
 # Checkpoint — 2026-09-16 — MCP discovery/execution registry parity repair
 
 ROOT_CAUSE: `McpToolCatalog` advertised canonical Article mutation names, while
