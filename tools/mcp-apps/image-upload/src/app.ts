@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertUploadManifestCount, buildWidgetState, extractUploadManifest, inspectToolResult, normalizeSelectedFiles, type SelectedImage, type ToolResult, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertUploadManifestCount, buildWidgetState, extractUploadManifest, inspectToolResult, normalizeSelectedFiles, shouldProcessToolResultNotification, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -151,7 +151,8 @@ async function start(): Promise<void> {
     void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
   }
 
-  function handleToolResult(result: ToolResult, expectedCount?: number): UploadedItem[] {
+  function handleToolResult(result: ToolResult, expectedCount?: number, source: ToolResultNotificationSource = "widget-upload"): UploadedItem[] {
+    if (!shouldProcessToolResultNotification(source)) return [];
     const manifest = extractUploadManifest(result);
     if (expectedCount !== undefined) assertUploadManifestCount(manifest, expectedCount);
     uploaded = manifest.items;
@@ -201,7 +202,7 @@ async function start(): Promise<void> {
       arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references },
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const returned = handleToolResult(result as ToolResult, selected.length);
+    const returned = handleToolResult(result as ToolResult, selected.length, "widget-upload");
     recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
     if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
     recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
@@ -262,10 +263,14 @@ async function start(): Promise<void> {
     }
   }
 
-  app.ontoolresult = (result) => {
-    try { handleToolResult(result as ToolResult); } catch (error) {
-      recordDiagnostic("ERROR", "ERROR", "SERVER_TOOL_RESULT_INVALID", error);
-      setState("ERROR", `Kết quả MCP không hợp lệ: ${safeErrorMessage(error)}`);
+  app.ontoolresult = (_result) => {
+    // The notification emitted while this App is mounted is the result of
+    // nhk.media.upload-widget.open. App.callServerTool returns the actual
+    // widget-upload/capture result directly, so the open result must never be
+    // parsed as an upload manifest.
+    if (!shouldProcessToolResultNotification("open")) {
+      recordDiagnostic("OPEN_TOOL_RESULT_IGNORED", "DONE", "OPEN_TOOL_RESULT_NOT_UPLOAD");
+      return;
     }
   };
   app.onerror = (error) => {

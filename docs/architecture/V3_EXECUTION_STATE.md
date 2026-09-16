@@ -1,5 +1,34 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Live image widget lifecycle/envelope repair
+
+SCOPE: Repair the bounded ChatGPT image-upload widget so the initial
+`nhk.media.upload-widget.open` result is treated as an open-resource lifecycle
+event, while only direct `nhk.media.widget-upload` and `nhk.capture.ingest`
+results are parsed as operation results. No new semantic type, field, endpoint,
+Media identity or Article write path was introduced.
+
+FIX: The widget now ignores the standard open-tool result notification instead
+of interpreting it as an upload manifest and surfacing
+`SERVER_TOOL_RESULT_INVALID`. Manifest parsing now accepts the observed
+Ability-envelope shape (`result.content[]`) and case-insensitive success
+statuses while retaining typed error/count-mismatch fail-closed behavior.
+The generated served resource was rebuilt. Capture handoff remains explicit
+`intent=MEDIA_ENRICHMENT`, media-only, and does not create an Article.
+
+LOCAL_VERIFICATION: Widget tests PASS (19/19), TypeScript check PASS,
+production widget build PASS, focused MCP/widget/schema tests PASS (70 tests /
+679 assertions), full Unit suite PASS (1,633 tests / 8,066 assertions), PHP
+lint PASS, documentation snapshot generation PASS, and `git diff --check`
+PASS. Full repository PHPUnit was also attempted; its remaining failures are
+environmental WordPress/DB bootstrap failures (`stdClass` wpdb or missing WP
+functions), not widget failures. `V2_V3_PARITY_MATRIX.md` remains historical
+non-normative evidence and is not being claimed as complete parity.
+
+DEPLOYMENT: Pending the single canonical wrapper run against `demo.1945.vn`
+with the configured `NHK_DEMO_DEPLOY_CONFIG`. No live upload or staging
+semantic mutation has occurred in this checkpoint.
+
 # Checkpoint — 2026-09-16 — Remote registry evidence and deployment blocker
 
 REMOTE_READ_ONLY: Fresh staging `POST /wp-json/nhk/v1/mcp` initialize with

@@ -648,7 +648,7 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/capture-ingest', $enabled);
     }
 
-    public function test_easy_mcp_reconciles_stale_internal_writers_and_article_lifecycle_to_the_canonical_allowlist(): void
+    public function test_easy_mcp_preserves_explicitly_selected_registered_nhk_abilities_and_reconciles_unknown_ids(): void
     {
         $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([
             'core/get-site-info',
@@ -663,11 +663,45 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/documentation-bootstrap', $enabled);
         self::assertContains('nhk-v3/documentation-get', $enabled);
         self::assertContains('nhk-v3/documentation-list', $enabled);
-        self::assertNotContains('nhk-v3/video-ingest', $enabled);
+        self::assertContains('nhk-v3/video-ingest', $enabled);
+        self::assertNotContains('nhk-v3/not-a-registered-ability', $enabled);
+        self::assertNotContains('wp_create_post', $enabled);
         foreach (['nhk-v3/article-draft-create', 'nhk-v3/article-draft-update', 'nhk-v3/article-publish-review', 'nhk-v3/article-publish-approve', 'nhk-v3/article-publish', 'nhk-v3/article-trash', 'nhk-v3/article-restore'] as $ability) {
             self::assertContains($ability, $enabled);
         }
         self::assertSame($enabled, McpAbilityRegistration::ensureEasyMcpEnabledAbilities($enabled));
+    }
+
+    public function test_easy_mcp_native_and_connector_names_round_trip_to_one_canonical_dispatch_tool(): void
+    {
+        $priority = [
+            'nhk.capture.ingest',
+            'nhk.article.ingest',
+            'nhk.proposal.create',
+            'nhk.proposal.submit',
+            'nhk.proposal.review',
+            'nhk.proposal.approve',
+            'nhk.proposal.eligibility',
+            'nhk.proposal.apply',
+            'nhk.knowledge.ingest',
+            'nhk.source.ingest',
+            'nhk.evidence.ingest',
+        ];
+
+        foreach ($priority as $toolName) {
+            $abilityName = McpAbilityRegistration::abilityNameForTool($toolName);
+            self::assertNotNull($abilityName, $toolName);
+            $connectorName = McpAbilityRegistration::connectorToolNameForAbility((string) $abilityName);
+            self::assertSame($abilityName, McpAbilityRegistration::abilityNameForConnectorTool($connectorName), $toolName);
+            self::assertSame($toolName, McpAbilityRegistration::toolNameForConnectorTool($connectorName), $toolName);
+            self::assertTrue(McpToolCatalog::hasExecutableDispatchHandler($toolName), $toolName);
+        }
+
+        $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([
+            McpAbilityRegistration::connectorToolNameForAbility('nhk-v3/proposal-create'),
+        ]);
+        self::assertContains('nhk-v3/proposal-create', $enabled);
+        self::assertNotContains('wp_ability_nhk_v3_proposal_create', $enabled);
     }
 
     public function test_empty_easy_mcp_option_gets_the_canonical_operator_surface(): void

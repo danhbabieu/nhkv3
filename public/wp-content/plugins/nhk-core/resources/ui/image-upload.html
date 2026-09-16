@@ -12018,6 +12018,9 @@ function normalizeSelectedFiles(value) {
     return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
   });
 }
+function shouldProcessToolResultNotification(source) {
+  return source === "widget-upload" || source === "capture";
+}
 const SAFE_ERROR_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
 function errorCode(value) {
   if (typeof value === "string") {
@@ -12041,6 +12044,17 @@ function parsedText(result) {
     return text;
   }
 }
+function parsedContent(value) {
+  const content = value.content;
+  if (!Array.isArray(content)) return void 0;
+  const text = content.find((item) => item && typeof item === "object" && item.type === "text");
+  if (typeof text?.text !== "string" || text.text === "") return void 0;
+  try {
+    return JSON.parse(text.text);
+  } catch {
+    return text.text;
+  }
+}
 function inspectValue(value, depth = 0) {
   if (depth > 6) return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
   if (typeof value === "string") {
@@ -12054,14 +12068,15 @@ function inspectValue(value, depth = 0) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { kind: "success", payload: value };
   const record2 = value;
   if (record2.isError === true) return { kind: "error", code: errorCode(record2) ?? errorCode(record2.structuredContent) ?? errorCode(record2.result) ?? "SERVER_TOOL_ERROR" };
-  const nestedError = errorCode(record2.error);
-  if (record2.error !== void 0 && nestedError) return { kind: "error", code: nestedError };
+  if (record2.error !== void 0) return { kind: "error", code: errorCode(record2.error) ?? "SERVER_TOOL_ERROR" };
   for (const nested of [record2.structuredContent, record2.result]) {
     if (nested === void 0) continue;
     const inspection = inspectValue(nested, depth + 1);
     if (inspection.kind !== "success") return inspection;
     return inspection;
   }
+  const content = parsedContent(record2);
+  if (content !== void 0) return inspectValue(content, depth + 1);
   return { kind: "success", payload: value };
 }
 function inspectToolResult(result) {
@@ -12076,7 +12091,8 @@ function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record2 = value;
   const statusValue = typeof record2.status === "string" ? record2.status : record2.upload_status;
-  const status = statusValue === "CREATED" ? "SUCCESS" : typeof statusValue === "string" && statusValue !== "" ? statusValue : fallbackStatus;
+  const normalizedStatus = typeof statusValue === "string" ? statusValue.trim().toUpperCase() : "";
+  const status = normalizedStatus === "CREATED" || normalizedStatus === "SUCCESS" ? "SUCCESS" : normalizedStatus !== "" ? normalizedStatus : fallbackStatus;
   const item = {
     ...typeof record2.attachment_id === "number" ? { attachment_id: record2.attachment_id } : {},
     ...typeof record2.media_id === "string" ? { media_id: record2.media_id } : {},
@@ -12254,7 +12270,8 @@ async function start() {
     if (!connected || typeof host?.setWidgetState !== "function") return;
     void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
   }
-  function handleToolResult(result, expectedCount) {
+  function handleToolResult(result, expectedCount, source = "widget-upload") {
+    if (!shouldProcessToolResultNotification(source)) return [];
     const manifest = extractUploadManifest(result);
     if (expectedCount !== void 0) assertUploadManifestCount(manifest, expectedCount);
     uploaded = manifest.items;
@@ -12298,7 +12315,7 @@ async function start() {
       arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references }
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const returned = handleToolResult(result, selected.length);
+    const returned = handleToolResult(result, selected.length, "widget-upload");
     recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
     if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
     recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
@@ -12356,12 +12373,10 @@ async function start() {
       renderSelection();
     }
   }
-  app.ontoolresult = (result) => {
-    try {
-      handleToolResult(result);
-    } catch (error2) {
-      recordDiagnostic("ERROR", "ERROR", "SERVER_TOOL_RESULT_INVALID", error2);
-      setState("ERROR", `Kết quả MCP không hợp lệ: ${safeErrorMessage(error2)}`);
+  app.ontoolresult = (_result) => {
+    if (!shouldProcessToolResultNotification("open")) {
+      recordDiagnostic("OPEN_TOOL_RESULT_IGNORED", "DONE", "OPEN_TOOL_RESULT_NOT_UPLOAD");
+      return;
     }
   };
   app.onerror = (error2) => {

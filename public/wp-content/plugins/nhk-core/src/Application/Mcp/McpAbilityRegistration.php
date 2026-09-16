@@ -75,6 +75,20 @@ final class McpAbilityRegistration
         return 'wp_ability_' . strtolower((string) preg_replace('/[^a-z0-9]+/', '_', $abilityName));
     }
 
+    public static function abilityNameForConnectorTool(string $connectorTool): ?string
+    {
+        foreach (self::abilityNames() as $abilityName) {
+            if (self::connectorToolNameForAbility($abilityName) === $connectorTool) return $abilityName;
+        }
+        return null;
+    }
+
+    public static function toolNameForConnectorTool(string $connectorTool): ?string
+    {
+        $abilityName = self::abilityNameForConnectorTool($connectorTool);
+        return $abilityName === null ? null : self::toolNameForAbility($abilityName);
+    }
+
     public static function toolNameForAbility(string $abilityName): ?string
     {
         foreach ([self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP] as $map) {
@@ -124,10 +138,21 @@ final class McpAbilityRegistration
     public static function ensureEasyMcpEnabledAbilities(mixed $enabled): array
     {
         $enabled = is_array($enabled) ? $enabled : [];
-        $preserved = array_values(array_filter($enabled, static fn (mixed $ability): bool => is_string($ability) && !str_starts_with($ability, 'nhk-v3/')));
+        $registered = array_fill_keys(self::abilityNames(), true);
+        $preserved = [];
+        foreach ($enabled as $ability) {
+            if (!is_string($ability) || trim($ability) === '') continue;
+            $ability = self::abilityNameForConnectorTool($ability) ?? $ability;
+            // Easy MCP stores native Ability IDs today, while older connector
+            // builds may post their wp_ability_* projection. Normalize the
+            // latter, retain every registered NHK Ability explicitly selected
+            // by an administrator, and discard unknown NHK IDs only.
+            if (str_starts_with($ability, 'nhk-v3/') && !isset($registered[$ability])) continue;
+            $preserved[] = $ability;
+        }
         $explicitInternal = array_values(array_intersect(
             self::explicitInternalAdminAbilityAllowlist(),
-            array_values(array_filter($enabled, 'is_string')),
+            $preserved,
         ));
         $boundedContinuation = self::publicationContinuationAbilityNames();
 

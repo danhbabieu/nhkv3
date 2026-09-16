@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertUploadManifestCount, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, normalizeSelectedFiles } from "../src/contract.ts";
+import { assertUploadManifestCount, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, normalizeSelectedFiles, shouldProcessToolResultNotification } from "../src/contract.ts";
+
+test("does not parse the tool result that opened the widget as an upload result", () => {
+  assert.equal(shouldProcessToolResultNotification("open"), false);
+  assert.equal(shouldProcessToolResultNotification(null), false);
+  assert.equal(shouldProcessToolResultNotification("widget-upload"), true);
+  assert.equal(shouldProcessToolResultNotification("capture"), true);
+});
 
 test("normalizes ChatGPT library selections as authorized file references", () => {
   assert.deepEqual(normalizeSelectedFiles([
@@ -76,6 +83,36 @@ test("maps the server result envelope returned by the Ability bridge", () => {
     status: "SUCCESS",
     file_id: "file-envelope",
   }]);
+});
+
+test("maps an Ability envelope whose result only contains content JSON", () => {
+  const result = extractUploadManifest({
+    result: {
+      isError: false,
+      content: [{ type: "text", text: JSON.stringify({
+        requested_count: 1,
+        success_count: 1,
+        failure_count: 0,
+        items: [{
+          ordinal: 0,
+          status: "success",
+          attachment_id: 44,
+          media_id: "media-content-envelope",
+          filename: "content-envelope.webp",
+          canonical_url: "/anh/content-envelope.webp",
+          attachment_readback_status: "verified",
+          mime_type: "image/webp",
+          byte_size: 120,
+          width: 1200,
+          height: 900,
+        }],
+      }) }],
+    },
+  });
+
+  assert.equal(result.items[0].media_id, "media-content-envelope");
+  assert.equal(result.items[0].status, "SUCCESS");
+  assertUploadManifestCount(result, 1);
 });
 
 test("unwraps a documentation checkpoint from the Ability result envelope", () => {

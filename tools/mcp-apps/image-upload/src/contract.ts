@@ -56,6 +56,16 @@ export type ToolResult = {
   result?: unknown;
 };
 
+export type ToolResultNotificationSource = "open" | "widget-upload" | "capture";
+
+/**
+ * The tool-result notification delivered while mounting an App belongs to the
+ * tool that opened the widget. It is not the result of a widget action.
+ */
+export function shouldProcessToolResultNotification(source: ToolResultNotificationSource | null): boolean {
+  return source === "widget-upload" || source === "capture";
+}
+
 export type ToolResultInspection =
   | { kind: "success"; payload: unknown }
   | { kind: "error"; code: string }
@@ -87,6 +97,18 @@ function parsedText(result: ToolResult): unknown {
   }
 }
 
+function parsedContent(value: Record<string, unknown>): unknown {
+  const content = value.content;
+  if (!Array.isArray(content)) return undefined;
+  const text = content.find((item) => item && typeof item === "object" && (item as { type?: unknown }).type === "text") as { text?: unknown } | undefined;
+  if (typeof text?.text !== "string" || text.text === "") return undefined;
+  try {
+    return JSON.parse(text.text) as unknown;
+  } catch {
+    return text.text;
+  }
+}
+
 function inspectValue(value: unknown, depth = 0): ToolResultInspection {
   if (depth > 6) return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
   if (typeof value === "string") {
@@ -100,14 +122,15 @@ function inspectValue(value: unknown, depth = 0): ToolResultInspection {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { kind: "success", payload: value };
   const record = value as Record<string, unknown>;
   if (record.isError === true) return { kind: "error", code: errorCode(record) ?? errorCode(record.structuredContent) ?? errorCode(record.result) ?? "SERVER_TOOL_ERROR" };
-  const nestedError = errorCode(record.error);
-  if (record.error !== undefined && nestedError) return { kind: "error", code: nestedError };
+  if (record.error !== undefined) return { kind: "error", code: errorCode(record.error) ?? "SERVER_TOOL_ERROR" };
   for (const nested of [record.structuredContent, record.result]) {
     if (nested === undefined) continue;
     const inspection = inspectValue(nested, depth + 1);
     if (inspection.kind !== "success") return inspection;
     return inspection;
   }
+  const content = parsedContent(record);
+  if (content !== undefined) return inspectValue(content, depth + 1);
   return { kind: "success", payload: value };
 }
 
@@ -127,6 +150,8 @@ export function extractPayload(result: ToolResult): unknown {
       const envelope = nested as { structuredContent?: unknown; result?: unknown };
       if (envelope.structuredContent !== undefined) return extractPayload(envelope as ToolResult);
       if (envelope.result !== undefined) return extractPayload(envelope as ToolResult);
+      const content = parsedContent(nested as Record<string, unknown>);
+      if (content !== undefined) return content;
     }
     return nested;
   }
@@ -143,7 +168,8 @@ function safeUploadedItem(value: unknown, fallbackStatus = "SUCCESS"): UploadedI
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const statusValue = typeof record.status === "string" ? record.status : record.upload_status;
-  const status = statusValue === "CREATED" ? "SUCCESS" : typeof statusValue === "string" && statusValue !== "" ? statusValue : fallbackStatus;
+  const normalizedStatus = typeof statusValue === "string" ? statusValue.trim().toUpperCase() : "";
+  const status = normalizedStatus === "CREATED" || normalizedStatus === "SUCCESS" ? "SUCCESS" : normalizedStatus !== "" ? normalizedStatus : fallbackStatus;
   const item: UploadedItem = {
     ...(typeof record.attachment_id === "number" ? { attachment_id: record.attachment_id } : {}),
     ...(typeof record.media_id === "string" ? { media_id: record.media_id } : {}),

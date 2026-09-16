@@ -88,6 +88,21 @@ final class McpProposalLifecycleExposureTest extends TestCase
         }
     }
 
+    public function test_proposal_create_invalid_input_reaches_canonical_dispatch_instead_of_unknown_tool(): void
+    {
+        $transport = new McpTransport(
+            $this->readHandler(),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+        );
+
+        $response = $transport->dispatch($this->call('nhk.proposal.create', []));
+
+        self::assertSame(400, $response['status']);
+        self::assertSame(-32602, $response['body']['error']['code'] ?? null);
+        self::assertNotSame(-32601, $response['body']['error']['code'] ?? null);
+    }
+
     public function test_proposal_lifecycle_keeps_action_specific_capability_guards(): void
     {
         $required = [
