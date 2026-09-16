@@ -27,7 +27,7 @@ final class TrustedProvidedFileMaterializer
 
     /**
      * @param callable|null $downloader function(string $url, string $path, int $remainingBytes): array{status:int}
-     * @param callable|null $hostPolicy legacy diagnostic observer; never an authorization gate
+     * @param callable|null $hostPolicy legacy host diagnostic observer (string $host); never an authorization gate and never receives the URL
      * @param callable|null $resolver function(string $host): list<string>|list<array<string,mixed>>
      * @return array{files:array<string,array<int|string,mixed>>,temporary_paths:list<string>}
      */
@@ -128,7 +128,7 @@ final class TrustedProvidedFileMaterializer
         if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
             throw new ChatGptMcpGatewayException('CHATGPT_FILE_URL_REJECTED', 'IP-literal file destinations are not accepted.');
         }
-        self::observeHost($host, $url, $hostPolicy);
+        self::observeHost($host, $hostPolicy);
         self::resolvePublicAddresses($host, $resolver);
         return $url;
     }
@@ -147,10 +147,10 @@ final class TrustedProvidedFileMaterializer
         return $host;
     }
 
-    private static function observeHost(string $host, string $url, ?callable $observer): void
+    private static function observeHost(string $host, ?callable $observer): void
     {
         if ($observer === null) return;
-        try { $observer($host, $url); } catch (\Throwable) { /* diagnostics never change authorization */ }
+        try { $observer($host); } catch (\Throwable) { /* diagnostics never change authorization */ }
     }
 
     /** @return list<string> */
@@ -158,18 +158,18 @@ final class TrustedProvidedFileMaterializer
     {
         $records = $resolver !== null ? $resolver($host) : (function_exists('dns_get_record') ? @dns_get_record($host, DNS_A | DNS_AAAA) : false);
         if (!is_array($records) || $records === []) {
-            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.');
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host);
         }
         $addresses = [];
         foreach ($records as $record) {
             $ip = is_string($record) ? trim($record) : (string) ($record['ip'] ?? $record['ipv6'] ?? '');
             if ($ip === '' || !self::isPublicIp($ip)) {
-                throw new ChatGptMcpGatewayException('CHATGPT_FILE_PRIVATE_IP_REJECTED', 'The uploaded file hostname resolved to a non-public destination.');
+                throw new ChatGptMcpGatewayException('CHATGPT_FILE_PRIVATE_IP_REJECTED', 'The uploaded file hostname resolved to a non-public destination.', $host);
             }
             $addresses[] = $ip;
         }
         $addresses = array_values(array_unique($addresses));
-        if ($addresses === []) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.');
+        if ($addresses === []) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host);
         return $addresses;
     }
 
@@ -206,7 +206,7 @@ final class TrustedProvidedFileMaterializer
             $parts = parse_url($current);
             $host = is_array($parts) ? self::normalizeHost((string) ($parts['host'] ?? '')) : '';
             $addresses = self::resolvePublicAddresses($host, $resolver);
-            self::observeHost($host, $current, $hostPolicy);
+            self::observeHost($host, $hostPolicy);
             if (is_file($path)) @unlink($path);
             $handle = @fopen($path, 'wb');
             if (!is_resource($handle)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be opened.');
@@ -266,6 +266,9 @@ final class TrustedProvidedFileMaterializer
     {
         $directory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'nhk-v3-media-materializer';
         if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.');
+        $directoryReal = realpath($directory);
+        $webrootReal = defined('ABSPATH') ? realpath((string) ABSPATH) : false;
+        if ($directoryReal === false || (is_string($webrootReal) && self::within($webrootReal, $directoryReal))) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'The temporary file directory is not private.');
         $path = tempnam($directory, 'nhk-');
         if (!is_string($path) || $path === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.');
         @chmod($path, 0600);
@@ -322,5 +325,10 @@ final class TrustedProvidedFileMaterializer
     private static function cleanup(array $paths): void
     {
         foreach ($paths as $path) if (is_string($path) && is_file($path)) @unlink($path);
+    }
+
+    private static function within(string $root, string $path): bool
+    {
+        return $root !== '' && $root !== '.' && str_starts_with($path, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR);
     }
 }

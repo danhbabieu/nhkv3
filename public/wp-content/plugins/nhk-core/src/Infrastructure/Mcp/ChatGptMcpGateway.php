@@ -108,7 +108,7 @@ final class ChatGptMcpGateway
     /**
      * @param mixed $provided
      * @param callable|null $downloader function(string $url, string $path, int $remainingBytes): array{status:int}
-     * @param callable|null $hostPolicy legacy diagnostic observer; never an authorization gate
+     * @param callable|null $hostPolicy legacy host diagnostic observer (string $host); never an authorization gate and never receives the URL
      * @param callable|null $resolver function(string $host): list<string>|list<array<string,mixed>>
      * @return array{files:array<string,array<int|string,mixed>>,temporary_paths:list<string>}
      */

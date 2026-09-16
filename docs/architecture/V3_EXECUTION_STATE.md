@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — ChatGPT file transport trust-model remediation (LOCAL ONLY)
+
+SCOPE: Remediate the ChatGPT provided-file transport at the capability-gated
+`nhk.media.widget-upload` boundary without adding provider-region hostnames,
+wildcards, source allowlists or live semantic mutations.
+
+ROOT_CAUSE: The previous transport treated an exact `download_url` hostname
+allowlist as authorization, producing `CHATGPT_FILE_HOST_NOT_ALLOWED` for a
+valid ChatGPT storage region while providing no sufficient SSRF guarantee.
+
+IMPLEMENTED: The boundary now accepts only the structured provided-file object
+with required `download_url` and `file_id`; URL-only, opaque, local-path and
+base64 inputs fail closed. The centralized materializer validates HTTPS/443,
+normalizes hostnames, resolves A+AAAA and rejects every non-public address,
+pins validated addresses with cURL `CURLOPT_RESOLVE`, verifies TLS, disables
+ambient proxy/credential forwarding, revalidates up to two redirects, streams
+within the byte cap and writes random 0600 temporary files outside webroot.
+MIME/signature, decoder, dimension and pixel-budget validation remains before
+the existing image/Media pipeline, which owns private source-original,
+public WebP, attachment/Media read-back and rollback. The MU-plugin is only a
+deployment marker; host/provider patterns are diagnostic evidence, never
+authorization. Descriptor metadata retains `_meta["openai/fileParams"]=["files"]`.
+
+THREAT_MODEL: `docs/superpowers/reports/2026-09-16-chatgpt-file-transport-threat-model.md`.
+
+LOCAL_VERIFICATION: Focused transport/widget/catalog tests pass (85 tests /
+715 assertions); NHK Unit passes (1,658 tests / 8,085 assertions); NHK Contract
+passes (6 tests / 48 assertions); widget TypeScript typecheck, test and
+production build pass; Composer lint, PHP lint, diff check and changed-scope
+secret scan pass.
+
+LIVE_STATUS: No deploy, connector reconnect, live upload, staging mutation or
+external two-host acceptance was performed. The two-host acceptance gate still
+requires two different ChatGPT storage hostnames with zero source allowlist
+changes between uploads. Do not claim live completion from this local result.
+
 # Checkpoint — 2026-09-16 — Media URL continuation verification
 
 CURRENT_COMMIT: The existing Media URL implementation is present at HEAD

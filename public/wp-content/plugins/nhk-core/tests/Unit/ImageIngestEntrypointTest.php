@@ -82,7 +82,8 @@ final class ImageIngestEntrypointTest extends TestCase
                     self::assertTrue(copy($fixture, $path));
                     return ['status' => 200];
                 },
-                static fn (string $host, string $url): bool => $host === 'files.example.test',
+                null,
+                static fn (string $host): array => ['93.184.216.34'],
             ),
         );
 
