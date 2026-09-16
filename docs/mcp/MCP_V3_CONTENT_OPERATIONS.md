@@ -243,6 +243,15 @@ bounded Claims through the Graph neighborhood, composes the draft, reconciles
 Replays resume the same Capture and must not create a second Post or re-upload
 an already completed physical phase.
 
+In addition to native `files[]` and already-adopted `media_ids`, Capture may
+receive `existing_media_urls[]` for already-present first-party WordPress
+attachments. This is a locator adapter only: HTTPS/approved-origin validation,
+exact WordPress attachment/derivative metadata resolution and local attachment
+read-back happen before the same governed Media adoption boundary. The adapter
+does not fetch the URL, use fuzzy filename matching, create an attachment or
+become a second Media writer. `existing_media_urls[]`, `media_ids[]` and
+`files[]` are mutually exclusive physical input forms for one packet.
+
 The Capture tool is capability-gated by `nhk_ingest_articles`; its optional
 `files[]` are native multipart parts and never base64, paths or JSON bytes.
 The text-only path is valid and still runs interpretation, subject resolution,
@@ -689,9 +698,15 @@ Capture owner. `nhk.media.upload-widget.open` renders
 obtain a temporary `download_url` and `file_id`, then calls the internal
 `nhk.media.widget-upload` transport tool. Each item must be the structured
 provided-file object with `download_url` and `file_id` (plus optional
-`mime_type` and `file_name`). Opaque IDs, local paths, base64 and arbitrary URLs
-are rejected by the reusable trusted materializer, including redirect
-revalidation and image MIME/size checks.
+`mime_type` and `file_name`). The object shape is trusted only as the
+capability-gated tool's input contract. The centralized materializer treats
+the URL as an untrusted network destination and independently enforces HTTPS
+port 443, no credentials, hostname normalization, A+AAAA public-IP
+resolution, pinned TLS connections, no ambient proxy/credential headers,
+streaming limits, bounded redirect revalidation and actual image MIME/decoder
+checks. Opaque IDs, local paths, base64 and URL-only inputs are rejected.
+ChatGPT storage hostnames and regions are diagnostic evidence only; they are
+not a source-code authorization list.
 
 The widget tool delegates to `ImageIngestEntrypoint`, the existing native
 WordPress attachment lifecycle and canonical Media adoption/read-back. It

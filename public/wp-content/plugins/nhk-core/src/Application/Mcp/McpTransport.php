@@ -351,8 +351,9 @@ final class McpTransport
     {
         if (is_callable($this->runtimeWriteReady) && !(bool) ($this->runtimeWriteReady)()) throw new \RuntimeException('REQUIRED_SCHEMA_NOT_READY');
         $hasMediaIds = isset($arguments['media_ids']) && (array) $arguments['media_ids'] !== [];
+        $hasExistingMediaUrls = isset($arguments['existing_media_urls']) && (array) $arguments['existing_media_urls'] !== [];
         $hasProvidedFiles = isset($arguments['files']) && (array) $arguments['files'] !== [];
-        if ($hasMediaIds && ($hasProvidedFiles || $files !== [])) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
+        if (($hasMediaIds && ($hasProvidedFiles || $files !== [] || $hasExistingMediaUrls)) || ($hasExistingMediaUrls && ($hasProvidedFiles || $files !== []))) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
         if (is_array($arguments['resume_children'] ?? null) && $arguments['resume_children'] !== [] && !isset($arguments['capture_id'])) {
             throw new \InvalidArgumentException('CAPTURE_RESUME_REQUIRES_CAPTURE_ID');
         }

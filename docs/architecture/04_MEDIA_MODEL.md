@@ -16,11 +16,21 @@ internal/admin compatibility or lifecycle tooling only and is not the normal
 operator path.
 
 The ChatGPT MCP Apps image widget is a transport/presentation adapter over the
-same physical owner. Its `nhk.media.widget-upload` tool accepts only trusted
-structured provided-file references, delegates to `ImageIngestEntrypoint`, and
-returns canonical attachment/Media read-back without semantic mutation. The
-widget may hand its ordered canonical `media_ids` to Capture later; that path
-reuses the existing attachment/Media and does not re-download or duplicate it.
+same physical owner. Its `nhk.media.widget-upload` tool accepts only the
+canonical structured provided-file object (`download_url` and `file_id`, plus
+advisory `mime_type`/`file_name`) through its capability-gated boundary. The
+object shape is trusted input structure, not a trust decision about the remote
+host: the centralized materializer independently enforces HTTPS/443,
+credential-free public-IP resolution, pinned TLS fetches, redirect
+revalidation, streaming limits and actual image decoding before delegating to
+`ImageIngestEntrypoint`. Host/provider patterns are diagnostics only; no
+ChatGPT region hostname allowlist authorizes a download. URL-only, opaque ID,
+local path and arbitrary URL inputs remain rejected.
+
+The widget returns canonical attachment/Media read-back without semantic
+mutation. It may hand its ordered canonical `media_ids` to Capture later; that
+path reuses the existing attachment/Media and does not re-download or
+duplicate it.
 
 Article-scoped image title, alt text and caption are contextual placement
 metadata. They belong to the Article-owned MediaUsage/managed placement and do
@@ -150,6 +160,15 @@ Graph edge.
 → canonical attachment read-back / `nhk.media.attachment.get`
 → `nhk-v3/media-ingest` attachment adoption/binding
 → `MediaAsset` → `Media` → `MediaUsage`.
+
+Capture also accepts an existing first-party WordPress Media URL as a physical
+input adapter. The adapter requires HTTPS and an approved site origin, resolves
+the exact owning attachment through `_wp_attached_file`/attachment metadata,
+reads it back locally and then enters the same attachment adoption boundary.
+It never downloads the URL, fuzzy-matches a filename, creates a second
+attachment or treats the URL as semantic identity. Derivative URLs resolve to
+the owning attachment only when WordPress metadata proves the exact generated
+path; foreign, ambiguous, traversal or non-image inputs fail closed.
 
 Một file là batch có một item; batch hỗ trợ 1..N file trong giới hạn runtime.
 Manifest phải giữ thứ tự và trả về per-item `attachment_id`, `source_url`,

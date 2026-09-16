@@ -1,5 +1,47 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Existing first-party WordPress Media URL adapter
+
+SCOPE: Additive completion of the existing Capture physical-input boundary.
+`nhk.capture.ingest` now accepts bounded `existing_media_urls[]` alongside the
+existing native `files[]` and adopted `media_ids[]` paths. The three physical
+forms are mutually exclusive per packet; no new Media, Article, Graph or
+generic WordPress writer was introduced.
+
+FIX: `WordPressAttachmentUrlResolver` requires HTTPS and an exact site/home
+origin, normalizes query-bearing URLs, rejects traversal, resolves the exact
+owning attachment from `_wp_attached_file` or proven attachment derivatives,
+and performs local image read-back. Foreign, ambiguous, non-image, unreadable
+and unproven URLs fail closed. The resolved attachment enters the existing
+Capture `mediaAdoption` callback and the existing Media owner. Existing raster
+attachments retain a PRIVATE source-original copy and receive a proportional
+PUBLIC WebP derivative using the shared 1200px long-edge policy and quality 86;
+the derivative uses collision-safe `/anh/{seo-slug}.webp` storage. Replays
+reuse the attachment stable key. `MEDIA_ENRICHMENT` reconciles contextual
+`MediaUsage` with the existing `featured_primary` vocabulary; the existing
+entity projection maps that role to representative media. Visual-support
+reverse reconciliation remains in the shared coordinator.
+
+EXPOSURE: Canonical documentation, Capture, intent, Easy MCP normalization and
+dispatch parity were verified against the existing registry/transport tests.
+The widget/native upload path and existing `media_ids` continuation remain
+unchanged. Canonical MCP documentation snapshots were regenerated.
+
+LOCAL_VERIFICATION: Focused Capture/Media/MCP/projection/resolver tests PASS
+(73 tests / 778 assertions); PHP lint PASS for changed Capture/Media/MCP files;
+documentation snapshot generation PASS; `git diff --check` PASS. The full
+repository PHPUnit attempt reached 1,826 tests but remains non-green because
+the current worktree contains separate trusted-file gateway changes whose
+legacy tests now fail, and WordPress integration tests lack the required
+`NHK_WP_TEST_PATH=public` bootstrap. Those failures were not attributed to
+the URL adapter.
+
+LIVE_ACCEPTANCE: Not performed. The current bounded staging authorization in
+`AGENTS.md` does not include attachment 555 or the supplied Classification
+UUID, and the deployment verifier is blocked by missing
+`NHK_DEMO_DEPLOY_CONFIG`. No live data, staging semantic object or connector
+selection was mutated.
+
 # Checkpoint — 2026-09-16 — Live image widget lifecycle/envelope repair
 
 SCOPE: Repair the bounded ChatGPT image-upload widget so the initial

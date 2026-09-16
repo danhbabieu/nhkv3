@@ -108,12 +108,13 @@ final class ChatGptMcpGateway
     /**
      * @param mixed $provided
      * @param callable|null $downloader function(string $url, string $path, int $remainingBytes): array{status:int}
-     * @param callable|null $hostPolicy function(string $host, string $url): bool
+     * @param callable|null $hostPolicy legacy diagnostic observer; never an authorization gate
+     * @param callable|null $resolver function(string $host): list<string>|list<array<string,mixed>>
      * @return array{files:array<string,array<int|string,mixed>>,temporary_paths:list<string>}
      */
-    public static function materializeReferences(mixed $provided, ?callable $downloader = null, ?callable $hostPolicy = null): array
+    public static function materializeReferences(mixed $provided, ?callable $downloader = null, ?callable $hostPolicy = null, ?callable $resolver = null): array
     {
-        return TrustedProvidedFileMaterializer::materialize($provided, $downloader, $hostPolicy);
+        return TrustedProvidedFileMaterializer::materialize($provided, $downloader, $hostPolicy, $resolver);
     }
 
     /** @param array<string,mixed> $rpc @return array<string,mixed> */
@@ -127,15 +128,9 @@ final class ChatGptMcpGateway
         return $rpc;
     }
 
-    public static function validateRedirectTarget(string $base, string $location, ?callable $hostPolicy = null): string
+    public static function validateRedirectTarget(string $base, string $location, ?callable $hostPolicy = null, ?callable $resolver = null): string
     {
-        return TrustedProvidedFileMaterializer::validateRedirectTarget($base, $location, $hostPolicy);
-    }
-
-    /** @param list<mixed> $allowed */
-    private static function isExactAllowlistedHost(string $host, array $allowed): bool
-    {
-        return TrustedProvidedFileMaterializer::isExactAllowlistedHost($host, $allowed);
+        return TrustedProvidedFileMaterializer::validateRedirectTarget($base, $location, $hostPolicy, $resolver);
     }
 
     private static function error(string $reasonCode, string $message, ?string $host = null): mixed

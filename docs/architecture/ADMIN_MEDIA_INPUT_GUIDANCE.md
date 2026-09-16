@@ -112,6 +112,13 @@ in another Article, Product, Specimen or projection.
 Existing legacy attachments are read-only unless a separately governed repair
 or migration task explicitly authorizes changes.
 
+An editor may also select an existing first-party WordPress Media URL through
+Capture. The URL is resolved to the exact attachment by WordPress storage
+metadata and read back locally; it is not downloaded or imported again. URL
+input then uses the same Media adoption, source-original retention, derivative,
+MediaUsage and reconciliation boundary as a native upload. Foreign hosts,
+ambiguous metadata, traversal paths and non-image attachments fail closed.
+
 ### Public image sizing
 
 The governed image adapter applies `PUBLIC IMAGE MAX LONG EDGE = 1200 PX` to

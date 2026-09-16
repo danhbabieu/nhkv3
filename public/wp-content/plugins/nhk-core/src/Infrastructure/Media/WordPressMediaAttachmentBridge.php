@@ -172,7 +172,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return $this->representation((int) $attachmentId, $asset, $contextualAlt);
     }
 
-    public function adoptAttachment(int $attachmentId): ?string
+    public function adoptAttachment(int $attachmentId, array $context = []): ?string
     {
         if (WordPressMediaAttachmentWriteGuard::active()) return null;
         if ($this->controlledWriteDepth > 0 || $attachmentId < 1 || !function_exists('get_post')) return $this->mediaIdForAttachment($attachmentId);
@@ -188,11 +188,28 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $upload = function_exists('wp_upload_dir') ? wp_upload_dir() : [];
         $baseDir = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
         $filePath = $baseDir !== '' ? $baseDir . '/' . ltrim($relative, '/') : '';
+        if (!is_file($filePath) || !is_readable($filePath)) return null;
+        $stableKey = $this->stableKeyForAttachment($attachmentId);
+        $existingStable = $this->media->findByStableKey($stableKey);
+        if ($existingStable instanceof Media) {
+            $source = null;
+            $derivative = null;
+            foreach ($this->assets->listByMediaId($existingStable->canonicalId) as $candidate) {
+                if ((int) ($candidate->metadata['wordpress_attachment_id'] ?? 0) === $attachmentId) $source = $candidate;
+                if ((int) ($candidate->metadata['wordpress_source_attachment_id'] ?? 0) === $attachmentId && $candidate->mimeType === 'image/webp' && $candidate->visibility === 'PUBLIC') $derivative = $candidate;
+            }
+            if ($source instanceof MediaAsset && $derivative instanceof MediaAsset) {
+                if ($existingStable->readiness !== 'ready') $existingStable = $this->mediaService->update($existingStable->canonicalId, $existingStable->canonicalName, 'ready', $existingStable->provenance, $existingStable->revision);
+                $this->saveMapping($existingStable, $source, $attachmentId);
+                return $existingStable->canonicalId;
+            }
+        }
         $metadata = function_exists('wp_get_attachment_metadata') ? wp_get_attachment_metadata($attachmentId) : [];
         $width = is_array($metadata) && isset($metadata['width']) ? (int) $metadata['width'] : null;
         $height = is_array($metadata) && isset($metadata['height']) ? (int) $metadata['height'] : null;
         $mime = strtolower((string) get_post_mime_type($attachmentId));
-        if ($mime !== 'image/webp' || $width < 1 || $height < 1 || !is_file($filePath) || !is_readable($filePath)) return null;
+        if ($mime !== 'image/webp') return $this->adoptExistingRasterAttachment($attachmentId, $post, $filePath, $context);
+        if ($width < 1 || $height < 1) return null;
         $checksum = hash_file('sha256', $filePath);
         $byteSize = filesize($filePath);
         if (!is_string($checksum) || $checksum === '' || $byteSize === false || $byteSize < 1) return null;
@@ -214,6 +231,137 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $asset = $this->assets->findByAssetId($asset->assetId) ?? $asset;
         $this->saveMapping($media, $asset, $attachmentId);
         return $media->canonicalId;
+    }
+
+    /**
+     * Adopt an existing JPEG/PNG/etc. attachment without uploading it again.
+     * The attachment remains the physical WordPress locator; V3 retains a
+     * private source copy and creates the canonical public WebP derivative
+     * under the same Media identity.
+     */
+    private function adoptExistingRasterAttachment(int $attachmentId, object $post, string $filePath, array $context): ?string
+    {
+        if (!is_file($filePath) || !is_readable($filePath) || !function_exists('wp_get_image_editor')) return null;
+        $info = @getimagesize($filePath);
+        if (!is_array($info) || !is_string($info['mime'] ?? null) || (int) ($info[0] ?? 0) < 1 || (int) ($info[1] ?? 0) < 1) return null;
+        $sourceContents = file_get_contents($filePath);
+        if (!is_string($sourceContents) || $sourceContents === '') throw new RuntimeException('WORDPRESS_MEDIA_SOURCE_READ_FAILED');
+
+        $originalFilename = function_exists('get_post_meta') ? trim((string) get_post_meta($attachmentId, '_nhk_original_filename', true)) : '';
+        if ($originalFilename === '') $originalFilename = basename($filePath);
+        $canonicalName = trim((string) ($context['canonical_name'] ?? ''));
+        if ($canonicalName === '') $canonicalName = (string) ($post->post_title ?? $originalFilename);
+        $requestedSlug = trim((string) ($context['seo_slug'] ?? ''));
+        $canonicalFilename = (new MediaFilenameNormalizer())->normalizeWebp($requestedSlug !== '' ? $requestedSlug : $canonicalName, '', $originalFilename);
+        $canonicalFilename = $this->collisionSafeCanonicalFilename($canonicalFilename, $attachmentId);
+
+        $storageRoot = $this->publicMediaStorageRoot();
+        $storageKey = 'nhk-public/' . $canonicalFilename;
+        $publicPath = $storageRoot . '/' . $storageKey;
+        $publicDirectory = dirname($publicPath);
+        if (!is_dir($publicDirectory) && !mkdir($publicDirectory, 0755, true) && !is_dir($publicDirectory)) throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_STORAGE_UNAVAILABLE');
+        $createdPublic = false;
+        $sourceKey = null;
+        $media = null;
+        try {
+            if (!is_file($publicPath) || @getimagesize($publicPath) === false) {
+                $editor = wp_get_image_editor($filePath);
+                if (is_wp_error($editor)) throw new RuntimeException('WORDPRESS_MEDIA_EDITOR_UNAVAILABLE');
+                $target = PublicImageSizingPolicy::constrain((int) $info[0], (int) $info[1]);
+                if ($target['width'] !== (int) $info[0] || $target['height'] !== (int) $info[1]) {
+                    $resized = $editor->resize($target['width'], $target['height'], false);
+                    if (is_wp_error($resized)) throw new RuntimeException('WORDPRESS_MEDIA_RESIZE_FAILED');
+                }
+                if ($editor->set_quality(PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY) === false) throw new RuntimeException('WORDPRESS_MEDIA_QUALITY_FAILED');
+                $saved = $editor->save($publicPath, 'image/webp');
+                if (is_wp_error($saved) || !is_array($saved) || strtolower((string) ($saved['mime-type'] ?? '')) !== 'image/webp' || (string) ($saved['path'] ?? '') !== $publicPath) throw new RuntimeException('WORDPRESS_MEDIA_WEBP_UNAVAILABLE');
+                $createdPublic = true;
+            }
+            $publicInfo = @getimagesize($publicPath);
+            if (!is_array($publicInfo) || strtolower((string) ($publicInfo['mime'] ?? '')) !== 'image/webp') throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_DERIVATIVE_INVALID');
+            $publicChecksum = hash_file('sha256', $publicPath);
+            $publicSize = filesize($publicPath);
+            if (!is_string($publicChecksum) || $publicChecksum === '' || $publicSize === false || $publicSize < 1) throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_DERIVATIVE_READBACK_FAILED');
+
+            $sourceKey = PrivateMediaSourceStorage::fromWordPress()->store($sourceContents, $this->sourceExtension((string) $info['mime']));
+            $mediaDescription = trim((string) ($context['description'] ?? ''));
+            $sourceMetadata = ['source_original' => true, 'original_filename' => $originalFilename, 'wordpress_attachment_id' => $attachmentId];
+            $derivativeMetadata = ['canonical_filename' => $canonicalFilename, 'derived_from' => $sourceKey, 'wordpress_source_attachment_id' => $attachmentId, 'quality' => PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY];
+            if ($mediaDescription !== '') {
+                $sourceMetadata['description'] = $mediaDescription;
+                $derivativeMetadata['description'] = $mediaDescription;
+            }
+            $sourceAsset = [
+                'kind' => 'original', 'storage_key' => $sourceKey, 'original_filename' => $originalFilename,
+                'checksum' => hash('sha256', $sourceContents), 'mime_type' => strtolower((string) $info['mime']),
+                'byte_size' => strlen($sourceContents), 'width' => (int) $info[0], 'height' => (int) $info[1],
+                'visibility' => 'PRIVATE', 'metadata' => $sourceMetadata,
+            ];
+            $derivativeAsset = [
+                'kind' => 'derivative', 'storage_key' => $storageKey, 'original_filename' => $originalFilename,
+                'checksum' => $publicChecksum, 'mime_type' => 'image/webp', 'byte_size' => (int) $publicSize,
+                'width' => (int) $publicInfo[0], 'height' => (int) $publicInfo[1], 'visibility' => 'PUBLIC',
+                'metadata' => $derivativeMetadata,
+            ];
+            $media = $this->mediaService->ingest(
+                $this->stableKeyForAttachment($attachmentId),
+                $canonicalName,
+                'draft',
+                ['source' => 'wordpress_existing_attachment_url', 'wordpress_attachment_id' => $attachmentId],
+                [$sourceAsset, $derivativeAsset],
+            );
+            $media = $this->mediaService->update($media->canonicalId, $media->canonicalName, 'ready', $media->provenance, $media->revision);
+            $source = null;
+            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
+                if ($asset->storageKey === $sourceKey) { $source = $asset; break; }
+            }
+            if (!$source instanceof MediaAsset) throw new RuntimeException('WORDPRESS_MEDIA_SOURCE_ASSET_UNAVAILABLE');
+            $this->saveMapping($media, $source, $attachmentId);
+            return $media->canonicalId;
+        } catch (\Throwable $error) {
+            if ($media === null && $sourceKey !== null) {
+                try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceKey); } catch (\Throwable) { }
+            }
+            if ($media === null && $createdPublic && is_file($publicPath)) @unlink($publicPath);
+            throw $error;
+        }
+    }
+
+    private function publicMediaStorageRoot(): string
+    {
+        $configured = defined('NHK_MEDIA_STORAGE_ROOT') ? (string) NHK_MEDIA_STORAGE_ROOT : (string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: '');
+        if ($configured !== '') return rtrim($configured, '/\\');
+        $upload = function_exists('wp_upload_dir') ? wp_upload_dir() : [];
+        $root = is_array($upload) ? (string) ($upload['basedir'] ?? '') : '';
+        if ($root === '') throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_STORAGE_UNAVAILABLE');
+        return rtrim($root, '/\\');
+    }
+
+    private function sourceExtension(string $mime): string
+    {
+        return match (strtolower($mime)) {
+            'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', default => 'jpg',
+        };
+    }
+
+    private function stableKeyForAttachment(int $attachmentId): string
+    {
+        $blogId = function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1;
+        return 'wp-attachment:' . max(1, $blogId) . ':' . $attachmentId;
+    }
+
+    private function collisionSafeCanonicalFilename(string $filename, int $attachmentId): string
+    {
+        $existing = [];
+        foreach ($this->media->list() as $media) {
+            foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
+                $candidate = trim((string) ($asset->metadata['canonical_filename'] ?? ''));
+                if ($candidate !== '') $existing[] = $candidate;
+            }
+        }
+        $current = $this->mediaIdForAttachment($attachmentId);
+        if ($current !== null) return $filename;
+        return (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->collisionSafeFilename($filename, array_values(array_unique($existing)));
     }
 
     private function sourceAssetSpec(string $relative, string $originalFilename = ''): ?array

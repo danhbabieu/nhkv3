@@ -484,6 +484,15 @@ final class Plugin {
             (new GraphApi($graphService, new MigrationStatus()))->register();
             $wordpressAttachments = new WordPressMediaAttachmentIngestor($attachmentBridge);
             $existingMediaResolver = new \NHK\Core\Application\Media\ExistingMediaReferenceResolver($media, $assets, $wordpressAttachments);
+            $mediaUrlOrigin = static function (string $value): string {
+                $parts = parse_url($value);
+                if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || trim((string) ($parts['host'] ?? '')) === '') return '';
+                return 'https://' . strtolower((string) $parts['host']) . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+            };
+            $existingAttachmentUrlResolver = new \NHK\Core\Infrastructure\Media\WordPressAttachmentUrlResolver(
+                $wpdb,
+                array_values(array_filter(array_unique([$mediaUrlOrigin((string) site_url()), $mediaUrlOrigin((string) home_url())]))),
+            );
             $mediaBatchUpload = new MediaBatchUploadService($wordpressAttachments);
             $imageIngest = new ImageIngestEntrypoint(
                 static fn (string $idempotencyKey, array $metadata, array $files, array $items): array => $mediaBatchUpload->upload($idempotencyKey, $metadata, $files, $items),
@@ -678,10 +687,43 @@ final class Plugin {
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
-                static function (array $input) use ($imageIngest, $existingMediaResolver): array {
+                static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments): array {
                     $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
-                    if ($mediaIds !== []) {
+                    $existingUrls = is_array($input['existing_media_urls'] ?? null) ? array_values($input['existing_media_urls']) : [];
+                    if ($mediaIds !== [] || $existingUrls !== []) {
+                        if ($mediaIds !== [] && $existingUrls !== []) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
                         if (is_array($input['files'] ?? null) && $input['files'] !== []) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
+                        if ($existingUrls !== []) {
+                            $seen = [];
+                            $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+                            $media = is_array($input['media'] ?? null) ? $input['media'] : (is_array($inputMetadata['media'] ?? null) ? $inputMetadata['media'] : []);
+                            $items = [];
+                            foreach ($existingUrls as $url) {
+                                $url = trim((string) $url);
+                                $relative = $existingAttachmentUrlResolver->relativeUploadPath($url);
+                                if (isset($seen[$relative])) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_DUPLICATE');
+                                $seen[$relative] = true;
+                                $attachmentId = $existingAttachmentUrlResolver->resolve($url);
+                                $readback = $wordpressAttachments->read($attachmentId);
+                                if (!is_array($readback) || (int) ($readback['attachment_id'] ?? 0) !== $attachmentId) throw new \RuntimeException('EXISTING_MEDIA_ATTACHMENT_READBACK_FAILED');
+                                $items[] = [
+                                    'attachment_id' => $attachmentId,
+                                    'source_url' => $url,
+                                    'filename' => (string) ($readback['filename'] ?? basename($relative)),
+                                    'original_filename' => (string) ($readback['original_filename'] ?? basename($relative)),
+                                    'mime_type' => (string) ($readback['mime'] ?? ''),
+                                    'byte_size' => (int) ($readback['filesize'] ?? 0),
+                                    'width' => (int) ($readback['width'] ?? 0),
+                                    'height' => (int) ($readback['height'] ?? 0),
+                                    'attachment_readback_status' => 'verified',
+                                    'upload_status' => 'REUSED',
+                                    'reused' => true,
+                                    'media_context' => $media,
+                                    'sort_order' => count($items),
+                                ];
+                            }
+                            return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true, 'physical_input' => 'existing_wordpress_media_url'];
+                        }
                         $items = $existingMediaResolver->resolve($mediaIds);
                         return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true];
                     }
@@ -744,24 +786,44 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia): array {
+                static function (array $context) use ($articleMedia, $mediaService): array {
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $incomplete = [];
+                        $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
+                        $endpointType = trim((string) ($primary['type'] ?? ''));
+                        $endpointKey = trim((string) ($primary['id'] ?? ''));
+                        $usageReadback = [];
                         foreach ($assets as $asset) {
                             if (!is_array($asset)) continue;
                             $mediaId = trim((string) ($asset['media_id'] ?? ''));
                             if ($mediaId === '') $incomplete[] = 'MEDIA_CANONICAL_ID_MISSING';
                             if (($asset['attachment_readback_status'] ?? 'verified') !== 'verified') $incomplete[] = 'MEDIA_ATTACHMENT_READBACK_REQUIRED';
+                            if ($mediaId !== '' && $endpointType !== '' && $endpointKey !== '') {
+                                $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
+                                $usage = $mediaService->addUsage(
+                                    $mediaId,
+                                    $endpointType,
+                                    $endpointKey,
+                                    \NHK\Core\Domain\Media\MediaUsageRoleRegistry::FEATURED_PRIMARY,
+                                    (int) ($asset['sort_order'] ?? 0),
+                                    (string) ($mediaContext['alt_text'] ?? ''),
+                                    (string) ($mediaContext['caption'] ?? ''),
+                                    [],
+                                    (string) ($mediaContext['title'] ?? ''),
+                                );
+                                $usageReadback[] = ['usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision];
+                            }
                         }
                         return [
                             'status' => $incomplete === [] && $mediaIds !== [] ? 'RECONCILED' : 'PARTIAL',
                             'media_ids' => array_values(array_unique($mediaIds)),
                             'media_complete' => $incomplete === [],
                             'blockers' => array_values(array_unique($incomplete)),
+                            'media_usage' => $usageReadback,
+                            'canonical_readback' => ['media_ids' => array_values(array_unique($mediaIds)), 'media_usage' => $usageReadback],
                             'frontend_verified' => null,
-                            'canonical_readback' => ['media_ids' => array_values(array_unique($mediaIds))],
                         ];
                     }
                     $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
@@ -866,7 +928,13 @@ final class Plugin {
                     return $updated;
                 },
                 static function (array $context) use ($attachmentBridge, $media): array {
-                    $mediaId = $attachmentBridge->adoptAttachment((int) ($context['attachment_id'] ?? 0));
+                    $asset = is_array($context['asset'] ?? null) ? $context['asset'] : [];
+                    $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
+                    $mediaId = $attachmentBridge->adoptAttachment((int) ($context['attachment_id'] ?? 0), [
+                        'canonical_name' => (string) ($mediaContext['title'] ?? ''),
+                        'seo_slug' => (string) ($mediaContext['seo_slug'] ?? ''),
+                        'description' => (string) ($mediaContext['description'] ?? ''),
+                    ]);
                     $visualContexts = array_values(array_filter((array) ($context['visual_support_contexts'] ?? []), 'is_array'));
                     if ($mediaId !== null && $visualContexts !== []) {
                         $current = $media->findByCanonicalId($mediaId);
@@ -880,7 +948,7 @@ final class Plugin {
                             }
                         }
                     }
-                    return $mediaId === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'media_id' => $mediaId];
+                    return $mediaId === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'media_id' => $mediaId, 'canonical_readback' => ['media_id' => $mediaId]];
                 },
                 static function (array $context) use ($draftGateway): array {
                     return $draftGateway->publish((int) ($context['article_id'] ?? 0), (string) ($context['expected_state_token'] ?? ''), (array) ($context['evidence'] ?? []), (string) ($context['idempotency_key'] ?? ''));

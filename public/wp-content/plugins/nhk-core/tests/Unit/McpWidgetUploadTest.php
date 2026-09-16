@@ -26,7 +26,7 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(1, $tool['inputSchema']['properties']['files']['minItems']);
         self::assertSame(20, $tool['inputSchema']['properties']['files']['maxItems']);
         self::assertSame(['download_url', 'file_id'], $tool['inputSchema']['properties']['files']['items']['required']);
-        self::assertArrayNotHasKey('connectorMeta', $tool);
+        self::assertSame(['files'], $tool['connectorMeta']['openai/fileParams']);
         $open = $this->tool('nhk.media.upload-widget.open');
         self::assertSame('ui://nhk/image-upload.html', $open['connectorMeta']['ui']['resourceUri'] ?? null);
     }

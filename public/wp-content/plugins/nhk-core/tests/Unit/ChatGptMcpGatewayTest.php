@@ -13,29 +13,29 @@ final class ChatGptMcpGatewayTest extends TestCase
 {
     private const URL_HOST = 'files.openai.test';
 
-    public function test_live_connector_string_shape_enters_the_capture_gateway(): void
+    public function test_live_connector_provided_file_shape_enters_the_capture_gateway(): void
     {
         self::assertTrue(ChatGptMcpGateway::shouldHandle('/easy-mcp-ai/v1/mcp', [
             'method' => 'tools/call',
             'params' => [
                 'name' => ChatGptMcpGateway::TARGET_TOOL,
-                'arguments' => ['files' => ['https://' . self::URL_HOST . '/signed/file.gif?fixture=redacted']],
+                'arguments' => ['files' => [['download_url' => 'https://' . self::URL_HOST . '/signed/file.gif?fixture=redacted', 'file_id' => 'live-file']]],
             ],
         ]));
     }
 
-    public function test_live_string_url_becomes_native_file_before_ability_validation(): void
+    public function test_live_provided_file_becomes_native_file_before_ability_validation(): void
     {
-        $signedUrl = 'https://' . self::URL_HOST . '/signed/file.gif?fixture=redacted';
+        $reference = ['download_url' => 'https://' . self::URL_HOST . '/signed/file.gif?fixture=redacted', 'file_id' => 'live-file'];
         $result = ChatGptMcpGateway::materializeReferences([
-            $signedUrl,
+            $reference,
         ], static function (string $url, string $path, int $remaining): array {
             file_put_contents($path, self::gifBytes());
             return ['status' => 200];
-        }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+        }, null, static fn (string $host): array => ['93.184.216.34']);
 
         $nativeInput = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput(
-            ['files' => [$signedUrl], 'items' => [['client_file_id' => 'live-file']]],
+            ['files' => [$reference], 'items' => [['client_file_id' => 'live-file']]],
             'nhk-v3/capture-ingest',
             $result['files'],
             '1.7.17'
@@ -45,7 +45,7 @@ final class ChatGptMcpGatewayTest extends TestCase
             'id' => 1,
             'method' => 'tools/call',
             'params' => ['name' => ChatGptMcpGateway::TARGET_TOOL, 'arguments' => [
-                'files' => [$signedUrl],
+                'files' => [$reference],
                 'items' => [['client_file_id' => 'live-file']],
             ]],
         ]);
@@ -62,20 +62,20 @@ final class ChatGptMcpGatewayTest extends TestCase
         self::assertFileDoesNotExist($nativeInput['files'][0]['tmp_name']);
     }
 
-    public function test_live_string_urls_preserve_order_and_items_alignment(): void
+    public function test_live_provided_files_preserve_order_and_items_alignment(): void
     {
-        $urls = [
-            'https://' . self::URL_HOST . '/a.gif?fixture=a',
-            'https://' . self::URL_HOST . '/b.gif?fixture=b',
-            'https://' . self::URL_HOST . '/c.gif?fixture=c',
+        $references = [
+            ['download_url' => 'https://' . self::URL_HOST . '/a.gif?fixture=a', 'file_id' => 'a'],
+            ['download_url' => 'https://' . self::URL_HOST . '/b.gif?fixture=b', 'file_id' => 'b'],
+            ['download_url' => 'https://' . self::URL_HOST . '/c.gif?fixture=c', 'file_id' => 'c'],
         ];
-        $result = ChatGptMcpGateway::materializeReferences($urls, static function (string $url, string $path, int $remaining): array {
+        $result = ChatGptMcpGateway::materializeReferences($references, static function (string $url, string $path, int $remaining): array {
             file_put_contents($path, self::gifBytes() . basename((string) parse_url($url, PHP_URL_PATH)));
             return ['status' => 200];
-        }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+        }, null, static fn (string $host): array => ['93.184.216.34']);
 
         $nativeInput = EasyMcpNativeFileCompatibilityAdapter::normalizeNativeFileInput(
-            ['files' => $urls, 'items' => [
+            ['files' => $references, 'items' => [
                 ['client_file_id' => 'a'],
                 ['client_file_id' => 'b'],
                 ['client_file_id' => 'c'],
@@ -104,7 +104,7 @@ final class ChatGptMcpGatewayTest extends TestCase
             $paths[] = $path;
             file_put_contents($path, self::gifBytes());
             return ['status' => 200];
-        }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+        }, null, static fn (string $host): array => ['93.184.216.34']);
 
         self::assertCount(1, $result['temporary_paths']);
         self::assertSame(['one.gif'], $result['files']['files']['name']);
@@ -124,7 +124,7 @@ final class ChatGptMcpGatewayTest extends TestCase
         ], static function (string $url, string $path, int $remaining): array {
             file_put_contents($path, self::gifBytes() . basename($url));
             return ['status' => 200];
-        }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+        }, null, static fn (string $host): array => ['93.184.216.34']);
 
         self::assertCount(3, $result['files']['files']['tmp_name']);
         self::assertSame(['first.gif', 'second.gif', 'third.gif'], $result['files']['files']['name']);
@@ -171,7 +171,7 @@ final class ChatGptMcpGatewayTest extends TestCase
     public function test_invalid_file_references_fail_closed(string $expectedCode, mixed $files): void
     {
         try {
-            ChatGptMcpGateway::materializeReferences($files, null, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+            ChatGptMcpGateway::materializeReferences($files, null, null, static fn (string $host): array => ['93.184.216.34']);
             self::fail('Expected a fail-closed file reference error.');
         } catch (ChatGptMcpGatewayException $error) {
             self::assertSame($expectedCode, $error->reasonCode());
@@ -187,9 +187,8 @@ final class ChatGptMcpGatewayTest extends TestCase
             'opaque live string' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', ['file_opaque']],
             'filesystem path' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', ['/mnt/data/foo.jpg']],
             'http live string' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', ['http://' . self::URL_HOST . '/file']],
-            'arbitrary url' => ['CHATGPT_FILE_HOST_NOT_ALLOWED', [['download_url' => 'https://attacker.test/file', 'file_id' => 'file_attacker']]],
             'http url' => ['CHATGPT_FILE_URL_REJECTED', [['download_url' => 'http://' . self::URL_HOST . '/file', 'file_id' => 'file_http']]],
-            'private host' => ['CHATGPT_FILE_HOST_NOT_ALLOWED', [['download_url' => 'https://127.0.0.1/file', 'file_id' => 'file_private']]],
+            'private ip literal' => ['CHATGPT_FILE_URL_REJECTED', [['download_url' => 'https://127.0.0.1/file', 'file_id' => 'file_private']]],
             'extra field' => ['PROVIDED_FILE_REFERENCE_UNRESOLVABLE', [['download_url' => 'https://' . self::URL_HOST . '/file', 'file_id' => 'file_extra', 'path' => '/tmp/file']]],
             'too many files' => ['CHATGPT_FILE_COUNT_LIMIT', array_fill(0, 21, ['download_url' => 'https://' . self::URL_HOST . '/file', 'file_id' => 'file_many'])],
         ];
@@ -204,7 +203,7 @@ final class ChatGptMcpGatewayTest extends TestCase
             ], static function (string $url, string $temporaryPath, int $remaining) use (&$path): array {
                 $path = $temporaryPath;
                 return ['status' => 410];
-            }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+            }, null, static fn (string $host): array => ['93.184.216.34']);
             self::fail('Expected the expired file reference to be rejected.');
         } catch (ChatGptMcpGatewayException $error) {
             self::assertSame('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', $error->reasonCode());
@@ -214,64 +213,39 @@ final class ChatGptMcpGatewayTest extends TestCase
         }
     }
 
-    public function test_rejected_host_diagnostic_contains_only_normalized_host(): void
+    public function test_private_destination_diagnostic_contains_no_signed_url(): void
     {
         try {
             ChatGptMcpGateway::materializeReferences([
-                ['download_url' => 'https://ATTACKER.test/file?fixture=redacted', 'file_id' => 'file_secret'],
-            ], null, static fn (string $host, string $url): bool => false);
-            self::fail('Expected an allowlist rejection.');
+                ['download_url' => 'https://private.test/file?signature=redacted', 'file_id' => 'file_secret'],
+            ], null, null, static fn (string $host): array => ['10.0.0.8']);
+            self::fail('Expected a private destination rejection.');
         } catch (ChatGptMcpGatewayException $error) {
-            self::assertSame('CHATGPT_FILE_HOST_NOT_ALLOWED', $error->reasonCode());
-            self::assertSame('attacker.test', $error->host());
-            self::assertSame('CHATGPT_FILE_HOST_NOT_ALLOWED host=attacker.test', $error->getMessage());
-            self::assertStringNotContainsString('redacted', $error->getMessage());
+            self::assertSame('CHATGPT_FILE_PRIVATE_IP_REJECTED', $error->reasonCode());
+            self::assertStringNotContainsString('signature=redacted', $error->getMessage());
             self::assertStringNotContainsString('?', $error->getMessage());
         }
     }
 
     public function test_redirect_revalidates_each_target_host_before_download(): void
     {
-        $allowlist = static fn (string $host, string $url): bool => $host === self::URL_HOST;
         self::assertSame(
             'https://' . self::URL_HOST . '/next',
-            ChatGptMcpGateway::validateRedirectTarget('https://' . self::URL_HOST . '/start', '/next', $allowlist)
+            ChatGptMcpGateway::validateRedirectTarget('https://' . self::URL_HOST . '/start', '/next', null, static fn (string $host): array => ['93.184.216.34'])
         );
 
         try {
             ChatGptMcpGateway::validateRedirectTarget(
                 'https://' . self::URL_HOST . '/start',
                 'https://attacker.test/next?fixture=redacted',
-                $allowlist
+                null,
+                static fn (string $host): array => ['10.0.0.8']
             );
-            self::fail('Expected the redirect host to be revalidated.');
+            self::fail('Expected the redirect destination to be revalidated.');
         } catch (ChatGptMcpGatewayException $error) {
-            self::assertSame('CHATGPT_FILE_HOST_NOT_ALLOWED', $error->reasonCode());
-            self::assertSame('attacker.test', $error->host());
+            self::assertSame('CHATGPT_FILE_PRIVATE_IP_REJECTED', $error->reasonCode());
             self::assertStringNotContainsString('fixture=redacted', $error->getMessage());
         }
-    }
-
-    public function test_runtime_allowlist_is_exact_and_rejects_siblings_and_subdomains(): void
-    {
-        $method = new \ReflectionMethod(ChatGptMcpGateway::class, 'isExactAllowlistedHost');
-        self::assertTrue($method->invoke(null, 'oaisdmntpraustraliaeast.blob.core.windows.net', ['oaisdmntpraustraliaeast.blob.core.windows.net']));
-        self::assertFalse($method->invoke(null, 'oaisdmntpraustraliaeast2.blob.core.windows.net', ['oaisdmntpraustraliaeast.blob.core.windows.net']));
-        self::assertTrue($method->invoke(null, 'sdmntpraustraliaeast.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
-        self::assertFalse($method->invoke(null, 'sdmntpraustraliaeast2.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
-        self::assertFalse($method->invoke(null, 'child.sdmntpraustraliaeast.oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
-        self::assertFalse($method->invoke(null, 'oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
-    }
-
-    public function test_evidenced_japan_and_north_hosts_are_exact_matches_only(): void
-    {
-        $method = new \ReflectionMethod(ChatGptMcpGateway::class, 'isExactAllowlistedHost');
-        self::assertTrue($method->invoke(null, 'sdmntprjapaneast.oaiusercontent.com', ['sdmntprjapaneast.oaiusercontent.com']));
-        self::assertTrue($method->invoke(null, 'oaisdmntprnznorth.blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
-        self::assertFalse($method->invoke(null, 'sdmntprjapaneast2.oaiusercontent.com', ['sdmntprjapaneast.oaiusercontent.com']));
-        self::assertFalse($method->invoke(null, 'oaisdmntprnznorth2.blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
-        self::assertFalse($method->invoke(null, 'child.oaisdmntprnznorth.blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
-        self::assertFalse($method->invoke(null, 'blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
     }
 
     public function test_total_size_limit_and_actual_mime_sniff_are_enforced(): void
@@ -285,7 +259,7 @@ final class ChatGptMcpGatewayTest extends TestCase
                 ftruncate($handle, ChatGptMcpGateway::MAX_TOTAL_BYTES + 1);
                 fclose($handle);
                 return ['status' => 200];
-            }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+            }, null, static fn (string $host): array => ['93.184.216.34']);
             self::fail('Expected the total byte limit to reject the file.');
         } catch (ChatGptMcpGatewayException $error) {
             self::assertSame('CHATGPT_FILE_SIZE_LIMIT', $error->reasonCode());
@@ -297,7 +271,7 @@ final class ChatGptMcpGatewayTest extends TestCase
             ], static function (string $url, string $path, int $remaining): array {
                 file_put_contents($path, 'not an image');
                 return ['status' => 200];
-            }, static fn (string $host, string $url): bool => $host === self::URL_HOST);
+            }, null, static fn (string $host): array => ['93.184.216.34']);
             self::fail('Expected actual MIME sniffing to reject non-image bytes.');
         } catch (ChatGptMcpGatewayException $error) {
             self::assertSame('CHATGPT_FILE_MIME_REJECTED', $error->reasonCode());
@@ -317,13 +291,16 @@ final class ChatGptMcpGatewayTest extends TestCase
         self::assertStringContainsString("rest_get_server()->dispatch(\$proxy)", $gateway);
         self::assertStringContainsString("new \\WP_REST_Request('POST', '/nhk/v1/mcp')", $ability);
         self::assertStringContainsString("self::executeMcp(\$toolName, \$input)", $ability);
-        self::assertStringContainsString("'redirection' => 0", $materializer);
         self::assertStringContainsString('MAX_REDIRECTS', $materializer);
-        self::assertStringContainsString('self::validateUrl($current, $hostPolicy)', $materializer);
+        self::assertStringContainsString('resolvePublicAddresses', $materializer);
         self::assertStringNotContainsString('wp_upload_media', $gateway);
         self::assertStringNotContainsString('wp_upload_media_from_url', $gateway);
         self::assertStringNotContainsString('base64_decode', $gateway);
-        self::assertStringContainsString("str_starts_with(strtolower(\$reference), 'https://')", $materializer);
+        self::assertStringContainsString("array_is_list(\$provided)", $materializer);
+        self::assertStringContainsString('CURLOPT_RESOLVE', $materializer);
+        self::assertStringContainsString('CURLOPT_SSL_VERIFYPEER', $materializer);
+        self::assertStringContainsString('CURLOPT_PROXY =>', $materializer);
+        self::assertStringNotContainsString('defaultHostPolicy', $materializer);
         self::assertStringContainsString("unset(\$params['arguments']['files'])", $gateway);
         self::assertStringContainsString('finally {', $gateway);
     }
