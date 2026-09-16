@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Demo;
 
 use Closure;
 use NHK\Core\Application\Demo\StageResult;
-use NHK\Core\Application\Mcp\McpTransport;
+use NHK\Core\Application\Mcp\{McpReleaseIdentity, McpTransport};
 
 /** Read-only direct MCP verifier for the deployed canonical documentation. */
 final class RemoteMcpDocumentationVerifier
@@ -28,7 +28,7 @@ final class RemoteMcpDocumentationVerifier
 
             $tools = $this->call($url, 'tools/list', [], 2);
             $toolNames = array_values(array_filter(array_map(static fn (mixed $tool): string => is_array($tool) ? (string) ($tool['name'] ?? '') : '', is_array($tools['tools'] ?? null) ? $tools['tools'] : [])));
-            foreach (['nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list'] as $requiredTool) {
+            foreach (['nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.article.publish.review'] as $requiredTool) {
                 if (!in_array($requiredTool, $toolNames, true)) return StageResult::failed('MCP_BOOTSTRAP_UNAVAILABLE');
             }
 
@@ -37,6 +37,8 @@ final class RemoteMcpDocumentationVerifier
             if (!hash_equals($expectedBuildIdentity, (string) ($bootstrap['build_identity'] ?? ''))) return StageResult::blocked('DEPLOYMENT_NOT_ACTIVE');
             if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
             if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'] ?? null, $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameReleaseIdentity($bootstrap, $expectedBootstrap)) return StageResult::failed('RELEASE_TUPLE_MISMATCH');
+            if (!$this->callableProbe($url)) return StageResult::failed('MCP_CAPABILITY_PARITY_MISMATCH');
         } catch (\Throwable) {
             return StageResult::failed('MCP_BOOTSTRAP_UNAVAILABLE');
         }
@@ -85,7 +87,8 @@ final class RemoteMcpDocumentationVerifier
         return preg_match('/^[a-f0-9]{64}$/i', (string) ($expected['documentation_version'] ?? '')) === 1
             && preg_match('/^[a-f0-9]{64}$/i', (string) ($expected['manifest_hash'] ?? '')) === 1
             && preg_match('/^[a-f0-9]{64}$/i', $buildIdentity) === 1
-            && is_array($expected['files'] ?? null);
+            && is_array($expected['files'] ?? null)
+            && isset($expected['runtime_version'], $expected['source_revision'], $expected['catalog_version'], $expected['resource_version'], $expected['release_identity']);
     }
 
     /** @param array<string,mixed> $actual @param array<string,mixed> $expected */
@@ -93,6 +96,27 @@ final class RemoteMcpDocumentationVerifier
     {
         return hash_equals((string) $expected['documentation_version'], (string) ($actual['documentation_version'] ?? ''))
             && hash_equals((string) $expected['manifest_hash'], (string) ($actual['manifest_hash'] ?? ''));
+    }
+
+    /** @param array<string,mixed> $actual @param array<string,mixed> $expected */
+    private function sameReleaseIdentity(array $actual, array $expected): bool
+    {
+        foreach (['runtime_version', 'source_revision', 'catalog_version', 'resource_version', 'release_identity'] as $field) {
+            if (!array_key_exists($field, $expected) || !array_key_exists($field, $actual) || (string) $actual[$field] !== (string) $expected[$field]) return false;
+        }
+        $identity = $expected;
+        unset($identity['release_identity'], $identity['files'], $identity['manifest'], $identity['build_identity']);
+        return McpReleaseIdentity::hash($identity) === (string) $expected['release_identity'];
+    }
+
+    private function callableProbe(string $url): bool
+    {
+        $body = json_encode(['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/call', 'params' => ['name' => 'nhk.article.publish.review', 'arguments' => []]], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $response = ($this->request)($url, 'POST', $this->headers(), $body);
+        if (!is_array($response) || (int) ($response['status'] ?? 0) < 200 || (int) ($response['status'] ?? 0) >= 500 || !is_string($response['body'] ?? null)) return false;
+        $decoded = json_decode($response['body'], true);
+        if (!is_array($decoded)) return false;
+        return (int) ($decoded['error']['code'] ?? 0) !== -32601;
     }
 
     /** @param mixed $actual @param mixed $expected */

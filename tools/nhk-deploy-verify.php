@@ -107,16 +107,20 @@ if (!$verification->isPass()) {
     finish([
         'status' => $verification->status,
         'reason_code' => $verification->reasonCode,
-        'expected' => safeIdentity($expectedManifest, $expectedBuildIdentity),
+        'expected' => safeIdentity($localBootstrap, $expectedBuildIdentity),
     ], $json, 2);
 }
 
 finish([
     'status' => 'pass',
-    'source_revision' => $head,
+    'source_revision' => $localBootstrap['source_revision'],
+    'runtime_version' => $localBootstrap['runtime_version'],
     'documentation_version' => $expectedManifest['documentation_version'],
     'manifest_hash' => $expectedManifest['manifest_hash'],
     'build_identity' => $expectedBuildIdentity,
+    'catalog_version' => $localBootstrap['catalog_version'],
+    'resource_version' => $localBootstrap['resource_version'],
+    'release_identity' => $localBootstrap['release_identity'],
     'documents' => count((array) ($expectedManifest['files'] ?? [])),
     'deployment_identifier' => $deployment->identifier,
     'verification' => 'direct-mcp-bootstrap-and-list',
@@ -146,7 +150,16 @@ function validBaseUrl(string $baseUrl, string $target): bool
 /** @param array<string,mixed> $manifest @return array<string,mixed> */
 function safeIdentity(array $manifest, string $buildIdentity): array
 {
-    return ['documentation_version' => $manifest['documentation_version'] ?? null, 'manifest_hash' => $manifest['manifest_hash'] ?? null, 'build_identity' => $buildIdentity];
+    return [
+        'source_revision' => $manifest['source_revision'] ?? null,
+        'runtime_version' => $manifest['runtime_version'] ?? null,
+        'documentation_version' => $manifest['documentation_version'] ?? null,
+        'manifest_hash' => $manifest['manifest_hash'] ?? null,
+        'build_identity' => $buildIdentity,
+        'catalog_version' => $manifest['catalog_version'] ?? null,
+        'resource_version' => $manifest['resource_version'] ?? null,
+        'release_identity' => $manifest['release_identity'] ?? null,
+    ];
 }
 
 /** @param array<string,mixed> $payload */

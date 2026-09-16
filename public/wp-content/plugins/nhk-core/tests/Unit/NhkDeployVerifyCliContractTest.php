@@ -57,4 +57,12 @@ final class NhkDeployVerifyCliContractTest extends TestCase
             unlink($path);
         }
     }
+
+    public function test_deploy_receipt_projects_the_full_release_tuple(): void
+    {
+        $runner = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/nhk-deploy-verify.php');
+        foreach (['source_revision', 'runtime_version', 'documentation_version', 'manifest_hash', 'build_identity', 'catalog_version', 'resource_version', 'release_identity'] as $field) {
+            self::assertStringContainsString("'{$field}'", $runner, $field);
+        }
+    }
 }

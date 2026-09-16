@@ -196,7 +196,7 @@ final class McpDocumentationRegistry
             'constitution' => ['document_key' => 'constitution', 'revision' => $this->get('docs/constitution/NHK_V3_CONSTITUTION.md')['sha256']],
             'truth_model' => ['canonical_contract' => 'what NHK V3 architecture requires', 'runtime_status' => 'what this MCP runtime currently registers; LIVE requires fresh discovery/read-back'],
             'runtime_status' => ['surface' => 'mcp', 'status' => 'registered_not_live_verified', 'registered_tools' => McpToolCatalog::names()],
-            'mcp_capability_parity' => McpAbilityRegistration::exposureContract(),
+            'mcp_capability_parity' => McpAbilityRegistration::callableParity(),
             'source_root_available' => true,
         ];
     }

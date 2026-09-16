@@ -47,6 +47,7 @@ final class McpProposalLifecycleExposureTest extends TestCase
         self::assertSame(['post_id', 'fields', 'expected_state_token'], $tool['inputSchema']['required']);
         self::assertContains('nhk-v3/article-draft-update', McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
         self::assertContains('nhk-v3/article-draft-update', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
+        self::assertContains('nhk-v3/article-publish-review', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
     }
 
     public function test_proposal_lifecycle_tools_keep_internal_surface_and_callable_catalog_schemas(): void

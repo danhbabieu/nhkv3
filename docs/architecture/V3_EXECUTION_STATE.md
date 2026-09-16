@@ -10742,3 +10742,45 @@ proof, and one physical upload reused by both Capture intents.
 
 STATUS: `DESIGN_READY / USER_SPEC_REVIEW_REQUIRED` — implementation and the
 writing plan remain paused until the user reviews this design.
+
+# Checkpoint — 2026-09-16 — Public Clock live-blocker remediation (LOCAL ONLY)
+
+SCOPE: Remediated the three reported live blockers in the local NHK V3
+runtime contract. No staging or production semantic mutation, generic
+WordPress write, direct database write, duplicate creation, SSH, rsync or
+connector reconnection was performed.
+
+CAS: `EditorialStateToken::matches()` now rejects malformed/stale tokens at a
+dedicated typed boundary before managed-section validation, Capture write
+guard entry or native post update. The fixture-driven regression observes
+title, content, excerpt, modified time, revision counters and latest revision
+across one successful update, three repeated stale retries and one fresh-token
+retry. The stale path performs zero store updates.
+
+ABILITY/DISPATCH: Publication review now remains a narrow governed
+continuation, is auto-enabled with the existing draft continuation in the Easy
+MCP option reconciliation, and has explicit label/alias parity. The local
+contract exposes separate `RUNTIME_REGISTERED`, `EASY_MCP_DESCRIPTOR_EXPOSED`,
+`TOOLS_LIST_EXPOSED`, `CONNECTOR_DISCOVERABLE` and `CALLABLE_DISPATCHED` flags
+for every catalog-mapped Article tool. Remote verification probes the
+canonical publication-review call and rejects JSON-RPC `-32601` as
+`MCP_CAPABILITY_PARITY_MISMATCH`; capability failures remain typed rather than
+being converted to Unknown tool.
+
+RELEASE TUPLE: The immutable documentation manifest is schema version 2 and
+records its source revision. Runtime/bootstrap now returns the coherent
+`source_revision`, `runtime_version`, `documentation_version`, `manifest_hash`,
+`build_identity`, `catalog_version`, `resource_version` and `release_identity`
+tuple, plus MCP capability parity. The deployment verifier compares that
+tuple, documentation file hashes, catalog presence and callable dispatch;
+stale/partial remote artifacts fail closed.
+
+LOCAL_VERIFICATION: Focused CAS/MCP/release tests PASS (58 tests after the
+new remote unknown-tool regression; exact aggregate is recorded by the final
+verification run). Canonical docs snapshot was regenerated from the current
+repository after this checkpoint. Full relevant Composer/PHPUnit, PHP lint,
+diff and secret checks remain required before the commit checkpoint.
+
+LIVE_STATUS: `LIVE_PUBLIC_CLOCK_COMPLETE=NO` — external deployment and fresh
+remote read-back remain pending. This checkpoint claims local/contract
+readiness only, not live completion.

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Mcp\McpReleaseIdentity;
 use NHK\Core\Infrastructure\Demo\RemoteMcpDocumentationVerifier;
 use PHPUnit\Framework\TestCase;
 
@@ -20,7 +21,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
                 'tools/list' => ['status' => 200, 'body' => json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => ['tools' => [
                     ['name' => 'nhk.documentation.bootstrap'],
                     ['name' => 'nhk.documentation.get'],
-                    ['name' => 'nhk.documentation.list'],
+                    ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review'],
                 ]]], JSON_THROW_ON_ERROR)],
                 'tools/call' => ($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap'
                     ? $this->jsonResponse($expected)
@@ -34,7 +35,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('pass', $result->status, (string) $result->reasonCode);
         self::assertSame('mcp-documentation-verified', $result->identifier);
         self::assertSame(str_repeat('f', 64), $result->fingerprint);
-        self::assertCount(4, $calls);
+        self::assertCount(5, $calls);
         self::assertSame('https://demo.example/wp-json/nhk/v1/mcp', $calls[0][0]);
         self::assertSame('POST', $calls[0][1]);
         self::assertContains('MCP-Protocol-Version: 2026-07-28', $calls[0][2]);
@@ -61,7 +62,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             return match ($request['method'] ?? null) {
                 'initialize' => ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)],
-                'tools/list' => ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list']]]], JSON_THROW_ON_ERROR)],
+                'tools/list' => ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)],
                 'tools/call' => $this->jsonResponse($expected),
                 default => ['status' => 404, 'body' => ''],
             };
@@ -70,7 +71,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         $result = $verifier->verify('https://demo.example', $expected, str_repeat('f', 64));
 
         self::assertSame('pass', $result->status);
-        self::assertCount(4, $calls);
+        self::assertCount(5, $calls);
         foreach ($calls as $call) self::assertContains('Authorization: Basic dXNlcjpwYXNz', $call[2]);
     }
 
@@ -80,7 +81,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         $verifier = new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($expected): array {
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
-            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list']]]], JSON_THROW_ON_ERROR)];
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
             if (($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap') {
                 $bootstrap = $expected;
                 $bootstrap['manifest'] = ['files' => $expected['files']];
@@ -128,6 +129,22 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('MCP_BOOTSTRAP_UNAVAILABLE', $result->reasonCode);
     }
 
+    public function test_unknown_publication_review_dispatch_is_not_accepted_as_a_verified_release(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $verifier = new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($expected): array {
+            $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [
+                ['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review'],
+            ]]], JSON_THROW_ON_ERROR)];
+            if (($request['params']['name'] ?? '') === 'nhk.article.publish.review') return ['status' => 200, 'body' => json_encode(['jsonrpc' => '2.0', 'id' => 5, 'error' => ['code' => -32601, 'message' => 'Unknown tool']], JSON_THROW_ON_ERROR)];
+            return $this->jsonResponse($expected);
+        });
+
+        self::assertSame('MCP_CAPABILITY_PARITY_MISMATCH', $verifier->verify('https://demo.example', $expected, str_repeat('f', 64))->reasonCode);
+    }
+
     /** @param array<string,mixed> $payload */
     private function jsonResponse(array $payload): array
     {
@@ -140,7 +157,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         return new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($actual): array {
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
             if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
-            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list']]]], JSON_THROW_ON_ERROR)];
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
             $payload = ($request['params']['name'] ?? '') === 'nhk.documentation.bootstrap'
                 ? $actual
                 : ['documentation_version' => $actual['documentation_version'], 'manifest_hash' => $actual['manifest_hash'], 'files' => $actual['files']];
@@ -152,13 +169,25 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
     private function expectedBootstrap(): array
     {
         return [
+            'runtime_version' => '0.1.0',
+            'source_revision' => str_repeat('1', 40),
             'documentation_version' => str_repeat('d', 64),
             'manifest_hash' => str_repeat('e', 64),
             'build_identity' => str_repeat('f', 64),
+            'catalog_version' => str_repeat('a', 64),
+            'resource_version' => str_repeat('b', 64),
+            'environment' => 'staging',
+            'semantic_write_policy' => 'PROJECT_BUILD_ONLY',
+            'project_build_enabled' => true,
             'files' => [
                 ['path' => 'AGENTS.md', 'sha256' => str_repeat('a', 64)],
                 ['path' => 'docs/architecture/P0_DEPLOYMENT_PREFLIGHT.md', 'sha256' => str_repeat('b', 64)],
             ],
-        ];
+        ] + ['release_identity' => McpReleaseIdentity::hash([
+            'runtime_version' => '0.1.0', 'source_revision' => str_repeat('1', 40),
+            'documentation_version' => str_repeat('d', 64), 'manifest_hash' => str_repeat('e', 64),
+            'catalog_version' => str_repeat('a', 64), 'resource_version' => str_repeat('b', 64),
+            'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD_ONLY', 'project_build_enabled' => true,
+        ])];
     }
 }

@@ -514,6 +514,11 @@ final class McpContractTest extends TestCase
             self::assertSame($toolName, McpAbilityRegistration::toolNameForAbility((string) $ability), $toolName);
             self::assertTrue(McpToolCatalog::has($toolName), $toolName . ' must remain callable in the canonical catalog.');
         }
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.article.publish.review']['runtime_registered']);
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.article.publish.review']['easy_mcp_descriptor_exposed']);
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.article.publish.review']['tools_list_exposed']);
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.article.publish.review']['connector_discoverable']);
+        self::assertTrue(McpAbilityRegistration::callableParity()['nhk.article.publish.review']['callable_dispatched']);
     }
 
     public function test_proposal_eligibility_is_read_only_but_capability_gated(): void

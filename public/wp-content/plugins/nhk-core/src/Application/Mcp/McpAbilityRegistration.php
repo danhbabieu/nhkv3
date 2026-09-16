@@ -61,7 +61,7 @@ final class McpAbilityRegistration
     {
         return array_values(array_filter(array_map(
             static fn (string $tool): ?string => self::abilityNameForTool($tool),
-            SingleEntryPointPolicy::publicationContinuationTools(),
+            ['nhk.article.draft.update', 'nhk.article.publish.review'],
         )));
     }
 
@@ -107,6 +107,12 @@ final class McpAbilityRegistration
             ];
         }
         return $contract;
+    }
+
+    /** @return array<string,array<string,bool|string>> */
+    public static function callableParity(): array
+    {
+        return self::exposureContract();
     }
 
     /** @param mixed $enabled @return list<string> */

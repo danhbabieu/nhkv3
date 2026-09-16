@@ -269,12 +269,6 @@ final class McpToolCatalog
         return array_column(self::tools(), 'name');
     }
 
-    public static function has(string $tool): bool
-    {
-        foreach (self::tools() as $definition) if ($definition['name'] === $tool) return true;
-        return false;
-    }
-
     private static function tool(string $name, string $description, array $properties, array $required, bool $governed = false, array $connectorMeta = []): array
     {
         $surface = SingleEntryPointPolicy::surface($name);
