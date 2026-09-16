@@ -304,6 +304,21 @@ final class McpTransport
                 $safeErrors[] = ['ordinal' => (int) $ordinal, 'code' => $code, 'stage' => self::safeWidgetStage((string) ($error['stage'] ?? 'ingest'))];
                 continue;
             }
+            $itemStatus = strtolower(trim((string) ($item['status'] ?? 'success')));
+            if (in_array($itemStatus, ['error', 'failed', 'failure'], true) || isset($item['error'])) {
+                $error = is_array($item['error'] ?? null) ? $item['error'] : $item;
+                $code = self::safeWidgetErrorCode((string) ($error['code'] ?? $error['error_code'] ?? 'UPLOAD_FAILED'));
+                $stage = self::safeWidgetStage((string) ($error['stage'] ?? 'ingest'));
+                $safeItems[] = [
+                    'ordinal' => (int) $ordinal,
+                    'status' => 'error',
+                    'original_filename' => (string) ($item['original_filename'] ?? ($reference['file_name'] ?? '')),
+                    'error_code' => $code,
+                    'error' => ['code' => $code, 'stage' => $stage, 'message' => 'The image could not be ingested.'],
+                ];
+                $safeErrors[] = ['ordinal' => (int) $ordinal, 'code' => $code, 'stage' => $stage];
+                continue;
+            }
             $upload = [
                 'ordinal' => (int) $ordinal,
                 'status' => 'success',
@@ -356,7 +371,7 @@ final class McpTransport
             'stage' => self::safeWidgetStage((string) ($diagnostics['stage'] ?? 'materialization')),
             'message' => $error->safeMessage(),
         ];
-        foreach (['host', 'http_status', 'redirect_count', 'resolved_public_address_count', 'content_bytes_received', 'decoder_stage'] as $key) {
+        foreach (['correlation_id', 'host', 'http_status', 'redirect_count', 'resolved_public_address_count', 'content_bytes_received', 'decoder_stage'] as $key) {
             $value = $key === 'host' ? $error->host() : ($diagnostics[$key] ?? null);
             if ($value !== null && $value !== '') $safeError[$key] = $value;
         }

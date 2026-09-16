@@ -33,6 +33,7 @@ final class TrustedProvidedFileMaterializer
      */
     public static function materialize(mixed $provided, ?callable $downloader = null, ?callable $hostPolicy = null, ?callable $resolver = null): array
     {
+        $correlationId = self::correlationId();
         if (!is_array($provided) || !array_is_list($provided) || $provided === [] || count($provided) > self::MAX_FILES) {
             throw new ChatGptMcpGatewayException('CHATGPT_FILE_COUNT_LIMIT', 'The request must contain between one and twenty uploaded files.');
         }
@@ -70,12 +71,13 @@ final class TrustedProvidedFileMaterializer
                     : self::download($url, $path, $remaining, $hostPolicy, $resolver);
                 $status = (int) ($result['status'] ?? 0);
                 $host = self::normalizeHost((string) ($urlParts['host'] ?? ''));
+                $bytesReceived = max(0, (int) ($result['content_bytes_received'] ?? 0));
                 if ($status < 200 || $status >= 300) {
                     throw new ChatGptMcpGatewayException(
                         'PROVIDED_FILE_REFERENCE_UNRESOLVABLE',
                         'The provided file server returned an unusable HTTP response.',
                         $host,
-                        ['typed_code' => 'PROVIDED_FILE_HTTP_STATUS', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0)],
+                        ['typed_code' => 'PROVIDED_FILE_HTTP_STATUS', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0), 'content_bytes_received' => $bytesReceived],
                     );
                 }
                 if (!is_file($path)) {
@@ -83,20 +85,33 @@ final class TrustedProvidedFileMaterializer
                         'PROVIDED_FILE_REFERENCE_UNRESOLVABLE',
                         'The provided file response contained no readable body.',
                         $host,
-                        ['typed_code' => 'PROVIDED_FILE_EMPTY_BODY', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0)],
+                        ['typed_code' => 'PROVIDED_FILE_EMPTY_BODY', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0), 'content_bytes_received' => $bytesReceived],
                     );
                 }
 
                 $size = filesize($path);
-                if (!is_int($size) || $size < 1 || $size > $remaining || $totalBytes + $size > self::MAX_TOTAL_BYTES) {
-                    throw new ChatGptMcpGatewayException('CHATGPT_FILE_SIZE_LIMIT', 'The uploaded files exceed the 50 MB total limit.');
+                if (!is_int($size) || $size < 1) {
+                    throw new ChatGptMcpGatewayException(
+                        'PROVIDED_FILE_REFERENCE_UNRESOLVABLE',
+                        'The provided file response contained no readable body.',
+                        $host,
+                        ['typed_code' => 'PROVIDED_FILE_EMPTY_BODY', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0), 'content_bytes_received' => max($bytesReceived, 0)],
+                    );
+                }
+                if ($size > $remaining || $totalBytes + $size > self::MAX_TOTAL_BYTES) {
+                    throw new ChatGptMcpGatewayException(
+                        'CHATGPT_FILE_SIZE_LIMIT',
+                        'The uploaded files exceed the 50 MB total limit.',
+                        $host,
+                        ['typed_code' => 'PROVIDED_FILE_STREAM_LIMIT', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0), 'content_bytes_received' => max($bytesReceived, $size)],
+                    );
                 }
                 $mime = self::sniffMime($path);
                 if (!in_array($mime, self::ALLOWED_MIME_TYPES, true)) {
-                    throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file is not a supported image.');
+                    throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file is not a supported image.', $host, ['typed_code' => 'PROVIDED_FILE_MIME_INVALID', 'stage' => 'mime', 'decoder_stage' => 'mime_sniff', 'content_bytes_received' => $size]);
                 }
                 if ($declaredMime !== '' && strtolower($declaredMime) !== $mime) {
-                    throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_MISMATCH', 'The uploaded file MIME type does not match its bytes.');
+                    throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_MISMATCH', 'The uploaded file MIME type does not match its bytes.', $host, ['typed_code' => 'PROVIDED_FILE_MIME_INVALID', 'stage' => 'mime', 'decoder_stage' => 'mime_compare', 'content_bytes_received' => $size]);
                 }
                 self::assertImageResourceBudget($path);
                 $fileBag['files']['name'][] = self::safeFilename($providedName, $url, $mime);
@@ -109,6 +124,7 @@ final class TrustedProvidedFileMaterializer
             return ['files' => $fileBag, 'temporary_paths' => $temporaryPaths];
         } catch (\Throwable $error) {
             self::cleanup($temporaryPaths);
+            if ($error instanceof ChatGptMcpGatewayException) throw $error->withDiagnostic('correlation_id', $correlationId);
             throw $error;
         }
     }
@@ -126,10 +142,26 @@ final class TrustedProvidedFileMaterializer
         if (parse_url($location, PHP_URL_SCHEME) !== null || str_starts_with($location, '//')) {
             return self::validateUrl(str_starts_with($location, '//') ? 'https:' . $location : $location, $hostPolicy, $resolver);
         }
-        if (str_starts_with($location, '/')) {
-            return self::validateUrl('https://' . $baseParts['host'] . $location, $hostPolicy, $resolver);
+        $locationParts = parse_url($location);
+        if (!is_array($locationParts) || isset($locationParts['fragment'])) {
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect']);
         }
-        throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect']);
+        $basePath = (string) ($baseParts['path'] ?? '/');
+        $locationPath = (string) ($locationParts['path'] ?? '');
+        if ($locationPath === '' && !array_key_exists('query', $locationParts)) {
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect']);
+        }
+        if ($locationPath === '') {
+            $resolvedPath = $basePath;
+        } elseif (str_starts_with($locationPath, '/')) {
+            $resolvedPath = $locationPath;
+        } else {
+            $directory = str_ends_with($basePath, '/') ? $basePath : (strrpos($basePath, '/') !== false ? substr($basePath, 0, strrpos($basePath, '/') + 1) : '/');
+            $resolvedPath = $directory . $locationPath;
+        }
+        $resolvedPath = self::normalizeRedirectPath($resolvedPath);
+        $query = array_key_exists('query', $locationParts) ? '?' . (string) $locationParts['query'] : '';
+        return self::validateUrl('https://' . $baseParts['host'] . $resolvedPath . $query, $hostPolicy, $resolver);
     }
 
     private static function validateUrl(string $url, ?callable $hostPolicy = null, ?callable $resolver = null): string
@@ -241,6 +273,8 @@ final class TrustedProvidedFileMaterializer
                 CURLOPT_HEADER => false,
                 CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT_SECONDS,
                 CURLOPT_TIMEOUT => self::TIMEOUT_SECONDS,
+                CURLOPT_HTTPGET => true,
+                CURLOPT_HTTP_VERSION => defined('CURL_HTTP_VERSION_2TLS') ? CURL_HTTP_VERSION_2TLS : CURL_HTTP_VERSION_1_1,
                 CURLOPT_LOW_SPEED_LIMIT => 1,
                 CURLOPT_LOW_SPEED_TIME => self::TIMEOUT_SECONDS,
                 CURLOPT_SSL_VERIFYPEER => true,
@@ -300,25 +334,25 @@ final class TrustedProvidedFileMaterializer
 
     private static function sniffMime(string $path): string
     {
-        if (!class_exists('finfo')) throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_UNAVAILABLE', 'The file MIME sniffer is unavailable.');
+        if (!class_exists('finfo')) throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_UNAVAILABLE', 'The file MIME sniffer is unavailable.', null, ['typed_code' => 'PROVIDED_FILE_MIME_INVALID', 'stage' => 'mime', 'decoder_stage' => 'mime_sniff']);
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
-        if (!is_string($mime) || $mime === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file MIME type could not be verified.');
+        if (!is_string($mime) || $mime === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_MIME_REJECTED', 'The uploaded file MIME type could not be verified.', null, ['typed_code' => 'PROVIDED_FILE_MIME_INVALID', 'stage' => 'mime', 'decoder_stage' => 'mime_sniff']);
         return strtolower($mime);
     }
 
     private static function assertImageResourceBudget(string $path): void
     {
         $info = @getimagesize($path);
-        if (!is_array($info)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODE_FAILED', 'The uploaded image could not be decoded.');
+        if (!is_array($info)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODE_FAILED', 'The uploaded image could not be decoded.', null, ['typed_code' => 'PROVIDED_FILE_IMAGE_DECODE_FAILED', 'stage' => 'decode', 'decoder_stage' => 'getimagesize']);
         $width = (int) ($info[0] ?? 0);
         $height = (int) ($info[1] ?? 0);
         if ($width < 1 || $height < 1 || $width > self::MAX_DIMENSION || $height > self::MAX_DIMENSION || $width > intdiv(self::MAX_DECODED_PIXELS, max(1, $height))) {
-            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODED_PIXEL_LIMIT', 'The uploaded image exceeds the safe decoded-pixel budget.');
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODED_PIXEL_LIMIT', 'The uploaded image exceeds the safe decoded-pixel budget.', null, ['typed_code' => 'PROVIDED_FILE_PIXEL_LIMIT', 'stage' => 'decode', 'decoder_stage' => 'dimensions']);
         }
         if (function_exists('imagecreatefromstring')) {
             $bytes = @file_get_contents($path);
             $image = is_string($bytes) ? @imagecreatefromstring($bytes) : false;
-            if ($image === false) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODE_FAILED', 'The uploaded image could not be decoded.');
+            if ($image === false) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DECODE_FAILED', 'The uploaded image could not be decoded.', null, ['typed_code' => 'PROVIDED_FILE_IMAGE_DECODE_FAILED', 'stage' => 'decode', 'decoder_stage' => 'image_decode']);
             if (function_exists('imagedestroy')) imagedestroy($image);
         }
     }
@@ -343,6 +377,29 @@ final class TrustedProvidedFileMaterializer
         $value = trim($value);
         if ($value === '' || strlen($value) > $max || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) return '';
         return $value;
+    }
+
+    private static function correlationId(): string
+    {
+        try {
+            return bin2hex(random_bytes(8));
+        } catch (\Throwable) {
+            return substr(hash('sha256', uniqid('', true)), 0, 16);
+        }
+    }
+
+    private static function normalizeRedirectPath(string $path): string
+    {
+        $segments = [];
+        foreach (explode('/', '/' . ltrim($path, '/')) as $segment) {
+            if ($segment === '' || $segment === '.') continue;
+            if ($segment === '..') {
+                array_pop($segments);
+                continue;
+            }
+            $segments[] = $segment;
+        }
+        return '/' . implode('/', $segments);
     }
 
     private static function cleanup(array $paths): void

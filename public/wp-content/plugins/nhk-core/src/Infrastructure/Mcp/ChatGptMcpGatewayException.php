@@ -30,9 +30,18 @@ final class ChatGptMcpGatewayException extends \RuntimeException
             'CHATGPT_FILE_DECODED_PIXEL_LIMIT' => 'PROVIDED_FILE_PIXEL_LIMIT',
             'CHATGPT_FILE_TEMP_FAILED' => 'PROVIDED_FILE_TEMPFILE_FAILED',
             'CHATGPT_FILE_REDIRECT_REJECTED' => 'PROVIDED_FILE_REDIRECT_REJECTED',
+            'CHATGPT_FILE_GATEWAY_RUNTIME_UNAVAILABLE' => 'PROVIDED_FILE_CONNECT_FAILED',
+            'CHATGPT_FILE_MIME_UNAVAILABLE' => 'PROVIDED_FILE_MIME_INVALID',
             'PROVIDED_FILE_REFERENCE_UNRESOLVABLE' => 'PROVIDED_FILE_MATERIALIZATION_FAILED',
             default => $this->reasonCode,
         };
+    }
+
+    public function withDiagnostic(string $key, int|string|null $value): self
+    {
+        $diagnostics = $this->diagnostics;
+        if ($value !== null && $value !== '') $diagnostics[$key] = $value;
+        return new self($this->reasonCode, $this->getMessage(), $this->host, $diagnostics);
     }
 
     public function host(): ?string

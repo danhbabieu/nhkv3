@@ -138,7 +138,7 @@ final class ChatGptMcpGateway
     {
         $data = ['status' => 422, 'reason_code' => $reasonCode, 'field' => 'files'];
         if ($host !== null && $host !== '') $data['host'] = $host;
-        foreach (['http_status', 'redirect_count', 'resolved_public_address_count', 'content_bytes_received', 'decoder_stage'] as $key) {
+        foreach (['correlation_id', 'http_status', 'redirect_count', 'resolved_public_address_count', 'content_bytes_received', 'decoder_stage'] as $key) {
             if (isset($diagnostics[$key])) $data[$key] = $diagnostics[$key];
         }
         $readerMessage = $reasonCode . ': ' . $message;

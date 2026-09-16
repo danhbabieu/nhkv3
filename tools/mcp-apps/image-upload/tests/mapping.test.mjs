@@ -304,3 +304,28 @@ test("JSON error text preserves the typed code and strips signed URLs from widge
   assert.equal(JSON.stringify(state).includes("secret-token"), false);
   assert.equal(JSON.stringify(state).includes("oaiusercontent.test"), false);
 });
+
+test("wrapped error property wins over an apparent success manifest", () => {
+  const result = {
+    result: {
+      structuredContent: { status: "success", requested_count: 1, success_count: 1, failure_count: 0, items: [] },
+      error: { code: "PROVIDED_FILE_TLS_FAILED" },
+    },
+  };
+  assert.deepEqual(inspectToolResult(result), { kind: "error", code: "PROVIDED_FILE_TLS_FAILED" });
+  assert.throws(() => extractUploadManifest(result), /PROVIDED_FILE_TLS_FAILED/);
+});
+
+test("a typed error manifest never reaches count mismatch", () => {
+  const result = {
+    structuredContent: {
+      status: "error",
+      requested_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      items: [],
+    },
+  };
+  assert.deepEqual(inspectToolResult(result), { kind: "error", code: "SERVER_TOOL_ERROR" });
+  assert.throws(() => extractUploadManifest(result), /SERVER_TOOL_ERROR/);
+});

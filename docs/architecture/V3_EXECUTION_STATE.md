@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Widget upload Phase 2 transport/error hardening (LOCAL ONLY)
+
+SCOPE: Harden the existing `nhk.media.widget-upload` failure boundary and
+trusted provided-file materializer after the live `IMG_4617.jpeg` reproduction.
+No deployment, connector reconnection, staging semantic mutation, production
+mutation, generic WordPress writer or alternate transport was used.
+
+IMPLEMENTED: Expected empty-body, stream-limit, MIME and image-decoder failures
+now retain bounded typed causes and safe stages. Materialization failures carry
+an opaque correlation ID plus allowed diagnostics only; signed URLs, tokens,
+cookies, authorization values, temporary paths and session-scoped references
+remain excluded. The downloader explicitly performs GET, negotiates HTTP/2
+when supported, preserves the initial signed query, resolves path/query
+relative redirects without copying the original query, validates each hop and
+keeps hostname/SNI/TLS verification on the hostname while pinning validated
+public IPv4/IPv6 addresses.
+
+The server widget projection now preserves explicit failed per-item statuses
+instead of promoting them to successful uploads. The widget regression surface
+also proves wrapped `error` envelopes and typed error manifests stop before
+cardinality validation, while malformed results remain
+`SERVER_TOOL_RESULT_INVALID` and `MEDIA_READBACK_COUNT_MISMATCH` remains
+reserved for explicit success/partial cardinality contradictions.
+
+LOCAL_VERIFICATION: Focused PHP widget/materializer/gateway/entrypoint tests
+pass — 63 tests / 202 assertions, with the existing PHPUnit deprecations only.
+MCP Apps tests pass — 30 tests; TypeScript typecheck and production widget
+build pass. Composer PHP lint, changed-scope secret review and `git diff
+--check` pass. PHP_CodeSniffer is not installed in this checkout, so that
+optional check was not run.
+
+LIVE_STATUS: `UPLOAD_FINAL_STATUS=UNVERIFIED`. The real ChatGPT-hosted
+`IMG_4617.jpeg` acceptance remains blocked at the external deployment/config
+and connector-reconnection gate. No live Attachment, Media or public-WebP
+read-back is claimed from local tests.
+
 # Checkpoint — 2026-09-16 — Existing raster Media adoption partial-resume hotfix (LOCAL ONLY)
 
 SCOPE: Narrow repair of the existing WordPress attachment → canonical Media

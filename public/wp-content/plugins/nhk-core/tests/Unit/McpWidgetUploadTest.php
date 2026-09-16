@@ -99,6 +99,42 @@ final class McpWidgetUploadTest extends TestCase
         self::assertArrayNotHasKey('download_url', $result['items'][1]);
     }
 
+    public function test_widget_upload_does_not_promote_an_explicit_failed_item_to_success(): void
+    {
+        $calls = [];
+        $materializerCalls = 0;
+        $entrypoint = new ImageIngestEntrypoint(
+            static function (string $key, array $metadata, array $files, array $items) use (&$calls): array {
+                $calls[] = $items;
+                return [
+                    'items' => [
+                        ['ordinal' => 0, 'status' => 'success', 'client_file_id' => 'file_a', 'attachment_id' => 10, 'media_id' => 'media-a', 'filename' => 'a.webp', 'mime_type' => 'image/webp', 'width' => 10, 'height' => 10, 'byte_size' => 100, 'source_url' => '/anh/a.webp', 'attachment_readback_status' => 'verified'],
+                        ['ordinal' => 1, 'status' => 'error', 'client_file_id' => 'file_b', 'error' => ['code' => 'PROVIDED_FILE_HTTP_STATUS', 'stage' => 'download']],
+                    ],
+                ];
+            },
+            static function (mixed $references) use (&$materializerCalls): array {
+                $materializerCalls++;
+                return ['files' => ['files' => ['name' => ['a.jpg', 'b.jpg'], 'type' => ['image/jpeg', 'image/jpeg'], 'tmp_name' => ['/tmp/a', '/tmp/b'], 'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_OK], 'size' => [100, 100]]], 'temporary_paths' => []];
+            },
+        );
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, imageIngest: $entrypoint);
+        $result = $this->call($transport, [
+            'idempotency_key' => 'widget-explicit-failure',
+            'metadata' => ['description' => 'Explicit failed item'],
+            'files' => [
+                ['download_url' => 'https://files.openai.test/a', 'file_id' => 'file_a', 'file_name' => 'a.jpg'],
+                ['download_url' => 'https://files.openai.test/b', 'file_id' => 'file_b', 'file_name' => 'b.jpg'],
+            ],
+        ]);
+
+        self::assertSame('partial_success', $result['status']);
+        self::assertSame(1, $result['success_count']);
+        self::assertSame(1, $result['failure_count']);
+        self::assertSame(['success', 'error'], array_column($result['items'], 'status'));
+        self::assertSame('PROVIDED_FILE_HTTP_STATUS', $result['items'][1]['error']['code']);
+    }
+
     public function test_widget_upload_fails_closed_without_trustworthy_naming_context(): void
     {
         $calls = [];

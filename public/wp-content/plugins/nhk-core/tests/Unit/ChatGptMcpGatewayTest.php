@@ -62,6 +62,21 @@ final class ChatGptMcpGatewayTest extends TestCase
         self::assertFileDoesNotExist($nativeInput['files'][0]['tmp_name']);
     }
 
+    public function test_initial_signed_query_is_preserved_on_the_first_get(): void
+    {
+        $requestedUrl = null;
+        $result = ChatGptMcpGateway::materializeReferences([
+            ['download_url' => 'https://' . self::URL_HOST . '/signed/file.gif?sig=redacted&exp=123', 'file_id' => 'signed-file'],
+        ], static function (string $url, string $path, int $remaining) use (&$requestedUrl): array {
+            $requestedUrl = $url;
+            file_put_contents($path, self::gifBytes());
+            return ['status' => 200];
+        }, null, static fn (string $host): array => ['93.184.216.34']);
+
+        self::assertSame('https://' . self::URL_HOST . '/signed/file.gif?sig=redacted&exp=123', $requestedUrl);
+        self::cleanup($result['temporary_paths']);
+    }
+
     public function test_live_provided_files_preserve_order_and_items_alignment(): void
     {
         $references = [
@@ -228,7 +243,25 @@ final class ChatGptMcpGatewayTest extends TestCase
             self::assertSame('files.openai.test', $error->host());
             self::assertSame(410, $error->diagnostics()['http_status']);
             self::assertSame('download', $error->diagnostics()['stage']);
+            self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', (string) ($error->diagnostics()['correlation_id'] ?? ''));
             self::assertStringNotContainsString('signature=secret', $error->getMessage());
+        }
+    }
+
+    public function test_empty_success_body_has_a_distinct_typed_cause(): void
+    {
+        try {
+            ChatGptMcpGateway::materializeReferences([
+                ['download_url' => 'https://' . self::URL_HOST . '/empty', 'file_id' => 'file_empty'],
+            ], static function (string $url, string $temporaryPath, int $remaining): array {
+                touch($temporaryPath);
+                return ['status' => 200, 'content_bytes_received' => 0];
+            }, null, static fn (string $host): array => ['93.184.216.34']);
+            self::fail('Expected an empty response body to be rejected.');
+        } catch (ChatGptMcpGatewayException $error) {
+            self::assertSame('PROVIDED_FILE_EMPTY_BODY', $error->safeReasonCode());
+            self::assertSame('download', $error->diagnostics()['stage']);
+            self::assertSame(0, $error->diagnostics()['content_bytes_received']);
         }
     }
 
@@ -265,6 +298,28 @@ final class ChatGptMcpGatewayTest extends TestCase
             self::assertSame('CHATGPT_FILE_PRIVATE_IP_REJECTED', $error->reasonCode());
             self::assertStringNotContainsString('fixture=redacted', $error->getMessage());
         }
+    }
+
+    public function test_relative_redirect_resolves_against_the_current_path_without_carrying_the_original_query(): void
+    {
+        self::assertSame(
+            'https://' . self::URL_HOST . '/signed/next?fresh=1',
+            ChatGptMcpGateway::validateRedirectTarget(
+                'https://' . self::URL_HOST . '/signed/file.jpeg?signature=original',
+                'next?fresh=1',
+                null,
+                static fn (string $host): array => ['93.184.216.34'],
+            )
+        );
+        self::assertSame(
+            'https://' . self::URL_HOST . '/signed/file.jpeg?replacement=1',
+            ChatGptMcpGateway::validateRedirectTarget(
+                'https://' . self::URL_HOST . '/signed/file.jpeg?signature=original',
+                '?replacement=1',
+                null,
+                static fn (string $host): array => ['93.184.216.34'],
+            )
+        );
     }
 
     public function test_total_size_limit_and_actual_mime_sniff_are_enforced(): void
@@ -317,6 +372,8 @@ final class ChatGptMcpGatewayTest extends TestCase
         self::assertStringNotContainsString('base64_decode', $gateway);
         self::assertStringContainsString("array_is_list(\$provided)", $materializer);
         self::assertStringContainsString('CURLOPT_RESOLVE', $materializer);
+        self::assertStringContainsString('CURLOPT_HTTPGET', $materializer);
+        self::assertStringContainsString('CURL_HTTP_VERSION_2TLS', $materializer);
         self::assertStringContainsString('CURLOPT_SSL_VERIFYPEER', $materializer);
         self::assertStringContainsString('CURLOPT_PROXY =>', $materializer);
         self::assertStringNotContainsString('defaultHostPolicy', $materializer);
