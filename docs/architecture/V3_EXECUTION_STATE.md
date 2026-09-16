@@ -10954,3 +10954,37 @@ LIVE_STATUS: `DOCUMENTATION_LIST=UNVERIFIED`,
 `COMPAT_ALIAS=UNVERIFIED`, `CAPTURE_CHECKPOINT=UNVERIFIED`,
 `DOC_MANIFEST_INVALID=UNVERIFIED` — local remediation is ready, but live
 acceptance cannot be claimed without the separately approved external deploy.
+
+# Checkpoint — 2026-09-16 — Easy MCP Ability persistence and dispatch parity (LOCAL)
+
+SCOPE: Fixed the NHK integration boundary that reconciles the Easy MCP enabled
+Ability option. The previous filter removed every explicitly selected
+`nhk-v3/*` Ability unless it was in a narrow automatic/admin continuation
+allowlist, so valid plugin-provided Abilities such as proposal-create,
+article-ingest, knowledge-ingest, source-ingest and evidence-ingest vanished
+after the admin save/reload cycle. No semantic staging mutation, generic
+WordPress writer, direct database write or Governance bypass was used.
+
+IMPLEMENTED: The option boundary now retains every registered NHK Ability that
+an administrator explicitly selected, drops unknown NHK IDs, preserves the
+automatic operator surface and normalizes recognized `wp_ability_*` connector
+names back to native Ability IDs. Native Ability → connector tool → canonical
+MCP tool mapping is now directly testable and deterministic. The canonical MCP
+catalog/dispatch registry remains the sole action owner; permission and
+SingleEntryPointPolicy guards remain unchanged.
+
+LOCAL_VERIFICATION: Focused MCP tests pass (47 tests / 731 assertions). The
+full NHK Unit suite passes with `NHK_DEMO_DEPLOY_CONFIG` unset (1,633 tests /
+8,066 assertions, 13 warnings and 14 deprecations). Composer PHP lint and
+`git diff --check` pass. One earlier full-suite run inherited a deployment
+config from the shell and failed only because its cutover CLI expected missing
+config but attempted transport; it was cleanly reproduced as environment
+contamination and the unset-config run passed. Existing unrelated image-upload
+working-tree edits were preserved and are not part of this checkpoint.
+
+LIVE_STATUS: `ABILITY_UI_PERSISTENCE=UNVERIFIED_AFTER_FIX`,
+`MCP_DISCOVERY=UNVERIFIED_AFTER_FIX`, `MCP_DISPATCH=UNVERIFIED_AFTER_FIX` —
+the authenticated staging browser reproduced the pre-fix save-success but
+reload-unchecked behavior; code is locally ready, while staging verification
+requires the canonical external deployment wrapper and post-deploy browser/
+MCP read-back.
