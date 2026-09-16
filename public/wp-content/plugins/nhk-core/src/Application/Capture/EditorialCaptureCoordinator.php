@@ -48,6 +48,7 @@ final class EditorialCaptureCoordinator
         private ?ContentIntentRouter $contentIntentRouter = null,
         private ?\NHK\Core\Application\Media\VisualOpportunityDetector $visualOpportunityDetector = null,
         private ?\NHK\Core\Application\Media\VisualSupportRequirementService $visualSupportRequirements = null,
+        private ?\NHK\Core\Application\Media\MediaBindingService $mediaBindingService = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -81,6 +82,7 @@ final class EditorialCaptureCoordinator
                 'title' => trim((string) ($input['title'] ?? '')),
                 'excerpt' => trim((string) ($input['excerpt'] ?? '')),
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
+                'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
             ],
         ));
@@ -160,6 +162,13 @@ final class EditorialCaptureCoordinator
                 $diagnostics['physical_ingest'] = $this->withoutBody($manifest);
                 $record = $this->save($record, CaptureStage::ASSETS_STORED, $assets, $diagnostics, $receipts, 'ASSETS_STORED');
             }
+            // An exact typed Media binding is a deterministic fast path. It
+            // deliberately runs before interpretation/Graph/Claim work so a
+            // user-selected representative cannot time out in semantic
+            // discovery after the physical Media is already available.
+            if ($this->mediaBindingService !== null && strtoupper(trim((string) ($input['intent'] ?? ''))) === 'MEDIA_ENRICHMENT' && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== []) {
+                return $this->runTypedMediaBindingFastPath($record, $input, $assets, $diagnostics, $receipts);
+            }
             $this->beginPhase('INTERPRETED');
             $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
             $diagnostics['interpretation'] = $this->withoutBody($interpretation);
@@ -189,6 +198,22 @@ final class EditorialCaptureCoordinator
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
             $articleRequired = ($intent['article_required'] ?? false) === true;
+            $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
+            // Resolve before any draft/media writer. A UUID remains the
+            // selected identity, but contradictory explicit text must stop
+            // the workflow fail-closed.
+            $preflightResolution = $this->subjects->resolve(array_values(array_unique(array_merge(
+                (array) ($interpretation['primary_subject_hints'] ?? []),
+                (array) ($interpretation['secondary_subject_hints'] ?? []),
+                (array) ($interpretation['entity_mentions'] ?? []),
+                [trim((string) ($input['title'] ?? ''))],
+                $this->videoSubjectHints($videoInput),
+            ))));
+            if (($preflightResolution['status'] ?? '') === 'conflict') {
+                $diagnostics['subjects'] = $preflightResolution;
+                $diagnostics['failure_code'] = 'SUBJECT_CONFLICT_REVIEW_REQUIRED';
+                return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'SUBJECT_CONFLICT_REVIEW_REQUIRED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
+            }
             if ($articleRequired && $record->articleId === null) {
                 $this->beginPhase('DRAFT_CREATED');
                 $draft = ($this->draftCreator)([
@@ -234,10 +259,11 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::MEDIA_ADOPTED, $assets, $diagnostics, $receipts, 'MEDIA_ADOPTED', $record->articleId, $record->articleStateToken);
             }
             $this->beginPhase('SUBJECTS_RESOLVED');
-            $videoInput = is_array($input['video'] ?? null) ? $input['video'] : [];
             $resolution = $this->subjects->resolve(array_values(array_unique(array_merge(
                 (array) ($interpretation['primary_subject_hints'] ?? []),
                 (array) ($interpretation['secondary_subject_hints'] ?? []),
+                (array) ($interpretation['entity_mentions'] ?? []),
+                [trim((string) ($input['title'] ?? ''))],
                 $this->videoSubjectHints($videoInput),
             ))));
             if ($this->isVideoOnlyResume($input)) {
@@ -318,7 +344,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['visual_support'] = ['status' => $visualRequirements === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements];
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
-            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
+            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
             $isMediaEnrichment = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT';
             if ($isMediaEnrichment) {
                 // MEDIA_ENRICHMENT owns Media and MediaUsage only. Do not
@@ -427,7 +453,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
+            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);
@@ -520,6 +546,33 @@ final class EditorialCaptureCoordinator
             $diagnostics['resume_hints'] = $partialCompletion['resume_hints'] ?? ['resume_children' => []];
             return $this->save($record, $record->stage, $assets, $diagnostics, $receipts, $this->activeReceiptPhase ?? $status, $record->articleId, $record->articleStateToken, $status);
         }
+    }
+
+    /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
+    private function runTypedMediaBindingFastPath(CaptureRecord $record, array $input, array $assets, array $diagnostics, array $receipts): CaptureRecord
+    {
+        $intent = ['status' => 'resolved', 'intent' => 'MEDIA_ENRICHMENT', 'source' => 'EXPLICIT_TYPED_BINDING', 'article_required' => false, 'media_required' => true, 'diagnostics' => [], 'signals' => ['typed_media_binding' => true]];
+        $diagnostics['content_intent'] = $intent;
+        $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', null, null, 'IN_PROGRESS', null, $record->context + ['content_intent' => $intent]);
+        $diagnostics = $record->diagnostics;
+        $receipts = $record->phaseReceipts;
+        $this->beginPhase('KNOWLEDGE_RETRIEVED');
+        $retrieved = ['status' => 'not_requested', 'items' => [], 'selected_claims' => []];
+        $diagnostics['claim_retrieval'] = $retrieved;
+        $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', null, null, 'SKIPPED');
+        $diagnostics = $record->diagnostics;
+        $receipts = $record->phaseReceipts;
+        $writes = ['status' => 'SKIPPED', 'writes' => [], 'blockers' => [], 'canonical_readback' => null];
+        $diagnostics['semantic_write_back'] = $writes;
+        $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', null, null, 'SKIPPED');
+        $diagnostics = $record->diagnostics;
+        $receipts = $record->phaseReceipts;
+        $this->beginPhase('MEDIA_RECONCILED');
+        $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED');
+        $media = $this->mediaBindingService?->bindMany((array) ($input['media_bindings'] ?? []), $record->captureId . ':media-binding', $assets) ?? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []];
+        $diagnostics = $record->diagnostics + ['media_enrichment' => $this->withoutBody($media)];
+        $record = $this->save($record, 'MEDIA_RECONCILED', $assets, $diagnostics, $record->phaseReceipts, 'MEDIA_RECONCILED', null, null, ($media['status'] ?? '') === 'COMPLETE' ? 'COMPLETED' : 'PARTIAL');
+        return $this->finishNonArticleIntent($record, $record->assets, $record->diagnostics, $record->phaseReceipts, $intent, $retrieved, $writes, ['status' => 'not_requested', 'items' => [], 'blockers' => []], [], $media);
     }
 
     private function hasStage(CaptureRecord $record, CaptureStage $stage): bool
@@ -742,8 +795,9 @@ final class EditorialCaptureCoordinator
     /** @param array<string,mixed> $video @return list<string> */
     private function videoSubjectHints(array $video): array
     {
+        $hints = [];
         $packet = is_array($video['metadata']['subject_resolution_packet'] ?? null) ? $video['metadata']['subject_resolution_packet'] : [];
-        if (UuidCodec::isValid((string) ($packet['id'] ?? '')) && trim((string) ($packet['type'] ?? '')) !== '') return [(string) $packet['id']];
+        if (UuidCodec::isValid((string) ($packet['id'] ?? '')) && trim((string) ($packet['type'] ?? '')) !== '') $hints[] = (string) $packet['id'];
 
         $targets = [];
         foreach ((array) ($video['intended_relations'] ?? []) as $relation) {
@@ -752,10 +806,13 @@ final class EditorialCaptureCoordinator
             $type = trim((string) ($relation['target_type'] ?? ''));
             if (UuidCodec::isValid($id) && $type !== '') $targets[strtolower($id)] = $id;
         }
-        if (count($targets) === 1) return [array_values($targets)[0]];
+        if (count($targets) === 1) $hints[] = array_values($targets)[0];
 
         $hint = trim((string) ($video['user_hint'] ?? ''));
-        return $hint === '' ? [] : [$hint];
+        if ($hint !== '') $hints[] = $hint;
+        $sourceTitle = trim((string) ($video['metadata']['source_snapshot']['source_title'] ?? $video['source_title'] ?? ''));
+        if ($sourceTitle !== '') $hints[] = $sourceTitle;
+        return array_values(array_unique($hints));
     }
 
     /** @param array<string,mixed> $resolution @param array<string,mixed> $manifest @param list<array<string,mixed>> $items @return array<string,mixed>|null */

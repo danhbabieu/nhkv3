@@ -133,7 +133,13 @@ final class MediaVideoPageQuery
         $publicUrl = $urlResult['path'];
         $seoProjection = null;
         if ($urlResult['eligible'] && $sourceAvailable && ($source['availability'] ?? 'unknown') === 'available') {
-            $seoProjection = is_array($metadata['seo_projection'] ?? null) ? $metadata['seo_projection'] : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
+            $storedProjection = is_array($metadata['seo_projection'] ?? null) ? $metadata['seo_projection'] : null;
+            // Stored projections are cache artifacts, never an authority
+            // source. Legacy projections without a revision token are
+            // rebuilt as well, so a correction cannot serve stale copy/SEO.
+            $seoProjection = $storedProjection !== null && (int) ($storedProjection['source_revision'] ?? 0) === $video->revision
+                ? $storedProjection
+                : (new VideoSeoProjection())->project(['source' => array_merge($source, ['external_video_id' => $video->externalVideoId]), 'editorial' => $editorial, 'seo' => is_array($metadata['seo'] ?? null) ? $metadata['seo'] : []], function_exists('home_url') ? home_url((string) $publicUrl) : (string) $publicUrl);
         }
         $result = [
             'title' => (string) ($editorial['title'] ?? $video->title),

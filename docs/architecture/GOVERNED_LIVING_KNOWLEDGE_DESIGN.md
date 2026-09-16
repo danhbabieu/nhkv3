@@ -2,6 +2,15 @@
 
 **Status:** owner-approved incremental design, updated 2026-09-09.
 
+## Operational instruction boundary — 2026-09-17
+
+Workflow, editorial and compliance instructions are retained in the existing
+non-semantic context with their instruction class. They do not become
+Knowledge claims, Source records, Evidence or Graph relations. A correction
+may change the governed subject packet and relation plan, but only canonical
+Evidence can authorize a durable relation; generated copy and user workflow
+text remain outside Knowledge.
+
 ## Ownership
 
 Authority owns canonical identity and lifecycle. Graph owns typed relations.

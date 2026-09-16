@@ -57,6 +57,10 @@ final class CompletionCoordinator
         $content = $ownerType === 'video'
             ? $this->state($evidence['content_quality'] ?? null, null, 'CONTENT_COMPLETE', 'CONTENT_NEEDS_REVIEW', 'BLOCKED')
             : 'NOT_APPLICABLE';
+        $projectionConsistency = 'NOT_APPLICABLE';
+        if ($ownerType === 'video' && array_key_exists('projection_consistency', $evidence)) {
+            $projectionConsistency = $this->state($evidence['projection_consistency'], null, 'COMPLETE', 'BLOCKED', 'PARTIAL');
+        }
 
         if (!$publicCapable) {
             $public = 'NOT_APPLICABLE';
@@ -84,6 +88,7 @@ final class CompletionCoordinator
         if ($dependencies === 'BLOCKED' && $blockers === []) $blockers[] = 'DEPENDENCY_READBACK_UNVERIFIED';
         if ($relations === 'BLOCKED' && $blockers === []) $blockers[] = 'RELATION_OR_USAGE_RECONCILIATION_FAILED';
         if ($ownerType === 'video' && $content !== 'CONTENT_COMPLETE') $blockers[] = 'CONTENT_NEEDS_REVIEW';
+        if ($ownerType === 'video' && $projectionConsistency === 'BLOCKED') $blockers[] = 'VIDEO_PROJECTION_REVISION_MISMATCH';
         if ($public === 'BLOCKED' && $publicCapable && $blockers === []) $blockers[] = 'PUBLIC_ELIGIBILITY_NOT_VERIFIED';
         if ($frontend === 'BLOCKED' && $publicCapable && $blockers === []) $blockers[] = 'FRONTEND_READBACK_NOT_VERIFIED';
 
@@ -91,6 +96,7 @@ final class CompletionCoordinator
             && in_array($dependencies, ['COMPLETE', 'NOT_APPLICABLE'], true)
             && in_array($relations, ['COMPLETE', 'NOT_APPLICABLE'], true)
             && in_array($content, ['CONTENT_COMPLETE', 'NOT_APPLICABLE'], true)
+            && in_array($projectionConsistency, ['COMPLETE', 'NOT_APPLICABLE'], true)
             && in_array($public, ['READY', 'NOT_APPLICABLE'], true)
             && in_array($frontend, ['VERIFIED', 'NOT_APPLICABLE'], true)
             && $blockers === [];
@@ -104,6 +110,7 @@ final class CompletionCoordinator
             'dependency_state' => $dependencies,
             'relation_or_usage_state' => $relations,
             'content_state' => $content,
+            'projection_consistency' => $projectionConsistency,
             'public_state' => $public,
             'frontend_state' => $frontend,
             'complete' => $complete,

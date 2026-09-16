@@ -102,7 +102,24 @@ final class CanonicalAuthoritySubjectResolver
     /** @return array<string,mixed> */
     private function packet(AuthorityEntity $entity, string $match): array
     {
-        return ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'stable_key' => $entity->stableKey, 'name' => $entity->canonicalName, 'revision' => $entity->revision, 'match' => $match];
+        $parentIds = [];
+        foreach (['brand_uuid', 'model_uuid', 'parent_uuid', 'brand_id', 'model_id', 'parent_id'] as $key) {
+            $value = trim((string) ($entity->payload[$key] ?? ''));
+            if ($value !== '' && UuidCodec::isValid($value)) $parentIds[] = $value;
+        }
+
+        return [
+            'id' => $entity->canonicalId,
+            'type' => $entity->entityType,
+            'stable_key' => $entity->stableKey,
+            'name' => $entity->canonicalName,
+            'revision' => $entity->revision,
+            'match' => $match,
+            'compatibility' => [
+                'parent_ids' => array_values(array_unique($parentIds)),
+                'family' => trim((string) ($entity->payload['family'] ?? $entity->payload['classification_family'] ?? '')),
+            ],
+        ];
     }
 
     private function normalize(string $value): string

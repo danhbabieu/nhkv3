@@ -179,7 +179,8 @@ final class AuthorityProposalExecutor
     private function materializeVideoAttachments(Proposal $proposal, Video $video): array
     {
         $metadata = is_array($proposal->payload['metadata'] ?? null) ? $proposal->payload['metadata'] : [];
-        if (!array_key_exists('intake_version', $metadata) && $proposal->operation !== 'ingest') return [];
+        $semanticReconciliationRequested = (bool) ($metadata['semantic_reconciliation_requested'] ?? false);
+        if (!array_key_exists('intake_version', $metadata) && !$semanticReconciliationRequested && $proposal->operation !== 'ingest') return [];
         $attachments = is_array($metadata['semantic_attachments'] ?? null) ? $metadata['semantic_attachments'] : [];
         if ($attachments === [] && $this->relationProposals !== null) {
             if ($this->historicalEvidence !== null) {
@@ -203,8 +204,24 @@ final class AuthorityProposalExecutor
                 ];
             }
         }
-        if ($attachments === []) throw new \RuntimeException('NO_SEMANTIC_ATTACHMENT');
+        if ($attachments === [] && !$semanticReconciliationRequested) throw new \RuntimeException('NO_SEMANTIC_ATTACHMENT');
         if ($this->graph === null) throw new \RuntimeException('Graph executor is not configured.');
+        $desired = [];
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
+            $predicate = strtolower(trim((string) ($attachment['predicate'] ?? '')));
+            $targetType = trim((string) ($attachment['target_type'] ?? ''));
+            $targetUuid = trim((string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? ''));
+            if ($predicate === '' || $targetType === '' || $targetUuid === '') throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
+            $desired[$predicate . '|' . strtolower($targetType) . '|' . strtolower($targetUuid)] = true;
+        }
+        $existingPage = $this->graph->findOutgoing(new NodeReference('video', $video->canonicalId), null, 0, 200, true);
+        foreach ((array) ($existingPage['items'] ?? []) as $edge) {
+            if (!$edge instanceof GraphEdge || !$edge->isActive()) continue;
+            $key = strtolower($edge->predicate) . '|' . strtolower($edge->target->reference->endpoint_type) . '|' . strtolower($edge->target->reference->endpoint_key);
+            if (!isset($desired[$key])) $this->graph->retire($edge->edge_uuid, $edge->revision);
+        }
+        if ($attachments === []) return [];
         foreach ($attachments as $attachment) {
             if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
             $evidenceRefs = is_array($attachment['evidence_refs'] ?? null) ? $attachment['evidence_refs'] : [];
@@ -214,16 +231,13 @@ final class AuthorityProposalExecutor
                 if (!is_array($reference) || !isset($reference['evidence_id'])) throw new \RuntimeException('CANONICAL_EVIDENCE_REQUIRED');
                 $this->dependencies->evidence((string) $reference['evidence_id']);
             }
-            $this->graph->create(
-                new NodeReference('video', $video->canonicalId),
-                (string) ($attachment['predicate'] ?? ''),
-                new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? '')),
-            );
-            $readBack = $this->graph->findEdge(
-                new NodeReference('video', $video->canonicalId),
-                (string) ($attachment['predicate'] ?? ''),
-                new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? '')),
-            );
+            $predicate = (string) ($attachment['predicate'] ?? '');
+            $target = new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? ''));
+            $source = new NodeReference('video', $video->canonicalId);
+            $readBack = $this->graph->findEdge($source, $predicate, $target);
+            if ($readBack !== null && !$readBack->isActive()) $readBack = $this->graph->reactivate($readBack->edge_uuid, $readBack->revision);
+            if ($readBack === null) $readBack = $this->graph->create($source, $predicate, $target);
+            $readBack = $this->graph->findEdge($source, $predicate, $target);
             if ($readBack === null || !$readBack->isActive()) throw new \RuntimeException('VIDEO_RELATION_READBACK_FAILED');
         }
         return $attachments;

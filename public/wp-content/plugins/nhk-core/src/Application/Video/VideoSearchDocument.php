@@ -39,18 +39,23 @@ final class VideoSearchDocument
         $metadata = is_array($video->metadata) ? $video->metadata : [];
         $source = $this->source($video);
         $editorial = $this->editorial($video);
-        $values = [$this->title($video), $video->externalVideoId, $video->canonicalUrl, (string) ($editorial['summary'] ?? ''), (string) ($editorial['body'] ?? ''), (string) ($editorial['why_this_matters'] ?? ''), (string) ($source['source_title'] ?? ''), (string) ($source['source_description'] ?? ''), (string) ($metadata['category']['primary']['label'] ?? '')];
+        $subject = is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : [];
+        $values = [$this->title($video), $video->externalVideoId, $video->canonicalUrl, (string) ($subject['name'] ?? ''), (string) ($editorial['summary'] ?? ''), (string) ($editorial['body'] ?? ''), (string) ($editorial['why_this_matters'] ?? ''), (string) ($source['source_title'] ?? ''), (string) ($source['source_description'] ?? ''), (string) ($metadata['category']['primary']['label'] ?? '')];
         foreach ((array) ($source['tags'] ?? []) as $tag) $values[] = (string) $tag;
         foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {
             if (!is_array($attachment)) continue;
-            $target = $this->authority->findByCanonicalId((string) ($attachment['target_key'] ?? $attachment['target_id'] ?? ''));
+            $targetId = (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? $attachment['target_id'] ?? '');
+            // A stale relation must not keep an obsolete subject searchable
+            // after the canonical subject packet has moved to another entity.
+            if ($subject !== [] && $targetId !== '' && $targetId !== (string) ($subject['id'] ?? '')) continue;
+            $target = $this->authority->findByCanonicalId($targetId);
             if ($target !== null && $target->active()) $values[] = $target->canonicalName;
         }
         return $values;
     }
 
     /** @return array<string,mixed> */
-    private function source(Video $video): array { return is_array($video->metadata['source_snapshot'] ?? null) ? $video->metadata['source_snapshot'] : []; }
+    private function source(Video $video): array { return is_array($video->metadata['source_snapshot'] ?? null) ? $video->metadata['source_snapshot'] : (is_array($video->metadata['source'] ?? null) ? $video->metadata['source'] : []); }
     /** @return array<string,mixed> */
     private function editorial(Video $video): array { return is_array($video->metadata['editorial'] ?? null) ? $video->metadata['editorial'] : []; }
 }

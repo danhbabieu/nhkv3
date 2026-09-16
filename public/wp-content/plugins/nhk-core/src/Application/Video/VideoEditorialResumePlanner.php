@@ -30,6 +30,7 @@ final class VideoEditorialResumePlanner
         if (!$video instanceof Video) throw new \RuntimeException('VIDEO_CANONICAL_READBACK_UNAVAILABLE');
 
         $metadata = is_array($video->metadata) ? $video->metadata : [];
+        $previousSubjectId = trim((string) (($metadata['subject_resolution_packet']['id'] ?? '')));
         $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
         $source = array_merge($source, [
             'platform' => $video->platform,
@@ -62,6 +63,18 @@ final class VideoEditorialResumePlanner
         ];
         $metadata['editorial'] = $editorial;
         $metadata['seo'] = $seo;
+        $metadata['subject_resolution_packet'] = $subject;
+        if ($subject !== null && $previousSubjectId !== '' && $previousSubjectId !== (string) ($subject['id'] ?? '')) {
+            // A subject correction cannot carry the old target forward by
+            // accident. A replacement relation must arrive with fresh
+            // governed evidence; otherwise completeness remains blocked.
+            $metadata['semantic_attachments'] = array_values(array_filter(
+                (array) ($metadata['semantic_attachments'] ?? []),
+                static fn (mixed $attachment): bool => !is_array($attachment)
+                    || strtolower(trim((string) ($attachment['target_uuid'] ?? $attachment['target_id'] ?? ''))) !== strtolower($previousSubjectId),
+            ));
+            $metadata['semantic_reconciliation_requested'] = true;
+        }
         $metadata['enrichment_context'] = $enrichment;
         $metadata['seo_projection'] = $this->seo->project($package, $video->canonicalUrl);
         $metadata['editorial_input_fingerprint'] = $fingerprint;

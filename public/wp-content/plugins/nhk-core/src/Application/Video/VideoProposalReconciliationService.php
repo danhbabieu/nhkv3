@@ -75,6 +75,7 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
 
         $existing = $this->videos->findByExternalReference($platform, $externalId);
         $subject = $this->resolveSubject($metadata, $source);
+        if (is_array($subject) && ($subject['_status'] ?? '') === 'conflict') return $this->blocked($proposalId, 'SUBJECT_CONFLICT_REVIEW_REQUIRED');
         if ($subject === null) return $this->blocked($proposalId, 'SUBJECT_UNRESOLVED');
 
         $planned = $this->planner->plan($proposalId, ['payload' => $payload], $source, $subject, ['user_hint' => $this->userHint($metadata)]);
@@ -190,7 +191,12 @@ final class VideoProposalReconciliationService implements VideoProposalReconcili
         $allowedTypes = (new VideoRelationAdminContract())->targetTypes();
         $packetType = strtolower(trim((string) ($packet['type'] ?? '')));
         if (UuidCodec::isValid((string) ($packet['id'] ?? '')) && in_array($packetType, $allowedTypes, true)) {
-            return ['id' => (string) $packet['id'], 'type' => strtolower(trim((string) $packet['type'])), 'name' => (string) ($packet['name'] ?? '')];
+            if ($this->subjects !== null) {
+                $hints = [(string) $packet['id'], (string) ($source['source_title'] ?? ''), $this->userHint($metadata)];
+                $checked = $this->subjects->resolve(array_values(array_filter($hints, static fn (string $hint): bool => trim($hint) !== '')));
+                if (($checked['status'] ?? '') === 'conflict') return ['_status' => 'conflict'];
+            }
+            return ['id' => (string) $packet['id'], 'type' => $packetType, 'name' => (string) ($packet['name'] ?? '')];
         }
         $aboutTargets = [];
         foreach ((array) ($metadata['semantic_attachments'] ?? []) as $attachment) {

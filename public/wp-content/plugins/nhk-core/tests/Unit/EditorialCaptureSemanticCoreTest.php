@@ -240,6 +240,39 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         self::assertSame([$variantId], array_column($resolution['subjects'], 'id'));
     }
 
+    public function test_explicit_uuid_conflicting_classification_fails_closed_without_replacing_selected_identity(): void
+    {
+        $wrong = '01a07614-832d-7f27-959c-74eb0cd63f3e';
+        $right = '46891b45-730b-403f-a484-6fb2539bc433';
+        $model = '43d84522-69da-4088-a994-559aeb1546ad';
+        $resolution = (new SubjectResolutionService(fn (string $hint): array => match ($hint) {
+            $wrong => [['id' => $wrong, 'type' => 'classification', 'name' => 'Đồng hồ chim cúc cu', 'match' => 'uuid_exact', 'compatibility' => ['family' => 'clock_type']]],
+            'Đồng hồ vai bò' => [['id' => $right, 'type' => 'classification', 'name' => 'Đồng hồ vai bò', 'match' => 'exact_name_or_alias', 'compatibility' => ['family' => 'clock_type']]],
+            'Junghans W64' => [['id' => $model, 'type' => 'model', 'name' => 'Junghans W64', 'match' => 'exact_name_or_alias']],
+            default => [],
+        }))->resolve([$wrong, 'Junghans W64', 'Đồng hồ vai bò']);
+
+        self::assertSame('conflict', $resolution['status']);
+        self::assertSame($wrong, $resolution['primary']['id']);
+        self::assertSame([$wrong], array_column($resolution['subjects'], 'id'));
+        self::assertContains('SUBJECT_CONFLICT_REVIEW_REQUIRED', $resolution['diagnostics']);
+        self::assertNotEmpty($resolution['conflicts']);
+    }
+
+    public function test_operational_instructions_are_non_semantic_and_classified(): void
+    {
+        $interpreted = (new TextInputInterpreter())->interpret(implode('. ', [
+            'Hãy reuse đúng Video cũ',
+            'Không tạo Article mới',
+            'Sửa semantic target sang Đồng hồ vai bò',
+            'Đưa video vào loại đồng hồ vai bò',
+        ]));
+
+        self::assertSame([], $interpreted['user_claim_candidates']);
+        self::assertCount(4, $interpreted['non_semantic_context']['instructions']);
+        self::assertSame(['WORKFLOW_INSTRUCTION', 'WORKFLOW_INSTRUCTION', 'WORKFLOW_INSTRUCTION', 'WORKFLOW_INSTRUCTION'], array_column($interpreted['non_semantic_context']['instruction_classes'], 'classification'));
+    }
+
     public function test_user_knowledge_is_atomized_and_keeps_scope_and_attribution_diagnostics(): void
     {
         $interpreted = (new TextInputInterpreter())->interpret(implode("\n", [

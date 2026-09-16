@@ -29,16 +29,19 @@ final class RelationProposalReconciliationService
     /** @return array<string,mixed> */
     public function reconcile(Proposal $original, array $control = []): array
     {
-        if ($original->entityType !== 'relation' || $original->operation !== 'relation_create') return $this->blocked($original, 'RELATION_RECONCILIATION_UNSUPPORTED');
+        if ($original->entityType !== 'relation' || !in_array($original->operation, ['relation_create', 'relation_retire', 'relation_reactivate'], true)) return $this->blocked($original, 'RELATION_RECONCILIATION_UNSUPPORTED');
         if (!in_array($original->state, [ProposalState::SUBMITTED, ProposalState::APPROVED], true)) return $this->blocked($original, 'RELATION_PROPOSAL_NOT_RESUMABLE');
 
         try {
-            $payload = (new RelationRevisionBinder($this->endpoints))->bind($original->payload);
+            $payload = $original->operation === 'relation_create'
+                ? (new RelationRevisionBinder($this->endpoints))->bind($original->payload)
+                : $original->payload;
             $key = 'relation-reconcile:' . $original->id . ':' . hash('sha256', CommandCanonicalizer::canonicalize($payload));
             $replacement = $this->lifecycle->createFromArguments([
-                'operation' => 'relation_create',
+                'operation' => $original->operation,
                 'entity_type' => 'relation',
                 'subject_id' => (string) ($payload['source_uuid'] ?? $original->subjectId),
+                'target_uuid' => $original->targetUuid ?: ($original->operation === 'relation_create' ? null : $original->subjectId),
                 'payload' => $payload,
                 'idempotency_key' => $key,
             ]);

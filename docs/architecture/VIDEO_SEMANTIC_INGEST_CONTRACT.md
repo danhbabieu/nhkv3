@@ -17,6 +17,29 @@ is not `COMPLETE`; completion also requires duplicate check, semantic research,
 relation reconciliation and final verification. Weak/speculative relations are
 not created merely to maximize edge count.
 
+## Subject packet and contradiction gate — 2026-09-17
+
+An exact canonical UUID remains the selected identity, but it is not a reason
+to discard other explicit user/title hints. The resolver must validate those
+hints against the UUID's bounded type, parent and family compatibility. A
+different exact identity in the same registered type, or an incompatible
+classification family, returns `SUBJECT_CONFLICT_REVIEW_REQUIRED`; no draft,
+Video child, Knowledge claim, Graph edge or public projection is written from
+that run. The selected subject packet is immutable across Capture, Video,
+relation planning and enrichment; diagnostic candidates never silently replace
+it.
+
+Operational instructions such as reusing an existing Video, not creating an
+Article, changing a semantic target or assigning a Hub classification remain
+`non_semantic_context` with an explicit instruction class. They are not
+Knowledge claims or Evidence.
+
+An approved correction reuses the existing Video UUID. Its relation delta is
+computed against active Graph state: stale registered edges are retired and a
+new target is created or a retired target reactivated only after canonical
+Evidence validation. Editorial subject identity and durable Graph relation
+support remain separate gates.
+
 ## Single entry point for new Video submissions — 2026-09-09
 
 New Video input is carried by the registered Video adapter of

@@ -26,6 +26,7 @@ final class TextInputInterpreter
             'instructions' => [],
             'compliance_notes' => [],
             'editorial_instructions' => [],
+            'instruction_classes' => [],
         ];
         foreach ($sentences as $sentence) {
             $role = $this->sentenceRole($sentence);
@@ -35,6 +36,7 @@ final class TextInputInterpreter
             }
             if ($role === 'instruction') {
                 $nonSemantic['instructions'][] = $sentence;
+                $nonSemantic['instruction_classes'][] = ['text' => $sentence, 'classification' => $this->instructionClass($sentence)];
                 continue;
             }
             $claims[] = $this->userCandidate($sentence);
@@ -47,7 +49,13 @@ final class TextInputInterpreter
             $values = is_array($metadata[$key] ?? null) ? $metadata[$key] : [$metadata[$key] ?? null];
             foreach ($values as $value) if (trim((string) $value) !== '') $nonSemantic['editorial_instructions'][] = trim((string) $value);
         }
-        foreach ($nonSemantic as $key => $values) $nonSemantic[$key] = array_values(array_unique($values));
+        foreach (['instructions', 'compliance_notes', 'editorial_instructions'] as $key) $nonSemantic[$key] = array_values(array_unique($nonSemantic[$key]));
+        $classes = [];
+        foreach ($nonSemantic['instruction_classes'] as $item) {
+            $key = (string) ($item['classification'] ?? '') . ':' . (string) ($item['text'] ?? '');
+            if ($key !== ':') $classes[$key] = $item;
+        }
+        $nonSemantic['instruction_classes'] = array_values($classes);
         $articleIntent = implode("\n\n", array_map(static fn (array $candidate): string => (string) $candidate['text'], $claims));
         $mediaObservations = [];
         foreach ($assets as $asset) {
@@ -77,8 +85,16 @@ final class TextInputInterpreter
         // sentence is non-semantic only when it is directing treatment of a
         // claim/source or explicitly describing an evidence/compliance state.
         if (preg_match('/(?:không\s+(?:coi|dùng|sử dụng|nâng|đăng|đưa|project)|chưa\s+có\s+(?:evidence|bằng chứng)|chưa\s+được\s+(?:chứng minh|xác minh)|nhận định\s+(?:so sánh|quảng bá)|claim\s+[^.?!]*\s+(?:chưa|không)\s+có\s+(?:evidence|bằng chứng))/u', $lower) === 1) return 'compliance';
-        if (preg_match('/^(?:không\s+được|đừng|giữ|hãy\s+giữ|không\s+dùng|không\s+nâng|không\s+đăng|không\s+coi|chỉ\s+là)\b/u', $lower) === 1) return 'instruction';
+        if (preg_match('/^(?:không\s+được|đừng|giữ|hãy\s+giữ|hãy\s+(?:reuse|dùng|sửa|đưa|giữ)|reuse\b|vui\s+lòng|please|sửa\b|đưa\b|không\s+dùng|không\s+nâng|không\s+đăng|không\s+coi|không\s+tạo|chỉ\s+là)\b/u', $lower) === 1) return 'instruction';
         return 'claim';
+    }
+
+    private function instructionClass(string $sentence): string
+    {
+        $lower = function_exists('mb_strtolower') ? mb_strtolower(trim($sentence)) : strtolower(trim($sentence));
+        if (preg_match('/(?:evidence|bằng chứng|tuân thủ|compliance|không\s+được\s+đăng|không\s+được\s+project)/u', $lower) === 1) return 'COMPLIANCE_INSTRUCTION';
+        if (preg_match('/(?:reuse|không\s+tạo|sửa\s+(?:semantic|subject|target)|đưa\s+.+\s+vào|không\s+dùng\s+.+\s+thay)/u', $lower) === 1) return 'WORKFLOW_INSTRUCTION';
+        return 'EDITORIAL_INSTRUCTION';
     }
 
     /** @return array<string,mixed> */

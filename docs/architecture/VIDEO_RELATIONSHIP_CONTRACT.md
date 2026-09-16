@@ -32,6 +32,20 @@ with at least one approved attachment through `GraphService` in the same
 Controlled Apply transaction. Zero candidates returns
 `NO_SEMANTIC_ATTACHMENT`; a Hub never satisfies this requirement.
 
+## Governed correction delta — 2026-09-17
+
+Video correction is an A→B transition on the same canonical Video. Controlled
+Apply reads active outbound `about` edges, retires stale targets with their
+current edge revision, and creates or reactivates only the desired registered
+target after the attachment's Evidence references pass canonical dependency
+validation. The old relation proposal is never edited; a stale governed
+relation command is rebuilt through the reconciliation service and may use
+`relation_create`, `relation_retire` or `relation_reactivate`.
+
+If the correct relation lacks usable Evidence, the editorial subject may be
+corrected but the Video remains non-publishable/review-required. A stale edge
+must not remain active merely because the new relation is pending.
+
 Public related sections reuse `RelatedContentQuery`, direct before derived,
 with derived traversal bounded at two hops. Derived output is never persisted
 as a shortcut. The current shared traversal engine remains a documented

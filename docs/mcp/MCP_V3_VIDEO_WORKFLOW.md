@@ -25,6 +25,15 @@ creates them atomically; no `wp_create_post`, taxonomy, post meta or direct SQL
 path is used. Same idempotency key and same intent return the original
 Proposal; changed intent under the same key is an idempotency conflict.
 
+Subject resolution is fail-closed. An explicit UUID is preserved as the
+primary packet while all other explicit hints are checked for contradiction;
+same-type identity conflict returns `SUBJECT_CONFLICT_REVIEW_REQUIRED` before
+any draft or semantic writer. Every downstream Video child consumes that one
+packet and does not run a shadow resolver. Corrections keep the same Video
+UUID, reconcile stale Graph relations through Governance, and rebuild Search,
+public and SEO projections from the canonical Video revision. A stale stored
+SEO projection is never served.
+
 Source synchronization is read-only preview/reconciliation planning until a
 separate sync command is exposed. It reports `NO_CHANGE`, `SOURCE_CHANGED`,
 `SOURCE_UNAVAILABLE` or `REVIEW_REQUIRED` and never overwrites NHK editorial

@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Video root-cause contract repair (LOCAL ONLY)
+
+SCOPE: Repaired the local Video subject-resolution, governed relation delta,
+instruction boundary and stale projection paths. The requested live YouTube
+case is outside the current `STAGING_ACCEPTANCE_SCOPE` because its Video,
+Knowledge and relation IDs are not in the allowlist. No staging/live mutation,
+deploy or external read-back was performed.
+
+ROOT_CAUSE: Subject resolution discarded all non-UUID hints as soon as any UUID
+was present, so a wrong classification UUID could mask explicit W64 and
+classification text. Video correction also lacked a governed stale-edge delta,
+and public Video pages trusted stored SEO projections without a canonical
+revision check. Operational instructions had no explicit class in the
+non-semantic context.
+
+FIX: UUIDs now remain selected identity while bounded contradictory candidates
+produce `SUBJECT_CONFLICT_REVIEW_REQUIRED` before draft/semantic writes. The
+immutable packet is handed to child work; relation apply retires stale Video
+`about` edges and creates/reactivates evidence-bound targets through
+`GraphService`; editorial resume preserves the same Video UUID and removes the
+old target from pending attachments; Search filters stale target names and the
+public query refuses unversioned/stale SEO artifacts. Contracts now document
+the correction and instruction rules.
+
+LOCAL_VERIFICATION: Focused semantic/reconciliation suite PASS after the fix;
+full-suite and diff checks are pending at this checkpoint. Live repair remains
+`BLOCKED_OUTSIDE_APPROVED_SCOPE` until a new explicit bounded authorization
+includes the exact requested IDs and the required deployment/runtime
+bootstrap/read-back gates.
+
 # Checkpoint — 2026-09-16 — FIX-CONFIRMED-REGRESSIONS attachment 555 (LOCAL ONLY)
 
 SCOPE: Continued the bounded local repair for the confirmed MediaUsage identity
