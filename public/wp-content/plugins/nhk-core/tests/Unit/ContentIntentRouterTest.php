@@ -176,15 +176,15 @@ final class ContentIntentRouterTest extends TestCase
 
     public function test_media_enrichment_skips_article_stages_and_reconciles_media(): void
     {
-        $calls = ['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $calls = ['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 0, 'retrieve' => 0, 'semantic' => 0];
         $coordinator = new EditorialCaptureCoordinator(
             new IntentCaptureRepository(),
             static fn (array $input): array => ['items' => [['kind' => 'image', 'media_id' => 'media-1', 'attachment_readback_status' => 'verified']]],
             static function (array $input) use (&$calls): array { ++$calls['draft']; return ['post_id' => 902, 'state_token' => 'token']; },
             new TextInputInterpreter(),
             new SubjectResolutionService(static fn (string $hint): array => []),
-            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            static fn (array $context): array => ['status' => 'COMPLETED', 'writes' => []],
+            new ClaimRetrievalEngine(static function (array $subject) use (&$calls): array { ++$calls['retrieve']; return ['status' => 'available', 'items' => []]; }, static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$calls): array { ++$calls['semantic']; return ['status' => 'COMPLETED', 'writes' => []]; },
             new ArticleComposer(),
             static function (array $context) use (&$calls): array { ++$calls['media']; return ['status' => 'RECONCILED', 'media_ids' => ['media-1'], 'media_complete' => true]; },
             static function (array $context) use (&$calls): array { ++$calls['publication']; return ['eligible' => true]; },
@@ -204,7 +204,7 @@ final class ContentIntentRouterTest extends TestCase
 
         self::assertNull($result->articleId);
         self::assertSame('MEDIA_ENRICHMENT', $result->toArray()['content_intent']['intent']);
-        self::assertSame(['draft' => 0, 'media' => 1, 'publication' => 0, 'final' => 1], $calls);
+        self::assertSame(['draft' => 0, 'media' => 1, 'publication' => 0, 'final' => 1, 'retrieve' => 0, 'semantic' => 0], $calls);
         self::assertSame('RECONCILED', $result->diagnostics['media_enrichment']['status']);
     }
 

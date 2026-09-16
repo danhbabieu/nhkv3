@@ -81,6 +81,57 @@ final class MediaServiceCompletionTest extends TestCase
         self::assertSame('uploads/public-clock.webp', $assets->listByMediaId($item->canonicalId)[0]->storageKey);
     }
 
+    public function test_replay_reconciles_partial_asset_metadata_without_rewriting_storage_key_or_identity(): void
+    {
+        [$media, $assets, $service] = $this->stores();
+        $first = $service->ingest('wp-attachment:1:556', 'Vải bô front', 'draft', [], [[
+            'kind' => 'original',
+            'storage_key' => 'private/556-source.jpeg',
+            'checksum' => hash('sha256', 'IMG_4646-scaled.jpeg'),
+            'mime_type' => 'image/jpeg',
+            'byte_size' => 781688,
+            'width' => 2560,
+            'height' => 1920,
+            'visibility' => 'PRIVATE',
+            'metadata' => ['source_original' => true],
+        ]]);
+        $before = $assets->listByMediaId($first->canonicalId)[0];
+
+        $replayed = $service->ingest('wp-attachment:1:556', 'Vải bô front', 'draft', [], [[
+            'kind' => 'original',
+            'storage_key' => 'private/556-source.jpeg',
+            'original_filename' => 'IMG_4646-scaled.jpeg',
+            'checksum' => hash('sha256', 'IMG_4646-scaled.jpeg'),
+            'mime_type' => 'image/jpeg',
+            'byte_size' => 781688,
+            'width' => 2560,
+            'height' => 1920,
+            'visibility' => 'PRIVATE',
+            'metadata' => ['source_original' => true, 'original_filename' => 'IMG_4646-scaled.jpeg', 'wordpress_attachment_id' => 556],
+        ]]);
+        $after = $assets->listByMediaId($replayed->canonicalId);
+
+        self::assertSame($first->canonicalId, $replayed->canonicalId);
+        self::assertCount(1, $after);
+        self::assertSame($before->assetId, $after[0]->assetId);
+        self::assertSame('private/556-source.jpeg', $after[0]->storageKey);
+        self::assertSame(556, $after[0]->metadata['wordpress_attachment_id'] ?? null);
+    }
+
+    public function test_normalize_asset_spec_rejects_path_traversal_storage_keys(): void
+    {
+        [$media, $assets, $service] = $this->stores();
+
+        $this->expectException(\NHK\Core\Domain\Media\MediaException::class);
+        $service->ingest('wp-attachment:1:556-invalid', 'Vải bô front', 'draft', [], [[
+            'kind' => 'original',
+            'storage_key' => '../IMG_4646-scaled.jpeg',
+            'checksum' => hash('sha256', 'camera'),
+            'mime_type' => 'image/jpeg',
+            'byte_size' => 6,
+        ]]);
+    }
+
     public function test_completion_does_not_update_an_already_public_asset_without_metadata_changes(): void
     {
         [$media, $assets, $service] = $this->stores();

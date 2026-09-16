@@ -57,7 +57,10 @@ final class MediaService
             $existing = null;
             foreach ($existingAssets as $asset) if ($asset->storageKey === $candidate->storageKey) { $existing = $asset; break; }
             if ($existing !== null) {
-                if (!$this->sameAsset($existing, $candidate)) throw new MediaException('Media asset storage key is already bound to different content.');
+                if ($this->sameAsset($existing, $candidate)) continue;
+                if (!$this->samePhysicalAsset($existing, $candidate)) throw new MediaException('Media asset storage key is already bound to different content.');
+                $updated = $this->assets->update(new MediaAsset($existing->assetId, $existing->mediaId, $existing->kind, $existing->storageKey, $existing->checksum, $existing->mimeType, $existing->byteSize, $existing->width, $existing->height, $candidate->visibility, array_replace($existing->metadata, $candidate->metadata)));
+                foreach ($existingAssets as $index => $current) if ($current->assetId === $existing->assetId) { $existingAssets[$index] = $updated; break; }
                 continue;
             }
             $existingAssets[] = $this->assets->create($candidate);
@@ -122,6 +125,9 @@ final class MediaService
         foreach ($this->assets->listByMediaId($mediaId) as $existing) {
             if ($existing->storageKey !== $candidate->storageKey) continue;
             if ($this->sameAsset($existing, $candidate)) return $existing;
+            if ($this->samePhysicalAsset($existing, $candidate)) {
+                return $this->assets->update(new MediaAsset($existing->assetId, $existing->mediaId, $existing->kind, $existing->storageKey, $existing->checksum, $existing->mimeType, $existing->byteSize, $existing->width, $existing->height, $candidate->visibility, array_replace($existing->metadata, $candidate->metadata)));
+            }
             throw new MediaException('Media asset storage key is already bound to different content.');
         }
         $created = $this->assets->create($candidate);
@@ -183,6 +189,18 @@ final class MediaService
             && $left->height === $right->height
             && $left->visibility === $right->visibility
             && $left->metadata === $right->metadata;
+    }
+
+    private function samePhysicalAsset(MediaAsset $left, MediaAsset $right): bool
+    {
+        return $left->mediaId === $right->mediaId
+            && $left->kind === $right->kind
+            && $left->storageKey === $right->storageKey
+            && $left->checksum === $right->checksum
+            && $left->mimeType === $right->mimeType
+            && $left->byteSize === $right->byteSize
+            && $left->width === $right->width
+            && $left->height === $right->height;
     }
 
     private function sameUsage(MediaUsage $left, MediaUsage $right): bool
@@ -257,7 +275,11 @@ final class MediaService
         // normalization belongs to the upload/derivative owner before this
         // semantic boundary; changing the key here breaks attachment
         // read-back when the original filename is a camera name.
-        $spec['storage_key'] = (string) ($spec['storage_key'] ?? '');
+        $storageKey = $spec['storage_key'] ?? null;
+        if (!is_string($storageKey) || $storageKey === '' || strlen($storageKey) > 255 || preg_match('/[\x00-\x1F\x7F]/', $storageKey) === 1 || str_contains($storageKey, '\\') || str_starts_with($storageKey, '/') || preg_match('/^[A-Za-z]:[\\\/]/', $storageKey) === 1 || preg_match('#(^|/)\.\.?(/|$)#', $storageKey) === 1) {
+            throw new MediaException('Media asset storage key is invalid.');
+        }
+        $spec['storage_key'] = $storageKey;
         $spec['metadata'] = $metadata;
         return $spec;
     }

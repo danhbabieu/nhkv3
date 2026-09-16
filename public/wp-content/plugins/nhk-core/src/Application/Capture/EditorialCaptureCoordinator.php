@@ -313,40 +313,59 @@ final class EditorialCaptureCoordinator
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
             $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
-            $this->beginPhase('KNOWLEDGE_RETRIEVED');
-            $retrieved = $this->claims->retrieve($semanticContext);
-            $diagnostics['claim_retrieval'] = $retrieved;
-            $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken);
-
-            $this->beginPhase('SEMANTICS_RECONCILED');
-            $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED');
-            $assets = $record->assets;
-            $diagnostics = $record->diagnostics;
-            $receipts = $record->phaseReceipts;
-            $writes = ($this->semanticWriteBack)($semanticContext + ['retrieval' => $retrieved]);
-            // Child Governance receipts are persisted by the continuation
-            // service through the same Capture repository. Refresh the
-            // optimistic revision before the coordinator writes its result.
-            $latest = $this->captures->findById($record->captureId);
-            if ($latest !== null) {
-                $record = $latest;
+            $isMediaEnrichment = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT';
+            if ($isMediaEnrichment) {
+                // MEDIA_ENRICHMENT owns Media and MediaUsage only. Do not
+                // enter the unrelated claim/Governance boundary or create an
+                // Article while repairing an existing attachment.
+                $retrieved = ['status' => 'not_requested', 'items' => [], 'selected_claims' => []];
+                $diagnostics['claim_retrieval'] = $retrieved;
+                $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken, 'SKIPPED');
+                $writes = ['status' => 'SKIPPED', 'writes' => [], 'blockers' => [], 'canonical_readback' => null];
+                $diagnostics['semantic_write_back'] = $writes;
+                $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, 'SKIPPED');
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
                 $receipts = $record->phaseReceipts;
-            }
-            $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
-            $semanticStatus = (string) ($writes['status'] ?? 'COMPLETED');
-            $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $semanticStatus);
-            $assets = $record->assets;
-            $diagnostics = $record->diagnostics;
-            $receipts = $record->phaseReceipts;
-            if (in_array((string) ($writes['status'] ?? ''), ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
-                return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, (string) $writes['status']);
-            }
+                $videoPublication = ['status' => 'not_requested', 'items' => [], 'blockers' => []];
+                $diagnostics['video_publication'] = $videoPublication;
+                $diagnostics['deep_enrichment'] = ['status' => 'NOT_REQUESTED', 'visual_support' => ['status' => 'not_requested', 'requirements' => []], 'knowledge_reuse' => [], 'article_reuse_internal_link' => [], 'new_deep_content_opportunity' => null];
+            } else {
+                $this->beginPhase('KNOWLEDGE_RETRIEVED');
+                $retrieved = $this->claims->retrieve($semanticContext);
+                $diagnostics['claim_retrieval'] = $retrieved;
+                $record = $this->save($record, CaptureStage::KNOWLEDGE_RETRIEVED, $assets, $diagnostics, $receipts, 'KNOWLEDGE_RETRIEVED', $record->articleId, $record->articleStateToken);
 
-            $videoPublication = is_callable($this->videoPublicationVerifier)
-                ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
-                : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
-            $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
-            $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities);
+                $this->beginPhase('SEMANTICS_RECONCILED');
+                $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED');
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
+                $writes = ($this->semanticWriteBack)($semanticContext + ['retrieval' => $retrieved]);
+                // Child Governance receipts are persisted by the continuation
+                // service through the same Capture repository. Refresh the
+                // optimistic revision before the coordinator writes its result.
+                $latest = $this->captures->findById($record->captureId);
+                if ($latest !== null) {
+                    $record = $latest;
+                    $receipts = $record->phaseReceipts;
+                }
+                $diagnostics['semantic_write_back'] = $this->withoutBody($writes);
+                $semanticStatus = (string) ($writes['status'] ?? 'COMPLETED');
+                $record = $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, $semanticStatus);
+                $assets = $record->assets;
+                $diagnostics = $record->diagnostics;
+                $receipts = $record->phaseReceipts;
+                if (in_array((string) ($writes['status'] ?? ''), ['FAILED_RETRYABLE', 'SYSTEM_BLOCKED'], true)) {
+                    return $this->save($record, CaptureStage::SEMANTICS_RECONCILED, $assets, $diagnostics, $receipts, 'SEMANTICS_RECONCILED', $record->articleId, $record->articleStateToken, (string) $writes['status']);
+                }
+
+                $videoPublication = is_callable($this->videoPublicationVerifier)
+                    ? ($this->videoPublicationVerifier)(['capture_id' => $record->captureId, 'assets' => $assets, 'subject_resolution' => $resolution, 'semantic_write_back' => $writes])
+                    : ['status' => 'not_requested', 'items' => [], 'blockers' => []];
+                $diagnostics['video_publication'] = $this->withoutBody($videoPublication);
+                $diagnostics['deep_enrichment'] = $this->deepEnrichment($retrieved, $writes, [], $visualOpportunities);
+            }
 
             if (!$articleRequired && $record->articleId === null) {
                 $media = [];

@@ -688,6 +688,14 @@ final class Plugin {
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
                 static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments): array {
+                    $trace = static function (string $stage, string $status, array $details = []): void {
+                        $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
+                        if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
+                        if (function_exists('error_log')) {
+                            $encoded = function_exists('wp_json_encode') ? wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                            error_log('[nhk.capture.stage] ' . (is_string($encoded) ? $encoded : $stage));
+                        }
+                    };
                     $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
                     $existingUrls = is_array($input['existing_media_urls'] ?? null) ? array_values($input['existing_media_urls']) : [];
                     if ($mediaIds !== [] || $existingUrls !== []) {
@@ -700,12 +708,16 @@ final class Plugin {
                             $items = [];
                             foreach ($existingUrls as $url) {
                                 $url = trim((string) $url);
+                                $trace('URL_RESOLUTION', 'STARTED', ['capture_id' => (string) ($input['idempotency_key'] ?? '')]);
                                 $relative = $existingAttachmentUrlResolver->relativeUploadPath($url);
                                 if (isset($seen[$relative])) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_DUPLICATE');
                                 $seen[$relative] = true;
                                 $attachmentId = $existingAttachmentUrlResolver->resolve($url);
+                                $trace('URL_RESOLUTION', 'VERIFIED', ['attachment_id' => $attachmentId]);
+                                $trace('ATTACHMENT_READBACK', 'STARTED', ['attachment_id' => $attachmentId]);
                                 $readback = $wordpressAttachments->read($attachmentId);
                                 if (!is_array($readback) || (int) ($readback['attachment_id'] ?? 0) !== $attachmentId) throw new \RuntimeException('EXISTING_MEDIA_ATTACHMENT_READBACK_FAILED');
+                                $trace('ATTACHMENT_READBACK', 'VERIFIED', ['attachment_id' => $attachmentId, 'width' => (int) ($readback['width'] ?? 0), 'height' => (int) ($readback['height'] ?? 0)]);
                                 $items[] = [
                                     'attachment_id' => $attachmentId,
                                     'source_url' => $url,
@@ -722,6 +734,7 @@ final class Plugin {
                                     'sort_order' => count($items),
                                 ];
                             }
+                            $trace('PHYSICAL_INGEST', 'VERIFIED', ['items' => count($items)]);
                             return ['status' => 'verified', 'items' => $items, 'count' => count($items), 'reused' => true, 'physical_input' => 'existing_wordpress_media_url'];
                         }
                         $items = $existingMediaResolver->resolve($mediaIds);
@@ -786,10 +799,19 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages): array {
+                    $trace = static function (string $stage, string $status, array $details = []): void {
+                        $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
+                        if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
+                        if (function_exists('error_log')) {
+                            $encoded = function_exists('wp_json_encode') ? wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                            error_log('[nhk.capture.stage] ' . (is_string($encoded) ? $encoded : $stage));
+                        }
+                    };
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
+                        $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
                         $incomplete = [];
                         $primary = is_array($context['subject_resolution']['primary'] ?? null) ? $context['subject_resolution']['primary'] : [];
                         $endpointType = trim((string) ($primary['type'] ?? ''));
@@ -802,21 +824,34 @@ final class Plugin {
                             if (($asset['attachment_readback_status'] ?? 'verified') !== 'verified') $incomplete[] = 'MEDIA_ATTACHMENT_READBACK_REQUIRED';
                             if ($mediaId !== '' && $endpointType !== '' && $endpointKey !== '') {
                                 $mediaContext = is_array($asset['media_context'] ?? null) ? $asset['media_context'] : [];
+                                $role = \NHK\Core\Domain\Media\MediaUsageRoleRegistry::FEATURED_PRIMARY;
+                                $desiredUsage = [[
+                                    'role' => $role,
+                                    'media_id' => $mediaId,
+                                    'sort_order' => (int) ($asset['sort_order'] ?? 0),
+                                    'alt_text' => (string) ($mediaContext['alt_text'] ?? ''),
+                                    'caption' => (string) ($mediaContext['caption'] ?? ''),
+                                    'title' => (string) ($mediaContext['title'] ?? ''),
+                                ]];
+                                $usagePlan = (new \NHK\Core\Application\Media\MediaUsageReconciler())->plan($endpointType, $endpointKey, $usages->listByEndpoint($endpointType, $endpointKey, $role), $desiredUsage);
+                                if (($usagePlan['status'] ?? '') !== 'PLANNED') throw new \NHK\Core\Domain\Media\MediaException('MEDIA_USAGE_RECONCILE_CONFLICT');
+                                $plannedAction = (array) ($usagePlan['actions'][0] ?? []);
                                 $usage = $mediaService->addUsage(
                                     $mediaId,
                                     $endpointType,
                                     $endpointKey,
-                                    \NHK\Core\Domain\Media\MediaUsageRoleRegistry::FEATURED_PRIMARY,
+                                    $role,
                                     (int) ($asset['sort_order'] ?? 0),
                                     (string) ($mediaContext['alt_text'] ?? ''),
                                     (string) ($mediaContext['caption'] ?? ''),
                                     [],
                                     (string) ($mediaContext['title'] ?? ''),
                                 );
-                                $usageReadback[] = ['usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision];
+                                $usageReadback[] = ['usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision, 'reconciliation' => 'MEDIA_USAGE_' . (string) ($plannedAction['action'] ?? 'UPDATE')];
                                 try { do_action('nhk_v3_media_adoption_phase', 'USAGE_RECONCILED', (int) ($asset['attachment_id'] ?? 0), $usage->mediaId); } catch (\Throwable) { }
                             }
                         }
+                        $trace('MEDIA_USAGE_RECONCILIATION', $incomplete === [] ? 'VERIFIED' : 'PARTIAL', ['capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'media_count' => count(array_unique($mediaIds)), 'usage_count' => count($usageReadback)]);
                         return [
                             'status' => $incomplete === [] && $mediaIds !== [] ? 'RECONCILED' : 'PARTIAL',
                             'media_ids' => array_values(array_unique($mediaIds)),
@@ -902,7 +937,15 @@ final class Plugin {
                 },
                 static function (array $context) use ($articleEditorial): array {
                     $articleId = (int) ($context['article_id'] ?? 0);
-                    if ($articleId < 1) return ['status' => 'verified', 'post' => null, 'article_owner' => 'NOT_REQUIRED'];
+                    if ($articleId < 1) {
+                        $payload = ['stage' => 'CAPTURE_FINAL_CANONICAL_READBACK', 'status' => 'VERIFIED', 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'article_owner' => 'NOT_REQUIRED', 'at' => gmdate('c')];
+                        if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
+                        if (function_exists('error_log')) {
+                            $encoded = function_exists('wp_json_encode') ? wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                            error_log('[nhk.capture.stage] ' . (is_string($encoded) ? $encoded : 'CAPTURE_FINAL_CANONICAL_READBACK'));
+                        }
+                        return ['status' => 'verified', 'post' => null, 'article_owner' => 'NOT_REQUIRED'];
+                    }
                     $post = $articleEditorial->read($articleId);
                     return $post === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'post' => $post->snapshot()];
                 },

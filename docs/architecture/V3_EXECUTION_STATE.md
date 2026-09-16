@@ -1,5 +1,53 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Existing WordPress attachment adoption timeout repair (LOCAL ONLY)
+
+SCOPE: Reproduced the camera-name/storage-key and MEDIA_ENRICHMENT orchestration
+failure modes with the `IMG_4646-scaled.jpeg` fixture metadata
+(2560x1920, 781688 bytes) and the existing-attachment contract. No live
+semantic mutation was sent. The current `STAGING_ACCEPTANCE_SCOPE` authorizes
+attachment `489`, not attachment `556`; the requested live acceptance is
+therefore fail-closed until that exact scope is explicitly updated.
+
+ROOT_CAUSE: Two independent bounded-path defects were confirmed by red tests.
+First, `MEDIA_ENRICHMENT` still entered claim/semantic Governance after
+attachment adoption even though its owner is Media/MediaUsage and it must not
+create an Article. Second, an existing Media asset with identical physical
+bytes but incomplete metadata was treated as a storage-key conflict rather
+than reconciled in place. The existing-attachment bridge also performed an
+unbounded Media/asset scan before returning an already-owned canonical
+filename. The bridge now persists the PRIVATE source-original and resolves the
+Media identity before entering WebP generation, so a timeout/failure can resume
+with the same Media UUID; it then persists the PUBLIC WebP, binds the exact
+attachment, and emits canonical read-back phase traces.
+
+FIRST_FAILED_STAGE: The camera/storage-key regression fails at semantic Media
+asset registration (`Media asset storage key is already bound to different
+content`) when only metadata differs; the MEDIA_ENRICHMENT regression enters
+the unrelated `semantic_write_back` boundary. A live first-failed stage for
+attachment `556` is intentionally NOT VERIFIED because the required live
+mutation is outside the current bounded scope. Structured traces now cover
+URL resolution, attachment read-back, identity, mapping inspection,
+source-original persistence, WebP generation/persistence, binding, usage and
+final canonical read-back.
+
+FIX: `MediaService` validates and preserves caller-owned durable
+`storage_key` values, reconciles same-physical asset metadata without changing
+asset UUID/key, and rejects traversal/absolute/control-character keys.
+`WordPressMediaAttachmentBridge` resumes partial mappings, persists source
+first, avoids the replay-wide collision scan, retains one Media identity, and
+emits stage timing logs. `MEDIA_ENRICHMENT` skips unrelated claim/Governance
+work while retaining MediaUsage and final Capture read-back.
+
+LOCAL_VERIFICATION: Red tests were captured before the fix. Focused suite is
+PASS — 30 tests / 81 assertions, with 3 guarded WordPress integration skips.
+Composer PHP lint and `git diff --check` pass. Full PHPUnit was attempted;
+environment-gated WordPress integrations fail because this workspace has no
+WordPress bootstrap/test database, and the pre-existing DemoCutover contract
+failure remains separately recorded. Deployment and live read-back remain
+blocked by the dirty worktree's unrelated user changes and the explicit scope
+gate above.
+
 # Checkpoint — 2026-09-16 — `@v3-22` live Easy MCP discovery after reconnect
 
 SCOPE: Complete the bounded live connector verification for the explicit
