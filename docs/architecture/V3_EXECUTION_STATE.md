@@ -10619,3 +10619,27 @@ write, staging mutation, publish or production operation was performed.
 
 STATUS: `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING` — live connector,
 staging data read-back and browser content acceptance remain externally gated.
+
+# Checkpoint — 2026-09-16 — Live image create root-error preservation design
+
+SCOPE: Completed the design-only root-cause slice for the reproduced live
+ChatGPT image-create failure. No production code, deployment, connector
+reconnection, staging mutation or production operation was performed.
+
+ROOT_CAUSE: The widget checked `isError` only on the outer server result while
+the Easy MCP/Ability bridge can place typed failure data under a nested
+`result` envelope or JSON text. The widget consequently treated a typed
+server failure as zero uploads and replaced its reason with
+`MEDIA_READBACK_COUNT_MISMATCH`. The current widget response also projects
+success-only uploads keyed by a transport identifier, and the observed Japan
+East exact host is absent from the staging filter.
+
+DESIGN: The approved design is
+`docs/superpowers/specs/2026-09-16-live-image-create-root-error-design.md`.
+It defines safe envelope inspection and precedence, an ordered per-item upload
+manifest with count fields and ordinal fallback, the exact Japan East host
+addition within the existing allowlist, serialized `MEDIA_ENRICHMENT` schema
+proof, and one physical upload reused by both Capture intents.
+
+STATUS: `DESIGN_READY / USER_SPEC_REVIEW_REQUIRED` — implementation and the
+writing plan remain paused until the user reviews this design.
