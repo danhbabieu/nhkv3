@@ -103,7 +103,7 @@ final class McpToolCatalog
                     'required' => ['url'],
                     'additionalProperties' => false,
                 ],
-                'files' => ['type' => 'array', 'maxItems' => 20, 'items' => [
+                'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
                     'type' => 'object',
                     'description' => 'OpenAI ChatGPT uploaded file reference. The connector supplies a temporary download URL and opaque file ID; the server materializes bytes into a native temporary file.',
                     'properties' => [
@@ -113,6 +113,7 @@ final class McpToolCatalog
                         'file_name' => ['type' => 'string'],
                     ],
                     'required' => ['download_url', 'file_id'],
+                    'additionalProperties' => false,
                 ]],
             ], ['idempotency_key', 'documentation_checkpoint'], true, ['openai/fileParams' => ['files']]),
             self::tool('nhk.category.resolve', 'Resolve a native WordPress Category by ID, exact slug or exact name.', ['selector' => ['type' => 'object']], ['selector']),

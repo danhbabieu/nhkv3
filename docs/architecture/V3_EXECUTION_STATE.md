@@ -26,7 +26,7 @@ authorization. Descriptor metadata retains `_meta["openai/fileParams"]=["files"]
 THREAT_MODEL: `docs/superpowers/reports/2026-09-16-chatgpt-file-transport-threat-model.md`.
 
 LOCAL_VERIFICATION: Focused transport/widget/catalog tests pass (85 tests /
-715 assertions); NHK Unit passes (1,658 tests / 8,085 assertions); NHK Contract
+720 assertions); NHK Unit passes (1,658 tests / 8,088 assertions); NHK Contract
 passes (6 tests / 48 assertions); widget TypeScript typecheck, test and
 production build pass; Composer lint, PHP lint, diff check and changed-scope
 secret scan pass.
