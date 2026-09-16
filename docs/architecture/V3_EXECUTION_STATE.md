@@ -10775,11 +10775,16 @@ tuple, plus MCP capability parity. The deployment verifier compares that
 tuple, documentation file hashes, catalog presence and callable dispatch;
 stale/partial remote artifacts fail closed.
 
-LOCAL_VERIFICATION: Focused CAS/MCP/release tests PASS (58 tests after the
-new remote unknown-tool regression; exact aggregate is recorded by the final
-verification run). Canonical docs snapshot was regenerated from the current
-repository after this checkpoint. Full relevant Composer/PHPUnit, PHP lint,
-diff and secret checks remain required before the commit checkpoint.
+LOCAL_VERIFICATION: Focused CAS/MCP/release tests PASS — 105 tests / 966
+assertions, with 2 deprecations. The full Unit suite also PASS — 1,625 tests /
+7,883 assertions, with 13 warnings and 14 deprecations. MCP Apps typecheck and
+17 tests PASS; Composer validate, PHP lint, diff-check and changed-scope
+secret scan PASS. The full Composer suite remains environment-blocked by
+missing WordPress test bootstrap/database (`stdClass::query()`, missing
+`NHK_WP_TEST_PATH`, and mandatory P4 acceptance prerequisites). The canonical
+docs snapshot was regenerated from the committed repository HEAD. The deploy
+wrapper correctly fails closed before transfer while unrelated user changes
+leave the checkout dirty (`WORKTREE_NOT_CLEAN`).
 
 LIVE_STATUS: `LIVE_PUBLIC_CLOCK_COMPLETE=NO` — external deployment and fresh
 remote read-back remain pending. This checkpoint claims local/contract
