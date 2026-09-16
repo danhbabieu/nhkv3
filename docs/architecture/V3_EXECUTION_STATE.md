@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Remote registry evidence and deployment blocker
+
+REMOTE_READ_ONLY: Fresh staging `POST /wp-json/nhk/v1/mcp` initialize with
+protocol `2026-07-28` returned `DOC_MANIFEST_INVALID`, while the same endpoint's
+fresh `tools/list` returned `nhk.article.draft.create`,
+`nhk.article.draft.update`, `nhk.article.publish.review`,
+`nhk.article.publish.approve`, `nhk.article.publish` and
+`nhk.capture.ingest`. The authenticated WordPress Ability list returned
+`nhk-v3/article-draft-update`, the three publication Abilities and
+`nhk-v3/capture-ingest`, but not `nhk-v3/article-draft-create`; its exact GET
+returned `rest_ability_not_found`.
+
+INTERPRETATION: This is direct evidence of the pre-fix split between the
+canonical MCP catalog and Easy MCP's normalized Ability registry. No
+write-capable `tools/call` validation or mutation was attempted because the
+current bounded staging scope authorizes only exact existing IDs and does not
+authorize creation of the requested new draft.
+
+DEPLOYMENT: The clean-HEAD deploy verifier stopped before transfer with
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; `NHK_DEMO_DEPLOY_CONFIG` is unset. The
+current remote therefore cannot be credited with the local parity repair, and
+no cache clear/rebuild, connector reconnect, draft creation, trash, or other
+staging mutation has occurred.
+
 # Checkpoint — 2026-09-16 — Live image upload trusted-host completion gate
 
 SCOPE: Close the exact ChatGPT file-host policy gap for the live one-image
