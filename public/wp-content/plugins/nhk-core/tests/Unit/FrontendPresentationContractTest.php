@@ -54,6 +54,14 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('array_unique', $source);
     }
 
+    public function test_shared_presentation_css_does_not_reserve_a_removed_hierarchy_column(): void
+    {
+        $source = $this->read('presentation.css');
+        self::assertStringNotContainsString('minmax(170px,220px) minmax(0,1fr) minmax(230px,290px)', $source);
+        self::assertStringNotContainsString('minmax(160px,190px) minmax(0,1fr) minmax(210px,250px)', $source);
+        self::assertStringContainsString("wp_enqueue_style('nhk-v3-presentation', get_theme_file_uri('presentation.css'), ['nhk-v3-knowledge'], '1.0.1')", $this->read('functions.php'));
+    }
+
     public function test_entity_archive_intro_explains_the_reader_purpose_of_each_profile_family(): void
     {
         $source = $this->read('entity.php');

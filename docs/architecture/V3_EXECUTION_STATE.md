@@ -10540,6 +10540,34 @@ WORKTREE: Pre-existing user changes in the image-upload files remain
 untouched. The implementation is intentionally left uncommitted on the shared
 dirty `main` worktree so those changes are preserved.
 
+# Checkpoint — 2026-09-16 — Public dossier three-column regression diagnosis
+
+SYMPTOM: The live `/dong-ho-cong-cong/` page rendered the reader content in a
+220px column while the context rail expanded to roughly 602px. The page
+markup had exactly two `.semantic-layout` children (`semantic-main` and
+`context-rail`), but the pulled `presentation.css` still reserved the removed
+three-column hierarchy layout.
+
+ROOT_CAUSE: `presentation.css` contained both a desktop three-column rule and
+an 80rem three-column override for `.semantic-layout`. Those rules overrode
+the two-column base layout in `entity.css` after the hierarchy rail had been
+removed from `entity.php`. The live DOM/CSS measurement confirmed the
+effective columns were `220px 602px 290px`.
+
+FIX: Removed the obsolete three-column declarations from `presentation.css`
+and bumped its WordPress asset version from `1.0.0` to `1.0.1` so a pull/deploy
+cannot continue serving the stale stylesheet from browser/CDN cache. Added a
+frontend regression contract that rejects the removed hierarchy-column rules
+and requires the cache-busting version.
+
+VERIFICATION: The regression test was observed failing before the CSS/version
+fix and passes afterward. Presentation contract suite passes — 15 tests / 82
+assertions with one pre-existing warning. Full NHK Unit suite passes — 1,617
+tests / 7,780 assertions with 13 warnings and 14 deprecations. Changed PHP
+lint and `git diff --check` pass. The live page was inspected read-only to
+establish the root cause; post-fix live read-back is pending the next
+pull/deploy and is not claimed here.
+
 # Checkpoint — 2026-09-16 — Public Clock continuation/tool-surface closeout (LOCAL ONLY)
 
 SCOPE: Continued the bounded Public Clock / Turret Clock work on the existing

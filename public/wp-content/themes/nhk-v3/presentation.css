@@ -1,5 +1,4 @@
 /* Shared presentation seam: navigation, cards and responsive dossier layout. */
-.semantic-layout{grid-template-columns:minmax(170px,220px) minmax(0,1fr) minmax(230px,290px);gap:34px}
 .hierarchy-rail{min-width:0;padding-top:54px}
 .hierarchy-nav{border-top:2px solid var(--nhk-text);padding-top:12px}
 .hierarchy-nav ul{list-style:none;margin:0;padding:0}
@@ -33,7 +32,6 @@
 .media-card-image img{display:block;width:100%;height:100%;object-fit:contain}
 .media-card figcaption{padding:10px 12px;color:var(--nhk-muted);font-size:.82rem}
 .video-card:focus-visible,.visual-card:focus-visible,.related-card:focus-visible,.entity-card:focus-within{outline:3px solid var(--nhk-accent-secondary);outline-offset:3px}
-@media(max-width:80rem){.semantic-layout{grid-template-columns:minmax(160px,190px) minmax(0,1fr) minmax(210px,250px);gap:24px}}
 @media(max-width:64rem){.semantic-layout{grid-template-columns:minmax(0,1fr) minmax(210px,250px)}.hierarchy-rail{grid-column:1 / -1;padding-top:26px}.hierarchy-nav ul{display:flex;flex-wrap:wrap;gap:8px}.hierarchy-nav li{border:1px solid var(--nhk-border);padding:7px 10px}.hierarchy-nav .hierarchy-parent{display:inline-block;margin-right:12px}}
 @media(max-width:48rem){.semantic-layout{display:block}.hierarchy-rail{padding-top:20px}.context-rail{padding-top:32px}.visual-rail{grid-template-columns:repeat(2,minmax(0,1fr))}.local-section-nav ul{gap:14px}}
 @media(max-width:36rem){.visual-rail{grid-template-columns:1fr}}
