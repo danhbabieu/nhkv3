@@ -1,5 +1,45 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Media URL continuation verification
+
+CURRENT_COMMIT: The existing Media URL implementation is present at HEAD
+`0da3ccbea11d21793560a7d7bd7f987fc94dbb03` and is also the current
+`origin/main`. No implementation was repeated or reverted in this checkpoint.
+
+TASK_FILES: The Media URL task consists of the resolver, Capture schema and
+transport/catalog changes, Media attachment bridge and Plugin convergence,
+focused resolver/Capture tests, and the Media/MCP architecture guidance. The
+committed task also contains shared MCP documentation/catalog hunks; those
+shared hunks were preserved. PREEXISTING_OTHER_WORK remains in the worktree:
+trusted-file gateway/materializer changes, their tests, and the untracked
+ChatGPT MU-plugin. They were not staged, reverted or overwritten.
+
+VERIFICATION: Capture schema read-back reports `existing_media_urls`,
+`media_ids`, `files`, `capture_id`, `followup_mode=ATTACH_ASSETS` and all five
+current intents (`VIDEO`, `IMAGE_ARTICLE`, `TEXT_ARTICLE`, `KNOWLEDGE_DELTA`,
+`MEDIA_ENRICHMENT`). Documentation abilities map to
+`nhk-v3/documentation-bootstrap`, `nhk-v3/documentation-list`,
+`nhk-v3/documentation-get` and `nhk-v3/capture-ingest`; all four have
+executable dispatch handlers. Focused Capture/Media/MCP/projection tests pass
+(88 tests / 849 assertions, one deprecation); Composer PHP lint and canonical
+MCP documentation generation pass. Unit-only PHPUnit reaches 1,658 tests with
+one unrelated `DemoCutoverCliContractTest` failure. Full PHPUnit with
+`NHK_WP_TEST_PATH=public NHK_WP_TEST_DB=nhk_v3_test` reaches the WordPress
+bootstrap but fails because the local `$wpdb` is a `stdClass`; it does not
+provide the required WordPress/database runtime.
+
+DEPLOYMENT: `NHK_DEMO_DEPLOY_CONFIG`, `NHK_DEMO_WP_USER` and
+`NHK_DEMO_WP_APP_TOKEN` are set, but the canonical
+`./scripts/nhk-deploy-verify --target=demo.1945.vn --base-url=https://demo.1945.vn
+--expected-head="$(git rev-parse HEAD)" --json` command stops with
+`WORKTREE_NOT_CLEAN` before transfer. No deploy, connector reload, staging
+mutation or live read-back occurred.
+
+LIVE_AUTHORIZATION: The exact target attachment 555 and Cuckoo Classification
+UUID are outside the bounded `STAGING_ACCEPTANCE_SCOPE` in `AGENTS.md`, so
+`LIVE_MUTATION_NOT_AUTHORIZED_IN_CODEX_ENV` remains active. No authorization
+package or permission was invented.
+
 # Checkpoint — 2026-09-16 — Existing first-party WordPress Media URL adapter
 
 SCOPE: Additive completion of the existing Capture physical-input boundary.
