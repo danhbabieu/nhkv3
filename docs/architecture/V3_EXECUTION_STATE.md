@@ -10782,9 +10782,10 @@ assertions, with 2 deprecations. The full Unit suite also PASS — 1,625 tests /
 secret scan PASS. The full Composer suite remains environment-blocked by
 missing WordPress test bootstrap/database (`stdClass::query()`, missing
 `NHK_WP_TEST_PATH`, and mandatory P4 acceptance prerequisites). The canonical
-docs snapshot was regenerated from the committed repository HEAD. The deploy
-wrapper correctly fails closed before transfer while unrelated user changes
-leave the checkout dirty (`WORKTREE_NOT_CLEAN`).
+docs snapshot was regenerated from the committed repository HEAD. The
+canonical deploy wrapper was run against the exact HEAD and correctly failed
+closed before transfer with `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; no remote
+write, connector reconnection or staging mutation occurred.
 
 LIVE_STATUS: `LIVE_PUBLIC_CLOCK_COMPLETE=NO` — external deployment and fresh
 remote read-back remain pending. This checkpoint claims local/contract
