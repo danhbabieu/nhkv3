@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildWidgetState, extractUploads, normalizeSelectedFiles } from "../src/contract.ts";
+import { buildWidgetState, extractPayload, extractUploads, normalizeSelectedFiles } from "../src/contract.ts";
 
 test("normalizes ChatGPT library selections as authorized file references", () => {
   assert.deepEqual(normalizeSelectedFiles([
@@ -75,6 +75,20 @@ test("maps the server result envelope returned by the Ability bridge", () => {
     public_filename: "envelope.webp",
     file_id: "file-envelope",
   }]);
+});
+
+test("unwraps a documentation checkpoint from the Ability result envelope", () => {
+  assert.deepEqual(extractPayload({
+    result: {
+      structuredContent: {
+        manifest_hash: "manifest-hash",
+        documentation_version: "documentation-version",
+      },
+    },
+  }), {
+    manifest_hash: "manifest-hash",
+    documentation_version: "documentation-version",
+  });
 });
 
 test("keeps diagnostic error messages safe and never persists signed URLs", () => {
