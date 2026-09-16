@@ -1,5 +1,104 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Public Clock runtime closeout attempt
+
+SCOPE: Fresh deployed-runtime documentation bootstrap and read-back completed
+for the bounded staging scope. No code change, deploy, push, duplicate
+creation, generic WordPress write or direct database write was performed.
+
+RUNTIME: Documentation bootstrap returned runtime `0.1.0`, documentation
+version `03b4aa0d747817a7fda7e10b8c76f65bc17021d5e96f17bd14965d25d9ed9c17`,
+manifest hash `6d66239245128b37ad063f1604fdfd0e703ba5bc6787dc5b047726a48318ffd0`,
+build identity
+`2df46c21b061cc35dec81069a78865107bd6172cccfe73c26e26b04bae620eed`,
+environment `staging`, and `project_build_enabled=true`. Runtime status was
+`registered_not_live_verified` before browser verification. The v3_18 tool
+surface exposes the read and Capture paths, but its `authority_intent` schema
+does not expose the structured `requests[]` required by the deployed generic
+Authority UPDATE flow. The older direct proposal/source abilities returned
+`Unknown tool`; no bypass was attempted.
+
+AUTHORITY: Canonical read-back found exactly one active Public Clock
+classification `01a09e44-539a-7f1a-938a-d7d91bb689a3`, stable key
+`nhk:classification:clock-type.dong-ho-cong-cong`, revision 1, and exactly one
+active Turret classification `01a09f73-0aad-79b3-9aaf-5f02cb33a9d1`, stable key
+`nhk:classification:clock-type.dong-ho-thap`, revision 1. Both descriptions
+remain absent. Governed description UPDATE therefore remains unapplied: the
+existing exact Captures are `EDITORIAL`, while the Authority continuation
+requires an Authority Capture; creating one is outside the approved request.
+
+DUPLICATE_AUDIT: Existing subtype relation
+`01a0a344-da4d-7653-b7e8-75ffdd80ac38` remains the sole active Turret-to-Parent
+edge. Existing Knowledge was reused; no Entity, Capture, Proposal, Knowledge
+or Media duplicate was created. Category 4 read-back remains `Tri thức đồng
+hồ` with slug `tri-thuc-dong-ho`.
+
+PROVENANCE: The governed #485 continuation applied the five existing research
+packet Source records exactly once, with canonical IDs:
+`01a0a7f2-8233-71bb-a7d7-429ede9d8b92`,
+`01a0a7f2-8242-7dff-8e6f-d63c846c9417`,
+`01a0a7f2-8254-7122-b34e-23483eff2079`,
+`01a0a7f2-8263-78f2-a2c8-fb23c4dc1d76`, and
+`01a0a7f2-8272-7b47-997e-8462d46ab8e0`; inventory read-back returned one
+active record for each stable key. #485 Evidence reconciliation applied
+canonical Evidence IDs
+`01a0a7f6-a094-793f-9400-f91ed07a82c3`,
+`01a0a7f6-a0b1-7918-9b2c-11173afb895d`, and
+`01a0a7f6-a0c3-7582-9269-b6cf4a48b61a`. #487 Evidence reconciliation applied
+canonical Evidence IDs
+`01a0a7f7-2b0f-763c-8f13-9b50d5ac0d19`,
+`01a0a7f7-2b38-7158-b31f-92f98da74b2c`,
+`01a0a7f7-2b4a-742c-942d-fd711cdb5156`,
+`01a0a7f7-2b5b-771b-95c7-38872dd84fb0`,
+`01a0a7f7-2b6c-7966-8501-a460c96df504`,
+`01a0a7f7-2b7c-7d15-a338-495113ea9407`,
+`01a0a7f7-2b8f-7382-be6a-78c695bba1da`,
+`01a0a7f7-2ba1-702e-9632-8e83b9e324b0`,
+`01a0a7f7-2bb3-75b7-b6b2-7e27415f6265`, and
+`01a0a7f7-2bc3-7ac9-95b9-06eaa85f351c`. Evidence relations preserve
+`supports`/`qualifies` scope; insufficient claims were not fabricated. The
+semantic write-back lifecycle reported `PROPOSAL`, `SUBMIT`, `APPROVE`,
+`ELIGIBILITY` and `CONTROLLED_APPLY` applied for these evidence writes.
+
+ARTICLE_485: Existing Capture
+`01a09aa3-59a2-74c0-9c6a-1a6867eb7f59` resolved the exact Public Clock
+subject. Article #485 retains its existing slug, category 4 and Media
+`01a0a36c-3332-7083-85fd-43dbc2a80810` (asset
+`01a0a36c-3338-7ac0-ba72-a7c87c4e6b5e`, attachment 489); existing
+`featured_primary` MediaUsage
+`01a0a350-daac-7aca-97e9-144b0f71bebb` was read back and the existing `about`
+relation was idempotent. The continuation addenda
+`01a0a7f5-0b7e-74c3-9cf1-73f04989852a` and
+`01a0a7f6-a00a-7d37-979a-84932d6e810c` failed closed with
+`EDITORIAL_STATE_CONFLICT` after semantic evidence application. Article #485
+remains draft and was not published.
+
+ARTICLE_487: Existing Capture
+`01a09aa4-9ecc-758b-854d-5d44bb176267` resolved the exact Turret subject;
+jargon content persisted and the ten Evidence writes above applied. No new
+Media was created. The continuation remained draft with
+`MEDIA_USAGE_UPDATE_CONFLICT_`; publication diagnostics reported
+`MEDIAUSAGE_INCOMPLETE` and `PUBLIC_CLAIM_COMPLIANCE_BLOCKED`. Article #487
+was not published.
+
+LIVE_READBACK: Browser verification confirmed all three routes resolve:
+`/loai-dong-ho/`, `/dong-ho-cong-cong/` and `/dong-ho-thap/`. The archive
+contains the required card “Đồng hồ công cộng”. The Public Clock dossier
+shows the parent/child hierarchy and cited eligible Knowledge, but does not
+yet show article #485 or its Media publicly because #485 remains draft. The
+Turret dossier shows its parent and cited technical Knowledge, but does not
+yet show article #487 for the same reason. No Public Clock or Turret video
+child was created; Video therefore remains `EMPTY_BY_DATA` for this bounded
+content family (the global Video hub contains unrelated pre-existing
+records).
+
+STATUS: `LIVE_PUBLIC_CLOCK_COMPLETE=NO` — EXTERNAL_HARD_BLOCKER. The current
+deployed connector does not expose the structured governed Authority UPDATE
+request or callable publication mutation surface, and the existing Capture
+continuations fail closed on the recorded editorial/media gates. Ledger state
+is updated from actual runtime IDs and read-back; no code, deploy or push was
+performed.
+
 # Checkpoint — 2026-09-16 — Public Clock local closeout
 
 SCOPE: Completed the local Public Clock closeout pass without deployment,
