@@ -11,6 +11,7 @@ use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, Sourc
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
+use NHK\Core\Infrastructure\Mcp\ChatGptMcpGatewayException;
 use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -48,7 +49,7 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(1, $result['success_count']);
         self::assertSame(0, $result['failure_count']);
         self::assertSame(0, $result['items'][0]['ordinal']);
-        self::assertSame('SUCCESS', $result['items'][0]['status']);
+        self::assertSame('success', $result['items'][0]['status']);
         self::assertSame('/anh/safe-1.webp', $result['uploads'][0]['canonical_url']);
         self::assertSame('verified', $result['uploads'][0]['attachment_readback_status']);
         self::assertSame([['widget-one', ['source' => 'chatgpt_widget', 'description' => 'Mặt trước đồng hồ Odo 36/10'], 'file_one']], $calls);
@@ -72,7 +73,7 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(['file_a', 'file_b'], array_column($result['uploads'], 'file_id'));
         self::assertCount(2, $result['uploads']);
         self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
-        self::assertSame(['SUCCESS', 'SUCCESS'], array_column($result['items'], 'status'));
+        self::assertSame(['success', 'success'], array_column($result['items'], 'status'));
         self::assertSame(1, $materializerCalls);
     }
 
@@ -94,7 +95,7 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(1, $result['success_count']);
         self::assertSame(1, $result['failure_count']);
         self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
-        self::assertSame(['SUCCESS', 'FAILED'], array_column($result['items'], 'status'));
+        self::assertSame(['success', 'error'], array_column($result['items'], 'status'));
         self::assertArrayNotHasKey('download_url', $result['items'][1]);
     }
 
@@ -131,6 +132,62 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(1, $materializerCalls);
     }
 
+    public function test_widget_upload_uses_ordinal_fallback_when_ingest_strips_transport_ids(): void
+    {
+        $calls = [];
+        $materializerCalls = 0;
+        $transport = $this->transport($calls, $materializerCalls);
+        $result = $this->call($transport, [
+            'idempotency_key' => 'widget-ordinal',
+            'metadata' => ['description' => 'Ordinal mapping'],
+            'files' => [
+                ['download_url' => 'https://files.openai.test/a', 'file_id' => 'sediment://a', 'file_name' => 'a.jpg'],
+                ['download_url' => 'https://files.openai.test/b', 'file_id' => 'sediment://b', 'file_name' => 'b.jpg'],
+            ],
+        ]);
+
+        self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
+        self::assertSame(['media-1', 'media-2'], array_column($result['items'], 'media_id'));
+        self::assertSame(2, $result['success_count']);
+        self::assertSame(0, $result['failure_count']);
+    }
+
+    public function test_widget_upload_returns_typed_materialization_failure_without_creating_attachment_or_media(): void
+    {
+        $uploadCalls = 0;
+        $entrypoint = new ImageIngestEntrypoint(
+            static function () use (&$uploadCalls): array {
+                $uploadCalls++;
+                return [];
+            },
+            static function (): array {
+                throw new ChatGptMcpGatewayException(
+                    'PROVIDED_FILE_REFERENCE_UNRESOLVABLE',
+                    'The provided file server could not be reached securely.',
+                    'files.openai.test',
+                    ['typed_code' => 'PROVIDED_FILE_CONNECT_FAILED', 'stage' => 'connect', 'http_status' => 502, 'redirect_count' => 0],
+                );
+            },
+        );
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => true, imageIngest: $entrypoint);
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.widget-upload', 'arguments' => [
+            'idempotency_key' => 'widget-failed-materialization',
+            'metadata' => ['description' => 'Failure must stay typed'],
+            'files' => [['download_url' => 'https://files.openai.test/one?sig=secret', 'file_id' => 'file-one', 'file_name' => 'one.jpg']],
+        ]]]);
+
+        $result = $response['body']['result']['structuredContent'];
+        self::assertSame('error', $result['status']);
+        self::assertSame(1, $result['requested_count']);
+        self::assertSame(0, $result['success_count']);
+        self::assertSame(1, $result['failure_count']);
+        self::assertSame('PROVIDED_FILE_CONNECT_FAILED', $result['items'][0]['error']['code']);
+        self::assertSame('connect', $result['items'][0]['error']['stage']);
+        self::assertArrayNotHasKey('download_url', $result['items'][0]);
+        self::assertStringNotContainsString('secret', json_encode($result));
+        self::assertSame(0, $uploadCalls, 'No Attachment or Media writer may run after materialization failure.');
+    }
+
     private function transport(array &$calls, int &$materializerCalls): McpTransport
     {
         $entrypoint = new ImageIngestEntrypoint(
@@ -139,6 +196,12 @@ final class McpWidgetUploadTest extends TestCase
                 $manifest = [];
                 foreach ($items as $index => $item) {
                     $manifest[] = ['client_file_id' => (string) ($item['client_file_id'] ?? ''), 'attachment_id' => 10 + $index, 'media_id' => 'media-' . ($index + 1), 'filename' => 'safe-' . ($index + 1) . '.webp', 'original_filename' => (string) ($item['filename'] ?? ''), 'mime_type' => 'image/webp', 'width' => 10, 'height' => 10, 'byte_size' => 100, 'source_url' => '/anh/safe-' . ($index + 1) . '.webp', 'attachment_readback_status' => 'verified'];
+                }
+                if ($key === 'widget-ordinal') {
+                    foreach ($manifest as $index => $item) {
+                        unset($manifest[$index]['client_file_id']);
+                        $manifest[$index]['ordinal'] = $index;
+                    }
                 }
                 if ($key === 'widget-partial') {
                     return ['items' => [$manifest[0]], 'errors' => [['client_file_id' => 'file_b', 'code' => 'TRUSTED_FILE_READ_FAILED']]];

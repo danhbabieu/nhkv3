@@ -12029,11 +12029,17 @@ function errorCode(value) {
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record2 = value;
-  for (const key of ["code", "reason_code", "reasonCode"]) {
+  for (const key of ["code", "reason_code", "reasonCode", "error_code"]) {
     const code = errorCode(record2[key]);
     if (code) return code;
   }
   return errorCode(record2.error);
+}
+function textErrorCode(value) {
+  const text = value.trim();
+  const typed = text.match(/^(?:Error\s*:\s*)?([A-Z][A-Z0-9_]{2,})(?:\b|:)/)?.[1];
+  if (typed && SAFE_ERROR_CODE.test(typed)) return typed;
+  return /^error\s*:/i.test(text) ? "SERVER_TOOL_ERROR" : null;
 }
 function parsedText(result) {
   const text = result.content?.find((item) => item.type === "text")?.text;
@@ -12056,36 +12062,65 @@ function parsedContent(value) {
   }
 }
 function inspectValue(value, depth = 0) {
-  if (depth > 6) return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+  if (depth > 6) return { kind: "malformed", code: "SERVER_TOOL_RESULT_INVALID" };
   if (typeof value === "string") {
     try {
       return inspectValue(JSON.parse(value), depth + 1);
     } catch {
-      const code = errorCode(value);
-      return code ? { kind: "error", code } : { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+      const code = textErrorCode(value);
+      return code ? { kind: "error", code } : { kind: "malformed", code: "SERVER_TOOL_RESULT_INVALID" };
     }
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return { kind: "success", payload: value };
   const record2 = value;
-  if (record2.isError === true) return { kind: "error", code: errorCode(record2) ?? errorCode(record2.structuredContent) ?? errorCode(record2.result) ?? "SERVER_TOOL_ERROR" };
+  if (record2.isError === true) return { kind: "error", code: errorCode(record2) ?? errorCode(record2.structuredContent) ?? errorCode(record2.result) ?? textErrorCode(typeof record2.content === "string" ? record2.content : "") ?? "SERVER_TOOL_ERROR" };
   if (record2.error !== void 0) return { kind: "error", code: errorCode(record2.error) ?? "SERVER_TOOL_ERROR" };
+  const status = typeof record2.status === "string" ? record2.status.trim().toLowerCase() : "";
+  if (status === "error") {
+    const item = Array.isArray(record2.items) ? record2.items.find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate.error !== void 0 || candidate.error_code !== void 0)) : void 0;
+    return { kind: "error", code: errorCode(record2.items) ?? errorCode(item) ?? "SERVER_TOOL_ERROR" };
+  }
+  if (Array.isArray(record2.content)) {
+    const text = record2.content.find((item) => item && typeof item === "object" && item.type === "text");
+    if (typeof text?.text === "string") {
+      const code = textErrorCode(text.text);
+      if (code) return { kind: "error", code };
+    }
+  }
+  let firstSuccess = null;
+  let firstMalformed = null;
   for (const nested of [record2.structuredContent, record2.result]) {
     if (nested === void 0) continue;
     const inspection = inspectValue(nested, depth + 1);
-    if (inspection.kind !== "success") return inspection;
-    return inspection;
+    if (inspection.kind === "error") return inspection;
+    if (inspection.kind === "success" && firstSuccess === null) firstSuccess = inspection;
+    if (inspection.kind === "malformed" && firstMalformed === null) firstMalformed = inspection;
   }
   const content = parsedContent(record2);
-  if (content !== void 0) return inspectValue(content, depth + 1);
-  return { kind: "success", payload: value };
+  if (content !== void 0) {
+    const inspection = inspectValue(content, depth + 1);
+    if (inspection.kind === "error") return inspection;
+    if (inspection.kind === "success" && firstSuccess === null) firstSuccess = inspection;
+    if (inspection.kind === "malformed" && firstMalformed === null) firstMalformed = inspection;
+  }
+  return firstSuccess ?? firstMalformed ?? { kind: "success", payload: value };
 }
 function inspectToolResult(result) {
-  if (result.isError === true) return { kind: "error", code: errorCode(result) ?? errorCode(result.structuredContent) ?? errorCode(result.result) ?? errorCode(parsedText(result)) ?? "SERVER_TOOL_ERROR" };
+  if (result.isError === true) return { kind: "error", code: errorCode(result) ?? errorCode(result.error) ?? errorCode(result.structuredContent) ?? errorCode(result.result) ?? errorCode(parsedText(result)) ?? "SERVER_TOOL_ERROR" };
+  if (result.error !== void 0) return { kind: "error", code: errorCode(result.error) ?? "SERVER_TOOL_ERROR" };
+  let firstSuccess = null;
+  let firstMalformed = null;
   for (const candidate of [result.structuredContent, result.result, parsedText(result)]) {
     if (candidate === void 0) continue;
-    return inspectValue(candidate);
+    const inspection = inspectValue(candidate);
+    if (inspection.kind === "error") return inspection;
+    if (inspection.kind === "success" && firstSuccess === null) firstSuccess = inspection;
+    if (inspection.kind === "malformed" && firstMalformed === null) firstMalformed = inspection;
   }
-  return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+  if (firstSuccess !== null) return firstSuccess;
+  if (firstMalformed !== null) return firstMalformed;
+  const direct = inspectValue(result);
+  return direct.kind === "success" && direct.payload === result ? { kind: "malformed", code: "SERVER_TOOL_RESULT_INVALID" } : direct;
 }
 function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -12094,6 +12129,7 @@ function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
   const normalizedStatus = typeof statusValue === "string" ? statusValue.trim().toUpperCase() : "";
   const status = normalizedStatus === "CREATED" || normalizedStatus === "SUCCESS" ? "SUCCESS" : normalizedStatus !== "" ? normalizedStatus : fallbackStatus;
   const item = {
+    ...Number.isInteger(record2.ordinal) && record2.ordinal >= 0 ? { ordinal: record2.ordinal } : {},
     ...typeof record2.attachment_id === "number" ? { attachment_id: record2.attachment_id } : {},
     ...typeof record2.media_id === "string" ? { media_id: record2.media_id } : {},
     ...typeof record2.public_filename === "string" ? { public_filename: record2.public_filename } : typeof record2.filename === "string" ? { public_filename: record2.filename } : {},
@@ -12104,7 +12140,7 @@ function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
     ...typeof record2.height === "number" ? { height: record2.height } : {},
     ...typeof record2.canonical_url === "string" ? { canonical_url: record2.canonical_url } : typeof record2.source_url === "string" ? { canonical_url: record2.source_url } : {},
     ...typeof record2.attachment_readback_status === "string" ? { attachment_readback_status: record2.attachment_readback_status } : {},
-    ...typeof record2.error_code === "string" ? { error_code: record2.error_code } : typeof record2.code === "string" && SAFE_ERROR_CODE.test(record2.code) ? { error_code: record2.code } : {},
+    ...typeof record2.error_code === "string" ? { error_code: record2.error_code } : typeof record2.code === "string" && SAFE_ERROR_CODE.test(record2.code) ? { error_code: record2.code } : errorCode(record2.error) ? { error_code: errorCode(record2.error) } : {},
     status
   };
   const fileId = typeof record2.file_id === "string" ? record2.file_id : typeof record2.client_file_id === "string" ? record2.client_file_id : void 0;
@@ -12114,22 +12150,38 @@ function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
 function extractUploadManifest(result) {
   const inspection = inspectToolResult(result);
   if (inspection.kind !== "success") throw new Error(inspection.code);
-  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("MCP_RESULT_MALFORMED");
+  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("SERVER_TOOL_RESULT_INVALID");
   const record2 = inspection.payload;
   const rawItems = Array.isArray(record2.items) ? record2.items : Array.isArray(record2.uploads) ? record2.uploads : null;
-  if (!rawItems) throw new Error("MCP_RESULT_MALFORMED");
-  const items = rawItems.flatMap((item) => {
+  if (!rawItems) throw new Error("SERVER_TOOL_RESULT_INVALID");
+  const authoritativeItems = Array.isArray(record2.items);
+  const items = rawItems.flatMap((item, index) => {
     const safeItem = safeUploadedItem(item, "SUCCESS");
+    if (safeItem && authoritativeItems && safeItem.ordinal === void 0) safeItem.ordinal = index;
     return safeItem ? [safeItem] : [];
   });
+  if (items.length !== rawItems.length) throw new Error("SERVER_TOOL_RESULT_INVALID");
   const requested = typeof record2.requested_count === "number" ? record2.requested_count : rawItems.length;
   const success = typeof record2.success_count === "number" ? record2.success_count : items.filter((item) => item.status === "SUCCESS").length;
   const failure2 = typeof record2.failure_count === "number" ? record2.failure_count : Math.max(0, requested - success);
-  if (!Number.isInteger(requested) || !Number.isInteger(success) || !Number.isInteger(failure2) || requested < 0 || success < 0 || failure2 < 0) throw new Error("MCP_RESULT_MALFORMED");
-  return { requested_count: requested, success_count: success, failure_count: failure2, items };
+  if (!Number.isInteger(requested) || !Number.isInteger(success) || !Number.isInteger(failure2) || requested < 0 || success < 0 || failure2 < 0) throw new Error("SERVER_TOOL_RESULT_INVALID");
+  const statusValue = typeof record2.status === "string" ? record2.status.trim().toLowerCase() : "";
+  const status = statusValue === "" ? failure2 > 0 ? "partial_success" : "success" : statusValue;
+  if (status !== "success" && status !== "partial_success") throw new Error("SERVER_TOOL_RESULT_INVALID");
+  if (authoritativeItems) {
+    const ordinals = items.map((item) => item.ordinal);
+    if (new Set(ordinals).size !== ordinals.length || ordinals.some((ordinal) => ordinal === void 0 || ordinal < 0 || ordinal >= requested)) throw new Error("SERVER_TOOL_RESULT_INVALID");
+  }
+  return { status, requested_count: requested, success_count: success, failure_count: failure2, items };
+}
+function assertUploadManifestCounts(manifest) {
+  const successItems = manifest.items.filter((item) => item.status === "SUCCESS").length;
+  const failureItems = manifest.items.filter((item) => item.status !== "SUCCESS").length;
+  if (manifest.requested_count !== manifest.success_count + manifest.failure_count || manifest.items.length !== manifest.requested_count || successItems !== manifest.success_count || failureItems !== manifest.failure_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
 }
 function assertUploadManifestCount(manifest, expected) {
-  if (manifest.requested_count !== expected || manifest.success_count !== expected || manifest.failure_count !== 0 || manifest.items.length !== expected || manifest.items.some((item) => item.status !== "SUCCESS")) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  assertUploadManifestCounts(manifest);
+  if (manifest.status !== "success" || manifest.requested_count !== expected || manifest.success_count !== expected || manifest.failure_count !== 0 || manifest.items.some((item) => item.status !== "SUCCESS")) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
 }
 function redactDiagnostic(value) {
   return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");

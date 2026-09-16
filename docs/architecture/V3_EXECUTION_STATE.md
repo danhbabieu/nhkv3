@@ -1,5 +1,51 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Widget upload root-error preservation (LOCAL ONLY)
+
+SCOPE: Repair the existing ChatGPT `nhk.media.widget-upload` result boundary
+so expected server/materialization failures remain typed and cannot collapse
+into `MEDIA_READBACK_COUNT_MISMATCH`. No deployment, connector reconnection,
+staging mutation, production mutation, generic WordPress writer or alternate
+transport was used.
+
+IMPLEMENTED: The widget contract now inspects transport/tool/nested errors and
+Error TextContent before unwrapping bounded `structuredContent`, `result` and
+`content` envelopes. Typed failure manifests stop before count validation;
+malformed success packets return `SERVER_TOOL_RESULT_INVALID`; count mismatch
+is reserved for explicit success/partial manifests with inconsistent declared
+cardinality. The authoritative manifest includes status, requested/success/
+failure counts and ordered ordinal items, with compatibility `uploads[]`
+support and safe Media-ID continuation when a transport file ID is stripped.
+
+SERVER: `McpTransport` now emits lowercase `success`, `partial_success` and
+`error` manifest statuses, retains every requested failed ordinal with a safe
+typed error object, falls back to ordinal mapping when client IDs are absent,
+and returns a typed failure manifest when trusted materialization fails. The
+trusted materializer now preserves bounded typed causes and diagnostics for
+HTTP status, DNS/public destination, TLS/connect, redirect, stream, empty
+body, MIME, decode, pixel and tempfile failures. Gateway reader output prefixes
+the safe code and carries only bounded diagnostic fields; signed URLs,
+session-scoped references and temp paths remain excluded.
+
+SECURITY: Existing HTTPS/443, DNS and public-IP validation, cURL pinning,
+TLS verification, redirect revalidation, byte limits, decoder limits and the
+no-host-allowlist policy remain unchanged. No region hostname or wildcard was
+added.
+
+LOCAL_VERIFICATION: Widget production build, 28 MCP Apps tests and TypeScript
+typecheck pass. Focused PHP widget/materializer/gateway/Easy MCP/MCP contract
+tests pass: 110 tests / 812 assertions. Changed PHP lint and `git diff --check`
+pass. The full NHK Unit suite was attempted at 1,667 tests / 8,160 assertions
+and has one unrelated `DemoCutoverCliContractTest` failure where the existing
+deployment command returned `REMOTE_DEPLOYMENT_FAILED` instead of that test's
+expected `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; no unrelated deployment code
+was changed.
+
+LIVE_STATUS: `UPLOAD_FINAL_STATUS=UNVERIFIED` — the real `IMG_4617.jpeg`
+acceptance, Attachment/Media/Capture/public-WebP read-back and remote error
+envelope remain pending the owner-approved external deployment/configuration
+gate. No live completion is claimed.
+
 # Checkpoint — 2026-09-16 — ChatGPT file transport trust-model remediation (LOCAL ONLY)
 
 SCOPE: Remediate the ChatGPT provided-file transport at the capability-gated

@@ -69,8 +69,22 @@ final class TrustedProvidedFileMaterializer
                     ? $downloader($url, $path, $remaining)
                     : self::download($url, $path, $remaining, $hostPolicy, $resolver);
                 $status = (int) ($result['status'] ?? 0);
-                if ($status < 200 || $status >= 300 || !is_file($path)) {
-                    throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be downloaded.');
+                $host = self::normalizeHost((string) ($urlParts['host'] ?? ''));
+                if ($status < 200 || $status >= 300) {
+                    throw new ChatGptMcpGatewayException(
+                        'PROVIDED_FILE_REFERENCE_UNRESOLVABLE',
+                        'The provided file server returned an unusable HTTP response.',
+                        $host,
+                        ['typed_code' => 'PROVIDED_FILE_HTTP_STATUS', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0)],
+                    );
+                }
+                if (!is_file($path)) {
+                    throw new ChatGptMcpGatewayException(
+                        'PROVIDED_FILE_REFERENCE_UNRESOLVABLE',
+                        'The provided file response contained no readable body.',
+                        $host,
+                        ['typed_code' => 'PROVIDED_FILE_EMPTY_BODY', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => (int) ($result['redirect_count'] ?? 0)],
+                    );
                 }
 
                 $size = filesize($path);
@@ -103,11 +117,11 @@ final class TrustedProvidedFileMaterializer
     {
         $location = trim($location);
         if ($location === '' || str_contains($location, "\r") || str_contains($location, "\n")) {
-            throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.');
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect']);
         }
         $baseParts = parse_url($base);
         if (!is_array($baseParts) || strtolower((string) ($baseParts['scheme'] ?? '')) !== 'https' || empty($baseParts['host'])) {
-            throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.');
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect']);
         }
         if (parse_url($location, PHP_URL_SCHEME) !== null || str_starts_with($location, '//')) {
             return self::validateUrl(str_starts_with($location, '//') ? 'https:' . $location : $location, $hostPolicy, $resolver);
@@ -115,7 +129,7 @@ final class TrustedProvidedFileMaterializer
         if (str_starts_with($location, '/')) {
             return self::validateUrl('https://' . $baseParts['host'] . $location, $hostPolicy, $resolver);
         }
-        throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.');
+        throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect']);
     }
 
     private static function validateUrl(string $url, ?callable $hostPolicy = null, ?callable $resolver = null): string
@@ -156,20 +170,24 @@ final class TrustedProvidedFileMaterializer
     /** @return list<string> */
     private static function resolvePublicAddresses(string $host, ?callable $resolver): array
     {
-        $records = $resolver !== null ? $resolver($host) : (function_exists('dns_get_record') ? @dns_get_record($host, DNS_A | DNS_AAAA) : false);
+        try {
+            $records = $resolver !== null ? $resolver($host) : (function_exists('dns_get_record') ? @dns_get_record($host, DNS_A | DNS_AAAA) : false);
+        } catch (\Throwable) {
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host, ['typed_code' => 'PROVIDED_FILE_DNS_RESOLUTION_FAILED', 'stage' => 'dns', 'resolved_public_address_count' => 0]);
+        }
         if (!is_array($records) || $records === []) {
-            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host);
+            throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host, ['typed_code' => 'PROVIDED_FILE_DNS_RESOLUTION_FAILED', 'stage' => 'dns', 'resolved_public_address_count' => 0]);
         }
         $addresses = [];
         foreach ($records as $record) {
             $ip = is_string($record) ? trim($record) : (string) ($record['ip'] ?? $record['ipv6'] ?? '');
             if ($ip === '' || !self::isPublicIp($ip)) {
-                throw new ChatGptMcpGatewayException('CHATGPT_FILE_PRIVATE_IP_REJECTED', 'The uploaded file hostname resolved to a non-public destination.', $host);
+                throw new ChatGptMcpGatewayException('CHATGPT_FILE_PRIVATE_IP_REJECTED', 'The uploaded file hostname resolved to a non-public destination.', $host, ['typed_code' => 'PROVIDED_FILE_DESTINATION_NOT_PUBLIC', 'stage' => 'dns', 'resolved_public_address_count' => count($addresses)]);
             }
             $addresses[] = $ip;
         }
         $addresses = array_values(array_unique($addresses));
-        if ($addresses === []) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host);
+        if ($addresses === []) throw new ChatGptMcpGatewayException('CHATGPT_FILE_DNS_FAILED', 'The uploaded file hostname could not be resolved.', $host, ['typed_code' => 'PROVIDED_FILE_DNS_RESOLUTION_FAILED', 'stage' => 'dns', 'resolved_public_address_count' => 0]);
         return $addresses;
     }
 
@@ -200,7 +218,7 @@ final class TrustedProvidedFileMaterializer
 
     private static function download(string $url, string $path, int $remaining, ?callable $hostPolicy, ?callable $resolver): array
     {
-        if (!function_exists('curl_init')) throw new ChatGptMcpGatewayException('CHATGPT_FILE_GATEWAY_RUNTIME_UNAVAILABLE', 'The trusted file downloader is unavailable.');
+        if (!function_exists('curl_init')) throw new ChatGptMcpGatewayException('CHATGPT_FILE_GATEWAY_RUNTIME_UNAVAILABLE', 'The trusted file downloader is unavailable.', null, ['typed_code' => 'PROVIDED_FILE_CONNECT_FAILED', 'stage' => 'connect']);
         $current = $url;
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
             $parts = parse_url($current);
@@ -209,13 +227,13 @@ final class TrustedProvidedFileMaterializer
             self::observeHost($host, $hostPolicy);
             if (is_file($path)) @unlink($path);
             $handle = @fopen($path, 'wb');
-            if (!is_resource($handle)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be opened.');
+            if (!is_resource($handle)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be opened.', $host, ['typed_code' => 'PROVIDED_FILE_TEMPFILE_FAILED', 'stage' => 'tempfile']);
             $written = 0;
             $overflow = false;
             $writeFailed = false;
             $location = '';
             $curl = curl_init();
-            if ($curl === false) { fclose($handle); throw new ChatGptMcpGatewayException('CHATGPT_FILE_GATEWAY_RUNTIME_UNAVAILABLE', 'The trusted file downloader is unavailable.'); }
+            if ($curl === false) { fclose($handle); throw new ChatGptMcpGatewayException('CHATGPT_FILE_GATEWAY_RUNTIME_UNAVAILABLE', 'The trusted file downloader is unavailable.', $host, ['typed_code' => 'PROVIDED_FILE_CONNECT_FAILED', 'stage' => 'connect']); }
             curl_setopt_array($curl, [
                 CURLOPT_URL => $current,
                 CURLOPT_RETURNTRANSFER => false,
@@ -250,27 +268,32 @@ final class TrustedProvidedFileMaterializer
             $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
             curl_close($curl);
             fclose($handle);
-            if ($overflow) throw new ChatGptMcpGatewayException('CHATGPT_FILE_SIZE_LIMIT', 'The uploaded files exceed the 50 MB total limit.');
-            if ($writeFailed || $ok === false && $errno !== 0) throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be downloaded.');
+            if ($overflow) throw new ChatGptMcpGatewayException('CHATGPT_FILE_SIZE_LIMIT', 'The uploaded files exceed the 50 MB total limit.', $host, ['typed_code' => 'PROVIDED_FILE_STREAM_LIMIT', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => $hop, 'content_bytes_received' => $written]);
+            if ($writeFailed) throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The provided file response could not be written safely.', $host, ['typed_code' => 'PROVIDED_FILE_TEMPFILE_FAILED', 'stage' => 'download', 'http_status' => $status, 'redirect_count' => $hop, 'content_bytes_received' => $written]);
+            if ($ok === false && $errno !== 0) {
+                $typedCode = in_array($errno, [35, 51, 53, 58, 60, 77], true) ? 'PROVIDED_FILE_TLS_FAILED' : 'PROVIDED_FILE_CONNECT_FAILED';
+                throw new ChatGptMcpGatewayException('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The provided file server could not be reached securely.', $host, ['typed_code' => $typedCode, 'stage' => 'connect', 'http_status' => $status, 'redirect_count' => $hop, 'content_bytes_received' => $written]);
+            }
             if (in_array($status, [301, 302, 303, 307, 308], true)) {
-                if ($location === '' || $hop >= self::MAX_REDIRECTS) throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect chain is too long or invalid.');
+                if ($location === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect is invalid.', $host, ['typed_code' => 'PROVIDED_FILE_REDIRECT_REJECTED', 'stage' => 'redirect', 'http_status' => $status, 'redirect_count' => $hop]);
+                if ($hop >= self::MAX_REDIRECTS) throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect chain exceeded its safety limit.', $host, ['typed_code' => 'PROVIDED_FILE_REDIRECT_LIMIT', 'stage' => 'redirect', 'http_status' => $status, 'redirect_count' => $hop]);
                 $current = self::validateRedirectTarget($current, $location, $hostPolicy, $resolver);
                 continue;
             }
-            return ['status' => $status];
+            return ['status' => $status, 'redirect_count' => $hop, 'content_bytes_received' => $written, 'resolved_public_address_count' => count($addresses)];
         }
-        throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect chain is too long.');
+        throw new ChatGptMcpGatewayException('CHATGPT_FILE_REDIRECT_REJECTED', 'The uploaded file redirect chain exceeded its safety limit.', null, ['typed_code' => 'PROVIDED_FILE_REDIRECT_LIMIT', 'stage' => 'redirect', 'redirect_count' => self::MAX_REDIRECTS]);
     }
 
     private static function temporaryPath(): string
     {
         $directory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'nhk-v3-media-materializer';
-        if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.');
+        if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.', null, ['typed_code' => 'PROVIDED_FILE_TEMPFILE_FAILED', 'stage' => 'tempfile']);
         $directoryReal = realpath($directory);
         $webrootReal = defined('ABSPATH') ? realpath((string) ABSPATH) : false;
-        if ($directoryReal === false || (is_string($webrootReal) && self::within($webrootReal, $directoryReal))) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'The temporary file directory is not private.');
+        if ($directoryReal === false || (is_string($webrootReal) && self::within($webrootReal, $directoryReal))) throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'The temporary file directory is not private.', null, ['typed_code' => 'PROVIDED_FILE_TEMPFILE_FAILED', 'stage' => 'tempfile']);
         $path = tempnam($directory, 'nhk-');
-        if (!is_string($path) || $path === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.');
+        if (!is_string($path) || $path === '') throw new ChatGptMcpGatewayException('CHATGPT_FILE_TEMP_FAILED', 'A temporary file could not be created.', null, ['typed_code' => 'PROVIDED_FILE_TEMPFILE_FAILED', 'stage' => 'tempfile']);
         @chmod($path, 0600);
         return $path;
     }

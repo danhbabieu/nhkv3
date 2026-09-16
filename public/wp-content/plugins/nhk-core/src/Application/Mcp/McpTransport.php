@@ -13,6 +13,7 @@ use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
 use NHK\Core\Application\Capture\{AuthorityCaptureService, EditorialCaptureContinuationService, EditorialCaptureCoordinator};
 use NHK\Core\Application\Runtime\{SemanticWritePolicyResolver, SemanticWritePolicyViolation};
 use NHK\Core\Domain\Knowledge\DependencyValidationException;
+use NHK\Core\Infrastructure\Mcp\ChatGptMcpGatewayException;
 
 final class McpTransport
 {
@@ -254,22 +255,30 @@ final class McpTransport
                 'sort_order' => $index,
             ];
         }
-        $manifest = $this->imageIngest->ingest(
-            (string) ($arguments['idempotency_key'] ?? ''),
-            ['source' => 'chatgpt_widget', 'description' => $description],
-            $references,
-            $items,
-            false,
-        );
+        try {
+            $manifest = $this->imageIngest->ingest(
+                (string) ($arguments['idempotency_key'] ?? ''),
+                ['source' => 'chatgpt_widget', 'description' => $description],
+                $references,
+                $items,
+                false,
+            );
+        } catch (ChatGptMcpGatewayException $error) {
+            return $this->widgetFailureManifest(count($references), $error);
+        }
         $itemsByFileId = [];
-        foreach (array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array')) as $item) {
+        $itemsByOrdinal = [];
+        foreach (array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array')) as $index => $item) {
             $clientFileId = (string) ($item['client_file_id'] ?? '');
             if ($clientFileId !== '') $itemsByFileId[$clientFileId] = $item;
+            $itemsByOrdinal[(int) ($item['ordinal'] ?? $index)] = $item;
         }
         $errorsByFileId = [];
-        foreach (array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array')) as $error) {
+        $errorsByOrdinal = [];
+        foreach (array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array')) as $index => $error) {
             $clientFileId = (string) ($error['client_file_id'] ?? '');
             if ($clientFileId !== '') $errorsByFileId[$clientFileId] = $error;
+            $errorsByOrdinal[(int) ($error['ordinal'] ?? $index)] = $error;
         }
         $uploads = [];
         $safeItems = [];
@@ -277,22 +286,27 @@ final class McpTransport
         foreach ($references as $ordinal => $reference) {
             if (!is_array($reference)) continue;
             $fileId = (string) ($reference['file_id'] ?? '');
-            $item = $itemsByFileId[$fileId] ?? null;
+            $item = $itemsByFileId[$fileId] ?? $itemsByOrdinal[(int) $ordinal] ?? null;
             if (!is_array($item)) {
-                $error = $errorsByFileId[$fileId] ?? ['code' => 'UPLOAD_RESULT_ITEM_MISSING'];
+                $error = $errorsByFileId[$fileId] ?? $errorsByOrdinal[(int) $ordinal] ?? ['code' => 'UPLOAD_RESULT_ITEM_MISSING'];
                 $code = self::safeWidgetErrorCode((string) ($error['code'] ?? 'UPLOAD_FAILED'));
                 $safeItems[] = [
                     'ordinal' => (int) $ordinal,
-                    'status' => 'FAILED',
+                    'status' => 'error',
                     'original_filename' => (string) ($reference['file_name'] ?? ''),
                     'error_code' => $code,
+                    'error' => [
+                        'code' => $code,
+                        'stage' => self::safeWidgetStage((string) ($error['stage'] ?? 'ingest')),
+                        'message' => 'The image could not be ingested.',
+                    ],
                 ];
-                $safeErrors[] = ['ordinal' => (int) $ordinal, 'code' => $code];
+                $safeErrors[] = ['ordinal' => (int) $ordinal, 'code' => $code, 'stage' => self::safeWidgetStage((string) ($error['stage'] ?? 'ingest'))];
                 continue;
             }
             $upload = [
                 'ordinal' => (int) $ordinal,
-                'status' => 'SUCCESS',
+                'status' => 'success',
                 'attachment_id' => (int) ($item['attachment_id'] ?? 0),
                 'media_id' => (string) ($item['media_id'] ?? ''),
                 'public_filename' => (string) ($item['filename'] ?? ''),
@@ -310,6 +324,7 @@ final class McpTransport
             $safeItems[] = $upload;
         }
         return [
+            'status' => $uploads === [] ? 'error' : ($safeErrors === [] ? 'success' : 'partial_success'),
             'requested_count' => count($references),
             'success_count' => count($uploads),
             'failure_count' => count($safeItems) - count($uploads),
@@ -319,10 +334,44 @@ final class McpTransport
         ];
     }
 
+    private static function safeWidgetStage(string $stage): string
+    {
+        $stage = strtolower(trim($stage));
+        return preg_match('/^[a-z][a-z0-9_.-]{0,63}$/', $stage) === 1 ? $stage : 'ingest';
+    }
+
     private static function safeWidgetErrorCode(string $code): string
     {
         $code = strtoupper(trim($code));
         return preg_match('/^[A-Z][A-Z0-9_]{2,}$/', $code) === 1 ? $code : 'UPLOAD_FAILED';
+    }
+
+    /** @return array<string,mixed> */
+    private function widgetFailureManifest(int $requested, ChatGptMcpGatewayException $error): array
+    {
+        $code = self::safeWidgetErrorCode($error->safeReasonCode());
+        $diagnostics = $error->diagnostics();
+        $safeError = [
+            'code' => $code,
+            'stage' => self::safeWidgetStage((string) ($diagnostics['stage'] ?? 'materialization')),
+            'message' => $error->safeMessage(),
+        ];
+        foreach (['host', 'http_status', 'redirect_count', 'resolved_public_address_count', 'content_bytes_received', 'decoder_stage'] as $key) {
+            $value = $key === 'host' ? $error->host() : ($diagnostics[$key] ?? null);
+            if ($value !== null && $value !== '') $safeError[$key] = $value;
+        }
+        $items = [];
+        for ($ordinal = 0; $ordinal < $requested; $ordinal++) {
+            $items[] = ['ordinal' => $ordinal, 'status' => 'error', 'error' => $safeError, 'error_code' => $code];
+        }
+        return [
+            'status' => 'error',
+            'requested_count' => $requested,
+            'success_count' => 0,
+            'failure_count' => $requested,
+            'items' => $items,
+            'errors' => array_map(static fn (array $item): array => ['ordinal' => $item['ordinal'], 'code' => $code, 'stage' => $safeError['stage']], $items),
+        ];
     }
 
     private static function modelVisibleWidgetCanonicalUrl(string $url): string

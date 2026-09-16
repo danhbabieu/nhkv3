@@ -1,4 +1,5 @@
 export type UploadedItem = {
+  ordinal?: number;
   attachment_id?: number;
   media_id?: string;
   public_filename?: string;
@@ -15,6 +16,7 @@ export type UploadedItem = {
 };
 
 export type UploadManifest = {
+  status: "success" | "partial_success";
   requested_count: number;
   success_count: number;
   failure_count: number;
@@ -51,6 +53,7 @@ export function normalizeSelectedFiles(value: unknown): SelectedImage[] {
 
 export type ToolResult = {
   isError?: unknown;
+  error?: unknown;
   structuredContent?: unknown;
   content?: Array<{ type?: string; text?: string }>;
   result?: unknown;
@@ -69,7 +72,7 @@ export function shouldProcessToolResultNotification(source: ToolResultNotificati
 export type ToolResultInspection =
   | { kind: "success"; payload: unknown }
   | { kind: "error"; code: string }
-  | { kind: "malformed"; code: "MCP_RESULT_MALFORMED" };
+  | { kind: "malformed"; code: "SERVER_TOOL_RESULT_INVALID" };
 
 const SAFE_ERROR_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
 
@@ -80,11 +83,18 @@ function errorCode(value: unknown): string | null {
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  for (const key of ["code", "reason_code", "reasonCode"]) {
+  for (const key of ["code", "reason_code", "reasonCode", "error_code"]) {
     const code = errorCode(record[key]);
     if (code) return code;
   }
   return errorCode(record.error);
+}
+
+function textErrorCode(value: string): string | null {
+  const text = value.trim();
+  const typed = text.match(/^(?:Error\s*:\s*)?([A-Z][A-Z0-9_]{2,})(?:\b|:)/)?.[1];
+  if (typed && SAFE_ERROR_CODE.test(typed)) return typed;
+  return /^error\s*:/i.test(text) ? "SERVER_TOOL_ERROR" : null;
 }
 
 function parsedText(result: ToolResult): unknown {
@@ -110,37 +120,68 @@ function parsedContent(value: Record<string, unknown>): unknown {
 }
 
 function inspectValue(value: unknown, depth = 0): ToolResultInspection {
-  if (depth > 6) return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+  if (depth > 6) return { kind: "malformed", code: "SERVER_TOOL_RESULT_INVALID" };
   if (typeof value === "string") {
     try {
       return inspectValue(JSON.parse(value) as unknown, depth + 1);
     } catch {
-      const code = errorCode(value);
-      return code ? { kind: "error", code } : { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+      const code = textErrorCode(value);
+      return code ? { kind: "error", code } : { kind: "malformed", code: "SERVER_TOOL_RESULT_INVALID" };
     }
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return { kind: "success", payload: value };
   const record = value as Record<string, unknown>;
-  if (record.isError === true) return { kind: "error", code: errorCode(record) ?? errorCode(record.structuredContent) ?? errorCode(record.result) ?? "SERVER_TOOL_ERROR" };
+  if (record.isError === true) return { kind: "error", code: errorCode(record) ?? errorCode(record.structuredContent) ?? errorCode(record.result) ?? textErrorCode(typeof record.content === "string" ? record.content : "") ?? "SERVER_TOOL_ERROR" };
   if (record.error !== undefined) return { kind: "error", code: errorCode(record.error) ?? "SERVER_TOOL_ERROR" };
+  const status = typeof record.status === "string" ? record.status.trim().toLowerCase() : "";
+  if (status === "error") {
+    const item = Array.isArray(record.items) ? record.items.find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate) && ((candidate as Record<string, unknown>).error !== undefined || (candidate as Record<string, unknown>).error_code !== undefined)) : undefined;
+    return { kind: "error", code: errorCode(record.items) ?? errorCode(item) ?? "SERVER_TOOL_ERROR" };
+  }
+  if (Array.isArray(record.content)) {
+    const text = record.content.find((item) => item && typeof item === "object" && (item as { type?: unknown }).type === "text") as { text?: unknown } | undefined;
+    if (typeof text?.text === "string") {
+      const code = textErrorCode(text.text);
+      if (code) return { kind: "error", code };
+    }
+  }
+  let firstSuccess: ToolResultInspection | null = null;
+  let firstMalformed: ToolResultInspection | null = null;
   for (const nested of [record.structuredContent, record.result]) {
     if (nested === undefined) continue;
     const inspection = inspectValue(nested, depth + 1);
-    if (inspection.kind !== "success") return inspection;
-    return inspection;
+    if (inspection.kind === "error") return inspection;
+    if (inspection.kind === "success" && firstSuccess === null) firstSuccess = inspection;
+    if (inspection.kind === "malformed" && firstMalformed === null) firstMalformed = inspection;
   }
   const content = parsedContent(record);
-  if (content !== undefined) return inspectValue(content, depth + 1);
-  return { kind: "success", payload: value };
+  if (content !== undefined) {
+    const inspection = inspectValue(content, depth + 1);
+    if (inspection.kind === "error") return inspection;
+    if (inspection.kind === "success" && firstSuccess === null) firstSuccess = inspection;
+    if (inspection.kind === "malformed" && firstMalformed === null) firstMalformed = inspection;
+  }
+  return firstSuccess ?? firstMalformed ?? { kind: "success", payload: value };
 }
 
 export function inspectToolResult(result: ToolResult): ToolResultInspection {
-  if (result.isError === true) return { kind: "error", code: errorCode(result) ?? errorCode(result.structuredContent) ?? errorCode(result.result) ?? errorCode(parsedText(result)) ?? "SERVER_TOOL_ERROR" };
+  if (result.isError === true) return { kind: "error", code: errorCode(result) ?? errorCode(result.error) ?? errorCode(result.structuredContent) ?? errorCode(result.result) ?? errorCode(parsedText(result)) ?? "SERVER_TOOL_ERROR" };
+  if (result.error !== undefined) return { kind: "error", code: errorCode(result.error) ?? "SERVER_TOOL_ERROR" };
+  let firstSuccess: ToolResultInspection | null = null;
+  let firstMalformed: ToolResultInspection | null = null;
   for (const candidate of [result.structuredContent, result.result, parsedText(result)]) {
     if (candidate === undefined) continue;
-    return inspectValue(candidate);
+    const inspection = inspectValue(candidate);
+    if (inspection.kind === "error") return inspection;
+    if (inspection.kind === "success" && firstSuccess === null) firstSuccess = inspection;
+    if (inspection.kind === "malformed" && firstMalformed === null) firstMalformed = inspection;
   }
-  return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+  if (firstSuccess !== null) return firstSuccess;
+  if (firstMalformed !== null) return firstMalformed;
+  const direct = inspectValue(result);
+  return direct.kind === "success" && direct.payload === result
+    ? { kind: "malformed", code: "SERVER_TOOL_RESULT_INVALID" }
+    : direct;
 }
 
 export function extractPayload(result: ToolResult): unknown {
@@ -171,6 +212,7 @@ function safeUploadedItem(value: unknown, fallbackStatus = "SUCCESS"): UploadedI
   const normalizedStatus = typeof statusValue === "string" ? statusValue.trim().toUpperCase() : "";
   const status = normalizedStatus === "CREATED" || normalizedStatus === "SUCCESS" ? "SUCCESS" : normalizedStatus !== "" ? normalizedStatus : fallbackStatus;
   const item: UploadedItem = {
+    ...(Number.isInteger(record.ordinal) && (record.ordinal as number) >= 0 ? { ordinal: record.ordinal as number } : {}),
     ...(typeof record.attachment_id === "number" ? { attachment_id: record.attachment_id } : {}),
     ...(typeof record.media_id === "string" ? { media_id: record.media_id } : {}),
     ...(typeof record.public_filename === "string" ? { public_filename: record.public_filename } : typeof record.filename === "string" ? { public_filename: record.filename } : {}),
@@ -181,7 +223,7 @@ function safeUploadedItem(value: unknown, fallbackStatus = "SUCCESS"): UploadedI
     ...(typeof record.height === "number" ? { height: record.height } : {}),
     ...(typeof record.canonical_url === "string" ? { canonical_url: record.canonical_url } : typeof record.source_url === "string" ? { canonical_url: record.source_url } : {}),
     ...(typeof record.attachment_readback_status === "string" ? { attachment_readback_status: record.attachment_readback_status } : {}),
-    ...(typeof record.error_code === "string" ? { error_code: record.error_code } : typeof record.code === "string" && SAFE_ERROR_CODE.test(record.code) ? { error_code: record.code } : {}),
+    ...(typeof record.error_code === "string" ? { error_code: record.error_code } : typeof record.code === "string" && SAFE_ERROR_CODE.test(record.code) ? { error_code: record.code } : errorCode(record.error) ? { error_code: errorCode(record.error)! } : {}),
     status,
   };
   const fileId = typeof record.file_id === "string" ? record.file_id : typeof record.client_file_id === "string" ? record.client_file_id : undefined;
@@ -192,23 +234,40 @@ function safeUploadedItem(value: unknown, fallbackStatus = "SUCCESS"): UploadedI
 export function extractUploadManifest(result: ToolResult): UploadManifest {
   const inspection = inspectToolResult(result);
   if (inspection.kind !== "success") throw new Error(inspection.code);
-  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("MCP_RESULT_MALFORMED");
+  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("SERVER_TOOL_RESULT_INVALID");
   const record = inspection.payload as Record<string, unknown>;
   const rawItems = Array.isArray(record.items) ? record.items : Array.isArray(record.uploads) ? record.uploads : null;
-  if (!rawItems) throw new Error("MCP_RESULT_MALFORMED");
-  const items = rawItems.flatMap((item) => {
+  if (!rawItems) throw new Error("SERVER_TOOL_RESULT_INVALID");
+  const authoritativeItems = Array.isArray(record.items);
+  const items = rawItems.flatMap((item, index) => {
     const safeItem = safeUploadedItem(item, "SUCCESS");
+    if (safeItem && authoritativeItems && safeItem.ordinal === undefined) safeItem.ordinal = index;
     return safeItem ? [safeItem] : [];
   });
+  if (items.length !== rawItems.length) throw new Error("SERVER_TOOL_RESULT_INVALID");
   const requested = typeof record.requested_count === "number" ? record.requested_count : rawItems.length;
   const success = typeof record.success_count === "number" ? record.success_count : items.filter((item) => item.status === "SUCCESS").length;
   const failure = typeof record.failure_count === "number" ? record.failure_count : Math.max(0, requested - success);
-  if (!Number.isInteger(requested) || !Number.isInteger(success) || !Number.isInteger(failure) || requested < 0 || success < 0 || failure < 0) throw new Error("MCP_RESULT_MALFORMED");
-  return { requested_count: requested, success_count: success, failure_count: failure, items };
+  if (!Number.isInteger(requested) || !Number.isInteger(success) || !Number.isInteger(failure) || requested < 0 || success < 0 || failure < 0) throw new Error("SERVER_TOOL_RESULT_INVALID");
+  const statusValue = typeof record.status === "string" ? record.status.trim().toLowerCase() : "";
+  const status = statusValue === "" ? (failure > 0 ? "partial_success" : "success") : statusValue;
+  if (status !== "success" && status !== "partial_success") throw new Error("SERVER_TOOL_RESULT_INVALID");
+  if (authoritativeItems) {
+    const ordinals = items.map((item) => item.ordinal);
+    if (new Set(ordinals).size !== ordinals.length || ordinals.some((ordinal) => ordinal === undefined || ordinal < 0 || ordinal >= requested)) throw new Error("SERVER_TOOL_RESULT_INVALID");
+  }
+  return { status, requested_count: requested, success_count: success, failure_count: failure, items };
+}
+
+export function assertUploadManifestCounts(manifest: UploadManifest): void {
+  const successItems = manifest.items.filter((item) => item.status === "SUCCESS").length;
+  const failureItems = manifest.items.filter((item) => item.status !== "SUCCESS").length;
+  if (manifest.requested_count !== manifest.success_count + manifest.failure_count || manifest.items.length !== manifest.requested_count || successItems !== manifest.success_count || failureItems !== manifest.failure_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
 }
 
 export function assertUploadManifestCount(manifest: UploadManifest, expected: number): void {
-  if (manifest.requested_count !== expected || manifest.success_count !== expected || manifest.failure_count !== 0 || manifest.items.length !== expected || manifest.items.some((item) => item.status !== "SUCCESS")) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  assertUploadManifestCounts(manifest);
+  if (manifest.status !== "success" || manifest.requested_count !== expected || manifest.success_count !== expected || manifest.failure_count !== 0 || manifest.items.some((item) => item.status !== "SUCCESS")) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
 }
 
 export function extractUploads(result: ToolResult): UploadedItem[] {

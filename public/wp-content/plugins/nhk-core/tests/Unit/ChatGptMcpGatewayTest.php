@@ -213,6 +213,25 @@ final class ChatGptMcpGatewayTest extends TestCase
         }
     }
 
+    public function test_http_failure_preserves_a_typed_safe_cause_and_bounded_diagnostics(): void
+    {
+        try {
+            ChatGptMcpGateway::materializeReferences([
+                ['download_url' => 'https://' . self::URL_HOST . '/expired?signature=secret', 'file_id' => 'file_expired'],
+            ], static function (string $url, string $temporaryPath, int $remaining): array {
+                return ['status' => 410, 'redirect_count' => 0];
+            }, null, static fn (string $host): array => ['93.184.216.34']);
+            self::fail('Expected the HTTP failure to be rejected.');
+        } catch (ChatGptMcpGatewayException $error) {
+            self::assertSame('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', $error->reasonCode());
+            self::assertSame('PROVIDED_FILE_HTTP_STATUS', $error->safeReasonCode());
+            self::assertSame('files.openai.test', $error->host());
+            self::assertSame(410, $error->diagnostics()['http_status']);
+            self::assertSame('download', $error->diagnostics()['stage']);
+            self::assertStringNotContainsString('signature=secret', $error->getMessage());
+        }
+    }
+
     public function test_private_destination_diagnostic_contains_no_signed_url(): void
     {
         try {

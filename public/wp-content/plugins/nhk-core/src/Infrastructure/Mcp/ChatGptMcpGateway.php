@@ -95,9 +95,9 @@ final class ChatGptMcpGateway
                 self::$proxyDispatch = false;
             }
         } catch (ChatGptMcpGatewayException $error) {
-            return self::error($error->reasonCode(), $error->getMessage(), $error->host());
+            return self::error($error->safeReasonCode(), $error->safeMessage(), $error->host(), $error->diagnostics());
         } catch (\Throwable $error) {
-            return self::error('PROVIDED_FILE_REFERENCE_UNRESOLVABLE', 'The uploaded file reference could not be materialized.');
+            return self::error('PROVIDED_FILE_MATERIALIZATION_FAILED', 'The provided file could not be materialized.');
         } finally {
             foreach ($materialized['temporary_paths'] ?? [] as $path) {
                 if (is_string($path) && is_file($path)) @unlink($path);
@@ -133,12 +133,17 @@ final class ChatGptMcpGateway
         return TrustedProvidedFileMaterializer::validateRedirectTarget($base, $location, $hostPolicy, $resolver);
     }
 
-    private static function error(string $reasonCode, string $message, ?string $host = null): mixed
+    /** @param array<string,int|string|null> $diagnostics */
+    private static function error(string $reasonCode, string $message, ?string $host = null, array $diagnostics = []): mixed
     {
         $data = ['status' => 422, 'reason_code' => $reasonCode, 'field' => 'files'];
         if ($host !== null && $host !== '') $data['host'] = $host;
-        if (class_exists('WP_Error')) return new \WP_Error('nhk_chatgpt_file_gateway', $message, $data);
-        return $message;
+        foreach (['http_status', 'redirect_count', 'resolved_public_address_count', 'content_bytes_received', 'decoder_stage'] as $key) {
+            if (isset($diagnostics[$key])) $data[$key] = $diagnostics[$key];
+        }
+        $readerMessage = $reasonCode . ': ' . $message;
+        if (class_exists('WP_Error')) return new \WP_Error('nhk_chatgpt_file_gateway', $readerMessage, $data);
+        return $readerMessage;
     }
 
     private static function withNativeFiles(array $files, callable $callback): mixed
