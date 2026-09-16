@@ -43,6 +43,40 @@ final class ConversationalAuthorityGovernanceTest extends TestCase
         self::assertSame('brand', $repository->find($result['proposal_ids'][0])?->entityType);
     }
 
+    public function test_approved_authority_update_preserves_full_registry_payload_and_revision_binding(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $handler = new McpGovernanceHandler(new GovernanceService($repository));
+        $target = \NHK\Core\Shared\Uuid\UuidCodec::newV7();
+        $plan = [
+            'reuse' => [],
+            'create_candidates' => [],
+            'update_candidates' => [[
+                'candidate_id' => 'candidate-update',
+                'action' => 'UPDATE',
+                'entity_type' => 'brand',
+                'canonical_uuid' => $target,
+                'canonical_revision' => 3,
+                'expected_revision' => 3,
+                'canonical_name' => 'Hermle',
+                'stable_key' => 'nhk:brand:hermle',
+                'entity_payload' => ['description' => 'Mô tả.', 'country' => 'Đức'],
+                'dependencies' => [],
+            ]],
+            'relation_candidates' => [],
+        ];
+
+        $result = (new GovernedAuthorityPlanExecutor($handler))->execute($plan, str_repeat('a', 64), str_repeat('a', 64), ['candidate-update'], ConversationalAuthorityPolicy::REVIEW_REQUIRED);
+        $proposal = $repository->find($result['proposal_ids'][0]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame('update', $proposal?->operation);
+        self::assertSame($target, $proposal?->targetUuid);
+        self::assertSame(3, $proposal?->expectedRevision);
+        self::assertSame(['description' => 'Mô tả.', 'country' => 'Đức'], $proposal?->payload['entity_payload']);
+        self::assertSame('nhk:brand:hermle', $proposal?->payload['stable_key']);
+    }
+
     public function test_changed_plan_fingerprint_blocks_before_proposal_creation(): void
     {
         $repository = new InMemoryProposalRepository();

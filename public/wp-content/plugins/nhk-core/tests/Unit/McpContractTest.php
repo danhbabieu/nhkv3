@@ -650,12 +650,16 @@ final class McpContractTest extends TestCase
     public function test_empty_easy_mcp_option_gets_the_canonical_operator_surface(): void
     {
         $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]);
-        self::assertSame(McpAbilityRegistration::operatorEnabledAbilityAllowlist(), $enabled);
+        self::assertSame(
+            array_values(array_unique(array_merge(McpAbilityRegistration::operatorEnabledAbilityAllowlist(), ['nhk-v3/article-draft-update']))),
+            $enabled,
+        );
         self::assertContains('nhk-v3/capture-ingest', $enabled);
         self::assertContains('nhk-v3/documentation-bootstrap', $enabled);
         self::assertContains('nhk-v3/documentation-get', $enabled);
         self::assertContains('nhk-v3/documentation-list', $enabled);
         foreach (SingleEntryPointPolicy::internalOnlyTools() as $tool) {
+            if ($tool === 'nhk.article.draft.update') continue;
             self::assertNotContains(McpAbilityRegistration::abilityNameForTool($tool), $enabled);
         }
     }

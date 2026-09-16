@@ -99,7 +99,7 @@ explicit `--affirmation="Đăng"` argument and is never hard-coded.
 | Classification | Current surfaces | Rule |
 |---|---|---|
 | Canonical | `nhk.capture.ingest`, Admin “Capture nội dung mới” | only normal creation boundary; one Capture per submission; Article draft only for Article intents |
-| Legacy but still needed internally | direct Article/draft/publication, Media upload/ingest, Video ingest, Knowledge/Source/Evidence ingest, proposal/relation and URL maintenance tools | retained for bounded lifecycle, migration or repair work; require `nhk_internal_content_operations` and are not auto-enabled for normal Easy MCP discovery |
+| Legacy but still needed internally | direct Article/draft/publication, Media upload/ingest, Video ingest, Knowledge/Source/Evidence ingest, proposal/relation and URL maintenance tools | retained for bounded lifecycle, migration or repair work; require `nhk_internal_content_operations`; only the typed existing-Capture `article-draft-update` continuation is connector-discoverable, while other writers are not auto-enabled |
 | Deprecated public/operator path | standalone creation buttons and direct mutation Ability exposure | removed from the normal Admin surface and public Ability metadata; no silent redirect is used when the input context would be lost |
 | Dangerous bypass path | any direct mutation call without the internal boundary | fails closed before schema/capability execution with `DIRECT_WRITE_BLOCKED` and `USE_CANONICAL_CAPTURE_FLOW`; no partial mutation or fallback writer is allowed |
 
@@ -215,6 +215,13 @@ or unscoped Media. An existing Media may be reused only after persisted
 subject-scope matching; otherwise the wrong-variant usage is removed and the
 Article remains missing/placeholder. Same addendum payloads replay
 idempotently, while changed payloads conflict.
+
+When a client resumes Governance with only `governance` control input, the
+runtime binds that request to the existing addendum fingerprint and restores
+the persisted text, intent, observations and metadata packet before calling
+the coordinator. This preserves `metadata.provenance_packets` across
+proposal → approval → controlled apply and keeps Source/Evidence creation on
+the canonical Capture path.
 
 The ChatGPT image widget may instead pass an ordered `media_ids` array to the
 same `ATTACH_ASSETS` continuation after the physical widget transport has

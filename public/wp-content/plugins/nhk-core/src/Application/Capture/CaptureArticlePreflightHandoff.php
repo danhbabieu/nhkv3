@@ -16,10 +16,7 @@ final class CaptureArticlePreflightHandoff
         $overlap = (string) ($research->overlap['classification'] ?? 'UNCERTAIN');
         $category = (string) ($research->categoryPlan['status'] ?? 'UNKNOWN');
         $mediaComplete = ($media['media_complete'] ?? false) === true
-            || (strtoupper((string) ($media['state'] ?? '')) === 'MEDIA_COMPLETE'
-                && isset($media['slots']['featured_primary'], $media['slots']['inline_primary'])
-                && ($media['slots']['featured_primary']['placeholder'] ?? true) === false
-                && ($media['slots']['inline_primary']['placeholder'] ?? true) === false);
+            || (($media['slots']['featured_primary']['placeholder'] ?? true) === false);
         $compliance = (string) ($research->compliance['status'] ?? '');
         $semanticApplied = (string) ($semanticWriteBack['status'] ?? '') === 'APPLIED';
         $slug = trim((string) ($articleState['slug'] ?? ''));

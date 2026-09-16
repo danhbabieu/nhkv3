@@ -107,4 +107,66 @@ final class EntityPresentationViewModelTest extends TestCase
 
         self::assertSame('READY', $view['presentation_readiness']['status']);
     }
+
+    public function test_builds_a_reader_guide_in_a_stable_public_order_from_existing_claims(): void
+    {
+        $view = EntityPresentationViewModel::fromDossier('clock_type', [
+            'status' => 'AVAILABLE',
+            'identity' => ['name' => 'Đồng hồ công cộng', 'url' => '/dong-ho-cong-cong/'],
+            'knowledge' => [
+                'status' => 'AVAILABLE',
+                'facets' => [
+                    'identity' => [['text' => 'Hệ thống công bố thời gian trong không gian chung.', 'canonical_id' => 'claim-1']],
+                    'domestic_cultural' => [['text' => 'Phục vụ đời sống đô thị và cộng đồng.', 'canonical_id' => 'claim-2']],
+                    'rarity_frequency' => [['text' => 'Mức độ gặp cần được đối chiếu theo từng hiện vật.', 'canonical_id' => 'claim-3']],
+                ],
+            ],
+            'collector_profile' => [
+                'status' => 'available',
+                'facets' => [
+                    'display_form' => [['text' => 'Lắp đặt trong không gian chung.', 'canonical_id' => 'claim-4']],
+                    'movement_family' => [['text' => 'Có thể có bộ máy cơ khí lớn.', 'canonical_id' => 'claim-5']],
+                    'provenance' => [['text' => 'Nguồn gốc lắp đặt là điểm cần tra cứu.', 'canonical_id' => 'claim-6']],
+                ],
+            ],
+        ]);
+
+        self::assertSame(['definition', 'context', 'collector_value', 'collector_focus'], array_keys($view['reader_guide']));
+        self::assertSame('Hệ thống công bố thời gian trong không gian chung.', $view['reader_guide']['definition']['items'][0]['text']);
+        self::assertSame('Phục vụ đời sống đô thị và cộng đồng.', $view['reader_guide']['context']['items'][0]['text']);
+        self::assertSame('Nguồn gốc lắp đặt là điểm cần tra cứu.', $view['reader_guide']['collector_value']['items'][0]['text']);
+        self::assertSame('Lắp đặt trong không gian chung.', $view['reader_guide']['collector_focus']['items'][0]['text']);
+        self::assertArrayNotHasKey('canonical_id', $view['reader_guide']['definition']['items'][0]);
+    }
+
+    public function test_marks_reader_guide_groups_empty_without_inventing_content(): void
+    {
+        $view = EntityPresentationViewModel::fromDossier('classification', [
+            'status' => 'AVAILABLE',
+            'identity' => ['name' => 'Một phân loại', 'url' => '/phan-loai/mot-phan-loai/'],
+            'knowledge' => ['status' => 'UNAVAILABLE', 'facets' => []],
+            'collector_profile' => ['status' => 'unavailable', 'facets' => []],
+        ]);
+
+        foreach ($view['reader_guide'] as $group) {
+            self::assertSame('EMPTY', $group['status']);
+            self::assertSame([], $group['items']);
+        }
+    }
+
+    public function test_enriches_an_existing_view_with_collector_facets_after_dossier_composition(): void
+    {
+        $view = EntityPresentationViewModel::withCollectorProfile(
+            ['reader_guide' => [
+                'definition' => ['status' => 'AVAILABLE', 'items' => [['text' => 'Định nghĩa']]],
+                'context' => ['status' => 'EMPTY', 'items' => []],
+                'collector_value' => ['status' => 'EMPTY', 'items' => []],
+                'collector_focus' => ['status' => 'EMPTY', 'items' => []],
+            ]],
+            ['facets' => ['rarity' => [['text' => 'Hiếm']], 'case_styles' => [['text' => 'Vỏ vuông']]]],
+        );
+
+        self::assertSame('Hiếm', $view['reader_guide']['collector_value']['items'][0]['text']);
+        self::assertSame('Vỏ vuông', $view['reader_guide']['collector_focus']['items'][0]['text']);
+    }
 }

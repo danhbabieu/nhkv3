@@ -19,6 +19,9 @@ final class McpAbilityRegistration
 
     /** @var list<string> Explicit internal/admin lifecycle opt-ins only. */
     private const EASY_MCP_EXPLICIT_INTERNAL_ABILITIES = [
+        // Narrow, capability-gated continuation for an existing Capture-owned
+        // draft; this is not a generic WordPress writer.
+        'nhk-v3/article-draft-update',
         'nhk-v3/public-url-reproject',
         'nhk-v3/media-widget-upload',
         'nhk-v3/proposal-submit',
@@ -62,8 +65,9 @@ final class McpAbilityRegistration
             self::explicitInternalAdminAbilityAllowlist(),
             array_values(array_filter($enabled, 'is_string')),
         ));
+        $boundedContinuation = ['nhk-v3/article-draft-update'];
 
-        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $explicitInternal)));
+        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $boundedContinuation, $explicitInternal)));
     }
 
     public static function reconcileEasyMcpEnabledAbilities(): void
@@ -375,8 +379,8 @@ final class McpAbilityRegistration
                     // admin surface so an administrator can explicitly enable
                     // it. Existing internal writers retain their hidden REST
                     // metadata.
-                    'public' => $toolName === 'nhk.media.widget-upload' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
-                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'public' => $toolName === 'nhk.media.widget-upload' || $toolName === 'nhk.article.draft.update' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || $toolName === 'nhk.article.draft.update' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
                     'surface' => SingleEntryPointPolicy::surface($toolName),
                     'annotations' => [
                         'readonly' => false,

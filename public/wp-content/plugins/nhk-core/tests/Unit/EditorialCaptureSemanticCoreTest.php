@@ -86,9 +86,11 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         $second = $composer->compose($first['content'] . "\n\nBổ sung biên tập.", [], $claims, ['prior_composition' => $first]);
         $third = $composer->compose($second['content'] . "\n\nBổ sung lần ba.", [], $claims, ['prior_composition' => $second]);
 
+        self::assertStringNotContainsString('Trong bối cảnh hồ sơ đã được kiểm chứng', $third['content']);
+        self::assertStringNotContainsString('[trong phạm vi đã kiểm chứng]', $third['content']);
         self::assertCount(1, array_filter(
             preg_split('/\n\n/u', $third['content']) ?: [],
-            static fn (string $paragraph): bool => str_contains($paragraph, 'Trong bối cảnh hồ sơ đã được kiểm chứng'),
+            static fn (string $paragraph): bool => str_contains($paragraph, 'người sưu tầm đối chiếu'),
         ));
         self::assertCount(1, array_filter(
             $third['managed_sections'] ?? [],
@@ -116,7 +118,7 @@ final class EditorialCaptureSemanticCoreTest extends TestCase
         $claims = [['claim_id' => 'claim-1', 'revision' => 2, 'text' => 'Cấu hình này dùng bộ máy được ghi nhận trong hồ sơ.', 'provenance' => 'CATALOG_SUPPORTED']];
         $composer = new ArticleComposer();
         $first = $composer->compose('Ghi chú biên tập.', [], $claims);
-        $edited = str_replace('Trong bối cảnh hồ sơ đã được kiểm chứng', 'Biên tập viên đã sửa nội dung', $first['content']);
+        $edited = str_replace('Một điểm đáng chú ý để người sưu tầm đối chiếu', 'Biên tập viên đã sửa nội dung', $first['content']);
 
         $this->expectException(\NHK\Core\Application\Semantic\ManagedArticleSectionConflict::class);
         $composer->compose($edited . "\n\nĐoạn do biên tập viên thêm.", [], $claims, ['prior_composition' => $first]);

@@ -29,13 +29,19 @@ final class ArticlePublicationGate
         $this->requireTrue($evidence, 'category_resolved', 'CATEGORY_UNRESOLVED', $blockers);
         $this->requireTrue($evidence, 'semantic_plan_complete', 'SEMANTIC_PLAN_INCOMPLETE', $blockers);
         $this->requireTrue($evidence, 'semantic_readback_verified', 'SEMANTIC_READBACK_UNVERIFIED', $blockers);
-        $this->requireTrue($evidence, 'media_usage_complete', 'MEDIAUSAGE_INCOMPLETE', $blockers);
         $mediaSnapshot = is_array($evidence['media_snapshot'] ?? null) ? $evidence['media_snapshot'] : [];
-        foreach (['featured_primary', 'inline_primary'] as $slot) {
-            if (($mediaSnapshot[$slot]['placeholder'] ?? false) === true) {
+        if ($mediaSnapshot === []) {
+            $this->requireTrue($evidence, 'media_usage_complete', 'MEDIAUSAGE_INCOMPLETE', $blockers);
+        } else {
+            $featuredMissing = ($mediaSnapshot['featured_primary']['placeholder'] ?? true) === true;
+            $inlineMissing = ($mediaSnapshot['inline_primary']['placeholder'] ?? true) === true;
+            if ($featuredMissing) {
                 if (!in_array('MEDIAUSAGE_INCOMPLETE', $blockers, true)) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
-                $blockers[] = $slot === 'inline_primary' ? 'ARTICLE_MEDIA_INLINE_MISSING' : 'ARTICLE_MEDIA_FEATURED_MISSING';
+                $blockers[] = 'ARTICLE_MEDIA_FEATURED_MISSING';
+            } elseif (($evidence['media_usage_complete'] ?? false) !== true) {
+                $warnings[] = 'MEDIAUSAGE_INCOMPLETE';
             }
+            if ($inlineMissing) $warnings[] = 'ARTICLE_MEDIA_INLINE_MISSING';
         }
         $this->optionalTrue($evidence, 'real_image_requirements_met', 'REAL_IMAGE_REQUIREMENTS_UNMET', 'REAL_IMAGE_INCOMPLETE', $blockers, $warnings);
         $this->requireTrue($evidence, 'claim_compliance_acceptable', 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', $blockers);

@@ -83,7 +83,97 @@ final class EntityPresentationViewModel
             'timestamps' => self::timestamps($dossier),
             'warnings' => array_values(array_unique(array_map('strval', is_array($dossier['warnings'] ?? null) ? $dossier['warnings'] : []))),
             'profile' => is_array($profile['section_order'] ?? null) ? $profile : [],
+            'reader_guide' => self::readerGuide($dossier, $knowledge, $payload),
         ];
+    }
+
+    /** @param array<string,mixed> $view @param array<string,mixed> $collectorProfile @return array<string,mixed> */
+    public static function withCollectorProfile(array $view, array $collectorProfile): array
+    {
+        $guide = is_array($view['reader_guide'] ?? null) ? $view['reader_guide'] : [];
+        $collectorFacets = is_array($collectorProfile['facets'] ?? null) ? $collectorProfile['facets'] : [];
+        $value = self::facetItems($collectorFacets, ['provenance', 'rarity', 'condition_guidance', 'originality_guidance', 'origin_certification']);
+        $focus = self::facetItems($collectorFacets, [
+            'display_form', 'dimensions', 'dating', 'case_styles', 'motifs', 'materials',
+            'craft_modes', 'production_scale', 'movement_family', 'running_duration',
+            'drive_system', 'functions', 'sound', 'music', 'automata', 'night_shutoff',
+        ]);
+        $guide['collector_value'] = self::readerGroup(self::mergeItems(is_array($guide['collector_value']['items'] ?? null) ? $guide['collector_value']['items'] : [], $value));
+        $guide['collector_focus'] = self::readerGroup(self::mergeItems(is_array($guide['collector_focus']['items'] ?? null) ? $guide['collector_focus']['items'] : [], $focus));
+        $view['reader_guide'] = $guide;
+        return $view;
+    }
+
+    /** @return array<string,array{status:string,items:list<array<string,mixed>>}> */
+    private static function readerGuide(array $dossier, array $knowledge, array $payload): array
+    {
+        $facets = is_array($knowledge['facets'] ?? null) ? $knowledge['facets'] : [];
+        $collector = is_array($dossier['collector_profile'] ?? null) ? $dossier['collector_profile'] : [];
+        $collectorFacets = is_array($collector['facets'] ?? null) ? $collector['facets'] : [];
+
+        $definition = [];
+        foreach (['summary', 'description'] as $key) {
+            $text = self::text($payload[$key] ?? '');
+            if ($text !== '') {
+                $definition[] = ['text' => $text, 'source' => 'summary'];
+                break;
+            }
+        }
+        if ($definition === []) $definition = self::facetItems($facets, ['identity', 'recognition', 'configuration']);
+
+        $context = self::facetItems($facets, ['domestic_cultural', 'chronology']);
+        $collectorValue = self::mergeItems(
+            self::facetItems($collectorFacets, ['provenance', 'rarity', 'condition_guidance', 'originality_guidance', 'origin_certification']),
+            self::facetItems($facets, ['provenance', 'rarity_frequency', 'specimen_observation']),
+        );
+        $collectorFocus = self::facetItems($collectorFacets, [
+            'display_form', 'dimensions', 'dating', 'case_styles', 'motifs', 'materials',
+            'craft_modes', 'production_scale', 'movement_family', 'running_duration',
+            'drive_system', 'functions', 'sound', 'music', 'automata', 'night_shutoff',
+        ]);
+
+        return [
+            'definition' => self::readerGroup($definition),
+            'context' => self::readerGroup($context),
+            'collector_value' => self::readerGroup($collectorValue),
+            'collector_focus' => self::readerGroup($collectorFocus),
+        ];
+    }
+
+    /** @param list<array<string,mixed>> $items @return array{status:string,items:list<array<string,mixed>>} */
+    private static function readerGroup(array $items): array
+    {
+        return ['status' => $items === [] ? 'EMPTY' : 'AVAILABLE', 'items' => array_values($items)];
+    }
+
+    /** @param array<string,mixed> $facets @param list<string> $keys @return list<array<string,mixed>> */
+    private static function facetItems(array $facets, array $keys): array
+    {
+        $items = [];
+        foreach ($keys as $key) {
+            $claims = is_array($facets[$key] ?? null) ? $facets[$key] : [];
+            foreach ($claims as $claim) {
+                if (!is_array($claim) || self::text($claim['text'] ?? '') === '') continue;
+                $item = ['text' => self::text($claim['text'])];
+                if (isset($claim['evidence']) && is_array($claim['evidence'])) $item['evidence'] = self::safeItems($claim['evidence']);
+                $items[] = $item;
+            }
+        }
+        return $items;
+    }
+
+    /** @param list<array<string,mixed>> $left @param list<array<string,mixed>> $right @return list<array<string,mixed>> */
+    private static function mergeItems(array $left, array $right): array
+    {
+        $seen = [];
+        $items = [];
+        foreach ([...$left, ...$right] as $item) {
+            $key = self::text($item['text'] ?? '');
+            if ($key === '' || isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $items[] = $item;
+        }
+        return $items;
     }
 
     /** @return array<string,mixed> */

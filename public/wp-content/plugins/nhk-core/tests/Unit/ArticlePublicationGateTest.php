@@ -71,8 +71,44 @@ final class ArticlePublicationGateTest extends TestCase
         $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
 
         self::assertContains('SUBJECT_NOT_PERSISTED', $result->blockers);
+        self::assertNotContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertNotContains('ARTICLE_MEDIA_INLINE_MISSING', $result->blockers);
+        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
+    }
+
+    public function test_missing_optional_inline_media_is_a_warning_when_featured_media_is_verified(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['media_usage_complete'] = false;
+        $evidence['media_snapshot'] = [
+            'featured_primary' => ['placeholder' => false],
+            'inline_primary' => ['placeholder' => true],
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertNotContains('ARTICLE_MEDIA_INLINE_MISSING', $result->blockers);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->warnings);
+        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
+    }
+
+    public function test_missing_featured_media_remains_a_publication_blocker(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['media_usage_complete'] = false;
+        $evidence['media_snapshot'] = [
+            'featured_primary' => ['placeholder' => true],
+            'inline_primary' => ['placeholder' => true],
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertFalse($result->eligible);
         self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
-        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->blockers);
+        self::assertContains('ARTICLE_MEDIA_FEATURED_MISSING', $result->blockers);
+        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
     }
 
     /** @return array<string,bool> */

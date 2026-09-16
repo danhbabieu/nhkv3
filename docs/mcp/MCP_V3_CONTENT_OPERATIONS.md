@@ -50,17 +50,23 @@ required → publication gate when applicable → final read-back`.
 
 The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
 Article draft/update/publish, relation and proposal creation are retained only
-for internal/admin compatibility or lifecycle operations. They are marked
+for internal/admin compatibility or lifecycle operations. The typed
+`nhk.article.draft.update` Ability is the one narrow connector-discoverable
+continuation exception: it may reconcile an existing Capture-owned draft body
+under the same state-token/Capture guard, but it remains `internal_admin_only`
+and capability-gated. All other direct writers are marked
 `internal_admin_only` in the executable catalog/Ability metadata, require
 `nhk_internal_content_operations`, and return `DIRECT_WRITE_BLOCKED` with
 `USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
 not fall back to one of these writers when Capture is unavailable. The existing
 Easy MCP bridge has explicit internal/admin opt-ins for the bounded
-`nhk-v3/public-url-reproject`, physical `nhk-v3/media-widget-upload`, and
+`nhk-v3/article-draft-update`, `nhk-v3/public-url-reproject`, physical
+`nhk-v3/media-widget-upload`, and
 Proposal lifecycle `nhk-v3/proposal-submit`, `nhk-v3/proposal-approve`, and
 `nhk-v3/proposal-apply` Abilities. These remain capability guarded and are
-never added by `PROJECT_BUILD`; they are available only after explicit
-internal/admin enablement. Proposal callbacks continue to delegate to the
+never added by `PROJECT_BUILD`; the article-draft continuation is enabled as
+the sole bounded exception, while the other internal opt-ins remain available
+only after explicit internal/admin enablement. Proposal callbacks continue to delegate to the
 canonical MCP transport and existing Governance owners.
 
 ### Runtime semantic-write policy — 2026-09-13
@@ -257,7 +263,11 @@ user-authored text remains owned by the native WordPress Post, while managed
 derived sections are reconciled by deterministic semantic identity. Public
 Article/Video/SEO textual projections reject structured internal workflow
 tokens and identifiers with `PUBLIC_INTERNAL_JARGON_LEAK`; machine context is
-kept in the Capture/research trace.
+kept in the Capture/research trace. A governance-only replay of an existing
+Capture addendum binds to the persisted addendum fingerprint and restores its
+stored editorial/provenance payload before rerunning the same guarded
+reconciliation; it is not treated as a changed addendum and cannot lose a
+Source packet between approval attempts.
 
 ### Cross-domain convergence receipt — 2026-09-13
 

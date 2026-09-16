@@ -83,7 +83,11 @@ final class ArticleResearchPreflight
         $blueprint = ['primary_subject' => $resolution['primary'] ?? null, 'intent' => trim($topic), 'title_intent' => $plannedTitle, 'h1_intent' => $plannedTitle, 'slug_intent' => $this->slug($plannedTitle), 'meta_description_intent' => $plannedTitle, 'outline' => [], 'media_complete' => $mediaComplete, 'structured_data_applicable' => true, 'canonical_expectation' => 'PUBLIC_CANONICAL_ROUTE', 'indexability_expectation' => 'INDEXABLE_IF_PUBLISHED'];
         $mediaPlan = ['candidates' => $media, 'media_complete' => $mediaComplete];
         if ($articleMedia !== []) $mediaPlan = array_merge($articleMedia, $mediaPlan, ['media_complete' => $mediaComplete]);
-        if (!$mediaComplete && !isset($mediaPlan['diagnostics'])) $mediaPlan['diagnostics'] = [['code' => 'ARTICLE_MEDIA_INLINE_MISSING']];
+        if (!isset($mediaPlan['diagnostics'])) {
+            $mediaPlan['diagnostics'] = [];
+            if (($articleMedia['featured_primary']['placeholder'] ?? false) === true) $mediaPlan['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_FEATURED_MISSING'];
+            if (($articleMedia['inline_primary']['placeholder'] ?? false) === true) $mediaPlan['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING'];
+        }
         if (!isset($mediaPlan['guidance']) || !is_array($mediaPlan['guidance'])) $mediaPlan['guidance'] = $this->mediaGuidance($articleMedia, $resolution, $mediaComplete);
         return new ArticleResearchResult($resolution, $inventory, $overlap, ['claims' => $inventory['knowledge'] ?? [], 'sources' => $inventory['sources'] ?? [], 'evidence' => $inventory['evidence'] ?? []], $relations, $links, $category, $mediaPlan, ['candidates' => $inventory['videos'] ?? []], $blueprint, $compliance, array_values(array_unique($blockers)), array_values(array_unique($warnings)), $blockers === [], $dictionaryPlan);
     }

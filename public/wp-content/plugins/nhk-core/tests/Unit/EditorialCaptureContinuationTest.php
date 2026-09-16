@@ -199,6 +199,35 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertStringContainsString('Ghi chú ban đầu.', $events['merged_text']);
     }
 
+    public function test_governance_only_replay_restores_persisted_provenance_packet(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+        $input = [
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'governance-provenance-only-replay',
+            'intent' => 'TEXT_ARTICLE',
+            'text' => 'Bài viết đã biên tập.',
+            'metadata' => ['editorial_replacement' => true, 'provenance_packets' => ['sources' => [['stable_key' => 'nhk:source:replay']]]],
+        ];
+
+        $first = $service->execute($input);
+        $resumed = $service->execute([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => 'governance-provenance-only-replay',
+            'governance' => ['approval_confirmed' => true],
+        ]);
+
+        self::assertSame($first['addendum']['addendum_id'], $resumed['addendum']['addendum_id']);
+        self::assertSame('COMPLETED', $resumed['addendum']['status']);
+        self::assertSame(['sources' => [['stable_key' => 'nhk:source:replay']]], $events['provenance_packets']);
+        self::assertCount(1, $addenda->records);
+    }
+
     public function test_rejected_addendum_retains_sanitized_audit_payload_without_files(): void
     {
         $captures = new ContinuationCaptureRepository();

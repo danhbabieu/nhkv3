@@ -136,7 +136,10 @@ final class FrontendSemanticBootstrap
                 if (is_array($published)) $item['published_claim_projection'] = $published;
                 if ($entity->entityType === 'classification') {
                     $item['collector_profile'] = $collectorProfile->build($entity->canonicalId, 1, 50);
-                    if (is_array($item['dossier'] ?? null)) $item['dossier']['collector_profile'] = $item['collector_profile'];
+                    if (is_array($item['dossier'] ?? null)) {
+                        $item['dossier']['collector_profile'] = $item['collector_profile'];
+                        if (is_array($item['dossier']['presentation'] ?? null)) $item['dossier']['presentation'] = \NHK\Core\Application\Presentation\EntityPresentationViewModel::withCollectorProfile($item['dossier']['presentation'], $item['collector_profile']);
+                    }
                 }
             }
             return $item;

@@ -22,6 +22,8 @@ final class PublicEditorialCopyGuard
             '/\bcanonical\s+(?:Variant|Model)\b/i',
             '/\b(?:canonical\s+)?(?:Variant|Model)\s+(?:theo|scope|relation|diagnostic)/iu',
             '/\bSource\/Evidence\b/i',
+            '/Trong bối cảnh hồ sơ đã được kiểm chứng/ui',
+            '/\[trong phạm vi đã kiểm chứng\]/ui',
             '/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i',
         ];
         foreach ($patterns as $pattern) if (preg_match($pattern, $copy) === 1) throw new \RuntimeException('PUBLIC_INTERNAL_JARGON_LEAK');

@@ -46,6 +46,22 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringContainsString('Nhóm con', $source);
     }
 
+    public function test_entity_detail_has_a_reader_first_form_and_no_empty_hierarchy_rail(): void
+    {
+        $source = $this->read('entity.php');
+        foreach (['reader-guide', 'Đây là gì?', 'Vai trò & bối cảnh', 'Giá trị sưu tầm', 'Người sưu tầm thường xem gì?'] as $needle) self::assertStringContainsString($needle, $source);
+        self::assertStringNotContainsString('class="hierarchy-rail"', $source);
+        self::assertStringContainsString('array_unique', $source);
+    }
+
+    public function test_entity_archive_intro_explains_the_reader_purpose_of_each_profile_family(): void
+    {
+        $source = $this->read('entity.php');
+        self::assertStringContainsString('$archiveSummary', $source);
+        self::assertStringContainsString('Mỗi hồ sơ giúp bạn hiểu', $source);
+        self::assertStringContainsString('Duyệt theo loại đồng hồ', $source);
+    }
+
     public function test_collector_profile_uses_collector_first_facet_order_and_keeps_makers_last(): void
     {
         $source = $this->read('entity.php');

@@ -5,7 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Authority\AuthorityService;
 use NHK\Core\Application\Entity\{PublicEntityCollectionQuery, PublicEntityEligibilityPolicy, PublicIdentityContract, PublicRouteResolver};
-use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
+use NHK\Core\Domain\Authority\{AuthorityEntity, CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -62,6 +62,38 @@ final class ClockTypeFrontendAcceptanceTest extends TestCase
         $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, new ClockTypeFrontendFixtureIdentityRepository([])), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes);
 
         self::assertSame([], $query->archiveProfile('clock_type')['items']);
+    }
+
+    public function test_future_clock_groups_reuse_the_profile_archive_read_only_without_special_cases(): void
+    {
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $repository = new InMemoryAuthorityRepository();
+        $future = [
+            ['id' => '01a07614-832d-7f27-959c-74eb0cd63f3e', 'key' => 'nhk:classification:clock-type.cuckoo-clock', 'name' => 'Đồng hồ chim cúc cu'],
+            ['id' => '46891b45-730b-403f-a484-6fb2539bc433', 'key' => 'nhk:classification:clock-type.vai-bo', 'name' => 'Đồng hồ vai bò'],
+        ];
+        $identityRows = [];
+        foreach ($future as $item) {
+            $entity = new AuthorityEntity($item['id'], 'classification', $item['key'], $item['name'], 1, [
+                'family' => 'clock_type',
+                'description' => $item['name'] . ' là một nhóm đồng hồ dùng cho mô phỏng kiểm thử hồ sơ công khai.',
+            ]);
+            $repository->create($entity);
+            $identityRows['authority|' . $entity->canonicalId . '|classification'] = ['current_slug' => $item['id'] === $future[0]['id'] ? 'dong-ho-chim-cuc-cu' : 'dong-ho-vai-bo'];
+        }
+        $identities = new ClockTypeFrontendFixtureIdentityRepository($identityRows);
+        $routes = new PublicRouteResolver($repository, $types, null, null, $identities);
+        $query = new PublicEntityCollectionQuery($repository, $types, new PublicIdentityContract($types, $identities), new PublicEntityEligibilityPolicy($repository, $types, $routes), $routes);
+        $before = count($repository->listByType('classification', true));
+
+        $archive = $query->archiveProfile('clock_type');
+
+        self::assertSame($before, count($repository->listByType('classification', true)));
+        self::assertSame(2, $archive['total']);
+        $names = array_column($archive['items'], 'name');
+        sort($names);
+        self::assertSame(['Đồng hồ chim cúc cu', 'Đồng hồ vai bò'], $names);
     }
 }
 

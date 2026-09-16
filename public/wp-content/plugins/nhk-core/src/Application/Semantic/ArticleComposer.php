@@ -53,7 +53,7 @@ final class ArticleComposer
             if ($semanticKey !== '') $seenClaims[$semanticKey] = true;
             $summary = $this->claimSummary((string) ($claim['text'] ?? ''));
             if ($summary !== '') {
-                $content = 'Trong bối cảnh hồ sơ đã được kiểm chứng, nội dung này được đặt cạnh ghi nhận rằng ' . $summary . '.';
+                $content = 'Một điểm đáng chú ý để người sưu tầm đối chiếu là ' . $this->lowerFirst($summary) . '.';
                 $semanticKey = $semanticKey !== '' ? $semanticKey : 'claim-context:' . hash('sha256', $content);
                 $fingerprint = hash('sha256', $content);
                 $sectionId = 'nhk-managed-' . hash('sha256', $semanticKey);
@@ -131,11 +131,20 @@ final class ArticleComposer
     {
         $text = trim($text);
         if ($text === '') return '';
+        $text = preg_replace('/^Trong bối cảnh hồ sơ đã được kiểm chứng,\s*/ui', '', $text) ?? $text;
+        $text = preg_replace('/\s*\[trong phạm vi đã kiểm chứng\]\s*$/ui', '', $text) ?? $text;
         $text = rtrim($text, '.!?。！？');
         $text = preg_replace('/^(.{0,80}?)(?:\s+)(?:là|là một)\s+/ui', '$1 được ghi nhận là ', $text) ?? $text;
         // Keep the source boundary explicit so a Claim is synthesized rather
         // than dumped verbatim into editorial prose.
-        return $text . ' [trong phạm vi đã kiểm chứng]';
+        return $text;
+    }
+
+    private function lowerFirst(string $text): string
+    {
+        if ($text === '') return '';
+        if (function_exists('mb_strtolower') && function_exists('mb_substr')) return mb_strtolower(mb_substr($text, 0, 1)) . mb_substr($text, 1);
+        return strtolower(substr($text, 0, 1)) . substr($text, 1);
     }
 
     /** @param list<array<string,mixed>> $assets */

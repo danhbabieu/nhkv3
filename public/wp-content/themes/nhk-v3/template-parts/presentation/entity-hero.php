@@ -5,6 +5,8 @@ $label = trim((string) ($args['label'] ?? 'Hồ sơ'));
 $fallback = (string) ($args['fallback'] ?? get_theme_file_uri('/assets/default-archive.svg'));
 $name = trim((string) ($view['title'] ?? $identity['name'] ?? $args['name'] ?? ''));
 $summary = trim((string) ($view['summary'] ?? $view['description'] ?? ''));
+$readerDefinition = is_array($view['reader_guide']['definition'] ?? null) ? $view['reader_guide']['definition'] : [];
+if ($summary === '' && is_array($readerDefinition['items'] ?? null) && isset($readerDefinition['items'][0]['text'])) $summary = trim((string) $readerDefinition['items'][0]['text']);
 $media = is_array($view['hero_media'] ?? null) ? $view['hero_media'] : [];
 $image = trim((string) ($media['url'] ?? '')) ?: $fallback;
 $alt = trim((string) ($media['alt'] ?? ''));

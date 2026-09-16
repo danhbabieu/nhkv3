@@ -137,7 +137,17 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
         $payload = $candidate;
         $payload['candidate_id'] = (string) ($candidate['candidate_id'] ?? '');
-        if (!$isRelation) $payload = ['candidate_id' => $payload['candidate_id'], 'stable_key' => (string) ($candidate['proposed_stable_key'] ?? $candidate['stable_key_preview'] ?? ''), 'name' => (string) ($candidate['name'] ?? $candidate['proposed_canonical_name'] ?? ''), 'entity_payload' => array_filter(['family' => $candidate['family'] ?? null, 'aliases' => $candidate['aliases'] ?? null, 'description' => $candidate['description'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== [])];
+        if (!$isRelation) {
+            $entityPayload = is_array($candidate['entity_payload'] ?? null)
+                ? $candidate['entity_payload']
+                : array_filter(['family' => $candidate['family'] ?? null, 'aliases' => $candidate['aliases'] ?? null, 'description' => $candidate['description'] ?? null], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+            $payload = [
+                'candidate_id' => $payload['candidate_id'],
+                'stable_key' => (string) ($candidate['stable_key'] ?? $candidate['proposed_stable_key'] ?? $candidate['stable_key_preview'] ?? ''),
+                'name' => (string) ($candidate['canonical_name'] ?? $candidate['name'] ?? $candidate['proposed_canonical_name'] ?? ''),
+                'entity_payload' => $entityPayload,
+            ];
+        }
         if ($auditContext !== []) $payload['project_build_audit'] = [
             'capture_id' => trim((string) ($auditContext['capture_id'] ?? '')),
             'policy_mode' => strtoupper(trim((string) ($auditContext['policy_mode'] ?? ''))),
@@ -151,6 +161,10 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         ];
         $contentFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
         $dependencyIds = array_values(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? []))));
-        return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? ''), 'actor' => $actor];
+        $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : null;
+        $expectedRevision = !$isRelation && !in_array($operation, ['create', 'ingest'], true)
+            ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1))
+            : null;
+        return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? ''), 'actor' => $actor];
     }
 }

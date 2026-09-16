@@ -98,6 +98,134 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame([], $plan['create_candidates']);
     }
 
+    public function test_existing_classification_with_explicit_description_delta_produces_update_candidate(): void
+    {
+        $description = 'Đồng hồ công cộng phục vụ việc công bố thời gian trong không gian chung.';
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Mô tả cũ.']);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan(
+            [
+                'text' => 'Cập nhật mô tả cho Đồng hồ công cộng.',
+                'authority_intent' => [
+                    'mode' => 'PLAN',
+                    'requests' => [[
+                        'entity_type' => 'classification',
+                        'name' => 'Đồng hồ công cộng',
+                        'payload_delta' => ['description' => $description],
+                    ]],
+                ],
+            ],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 4],
+        );
+
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame([], $plan['reuse']);
+        self::assertSame($entity->canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
+        self::assertSame($entity->revision, $plan['update_candidates'][0]['expected_revision']);
+        self::assertSame(['description' => $description], $plan['update_candidates'][0]['payload_patch']);
+        self::assertSame(['family' => 'clock_type', 'description' => $description], $plan['update_candidates'][0]['entity_payload']);
+    }
+
+    public function test_same_description_delta_reuses_existing_classification_without_update(): void
+    {
+        $description = 'Đồng hồ công cộng đã có mô tả.';
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => $description]);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan(
+            [
+                'text' => 'Kiểm tra mô tả Đồng hồ công cộng.',
+                'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                    'entity_type' => 'classification',
+                    'name' => 'Đồng hồ công cộng',
+                    'payload_delta' => ['description' => $description],
+                ]]],
+            ],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame([], $plan['update_candidates']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
+    public function test_existing_uuid_in_structured_intent_reuses_the_exact_authority_without_duplicate_creation(): void
+    {
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type']);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'text' => 'Đồng hồ công cộng — ' . $entity->canonicalId . '.',
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'classification',
+                'canonical_uuid' => $entity->canonicalId,
+                'name' => 'Đồng hồ công cộng',
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame($entity->canonicalId, $plan['reuse'][0]['canonical_uuid']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame([], $plan['update_candidates']);
+    }
+
+    public function test_registry_unsupported_update_field_is_reviewed_without_mutating_plan(): void
+    {
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Mô tả.']);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan(
+            [
+                'text' => 'Cập nhật Đồng hồ công cộng.',
+                'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                    'entity_type' => 'classification',
+                    'name' => 'Đồng hồ công cộng',
+                    'payload_delta' => ['summary' => 'Không thuộc contract.'],
+                ]]],
+            ],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertSame([], $plan['update_candidates']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertContains('UNSUPPORTED_AUTHORITY_FIELD', array_column($plan['blockers'], 'code'));
+    }
+
+    public function test_brand_country_delta_uses_the_same_registry_driven_update_path(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', ['description' => 'Mô tả.']);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan(
+            [
+                'text' => 'Cập nhật quốc gia của Hermle.',
+                'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                    'entity_type' => 'brand',
+                    'name' => 'Hermle',
+                    'payload_delta' => ['country' => 'Đức'],
+                ]]],
+            ],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 2],
+        );
+
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame(['description' => 'Mô tả.', 'country' => 'Đức'], $plan['update_candidates'][0]['entity_payload']);
+        self::assertSame($entity->revision, $plan['update_candidates'][0]['expected_revision']);
+    }
+
+    public function test_replanning_same_update_input_is_fingerprint_stable_for_apply_approved_plan(): void
+    {
+        $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Cũ.']);
+        $input = [
+            'text' => 'Cập nhật mô tả cho Đồng hồ công cộng.',
+            'authority_intent' => ['mode' => 'APPLY_APPROVED_PLAN', 'requests' => [[
+                'entity_type' => 'classification',
+                'name' => 'Đồng hồ công cộng',
+                'payload_delta' => ['description' => 'Mới.'],
+            ]]],
+        ];
+        $context = ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 7, 'contract' => ['documentation_version' => 'doc', 'manifest_hash' => 'hash']];
+        $planner = new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types);
+
+        $first = $planner->plan($input, $context);
+        $replanned = $planner->plan($input, $context);
+
+        self::assertSame($first['plan_fingerprint'], $replanned['plan_fingerprint']);
+        self::assertSame($first['update_candidates'], $replanned['update_candidates']);
+    }
+
     public function test_glass_dome_is_reviewed_without_model_type_or_subtype_creation(): void
     {
         $planner = new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types);
@@ -133,6 +261,27 @@ final class AuthorityIntentPlannerTest extends TestCase
     {
         $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
             ['text' => 'Đồng hồ cúc cu đã có chưa?', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame('CANONICAL_NOT_FOUND', $plan['ambiguities'][0]['code']);
+    }
+
+    public function test_four_hundred_day_group_without_canonical_id_stays_search_only(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            [
+                'text' => 'Tìm nhóm đồng hồ 400 ngày.',
+                'authority_intent' => [
+                    'mode' => 'PLAN',
+                    'requests' => [[
+                        'entity_type' => 'classification',
+                        'name' => 'Đồng hồ 400 ngày',
+                        'allow_create' => false,
+                    ]],
+                ],
+            ],
             ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
         );
 

@@ -50,11 +50,14 @@ final class EditorialCaptureAssetFollowUpTest extends TestCase
 
         $first = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'asset-followup-1', 'followup_mode' => 'ATTACH_ASSETS', 'files' => [$file], 'items' => [['client_file_id' => 'dial-1', 'visual_context' => ['feature_key' => 'DIAL']]]]);
         $replay = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'asset-followup-1', 'followup_mode' => 'ATTACH_ASSETS', 'files' => [$file], 'items' => [['client_file_id' => 'dial-1', 'visual_context' => ['feature_key' => 'DIAL']]]]);
+        $governanceReplay = $service->execute(['capture_id' => $capture->captureId, 'idempotency_key' => 'asset-followup-1', 'governance' => ['approval_confirmed' => true]]);
 
         self::assertSame('COMPLETED', $first['addendum']['status'], json_encode($first, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         self::assertSame($capture->captureId, $first['capture']['capture_id']);
         self::assertSame(512, $first['capture']['article_id']);
         self::assertSame($first['addendum']['addendum_id'], $replay['addendum']['addendum_id']);
+        self::assertSame($first['addendum']['addendum_id'], $governanceReplay['addendum']['addendum_id']);
+        self::assertSame('COMPLETED', $governanceReplay['addendum']['status']);
         self::assertSame(1, $calls['physical']);
         self::assertSame(1, $calls['adoption']);
         self::assertSame(0, $calls['draft']);

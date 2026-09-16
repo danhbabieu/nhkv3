@@ -48,7 +48,7 @@ final class PublicationDiagnosticRegistry
             $owner('REAL_IMAGE_INCOMPLETE', 'Ảnh thật chưa hoàn tất.', 'Bổ sung ảnh thật phù hợp.'),
             $owner('MEDIAUSAGE_INCOMPLETE', 'Thông tin sử dụng Media chưa hoàn tất.', 'Hoàn tất MediaUsage.'),
             $owner('ARTICLE_MEDIA_FEATURED_MISSING', 'Ảnh đại diện bắt buộc chưa được gắn.', 'Gắn MediaUsage FEATURED_PRIMARY hợp lệ.'),
-            $owner('ARTICLE_MEDIA_INLINE_MISSING', 'Ảnh inline bắt buộc chưa được gắn.', 'Gắn MediaUsage INLINE_PRIMARY hợp lệ.'),
+            $owner('ARTICLE_MEDIA_INLINE_MISSING', 'Ảnh inline chưa được gắn.', 'Gắn MediaUsage INLINE_PRIMARY nếu phù hợp.'),
             $owner('SEO_PROJECTION_INVALID', 'SEO chưa hoàn tất.', 'Hoàn tất projection SEO.'),
             $owner('INTERNAL_LINKS_INCOMPLETE', 'Liên kết nội bộ chưa hoàn tất.', 'Bổ sung liên kết nội bộ hợp lệ.'),
             $owner('STRUCTURED_DATA_INCOMPLETE', 'Structured data chưa hoàn tất.', 'Hoàn tất dữ liệu có cấu trúc.'),

@@ -376,10 +376,10 @@ final class Plugin {
                             $mediaItem = $usage !== null ? $media->findByCanonicalId($usage->mediaId) : null;
                             $articleMedia[$role] = ['media_id' => $mediaItem?->canonicalId, 'placeholder' => $mediaItem?->isSystemPlaceholder() ?? true];
                         }
-                        $articleMedia['media_complete'] = count($articleMedia) === 2
-                            && !($articleMedia['featured_primary']['placeholder'] ?? true)
-                            && !($articleMedia['inline_primary']['placeholder'] ?? true);
-                        $articleMedia['diagnostics'] = $articleMedia['media_complete'] ? [] : [['code' => 'ARTICLE_MEDIA_INLINE_MISSING']];
+                        $articleMedia['media_complete'] = !($articleMedia['featured_primary']['placeholder'] ?? true);
+                        $articleMedia['diagnostics'] = [];
+                        if (($articleMedia['featured_primary']['placeholder'] ?? true) === true) $articleMedia['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_FEATURED_MISSING'];
+                        if (($articleMedia['inline_primary']['placeholder'] ?? true) === true) $articleMedia['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING'];
                     }
                     $authorityRows = [];
                     foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];

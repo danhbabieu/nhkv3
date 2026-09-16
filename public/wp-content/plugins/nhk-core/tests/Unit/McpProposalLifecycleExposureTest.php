@@ -36,6 +36,19 @@ final class McpProposalLifecycleExposureTest extends TestCase
         );
     }
 
+    public function test_article_draft_update_is_a_narrow_always_discoverable_continuation_opt_in(): void
+    {
+        $tool = array_column(McpToolCatalog::tools(), null, 'name')['nhk.article.draft.update'];
+        self::assertSame('nhk-v3/article-draft-update', McpAbilityRegistration::abilityNameForTool('nhk.article.draft.update'));
+        self::assertTrue(SingleEntryPointPolicy::isInternalOnly('nhk.article.draft.update'));
+        self::assertSame('mutation', $tool['kind']);
+        self::assertTrue($tool['governed']);
+        self::assertSame('internal_admin_only', $tool['surface']);
+        self::assertSame(['post_id', 'fields', 'expected_state_token'], $tool['inputSchema']['required']);
+        self::assertContains('nhk-v3/article-draft-update', McpAbilityRegistration::explicitInternalAdminAbilityAllowlist());
+        self::assertContains('nhk-v3/article-draft-update', McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]));
+    }
+
     public function test_proposal_lifecycle_tools_keep_internal_surface_and_callable_catalog_schemas(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');

@@ -134,12 +134,17 @@ final class McpTransportIntegrationTest extends TestCase
                 self::assertTrue($ability->get_meta_item('show_in_rest'));
                 self::assertSame('internal_admin_only', $ability->get_meta_item('surface'));
             } elseif (in_array($abilityName, [
+                'nhk-v3/article-draft-update',
                 'nhk-v3/article-publish-review',
                 'nhk-v3/article-publish-approve',
                 'nhk-v3/article-publish',
             ], true)) {
                 self::assertTrue($ability->get_meta_item('public'));
                 self::assertTrue($ability->get_meta_item('show_in_rest'));
+                if ($abilityName === 'nhk-v3/article-draft-update') {
+                    self::assertSame('internal_admin_only', $ability->get_meta_item('surface'));
+                    self::assertSame(['post_id', 'fields', 'expected_state_token'], $ability->get_input_schema()['required']);
+                }
             } else {
                 self::assertFalse($ability->get_meta_item('public'));
                 self::assertFalse($ability->get_meta_item('show_in_rest'));

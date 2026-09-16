@@ -1,5 +1,123 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Public Clock local closeout
+
+SCOPE: Completed the local Public Clock closeout pass without deployment,
+push, upload, commit or semantic mutation. The existing Public Clock,
+Turret, Capture, Article, Knowledge, Media, Asset, attachment and subtype
+relation IDs remain the only IDs in scope. No Source or Evidence records were
+created locally because canonical application requires the governed Capture
+continuation and a writable runtime; the bounded research packet below is
+ready for that continuation.
+
+GENERIC AUTHORITY FIX: `AuthorityIntentPlanner` now consumes structured,
+registry-validated field deltas. An exact active Authority matched by UUID,
+stable key or canonical name produces one UPDATE candidate only when the
+requested supported value differs; an unchanged value produces REUSE only.
+The candidate preserves canonical UUID/stable key and expected revision, and
+`GovernedAuthorityPlanExecutor` carries the full registry payload through the
+Governance proposal. This applies to Classification, Brand and all catalog
+types; unsupported fields are rejected for review. UUID/name duplicate
+regression and APPLY_APPROVED_PLAN replan stability are covered.
+
+DATA PLAN (GOVERNED APPLY AFTER DEPLOY): Replan the existing Public Clock UUID
+`01a09e44-539a-7f1a-938a-d7d91bb689a3` at its current revision with only
+`payload_delta.description` set to: “Đồng hồ công cộng là các hệ thống đo và
+công bố thời gian phục vụ nhiều người trong không gian chung. Chúng có thể sử
+dụng mặt số lớn, chuông hoặc kết hợp cả hai, xuất hiện trong các bối cảnh như
+tháp, nhà thờ, công trình hành chính, quảng trường và đường sắt. Đồng hồ tháp
+là một nhánh quan trọng nhưng không đồng nghĩa với toàn bộ nhóm.” Replan the
+existing Turret UUID `01a09f73-0aad-79b3-9aaf-5f02cb33a9d1` similarly with only
+the approved turret description. Apply only the UPDATE candidates after fresh
+revision/duplicate review, then canonical read back UUID, stable key, payload
+and incremented revision. The Turret description is: “Đồng hồ tháp là một
+nhánh của đồng hồ công cộng, trong đó bộ máy được lắp trong tháp hoặc phần
+cao của công trình để truyền chuyển động tới một hay nhiều mặt số lớn; nhiều
+hệ thống còn có cơ cấu điểm giờ hoặc đánh chuông. Khi nghiên cứu cần phân
+biệt bộ máy turret với toàn bộ installation gồm mặt số, truyền động, chuông và
+kiến trúc công trình.” No `summary` field, identity change, CREATE candidate or
+direct writer is permitted.
+
+PUBLICATION MEDIA FIX: Article publication now treats `featured_primary` as
+the required publication image boundary and `inline_primary` as optional
+visual support. Missing inline media remains a warning and never creates a
+publication blocker by itself. A missing featured image remains a typed
+blocker. Capture handoff and the WordPress article inventory use the same
+featured-based completeness law.
+
+BOUNDED RESEARCH PACKET (PLANNED, NOT APPLIED):
+
+* `PC-K02` — AHS, “About the Turret Clock Group”,
+  https://www.ahsoc.org/groups/turret-clock-group/about-the-turret-clock-group/;
+  excerpt: “all turret clocks and public timekeeping”; supports the shared
+  public-timekeeping role and qualifies it as a broad group context.
+* `PC-K02`, `PC-K04`, `PC-K06` — AHS, “Fiftieth anniversary tour and
+  celebrations, October 2023”,
+  https://www.ahsoc.org/groups/turret-clock-group/tcg-recent-meetings-and-tours/fiftieth-anniversary-tour-and-celebrations/;
+  excerpts: “three-train movement”, “converted to auto-winding”, and
+  “leading-off and the motion works”; supports movement, strike/chime,
+  winding, dial transmission and historical alteration scope.
+* `PC-K05` — Science Museum, “The Cable: The world runs on time”,
+  https://www.sciencemuseum.org.uk/sites/default/files/2023-11/Large-print-guide-Information-Age.pdf;
+  excerpt: “railway networks spread in parallel, bringing the need for a
+  commonly agreed time reference”; supports railway synchronization and
+  qualifies the claim as a time-reference/network history claim.
+* `PC-K04`, `TC-K01`, `TC-K02`, `TC-K04` — Science Museum Group, “Turret Clock
+  from the Old Edmonton Institution”,
+  https://collection.sciencemuseumgroup.org.uk/objects/co48307/turret-clock-from-the-old-edmonton-institution;
+  excerpt: “with dial, hands, pendulum and weights”; the catalog also lists
+  pulleys, gear wheels and bevel gear; supports installation components,
+  weight drive and multi-dial transmission.
+* `TC-K01`, `TC-K02`, `TC-K03`, `TC-K06` — British Museum, “Cassiobury Park
+  clock”, https://www.britishmuseum.org/collection/object/H_1964-0203-1;
+  excerpt: “Iron turret clock with verge escapement”; the record describes an
+  iron posted frame, separate going/striking trains and weighted foliot;
+  supports frame, drive, escapement, strike and historical modification.
+* `TC-K01`, `TC-K02`, `TC-K03`, `TC-K06` — British Museum, “hour-striking
+  clock; turret clock; weight-driven clock”,
+  https://www.britishmuseum.org/collection/object/H_1964-1203-1;
+  excerpt: “weight-driven; verge escapement; formerly with foliot, now with
+  pendulum”; supports the historical transition and qualifies the object as
+  one documented example, not a universal claim about every turret clock.
+
+The turret packet is clustered as requested: `TC-K01`/`TC-K02` movement,
+frame, weights and trains; `TC-K03` escapement history; `TC-K04` leading-off,
+shaft, bevel gear and motionwork; `TC-K05` winding modes; and `TC-K06`
+alteration/provenance/conservation. Sources are marked support/qualify only;
+no source contradicts the bounded claims. `SOURCE_IDS=NONE_CREATED_LOCAL_ONLY`
+and `EVIDENCE_IDS=NONE_CREATED_LOCAL_ONLY`; the next governed continuation
+must reuse exact existing claims and deduplicate Source by stable key before
+creating Evidence with exact claim scope.
+
+CANONICAL WORKFLOW STATUS: Existing subject bindings remain exact: Public
+Clock 7/7 and Turret 9/9. Capture, Article preflight and dossier projections
+continue to use subject-scoped canonical Knowledge; review-only or
+insufficient-evidence claims are not promoted to public prose. The existing
+subtype relation is reused; Church, Civic, Railway and installation contexts
+remain context, not new subtype entities. Existing Media, Asset, attachment
+and #485 usages remain reuse-only. The shared readiness law remains ACTIVE +
+valid public identity + one meaningful public signal; archive filtering and
+detail projection use that law, with no Public Clock hard-code.
+
+VERIFICATION: Focused closeout regression passes `376 tests / 1,698
+assertions`; the Authority/Clock future-group subset passes `28 tests / 117
+assertions`. Full Unit passes `1,616 tests / 7,775 assertions` with 13
+warnings and 14 deprecations. Contract suite passes `6 tests / 48 assertions`.
+Composer PHP lint passes; MCP Apps typecheck and tests pass (`13 tests`);
+`git diff --check` passes. The documented guarded Integration command was
+attempted against exact `nhk_v3_test` and failed before test execution because
+WordPress could not establish its database connection. Local HTTP route smoke
+also failed because localhost:80 is not listening. These are environment
+failures, not green runtime acceptance. Persisted Article #487 jargon and
+live route/content acceptance therefore remain runtime/deployment checks. The
+read-only future-group simulation proves the profile archive can reuse the
+exact Cuckoo and Vai Bò UUIDs without mutation; 400-day remains search-only
+when no canonical ID is supplied, with no CREATE candidate.
+
+NO DEPLOYMENT: Deployment, push, SCP, rsync, server upload, staging semantic
+mutation and commit were not performed. `LIVE_PUBLIC_CLOCK_COMPLETE` remains
+`PENDING_DEPLOYMENT`.
+
 # Checkpoint — 2026-09-15 — Public Clock generic readiness and bounded read-back
 
 SCOPE: The explicitly approved bounded Public Clock completion scope was used
@@ -10387,3 +10505,89 @@ proof is environment-gated and was not reclassified as source-only success.
 
 COMMITS: `96eecc98` local blocker implementation and `daebe02c` explicit
 multi-image convergence contract test. No push or deployment was attempted.
+
+# Checkpoint — 2026-09-16 — Reader-first public dossier form (LOCAL ONLY)
+
+SCOPE: Reworked the public entity dossier presentation around a common reader
+journey for clock types and other entity profiles. The implementation adds a
+presentation-only `reader_guide` assembled from existing summary, Knowledge
+facets and collector facets; it does not add canonical fields, semantic types,
+relations or writes.
+
+IMPLEMENTED: Added the four reader questions `Đây là gì?`, `Vai trò & bối
+cảnh`, `Giá trị sưu tầm` and `Người sưu tầm thường xem gì?`; preserved honest
+empty states; removed the empty hierarchy grid child; hid the internal
+`family=clock_type` fact; suppressed zero-only collector statistics; and
+deduplicated collector-related public items at the presentation boundary.
+Archive copy now explains the purpose of profile browsing without inventing
+counts or purchase claims. Existing homepage structure was retained because
+it already provides the discovery entry point and no new semantic source was
+needed.
+
+VERIFICATION: Focused presentation/frontend tests pass — 22 tests / 108
+assertions with one pre-existing warning. Full NHK Unit suite passes — 1,603
+tests / 7,717 assertions with 13 warnings and 14 deprecations. Contract suite
+passes — 6 tests / 48 assertions. Changed PHP lint and `git diff --check`
+pass; secret/prohibited-data scan found no matches in the diff.
+
+RUNTIME_BOUNDARY: Read-only route smoke and structural diagnostics were
+attempted but are environment-blocked: local WordPress cannot bootstrap and
+localhost:80 is not listening. The remote demo was inspected read-only before
+the change; no demo deployment, staging/production mutation, migration or
+publish occurred. No live success is claimed.
+
+WORKTREE: Pre-existing user changes in the image-upload files remain
+untouched. The implementation is intentionally left uncommitted on the shared
+dirty `main` worktree so those changes are preserved.
+
+# Checkpoint — 2026-09-16 — Public Clock continuation/tool-surface closeout (LOCAL ONLY)
+
+SCOPE: Continued the bounded Public Clock / Turret Clock work on the existing
+Capture and Post boundaries. No Classification, Capture, Post, Source,
+Evidence, Knowledge, Graph, Media or staging record was created or mutated.
+
+IMPLEMENTED: Made the narrow existing-Capture `nhk.article.draft.update`
+continuation explicitly discoverable through the Easy MCP bridge while keeping
+it capability-gated and non-generic; preserved persisted Capture metadata,
+provenance packets, intent, observations and editorial replacement text on
+governance-only replay; prevented asset follow-up replay from recomputing a
+conflicting fingerprint; removed the legacy verified-scope wrapper from
+generated Article prose and added public-copy guards; rebuilt the MCP Apps
+image-upload resource from its source.
+
+DOCUMENTATION_BOOTSTRAP: Source-root bootstrap after these documentation
+changes returned documentation_version
+`fa157d8a8c68ffb61d604c86a986f53da727399a0c15a70b57ed707c5c5c66c9`,
+manifest_hash
+`a4ff58c06be15450d36f6f68f3fdd2980e734513e7f689365104d5e8413066e3`,
+runtime_version `0.1.0`, build_identity
+`439fc5a41d44a246b0b3403ecde73ccb5c15f6863da2c37bede62e3e3148a992` and
+runtime status `registered_not_live_verified`. The source catalog exposes 52
+tools, including `nhk.capture.ingest` and `nhk.article.draft.update`; this is
+not a connector tools/list or callable-live proof.
+
+VERIFICATION: Full NHK Unit suite PASS — 1,611 tests / 7,757 assertions, with
+13 warnings and 14 deprecations. MCP Apps `npm run typecheck` PASS and
+`npm test` PASS — 13 tests. Focused capture/provenance/article/MCP contracts
+PASS — 149 tests / 1,208 assertions. Composer PHP lint PASS,
+`git diff --check` PASS, and prohibited-secret pattern scan PASS. Guarded
+integration was attempted only with `NHK_WP_TEST_PATH=public` and
+`NHK_WP_TEST_DB=nhk_v3_test`; WordPress fails closed with `Error establishing a
+database connection`.
+
+LIVE_READBACK: Read-only browser inspection of demo.1945.vn confirmed
+`/loai-dong-ho/`, `/dong-ho-cong-cong/` and `/dong-ho-thap/` resolve, parent/child
+links are correct, and the child shows turret-specific Knowledge. The parent
+still emits two `Undefined array key 2` warnings from the deployed old
+`FrontendSemanticBootstrap.php` line 185. Post 485 via `?p=485` still has the
+old title and legacy raw Knowledge appendage/managed-section prose. No fresh
+connector tools/list, callable typed update, Capture continuation, Source or
+Evidence mutation was attempted.
+
+DEPLOYMENT_BOUNDARY: `NHK_DEMO_DEPLOY_CONFIG=UNSET`; the canonical deployment
+wrapper requires that approved external config and a clean committed checkout.
+No SSH, rsync, direct server edit, generic WordPress writer, direct database
+write, staging mutation, publish or production operation was performed.
+
+STATUS: `IMPLEMENTED_CODE_SIDE / LIVE_ACCEPTANCE_PENDING` — live connector,
+staging data read-back and browser content acceptance remain externally gated.

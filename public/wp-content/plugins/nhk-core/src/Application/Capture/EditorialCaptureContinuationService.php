@@ -23,8 +23,13 @@ final class EditorialCaptureContinuationService
         if ($key === '') throw new \InvalidArgumentException('Capture addendum idempotency key is required.');
         $fingerprint = $this->fingerprint($input);
         $existing = $this->addenda->findByIdempotencyKey($key);
+        $governanceOnlyReplay = $this->isGovernanceOnlyReplay($input);
         if ($existing !== null) {
-            if (strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS' && (!isset($input['files']) || (array) $input['files'] === []) && (!isset($input['media_ids']) || (array) $input['media_ids'] === [])) $fingerprint = $this->fingerprint($input, $existing);
+            // Governance is control-plane input, not a new editorial payload.
+            // Bind a control-only replay to the persisted request and restore
+            // its payload below so provenance cannot disappear on resume.
+            if ($governanceOnlyReplay) $fingerprint = $existing->requestFingerprint;
+            if (!$governanceOnlyReplay && strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS' && (!isset($input['files']) || (array) $input['files'] === []) && (!isset($input['media_ids']) || (array) $input['media_ids'] === [])) $fingerprint = $this->fingerprint($input, $existing);
             if (!hash_equals($existing->requestFingerprint, $fingerprint) || $existing->captureId !== $captureId) return $this->conflict($existing, $captureId, $fingerprint);
             // A governance decision is a continuation of the same addendum,
             // not a new addendum. Re-run the guarded semantic checkpoint with
@@ -40,6 +45,10 @@ final class EditorialCaptureContinuationService
             if ($control !== []) {
                 $capture = $this->captures->findById($captureId);
                 if (!$capture instanceof CaptureRecord) return $this->response(null, $existing);
+                $persistedPayload = is_array($existing->payload) ? $existing->payload : [];
+                $persistedMetadata = is_array($persistedPayload['metadata'] ?? null) ? $persistedPayload['metadata'] : [];
+                $input['metadata'] = $persistedMetadata + (is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
+                if (trim((string) ($input['intent'] ?? '')) === '' && isset($persistedPayload['intent'])) $input['intent'] = (string) $persistedPayload['intent'];
                 if (strtoupper((string) ($existing->payload['followup_mode'] ?? '')) === 'ATTACH_ASSETS') {
                     $input['followup_mode'] = 'ATTACH_ASSETS';
                     $input['asset_followup_items'] = array_values(array_filter((array) ($existing->payload['asset_manifest']['items'] ?? []), 'is_array'));
@@ -47,9 +56,9 @@ final class EditorialCaptureContinuationService
                     $input['visual_context'] = is_array($existing->payload['visual_context'] ?? null) ? $existing->payload['visual_context'] : [];
                     $input['asset_followup_replay'] = true;
                 }
-                $input['text'] = '';
+                $input['text'] = (($input['metadata']['editorial_replacement'] ?? false) === true) ? trim((string) ($persistedPayload['text'] ?? '')) : '';
                 $input['subject_hints'] = (array) ($existing->payload['subject_hints'] ?? []);
-                $input['observations'] = [];
+                $input['observations'] = is_array($existing->payload['observations'] ?? null) ? $existing->payload['observations'] : [];
                 $input['existing_capture_continuation'] = true;
                 $input['continuation_idempotency_key'] = $key;
                 $input['continuation_delta_text'] = trim((string) ($existing->payload['text'] ?? ''));
@@ -143,6 +152,7 @@ final class EditorialCaptureContinuationService
     {
         $resumeChildren = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
         $payload = ['text' => trim((string) ($input['text'] ?? $input['content'] ?? '')), 'subject_hints' => is_array($input['subject_hints'] ?? null) ? array_values($input['subject_hints']) : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : []];
+        if (trim((string) ($input['intent'] ?? '')) !== '') $payload['intent'] = (string) $input['intent'];
         if ($resumeChildren !== []) $payload['resume_children'] = $resumeChildren;
         if (strtoupper(trim((string) ($input['followup_mode'] ?? ''))) === 'ATTACH_ASSETS') {
             $payload['followup_mode'] = 'ATTACH_ASSETS';
@@ -159,6 +169,17 @@ final class EditorialCaptureContinuationService
         $payload = $this->payload($input);
         if ($existing !== null && ($payload['followup_mode'] ?? '') === 'ATTACH_ASSETS' && ($payload['asset_fingerprints'] ?? []) === []) $payload['asset_fingerprints'] = $existing->payload['asset_fingerprints'] ?? [];
         return hash('sha256', CommandCanonicalizer::canonicalize($payload));
+    }
+
+    private function isGovernanceOnlyReplay(array $input): bool
+    {
+        if (!is_array($input['governance'] ?? null) || $input['governance'] === []) return false;
+        foreach (['text', 'content', 'intent', 'subject_hints', 'observations', 'metadata', 'files', 'media_ids', 'items', 'followup_mode', 'resume_children'] as $field) {
+            if (!array_key_exists($field, $input)) continue;
+            $value = $input[$field];
+            if (is_array($value) ? $value !== [] : trim((string) $value) !== '') return false;
+        }
+        return true;
     }
 
     private function saveAddendum(CaptureAddendumRecord $record, string $status, int $captureRevision, array $diagnostics, ?array $payload = null): CaptureAddendumRecord
