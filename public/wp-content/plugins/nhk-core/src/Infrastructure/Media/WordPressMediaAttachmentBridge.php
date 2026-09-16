@@ -3,11 +3,12 @@ declare(strict_types=1);
 
 namespace NHK\Core\Infrastructure\Media;
 
-use NHK\Core\Application\Media\{MediaFilenameNormalizer, MediaService};
+use NHK\Core\Application\Media\{MediaFilenameNormalizer, MediaService, PublicImageSizingPolicy, PublicMediaAssetSelector};
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Media\{Media, MediaAsset};
 use NHK\Core\Infrastructure\Article\WpEditorialStateReader;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use RuntimeException;
 
 /**
  * The only adapter allowed to translate canonical Media into WordPress

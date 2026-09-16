@@ -11113,3 +11113,56 @@ perform SSH/rsync staging publication. No SSH, rsync, remote write, cache
 flush, connector reconnect or staging semantic mutation occurred. The local
 checkout remains clean at the committed code; live acceptance is therefore
 pending an allowed deployment action.
+
+# Checkpoint — 2026-09-16 — Media sizing runtime dependency repair (LOCAL ONLY)
+
+SCOPE: Repaired the narrowly scoped Media image-adoption runtime dependency
+that blocked the existing WordPress Media URL path. No Capture, Article,
+Knowledge, Source, Evidence, Graph, Authority, Classification, MediaUsage,
+staging or production record was created or mutated.
+
+ROOT_CAUSE: `PublicImageSizingPolicy` was introduced as the canonical sizing
+owner under `NHK\\Core\\Application\\Media`, but
+`WordPressMediaAttachmentBridge` referenced it unqualified from
+`NHK\\Core\\Infrastructure\\Media`. The same existing-raster adoption branch
+also referenced `PublicMediaAssetSelector` and `RuntimeException` unqualified.
+The first runtime lookup therefore resolved to the nonexistent class
+`NHK\\Core\\Infrastructure\\Media\\PublicImageSizingPolicy`; after that was
+fixed alone, the next unqualified dependency would have failed similarly.
+This is a caller/wiring namespace defect (case D), not a missing sizing owner,
+duplicate policy or missing PSR-4 file.
+
+FIX: Imported the existing canonical `PublicImageSizingPolicy`,
+`PublicMediaAssetSelector` and global `RuntimeException` into the bridge. No
+sizing formula, optimizer flow, URL resolver, attachment reuse behavior,
+MediaUsage role, representative projection or Capture semantic phase changed.
+Added a focused Media runtime dependency-closure regression covering the
+canonical classes, case-exact PSR-4 paths, bridge imports, proportional
+`1920x2560 → 900x1200`, no-upscale `800x600`, aspect preservation, WebP quality
+86 and the shared adapter profile.
+
+PACKAGE: The canonical policy file is present at
+`public/wp-content/plugins/nhk-core/src/Application/Media/PublicImageSizingPolicy.php`
+and is tracked by Git. The existing deployment adapter transfers the complete
+`nhk-core/` directory (excluding only tests and secret-pattern files), so the
+source file is included in the plugin artifact; no separate plugin vendor
+autoload is used. Composer optimized root autoload generation completed.
+
+VERIFICATION: Focused Media/Capture-adjacent tests PASS — 64 tests / 738
+assertions, with one pre-existing warning and two deprecations. Full NHK Unit
+suite PASS — 1,660 tests / 8,108 assertions, with 13 warnings, 15
+deprecations and 17 PHPUnit deprecations. Contract suite PASS — 6 tests / 48
+assertions. Changed PHP lint and `git diff --check` pass. The read-only release
+preflight reaches Composer/runtime/documentation checks, but WordPress
+bootstrap, schema, hydration and REST checks fail closed on the local MySQL
+connection. Guarded WordPress Media integration has the same environment
+blocker. No deployment, remote reload, connector reconnection, live Capture
+resume, attachment #555 read-back, public HTTP read-back or frontend read-back
+was attempted or claimed.
+
+STATUS: `MEDIA_RUNTIME_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED` — deploy
+through the canonical owner-approved process, then resume the existing Capture
+`01a0a9b2-9f9d-78d0-b180-82f14f1e7912` with `resume_hint=media` and verify
+attachment #555, canonical Media, WebP `900x1200`, SEO path, featured-primary
+MediaUsage, Classification representative and frontend read-back before
+claiming completion.
