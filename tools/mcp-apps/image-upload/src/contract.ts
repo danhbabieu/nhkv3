@@ -47,6 +47,25 @@ type ToolResult = {
   result?: unknown;
 };
 
+export function extractPayload(result: ToolResult): unknown {
+  const nested = result.structuredContent ?? result.result;
+  if (nested !== undefined) {
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const envelope = nested as { structuredContent?: unknown; result?: unknown };
+      if (envelope.structuredContent !== undefined) return extractPayload(envelope as ToolResult);
+      if (envelope.result !== undefined) return extractPayload(envelope as ToolResult);
+    }
+    return nested;
+  }
+  const text = result.content?.find((item) => item.type === "text")?.text;
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 function uploadsFromValue(value: unknown): UploadedItem[] | null {
   if (!value || typeof value !== "object") return null;
   const record = value as { uploads?: unknown; structuredContent?: unknown; result?: unknown };
@@ -59,7 +78,7 @@ function uploadsFromValue(value: unknown): UploadedItem[] | null {
 }
 
 export function extractUploads(result: ToolResult): UploadedItem[] {
-  const structuredUploads = uploadsFromValue(result.structuredContent) ?? uploadsFromValue(result.result) ?? uploadsFromValue(result);
+  const structuredUploads = uploadsFromValue(extractPayload(result)) ?? uploadsFromValue(result);
   if (structuredUploads !== null) return structuredUploads;
 
   const text = result.content?.find((item) => item.type === "text")?.text;

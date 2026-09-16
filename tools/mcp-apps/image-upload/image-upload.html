@@ -23,16 +23,16 @@
     </style>
   </head>
   <body>
-    <h2>Trình tải ảnh NHK</h2>
-    <p>Chọn một hoặc nhiều ảnh. Ảnh sẽ được lưu thành Media chuẩn của NHK.</p>
+    <h2>Ảnh NHK</h2>
+    <p>Thêm ảnh và mô tả để tải tư liệu hoặc tạo bài viết.</p>
     <p>Trạng thái: <span id="state">CONNECTING</span></p>
-    <label for="context">Ngữ cảnh đặt tên (bắt buộc)</label>
+    <label for="context">Mô tả ảnh / nội dung</label>
     <input id="context" type="text" maxlength="500" placeholder="Ví dụ: Mặt trước đồng hồ Odo 36/10" autocomplete="off" />
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
-      <button id="select" type="button" hidden disabled>Chọn ảnh trong Library</button>
-      <button id="upload" type="button" disabled>Tải ảnh đã chọn</button>
-      <button id="use" type="button" disabled>Dùng ảnh trong chat</button>
+      <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
+      <button id="upload" type="button" disabled>Tải ảnh lên</button>
+      <button id="create" type="button" disabled>Tạo bài viết</button>
     </div>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>

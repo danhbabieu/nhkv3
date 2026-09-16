@@ -12018,6 +12018,24 @@ function normalizeSelectedFiles(value) {
     return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
   });
 }
+function extractPayload(result) {
+  const nested = result.structuredContent ?? result.result;
+  if (nested !== void 0) {
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const envelope = nested;
+      if (envelope.structuredContent !== void 0) return extractPayload(envelope);
+      if (envelope.result !== void 0) return extractPayload(envelope);
+    }
+    return nested;
+  }
+  const text = result.content?.find((item) => item.type === "text")?.text;
+  if (!text) return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+}
 function uploadsFromValue(value) {
   if (!value || typeof value !== "object") return null;
   const record2 = value;
@@ -12029,7 +12047,7 @@ function uploadsFromValue(value) {
   return null;
 }
 function extractUploads(result) {
-  const structuredUploads = uploadsFromValue(result.structuredContent) ?? uploadsFromValue(result.result) ?? uploadsFromValue(result);
+  const structuredUploads = uploadsFromValue(extractPayload(result)) ?? uploadsFromValue(result);
   if (structuredUploads !== null) return structuredUploads;
   const text = result.content?.find((item) => item.type === "text")?.text;
   if (!text) return [];
@@ -12064,6 +12082,8 @@ function buildWidgetState(items, diagnostics = [], uploadStatus = items.length >
   };
 }
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
+const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
+const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 function byId(id) {
@@ -12091,7 +12111,7 @@ async function start() {
   const input = byId("files");
   const select = byId("select");
   const upload = byId("upload");
-  const use = byId("use");
+  const create = byId("create");
   const summary = byId("summary");
   const previews = byId("previews");
   const state = byId("state");
@@ -12107,6 +12127,8 @@ async function start() {
   let uploaded = [];
   let diagnostics = [];
   let uploadStatus = "idle";
+  let failedIntent = null;
+  let retryOperationKey = null;
   function renderDiagnostics() {
     diagnosticsView.replaceChildren();
     diagnostics.slice(-12).forEach((diagnostic) => {
@@ -12157,7 +12179,9 @@ async function start() {
       previews.append(figure);
     });
     summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
-    upload.disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
+    const disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
+    upload.disabled = disabled;
+    create.disabled = disabled;
   }
   function renderUploads(items) {
     results.replaceChildren();
@@ -12165,7 +12189,7 @@ async function start() {
       const row = document.createElement("div");
       row.className = "success";
       const filename = item.public_filename || item.original_filename || "(unnamed image)";
-      row.textContent = `Đính kèm ${item.attachment_id ?? "—"} · Media ${item.media_id ?? "—"} · ${filename} · ${item.status || "đã tải"}`;
+      row.textContent = `${filename} · ${item.status || "đã tải"}`;
       results.append(row);
     });
   }
@@ -12184,70 +12208,98 @@ async function start() {
     }
     return items;
   }
-  async function uploadFiles() {
+  function checkpointFrom(result) {
+    const payload = extractPayload(result);
+    if (!payload || typeof payload !== "object") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
+    const value = payload;
+    if (typeof value.manifest_hash !== "string" || typeof value.documentation_version !== "string") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
+    return { manifest_hash: value.manifest_hash, documentation_version: value.documentation_version };
+  }
+  function assertCaptureResult(result) {
+    if (result.isError) throw new Error("CAPTURE_TOOL_ERROR");
+    const payload = extractPayload(result);
+    if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+    const record2 = payload;
+    if (typeof record2.capture_id !== "string" && typeof record2.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  }
+  async function materializeSelectedImages(operationKey, namingContext) {
+    if (uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return uploaded;
+    const references = [];
+    for (const item of selected) {
+      const fileName = item.kind === "local" ? item.file.name : item.fileName;
+      recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
+      setState("UPLOADING", `Đang tải ${fileName}…`);
+      const fileId = item.kind === "local" ? (await host.uploadFile(item.file, { library: false })).fileId : item.fileId;
+      if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
+      recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
+      const download = await host.getFileDownloadUrl({ fileId });
+      if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
+      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
+      recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
+    }
+    const result = await app.callServerTool({
+      name: SERVER_TOOL_NAME,
+      arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references }
+    });
+    recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+    const returned = handleToolResult(result);
+    if (returned.length !== selected.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
+    if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
+    recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
+    if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
+    recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
+    return returned;
+  }
+  async function runFinalAction(intent) {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
     const namingContext = context.value.trim();
     if (namingContext === "") {
       recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Nhập ngữ cảnh đặt tên trước khi tải ảnh.");
+      setState("ERROR", "Hãy nhập mô tả ảnh hoặc nội dung trước khi thực hiện.");
       return;
     }
     uploading = true;
     uploadStatus = "idle";
-    uploaded = [];
-    renderUploads([]);
     renderSelection();
-    setState("UPLOADING", "Đang tải ảnh đã chọn…");
-    const references = [];
+    setState("UPLOADING", "Đang xử lý ảnh đã chọn…");
+    const operationKey = failedIntent === intent && retryOperationKey !== null ? retryOperationKey : createIdempotencyKey();
     try {
-      for (const item of selected) {
-        const fileName = item.kind === "local" ? item.file.name : item.fileName;
-        recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
-        setState("UPLOADING", `Đang tải ${fileName}…`);
-        const fileId = item.kind === "local" ? (await host.uploadFile(item.file, { library: false })).fileId : item.fileId;
-        if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
-        recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
-        const download = await host.getFileDownloadUrl({ fileId });
-        if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-        references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
-        recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
-      }
       recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      const result = await app.callServerTool({
-        name: SERVER_TOOL_NAME,
-        arguments: { idempotency_key: createIdempotencyKey(), metadata: { description: namingContext }, files: references }
+      uploaded = await materializeSelectedImages(operationKey, namingContext);
+      const docs = await app.callServerTool({ name: DOCUMENTATION_TOOL_NAME, arguments: {} });
+      const checkpoint = checkpointFrom(docs);
+      const capture = await app.callServerTool({
+        name: CAPTURE_TOOL_NAME,
+        arguments: {
+          idempotency_key: `${operationKey}:capture`,
+          documentation_checkpoint: checkpoint,
+          intent: intent === "MEDIA_ENRICHMENT" ? "MEDIA_ENRICHMENT" : "IMAGE_ARTICLE",
+          text: namingContext,
+          title: namingContext,
+          media_ids: uploaded.map((item) => item.media_id).filter((id) => Boolean(id)),
+          publish: intent === "IMAGE_ARTICLE"
+        }
       });
-      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-      const returned = handleToolResult(result);
-      if (returned.length === 0) throw new Error("SERVER_TOOL_EMPTY_RESULT");
-      recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
-      if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
-      recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
-      if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
-      recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
-      use.disabled = typeof host?.sendFollowUpMessage !== "function";
+      recordDiagnostic("CAPTURE_READBACK_START", "START", "CAPTURE_READBACK_REQUESTED");
+      assertCaptureResult(capture);
+      recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       uploadStatus = "complete";
       saveWidgetState();
-      recordDiagnostic("READY_FOR_USE", "DONE", "WIDGET_READY_FOR_USE");
-      setState("SUCCESS", `Đã tải thành công ${uploaded.length} ảnh.`);
+      failedIntent = null;
+      retryOperationKey = null;
+      recordDiagnostic("READY_FOR_USE", "DONE", "CAPTURE_WORKFLOW_COMPLETE");
+      setState("SUCCESS", intent === "MEDIA_ENRICHMENT" ? `Đã tải lên ${uploaded.length} ảnh.` : "Đã tạo bài viết từ ảnh đã chọn.");
     } catch (error2) {
       uploadStatus = "error";
+      failedIntent = intent;
+      retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error2), error2);
-      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error2)}`);
+      setState("ERROR", `${intent === "MEDIA_ENRICHMENT" ? "Tải ảnh" : "Tạo bài viết"} thất bại: ${safeErrorMessage(error2)}`);
     } finally {
       uploading = false;
       renderSelection();
     }
-  }
-  async function useImagesInChat() {
-    if (!connected || uploaded.length === 0 || typeof host?.sendFollowUpMessage !== "function") {
-      setState("ERROR", "ChatGPT host này không hỗ trợ gửi tiếp tin nhắn.");
-      return;
-    }
-    await host.sendFollowUpMessage({
-      role: "user",
-      content: [{ type: "text", text: `Dùng các ảnh NHK đã tải trong Capture tiếp theo: ${uploaded.map((item) => item.media_id).filter(Boolean).join(", ")}` }]
-    });
   }
   app.ontoolresult = (result) => {
     try {
@@ -12262,6 +12314,9 @@ async function start() {
     setState("ERROR", `Kết nối MCP Apps thất bại: ${safeErrorMessage(error2)}`);
   };
   input.addEventListener("change", () => {
+    uploaded = [];
+    failedIntent = null;
+    retryOperationKey = null;
     selected = asFiles(input.files).filter((file) => IMAGE_TYPES.test(file.type)).map((file) => ({ kind: "local", file }));
     recordDiagnostic("FILE_SELECTED", "DONE", "LOCAL_FILE_SELECTED");
     recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LOCAL_FILE_PREVIEW_READY");
@@ -12270,6 +12325,9 @@ async function start() {
   select.addEventListener("click", async () => {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
+      uploaded = [];
+      failedIntent = null;
+      retryOperationKey = null;
       selected = normalizeSelectedFiles(await host.selectFiles());
       recordDiagnostic("FILE_SELECTED", "DONE", "LIBRARY_FILE_SELECTED");
       recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
@@ -12279,8 +12337,8 @@ async function start() {
       setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error2)}`);
     }
   });
-  upload.addEventListener("click", () => void uploadFiles());
-  use.addEventListener("click", () => void useImagesInChat());
+  create.addEventListener("click", () => void runFinalAction("IMAGE_ARTICLE"));
+  upload.addEventListener("click", () => void runFinalAction("MEDIA_ENRICHMENT"));
   setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
   recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
   recordDiagnostic("RESOURCE_LOADED", "DONE", "RESOURCE_READY");
@@ -12291,15 +12349,14 @@ async function start() {
     input.disabled = false;
     select.hidden = typeof host?.selectFiles !== "function";
     select.disabled = typeof host?.selectFiles !== "function";
-    use.disabled = true;
-    setState("READY", supportsFileUpload() ? "Sẵn sàng. Chọn ảnh và nhập ngữ cảnh đặt tên để tải lên." : "Đã kết nối nhưng host không hỗ trợ uploadFile và getFileDownloadUrl.");
+    setState("READY", supportsFileUpload() ? "Sẵn sàng. Chọn ảnh và nhập mô tả ảnh hoặc nội dung." : "Đã kết nối nhưng host không hỗ trợ uploadFile và getFileDownloadUrl.");
     renderSelection();
   } catch (error2) {
     connected = false;
     input.disabled = true;
     select.disabled = true;
     upload.disabled = true;
-    use.disabled = true;
+    create.disabled = true;
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error2);
     setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error2)}`);
   }
@@ -12308,16 +12365,16 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else void start();</script>
   </head>
   <body>
-    <h2>Trình tải ảnh NHK</h2>
-    <p>Chọn một hoặc nhiều ảnh. Ảnh sẽ được lưu thành Media chuẩn của NHK.</p>
+    <h2>Ảnh NHK</h2>
+    <p>Thêm ảnh và mô tả để tải tư liệu hoặc tạo bài viết.</p>
     <p>Trạng thái: <span id="state">CONNECTING</span></p>
-    <label for="context">Ngữ cảnh đặt tên (bắt buộc)</label>
+    <label for="context">Mô tả ảnh / nội dung</label>
     <input id="context" type="text" maxlength="500" placeholder="Ví dụ: Mặt trước đồng hồ Odo 36/10" autocomplete="off" />
     <input id="files" type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple disabled />
     <div id="actions">
-      <button id="select" type="button" hidden disabled>Chọn ảnh trong Library</button>
-      <button id="upload" type="button" disabled>Tải ảnh đã chọn</button>
-      <button id="use" type="button" disabled>Dùng ảnh trong chat</button>
+      <button id="select" type="button" hidden disabled>Chọn ảnh từ thư viện ChatGPT</button>
+      <button id="upload" type="button" disabled>Tải ảnh lên</button>
+      <button id="create" type="button" disabled>Tạo bài viết</button>
     </div>
     <div id="summary" aria-live="polite">Chưa chọn ảnh.</div>
     <div id="previews"></div>

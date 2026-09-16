@@ -1,10 +1,12 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { buildWidgetState, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { buildWidgetState, extractPayload, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
 // the canonical NHK name remains the server-side catalog name.
 const SERVER_TOOL_NAME = "wp_ability_nhk_v3_media_widget_upload";
+const CAPTURE_TOOL_NAME = "wp_ability_nhk_v3_capture_ingest";
+const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -15,6 +17,7 @@ type ToolResult = {
   isError?: boolean;
   structuredContent?: unknown;
   content?: Array<{ type?: string; text?: string }>;
+  result?: unknown;
 };
 
 type ChatGptFileApi = {
@@ -22,7 +25,6 @@ type ChatGptFileApi = {
   uploadFile?: (file: File, options?: { library?: boolean }) => Promise<{ fileId?: string }>;
   getFileDownloadUrl?: (options: { fileId: string }) => Promise<{ downloadUrl?: string }>;
   setWidgetState?: (state: unknown) => void | Promise<void>;
-  sendFollowUpMessage?: (message: { role: "user"; content: Array<{ type: "text"; text: string }> }) => void | Promise<void>;
 };
 
 declare global {
@@ -60,7 +62,7 @@ async function start(): Promise<void> {
   const input = byId<HTMLInputElement>("files");
   const select = byId<HTMLButtonElement>("select");
   const upload = byId<HTMLButtonElement>("upload");
-  const use = byId<HTMLButtonElement>("use");
+  const create = byId<HTMLButtonElement>("create");
   const summary = byId<HTMLDivElement>("summary");
   const previews = byId<HTMLDivElement>("previews");
   const state = byId<HTMLSpanElement>("state");
@@ -76,6 +78,8 @@ async function start(): Promise<void> {
   let uploaded: UploadedItem[] = [];
   let diagnostics: WidgetDiagnostic[] = [];
   let uploadStatus: WidgetUploadStatus = "idle";
+  let failedIntent: "MEDIA_ENRICHMENT" | "IMAGE_ARTICLE" | null = null;
+  let retryOperationKey: string | null = null;
 
   function renderDiagnostics(): void {
     diagnosticsView.replaceChildren();
@@ -133,7 +137,9 @@ async function start(): Promise<void> {
       previews.append(figure);
     });
     summary.textContent = `${selected.length} ảnh, ${(total / 1048576).toFixed(2)} MB`;
-    upload.disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
+    const disabled = !connected || uploading || selected.length === 0 || !supportsFileUpload();
+    upload.disabled = disabled;
+    create.disabled = disabled;
   }
 
   function renderUploads(items: UploadedItem[]): void {
@@ -142,7 +148,7 @@ async function start(): Promise<void> {
       const row = document.createElement("div");
       row.className = "success";
       const filename = item.public_filename || item.original_filename || "(unnamed image)";
-      row.textContent = `Đính kèm ${item.attachment_id ?? "—"} · Media ${item.media_id ?? "—"} · ${filename} · ${item.status || "đã tải"}`;
+      row.textContent = `${filename} · ${item.status || "đã tải"}`;
       results.append(row);
     });
   }
@@ -164,75 +170,105 @@ async function start(): Promise<void> {
     return items;
   }
 
-  async function uploadFiles(): Promise<void> {
+  function checkpointFrom(result: ToolResult): { manifest_hash: string; documentation_version: string } {
+    const payload = extractPayload(result);
+    if (!payload || typeof payload !== "object") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
+    const value = payload as { manifest_hash?: unknown; documentation_version?: unknown };
+    if (typeof value.manifest_hash !== "string" || typeof value.documentation_version !== "string") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
+    return { manifest_hash: value.manifest_hash, documentation_version: value.documentation_version };
+  }
+
+  function assertCaptureResult(result: ToolResult): void {
+    if (result.isError) throw new Error("CAPTURE_TOOL_ERROR");
+    const payload = extractPayload(result);
+    if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+    const record = payload as { capture_id?: unknown; capture?: { capture_id?: unknown } };
+    if (typeof record.capture_id !== "string" && typeof record.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
+  }
+
+  async function materializeSelectedImages(operationKey: string, namingContext: string): Promise<UploadedItem[]> {
+    if (uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return uploaded;
+    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string }> = [];
+    for (const item of selected) {
+      const fileName = item.kind === "local" ? item.file.name : item.fileName;
+      recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
+      setState("UPLOADING", `Đang tải ${fileName}…`);
+      const fileId = item.kind === "local"
+        ? (await host!.uploadFile!(item.file, { library: false })).fileId
+        : item.fileId;
+      if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
+      recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
+      const download = await host!.getFileDownloadUrl!({ fileId });
+      if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
+      references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
+      recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
+    }
+
+    const result = await app.callServerTool({
+      name: SERVER_TOOL_NAME,
+      arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references },
+    });
+    recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
+    const returned = handleToolResult(result as ToolResult);
+    if (returned.length !== selected.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
+    if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
+    recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
+    if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
+    recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
+    return returned;
+  }
+
+  async function runFinalAction(intent: "MEDIA_ENRICHMENT" | "IMAGE_ARTICLE"): Promise<void> {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
     const namingContext = context.value.trim();
     if (namingContext === "") {
       recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Nhập ngữ cảnh đặt tên trước khi tải ảnh.");
+      setState("ERROR", "Hãy nhập mô tả ảnh hoặc nội dung trước khi thực hiện.");
       return;
     }
     uploading = true;
     uploadStatus = "idle";
-    uploaded = [];
-    renderUploads([]);
     renderSelection();
-    setState("UPLOADING", "Đang tải ảnh đã chọn…");
-    const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string }> = [];
+    setState("UPLOADING", "Đang xử lý ảnh đã chọn…");
+    const operationKey = failedIntent === intent && retryOperationKey !== null ? retryOperationKey : createIdempotencyKey();
 
     try {
-      for (const item of selected) {
-        const fileName = item.kind === "local" ? item.file.name : item.fileName;
-        recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
-        setState("UPLOADING", `Đang tải ${fileName}…`);
-        const fileId = item.kind === "local"
-          ? (await host!.uploadFile!(item.file, { library: false })).fileId
-          : item.fileId;
-        if (!fileId) throw new Error(`Upload did not return a file ID for ${fileName}.`);
-        recordDiagnostic("HOST_FILE_UPLOAD_DONE", "DONE", "HOST_FILE_UPLOAD_VERIFIED");
-        const download = await host!.getFileDownloadUrl!({ fileId });
-        if (!download.downloadUrl) throw new Error(`Download URL was not returned for ${fileName}.`);
-        references.push({ download_url: download.downloadUrl, file_id: fileId, mime_type: item.kind === "local" ? item.file.type : item.mimeType, file_name: fileName });
-        recordDiagnostic("TRUSTED_FILE_REF_READY", "DONE", "TRUSTED_FILE_REFERENCE_READY");
-      }
-
       recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      const result = await app.callServerTool({
-        name: SERVER_TOOL_NAME,
-        arguments: { idempotency_key: createIdempotencyKey(), metadata: { description: namingContext }, files: references },
+      uploaded = await materializeSelectedImages(operationKey, namingContext);
+      const docs = await app.callServerTool({ name: DOCUMENTATION_TOOL_NAME, arguments: {} });
+      const checkpoint = checkpointFrom(docs as ToolResult);
+      const capture = await app.callServerTool({
+        name: CAPTURE_TOOL_NAME,
+        arguments: {
+          idempotency_key: `${operationKey}:capture`,
+          documentation_checkpoint: checkpoint,
+          intent: intent === "MEDIA_ENRICHMENT" ? "MEDIA_ENRICHMENT" : "IMAGE_ARTICLE",
+          text: namingContext,
+          title: namingContext,
+          media_ids: uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)),
+          publish: intent === "IMAGE_ARTICLE",
+        },
       });
-      recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-      const returned = handleToolResult(result as ToolResult);
-      if (returned.length === 0) throw new Error("SERVER_TOOL_EMPTY_RESULT");
-      recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
-      if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
-      recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
-      if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
-      recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
-      use.disabled = typeof host?.sendFollowUpMessage !== "function";
+      recordDiagnostic("CAPTURE_READBACK_START", "START", "CAPTURE_READBACK_REQUESTED");
+      assertCaptureResult(capture as ToolResult);
+      recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
       uploadStatus = "complete";
       saveWidgetState();
-      recordDiagnostic("READY_FOR_USE", "DONE", "WIDGET_READY_FOR_USE");
-      setState("SUCCESS", `Đã tải thành công ${uploaded.length} ảnh.`);
+      failedIntent = null;
+      retryOperationKey = null;
+      recordDiagnostic("READY_FOR_USE", "DONE", "CAPTURE_WORKFLOW_COMPLETE");
+      setState("SUCCESS", intent === "MEDIA_ENRICHMENT" ? `Đã tải lên ${uploaded.length} ảnh.` : "Đã tạo bài viết từ ảnh đã chọn.");
     } catch (error) {
       uploadStatus = "error";
+      failedIntent = intent;
+      retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
-      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error)}`);
+      setState("ERROR", `${intent === "MEDIA_ENRICHMENT" ? "Tải ảnh" : "Tạo bài viết"} thất bại: ${safeErrorMessage(error)}`);
     } finally {
       uploading = false;
       renderSelection();
     }
-  }
-
-  async function useImagesInChat(): Promise<void> {
-    if (!connected || uploaded.length === 0 || typeof host?.sendFollowUpMessage !== "function") {
-      setState("ERROR", "ChatGPT host này không hỗ trợ gửi tiếp tin nhắn.");
-      return;
-    }
-    await host.sendFollowUpMessage({
-      role: "user",
-      content: [{ type: "text", text: `Dùng các ảnh NHK đã tải trong Capture tiếp theo: ${uploaded.map((item) => item.media_id).filter(Boolean).join(", ")}` }],
-    });
   }
 
   app.ontoolresult = (result) => {
@@ -246,6 +282,9 @@ async function start(): Promise<void> {
     setState("ERROR", `Kết nối MCP Apps thất bại: ${safeErrorMessage(error)}`);
   };
   input.addEventListener("change", () => {
+    uploaded = [];
+    failedIntent = null;
+    retryOperationKey = null;
     selected = asFiles(input.files)
       .filter((file) => IMAGE_TYPES.test(file.type))
       .map((file) => ({ kind: "local" as const, file }));
@@ -256,6 +295,9 @@ async function start(): Promise<void> {
   select.addEventListener("click", async () => {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
+      uploaded = [];
+      failedIntent = null;
+      retryOperationKey = null;
       selected = normalizeSelectedFiles(await host.selectFiles());
       recordDiagnostic("FILE_SELECTED", "DONE", "LIBRARY_FILE_SELECTED");
       recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
@@ -265,8 +307,8 @@ async function start(): Promise<void> {
       setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error)}`);
     }
   });
-  upload.addEventListener("click", () => void uploadFiles());
-  use.addEventListener("click", () => void useImagesInChat());
+  create.addEventListener("click", () => void runFinalAction("IMAGE_ARTICLE"));
+  upload.addEventListener("click", () => void runFinalAction("MEDIA_ENRICHMENT"));
 
   setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
   recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
@@ -278,9 +320,8 @@ async function start(): Promise<void> {
     input.disabled = false;
     select.hidden = typeof host?.selectFiles !== "function";
     select.disabled = typeof host?.selectFiles !== "function";
-    use.disabled = true;
     setState("READY", supportsFileUpload()
-      ? "Sẵn sàng. Chọn ảnh và nhập ngữ cảnh đặt tên để tải lên."
+      ? "Sẵn sàng. Chọn ảnh và nhập mô tả ảnh hoặc nội dung."
       : "Đã kết nối nhưng host không hỗ trợ uploadFile và getFileDownloadUrl.");
     renderSelection();
   } catch (error: unknown) {
@@ -288,7 +329,7 @@ async function start(): Promise<void> {
     input.disabled = true;
     select.disabled = true;
     upload.disabled = true;
-    use.disabled = true;
+    create.disabled = true;
     recordDiagnostic("ERROR", "ERROR", "MCP_APPS_CONNECT_FAILED", error);
     setState("ERROR", `Không thể kết nối MCP Apps: ${safeErrorMessage(error)}`);
   }
