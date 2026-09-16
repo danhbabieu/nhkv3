@@ -1,5 +1,52 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Provided-file WebP attachment read-back repair (LOCAL ONLY)
+
+SCOPE: Debugged the ChatGPT provided-file → `nhk.media.widget-upload` →
+WordPress attachment → canonical Media path for the real `IMG_4644.jpeg`
+reproduction. No deployment, connector reconnection, staging semantic
+mutation, production mutation, generic WordPress writer or alternate
+transport was used.
+
+ROOT_CAUSE: `WordPressMediaAttachmentBridge::adoptAttachment()` builds the
+derivative asset with the already durable WordPress storage key
+`uploads/<attached-file>`, then looks that key up again after
+`MediaService::ingest()`. `MediaService::normalizeAssetSpec()` incorrectly
+renamed any asset whose `original_filename` matched a camera pattern such as
+`IMG_4644.jpeg`. The persisted key therefore became
+`uploads/<canonical>-image.jpeg` while the attachment read-back key remained
+`uploads/<canonical>.webp`; the exact predicate at bridge line 235 returned no
+asset and line 236 emitted `WORDPRESS_MEDIA_ASSET_UNAVAILABLE`.
+
+FIRST_FAILED_STAGE: `MEDIA_ASSET_REGISTERED` / adoption asset read-back. The
+provided temp file was present/readable through the synchronous upload callback;
+source validation, WebP generation, durable upload, `wp_insert_attachment`,
+attachment metadata and private source persistence occur before the failing
+lookup. The ingestor `finally` then deleted the request work files and rolled
+back the attachment/public upload, explaining the empty fresh live read-back.
+
+FIX: Removed semantic-service filename rewriting. Upload and derivative owners
+already choose normalized filenames; `MediaService` now preserves caller-owned
+physical storage keys. Added unit coverage for an `IMG_4644.jpeg` derivative,
+an integration regression using that filename on the complete provided-file
+path, and an explicit temp-lifetime assertion before the upload callback
+returns.
+
+LOCAL_VERIFICATION: Focused Media/widget/materializer/gateway/entrypoint/MCP
+tests pass — 85 tests / 776 assertions. Contract suite passes — 6 tests / 48
+assertions. MCP Apps tests pass — 30 tests; TypeScript typecheck and production
+widget build pass. Composer PHP lint and `git diff --check` pass. Full Unit
+reaches 1,673 tests / 8,202 assertions with one pre-existing unrelated
+`DemoCutoverCliContractTest` failure (`REMOTE_DEPLOYMENT_FAILED` versus its
+expected `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`). Guarded WordPress integration
+is infrastructure-blocked because local MySQL has no running socket and
+WordPress bootstrap stops at database connection failure; it is not claimed as
+a pass.
+
+LIVE_STATUS: `UPLOAD_FINAL_STATUS=UNVERIFIED`. No live deployment, external
+acceptance, attachment, Media or public-WebP read-back was performed. The
+owner must push the local fix and update the server before live acceptance.
+
 # Checkpoint — 2026-09-16 — Connector-specific Easy MCP semantic discovery repair (LOCAL)
 
 SCOPE: Repair the existing Easy MCP Ability discovery boundary for the

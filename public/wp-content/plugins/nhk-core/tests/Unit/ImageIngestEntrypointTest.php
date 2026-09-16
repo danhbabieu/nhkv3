@@ -70,6 +70,8 @@ final class ImageIngestEntrypointTest extends TestCase
         $upload = null;
         $entrypoint = new ImageIngestEntrypoint(
             static function (string $key, array $metadata, array $files, array $items) use (&$upload): array {
+                self::assertFileExists((string) $files['files']['tmp_name'][0]);
+                self::assertFileIsReadable((string) $files['files']['tmp_name'][0]);
                 $upload = [$key, $metadata, $files, $items];
                 return ['items' => [['attachment_id' => 12]]];
             },

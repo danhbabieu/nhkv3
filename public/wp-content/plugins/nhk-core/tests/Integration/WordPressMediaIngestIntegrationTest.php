@@ -222,7 +222,7 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
                 'download_url' => 'https://files.example.test/image',
                 'file_id' => 'structured-file-1',
                 'mime_type' => 'image/png',
-                'file_name' => 'camera-original.png',
+                'file_name' => 'IMG_4644.jpeg',
             ]], [['client_file_id' => 'structured-file-1']]);
             $item = $manifest['items'][0] ?? [];
             $attachmentId = (int) ($item['attachment_id'] ?? 0);
@@ -236,8 +236,8 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             self::assertGreaterThan(0, (int) ($item['byte_size'] ?? 0));
             self::assertStringEndsWith('.webp', (string) ($item['filename'] ?? ''));
             self::assertNotSame('camera-original.png', (string) ($item['filename'] ?? ''));
-            self::assertSame('camera-original.png', $item['original_filename'] ?? null);
-            self::assertSame('camera-original.png', (string) get_post_meta($attachmentId, '_nhk_original_filename', true));
+            self::assertSame('IMG_4644.jpeg', $item['original_filename'] ?? null);
+            self::assertSame('IMG_4644.jpeg', (string) get_post_meta($attachmentId, '_nhk_original_filename', true));
             self::assertNotNull($ingestor->read($attachmentId));
             self::assertNotEmpty($assets->listByMediaId($mediaId));
             $sourceRelative = (string) get_post_meta($attachmentId, '_nhk_source_original_file', true);

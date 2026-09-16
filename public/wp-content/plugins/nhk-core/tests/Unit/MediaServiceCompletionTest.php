@@ -59,6 +59,28 @@ final class MediaServiceCompletionTest extends TestCase
         self::assertSame([], $primary?->metadata['sizes'] ?? null);
     }
 
+    public function test_ingest_preserves_attachment_storage_key_when_original_filename_is_a_camera_name(): void
+    {
+        [$media, $assets, $service] = $this->stores();
+        $item = $service->ingest('wp-attachment:1:4644', 'Public clock', 'draft', [], [[
+            'kind' => 'derivative',
+            'storage_key' => 'uploads/public-clock.webp',
+            'original_filename' => 'IMG_4644.jpeg',
+            'checksum' => hash('sha256', 'public-clock'),
+            'mime_type' => 'image/webp',
+            'byte_size' => 12,
+            'width' => 1200,
+            'height' => 800,
+            'visibility' => 'PUBLIC',
+            'metadata' => [
+                'canonical_filename' => 'public-clock.webp',
+                'wordpress_source_attachment_id' => 4644,
+            ],
+        ]]);
+
+        self::assertSame('uploads/public-clock.webp', $assets->listByMediaId($item->canonicalId)[0]->storageKey);
+    }
+
     public function test_completion_does_not_update_an_already_public_asset_without_metadata_changes(): void
     {
         [$media, $assets, $service] = $this->stores();

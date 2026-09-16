@@ -253,15 +253,11 @@ final class MediaService
             if (!is_array($metadata['keyword_groups'])) throw new MediaException('Media keyword groups must be a list.');
             foreach ($metadata['keyword_groups'] as $group) SeoKeywordGroupRegistry::assertKnown((string) $group);
         }
-        $storageKey = (string) ($spec['storage_key'] ?? '');
-        $original = (string) ($spec['original_filename'] ?? basename($storageKey));
-        if (($metadata['source_original'] ?? false) !== true && $original !== '' && preg_match('/^(IMG|DSC|DSCF|PXL)[-_]?/i', $original) === 1) {
-            $view = (string) ($metadata['view'] ?? $metadata['detail_type'] ?? 'image');
-            $normalized = (new MediaFilenameNormalizer())->normalize($subject, $view, $original, isset($metadata['filename_suffix']) ? (string) $metadata['filename_suffix'] : null);
-            $directory = trim(str_replace('\\', '/', dirname($storageKey)), './');
-            $storageKey = ($directory !== '' ? $directory . '/' : '') . $normalized;
-        }
-        $spec['storage_key'] = $storageKey;
+        // Storage keys identify already-persisted physical bytes. Filename
+        // normalization belongs to the upload/derivative owner before this
+        // semantic boundary; changing the key here breaks attachment
+        // read-back when the original filename is a camera name.
+        $spec['storage_key'] = (string) ($spec['storage_key'] ?? '');
         $spec['metadata'] = $metadata;
         return $spec;
     }
