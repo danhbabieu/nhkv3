@@ -1,5 +1,53 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — `@v3-22` live Easy MCP discovery after reconnect
+
+SCOPE: Complete the bounded live connector verification for the explicit
+`@v3-22` OAuth connection on `demo.1945.vn`. No valid semantic mutation
+payload was supplied and no Article, Source, Evidence, Capture or Proposal
+object was intentionally created or changed.
+
+DEPLOYMENT: The canonical `nhk-deploy-verify` wrapper accepted the clean
+`3acc952b7a9cfb2f6cfc5b0190b58ed0ecb10fc2` checkout and reached remote
+deployment, but its final remote documentation verifier returned
+`MCP_BOOTSTRAP_UNAVAILABLE`. Direct live Admin/connector evidence below
+confirms the deployed Ability surface; the wrapper's secondary verifier is
+not claimed as PASS.
+
+ADMIN_SAVE_RELOAD: PASS. The Easy MCP Ability Admin page retained all five
+selected native IDs after Save and reload:
+`nhk-v3/article-ingest`, `nhk-v3/source-ingest`,
+`nhk-v3/evidence-ingest`, `nhk-v3/capture-ingest` and
+`nhk-v3/proposal-create`. The global allowed-tool pattern remains
+`wp_ability_nhk_v3_*` and no per-connection whitelist was exposed by the
+inspected Admin/OAuth UI.
+
+V3_22_DISCOVERY: PASS after disconnect/reconnect. The connected `v3-22`
+action catalog contains all required connector projections:
+`wp_ability_nhk_v3_article_ingest`,
+`wp_ability_nhk_v3_source_ingest`,
+`wp_ability_nhk_v3_evidence_ingest`,
+`wp_ability_nhk_v3_capture_ingest` and
+`wp_ability_nhk_v3_proposal_create` (47 actions total). Before the stale
+connection was disconnected, the catalog showed only the prior subset.
+
+DISPATCH_STATUS: `UNVERIFIED`. A ChatGPT validation-only conversation was
+started with exactly one empty-object call requested per target and no retry;
+the provider remained in `Ingesting and processing article content` without a
+validation response and was stopped. The live connector therefore proves
+discoverability, not a completed call result. Local canonical dispatch and
+permission/contract tests remain PASS, including fail-closed internal
+capability guards. No semantically valid arguments were sent.
+
+PROJECTION_STATUS: The independent governed auto-publish path still returns
+`PROJECTION_VERIFIER_UNAVAILABLE` when constructed without a projection
+verifier. This is a separate completion/readiness blocker and was not changed
+by the connector discovery repair.
+
+LIVE_STATUS: `ADMIN_GLOBAL_ENABLED=PASS`, `ADMIN_SAVE_RELOAD=PASS`,
+`V3_22_DISCOVERY=PASS`, `V3_22_DISPATCH=UNVERIFIED`,
+`PROJECTION_VERIFIER=UNAVAILABLE_AS_DESIGNED_FAIL_CLOSED`.
+
 # Checkpoint — 2026-09-16 — Provided-file WebP attachment read-back repair (LOCAL ONLY)
 
 SCOPE: Debugged the ChatGPT provided-file → `nhk.media.widget-upload` →
