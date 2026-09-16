@@ -7,7 +7,7 @@ use NHK\Core\Domain\Capture\ContentIntent;
 
 final class McpToolCatalog
 {
-    /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool,surface:string,connectorMeta?:array}> */
+    /** @return list<array{name:string,description:string,inputSchema:array,kind:string,governed:bool,surface:string,dispatch:?string,connectorMeta?:array}> */
     public static function tools(): array
     {
         return [
@@ -257,6 +257,17 @@ final class McpToolCatalog
         return false;
     }
 
+    public static function hasExecutableDispatchHandler(string $tool): bool
+    {
+        return self::has($tool) && McpDispatchRegistry::hasHandler($tool);
+    }
+
+    /** @return list<string> */
+    public static function executableToolNames(): array
+    {
+        return McpDispatchRegistry::toolNames();
+    }
+
     public static function has(string $tool): bool
     {
         foreach (self::tools() as $definition) if ($definition['name'] === $tool) return true;
@@ -288,6 +299,7 @@ final class McpToolCatalog
             'kind' => $governed ? 'mutation' : 'read',
             'governed' => $governed,
             'surface' => $surface,
+            'dispatch' => McpDispatchRegistry::handlerKey($name),
         ];
         if ($connectorMeta !== []) $definition['connectorMeta'] = $connectorMeta;
         return $definition;

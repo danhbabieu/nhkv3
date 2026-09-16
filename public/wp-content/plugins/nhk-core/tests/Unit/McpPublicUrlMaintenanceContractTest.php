@@ -40,7 +40,12 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
         $ability = 'nhk-v3/public-url-reproject';
 
         self::assertSame([
+            'nhk-v3/article-draft-create',
             'nhk-v3/article-draft-update',
+            'nhk-v3/article-trash',
+            'nhk-v3/article-restore',
+            'nhk-v3/article-publish-approve',
+            'nhk-v3/article-publish',
             $ability,
             'nhk-v3/media-widget-upload',
             'nhk-v3/proposal-submit',

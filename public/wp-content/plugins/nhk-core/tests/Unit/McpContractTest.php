@@ -648,7 +648,7 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/capture-ingest', $enabled);
     }
 
-    public function test_easy_mcp_reconciles_stale_internal_writers_to_the_operator_allowlist(): void
+    public function test_easy_mcp_reconciles_stale_internal_writers_and_article_lifecycle_to_the_canonical_allowlist(): void
     {
         $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([
             'core/get-site-info',
@@ -664,7 +664,9 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/documentation-get', $enabled);
         self::assertContains('nhk-v3/documentation-list', $enabled);
         self::assertNotContains('nhk-v3/video-ingest', $enabled);
-        self::assertNotContains('nhk-v3/article-publish', $enabled);
+        foreach (['nhk-v3/article-draft-create', 'nhk-v3/article-draft-update', 'nhk-v3/article-publish-review', 'nhk-v3/article-publish-approve', 'nhk-v3/article-publish', 'nhk-v3/article-trash', 'nhk-v3/article-restore'] as $ability) {
+            self::assertContains($ability, $enabled);
+        }
         self::assertSame($enabled, McpAbilityRegistration::ensureEasyMcpEnabledAbilities($enabled));
     }
 
@@ -672,7 +674,11 @@ final class McpContractTest extends TestCase
     {
         $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]);
         self::assertSame(
-            array_values(array_unique(array_merge(McpAbilityRegistration::operatorEnabledAbilityAllowlist(), McpAbilityRegistration::publicationContinuationAbilityNames()))),
+            array_values(array_unique(array_merge(
+                McpAbilityRegistration::operatorEnabledAbilityAllowlist(),
+                McpAbilityRegistration::publicationContinuationAbilityNames(),
+                ['nhk-v3/article-draft-create', 'nhk-v3/article-draft-update', 'nhk-v3/article-publish-review', 'nhk-v3/article-publish-approve', 'nhk-v3/article-publish', 'nhk-v3/article-trash', 'nhk-v3/article-restore'],
+            ))),
             $enabled,
         );
         self::assertContains('nhk-v3/capture-ingest', $enabled);
@@ -680,7 +686,7 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/documentation-get', $enabled);
         self::assertContains('nhk-v3/documentation-list', $enabled);
         foreach (SingleEntryPointPolicy::internalOnlyTools() as $tool) {
-            if (in_array($tool, ['nhk.article.draft.update', ...SingleEntryPointPolicy::publicationContinuationTools()], true)) continue;
+            if (in_array($tool, ['nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore'], true)) continue;
             self::assertNotContains(McpAbilityRegistration::abilityNameForTool($tool), $enabled);
         }
     }

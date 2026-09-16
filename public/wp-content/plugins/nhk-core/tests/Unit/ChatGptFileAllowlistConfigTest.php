@@ -18,7 +18,9 @@ final class ChatGptFileAllowlistConfigTest extends TestCase
         self::assertStringContainsString('oaisdmntprcentralus.blob.core.windows.net', $config);
         self::assertStringContainsString('sdmntprcentralus.oaiusercontent.com', $config);
         self::assertStringContainsString('sdmntprjapaneast.oaiusercontent.com', $config);
+        self::assertStringContainsString('oaisdmntprnznorth.blob.core.windows.net', $config);
         self::assertStringNotContainsString('*.oaiusercontent.com', $config);
+        self::assertStringNotContainsString('*.blob.core.windows.net', $config);
         self::assertStringNotContainsString("'oaiusercontent.com'", $config);
     }
 }

@@ -21,7 +21,12 @@ final class McpAbilityRegistration
     private const EASY_MCP_EXPLICIT_INTERNAL_ABILITIES = [
         // Narrow, capability-gated continuation for an existing Capture-owned
         // draft; this is not a generic WordPress writer.
+        'nhk-v3/article-draft-create',
         'nhk-v3/article-draft-update',
+        'nhk-v3/article-trash',
+        'nhk-v3/article-restore',
+        'nhk-v3/article-publish-approve',
+        'nhk-v3/article-publish',
         'nhk-v3/public-url-reproject',
         'nhk-v3/media-widget-upload',
         'nhk-v3/proposal-submit',
@@ -95,15 +100,15 @@ final class McpAbilityRegistration
             if ($ability === null) continue;
             $exposed = !SingleEntryPointPolicy::isInternalOnly($toolName)
                 || SingleEntryPointPolicy::isPublicationContinuation($toolName)
-                || $toolName === 'nhk.article.draft.update';
+                || self::isEasyMcpArticleLifecycleTool($toolName);
             $contract[$toolName] = [
                 'ability' => $ability,
                 'connector_tool' => self::connectorToolNameForAbility($ability),
-                'runtime_registered' => true,
+                'runtime_registered' => $ability !== null,
                 'easy_mcp_descriptor_exposed' => $exposed,
                 'tools_list_exposed' => McpToolCatalog::has($toolName),
                 'connector_discoverable' => $exposed,
-                'callable_dispatched' => McpToolCatalog::has($toolName),
+                'callable_dispatched' => McpToolCatalog::hasExecutableDispatchHandler($toolName),
             ];
         }
         return $contract;
@@ -126,7 +131,7 @@ final class McpAbilityRegistration
         ));
         $boundedContinuation = self::publicationContinuationAbilityNames();
 
-        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $boundedContinuation, $explicitInternal)));
+        return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $boundedContinuation, self::articleLifecycleAbilityAllowlist(), $explicitInternal)));
     }
 
     public static function reconcileEasyMcpEnabledAbilities(): void
@@ -438,8 +443,8 @@ final class McpAbilityRegistration
                     // admin surface so an administrator can explicitly enable
                     // it. Existing internal writers retain their hidden REST
                     // metadata.
-                    'public' => $toolName === 'nhk.media.widget-upload' || $toolName === 'nhk.article.draft.update' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
-                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || $toolName === 'nhk.article.draft.update' || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'public' => $toolName === 'nhk.media.widget-upload' || self::isEasyMcpArticleLifecycleTool($toolName) || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || self::isEasyMcpArticleLifecycleTool($toolName) || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
                     'surface' => SingleEntryPointPolicy::surface($toolName),
                     'annotations' => [
                         'readonly' => false,
@@ -482,6 +487,36 @@ final class McpAbilityRegistration
         }
 
         return $schema;
+    }
+
+    /** @return list<string> */
+    private static function articleLifecycleAbilityAllowlist(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $tool): ?string => self::abilityNameForTool($tool),
+            [
+                'nhk.article.draft.create',
+                'nhk.article.draft.update',
+                'nhk.article.publish.review',
+                'nhk.article.publish.approve',
+                'nhk.article.publish',
+                'nhk.article.trash',
+                'nhk.article.restore',
+            ],
+        )));
+    }
+
+    private static function isEasyMcpArticleLifecycleTool(string $tool): bool
+    {
+        return in_array($tool, [
+            'nhk.article.draft.create',
+            'nhk.article.draft.update',
+            'nhk.article.publish.review',
+            'nhk.article.publish.approve',
+            'nhk.article.publish',
+            'nhk.article.trash',
+            'nhk.article.restore',
+        ], true);
     }
 
     private static function executeMcp(string $tool, mixed $input): mixed

@@ -263,6 +263,17 @@ final class ChatGptMcpGatewayTest extends TestCase
         self::assertFalse($method->invoke(null, 'oaiusercontent.com', ['sdmntpraustraliaeast.oaiusercontent.com']));
     }
 
+    public function test_evidenced_japan_and_north_hosts_are_exact_matches_only(): void
+    {
+        $method = new \ReflectionMethod(ChatGptMcpGateway::class, 'isExactAllowlistedHost');
+        self::assertTrue($method->invoke(null, 'sdmntprjapaneast.oaiusercontent.com', ['sdmntprjapaneast.oaiusercontent.com']));
+        self::assertTrue($method->invoke(null, 'oaisdmntprnznorth.blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
+        self::assertFalse($method->invoke(null, 'sdmntprjapaneast2.oaiusercontent.com', ['sdmntprjapaneast.oaiusercontent.com']));
+        self::assertFalse($method->invoke(null, 'oaisdmntprnznorth2.blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
+        self::assertFalse($method->invoke(null, 'child.oaisdmntprnznorth.blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
+        self::assertFalse($method->invoke(null, 'blob.core.windows.net', ['oaisdmntprnznorth.blob.core.windows.net']));
+    }
+
     public function test_total_size_limit_and_actual_mime_sniff_are_enforced(): void
     {
         try {

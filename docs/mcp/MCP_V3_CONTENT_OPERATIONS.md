@@ -50,24 +50,45 @@ required → publication gate when applicable → final read-back`.
 
 The standalone mutation tools for Media, Video, Knowledge, Source, Evidence,
 Article draft/update/publish, relation and proposal creation are retained only
-for internal/admin compatibility or lifecycle operations. The typed
-`nhk.article.draft.update` Ability is the one narrow connector-discoverable
-continuation exception: it may reconcile an existing Capture-owned draft body
-under the same state-token/Capture guard, but it remains `internal_admin_only`
-and capability-gated. All other direct writers are marked
-`internal_admin_only` in the executable catalog/Ability metadata, require
-`nhk_internal_content_operations`, and return `DIRECT_WRITE_BLOCKED` with
-`USE_CANONICAL_CAPTURE_FLOW` when called without that boundary. A client must
-not fall back to one of these writers when Capture is unavailable. The existing
-Easy MCP bridge has explicit internal/admin opt-ins for the bounded
-`nhk-v3/article-draft-update`, `nhk-v3/public-url-reproject`, physical
-`nhk-v3/media-widget-upload`, and
+for internal/admin compatibility or lifecycle operations. The complete typed
+Article lifecycle package (`draft.create`, `draft.update`, `publish.review`,
+`publish.approve`, `publish`, `trash`, and `restore`) is connector-discoverable
+as an explicit internal/admin surface, but every member remains
+`internal_admin_only`, capability-gated, state-token/idempotency guarded where
+applicable, and delegated to the canonical MCP transport. This exposure does
+not make direct Article writing the normal submission path. All other direct
+writers are marked `internal_admin_only` in the executable catalog/Ability
+metadata, require `nhk_internal_content_operations`, and return
+`DIRECT_WRITE_BLOCKED` with `USE_CANONICAL_CAPTURE_FLOW` when called without
+that boundary. A client must not fall back to one of these writers when Capture
+is unavailable. The existing Easy MCP bridge has explicit internal/admin
+exposure for the Article lifecycle package, plus opt-ins for
+`nhk-v3/public-url-reproject`, physical `nhk-v3/media-widget-upload`, and
 Proposal lifecycle `nhk-v3/proposal-submit`, `nhk-v3/proposal-approve`, and
 `nhk-v3/proposal-apply` Abilities. These remain capability guarded and are
-never added by `PROJECT_BUILD`; the article-draft continuation is enabled as
-the sole bounded exception, while the other internal opt-ins remain available
-only after explicit internal/admin enablement. Proposal callbacks continue to delegate to the
-canonical MCP transport and existing Governance owners.
+never added by `PROJECT_BUILD`; the Article lifecycle package is enabled by the
+canonical Easy MCP reconciliation, while the other internal opt-ins remain
+available only after explicit internal/admin enablement. Proposal callbacks
+continue to delegate to the canonical MCP transport and existing Governance
+owners.
+
+### Discovery and execution registry parity
+
+NHK V3 intentionally has two registry projections with different jobs. The
+canonical `McpToolCatalog` owns the custom `/nhk/v1/mcp` `tools/list` and
+canonical `tools/call` names. `McpAbilityRegistration` owns WordPress Ability
+registration and the Easy MCP projection; Easy MCP normalizes an Ability such
+as `nhk-v3/article-draft-create` to its connector name
+`wp_ability_nhk_v3_article_draft_create`. The Ability callback delegates back
+to the canonical MCP transport; it is not a second writer.
+
+`McpDispatchRegistry` is the explicit bridge between catalog discovery and
+transport dispatch. A catalog mutation is not considered executable unless it
+has a registered dispatch key, and every dispatch key must appear in the
+catalog. The parity test fails closed with
+`DISCOVERED_BUT_UNKNOWN_AT_CALL` or `EXECUTABLE_NOT_DISCOVERY_LISTED` when
+either direction breaks. This prevents a cached or projected descriptor from
+claiming a tool that the actual `tools/call` dispatcher cannot resolve.
 
 ### Runtime semantic-write policy — 2026-09-13
 
@@ -906,16 +927,16 @@ document authorizes a writer unless it is visible in fresh runtime discovery.
 ### Article publication continuation Ability surface
 
 For an existing Capture-owned Article that has reached
-`READY_FOR_PUBLICATION`, the bridge exposes exactly these lifecycle continuation
-Abilities for authenticated client discovery:
+`READY_FOR_PUBLICATION`, the bridge exposes exactly these publication lifecycle
+continuation Abilities for authenticated client discovery:
 
 - `nhk-v3/article-publish-review` → `nhk.article.publish.review`
 - `nhk-v3/article-publish-approve` → `nhk.article.publish.approve`
 - `nhk-v3/article-publish` → `nhk.article.publish`
 
-They remain `nhk_internal_content_operations`-guarded and are not included in
-the Easy MCP operator allowlist for new submissions. Their callbacks delegate to
-the canonical MCP transport, then `EditorialDraftGateway` and
+They remain `nhk_internal_content_operations`-guarded and are not a normal
+operator submission path. Their callbacks delegate to the canonical MCP
+transport, then `EditorialDraftGateway` and
 `OwnerPublicationApplicationService`; the `ArticlePublicationGate`, owner
 decision/audit, state-token CAS, idempotency and native/public read-backs remain
 mandatory. This surface does not expose a low-level WordPress writer and does

@@ -1,5 +1,43 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — MCP discovery/execution registry parity repair
+
+ROOT_CAUSE: `McpToolCatalog` advertised canonical Article mutation names, while
+the execution path was an inline `McpTransport` match and
+`McpAbilityRegistration::callableParity()` treated catalog presence as proof of
+dispatchability. Easy MCP is a separate WordPress Ability projection with
+normalized connector names (`wp_ability_nhk_v3_*`); the direct Article
+lifecycle abilities were not reconciled into its enabled/exposed set. This
+allowed discovery to report a tool without proving that the actual connector
+execution registry could resolve it, producing the observed
+`DISCOVERED_BUT_UNKNOWN_AT_CALL` state.
+
+DISCOVERY_SOURCE: `McpToolCatalog` for the canonical NHK `/nhk/v1/mcp`
+`tools/list`; `McpAbilityRegistration` plus Easy MCP's dynamic Ability
+registrar for the normalized connector projection. `EasyMcpNativeFileCompatibilityAdapter`
+is only the Capture file-reference adapter and is not the Article dispatcher.
+
+EXECUTION_REGISTRY_SOURCE: `McpDispatchRegistry` is now the explicit canonical
+tool-to-handler registry consumed by `McpToolCatalog` and `McpTransport`.
+Article Ability callbacks continue to delegate to the same canonical MCP
+transport; no generic WordPress writer or REST bypass was introduced.
+
+FIX: Every catalog tool has an explicit dispatch entry, transport dispatch is
+fail-closed when the entry is absent, the missing relation-backfill dispatch
+case is covered, and the complete Article lifecycle Ability package
+(`draft.create`, `draft.update`, `publish.review`, `publish.approve`,
+`publish`, `trash`, `restore`) is reconciled into Easy MCP's enabled/exposed
+internal/admin surface while retaining `nhk_internal_content_operations` and
+the existing lifecycle guards. A bidirectional parity regression test now
+fails with `DISCOVERED_BUT_UNKNOWN_AT_CALL` or
+`EXECUTABLE_NOT_DISCOVERY_LISTED`.
+
+VERIFICATION: Focused MCP parity/contract selection passed 39 tests / 626
+assertions, with PHP lint passing for all changed MCP source and test files.
+Staging rebuild, fresh external discovery, wire mutation/read-back/trash and
+the final deployed build identity remain pending; no staging mutation has been
+performed in this checkpoint.
+
 # Checkpoint — 2026-09-16 — Public Clock runtime closeout attempt
 
 SCOPE: Fresh deployed-runtime documentation bootstrap and read-back completed

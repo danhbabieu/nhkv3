@@ -130,6 +130,8 @@ final class McpTransport
         $definition = null;
         foreach (McpToolCatalog::tools() as $tool) if ($tool['name'] === $name) { $definition = $tool; break; }
         if ($definition === null) throw new McpMethodNotFound('tools/call:' . $name);
+        $dispatch = $definition['dispatch'] ?? null;
+        if (!is_string($dispatch) || $dispatch === '') throw new McpMethodNotFound('tools/call:' . $name);
         SingleEntryPointPolicy::guard($name, $this->can);
         $capability = match ($name) {
             'nhk.documentation.bootstrap', 'nhk.documentation.get', 'nhk.documentation.list', 'nhk.docs.bootstrap', 'nhk.docs.get' => 'read',
@@ -155,7 +157,7 @@ final class McpTransport
         if ($capability !== null && (!$this->can || !(bool) ($this->can)($capability))) throw new McpPermissionDenied($capability);
         if ($definition['kind'] === 'mutation' && $this->can !== null && !(bool) ($this->can)('read')) throw new McpPermissionDenied('read');
         $this->validateArguments($definition['inputSchema'], $arguments);
-        $result = match ($name) {
+        $result = match ($dispatch) {
             'nhk.documentation.bootstrap', 'nhk.docs.bootstrap' => ($this->documentation ?? new McpDocumentationRegistry())->bootstrap(),
             'nhk.documentation.get' => ($this->documentation ?? new McpDocumentationRegistry())->get((string) ($arguments['path'] ?? ''), isset($arguments['start_line']) ? (int) $arguments['start_line'] : null, isset($arguments['line_count']) ? (int) $arguments['line_count'] : null),
             'nhk.documentation.list' => ($this->documentation ?? new McpDocumentationRegistry())->list(isset($arguments['status']) ? (string) $arguments['status'] : null, isset($arguments['domain']) ? (string) $arguments['domain'] : null, isset($arguments['path_prefix']) ? (string) $arguments['path_prefix'] : null),
@@ -207,6 +209,7 @@ final class McpTransport
             'nhk.proposal.reject' => $this->proposal($this->governance->reject($this->required($arguments, 'id'), function_exists('get_current_user_id') ? (string) get_current_user_id() : '0')),
             'nhk.proposal.eligibility' => $this->governance->eligibility($this->required($arguments, 'id')),
             'nhk.proposal.apply' => $this->governance->apply($this->required($arguments, 'id')),
+            'nhk.relation.backfill.apply' => $this->governance->relationBatchApply((array) ($arguments['candidates'] ?? []), (bool) ($arguments['approval_confirmed'] ?? false)),
         };
         $text = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         return ['content' => [['type' => 'text', 'text' => $text]], 'structuredContent' => $result, 'isError' => false];
