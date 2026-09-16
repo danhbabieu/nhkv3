@@ -10,5 +10,6 @@ add_filter('nhk_chatgpt_file_allowed_hosts', static function (mixed $hosts): arr
     $hosts[] = 'sdmntpraustraliaeast.oaiusercontent.com';
     $hosts[] = 'oaisdmntprcentralus.blob.core.windows.net';
     $hosts[] = 'sdmntprcentralus.oaiusercontent.com';
+    $hosts[] = 'sdmntprjapaneast.oaiusercontent.com';
     return array_values(array_unique($hosts));
 }, 10, 1);

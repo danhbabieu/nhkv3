@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { buildWidgetState, extractPayload, extractUploads, normalizeSelectedFiles, type SelectedImage, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertUploadManifestCount, buildWidgetState, extractUploadManifest, inspectToolResult, normalizeSelectedFiles, type SelectedImage, type ToolResult, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -12,13 +12,6 @@ const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "ERROR"] as const;
 type WidgetState = (typeof STATES)[number];
-
-type ToolResult = {
-  isError?: boolean;
-  structuredContent?: unknown;
-  content?: Array<{ type?: string; text?: string }>;
-  result?: unknown;
-};
 
 type ChatGptFileApi = {
   selectFiles?: () => Promise<unknown>;
@@ -158,20 +151,18 @@ async function start(): Promise<void> {
     void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
   }
 
-  function handleToolResult(result: ToolResult): UploadedItem[] {
-    if (result.isError) {
-      throw new Error("SERVER_TOOL_ERROR");
-    }
-    const items = extractUploads(result);
-    if (items.length > 0) {
-      uploaded = items;
-      renderUploads(uploaded);
-    }
-    return items;
+  function handleToolResult(result: ToolResult, expectedCount?: number): UploadedItem[] {
+    const manifest = extractUploadManifest(result);
+    if (expectedCount !== undefined) assertUploadManifestCount(manifest, expectedCount);
+    uploaded = manifest.items;
+    renderUploads(uploaded);
+    return uploaded;
   }
 
   function checkpointFrom(result: ToolResult): { manifest_hash: string; documentation_version: string } {
-    const payload = extractPayload(result);
+    const inspection = inspectToolResult(result);
+    if (inspection.kind !== "success") throw new Error(inspection.code);
+    const payload = inspection.payload;
     if (!payload || typeof payload !== "object") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
     const value = payload as { manifest_hash?: unknown; documentation_version?: unknown };
     if (typeof value.manifest_hash !== "string" || typeof value.documentation_version !== "string") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
@@ -179,8 +170,9 @@ async function start(): Promise<void> {
   }
 
   function assertCaptureResult(result: ToolResult): void {
-    if (result.isError) throw new Error("CAPTURE_TOOL_ERROR");
-    const payload = extractPayload(result);
+    const inspection = inspectToolResult(result);
+    if (inspection.kind !== "success") throw new Error(inspection.code);
+    const payload = inspection.payload;
     if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
     const record = payload as { capture_id?: unknown; capture?: { capture_id?: unknown } };
     if (typeof record.capture_id !== "string" && typeof record.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
@@ -209,8 +201,7 @@ async function start(): Promise<void> {
       arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references },
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const returned = handleToolResult(result as ToolResult);
-    if (returned.length !== selected.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    const returned = handleToolResult(result as ToolResult, selected.length);
     recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
     if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
     recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");

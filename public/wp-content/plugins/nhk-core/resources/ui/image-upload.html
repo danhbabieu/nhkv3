@@ -12018,45 +12018,102 @@ function normalizeSelectedFiles(value) {
     return [{ kind: "library", fileId: reference.fileId, fileName: reference.fileName, mimeType: reference.mimeType }];
   });
 }
-function extractPayload(result) {
-  const nested = result.structuredContent ?? result.result;
-  if (nested !== void 0) {
-    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
-      const envelope = nested;
-      if (envelope.structuredContent !== void 0) return extractPayload(envelope);
-      if (envelope.result !== void 0) return extractPayload(envelope);
-    }
-    return nested;
+const SAFE_ERROR_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
+function errorCode(value) {
+  if (typeof value === "string") {
+    const code = value.match(/^[A-Z][A-Z0-9_]{2,}/)?.[0];
+    return code && SAFE_ERROR_CODE.test(code) ? code : null;
   }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record2 = value;
+  for (const key of ["code", "reason_code", "reasonCode"]) {
+    const code = errorCode(record2[key]);
+    if (code) return code;
+  }
+  return errorCode(record2.error);
+}
+function parsedText(result) {
   const text = result.content?.find((item) => item.type === "text")?.text;
   if (!text) return void 0;
   try {
     return JSON.parse(text);
   } catch {
-    return void 0;
+    return text;
   }
 }
-function uploadsFromValue(value) {
-  if (!value || typeof value !== "object") return null;
+function inspectValue(value, depth = 0) {
+  if (depth > 6) return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+  if (typeof value === "string") {
+    try {
+      return inspectValue(JSON.parse(value), depth + 1);
+    } catch {
+      const code = errorCode(value);
+      return code ? { kind: "error", code } : { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { kind: "success", payload: value };
   const record2 = value;
-  if (Array.isArray(record2.uploads)) return record2.uploads;
+  if (record2.isError === true) return { kind: "error", code: errorCode(record2) ?? errorCode(record2.structuredContent) ?? errorCode(record2.result) ?? "SERVER_TOOL_ERROR" };
+  const nestedError = errorCode(record2.error);
+  if (record2.error !== void 0 && nestedError) return { kind: "error", code: nestedError };
   for (const nested of [record2.structuredContent, record2.result]) {
-    const uploads = uploadsFromValue(nested);
-    if (uploads !== null) return uploads;
+    if (nested === void 0) continue;
+    const inspection = inspectValue(nested, depth + 1);
+    if (inspection.kind !== "success") return inspection;
+    return inspection;
   }
-  return null;
+  return { kind: "success", payload: value };
 }
-function extractUploads(result) {
-  const structuredUploads = uploadsFromValue(extractPayload(result)) ?? uploadsFromValue(result);
-  if (structuredUploads !== null) return structuredUploads;
-  const text = result.content?.find((item) => item.type === "text")?.text;
-  if (!text) return [];
-  try {
-    const parsed = JSON.parse(text);
-    return uploadsFromValue(parsed) ?? [];
-  } catch {
-    return [];
+function inspectToolResult(result) {
+  if (result.isError === true) return { kind: "error", code: errorCode(result) ?? errorCode(result.structuredContent) ?? errorCode(result.result) ?? errorCode(parsedText(result)) ?? "SERVER_TOOL_ERROR" };
+  for (const candidate of [result.structuredContent, result.result, parsedText(result)]) {
+    if (candidate === void 0) continue;
+    return inspectValue(candidate);
   }
+  return { kind: "malformed", code: "MCP_RESULT_MALFORMED" };
+}
+function safeUploadedItem(value, fallbackStatus = "SUCCESS") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record2 = value;
+  const statusValue = typeof record2.status === "string" ? record2.status : record2.upload_status;
+  const status = statusValue === "CREATED" ? "SUCCESS" : typeof statusValue === "string" && statusValue !== "" ? statusValue : fallbackStatus;
+  const item = {
+    ...typeof record2.attachment_id === "number" ? { attachment_id: record2.attachment_id } : {},
+    ...typeof record2.media_id === "string" ? { media_id: record2.media_id } : {},
+    ...typeof record2.public_filename === "string" ? { public_filename: record2.public_filename } : typeof record2.filename === "string" ? { public_filename: record2.filename } : {},
+    ...typeof record2.original_filename === "string" ? { original_filename: record2.original_filename } : {},
+    ...typeof record2.mime === "string" ? { mime: record2.mime } : typeof record2.mime_type === "string" ? { mime: record2.mime_type } : {},
+    ...typeof record2.filesize === "number" ? { filesize: record2.filesize } : typeof record2.byte_size === "number" ? { filesize: record2.byte_size } : {},
+    ...typeof record2.width === "number" ? { width: record2.width } : {},
+    ...typeof record2.height === "number" ? { height: record2.height } : {},
+    ...typeof record2.canonical_url === "string" ? { canonical_url: record2.canonical_url } : typeof record2.source_url === "string" ? { canonical_url: record2.source_url } : {},
+    ...typeof record2.attachment_readback_status === "string" ? { attachment_readback_status: record2.attachment_readback_status } : {},
+    ...typeof record2.error_code === "string" ? { error_code: record2.error_code } : typeof record2.code === "string" && SAFE_ERROR_CODE.test(record2.code) ? { error_code: record2.code } : {},
+    status
+  };
+  const fileId = typeof record2.file_id === "string" ? record2.file_id : typeof record2.client_file_id === "string" ? record2.client_file_id : void 0;
+  if (fileId && !fileId.includes("://")) item.file_id = fileId;
+  return item;
+}
+function extractUploadManifest(result) {
+  const inspection = inspectToolResult(result);
+  if (inspection.kind !== "success") throw new Error(inspection.code);
+  if (!inspection.payload || typeof inspection.payload !== "object" || Array.isArray(inspection.payload)) throw new Error("MCP_RESULT_MALFORMED");
+  const record2 = inspection.payload;
+  const rawItems = Array.isArray(record2.items) ? record2.items : Array.isArray(record2.uploads) ? record2.uploads : null;
+  if (!rawItems) throw new Error("MCP_RESULT_MALFORMED");
+  const items = rawItems.flatMap((item) => {
+    const safeItem = safeUploadedItem(item, "SUCCESS");
+    return safeItem ? [safeItem] : [];
+  });
+  const requested = typeof record2.requested_count === "number" ? record2.requested_count : rawItems.length;
+  const success = typeof record2.success_count === "number" ? record2.success_count : items.filter((item) => item.status === "SUCCESS").length;
+  const failure2 = typeof record2.failure_count === "number" ? record2.failure_count : Math.max(0, requested - success);
+  if (!Number.isInteger(requested) || !Number.isInteger(success) || !Number.isInteger(failure2) || requested < 0 || success < 0 || failure2 < 0) throw new Error("MCP_RESULT_MALFORMED");
+  return { requested_count: requested, success_count: success, failure_count: failure2, items };
+}
+function assertUploadManifestCount(manifest, expected) {
+  if (manifest.requested_count !== expected || manifest.success_count !== expected || manifest.failure_count !== 0 || manifest.items.length !== expected || manifest.items.some((item) => item.status !== "SUCCESS")) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
 }
 function redactDiagnostic(value) {
   return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
@@ -12197,27 +12254,26 @@ async function start() {
     if (!connected || typeof host?.setWidgetState !== "function") return;
     void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
   }
-  function handleToolResult(result) {
-    if (result.isError) {
-      throw new Error("SERVER_TOOL_ERROR");
-    }
-    const items = extractUploads(result);
-    if (items.length > 0) {
-      uploaded = items;
-      renderUploads(uploaded);
-    }
-    return items;
+  function handleToolResult(result, expectedCount) {
+    const manifest = extractUploadManifest(result);
+    if (expectedCount !== void 0) assertUploadManifestCount(manifest, expectedCount);
+    uploaded = manifest.items;
+    renderUploads(uploaded);
+    return uploaded;
   }
   function checkpointFrom(result) {
-    const payload = extractPayload(result);
+    const inspection = inspectToolResult(result);
+    if (inspection.kind !== "success") throw new Error(inspection.code);
+    const payload = inspection.payload;
     if (!payload || typeof payload !== "object") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
     const value = payload;
     if (typeof value.manifest_hash !== "string" || typeof value.documentation_version !== "string") throw new Error("DOCUMENTATION_CHECKPOINT_UNAVAILABLE");
     return { manifest_hash: value.manifest_hash, documentation_version: value.documentation_version };
   }
   function assertCaptureResult(result) {
-    if (result.isError) throw new Error("CAPTURE_TOOL_ERROR");
-    const payload = extractPayload(result);
+    const inspection = inspectToolResult(result);
+    if (inspection.kind !== "success") throw new Error(inspection.code);
+    const payload = inspection.payload;
     if (!payload || typeof payload !== "object") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
     const record2 = payload;
     if (typeof record2.capture_id !== "string" && typeof record2.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
@@ -12242,8 +12298,7 @@ async function start() {
       arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references }
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const returned = handleToolResult(result);
-    if (returned.length !== selected.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    const returned = handleToolResult(result, selected.length);
     recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
     if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
     recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");

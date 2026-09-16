@@ -43,6 +43,11 @@ final class McpWidgetUploadTest extends TestCase
         ]);
 
         self::assertSame(['file_one'], array_column($result['uploads'], 'file_id'));
+        self::assertSame(1, $result['requested_count']);
+        self::assertSame(1, $result['success_count']);
+        self::assertSame(0, $result['failure_count']);
+        self::assertSame(0, $result['items'][0]['ordinal']);
+        self::assertSame('SUCCESS', $result['items'][0]['status']);
         self::assertSame('/anh/safe-1.webp', $result['uploads'][0]['canonical_url']);
         self::assertSame('verified', $result['uploads'][0]['attachment_readback_status']);
         self::assertSame([['widget-one', ['source' => 'chatgpt_widget', 'description' => 'Mặt trước đồng hồ Odo 36/10'], 'file_one']], $calls);
@@ -65,7 +70,31 @@ final class McpWidgetUploadTest extends TestCase
 
         self::assertSame(['file_a', 'file_b'], array_column($result['uploads'], 'file_id'));
         self::assertCount(2, $result['uploads']);
+        self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
+        self::assertSame(['SUCCESS', 'SUCCESS'], array_column($result['items'], 'status'));
         self::assertSame(1, $materializerCalls);
+    }
+
+    public function test_widget_upload_returns_a_safe_partial_manifest_in_request_order(): void
+    {
+        $calls = [];
+        $materializerCalls = 0;
+        $transport = $this->transport($calls, $materializerCalls);
+        $result = $this->call($transport, [
+            'idempotency_key' => 'widget-partial',
+            'metadata' => ['description' => 'Một ảnh lỗi kết nối'],
+            'files' => [
+                ['download_url' => 'https://files.openai.test/a', 'file_id' => 'file_a', 'file_name' => 'a.jpg'],
+                ['download_url' => 'https://files.openai.test/b', 'file_id' => 'file_b', 'file_name' => 'b.jpg'],
+            ],
+        ]);
+
+        self::assertSame(2, $result['requested_count']);
+        self::assertSame(1, $result['success_count']);
+        self::assertSame(1, $result['failure_count']);
+        self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
+        self::assertSame(['SUCCESS', 'FAILED'], array_column($result['items'], 'status'));
+        self::assertArrayNotHasKey('download_url', $result['items'][1]);
     }
 
     public function test_widget_upload_fails_closed_without_trustworthy_naming_context(): void
@@ -109,6 +138,9 @@ final class McpWidgetUploadTest extends TestCase
                 $manifest = [];
                 foreach ($items as $index => $item) {
                     $manifest[] = ['client_file_id' => (string) ($item['client_file_id'] ?? ''), 'attachment_id' => 10 + $index, 'media_id' => 'media-' . ($index + 1), 'filename' => 'safe-' . ($index + 1) . '.webp', 'original_filename' => (string) ($item['filename'] ?? ''), 'mime_type' => 'image/webp', 'width' => 10, 'height' => 10, 'byte_size' => 100, 'source_url' => '/anh/safe-' . ($index + 1) . '.webp', 'attachment_readback_status' => 'verified'];
+                }
+                if ($key === 'widget-partial') {
+                    return ['items' => [$manifest[0]], 'errors' => [['client_file_id' => 'file_b', 'code' => 'TRUSTED_FILE_READ_FAILED']]];
                 }
                 return ['items' => $manifest];
             },

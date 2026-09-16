@@ -260,15 +260,36 @@ final class McpTransport
         );
         $itemsByFileId = [];
         foreach (array_values(array_filter((array) ($manifest['items'] ?? []), 'is_array')) as $item) {
-            $itemsByFileId[(string) ($item['client_file_id'] ?? '')] = $item;
+            $clientFileId = (string) ($item['client_file_id'] ?? '');
+            if ($clientFileId !== '') $itemsByFileId[$clientFileId] = $item;
+        }
+        $errorsByFileId = [];
+        foreach (array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array')) as $error) {
+            $clientFileId = (string) ($error['client_file_id'] ?? '');
+            if ($clientFileId !== '') $errorsByFileId[$clientFileId] = $error;
         }
         $uploads = [];
-        foreach ($references as $reference) {
+        $safeItems = [];
+        $safeErrors = [];
+        foreach ($references as $ordinal => $reference) {
             if (!is_array($reference)) continue;
             $fileId = (string) ($reference['file_id'] ?? '');
             $item = $itemsByFileId[$fileId] ?? null;
-            if (!is_array($item)) continue;
+            if (!is_array($item)) {
+                $error = $errorsByFileId[$fileId] ?? ['code' => 'UPLOAD_RESULT_ITEM_MISSING'];
+                $code = self::safeWidgetErrorCode((string) ($error['code'] ?? 'UPLOAD_FAILED'));
+                $safeItems[] = [
+                    'ordinal' => (int) $ordinal,
+                    'status' => 'FAILED',
+                    'original_filename' => (string) ($reference['file_name'] ?? ''),
+                    'error_code' => $code,
+                ];
+                $safeErrors[] = ['ordinal' => (int) $ordinal, 'code' => $code];
+                continue;
+            }
             $upload = [
+                'ordinal' => (int) $ordinal,
+                'status' => 'SUCCESS',
                 'attachment_id' => (int) ($item['attachment_id'] ?? 0),
                 'media_id' => (string) ($item['media_id'] ?? ''),
                 'public_filename' => (string) ($item['filename'] ?? ''),
@@ -277,14 +298,39 @@ final class McpTransport
                 'width' => (int) ($item['width'] ?? 0),
                 'height' => (int) ($item['height'] ?? 0),
                 'filesize' => (int) ($item['byte_size'] ?? 0),
-                'canonical_url' => (string) ($item['source_url'] ?? ''),
+                'canonical_url' => self::modelVisibleWidgetCanonicalUrl((string) ($item['source_url'] ?? '')),
                 'attachment_readback_status' => (string) ($item['attachment_readback_status'] ?? ''),
             ];
             $modelVisibleFileId = self::modelVisibleWidgetFileId((string) ($item['client_file_id'] ?? $fileId));
             if ($modelVisibleFileId !== null) $upload['file_id'] = $modelVisibleFileId;
             $uploads[] = $upload;
+            $safeItems[] = $upload;
         }
-        return ['uploads' => $uploads, 'errors' => array_values(array_filter((array) ($manifest['errors'] ?? []), 'is_array'))];
+        return [
+            'requested_count' => count($references),
+            'success_count' => count($uploads),
+            'failure_count' => count($safeItems) - count($uploads),
+            'items' => $safeItems,
+            'uploads' => $uploads,
+            'errors' => $safeErrors,
+        ];
+    }
+
+    private static function safeWidgetErrorCode(string $code): string
+    {
+        $code = strtoupper(trim($code));
+        return preg_match('/^[A-Z][A-Z0-9_]{2,}$/', $code) === 1 ? $code : 'UPLOAD_FAILED';
+    }
+
+    private static function modelVisibleWidgetCanonicalUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '' || str_contains($url, '://') && filter_var($url, FILTER_VALIDATE_URL) === false) return '';
+        if (str_contains($url, '://')) {
+            $parts = parse_url($url);
+            if (!is_array($parts) || !isset($parts['scheme'], $parts['host']) || isset($parts['query'], $parts['fragment'], $parts['user'], $parts['pass'])) return '';
+        }
+        return $url;
     }
 
     private static function modelVisibleWidgetFileId(string $fileId): ?string

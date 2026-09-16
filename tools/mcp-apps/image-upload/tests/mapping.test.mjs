@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildWidgetState, extractPayload, extractUploads, normalizeSelectedFiles } from "../src/contract.ts";
+import { assertUploadManifestCount, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, normalizeSelectedFiles } from "../src/contract.ts";
 
 test("normalizes ChatGPT library selections as authorized file references", () => {
   assert.deepEqual(normalizeSelectedFiles([
@@ -29,8 +29,8 @@ test("maps one widget-upload result without exposing its signed URL", () => {
     attachment_id: 41,
     media_id: "media-one",
     public_filename: "one.webp",
+    status: "SUCCESS",
     file_id: "file-one",
-    download_url: "https://files.openai.test/signed/one",
   }]);
   assert.deepEqual(buildWidgetState(result, [{
     stage: "MEDIA_READBACK_DONE",
@@ -39,7 +39,7 @@ test("maps one widget-upload result without exposing its signed URL", () => {
     uri: "ui://nhk/image-upload.html",
     tool: "nhk.media.widget-upload",
   }]), {
-    modelContent: { uploaded_media: [{ attachment_id: 41, media_id: "media-one", public_filename: "one.webp", status: "uploaded" }] },
+    modelContent: { uploaded_media: [{ attachment_id: 41, media_id: "media-one", public_filename: "one.webp", status: "SUCCESS" }] },
     privateContent: {
       upload_status: "complete",
       diagnostics: [{
@@ -73,6 +73,7 @@ test("maps the server result envelope returned by the Ability bridge", () => {
     attachment_id: 42,
     media_id: "media-envelope",
     public_filename: "envelope.webp",
+    status: "SUCCESS",
     file_id: "file-envelope",
   }]);
 });
@@ -116,4 +117,61 @@ test("preserves multi-image upload order in rendered and persisted mapping", () 
 
   assert.deepEqual(result.map((item) => item.media_id), ["media-one", "media-two"]);
   assert.deepEqual(buildWidgetState(result).imageIds, ["file-one", "file-two"]);
+});
+
+test("preserves a typed error from a nested Ability result envelope", () => {
+  const result = {
+    result: {
+      isError: true,
+      structuredContent: { error: { code: "CHATGPT_FILE_HOST_NOT_ALLOWED", message: "blocked" } },
+    },
+  };
+
+  assert.deepEqual(inspectToolResult(result), {
+    kind: "error",
+    code: "CHATGPT_FILE_HOST_NOT_ALLOWED",
+  });
+  assert.throws(() => extractUploadManifest(result), /CHATGPT_FILE_HOST_NOT_ALLOWED/);
+});
+
+test("rejects a malformed upload result before cardinality validation", () => {
+  assert.deepEqual(inspectToolResult({ content: [{ type: "text", text: "not-json" }] }), {
+    kind: "malformed",
+    code: "MCP_RESULT_MALFORMED",
+  });
+  assert.throws(() => extractUploadManifest({ content: [{ type: "text", text: "not-json" }] }), /MCP_RESULT_MALFORMED/);
+});
+
+test("maps the authoritative per-item manifest by ordinal without a transport file id", () => {
+  const manifest = extractUploadManifest({
+    structuredContent: {
+      requested_count: 1,
+      success_count: 1,
+      failure_count: 0,
+      items: [{
+        ordinal: 0,
+        status: "SUCCESS",
+        attachment_id: 43,
+        media_id: "media-ordinal",
+        public_filename: "ordinal.webp",
+        canonical_url: "/anh/ordinal.webp",
+        attachment_readback_status: "verified",
+        mime: "image/webp",
+        filesize: 100,
+        width: 100,
+        height: 80,
+      }],
+    },
+  });
+
+  assert.equal(manifest.items[0].media_id, "media-ordinal");
+  assert.equal(manifest.items[0].file_id, undefined);
+  assertUploadManifestCount(manifest, 1);
+});
+
+test("uses the typed server code instead of a misleading readback count mismatch", () => {
+  assert.throws(() => extractUploadManifest({
+    isError: true,
+    structuredContent: { error: { code: "TRUSTED_FILE_HOST_NOT_ALLOWED" } },
+  }), /TRUSTED_FILE_HOST_NOT_ALLOWED/);
 });
