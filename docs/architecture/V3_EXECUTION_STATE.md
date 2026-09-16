@@ -10988,3 +10988,10 @@ the authenticated staging browser reproduced the pre-fix save-success but
 reload-unchecked behavior; code is locally ready, while staging verification
 requires the canonical external deployment wrapper and post-deploy browser/
 MCP read-back.
+
+DEPLOYMENT_ATTEMPT: The canonical `./scripts/nhk-deploy-verify` invocation was
+rejected by the external-action policy before process start because it would
+perform SSH/rsync staging publication. No SSH, rsync, remote write, cache
+flush, connector reconnect or staging semantic mutation occurred. The local
+checkout remains clean at the committed code; live acceptance is therefore
+pending an allowed deployment action.
