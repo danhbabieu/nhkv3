@@ -1,5 +1,44 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Connector-specific Easy MCP semantic discovery repair (LOCAL)
+
+SCOPE: Repair the existing Easy MCP Ability discovery boundary for the
+explicitly enabled `@v3-22` administrative connection. No semantic data,
+WordPress posts, Governance proposals, staging objects or production data were
+created or mutated.
+
+ROOT_CAUSE: The NHK V3 native Ability IDs for `article-ingest`,
+`source-ingest`, `evidence-ingest` and `proposal-create` were registered and
+selected in the global Easy MCP option, but their internal-only metadata kept
+them hidden from the Easy MCP descriptor/exporter. The connector therefore
+received only the already discoverable lifecycle subset. This was not an
+Admin checkbox persistence failure and no separate connection-specific tool
+allowlist was present in the inspected Admin/OAuth surfaces.
+
+IMPLEMENTED: Added only the four governed semantic continuations to the
+existing explicit internal/admin Easy MCP opt-in allowlist and made their
+descriptor/REST exposure follow that allowlist. Their canonical MCP catalog
+mapping, dispatcher, `permission_callback`, internal capability gate and
+action-specific capability checks remain unchanged. Generic/public tokens do
+not gain execution authority; the direct semantic boundaries still fail closed
+without `nhk_internal_content_operations` and their required action capability.
+The capture ability remains the existing canonical discoverable boundary.
+
+LOCAL_VERIFICATION: Focused MCP exposure, contract, discovery-parity,
+governance and article tests pass — 54 tests / 1,002 assertions. Composer PHP
+lint and `git diff --check` pass. The configured `--testsuite Unit` selector
+reported `No tests executed`; a full unfiltered PHPUnit run is required before
+the deploy checkpoint. The projection path independently retains its existing
+fail-closed `PROJECTION_VERIFIER_UNAVAILABLE` result when no verifier is
+provided; it is outside this connector discovery repair.
+
+LIVE_STATUS: `ADMIN_GLOBAL_ENABLED=PASS` and `V3_22_PRE_FIX_DISCOVERY=FAIL`
+were verified read-only on `demo.1945.vn`: all five requested native
+abilities were checked in Admin, while the connected `v3-22` action surface
+showed only `capture-ingest` and `proposal-create` among the requested direct
+boundaries. Canonical deploy, Admin save/reload, connector reconnection and
+post-fix live discovery/dispatch remain pending.
+
 # Checkpoint — 2026-09-16 — Widget upload Phase 2 transport/error hardening (LOCAL ONLY)
 
 SCOPE: Harden the existing `nhk.media.widget-upload` failure boundary and

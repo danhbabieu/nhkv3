@@ -36,6 +36,28 @@ final class McpProposalLifecycleExposureTest extends TestCase
         );
     }
 
+    public function test_connector_discovery_exposes_only_the_explicit_semantic_admin_continuations(): void
+    {
+        $expected = [
+            'nhk.article.ingest' => 'nhk-v3/article-ingest',
+            'nhk.source.ingest' => 'nhk-v3/source-ingest',
+            'nhk.evidence.ingest' => 'nhk-v3/evidence-ingest',
+            'nhk.proposal.create' => 'nhk-v3/proposal-create',
+        ];
+
+        $contract = McpAbilityRegistration::exposureContract();
+        foreach ($expected as $tool => $ability) {
+            self::assertContains($ability, McpAbilityRegistration::explicitInternalAdminAbilityAllowlist(), $tool);
+            self::assertTrue($contract[$tool]['easy_mcp_descriptor_exposed'], $tool);
+            self::assertTrue($contract[$tool]['connector_discoverable'], $tool);
+            self::assertNotContains($ability, McpAbilityRegistration::operatorEnabledAbilityAllowlist(), $tool);
+            self::assertNotContains($ability, McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]), $tool);
+            self::assertSame($ability, McpAbilityRegistration::abilityNameForConnectorTool(McpAbilityRegistration::connectorToolNameForAbility($ability)), $tool);
+        }
+
+        self::assertFalse(McpAbilityRegistration::exposureContract()['nhk.knowledge.ingest']['easy_mcp_descriptor_exposed']);
+    }
+
     public function test_article_draft_update_is_a_narrow_always_discoverable_continuation_opt_in(): void
     {
         $tool = array_column(McpToolCatalog::tools(), null, 'name')['nhk.article.draft.update'];

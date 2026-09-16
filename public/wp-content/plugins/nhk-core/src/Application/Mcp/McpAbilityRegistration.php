@@ -32,6 +32,14 @@ final class McpAbilityRegistration
         'nhk-v3/proposal-submit',
         'nhk-v3/proposal-approve',
         'nhk-v3/proposal-apply',
+        // These direct semantic boundaries are explicit admin continuations,
+        // not normal new-submission entry points. They remain opt-in and
+        // capability-gated; marking them discoverable lets an authorized
+        // Easy MCP connection call the governed continuation handler.
+        'nhk-v3/article-ingest',
+        'nhk-v3/source-ingest',
+        'nhk-v3/evidence-ingest',
+        'nhk-v3/proposal-create',
     ];
 
     public static function bootstrapRegistry(): void
@@ -114,7 +122,8 @@ final class McpAbilityRegistration
             if ($ability === null) continue;
             $exposed = !SingleEntryPointPolicy::isInternalOnly($toolName)
                 || SingleEntryPointPolicy::isPublicationContinuation($toolName)
-                || self::isEasyMcpArticleLifecycleTool($toolName);
+                || self::isEasyMcpArticleLifecycleTool($toolName)
+                || self::isEasyMcpExplicitInternalTool($toolName);
             $contract[$toolName] = [
                 'ability' => $ability,
                 'connector_tool' => self::connectorToolNameForAbility($ability),
@@ -468,8 +477,8 @@ final class McpAbilityRegistration
                     // admin surface so an administrator can explicitly enable
                     // it. Existing internal writers retain their hidden REST
                     // metadata.
-                    'public' => $toolName === 'nhk.media.widget-upload' || self::isEasyMcpArticleLifecycleTool($toolName) || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
-                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || self::isEasyMcpArticleLifecycleTool($toolName) || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'public' => $toolName === 'nhk.media.widget-upload' || self::isEasyMcpArticleLifecycleTool($toolName) || self::isEasyMcpExplicitInternalTool($toolName) || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
+                    'show_in_rest' => $toolName === 'nhk.media.widget-upload' || self::isEasyMcpArticleLifecycleTool($toolName) || self::isEasyMcpExplicitInternalTool($toolName) || !SingleEntryPointPolicy::isInternalOnly($toolName) || SingleEntryPointPolicy::isPublicationContinuation($toolName),
                     'surface' => SingleEntryPointPolicy::surface($toolName),
                     'annotations' => [
                         'readonly' => false,
@@ -542,6 +551,12 @@ final class McpAbilityRegistration
             'nhk.article.trash',
             'nhk.article.restore',
         ], true);
+    }
+
+    private static function isEasyMcpExplicitInternalTool(string $tool): bool
+    {
+        $ability = self::abilityNameForTool($tool);
+        return $ability !== null && in_array($ability, self::explicitInternalAdminAbilityAllowlist(), true);
     }
 
     private static function executeMcp(string $tool, mixed $input): mixed
