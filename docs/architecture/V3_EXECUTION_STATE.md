@@ -19,7 +19,35 @@ advertises 19; no code or data was changed to mask either result. The
 required current old-iMac snapshot was not present; the only local dump is
 `nhk-v3-local-2026-09-01.sql.gz` and was not imported.
 
-Last updated: 2026-09-02, P0 public identity/slug/visibility parity audit checkpoint.
+Last updated: 2026-09-02, MCP V3 content-operations audit checkpoint.
+
+The MCP V3 content-operations audit confirms that the runtime catalog exposes
+19 tools, with `nhk.semantic.resolve` as tool 19; the two stale integration
+assertions expecting 18 were corrected to 19. The exact Authority registry,
+15 full-runtime Graph endpoint types, two Graph predicates, effective governed
+operation branches, Knowledge profiles, Media/Video contracts and Post
+endpoint boundary are documented in `docs/mcp/MCP_V3_CONTENT_OPERATIONS.md`.
+Album has no V3 contract and is recorded as `SEMANTIC_GAP`. Product currently
+permits both `product.specimen_uuid` and `product --about--> specimen` without
+a mutual-exclusion invariant; this is recorded as `CONSTITUTION_CONFLICT` and
+no new Product/Specimen flow was added. No semantic data, V2/live state,
+bootstrap or push was changed.
+
+The approved Entity Hubs and Brand Graph design checkpoint adds the public hub
+matrix, Brand relationship matrix, design specification and TDD implementation
+plan at `docs/architecture/V3_PUBLIC_HUB_MATRIX.md`,
+`docs/architecture/V3_BRAND_RELATIONSHIP_MATRIX.md`,
+`docs/architecture/V3_ENTITY_HUBS_BRAND_GRAPH_DESIGN_SPEC.md` and
+`docs/superpowers/plans/2026-09-02-entity-hubs-brand-graph.md`. The exact
+disappearance root cause is recorded as discovery/routing contract divergence:
+the homepage requires active entities with `PublicRouteResolver::path()`, while
+menu/archive surfaces still target technical namespaces. The runtime MCP audit
+confirms intentional read-only `nhk.semantic.resolve` tool 19 from commit
+`3c41bda`. Local WordPress bootstrap remains database-unavailable, so the exact
+241-edge source/predicate/target distribution is unverified; the checkpoint
+records the read-only audit query and does not infer a matrix from the aggregate.
+No physical Graph repair, semantic-data mutation, V2/live change or article
+body operation occurred.
 
 The read-only P0 public identity audit added
 `V3_PUBLIC_ENTITY_IDENTITY_MATRIX.md`. It confirms from current code that
@@ -85,10 +113,10 @@ Video detail remains unavailable because the local query has no active Video row
 | Current phase | P11 readiness audit in progress; local-dev P10 apply is checkpointed, live parity gates remain open |
 | Last accepted phase | P5 Canonical Domain Foundation |
 | DB migration | current 9 / target 9 on `nhk_v3`; Knowledge, Evidence metadata, Migration006/007, MediaAsset metadata/visibility and ProjectionContext009 are UP-only applied; media/video storage ready |
-| Tests | Unit suite: 153 tests, 934 assertions; guarded WordPress integration: 94 tests, 517 assertions; combined current evidence: 247 tests, 1,451 assertions (Unit + latest guarded evidence); Composer PHP lint, MCP wire smoke, all-nine-type core route smoke 34/34 and opt-in real Authority detail route smoke 41/41 pass; browser public-language/SEO and responsive route sweep remains recorded below |
+| Tests | Current Unit suite: 165 tests, 983 assertions; guarded WordPress integration is unavailable in this shell because WordPress bootstrap/database is unavailable; the latest prior guarded evidence remains historical only; Composer PHP lint and `git diff --check` pass for this checkpoint, while MCP wire/frontend HTTP evidence is blocked by the unavailable localhost endpoint |
 | Blockers | Active Video/data-gated detail evidence, external MCP interoperability/deployment verification, ambiguous case-level identity/provenance/retirement decisions after deterministic resolution, final decisions for 27 explicitly classified URL candidates, MediaAsset publication/privacy policy and governed recovery of 18 available V2 upload candidates plus 3 unavailable thumbnails, Source/Evidence activation/public provenance policy and unresolved legacy mappings; V2/live remains read-only |
 | Working assumptions | Media/Video routes are registered only when WordPress has a usable `$wpdb`; `nhk_v3_test` is the only destructive integration target; editorial aliases render empty states without creating fixture terms |
-| Next executable task | Wire the read-only `McpSemanticContextResolver` into the MCP read contract and transport, then collect local wire evidence; it must preserve exact UUID/stable-key/name-or-alias ordering and fail closed on ambiguity before continuing external MCP interoperability checks |
+| Next executable task | Obtain the architecture decision required by the recorded Product/Specimen `CONSTITUTION_CONFLICT` and Album `SEMANTIC_GAP`; separately restore the existing local HTTP/WordPress runtime before collecting fresh MCP wire/read-only evidence; do not add tools or semantic types before those boundaries are approved |
 | Last parity count | V2 restored read-only inventory: 800 posts, 1,301 entities, 185 relations, 3 media assets with field-level metadata, 19 sources, 40 citation evidence rows and 1,581 semantic projections; latest local-dev apply migrated 3,961 rows and skipped 1,012 with 0 conflicts, including 1,581 non-canonical projection contexts, 367 Knowledge, 370 Authority and 34 native-post redirects |
 | Pending migrations | None; `nhk_v3` is current 9/target 9 and Migration006 ledger, Evidence/MediaAsset metadata and ProjectionContext009 are active |
 | Migration dry-run | Baseline full restored-backup export: 4,973 records, 3,960 candidates and 1,013 skipped; policy-normalized rerun classifies native homepage `/` as `READY_NOOP`, yielding 3,961 mapped and 1,012 skipped with 0 conflicts; projection contexts account for 1,581 mapped records |
