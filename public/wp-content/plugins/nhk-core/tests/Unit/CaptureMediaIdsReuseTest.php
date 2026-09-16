@@ -17,7 +17,7 @@ final class CaptureMediaIdsReuseTest extends TestCase
         $captures = new CaptureMediaIdsCaptureRepository();
         $addenda = new CaptureMediaIdsAddendumRepository();
         $captureId = UuidCodec::newV7();
-        $capture = new CaptureRecord($captureId, 'capture-media-id', hash('sha256', 'capture-media-id'), CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', 512, 'state-512', [], ['raw_input' => 'Bài ảnh.', 'subject_hints' => ['Odo 36/8']], ['media_adoption' => ['status' => 'verified'], 'composition' => ['title' => 'Bài ảnh.']], []);
+        $capture = new CaptureRecord($captureId, 'capture-media-id', hash('sha256', 'capture-media-id'), CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', null, null, [], ['raw_input' => 'Bài ảnh.', 'subject_hints' => ['Odo 36/8'], 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'article_required' => false]], ['media_adoption' => ['status' => 'verified'], 'composition' => ['title' => 'Bài ảnh.']], []);
         $captures->create($capture);
         $mediaId = UuidCodec::newV7();
         $received = null;
@@ -46,6 +46,8 @@ final class CaptureMediaIdsReuseTest extends TestCase
         self::assertSame('COMPLETED', $result['addendum']['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
         self::assertSame([$mediaId], $received);
         self::assertSame($mediaId, $result['capture']['assets'][0]['media_id']);
+        self::assertSame('KNOWLEDGE_DELTA', $result['capture']['content_intent']['intent']);
+        self::assertSame('PERSISTED_CAPTURE', $result['capture']['diagnostics']['content_intent']['source']);
     }
 }
 

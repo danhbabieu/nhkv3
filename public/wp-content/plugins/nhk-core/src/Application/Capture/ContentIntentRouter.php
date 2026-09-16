@@ -39,6 +39,20 @@ final class ContentIntentRouter
         ];
     }
 
+    /** @param array<string,mixed> $persisted @param array<string,mixed> $input @param list<array<string,mixed>> $assets @return array<string,mixed> */
+    public function reusePersisted(array $persisted, array $input, array $assets = []): array
+    {
+        $value = strtoupper(trim((string) ($persisted['intent'] ?? '')));
+        $intent = ContentIntent::tryFrom($value);
+        if (!$intent instanceof ContentIntent) throw new \InvalidArgumentException('CAPTURE_PERSISTED_CONTENT_INTENT_INVALID');
+        $requested = strtoupper(trim((string) ($input['intent'] ?? '')));
+        if ($requested !== '' && $requested !== $intent->value) throw new \InvalidArgumentException('CAPTURE_CONTENT_INTENT_CHANGE_NOT_ALLOWED');
+        $signals = is_array($persisted['signals'] ?? null) ? $persisted['signals'] : [];
+        $result = $this->result($intent, 'PERSISTED_CAPTURE', $signals);
+        $result['intent_reused'] = true;
+        return $result;
+    }
+
     /** @return array<string,mixed> */
     private function signals(array $input, array $interpretation, array $assets): array
     {

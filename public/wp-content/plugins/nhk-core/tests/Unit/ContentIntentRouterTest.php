@@ -8,6 +8,7 @@ use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
 final class ContentIntentRouterTest extends TestCase
@@ -85,6 +86,127 @@ final class ContentIntentRouterTest extends TestCase
         $this->expectExceptionMessage('MEDIA_ENRICHMENT_REQUIRES_IMAGE');
 
         (new ContentIntentRouter())->route(['intent' => 'MEDIA_ENRICHMENT', 'text' => 'Bổ sung tư liệu hình ảnh.'], [], []);
+    }
+
+    public function test_existing_capture_reuses_persisted_intent_instead_of_rerunning_heuristics(): void
+    {
+        $route = (new ContentIntentRouter())->reusePersisted(
+            ['intent' => 'MEDIA_ENRICHMENT', 'article_required' => false],
+            ['text' => 'Nội dung nhiều câu và có thể đọc độc lập như một bài viết.', 'intent' => ''],
+            [['kind' => 'image', 'media_id' => UuidCodec::newV7()]],
+        );
+
+        self::assertSame('MEDIA_ENRICHMENT', $route['intent']);
+        self::assertSame('PERSISTED_CAPTURE', $route['source']);
+        self::assertTrue($route['intent_reused']);
+        self::assertFalse($route['article_required']);
+    }
+
+    public function test_existing_media_enrichment_asset_followup_preserves_intent_and_skips_article_owner(): void
+    {
+        $repository = new IntentCaptureRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'persisted-media-enrichment',
+            hash('sha256', 'persisted-media-enrichment'),
+            'MEDIA_ADOPTED',
+            'PARTIAL',
+            null,
+            null,
+            [],
+            ['raw_input' => 'Bổ sung tư liệu.', 'content_intent' => ['intent' => 'MEDIA_ENRICHMENT', 'article_required' => false]],
+            [],
+            [],
+        );
+        $repository->create($capture);
+        $calls = ['draft' => 0, 'media' => 0, 'semantic' => 0];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => throw new \RuntimeException('physical phase must not replay'),
+            static function (array $input) use (&$calls): array { ++$calls['draft']; return ['post_id' => 999, 'state_token' => 'unexpected']; },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$calls): array { ++$calls['semantic']; return ['status' => 'COMPLETED', 'writes' => []]; },
+            new ArticleComposer(),
+            static function (array $context) use (&$calls): array { ++$calls['media']; return ['status' => 'RECONCILED', 'media_ids' => ['media-1']]; },
+            static fn (array $context): array => throw new \RuntimeException('publication must not run'),
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new ContentIntentRouter(),
+        );
+
+        $result = $coordinator->continueWithAddendum($capture, [
+            'existing_capture_continuation' => true,
+            'followup_mode' => 'ATTACH_ASSETS',
+            'asset_followup_items' => [['kind' => 'image', 'media_id' => UuidCodec::newV7(), 'attachment_readback_status' => 'verified']],
+        ]);
+
+        self::assertNull($result->articleId);
+        self::assertSame('MEDIA_ENRICHMENT', $result->diagnostics['content_intent']['intent']);
+        self::assertSame('PERSISTED_CAPTURE', $result->diagnostics['content_intent']['source']);
+        self::assertSame('MEDIA_ENRICHMENT', $result->diagnostics['capture_intent_reused']);
+        self::assertSame(['draft' => 0, 'media' => 1, 'semantic' => 0], $calls);
+    }
+
+    public function test_existing_text_article_asset_followup_reuses_same_article_without_second_draft(): void
+    {
+        $repository = new IntentCaptureRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'persisted-text-article',
+            hash('sha256', 'persisted-text-article'),
+            'MEDIA_ADOPTED',
+            'PARTIAL',
+            512,
+            'state-512',
+            [],
+            ['raw_input' => 'Bài viết ban đầu.', 'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true]],
+            [],
+            [],
+        );
+        $repository->create($capture);
+        $calls = ['draft' => 0, 'media' => 0, 'semantic' => 0];
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static fn (array $input): array => throw new \RuntimeException('physical phase must not replay'),
+            static function (array $input) use (&$calls): array { ++$calls['draft']; return ['post_id' => 999, 'state_token' => 'unexpected']; },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$calls): array { ++$calls['semantic']; return ['status' => 'COMPLETED', 'writes' => []]; },
+            new ArticleComposer(),
+            static function (array $context) use (&$calls): array { ++$calls['media']; return ['status' => 'RECONCILED']; },
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new ContentIntentRouter(),
+        );
+
+        $result = $coordinator->continueWithAddendum($capture, [
+            'existing_capture_continuation' => true,
+            'followup_mode' => 'ATTACH_ASSETS',
+            'asset_followup_items' => [['kind' => 'image', 'media_id' => UuidCodec::newV7(), 'attachment_readback_status' => 'verified']],
+        ]);
+
+        self::assertSame(512, $result->articleId);
+        self::assertSame('TEXT_ARTICLE', $result->diagnostics['content_intent']['intent']);
+        self::assertSame('PERSISTED_CAPTURE', $result->diagnostics['content_intent']['source']);
+        self::assertSame(['draft' => 0, 'media' => 1, 'semantic' => 1], $calls);
     }
 
     public function test_image_with_standalone_editorial_content_defaults_to_image_article(): void

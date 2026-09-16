@@ -1,5 +1,35 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — FIX-CONFIRMED-REGRESSIONS attachment 555 (LOCAL ONLY)
+
+SCOPE: Continued the bounded local repair for the confirmed MediaUsage identity
+regression and persisted Capture intent regression. The requested live case is
+attachment `555` / Media `01a0a9ef-c5d9-7c93-86a4-32afab7ac89d`, but the current
+`STAGING_ACCEPTANCE_SCOPE` does not authorize attachment `555`, Capture
+`01a0a9b2-9f9d-78d0-b180-82f14f1e7912`, or its related live writes. No staging
+mutation, deploy, Post `564` cleanup, or live read-back was performed.
+
+FIX: Media usage reconciliation now resolves by canonical endpoint/role/
+placement identity before create, preserves the existing usage UUID, applies a
+deterministic KEEP/UPDATE decision, and resolves a bounded concurrent-create
+race by canonical reread. The WordPress repository applies the same identity
+preservation when metadata or sort order changes. Existing Capture
+`ATTACH_ASSETS` continuation reuses the persisted `content_intent` with source
+`PERSISTED_CAPTURE`, rejects an intent change, and reuses the existing Article
+owner for IMAGE_ARTICLE/TEXT_ARTICLE. MEDIA_ENRICHMENT remains MEDIA_ENRICHMENT
+and does not create an Article. The coordinator retains the complete
+claim-retrieval and semantic write-back path for every intent; no semantic
+shortcut is used. Attachment adoption retains partial Media identity, source
+original/WebP completion, binding, and phase observability.
+
+TESTS: Focused regression suite PASS — 37 tests / 160 assertions. Media and
+attachment integration-focused suite PASS — 67 tests / 179 assertions, with
+18 environment-gated WordPress skips. Full Unit suite runs 1680 tests / 8233
+assertions with one pre-existing unrelated failure in
+`DemoCutoverCliContractTest::test_requested_command_resolves_adapter_and_fails_closed_without_external_config`.
+PHP lint and `git diff --check` pass. Live acceptance remains fail-closed until
+an explicit bounded scope is issued for the exact 555 IDs.
+
 # Checkpoint — 2026-09-16 — Existing WordPress attachment adoption timeout repair (LOCAL ONLY)
 
 SCOPE: Reproduced the camera-name/storage-key and MEDIA_ENRICHMENT orchestration

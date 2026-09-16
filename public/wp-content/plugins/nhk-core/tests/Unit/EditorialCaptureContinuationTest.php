@@ -47,7 +47,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             342,
             'state-342',
             [],
-            ['raw_input' => 'Ghi chú ban đầu.', 'subject_hints' => ['Odo 30']],
+            ['raw_input' => 'Ghi chú ban đầu.', 'subject_hints' => ['Odo 30'], 'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true]],
             ['composition' => ['title' => 'Bài 342']],
             [],
         );

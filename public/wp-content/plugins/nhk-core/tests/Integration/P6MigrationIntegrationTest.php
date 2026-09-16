@@ -243,7 +243,7 @@ final class P6MigrationIntegrationTest extends TestCase
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));
     }
 
-    public function test_media_usage_repository_rejects_same_endpoint_with_changed_sort_order(): void
+    public function test_media_usage_repository_reconciles_same_identity_with_changed_sort_order(): void
     {
         global $wpdb;
         (new MediaMigration004())->up();
@@ -253,10 +253,9 @@ final class P6MigrationIntegrationTest extends TestCase
         $repository->create($usage);
 
         try {
-            $repository->create(new MediaUsage(UuidCodec::newV7(), $media->canonicalId, 'wp_post', '1:987655', 'featured', 1));
-            self::fail('Expected a same-endpoint Media usage with changed sort order to be rejected.');
-        } catch (\NHK\Core\Domain\Media\MediaException $exception) {
-            self::assertSame('Media usage identity already exists.', $exception->getMessage());
+            $updated = $repository->create(new MediaUsage(UuidCodec::newV7(), $media->canonicalId, 'wp_post', '1:987655', 'featured', 1));
+            self::assertSame($usage->usageId, $updated->usageId);
+            self::assertSame(1, $updated->sortOrder);
         } finally {
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_usages WHERE usage_uuid=%s", UuidCodec::toBinary($usage->usageId)));
             $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($media->canonicalId)));

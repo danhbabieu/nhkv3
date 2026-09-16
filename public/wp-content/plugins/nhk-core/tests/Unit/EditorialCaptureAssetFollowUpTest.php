@@ -19,7 +19,7 @@ final class EditorialCaptureAssetFollowUpTest extends TestCase
         $capture = new CaptureRecord(
             UuidCodec::newV7(), 'capture-assets', hash('sha256', 'capture-assets'),
             CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', 512, 'state-512',
-            [], ['raw_input' => 'Bài về mặt số.', 'subject_hints' => ['Odo 36/8']],
+            [], ['raw_input' => 'Bài về mặt số.', 'subject_hints' => ['Odo 36/8'], 'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'article_required' => true]],
             ['media_adoption' => ['status' => 'verified'], 'composition' => ['title' => 'Bài về mặt số.']], [],
         );
         $captures->create($capture);

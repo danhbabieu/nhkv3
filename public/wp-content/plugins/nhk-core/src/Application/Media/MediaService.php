@@ -65,7 +65,6 @@ final class MediaService
             }
             $existingAssets[] = $this->assets->create($candidate);
         }
-        $existingUsages = $this->usages->listByMediaId($media->canonicalId);
         foreach ($usageSpecs as $spec) {
             $candidate = new MediaUsage(
                 UuidCodec::newV7(),
@@ -81,13 +80,7 @@ final class MediaService
                 (int) ($spec['revision'] ?? 1),
                 (string) ($spec['placement_key'] ?? ''),
             );
-            $existing = null;
-            foreach ($existingUsages as $usage) if ($usage->endpointType === $candidate->endpointType && $usage->endpointKey === $candidate->endpointKey && $usage->role === $candidate->role && $usage->placementKey === $candidate->placementKey) { $existing = $usage; break; }
-            if ($existing !== null) {
-                $existingUsages[] = $this->upsertUsage($existing, $candidate);
-                continue;
-            }
-            $existingUsages[] = $this->usages->create($candidate);
+            $this->reconcileUsageCandidate($candidate);
         }
         // Canonical read-back is the only handoff to reverse semantic visual
         // reconciliation. Capture remains the intake boundary; this event is
@@ -166,12 +159,7 @@ final class MediaService
     {
         if (!$this->media->findByCanonicalId($mediaId)) throw new MediaException('Media not found.');
         $candidate = new MediaUsage(UuidCodec::newV7(), $mediaId, $endpointType, $endpointKey, $role, $sortOrder, $altText, $caption, $keywordGroups, $title, 1, $placementKey);
-        foreach ($this->usages->listByMediaId($mediaId) as $existing) {
-            if ($existing->endpointType !== $candidate->endpointType || $existing->endpointKey !== $candidate->endpointKey || $existing->role !== $candidate->role || $existing->placementKey !== $candidate->placementKey) continue;
-            if ($this->sameUsage($existing, $candidate)) return $existing;
-            return $this->upsertUsage($existing, $candidate);
-        }
-        return $this->usages->create($candidate);
+        return $this->reconcileUsageCandidate($candidate);
     }
 
     /** @return list<MediaAsset> */
@@ -229,7 +217,7 @@ final class MediaService
                 if (strtolower(trim($error->getMessage())) !== 'media usage update conflict.' || $attempts >= 1) throw $error;
                 ++$attempts;
                 $refreshed = null;
-                foreach ($this->usages->listByMediaId($candidate->mediaId) as $current) {
+                foreach ($this->usages->listByEndpoint($candidate->endpointType, $candidate->endpointKey, $candidate->role) as $current) {
                     if ($current->endpointType === $candidate->endpointType && $current->endpointKey === $candidate->endpointKey && $current->role === $candidate->role && $current->placementKey === $candidate->placementKey) {
                         $refreshed = $current;
                         break;
@@ -239,6 +227,39 @@ final class MediaService
                 if ($this->sameUsage($refreshed, $candidate)) return $refreshed;
                 $existing = $refreshed;
             }
+        }
+    }
+
+    private function reconcileUsageCandidate(MediaUsage $candidate): MediaUsage
+    {
+        $matches = array_values(array_filter(
+            $this->usages->listByEndpoint($candidate->endpointType, $candidate->endpointKey, $candidate->role),
+            static fn (mixed $usage): bool => $usage instanceof MediaUsage && $usage->placementKey === $candidate->placementKey,
+        ));
+        if (count($matches) > 1) throw new MediaException('MEDIA_USAGE_RECONCILE_CONFLICT');
+        $existing = $matches[0] ?? null;
+        if ($existing instanceof MediaUsage) {
+            if ($this->sameUsage($existing, $candidate)) return $existing;
+            return $this->upsertUsage($existing, $candidate);
+        }
+
+        try {
+            return $this->usages->create($candidate);
+        } catch (MediaException $error) {
+            // A repository may observe a concurrent create after the lookup.
+            // Resolve the canonical endpoint identity and then apply the same
+            // deterministic KEEP/UPDATE decision; this is not a blanket
+            // duplicate-error suppression path.
+            $raced = array_values(array_filter(
+                $this->usages->listByEndpoint($candidate->endpointType, $candidate->endpointKey, $candidate->role),
+                static fn (mixed $usage): bool => $usage instanceof MediaUsage && $usage->placementKey === $candidate->placementKey,
+            ));
+            if (count($raced) === 1) {
+                $existing = $raced[0];
+                if ($this->sameUsage($existing, $candidate)) return $existing;
+                return $this->upsertUsage($existing, $candidate);
+            }
+            throw $error;
         }
     }
 

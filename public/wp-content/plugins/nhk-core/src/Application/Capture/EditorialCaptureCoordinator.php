@@ -163,8 +163,15 @@ final class EditorialCaptureCoordinator
             $this->beginPhase('INTERPRETED');
             $interpretation = $this->interpreter->interpret($text, $assets, is_array($input['subject_hints'] ?? null) ? $input['subject_hints'] : [], is_array($input['metadata'] ?? null) ? $input['metadata'] : []);
             $diagnostics['interpretation'] = $this->withoutBody($interpretation);
-            $intent = ($this->contentIntentRouter ?? new ContentIntentRouter())->route($input, $interpretation, $assets);
+            $intentRouter = $this->contentIntentRouter ?? new ContentIntentRouter();
+            $persistedIntent = is_array($record->context['content_intent'] ?? null)
+                ? $record->context['content_intent']
+                : (is_array($diagnostics['content_intent'] ?? null) ? $diagnostics['content_intent'] : []);
+            $intent = ($input['existing_capture_continuation'] ?? false) === true && trim((string) ($persistedIntent['intent'] ?? '')) !== ''
+                ? $intentRouter->reusePersisted($persistedIntent, $input, $assets)
+                : $intentRouter->route($input, $interpretation, $assets);
             $diagnostics['content_intent'] = $intent;
+            if (($intent['intent_reused'] ?? false) === true) $diagnostics['capture_intent_reused'] = strtoupper((string) ($intent['intent'] ?? ''));
             $record = $this->save(
                 $record,
                 CaptureStage::INTERPRETED,
@@ -181,8 +188,7 @@ final class EditorialCaptureCoordinator
             if (($intent['status'] ?? '') !== 'resolved') {
                 return $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', $record->articleId, $record->articleStateToken, 'REVIEW_REQUIRED');
             }
-            $knowledgeOnlyContinuation = strtoupper((string) ($intent['intent'] ?? '')) === 'KNOWLEDGE_DELTA' && ($input['existing_capture_continuation'] ?? false) === true;
-            $articleRequired = ($intent['article_required'] ?? false) === true || ($record->articleId !== null && !$knowledgeOnlyContinuation);
+            $articleRequired = ($intent['article_required'] ?? false) === true;
             if ($articleRequired && $record->articleId === null) {
                 $this->beginPhase('DRAFT_CREATED');
                 $draft = ($this->draftCreator)([

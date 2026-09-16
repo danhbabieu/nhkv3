@@ -64,6 +64,54 @@ final class MediaServiceUsageIdentityTest extends TestCase
         self::assertSame(2, $usageRepository->updates);
     }
 
+    public function test_same_endpoint_role_and_placement_reconciles_to_new_media_without_duplicate_usage(): void
+    {
+        $old = new Media(UuidCodec::newV7(), 'old-media', 'Ảnh cũ', 'ready');
+        $new = new Media(UuidCodec::newV7(), 'new-media', 'Ảnh mới', 'ready');
+        $mediaRepository = new class([$old, $new]) implements MediaRepository {
+            public function __construct(private array $items) {}
+            public function findByCanonicalId(string $id): ?Media { foreach ($this->items as $item) if ($item->canonicalId === $id) return $item; return null; }
+            public function findByStableKey(string $key): ?Media { foreach ($this->items as $item) if ($item->stableKey === $key) return $item; return null; }
+            public function create(Media $media): Media { return $this->items[] = $media; }
+            public function update(Media $media, int $revision): Media { return $media; }
+            public function list(bool $includeRetired = false): array { return $this->items; }
+        };
+        $assetRepository = new class implements MediaAssetRepository {
+            public function findByAssetId(string $id): ?MediaAsset { return null; }
+            public function create(MediaAsset $asset): MediaAsset { return $asset; }
+            public function update(MediaAsset $asset, int $expectedRevision = 1): MediaAsset { return $asset; }
+            public function listByMediaId(string $id): array { return []; }
+            public function findByChecksum(string $checksum): array { return []; }
+        };
+        $usageRepository = new class implements MediaUsageRepository, MediaUsageUpdater {
+            public array $items = [];
+            public function create(MediaUsage $usage): MediaUsage { return $this->items[] = $usage; }
+            public function listByMediaId(string $id, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->mediaId === $id && ($role === null || $item->role === $role))); }
+            public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $item): bool => $item->endpointType === $type && $item->endpointKey === $key && ($role === null || $item->role === $role))); }
+            public function update(MediaUsage $usage): MediaUsage { foreach ($this->items as $index => $item) if ($item->usageId === $usage->usageId) return $this->items[$index] = new MediaUsage($usage->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $usage->revision + 1, $usage->placementKey); throw new \RuntimeException('usage missing'); }
+        };
+        $service = new MediaService($mediaRepository, $assetRepository, $usageRepository);
+        $existing = $service->addUsage($old->canonicalId, 'classification', 'classification-1', 'featured_primary');
+        $updated = $service->addUsage($new->canonicalId, 'classification', 'classification-1', 'featured_primary', 0, 'Ảnh mới');
+
+        self::assertSame($existing->usageId, $updated->usageId);
+        self::assertSame($new->canonicalId, $updated->mediaId);
+        self::assertSame('Ảnh mới', $updated->altText);
+        self::assertCount(1, $usageRepository->items);
+    }
+
+    public function test_concurrent_create_conflict_resolves_existing_usage_and_preserves_identity(): void
+    {
+        [$mediaRepository, $assetRepository, $usageRepository, $mediaId] = $this->stores();
+        $usageRepository->race = true;
+        $service = new MediaService($mediaRepository, $assetRepository, $usageRepository);
+        $result = $service->addUsage($mediaId, 'classification', 'classification-race', 'featured_primary', 0, 'Concurrent');
+
+        self::assertSame('Concurrent', $result->altText);
+        self::assertSame('classification-race', $result->endpointKey);
+        self::assertCount(1, $usageRepository->items);
+    }
+
     /** @return array{MediaRepository,MediaAssetRepository,object,string} */
     private function stores(): array
     {
@@ -91,7 +139,16 @@ final class MediaServiceUsageIdentityTest extends TestCase
             public array $items = [];
             public int $conflicts = 0;
             public int $updates = 0;
-            public function create(MediaUsage $usage): MediaUsage { return $this->items[] = $usage; }
+            public bool $race = false;
+            public function create(MediaUsage $usage): MediaUsage
+            {
+                if ($this->race) {
+                    $this->race = false;
+                    $this->items[] = new MediaUsage(UuidCodec::newV7(), $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder);
+                    throw new MediaException('Media usage identity already exists.');
+                }
+                return $this->items[] = $usage;
+            }
             public function listByMediaId(string $id, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $usage): bool => $usage->mediaId === $id && ($role === null || $usage->role === $role))); }
             public function listByEndpoint(string $type, string $key, ?string $role = null): array { return array_values(array_filter($this->items, static fn (MediaUsage $usage): bool => $usage->endpointType === $type && $usage->endpointKey === $key && ($role === null || $usage->role === $role))); }
             public function update(MediaUsage $usage): MediaUsage

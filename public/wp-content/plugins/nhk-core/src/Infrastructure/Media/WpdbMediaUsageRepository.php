@@ -26,14 +26,19 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, Med
         if (is_array($existingByIdentity)) {
             $existing = $this->hydrate($existingByIdentity);
             if ($existing === null) throw new MediaException('Media usage row is invalid.');
-            if ($existing->sortOrder === $usage->sortOrder) return $existing;
-            throw new MediaException('Media usage identity already exists.');
+            if ($this->sameUsage($existing, $usage)) return $existing;
+            return $this->update(new MediaUsage($existing->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $existing->revision, $usage->placementKey));
         }
         $ok = $this->database->query($this->database->prepare("INSERT INTO {$this->table} (usage_uuid,media_id,endpoint_type,endpoint_key,usage_role,placement_key,sort_order,alt_text,caption,title,keyword_groups_json,revision,created_at) VALUES (%s,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%d,%s)", UuidCodec::toBinary($usage->usageId), $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->placementKey, $usage->sortOrder, $usage->altText, $usage->caption, $usage->title, wp_json_encode($usage->keywordGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $usage->revision, gmdate('Y-m-d H:i:s.u')));
         if ($ok === false) {
             $existing = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE media_id=%d AND endpoint_type=%s AND endpoint_key=%s AND usage_role=%s AND placement_key=%s LIMIT 1", $mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->placementKey), ARRAY_A);
-            if (is_array($existing)) { $hydrated = $this->hydrate($existing); if ($hydrated !== null && $hydrated->sortOrder === $usage->sortOrder) return $hydrated; }
-            throw new MediaException('Media usage identity already exists.');
+            if (is_array($existing)) {
+                $hydrated = $this->hydrate($existing);
+                if ($hydrated === null) throw new MediaException('Media usage row is invalid.');
+                if ($this->sameUsage($hydrated, $usage)) return $hydrated;
+                return $this->update(new MediaUsage($hydrated->usageId, $usage->mediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $hydrated->revision, $usage->placementKey));
+            }
+            throw new MediaException('Media usage create failed.');
         }
         $row = $this->database->get_row($this->database->prepare("SELECT * FROM {$this->table} WHERE usage_uuid=%s LIMIT 1", UuidCodec::toBinary($usage->usageId)), ARRAY_A);
         return is_array($row) ? $this->hydrate($row) : $usage;
@@ -91,6 +96,20 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, Med
     }
 
     private function mediaInternalId(string $mediaUuid): ?int { $id = $this->database->get_var($this->database->prepare("SELECT id FROM {$this->mediaTable} WHERE canonical_uuid=%s LIMIT 1", UuidCodec::toBinary($mediaUuid))); return $id === null ? null : (int) $id; }
+
+    private function sameUsage(MediaUsage $left, MediaUsage $right): bool
+    {
+        return $left->mediaId === $right->mediaId
+            && $left->endpointType === $right->endpointType
+            && $left->endpointKey === $right->endpointKey
+            && $left->role === $right->role
+            && $left->sortOrder === $right->sortOrder
+            && $left->altText === $right->altText
+            && $left->caption === $right->caption
+            && $left->title === $right->title
+            && $left->keywordGroups === $right->keywordGroups
+            && $left->placementKey === $right->placementKey;
+    }
 
     /** @param list<array<string,mixed>> $rows @return list<MediaUsage> */
     private function hydrateList(array $rows): array
