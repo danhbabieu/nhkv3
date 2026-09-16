@@ -56,6 +56,59 @@ final class McpAbilityRegistration
         return self::EASY_MCP_EXPLICIT_INTERNAL_ABILITIES;
     }
 
+    /** @return list<string> */
+    public static function publicationContinuationAbilityNames(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $tool): ?string => self::abilityNameForTool($tool),
+            SingleEntryPointPolicy::publicationContinuationTools(),
+        )));
+    }
+
+    public static function connectorToolNameForAbility(string $abilityName): string
+    {
+        return 'wp_ability_' . strtolower((string) preg_replace('/[^a-z0-9]+/', '_', $abilityName));
+    }
+
+    public static function toolNameForAbility(string $abilityName): ?string
+    {
+        foreach ([self::READ_TOOL_MAP, self::CAPABILITY_GATED_READ_TOOL_MAP, self::GOVERNED_TOOL_MAP] as $map) {
+            foreach ($map as $toolName => $mappedAbility) {
+                if ($mappedAbility === $abilityName) return $toolName;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Keep the five exposure layers separately observable. The canonical
+     * catalog is the dispatch owner; Ability mapping is the Easy MCP owner.
+     *
+     * @return array<string,array<string,bool|string>>
+     */
+    public static function exposureContract(): array
+    {
+        $contract = [];
+        foreach (McpToolCatalog::tools() as $tool) {
+            $toolName = (string) $tool['name'];
+            $ability = self::abilityNameForTool($toolName);
+            if ($ability === null) continue;
+            $exposed = !SingleEntryPointPolicy::isInternalOnly($toolName)
+                || SingleEntryPointPolicy::isPublicationContinuation($toolName)
+                || $toolName === 'nhk.article.draft.update';
+            $contract[$toolName] = [
+                'ability' => $ability,
+                'connector_tool' => self::connectorToolNameForAbility($ability),
+                'runtime_registered' => true,
+                'easy_mcp_descriptor_exposed' => $exposed,
+                'tools_list_exposed' => McpToolCatalog::has($toolName),
+                'connector_discoverable' => $exposed,
+                'callable_dispatched' => McpToolCatalog::has($toolName),
+            ];
+        }
+        return $contract;
+    }
+
     /** @param mixed $enabled @return list<string> */
     public static function ensureEasyMcpEnabledAbilities(mixed $enabled): array
     {
@@ -65,7 +118,7 @@ final class McpAbilityRegistration
             self::explicitInternalAdminAbilityAllowlist(),
             array_values(array_filter($enabled, 'is_string')),
         ));
-        $boundedContinuation = ['nhk-v3/article-draft-update'];
+        $boundedContinuation = self::publicationContinuationAbilityNames();
 
         return array_values(array_unique(array_merge($preserved, self::operatorEnabledAbilityAllowlist(), $boundedContinuation, $explicitInternal)));
     }
@@ -145,7 +198,7 @@ final class McpAbilityRegistration
                 continue;
             }
 
-            $toolName = 'wp_ability_' . strtolower((string) preg_replace('/[^a-z0-9]+/', '_', $abilityName));
+            $toolName = self::connectorToolNameForAbility($abilityName);
             if (!isset($definitions[$toolName])) {
                 $diagnostics[] = self::diagnostic($abilityName, 'MCP_TOOL_NOT_REGISTERED', self::schemaValidationReason($ability));
             }
@@ -591,6 +644,8 @@ final class McpAbilityRegistration
             'nhk.article.draft.create' => 'NHK Article Create Draft',
             'nhk.article.draft.update' => 'NHK Article Update',
             'nhk.article.publish' => 'NHK Article Publish',
+            'nhk.article.publish.review' => 'NHK Article Publication Review',
+            'nhk.article.publish.approve' => 'NHK Article Publication Approval',
             'nhk.article.trash' => 'NHK Article Trash',
             'nhk.article.restore' => 'NHK Article Restore',
             'nhk.media.ingest' => 'NHK Image Intake / Upload Normalization',

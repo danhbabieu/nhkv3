@@ -500,6 +500,22 @@ final class McpContractTest extends TestCase
         }
     }
 
+    public function test_every_exposed_article_tool_has_one_canonical_ability_alias_and_dispatch_contract(): void
+    {
+        $tools = array_column(McpToolCatalog::tools(), null, 'name');
+        foreach (array_filter(array_keys($tools), static fn (string $name): bool => str_starts_with($name, 'nhk.article.')) as $toolName) {
+            $ability = McpAbilityRegistration::abilityNameForTool($toolName);
+            self::assertNotNull($ability, $toolName . ' must have a runtime Ability registration.');
+            self::assertSame(
+                'wp_ability_' . strtolower((string) preg_replace('/[^a-z0-9]+/', '_', $ability)),
+                McpAbilityRegistration::connectorToolNameForAbility((string) $ability),
+                $toolName,
+            );
+            self::assertSame($toolName, McpAbilityRegistration::toolNameForAbility((string) $ability), $toolName);
+            self::assertTrue(McpToolCatalog::has($toolName), $toolName . ' must remain callable in the canonical catalog.');
+        }
+    }
+
     public function test_proposal_eligibility_is_read_only_but_capability_gated(): void
     {
         $tools = array_column(McpToolCatalog::tools(), null, 'name');
@@ -651,7 +667,7 @@ final class McpContractTest extends TestCase
     {
         $enabled = McpAbilityRegistration::ensureEasyMcpEnabledAbilities([]);
         self::assertSame(
-            array_values(array_unique(array_merge(McpAbilityRegistration::operatorEnabledAbilityAllowlist(), ['nhk-v3/article-draft-update']))),
+            array_values(array_unique(array_merge(McpAbilityRegistration::operatorEnabledAbilityAllowlist(), McpAbilityRegistration::publicationContinuationAbilityNames()))),
             $enabled,
         );
         self::assertContains('nhk-v3/capture-ingest', $enabled);
@@ -659,7 +675,7 @@ final class McpContractTest extends TestCase
         self::assertContains('nhk-v3/documentation-get', $enabled);
         self::assertContains('nhk-v3/documentation-list', $enabled);
         foreach (SingleEntryPointPolicy::internalOnlyTools() as $tool) {
-            if ($tool === 'nhk.article.draft.update') continue;
+            if (in_array($tool, ['nhk.article.draft.update', ...SingleEntryPointPolicy::publicationContinuationTools()], true)) continue;
             self::assertNotContains(McpAbilityRegistration::abilityNameForTool($tool), $enabled);
         }
     }

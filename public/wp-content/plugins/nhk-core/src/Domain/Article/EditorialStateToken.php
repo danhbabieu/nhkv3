@@ -5,6 +5,13 @@ namespace NHK\Core\Domain\Article;
 
 final class EditorialStateToken
 {
+    public static function matches(string $expected, EditorialPostState $current): bool
+    {
+        if (preg_match('/^[a-f0-9]{64}$/i', $expected) !== 1) return false;
+
+        return hash_equals($current->token, $expected);
+    }
+
     /** @param array<string,mixed> $state */
     public static function fromState(array $state): string
     {

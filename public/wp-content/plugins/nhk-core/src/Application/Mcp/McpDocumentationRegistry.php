@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Mcp;
 /** Read-only projection of file-owned canonical documentation. */
 final class McpDocumentationRegistry
 {
-    public const MANIFEST_SCHEMA_VERSION = 1;
+    public const MANIFEST_SCHEMA_VERSION = 2;
     public const MAX_DOCUMENT_BYTES = 1048576;
     public const MAX_LINE_COUNT = 500;
 
@@ -101,7 +101,7 @@ final class McpDocumentationRegistry
             $entries[] = self::entry($definition, $definition['path'], $content);
         }
         usort($entries, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
-        $manifest = self::manifest($entries, $runtimeVersion, $generatedAt ?? self::generatedAt());
+        $manifest = self::manifest($entries, $runtimeVersion, $generatedAt ?? self::generatedAt(), self::readSourceRevision($sourceRoot));
         $manifestPath = $destination . DIRECTORY_SEPARATOR . 'manifest.json';
         if (is_file($manifestPath)) @chmod($manifestPath, 0644);
         if (file_put_contents($manifestPath, self::json($manifest) . "\n", LOCK_EX) === false) throw new McpDocumentationException('DOCS_NOT_AVAILABLE');
@@ -133,7 +133,7 @@ final class McpDocumentationRegistry
             'path' => $entry['path'], 'document_key' => $this->keyForPath($entry['path']), 'status' => $entry['status'], 'domain' => $entry['domain'], 'classification' => $entry['classification'],
             'sha256' => $hash, 'document_hash' => $hash, 'documentation_version' => $context['manifest']['documentation_version'], 'manifest_hash' => $context['manifest']['manifest_hash'],
             'content' => implode("\n", $selected) . ($selected === [] ? '' : "\n"), 'start_line' => $selected === [] ? $startLine : $offset + 1, 'end_line' => $endLine, 'has_more' => $endLine < $total,
-            'source_revision' => $this->sourceRevision($context['root']),
+            'source_revision' => $context['manifest']['source_revision'] ?? null,
         ];
     }
 
@@ -154,15 +154,20 @@ final class McpDocumentationRegistry
     public function runtimeIdentity(): array
     {
         $manifest = $this->context()['manifest'];
-        return [
+        $identity = [
             'environment' => $this->semanticWritePolicy->environment(),
             'semantic_write_policy' => $this->semanticWritePolicy->resolve()->value,
             'project_build_enabled' => $this->semanticWritePolicy->projectBuildEnabled(),
+            'source_revision' => $manifest['source_revision'] ?? null,
             'runtime_version' => $manifest['runtime_version'],
             'build_identity' => $this->buildIdentity(),
             'documentation_version' => $manifest['documentation_version'],
             'manifest_hash' => $manifest['manifest_hash'],
         ];
+        $identity['catalog_version'] = McpReleaseIdentity::catalogVersion();
+        $identity['resource_version'] = McpReleaseIdentity::resourceVersion();
+        $identity['release_identity'] = McpReleaseIdentity::hash($identity);
+        return $identity;
     }
 
     /** @return array<string,mixed> */
@@ -175,7 +180,7 @@ final class McpDocumentationRegistry
             $this->get($manifest['execution_state'], 1, 240),
         ];
         return [
-            'runtime_version' => $manifest['runtime_version'], 'documentation_version' => $manifest['documentation_version'], 'manifest_hash' => $manifest['manifest_hash'], 'generated_at' => $manifest['generated_at'], 'build_identity' => $identity['build_identity'],
+            'runtime_version' => $manifest['runtime_version'], 'source_revision' => $identity['source_revision'], 'documentation_version' => $manifest['documentation_version'], 'manifest_hash' => $manifest['manifest_hash'], 'generated_at' => $manifest['generated_at'], 'build_identity' => $identity['build_identity'], 'catalog_version' => $identity['catalog_version'], 'resource_version' => $identity['resource_version'], 'release_identity' => $identity['release_identity'],
             'environment' => $identity['environment'], 'semantic_write_policy' => $identity['semantic_write_policy'], 'project_build_enabled' => $identity['project_build_enabled'],
             'entry_point' => $manifest['entry_point'], 'status_index' => $manifest['status_index'], 'execution_state' => $manifest['execution_state'],
             'read_first' => $bootstrapDocuments[0]['content'], 'documentation_status_index' => $bootstrapDocuments[1]['content'], 'execution_state_content' => $bootstrapDocuments[2]['content'], 'bootstrap_documents' => $bootstrapDocuments,
@@ -186,11 +191,12 @@ final class McpDocumentationRegistry
             // bootstrap. They are projections of the same manifest, not a
             // second documentation source.
             'documentation_revision' => $manifest['documentation_version'],
-            'source_revision' => $this->sourceRevision($context['root']),
-            'build_revision' => $this->sourceRevision($context['root']),
+            'source_revision' => $identity['source_revision'],
+            'build_revision' => $identity['source_revision'],
             'constitution' => ['document_key' => 'constitution', 'revision' => $this->get('docs/constitution/NHK_V3_CONSTITUTION.md')['sha256']],
             'truth_model' => ['canonical_contract' => 'what NHK V3 architecture requires', 'runtime_status' => 'what this MCP runtime currently registers; LIVE requires fresh discovery/read-back'],
-            'runtime_status' => ['surface' => 'mcp', 'status' => 'registered_not_live_verified', 'registered_tools' => array_values(array_map(static fn (array $tool): string => (string) $tool['name'], McpToolCatalog::tools()))],
+            'runtime_status' => ['surface' => 'mcp', 'status' => 'registered_not_live_verified', 'registered_tools' => McpToolCatalog::names()],
+            'mcp_capability_parity' => McpAbilityRegistration::exposureContract(),
             'source_root_available' => true,
         ];
     }
@@ -237,7 +243,7 @@ final class McpDocumentationRegistry
             $entries[] = self::entry($definition, $definition['path'], $content);
         }
         usort($entries, static fn (array $left, array $right): int => strcmp($left['path'], $right['path']));
-        return self::manifest($entries, $this->runtimeVersion, self::generatedAt());
+        return self::manifest($entries, $this->runtimeVersion, self::generatedAt(), self::readSourceRevision($root));
     }
 
     /** @return array<string,mixed> */
@@ -260,9 +266,9 @@ final class McpDocumentationRegistry
     private static function manifestHash(array $manifest): string { unset($manifest['manifest_hash'], $manifest['generated_at']); return hash('sha256', self::json($manifest)); }
 
     /** @param list<array<string,mixed>> $entries @return array<string,mixed> */
-    private static function manifest(array $entries, string $runtimeVersion, string $generatedAt): array
+    private static function manifest(array $entries, string $runtimeVersion, string $generatedAt, ?string $sourceRevision = null): array
     {
-        $manifest = ['schema_version' => self::MANIFEST_SCHEMA_VERSION, 'documentation_version' => hash('sha256', self::json($entries)), 'runtime_version' => $runtimeVersion, 'generated_at' => $generatedAt, 'entry_point' => 'docs/constitution/READ_FIRST.md', 'status_index' => 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md', 'execution_state' => 'docs/architecture/V3_EXECUTION_STATE.md', 'files' => $entries];
+        $manifest = ['schema_version' => self::MANIFEST_SCHEMA_VERSION, 'documentation_version' => hash('sha256', self::json($entries)), 'runtime_version' => $runtimeVersion, 'source_revision' => $sourceRevision, 'generated_at' => $generatedAt, 'entry_point' => 'docs/constitution/READ_FIRST.md', 'status_index' => 'docs/architecture/CURRENT_DOCUMENTATION_STATUS_INDEX.md', 'execution_state' => 'docs/architecture/V3_EXECUTION_STATE.md', 'files' => $entries];
         $manifest['manifest_hash'] = self::manifestHash($manifest); return $manifest;
     }
 
@@ -308,7 +314,7 @@ final class McpDocumentationRegistry
 
     private static function realDirectory(string $path, string $code): string { $real = realpath($path); if ($real === false || !is_dir($real)) throw new McpDocumentationException($code); return $real; }
 
-    private function sourceRevision(string $root): ?string
+    private static function readSourceRevision(string $root): ?string
     {
         if (!is_dir($root . DIRECTORY_SEPARATOR . '.git') && !is_file($root . DIRECTORY_SEPARATOR . '.git')) return null;
         $revision = function_exists('shell_exec') ? shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse HEAD 2>/dev/null') : null; $revision = is_string($revision) ? trim($revision) : '';
