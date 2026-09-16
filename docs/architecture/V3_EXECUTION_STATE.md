@@ -10882,3 +10882,46 @@ write, connector reconnection or staging mutation occurred.
 LIVE_STATUS: `LIVE_PUBLIC_CLOCK_COMPLETE=NO` — external deployment and fresh
 remote read-back remain pending. This checkpoint claims local/contract
 readiness only, not live completion.
+
+# Checkpoint — 2026-09-16 — Canonical documentation manifest remediation (LOCAL)
+
+SCOPE: Reproduced the local manifest tamper/symlink failure and traced the
+`DOC_MANIFEST_INVALID` envelope to `McpDocumentationRegistry::readManifest()`;
+the old validator collapsed JSON/shape/path/key/metadata/inventory/file-hash/
+manifest-hash failures into one opaque reason. The ignored generated snapshot
+was also observed stale after a newer repository revision, which is the
+release condition that can leave staging serving a different documentation
+package than the runtime code.
+
+IMPLEMENTED: The canonical registry now validates the exact schema, canonical
+entry/status/domain/classification/key/path inventory, duplicate key/path,
+file existence/symlink safety, per-document SHA-256, documentation version,
+manifest hash, runtime version and repository source revision. Invalid results
+remain fail-closed as `DOC_MANIFEST_INVALID` but expose a safe
+`details.diagnostic` and bounded path/hash details. The deployment fingerprint
+now requires a valid generated snapshot, and the wrapper rejects a snapshot
+whose `source_revision` differs from the intended `HEAD`. Remote verification
+also requires canonical document get and the `nhk.docs.bootstrap` compatibility
+alias to match the same manifest.
+
+LOCAL_VERIFICATION: `composer generate:mcp-docs` produced 50 files from
+`HEAD=cd76bc350822e231e3c581186854f84e590137b4` with manifest hash
+`42b6d3a7fdcf6f528ffa366ea24f3d2e816f60cd36845b11297ade9fa7ca0d11` and
+documentation version
+`122795e78bfbd87dbe319ab4231ef72ad90d2045d019d466ff019323f5f172b1`.
+Focused docs/MCP/deploy tests pass 70 tests / 805 assertions; full Unit passes
+1,631 tests / 8,015 assertions; Contract passes 6 tests / 48 assertions;
+Composer validation, PHP lint and diff-check pass. The full Integration suite
+remains environment-blocked by missing `NHK_WP_TEST_PATH=public` and local
+WordPress/database bootstrap (14 prerequisite failures, 111 skips, 2 errors).
+
+DEPLOYMENT_BOUNDARY: The canonical wrapper was prepared with the existing
+`/private/tmp/nhk-demo-deploy.ini`, but the SSH/rsync deployment action was
+rejected by the external-action policy before process start. No remote write,
+connector reconnect, staging mutation or manual file transfer occurred.
+
+LIVE_STATUS: `DOCUMENTATION_LIST=UNVERIFIED`,
+`DOCUMENTATION_BOOTSTRAP=UNVERIFIED`, `DOC_GET=UNVERIFIED`,
+`COMPAT_ALIAS=UNVERIFIED`, `CAPTURE_CHECKPOINT=UNVERIFIED`,
+`DOC_MANIFEST_INVALID=UNVERIFIED` — local remediation is ready, but live
+acceptance cannot be claimed without the separately approved external deploy.
