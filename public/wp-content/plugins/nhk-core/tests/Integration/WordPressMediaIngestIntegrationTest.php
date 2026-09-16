@@ -4,9 +4,11 @@ declare(strict_types=1);
 namespace NHK\Tests\Integration;
 
 use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaService, PublicImageSizingPolicy};
-use NHK\Core\Infrastructure\Media\{PrivateMediaSourceStorage, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor};
+use NHK\Core\Domain\Media\Media;
+use NHK\Core\Infrastructure\Media\{PrivateMediaSourceStorage, WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Mcp\ChatGptMcpGateway;
-use NHK\Core\Infrastructure\Migration\{MediaAssetMetadataMigration008, MediaMigration004};
+use NHK\Core\Infrastructure\Migration\{MediaAssetMetadataMigration008, MediaMigration004, MediaWordPressBridgeMigration012};
+use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\TestDatabaseGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -20,6 +22,105 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
         TestDatabaseGuard::requireTestDatabase();
         (new MediaMigration004())->up();
         (new MediaAssetMetadataMigration008())->up();
+        (new MediaWordPressBridgeMigration012())->up();
+    }
+
+    public function test_partial_mapped_raster_replay_fills_the_existing_media_without_duplicate_identity(): void
+    {
+        global $wpdb;
+        $fixture = ABSPATH . 'wp-admin/images/post-formats-vs.png';
+        $fixtureInfo = getimagesize($fixture);
+        self::assertIsArray($fixtureInfo);
+        $expectedDimensions = PublicImageSizingPolicy::constrain((int) $fixtureInfo[0], (int) $fixtureInfo[1]);
+        $attachmentId = 0;
+        $mediaId = UuidCodec::newV7();
+        $sourceRelative = '';
+        $publicPath = '';
+        $uploadedPath = '';
+        try {
+            $media = new WpdbMediaRepository($wpdb);
+            $assets = new WpdbMediaAssetRepository($wpdb);
+            $service = new MediaService($media, $assets, new WpdbMediaUsageRepository($wpdb));
+            $bridge = new WordPressMediaAttachmentBridge($wpdb, $service, $media, $assets);
+            WordPressMediaAttachmentWriteGuard::enter();
+            try {
+                $upload = wp_upload_bits('nhk-partial-replay.png', null, (string) file_get_contents($fixture));
+                self::assertIsArray($upload);
+                self::assertEmpty($upload['error'] ?? null);
+                $uploadedPath = (string) ($upload['file'] ?? '');
+                self::assertNotSame('', $uploadedPath);
+                $attachmentId = (int) wp_insert_attachment([
+                    'post_mime_type' => 'image/png',
+                    'post_title' => 'IMG_4571',
+                    'post_content' => '',
+                    'post_status' => 'inherit',
+                ], $uploadedPath, 0, true);
+                self::assertGreaterThan(0, $attachmentId);
+                update_post_meta($attachmentId, '_wp_attached_file', _wp_relative_upload_path($uploadedPath));
+                $metadata = wp_generate_attachment_metadata($attachmentId, $uploadedPath);
+                self::assertIsArray($metadata);
+                wp_update_attachment_metadata($attachmentId, $metadata);
+            } finally {
+                WordPressMediaAttachmentWriteGuard::leave();
+            }
+
+            $stableKey = 'wp-attachment:' . max(1, (int) get_current_blog_id()) . ':' . $attachmentId;
+            $partial = $media->create(new Media($mediaId, $stableKey, 'Đồng hồ chim cúc cu — ảnh đại diện', 'draft', [
+                'source' => 'wordpress_existing_attachment_url',
+                'wordpress_attachment_id' => $attachmentId,
+            ]));
+            $mappingAssetId = UuidCodec::newV7();
+            $now = gmdate('Y-m-d H:i:s.u');
+            self::assertSame(1, (int) $wpdb->query($wpdb->prepare(
+                "INSERT INTO {$wpdb->prefix}nhk_media_wordpress_attachments (media_uuid,asset_uuid,attachment_id,storage_key,created_at,updated_at) VALUES (%s,%s,%d,%s,%s,%s)",
+                UuidCodec::toBinary($partial->canonicalId), UuidCodec::toBinary($mappingAssetId), $attachmentId, 'pending', $now, $now,
+            )));
+
+            $context = [
+                'canonical_name' => 'Đồng hồ chim cúc cu — ảnh đại diện',
+                'seo_slug' => 'dong-ho-chim-cuc-cu-anh-dai-dien',
+                'description' => 'Ảnh đại diện cho loại Đồng hồ chim cúc cu trên NHK.',
+            ];
+            self::assertSame($mediaId, $bridge->adoptAttachment($attachmentId, $context));
+            self::assertSame($mediaId, $bridge->adoptAttachment($attachmentId, $context));
+
+            $stored = $media->findByCanonicalId($mediaId);
+            self::assertNotNull($stored);
+            self::assertSame($stableKey, $stored?->stableKey);
+            self::assertSame('ready', $stored?->readiness);
+            $mediaAssets = $assets->listByMediaId($mediaId);
+            self::assertCount(2, $mediaAssets);
+            self::assertSame(1, count(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'original' && $asset->visibility === 'PRIVATE')));
+            $derivatives = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'derivative'));
+            self::assertCount(1, $derivatives);
+            self::assertSame('PUBLIC', $derivatives[0]->visibility);
+            self::assertSame('image/webp', $derivatives[0]->mimeType);
+            self::assertSame('dong-ho-chim-cuc-cu-anh-dai-dien.webp', $derivatives[0]->metadata['canonical_filename'] ?? null);
+            self::assertSame($expectedDimensions['width'], $derivatives[0]->width);
+            self::assertSame($expectedDimensions['height'], $derivatives[0]->height);
+            $sourceRelative = (string) (array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'original'))[0]->storageKey ?? '');
+            $configuredRoot = trim((string) (getenv('NHK_MEDIA_STORAGE_ROOT') ?: ''));
+            $publicRoot = $configuredRoot !== '' ? $configuredRoot : (string) (wp_upload_dir()['basedir'] ?? '');
+            $publicPath = rtrim($publicRoot, '/\\') . '/nhk-public/' . (string) ($derivatives[0]->metadata['canonical_filename'] ?? '');
+
+            $mapping = $wpdb->get_var($wpdb->prepare("SELECT media_uuid FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE attachment_id=%d", $attachmentId));
+            self::assertSame($mediaId, is_string($mapping) && strlen($mapping) === 16 ? UuidCodec::fromBinary($mapping) : null);
+            self::assertNotNull((new WordPressMediaAttachmentIngestor())->read($attachmentId));
+        } finally {
+            if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
+            if ($mediaId !== '') {
+                $internalId = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($mediaId)));
+                if ($internalId > 0) {
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_usages WHERE media_id=%d", $internalId));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE media_id=%d", $internalId));
+                    $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE id=%d", $internalId));
+                }
+                $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_wordpress_attachments WHERE media_uuid=%s", UuidCodec::toBinary($mediaId)));
+            }
+            if ($sourceRelative !== '' && str_starts_with($sourceRelative, 'private/')) try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceRelative); } catch (\Throwable) { }
+            if ($publicPath !== '' && is_file($publicPath)) @unlink($publicPath);
+            if ($uploadedPath !== '' && is_file($uploadedPath)) @unlink($uploadedPath);
+        }
     }
 
     public function test_real_file_ingest_retains_source_and_repeated_adoption_resolves_one_media(): void

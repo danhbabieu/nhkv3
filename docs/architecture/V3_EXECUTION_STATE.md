@@ -1,5 +1,55 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-16 — Existing raster Media adoption partial-resume hotfix (LOCAL ONLY)
+
+SCOPE: Narrow repair of the existing WordPress attachment → canonical Media
+adoption path for a mapped partial Media whose asset set is empty. No Article,
+Knowledge, Governance, Classification, Video, semantic resolver or Capture
+interpretation logic was changed. No deployment, connector reconnection,
+staging mutation or production mutation was performed.
+
+ROOT_CAUSE: `WordPressMediaAttachmentBridge::adoptAttachment()` returned
+immediately when an attachment mapping already existed. Its old completion
+helper only inspected the first existing asset, so a mapped Media with
+`assets=[]` was treated as finished and could never create the retained
+PRIVATE source-original, PUBLIC WebP derivative or complete binding.
+
+IMPLEMENTED: Existing attachment mappings now resolve the canonical Media and
+continue through the same raster adoption owner. Stable-key or mapping
+identity disagreement fails closed; an invalid mapped Media cannot cause a
+second Media identity. Partial replay reuses the existing stable key and
+canonical filename, preserves existing provenance, creates missing assets
+idempotently through `MediaService`, promotes readiness only after derivative
+read-back, and re-saves the attachment binding. A deterministic private-source
+cleanup guard prevents a failed replay from deleting a source file that was
+already present. Minimal phase hooks expose adoption progress through
+`ADOPTION_STARTED`, `MEDIA_IDENTITY_READY`, `SOURCE_ASSET_READY`,
+`PUBLIC_DERIVATIVE_READY`, `ATTACHMENT_BINDING_READY`, `USAGE_RECONCILED` and
+`COMPLETE`; no new logging system or semantic relation was introduced.
+
+REGRESSION: Added a guarded WordPress integration fixture for a real raster
+attachment plus one existing partial Media and attachment mapping. It replays
+twice and asserts one Media UUID, two assets (PRIVATE original and PUBLIC
+WebP), the current 1200px sizing ceiling, canonical binding read-back and
+attachment read-back. The fixture is equivalent to the supplied attachment-555
+state but does not mutate that out-of-scope live object.
+
+LOCAL_VERIFICATION: Focused Media/Capture tests pass: 59 tests / 224
+assertions. Focused widget/Capture/Media tests pass: 46 tests / 204
+assertions. `composer lint` passes for the complete plugin tree; PHP lint and
+`git diff --check` pass. Full NHK Unit reaches 1,667 tests / 8,160 assertions
+with one pre-existing unrelated `DemoCutoverCliContractTest` failure
+(`REMOTE_DEPLOYMENT_FAILED` versus its expected
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`). The new guarded integration test cannot
+run in this local session because WordPress bootstrap reports an unavailable
+database connection; this is recorded as infrastructure-blocked, not a pass.
+
+LIVE_STATUS: `MEDIA_555_HOTFIX_STATUS=UNVERIFIED` — the exact attachment 555,
+Media UUID `01a0a9ef-c5d9-7c93-86a4-32afab7ac89d`, Classification usage,
+representative projection and public HTTP 200 remain unverified. The exact
+objects are outside the current bounded `STAGING_ACCEPTANCE_SCOPE`; no live
+mutation or completion claim is authorized.
+
 # Checkpoint — 2026-09-16 — Widget upload root-error preservation (LOCAL ONLY)
 
 SCOPE: Repair the existing ChatGPT `nhk.media.widget-upload` result boundary

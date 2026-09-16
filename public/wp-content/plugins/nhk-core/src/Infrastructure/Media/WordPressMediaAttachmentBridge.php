@@ -177,11 +177,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
     {
         if (WordPressMediaAttachmentWriteGuard::active()) return null;
         if ($this->controlledWriteDepth > 0 || $attachmentId < 1 || !function_exists('get_post')) return $this->mediaIdForAttachment($attachmentId);
+        $this->adoptionPhase($attachmentId, 'ADOPTION_STARTED');
         $existing = $this->mediaIdForAttachment($attachmentId);
-        if ($existing !== null) {
-            $this->completeExistingAttachment($existing, $attachmentId);
-            return $existing;
-        }
         $post = get_post($attachmentId);
         if (!$post instanceof \WP_Post || $post->post_type !== 'attachment' || !str_starts_with(strtolower((string) get_post_mime_type($attachmentId)), 'image/')) return null;
         $relative = function_exists('get_post_meta') ? (string) get_post_meta($attachmentId, '_wp_attached_file', true) : '';
@@ -192,6 +189,11 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if (!is_file($filePath) || !is_readable($filePath)) return null;
         $stableKey = $this->stableKeyForAttachment($attachmentId);
         $existingStable = $this->media->findByStableKey($stableKey);
+        $mappedMedia = $existing !== null ? $this->media->findByCanonicalId($existing) : null;
+        if ($existing !== null && !$mappedMedia instanceof Media) throw new RuntimeException('WORDPRESS_ATTACHMENT_MEDIA_IDENTITY_UNAVAILABLE');
+        if ($mappedMedia instanceof Media && $existingStable instanceof Media && $mappedMedia->canonicalId !== $existingStable->canonicalId) throw new RuntimeException('WORDPRESS_ATTACHMENT_IDENTITY_CONFLICT');
+        $existingMedia = $mappedMedia instanceof Media ? $mappedMedia : $existingStable;
+        if ($existingMedia instanceof Media) $this->adoptionPhase($attachmentId, 'MEDIA_IDENTITY_READY', $existingMedia->canonicalId);
         if ($existingStable instanceof Media) {
             $source = null;
             $derivative = null;
@@ -202,6 +204,10 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             if ($source instanceof MediaAsset && $derivative instanceof MediaAsset) {
                 if ($existingStable->readiness !== 'ready') $existingStable = $this->mediaService->update($existingStable->canonicalId, $existingStable->canonicalName, 'ready', $existingStable->provenance, $existingStable->revision);
                 $this->saveMapping($existingStable, $source, $attachmentId);
+                $this->adoptionPhase($attachmentId, 'SOURCE_ASSET_READY', $existingStable->canonicalId);
+                $this->adoptionPhase($attachmentId, 'PUBLIC_DERIVATIVE_READY', $existingStable->canonicalId);
+                $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $existingStable->canonicalId);
+                $this->adoptionPhase($attachmentId, 'COMPLETE', $existingStable->canonicalId);
                 return $existingStable->canonicalId;
             }
         }
@@ -209,7 +215,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $width = is_array($metadata) && isset($metadata['width']) ? (int) $metadata['width'] : null;
         $height = is_array($metadata) && isset($metadata['height']) ? (int) $metadata['height'] : null;
         $mime = strtolower((string) get_post_mime_type($attachmentId));
-        if ($mime !== 'image/webp') return $this->adoptExistingRasterAttachment($attachmentId, $post, $filePath, $context);
+        if ($mime !== 'image/webp') return $this->adoptExistingRasterAttachment($attachmentId, $post, $filePath, $context, $existingMedia);
         if ($width < 1 || $height < 1) return null;
         $checksum = hash_file('sha256', $filePath);
         $byteSize = filesize($filePath);
@@ -231,6 +237,8 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $media = $this->mediaService->completeIngest($media->canonicalId, $asset->assetId);
         $asset = $this->assets->findByAssetId($asset->assetId) ?? $asset;
         $this->saveMapping($media, $asset, $attachmentId);
+        $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $media->canonicalId);
+        $this->adoptionPhase($attachmentId, 'COMPLETE', $media->canonicalId);
         return $media->canonicalId;
     }
 
@@ -240,7 +248,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
      * private source copy and creates the canonical public WebP derivative
      * under the same Media identity.
      */
-    private function adoptExistingRasterAttachment(int $attachmentId, object $post, string $filePath, array $context): ?string
+    private function adoptExistingRasterAttachment(int $attachmentId, object $post, string $filePath, array $context, ?Media $existingMedia = null): ?string
     {
         if (!is_file($filePath) || !is_readable($filePath) || !function_exists('wp_get_image_editor')) return null;
         $info = @getimagesize($filePath);
@@ -251,10 +259,10 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         $originalFilename = function_exists('get_post_meta') ? trim((string) get_post_meta($attachmentId, '_nhk_original_filename', true)) : '';
         if ($originalFilename === '') $originalFilename = basename($filePath);
         $canonicalName = trim((string) ($context['canonical_name'] ?? ''));
-        if ($canonicalName === '') $canonicalName = (string) ($post->post_title ?? $originalFilename);
+        if ($canonicalName === '') $canonicalName = $existingMedia instanceof Media ? $existingMedia->canonicalName : (string) ($post->post_title ?? $originalFilename);
         $requestedSlug = trim((string) ($context['seo_slug'] ?? ''));
         $canonicalFilename = (new MediaFilenameNormalizer())->normalizeWebp($requestedSlug !== '' ? $requestedSlug : $canonicalName, '', $originalFilename);
-        $canonicalFilename = $this->collisionSafeCanonicalFilename($canonicalFilename, $attachmentId);
+        $canonicalFilename = $this->collisionSafeCanonicalFilename($canonicalFilename, $attachmentId, $existingMedia);
 
         $storageRoot = $this->publicMediaStorageRoot();
         $storageKey = 'nhk-public/' . $canonicalFilename;
@@ -263,6 +271,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if (!is_dir($publicDirectory) && !mkdir($publicDirectory, 0755, true) && !is_dir($publicDirectory)) throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_STORAGE_UNAVAILABLE');
         $createdPublic = false;
         $sourceKey = null;
+        $sourceCreated = false;
         $media = null;
         try {
             if (!is_file($publicPath) || @getimagesize($publicPath) === false) {
@@ -283,8 +292,14 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
             $publicChecksum = hash_file('sha256', $publicPath);
             $publicSize = filesize($publicPath);
             if (!is_string($publicChecksum) || $publicChecksum === '' || $publicSize === false || $publicSize < 1) throw new RuntimeException('WORDPRESS_MEDIA_PUBLIC_DERIVATIVE_READBACK_FAILED');
+            $this->adoptionPhase($attachmentId, 'PUBLIC_DERIVATIVE_READY', $existingMedia?->canonicalId);
 
-            $sourceKey = PrivateMediaSourceStorage::fromWordPress()->store($sourceContents, $this->sourceExtension((string) $info['mime']));
+            $sourceStorage = PrivateMediaSourceStorage::fromWordPress();
+            $sourceExtension = $this->sourceExtension((string) $info['mime']);
+            $sourceKey = 'private/' . hash('sha256', $sourceContents) . '.' . $sourceExtension;
+            $sourceCreated = $sourceStorage->path($sourceKey) === null;
+            $sourceKey = $sourceStorage->store($sourceContents, $sourceExtension);
+            $this->adoptionPhase($attachmentId, 'SOURCE_ASSET_READY', $existingMedia?->canonicalId);
             $mediaDescription = trim((string) ($context['description'] ?? ''));
             $sourceMetadata = ['source_original' => true, 'original_filename' => $originalFilename, 'wordpress_attachment_id' => $attachmentId];
             $derivativeMetadata = ['canonical_filename' => $canonicalFilename, 'derived_from' => $sourceKey, 'wordpress_source_attachment_id' => $attachmentId, 'quality' => PublicMediaAssetSelector::DEFAULT_WEBP_QUALITY];
@@ -305,22 +320,31 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 'metadata' => $derivativeMetadata,
             ];
             $media = $this->mediaService->ingest(
-                $this->stableKeyForAttachment($attachmentId),
+                $existingMedia instanceof Media ? $existingMedia->stableKey : $this->stableKeyForAttachment($attachmentId),
                 $canonicalName,
                 'draft',
                 ['source' => 'wordpress_existing_attachment_url', 'wordpress_attachment_id' => $attachmentId],
                 [$sourceAsset, $derivativeAsset],
             );
-            $media = $this->mediaService->update($media->canonicalId, $media->canonicalName, 'ready', $media->provenance, $media->revision);
+            $this->adoptionPhase($attachmentId, 'MEDIA_IDENTITY_READY', $media->canonicalId);
+            $media = $this->mediaService->update(
+                $media->canonicalId,
+                $media->canonicalName,
+                'ready',
+                $existingMedia instanceof Media ? $existingMedia->provenance : $media->provenance,
+                $media->revision,
+            );
             $source = null;
             foreach ($this->assets->listByMediaId($media->canonicalId) as $asset) {
                 if ($asset->storageKey === $sourceKey) { $source = $asset; break; }
             }
             if (!$source instanceof MediaAsset) throw new RuntimeException('WORDPRESS_MEDIA_SOURCE_ASSET_UNAVAILABLE');
             $this->saveMapping($media, $source, $attachmentId);
+            $this->adoptionPhase($attachmentId, 'ATTACHMENT_BINDING_READY', $media->canonicalId);
+            $this->adoptionPhase($attachmentId, 'COMPLETE', $media->canonicalId);
             return $media->canonicalId;
         } catch (\Throwable $error) {
-            if ($media === null && $sourceKey !== null) {
+            if ($media === null && $sourceCreated && $sourceKey !== null) {
                 try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceKey); } catch (\Throwable) { }
             }
             if ($media === null && $createdPublic && is_file($publicPath)) @unlink($publicPath);
@@ -351,7 +375,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return 'wp-attachment:' . max(1, $blogId) . ':' . $attachmentId;
     }
 
-    private function collisionSafeCanonicalFilename(string $filename, int $attachmentId): string
+    private function collisionSafeCanonicalFilename(string $filename, int $attachmentId, ?Media $existingMedia = null): string
     {
         $existing = [];
         foreach ($this->media->list() as $media) {
@@ -360,8 +384,7 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
                 if ($candidate !== '') $existing[] = $candidate;
             }
         }
-        $current = $this->mediaIdForAttachment($attachmentId);
-        if ($current !== null) return $filename;
+        if ($existingMedia instanceof Media || $this->mediaIdForAttachment($attachmentId) !== null) return $filename;
         return (new \NHK\Core\Application\Media\PublicMediaAssetUrlResolver())->collisionSafeFilename($filename, array_values(array_unique($existing)));
     }
 
@@ -376,16 +399,12 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         return ['kind' => 'original', 'storage_key' => $relative, 'original_filename' => $originalFilename, 'checksum' => $checksum, 'mime_type' => strtolower((string) $info['mime']), 'byte_size' => (int) $size, 'width' => (int) ($info[0] ?? 0), 'height' => (int) ($info[1] ?? 0), 'visibility' => 'PRIVATE', 'metadata' => ['source_original' => true, 'original_filename' => $originalFilename, 'sizes' => []]];
     }
 
-    private function completeExistingAttachment(string $mediaId, int $attachmentId): void
+    private function adoptionPhase(int $attachmentId, string $phase, ?string $mediaId = null): void
     {
-        $media = $this->media->findByCanonicalId($mediaId);
-        $asset = $this->assets->listByMediaId($mediaId)[0] ?? null;
-        if (!$media instanceof Media || !$asset instanceof MediaAsset || $media->readiness === 'ready' && $asset->visibility === 'PUBLIC') return;
-        if ($asset->mimeType !== 'image/webp' || $asset->width === null || $asset->height === null || $asset->width < 1 || $asset->height < 1) return;
-        $this->mediaService->completeIngest($mediaId, $asset->assetId, ['canonical_filename' => (new MediaFilenameNormalizer())->normalizeWebp($media->canonicalName, 'image', basename($asset->storageKey)), 'sizes' => []]);
-        $completed = $this->assets->findByAssetId($asset->assetId) ?? $asset;
-        $this->saveMapping($media, $completed, $attachmentId);
+        if (!function_exists('do_action')) return;
+        try { do_action('nhk_v3_media_adoption_phase', $phase, $attachmentId, $mediaId); } catch (\Throwable) { }
     }
+
 
     /** @return array<string,mixed> */
     public function representationForMedia(Media $media, MediaAsset $asset, string $contextualAlt = ''): array

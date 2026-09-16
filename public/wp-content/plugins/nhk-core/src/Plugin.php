@@ -814,6 +814,7 @@ final class Plugin {
                                     (string) ($mediaContext['title'] ?? ''),
                                 );
                                 $usageReadback[] = ['usage_id' => $usage->usageId, 'media_id' => $usage->mediaId, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'role' => $usage->role, 'revision' => $usage->revision];
+                                try { do_action('nhk_v3_media_adoption_phase', 'USAGE_RECONCILED', (int) ($asset['attachment_id'] ?? 0), $usage->mediaId); } catch (\Throwable) { }
                             }
                         }
                         return [
