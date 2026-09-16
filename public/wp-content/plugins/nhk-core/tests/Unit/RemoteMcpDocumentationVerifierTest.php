@@ -33,7 +33,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('pass', $result->status, (string) $result->reasonCode);
         self::assertSame('mcp-documentation-verified', $result->identifier);
         self::assertSame(str_repeat('f', 64), $result->fingerprint);
-        self::assertCount(6, $calls);
+        self::assertCount(7, $calls);
         self::assertSame('https://demo.example/wp-json/nhk/v1/mcp', $calls[0][0]);
         self::assertSame('POST', $calls[0][1]);
         self::assertContains('MCP-Protocol-Version: 2026-07-28', $calls[0][2]);
@@ -69,7 +69,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         $result = $verifier->verify('https://demo.example', $expected, str_repeat('f', 64));
 
         self::assertSame('pass', $result->status);
-        self::assertCount(6, $calls);
+        self::assertCount(7, $calls);
         foreach ($calls as $call) self::assertContains('Authorization: Basic dXNlcjpwYXNz', $call[2]);
     }
 
