@@ -7,12 +7,14 @@ use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Capture\ContentIntentRouter;
+use NHK\Core\Application\Article\ArticlePublicationGate;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Domain\Capture\CaptureStage;
+use NHK\Core\Domain\Article\EditorialPostState;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -200,6 +202,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         $governance = new Task3InMemoryGovernance();
         $semanticResult = [];
         $publicationContext = [];
+        $publicationGate = new ArticlePublicationGate();
         $semantic = new GovernedCaptureContinuationService(
             $governance,
             static fn (): array => throw new \LogicException('ordinary Article must not apply semantic work'),
@@ -223,9 +226,42 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             },
             new ArticleComposer(),
             static fn (array $context): array => ['status' => 'RECONCILED', 'media_complete' => true],
-            static function (array $context) use (&$publicationContext): array {
+            static function (array $context) use ($publicationGate, &$publicationContext): array {
                 $publicationContext = $context;
-                return ['eligible' => true, 'blockers' => []];
+                $capture = is_array($context['capture'] ?? null) ? $context['capture'] : [];
+                $articleId = (int) ($context['article_id'] ?? 0);
+                $draft = new EditorialPostState(
+                    $articleId,
+                    '1:' . $articleId,
+                    'post',
+                    'draft',
+                    (string) (($context['composition']['title'] ?? '') ?: ($capture['context']['title'] ?? 'Vedette 37')),
+                    'Bổ sung mô tả biên tập cho Vedette 37.',
+                    (string) ($context['composition']['excerpt'] ?? ''),
+                    'vedette-37',
+                    '/vedette-37/',
+                    1,
+                    1,
+                    '2026-09-17 00:00:00',
+                );
+                return $publicationGate->check($draft, [
+                    'research_acceptable' => true,
+                    'subject_resolved' => true,
+                    'duplicate_intent_handled' => true,
+                    'category_resolved' => true,
+                    'semantic_plan_complete' => false,
+                    'semantic_readback_verified' => false,
+                    'media_usage_complete' => true,
+                    'real_image_requirements_met' => true,
+                    'claim_compliance_acceptable' => true,
+                    'seo_projection_valid' => true,
+                    'internal_links_valid' => true,
+                    'structured_data_valid' => true,
+                    'public_route_ready' => true,
+                    'rendered_public_verification' => true,
+                    'rendered_public_verification_status' => 'verified',
+                    'requirements' => $context['requirements'] ?? [],
+                ], $draft->token)->toArray();
             },
             static fn (array $context): array => ['status' => 'verified'],
             null,
@@ -277,6 +313,8 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame('NOT_REQUIRED', $publicationContext['requirements']['semantic_delta']['applicability']);
         self::assertSame('SKIPPED', $publicationContext['requirements']['semantic_delta']['state']);
         self::assertTrue($result->diagnostics['publication']['eligible']);
+        self::assertSame('PASS', $result->diagnostics['publication']['outcome']);
+        self::assertArrayHasKey('policy_version', $result->diagnostics['publication']);
         self::assertSame([], $result->diagnostics['publication']['blockers']);
     }
 
@@ -328,7 +366,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         );
         $mixed = $mixedService->execute('capture-mixed', 'capture-mixed:semantic', [
             'purpose' => 'MIXED',
-            'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true]],
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED']],
             'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'variant', 'revision' => 2], 'resolved' => [['id' => $subjectId, 'type' => 'variant', 'revision' => 2]]],
         ], ['proposal_ids' => [$mixedProposalId]]);
 

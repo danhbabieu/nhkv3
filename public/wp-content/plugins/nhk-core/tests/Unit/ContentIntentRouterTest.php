@@ -109,14 +109,14 @@ final class ContentIntentRouterTest extends TestCase
                 'intent' => 'IMAGE_ARTICLE',
                 'purpose' => 'MIXED',
                 'article_required' => true,
-                'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true],
+                'semantic_delta' => ['status' => 'REQUIRED'],
             ],
             ['text' => 'Bài viết tiếp tục sau khi semantic branch được duyệt.', 'intent' => 'IMAGE_ARTICLE'],
             [['kind' => 'image', 'media_id' => UuidCodec::newV7()]],
         );
 
         self::assertSame('MIXED', $route['purpose']);
-        self::assertSame(['status' => 'REQUIRED', 'approved' => true], $route['semantic_delta']);
+        self::assertSame(['status' => 'REQUIRED'], $route['semantic_delta']);
     }
 
     public function test_existing_media_enrichment_asset_followup_preserves_intent_and_skips_article_owner(): void
