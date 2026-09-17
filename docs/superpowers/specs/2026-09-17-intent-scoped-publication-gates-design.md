@@ -1,15 +1,18 @@
-# NHK V3 — Intent-Scoped Publication Gates
+# NHK V3 — Intent-Scoped Publication Gates and Contextual Media Reuse Design
 
 **Status:** design-only specification, 2026-09-17
-**Scope:** publication/completion orchestration, requirement classification and
-bounded reconciliation
+**Scope:** intent-scoped publication/completion orchestration, canonical Media
+reuse, contextual image SEO, Dictionary illustration projection and bounded
+reconciliation
 **Implementation:** none in this checkpoint
 **Deployment/SSH/direct DB write:** none
 
 This specification is subordinate to
-`docs/constitution/NHK_V3_CONSTITUTION.md`. It refines orchestration and gate
-selection; it does not create an Article entity, semantic Post owner, new Graph
-endpoint/predicate, new Media identity or Governance bypass.
+`docs/constitution/NHK_V3_CONSTITUTION.md`. It unifies the previously committed
+publication-gate design with the existing Media/Image SEO, Visual Support and
+Dictionary contracts. It refines orchestration and projection selection; it
+does not create an Article entity, semantic Post owner, new Graph
+endpoint/predicate, new Media identity, new binary store or Governance bypass.
 
 ## 1. Decision summary
 
@@ -37,6 +40,13 @@ The central rule is:
 > within their owning boundary before a decision. Only a concrete truth,
 > identity, integrity, stale-write or unsafe-public-state risk is a system
 > block.
+
+The same requirement packet is used by Capture completion and Article
+publication. Media projection readiness is reported by its owning Media/Asset/
+Usage boundary; Dictionary and Visual Support are applicable only when their
+approved projection or requirement is requested. A successful physical upload,
+Media commit or lexical observation is never silently promoted to a complete
+public result.
 
 ## 2. Problem statement and evidence
 
@@ -144,6 +154,12 @@ semantic delta, the relation plan must not be created.
 The existing `PostKnowledgeLinkService` correctly rejects direct mutation and
 requires a governed relation proposal; this design does not weaken that rule.
 It narrows when an Article is allowed to request such a semantic mutation.
+The same semantic-delta guard must cover the adjacent current planner branch:
+`GovernedCaptureContinuationService::plans()` also enters Knowledge/relation
+planning when `intent === KNOWLEDGE_DELTA || count($variants) === 1`. A single
+resolved Variant or a body claim candidate is not itself an explicit delta.
+For an ordinary Article, that branch is `NOT_REQUIRED`; for an explicit delta,
+it retains the existing governed proposal/dependency/read-back path.
 
 ### 2.3 Exact current defect: representative usage is mistaken for Article usage
 
@@ -169,6 +185,41 @@ ArticleResearchPreflight reads current Article slots
 That result is a state-ordering mismatch. It does not justify creating a second
 Media, re-uploading attachment 572, or treating representative usage as an
 Article slot.
+
+### 2.4 Current live Media re-adoption evidence
+
+The same canonical Media case exposes a separate physical/projection boundary:
+
+| Item | Observed state |
+|---|---|
+| WordPress attachment | `572` was edited through the WordPress Image Editor |
+| Current physical file | `dong-ho-vedette-37-loai-ngat-chuong-dem-e1789617314273.webp` |
+| Dimensions / size | `900x1200`, `177286` bytes |
+| Before bounded adoption | Attachment and canonical Media existed; representative usages existed; `Media.assets=[]` |
+| Bounded enrichment | `MEDIA_ENRICHMENT` reused attachment `572` and Media `01a0ad65-2b73-707e-9f0f-0a6999690b3d`, restoring one public derivative without a new binary upload or Media identity |
+| Remaining inconsistency | `nhk.media.attachment.get(572)` returned `null` while `wp_get_media(572)`, Capture physical read-back and `nhk.media.get(Media UUID)` succeeded |
+
+The executable boundary explains why this must be treated as a projection/read-
+back defect rather than duplicate identity: `McpReadHandler::mediaAttachmentGet()`
+delegates to `WordPressMediaAttachmentIngestor::read()`, which validates the
+current WordPress attachment, filesystem path, metadata and derivative paths.
+The canonical attachment-to-Media mapping is owned separately by
+`WordPressMediaAttachmentBridge` and
+`nhk_media_wordpress_attachments`. The read response currently does not merge
+that mapping with the physical read result. The unified invariant is therefore:
+
+```text
+active attachment mapping
+→ exact attachment read-back
+→ same canonical Media UUID and selected asset mapping
+```
+
+If one layer cannot prove the chain, the result is a typed
+`ATTACHMENT_READBACK_INCONSISTENT`/unavailable diagnostic. It is never an
+honest `null` success and never permission to mint a second Media. A future
+bounded repair may re-adopt the same attachment through the existing bridge,
+preserve all unrelated usages, update the source-derived asset mapping and
+perform final attachment, Media and public-derivative read-back.
 
 ## 3. Constitutional design principles
 
@@ -196,6 +247,28 @@ Article slot.
 10. This specification changes orchestration selection only. It does not
     authorize legacy-body import, data repair, staging mutation or deployment.
 
+### 3.1 Existing executable ownership evidence
+
+The design follows the current repository boundaries rather than introducing a
+new coordinator-owned store:
+
+| Concern | Existing owner evidence | Unified design consequence |
+|---|---|---|
+| Article editorial truth | native WordPress Post and `WordPressArticleMediaAdapter` | Title, body, excerpt, category, editorial ordering and permalink remain WordPress-owned. |
+| Semantic identity | Authority resolver and immutable Capture subject packet | A resolved subject is reusable context; it is not automatically a mutation request. |
+| Claims/provenance | Article research, Knowledge, Source/Evidence and Governance | Claim candidates remain planning input until an explicit semantic delta enters the governed lifecycle. |
+| Graph relation | `GraphService`, endpoint/predicate registries and `RelationRevisionBinder` | Only an explicit registered relation creates a Graph proposal; MediaUsage and Dictionary projection do not. |
+| Physical image | `WordPressMediaAttachmentIngestor`, `WordPressMediaAttachmentBridge`, `MediaService` | One attachment adoption resolves one canonical Media and its source/public assets. |
+| Asset delivery | `MediaAsset`, `PublicMediaAssetSelector`, `PublicMediaAssetDelivery` | Public output selects a source-derived eligible derivative; private source-original remains private. |
+| Usage/context | `MediaUsage`, `WpdbMediaUsageRepository`, `ArticleMediaCoordinator`, `MediaBindingService` | Endpoint, role, placement and contextual SEO are usage-scoped and revisioned. |
+| Feature visual need | `VisualSupportRequirementService` and indexed requirement repository | Missing feature illustration is durable application state, not a Claim, Evidence, Graph edge or publication-wide semantic blocker. |
+| Dictionary | Dictionary concept/label/candidate repositories and `DictionaryPublicQuery` | Lexical curation owns lexical copy and destination projection; illustration is reused through MediaUsage. |
+| Public image projection | Article/entity/gallery/Dictionary projection queries | Renderers resolve contextual usage first, then eligible MediaAsset; no second SEO truth store is created. |
+
+The owner table is also the dependency rule: a gate may ask an owner for
+read-back, but it may not manufacture that owner's canonical record to satisfy
+another branch.
+
 ## 4. Intent-scoped requirement matrix
 
 The matrix is the default policy. A request may narrow it only through an
@@ -209,9 +282,9 @@ it merely because it found claim candidates.
 | Post state/revision/CAS | Required | Required | N/A | N/A | N/A | Required for editorial sub-intent |
 | Canonical subject resolution | Required when subject is stated or inferred as a registered subject | Required when subject is stated or inferred | Conditional for exact target binding; N/A for unscoped physical commit | Required | Required | Required for each approved semantic candidate |
 | Editorial prose persistence | Required | Required | N/A | N/A unless explicit Article sub-intent | N/A unless explicit Article sub-intent | Required for editorial sub-intent |
-| Article `FEATURED_PRIMARY` | Required if image policy applies | N/A | N/A | N/A | N/A | Required for editorial image sub-intent |
-| Article `INLINE_PRIMARY` | Required if image policy applies; may reuse same real Media under single-image exception | N/A | N/A | N/A | N/A | Same as resolved editorial image sub-intent |
-| Article MediaUsage SEO blueprint | Required for each Article slot | N/A | N/A | N/A | N/A | Required for editorial image sub-intent |
+| Article `FEATURED_PRIMARY` | Required with a real eligible Media when image policy applies | Required usage record; real eligible Media is conditional on text-Article policy | N/A | N/A | N/A | Required for editorial image sub-intent |
+| Article `INLINE_PRIMARY` | Required with a real eligible Media when image policy applies; may reuse same real Media under single-image exception | Required usage record; real eligible Media is conditional on text-Article policy | N/A | N/A | N/A | Same as resolved editorial image sub-intent |
+| Article MediaUsage SEO blueprint | Required for each Article slot; placeholder state remains honest until a real Media is available | Required for each Article slot; real-image readiness may be `NOT_APPLICABLE` under text-Article policy | N/A | N/A | N/A | Required for editorial image sub-intent |
 | Representative Media reconciliation | Conditional: only if explicitly requested or the Media branch is in scope | Conditional | Required for requested representative binding | N/A unless semantic plan requests it | Conditional for registered thumbnail/Media branch | Required only for the requested branch |
 | Knowledge read/reuse | Conditional for claim selection in prose | Conditional for claim selection in prose | N/A | Required | Conditional for video enrichment | Required for approved semantic branch |
 | Knowledge mutation | N/A by default; Required only for explicit delta | N/A by default; Required only for explicit delta | N/A | Required | Conditional and separately approved | Required for approved delta only |
@@ -225,6 +298,19 @@ it merely because it found claim candidates.
 | Public claim compliance | Required over actual public Article copy and its projections | Required | Conditional over MediaUsage public copy | Required for public claim text | Required | Required per rendered surface |
 | Rendered public verification | Required after publication / before public success | Required after publication / before public success | N/A | Required for public semantic route | Required | Required per published branch |
 | Video | N/A | N/A | N/A | N/A | Required | Required only for explicit Video branch |
+
+The Authority and Mixed cases are explicit refinements of the final matrix
+column, not new intent values:
+
+| Intent | Native Article | Authority/semantic owner | Dictionary | Media illustration | Publication consequence |
+|---|---|---|---|---|---|
+| `AUTHORITY` | `NOT_APPLICABLE` | Required for the approved Authority plan; Governance and canonical read-back remain required for mutation | Optional lexical planning only | Optional visual-support/representative branch only when requested | No Article route, Article MediaUsage or Article SEO gate is acquired. |
+| `MIXED` | Required only for the explicit Article sub-intent | Required only for the explicit approved semantic delta/Authority branch | Conditional read/projection branch | Conditional per exact requested consumer | Article and semantic branches have separate receipts; completion requires every applicable required branch. |
+
+`AUTHORITY` is the current typed Capture purpose/operation boundary, not a new
+Authority entity type. It must continue to reuse registered Authority types,
+Graph predicates and Governance operations. A Dictionary concept or a visual
+support requirement never upgrades itself into an Authority branch.
 
 ### 4.1 Requirement decision owners
 
@@ -403,6 +489,83 @@ before reconciliation, but that diagnostic must be classified as
 consume the post-reconciliation snapshot, not the earlier representative-only
 snapshot.
 
+### 7.4 Contextual usage fields and registered role mapping
+
+`MediaUsage` is the contextual presentation record. Its current persisted
+identity is the canonical Media plus endpoint type/key, registered role and
+placement key; its contextual fields are `title`, `alt_text`, `caption`,
+keyword groups, sort order, selection source/policy and optimistic revision.
+`MediaUsageMetadataMigration021` and `WpdbMediaUsageRepository` already own
+this revisioned boundary.
+
+The design distinguishes these reader-facing intents without inventing a new
+runtime enum:
+
+| Design intent | Existing registered role/owner |
+|---|---|
+| Whole-node representative | `representative`, reconciled by `MediaBindingService` |
+| Article featured image | `featured_primary`, reconciled by `ArticleMediaCoordinator` and WordPress featured state |
+| Article inline image | `inline_primary` or `inline_supporting`, reconciled against native Post content |
+| Technical/detail view | `technical_detail`, optionally backed by an exact `VisualSupportRequirement` |
+| Evidence-like illustration | `evidence` only as presentation; it does not create Source/Evidence truth |
+| Gallery/supporting visual | registered `gallery`/supporting compatibility role where the target contract permits |
+| Contextual illustration | a target/placement context using one of the registered roles above; `contextual` is not a new role or Graph endpoint |
+
+The implementation must validate the selected role through
+`MediaUsageRoleRegistry`. If a desired context has no registered role or target
+contract, the result is `REGISTRY_GAP`/review, not a free-form role. Role alone
+never proves a semantic relation or factual feature.
+
+### 7.5 One Media identity and many valid contexts
+
+The reuse invariant is:
+
+```text
+same visual asset
+→ one canonical Media
+→ one source-original MediaAsset plus eligible derivatives
+→ many independently revisioned MediaUsage records
+```
+
+A new Media identity is justified only when the physical visual is meaningfully
+different or the existing identity cannot truthfully represent it. Valid new
+visuals include a whole-object view, a marking close-up, a mounting detail, an
+installed context or another evidence/technical view. A different alt/caption,
+Article, Model, Classification or Dictionary context is not a reason to create
+another binary, Attachment or Media.
+
+Exact binary reuse is separate from visual-similarity discovery. Before a new
+binary becomes a new Media, the bounded physical boundary may compare the
+source checksum, exact existing Attachment mapping, source provenance and
+storage ownership. An exact duplicate is a reuse candidate and should resolve
+to the already-owned Media when the mapping and scope are unambiguous. A
+near-duplicate photograph remains a separate candidate unless an approved
+identity contract explicitly proves that it is the same physical asset;
+similarity, filename, title, URL or checksum alone never merges semantic
+identity across unrelated provenance.
+
+### 7.6 MediaAsset lifecycle and WordPress compatibility
+
+The source-original remains a PRIVATE/protected `MediaAsset`; the canonical
+public derivative is source-derived WebP under the existing 1200px maximum
+long-edge rule, with smaller derivatives serving listing/srcset purposes only.
+`MediaAsset` owns checksum, MIME, dimensions, byte size, visibility, storage and
+delivery metadata. WordPress Attachment is a storage/projection locator and
+compatibility boundary, not the Media or SEO owner.
+
+Re-adoption of an edited attachment must use the exact existing mapping
+`wp-attachment:<blog>:<attachment_id>` and the current WordPress physical
+read-back. It may update or restore the source/public asset under the same
+Media UUID, preserve all existing MediaUsage records, update the attachment
+mapping and perform final MediaAsset/attachment/delivery read-back. If the
+physical edit materially changes the visual into a different semantic object,
+the operation returns review rather than guessing or merging.
+
+No re-adoption path may delete representative usage, create a Dictionary-owned
+binary, mint a second Media, or change a published public URL silently. The
+existing `WordPressMediaAttachmentBridge::adoptAttachment()` is the later
+implementation boundary; `MediaService` remains the asset reconciliation owner.
+
 ## 8. Public Identity: planned and materialized lifecycle
 
 Article has a deliberate native WordPress route exception: WordPress owns the
@@ -450,6 +613,56 @@ URL remains `NOT_APPLICABLE` until publication. The existing
 `PublicIdentityService` remains the owner for semantic public identities; it is
 not used to create a second Article identity.
 
+### 8.3 Contextual image SEO resolution
+
+For every rendered image, the projection resolves metadata in this exact order:
+
+1. exact active contextual `MediaUsage` for the current endpoint, role and
+   placement;
+2. subject-specific representative `MediaUsage` when the consumer explicitly
+   permits representative fallback;
+3. verified neutral Media metadata;
+4. WordPress Attachment fallback metadata for compatibility only;
+5. explicit `MISSING`.
+
+The fallback must be field-level and deterministic: a missing caption does not
+erase a safe alt text, and an Attachment title cannot override a more specific
+canonical Usage. Render-time code may select stored projections, but it may not
+invent a description, infer a feature, or convert a filename/OCR/recognition
+signal into semantic truth. Contextual `title`, `alt_text` and `caption` may
+differ across Article, Entity, Classification and Dictionary usages because the
+reader context differs; each remains bounded by the Media identity and claim
+compliance contract.
+
+The current implementation evidence is `ArticleMediaSeoProjection`,
+`EntityMediaProjection`, `PublicMediaGalleryQuery` and
+`VisualSupportPublicProjection`. The unified implementation should align these
+readers to the same precedence and public-asset selector rather than introduce
+a second SEO truth store. Every rendered URL must use an eligible public
+MediaAsset; private source-originals, placeholders, review-only assets and
+unavailable derivatives are omitted. Image sitemap and structured data use the
+same eligibility and preferred-image policy.
+
+### 8.4 Safe reverse-enrichment propagation
+
+Progressive enrichment is allowed only through an explicit scope matrix:
+
+| Source context | Target context | Allowed propagation |
+|---|---|---|
+| Exact approved subject identity and scope | neutral Media name | Yes, when the name is genuinely identity-safe and the Media revision/CAS passes. |
+| Article-specific alt/title/caption | global Media or Attachment SEO truth | No. Keep it on Article `MediaUsage`; an Attachment compatibility projection may mirror it only for that exact placement and under its owner contract. |
+| Representative contextual SEO | another target Usage | No automatic copy; generate a separately scoped Usage blueprint. |
+| Verified neutral Media metadata | eligible contextual Usage | Yes as deterministic fallback, never as stronger context than the source supports. |
+| WordPress Attachment manually edited title/alt | canonical Media identity/name | No automatic semantic authority. It is compatibility input and may produce a review/readback diagnostic. |
+| Dictionary definition or lexical explanation | Media description/identity | No. Dictionary remains lexical editorial ownership. |
+| Exact approved Dictionary concept identity | Dictionary `MediaUsage` illustration | Yes, through the existing MediaUsage/projection boundary with target/revision read-back. |
+| VisualSupportRequirement binding | affected consumer Usage/projection | Yes, only for the exact subject/scope/facet/feature/intent and after bounded suitability/read-back. |
+
+Thus later context can enrich a neutral Media name or add a target Usage, but
+editorial wording cannot leak backward and rewrite global Media truth. Every
+allowed propagation is idempotent, revision-aware and auditable. A conflict or
+scope mismatch is review/blocking at the owning boundary, never silent merge.
+
 ## 9. Blocker taxonomy
 
 ### 9.1 `HARD_BLOCK`
@@ -486,7 +699,13 @@ These are repairable only within one bounded owner operation:
 - derived projection stale;
 - a temporary owner readback gap where one refresh can establish current state;
 - representative reconciliation explicitly requested and deterministically
-  scoped.
+  scoped;
+- WordPress Image Editor changed the attachment while the stable attachment
+  mapping remains unambiguous and the current physical image can be validated;
+- attachment-to-Media readback is stale but the exact mapping, physical file,
+  Media identity and public derivative can be reconciled without ambiguity;
+- a missing contextual projection is deterministically rebuildable from an
+  existing Usage/Asset/Dictionary owner.
 
 ### 9.3 `WARNING` / `HUMAN_REVIEW`
 
@@ -494,6 +713,9 @@ These are repairable only within one bounded owner operation:
 - descriptive copy that needs editorial judgment but is not unsafe;
 - optional visual support;
 - an evidence gap outside the factual scope actually published;
+- a lexical candidate or Dictionary illustration choice that is ambiguous but
+  not required for the host Article/Entity to remain truthful;
+- a contextual caption/alt choice requiring editorial selection;
 - incomplete quality enhancements explicitly marked overridable by the active
   publication policy.
 
@@ -507,10 +729,15 @@ publication-relevant. They never fabricate a pass.
 - Graph mutation when no registered relation write is requested;
 - representative selection when no representative request or applicable Media
   branch exists;
+- Dictionary curation/illustration when no approved Dictionary projection is
+  requested;
+- feature-level VisualSupportRequirement when the host contract marks the
+  visual as optional;
 - Article route/readback for Media-only or Knowledge-only intents without an
   explicit Article sub-intent;
-- Article MediaUsage for `TEXT_ARTICLE` when the active policy does not require
-  an image.
+- real-image publication readiness for `TEXT_ARTICLE` when the active policy
+  does not require a real image; the constitutional Article slot Usage records
+  and their blueprint/read-back still apply.
 
 ## 10. Bounded auto-reconciliation algorithm
 
@@ -543,6 +770,25 @@ The one-refresh rule applies per owner boundary, not per entire Capture. A
 successful Media reconciliation must never be replayed merely because rendered
 verification is unavailable. Resume uses the Capture/operation idempotency key
 and the last durable owner receipt.
+
+For an Image Editor re-adoption, the bounded owner operation is:
+
+```text
+attachment read-back
+→ resolve existing attachment mapping by exact attachment/blog identity
+→ validate current physical bytes and metadata
+→ preserve the Media UUID and unrelated Usage UUIDs
+→ restore/update source-original and eligible public derivative
+→ update the attachment/asset mapping once
+→ read back attachment + Media + MediaAsset + public delivery
+```
+
+For an attachment readback inconsistency, the operation first compares the
+mapping table, WordPress attachment metadata, Media provenance and asset
+metadata. If all identify one owner, it may reconcile the projection once. If
+they identify different owners, missing files, or conflicting checksums, it is
+`HARD_BLOCK`/owner review. A `null` from one adapter is never converted into
+“attachment absent” when another canonical boundary proves the attachment.
 
 ## 11. Idempotency and concurrency
 
@@ -630,6 +876,13 @@ Examples:
    because this is one eligible real image. It does not duplicate the
    representative usages for the model or classification.
 
+   If the current WordPress Image Editor version of attachment 572 is the
+   physical input, the same bounded adoption boundary first proves the existing
+   `wp-attachment:<blog>:572` mapping, preserves Media
+   `01a0ad65-2b73-707e-9f0f-0a6999690b3d`, restores/reads the eligible public
+   derivative and leaves both representative usages intact. It does not create
+   a second Attachment, Media or binary.
+
 6. Category planning resolves `Tri thức đồng hồ` through the native category
    owner.
 7. Public route planning accepts slug intent
@@ -664,10 +917,11 @@ are `NOT_APPLICABLE` unless the request includes an explicit semantic delta.
 ### 14.2 `TEXT_ARTICLE`
 
 Input contains Article prose but no image. Native Post, category, planned route,
-SEO, claim compliance and editorial/read-back requirements apply. Article Media
-requirements are `NOT_APPLICABLE` when the active content policy does not require
-an image. A factual-looking sentence remains editorial input unless the user
-explicitly requests Knowledge mutation.
+SEO, claim compliance and editorial/read-back requirements apply. The mandatory
+Article MediaUsage slot records/blueprints still reconcile, while real-image
+publication readiness is `NOT_APPLICABLE` when the active content policy does
+not require a real image. A factual-looking sentence remains editorial input
+unless the user explicitly requests Knowledge mutation.
 
 ### 14.3 `MEDIA_ENRICHMENT`
 
@@ -701,7 +955,132 @@ Governance; Article editorial publication does not become a semantic apply.
 The combined completion receipt is complete only when every branch required by
 the explicit plan is verified.
 
-## 15. Exact components and files likely affected
+## 15. Unified canonical Media reuse and Dictionary illustration
+
+This section extends the Article Media rules above to every approved consumer.
+It does not create a new Album owner, generic Content node, Dictionary binary
+store or convenience Graph edge.
+
+### 15.1 Côn 111 reuse example
+
+One canonical representative photo may be reused as follows:
+
+```text
+Media A = Bộ côn 111
+
+Media A → Component/Concept “Côn 111” → representative
+Media A → Article 54 → technical_detail / inline
+Media A → Article 57 → technical_detail / inline
+Media A → Article Westminster → contextual/technical illustration
+Media A → Dictionary Concept “Côn 111” → preferred illustration
+```
+
+Each consumer has its own endpoint/context, placement and contextual
+`title`/`alt_text`/`caption`. The shared Media identity and eligible public
+derivative are reused; no duplicate binary, Attachment or Media is created.
+The illustration does not prove the Dictionary definition, create `depicts`,
+or create an Article-to-subject Graph edge.
+
+Additional valid visuals remain separate Media because they add information:
+
+```text
+Media B = close-up of the “111” marking
+Media C = mounting/attachment detail
+Media D = Côn 111 installed on a machine
+```
+
+These are not duplicate SEO variants. They are distinct physical views with
+different coverage and technical/contextual value. Selection remains governed
+by exact subject/scope, visual coverage, technical relevance, quality,
+provenance and current representative policy. Visual similarity alone cannot
+merge them.
+
+### 15.2 Dictionary preferred illustration
+
+Dictionary remains a lexical/curation projection. An approved Dictionary
+Concept may reuse one eligible canonical Media through the existing
+MediaUsage/projection boundary as its current preferred illustration and may
+expose supporting visuals through additional registered usages. It never copies
+binary data into Dictionary persistence and never owns Authority, Knowledge,
+Source/Evidence or Graph truth.
+
+The preferred illustration is stable for reader continuity but replaceable:
+
+- an owner-approved Usage is the current preferred illustration;
+- an explicitly approved Media B may replace Media A for future Dictionary
+  projection under Usage revision/CAS;
+- Media A and its existing contextual usages remain valid unless their own
+  owner contracts retire them;
+- a missing, private, placeholder, review-only or unavailable asset yields an
+  honest incomplete/unavailable Dictionary image projection, not a duplicate
+  Media or Attachment.
+
+The current executable read boundary is `DictionaryRuntime` →
+`DictionaryPublicQuery` → `EntityMediaProjection` for the lexical concept
+endpoint. The implementation slice must ensure that “preferred” is a stable
+projection decision using existing registered MediaUsage selection metadata,
+not a new Dictionary binary field or hidden semantic relation. Owner-delegated
+Dictionary concepts link directly to their canonical Entity/Knowledge/Article
+owner and do not create an indexable competing Dictionary detail page.
+The lexical endpoint/Usage boundary must remain an existing allow-listed
+application boundary; if the runtime cannot validate it, return
+`REGISTRY_GAP` rather than inventing a Graph endpoint or free-form role.
+
+### 15.3 Visual Support and technical reuse
+
+`VisualSupportRequirement` is the exact requirement ledger for a named feature;
+it is not a representative substitute. A resolved requirement may bind the
+same Media A already used as representative, or Media B/C/D when the detail
+view is more suitable. The binding is exact to subject, scope, facet, feature
+key, visual intent and consumer context. The reverse reconciler performs the
+indexed bounded lookup, creates the contextual Usage through the existing
+owner, invalidates affected projections and preserves prior binding history.
+
+Feature support remains `MISSING`, `RESOLVED` or `REVIEW_REQUIRED` separately
+from public asset eligibility. Public projection omits private/review/
+placeholder/unavailable assets and never treats a VisualSupport binding as
+Evidence or as a Graph relation.
+
+### 15.4 Explicit data placement
+
+| Data | Canonical placement | Forbidden propagation |
+|---|---|---|
+| Identity-safe Media name/provenance | `Media` and its provenance | Article-specific wording, Dictionary definition or Attachment editor text may not become global identity automatically. |
+| Source-original/public derivative/checksum/dimensions/visibility | `MediaAsset` | Derivative does not become a new Media. |
+| Target, role, placement, sort, contextual title/alt/caption, selection and revision | `MediaUsage` | Usage does not become Knowledge, Evidence or Graph truth. |
+| Article body/title/category/order | native WordPress Post | Do not copy into semantic stores or Dictionary persistence. |
+| Dictionary label/definition/destination | Dictionary concept/label repositories | Do not copy lexical text into Media or claim truth. |
+| Feature visual need/binding | VisualSupport requirement ledger + MediaUsage | Do not broaden scope or infer a factual claim. |
+| Canonical image URL/alt/caption in public output | projection queries from the above owners | Do not invent fields at render time or expose private source-originals. |
+
+## 16. Attachment readback and public render invariants
+
+The public image path must prove all of the following before emitting an image:
+
+1. the active contextual MediaUsage belongs to the exact endpoint/placement;
+2. the Media is active, ready and not a placeholder;
+3. the selected MediaAsset is a source-derived eligible PUBLIC asset under the
+   current size/visibility/delivery policy;
+4. contextual SEO fields are read from the precedence chain in §8.3;
+5. the URL is the canonical delivery path for that asset and not a private
+   source-original or a stale WordPress attachment path;
+6. Article structured data/image sitemap and rendered `<img>` use the same
+   eligible selection policy.
+
+An empty WordPress Attachment alt/caption does not break a valid canonical
+   Usage. Conversely, a valid Attachment row without a canonical MediaAsset
+   read-back does not make a broken image public. Media existence alone never
+   creates an indexable image-content page; `/anh/` delivery and sitemap
+   eligibility remain separate public projection decisions.
+
+The attachment read contract must return a typed result distinguishing:
+`VERIFIED` (physical attachment + mapping + Media/Asset agree),
+`UNAVAILABLE` (runtime/filesystem dependency unavailable),
+`INCONSISTENT` (each boundary is readable but disagrees), and
+`NOT_FOUND` (the exact attachment owner is absent). It must not collapse
+`INCONSISTENT` into `null`, empty success or a new Media candidate.
+
+## 17. Exact components and files likely affected
 
 This design step changes no implementation file. The later implementation
 slice should inspect and likely change only these existing boundaries:
@@ -723,15 +1102,24 @@ slice should inspect and likely change only these existing boundaries:
 | `Application/Graph/RelationRevisionBinder.php` / `Infrastructure/Graph/WpPostEndpointResolver.php` | Preserve strict revision failure for explicitly required relations and add regression coverage for the unrequested relation not being planned. |
 | `Application/Knowledge/PostKnowledgeLinkService.php` | Preserve governed-only behavior; no direct Post-to-Knowledge writer. |
 | `Application/Mcp/McpArticleIngestHandler.php` | Ensure read-only preflight and final ingest use the same intent-scoped evidence. |
+| `Application/Media/MediaService.php` / `MediaUsageReconciler.php` | Preserve one Media identity, reconcile exact asset/usage deltas and keep Usage UUID/revision semantics. |
+| `Application/Media/ArticleMediaSeoProjection.php`, `EntityMediaProjection.php`, `PublicMediaGalleryQuery.php` | Consume the shared contextual SEO precedence and eligible public-asset selector. |
+| `Application/Media/VisualSupportRequirementService.php`, `VisualSupportReverseReconciliationService.php`, `VisualSupportPublicProjection.php` | Keep exact feature requirements separate from representative coverage and invalidate affected projections after bounded reuse. |
+| `Infrastructure/Media/WordPressMediaAttachmentBridge.php` | Re-adopt Image Editor changes through exact attachment mapping while preserving Media/Usage identity. |
+| `Infrastructure/Media/WordPressMediaAttachmentIngestor.php` | Return typed physical attachment/readback state and retain the existing safe upload/derivative path. |
+| `Application/Mcp/McpReadHandler.php` | Make `nhk.media.attachment.get` distinguish physical absence from mapping/projection inconsistency. |
+| `Infrastructure/Media/WpdbMediaAssetRepository.php`, `WpdbMediaUsageRepository.php` | Preserve asset/usage persistence, revision/CAS and exact identity reads; no parallel writer. |
+| `Application/Dictionary/DictionaryRuntime.php`, `DictionaryPublicQuery.php` | Reuse canonical Media through the existing Dictionary projection and model preferred illustration as replaceable Usage state. |
+| `Infrastructure/Dictionary/WordPressDictionarySitemapProvider.php` | Keep delegated/draft/ambiguous Dictionary concepts out of indexable detail and sitemap projection. |
 
 No new file path, entity type, endpoint type, predicate, relation type or
 semantic store is required by this design.
 
-## 16. Backward compatibility and migration
+## 18. Backward compatibility and migration
 
 - No data migration, legacy Article-body parsing, semantic backfill, Graph
-  repair, Media merge, attachment rewrite or public URL reallocation is part of
-  this design.
+  repair, Media merge, attachment rewrite, Dictionary binary copy or public URL
+  reallocation is part of this design.
 - Existing published Articles remain native WordPress content. Existing
   representative usages remain representative usages; existing Article usages
   remain Article usages.
@@ -747,10 +1135,16 @@ semantic store is required by this design.
 - The existing `single_real_image_exception` behavior is preserved and becomes
   the explicit Article-level one-real-image rule rather than a reason to create
   duplicate Media.
+- Existing WordPress Image Editor edits are handled as bounded re-adoption of
+  the same attachment/Media mapping; they do not trigger a general repair,
+  checksum merge or usage deletion.
+- Existing Dictionary concepts, labels, delegated destinations and lexical
+  UUIDs remain unchanged. Preferred illustration is a projection/Usage choice,
+  not a new Dictionary asset store.
 - Owner publication approval and durable read-back rules remain unchanged;
   this design only improves the diagnostic classification before approval.
 
-## 17. Observability and diagnostics
+## 19. Observability and diagnostics
 
 Every Capture/Article receipt should expose a body-free requirement report with:
 
@@ -761,6 +1155,14 @@ Every Capture/Article receipt should expose a body-free requirement report with:
 - semantic delta decision and its explicit basis;
 - Article Media IDs by slot, representative usages separately, and whether the
   one-real-image exception was used;
+- MediaAsset source/public derivative IDs, dimensions, checksum/readback state,
+  attachment mapping state and whether re-adoption was attempted;
+- contextual SEO source selected for each rendered image and explicit
+  `MISSING`/fallback state;
+- VisualSupport requirement state and exact subject/scope/facet/feature when a
+  visual dependency is applicable;
+- Dictionary concept destination, preferred/supporting illustration Usage and
+  indexability state when Dictionary projection is applicable;
 - planned route and materialized route status separately;
 - bounded attempt count and resume hint;
 - exact diagnostic code, classification and policy version;
@@ -779,9 +1181,12 @@ article_media_reconcile=VERIFIED
 representative_media_reconcile=VERIFIED (separate target usages)
 planned_route=VERIFIED
 materialized_route=PHASE_DEPENDENT
+media_asset=PUBLIC_DERIVATIVE_VERIFIED
+contextual_seo_source=ARTICLE_MEDIAUSAGE
+dictionary_illustration=NOT_APPLICABLE
 ```
 
-## 18. Test strategy
+## 20. Test strategy
 
 ### Unit tests
 
@@ -804,6 +1209,22 @@ materialized_route=PHASE_DEPENDENT
 - Compliance distinguishes descriptive wording from unsupported superiority or
   objective claims and never creates Knowledge from the wording alone.
 - Completion aggregation does not require non-applicable owner branches.
+- Contextual alt/title/caption differ by Article, Entity and Dictionary Usage
+  without changing global Media or Attachment identity.
+- The fallback order is deterministic and field-level; missing safe metadata is
+  explicit rather than invented at render time.
+- A source checksum/attachment mapping exact duplicate reuses the canonical
+  Media candidate, while a visually similar but separately captured view stays
+  separate.
+- Image Editor re-adoption preserves Media UUID, existing representative and
+  Article/Dictionary/technical Usage UUIDs while restoring a missing derivative.
+- Attachment readback distinguishes VERIFIED, UNAVAILABLE, INCONSISTENT and
+  NOT_FOUND; the inconsistent case never creates a second Media.
+- VisualSupport reverse reconciliation binds only exact subject/scope/facet/
+  feature/intent and does not create Claim/Evidence/Graph truth.
+- Dictionary preferred illustration is reusable, pinned/replaceable through
+  existing Usage state, and owner-delegated concepts remain non-indexable as
+  competing detail pages.
 
 ### Contract tests
 
@@ -814,6 +1235,8 @@ materialized_route=PHASE_DEPENDENT
   diagnostics fail closed.
 - Governance lifecycle remains unchanged for real semantic mutations.
 - Public SEO and rendered-readback fields use the materialized route only.
+- Dictionary public query and sitemap exclude draft, ambiguous, delegated,
+  incomplete and unavailable concepts according to the lexical contracts.
 
 ### Guarded integration tests
 
@@ -824,7 +1247,44 @@ Post token blocks the write and a changed route owner blocks publication.
 
 No integration test in this design step writes staging/live data.
 
-## 19. Live acceptance plan
+## 21. Recommended bounded implementation slices
+
+The later implementation must preserve reviewable boundaries. Each slice can
+be tested and reviewed independently; no slice authorizes staging/live data
+mutation or changes the physical upload pipeline by assumption.
+
+1. **Intent-scoped publication requirements and semantic-delta gate.** Add the
+   requirement packet, `NOT_REQUIRED` semantic evidence, phase-aware route
+   identity and explicit omission of the implicit Article relation. Regression
+   coverage proves ordinary Article prose does not create Knowledge/Graph/
+   Governance work, while real deltas retain the full lifecycle.
+2. **Article MediaUsage ordering/reconciliation.** Move the committed Media-ID
+   handoff and Article slot reconcile ahead of final preflight/gate evidence;
+   preserve the one-real-image exception, Post CAS and existing usage identity.
+3. **Contextual Media SEO projection.** Align Article, Entity, gallery,
+   VisualSupport and Dictionary image readers on the exact Usage → subject
+   representative → neutral Media → Attachment fallback order, with explicit
+   `MISSING` and public-asset eligibility. No second metadata truth store.
+4. **WordPress Image Editor re-adoption and attachment readback.** Harden the
+   existing Bridge/Ingestor mapping lifecycle so edited attachment `572`-style
+   changes preserve Media and Usage identities, restore assets when needed and
+   return typed mapping/readback inconsistency rather than null ambiguity.
+5. **Dictionary illustration reuse/preferred projection.** Use the existing
+   Dictionary and MediaUsage boundaries for a stable pinned preferred
+   illustration plus replaceable supporting visuals; preserve delegated owner
+   routes and Dictionary indexability rules.
+6. **Exact binary duplicate prevention.** If current transport/adoption does
+   not fully prove it, add an owner-bound exact checksum/mapping/provenance
+   reuse decision before Media creation. Keep visual similarity as discovery
+   only and keep near-duplicate photographs separate.
+
+Each slice must include unit/contract coverage, guarded integration coverage
+where its owner requires a database, canonical read-back evidence and a
+separate execution-state checkpoint. Slices 1–2 address publication and media
+ordering; slices 3–6 address projection/reuse and can be reviewed without
+loosening the publication safety law.
+
+## 22. Live acceptance plan
 
 This design checkpoint performs no live acceptance. The supplied Case 573 IDs
 are not present in the currently approved `STAGING_ACCEPTANCE_SCOPE` in
@@ -839,7 +1299,8 @@ When separately authorized, the run must be read-first and fail-closed:
 2. Perform a duplicate/read-only audit for Capture 573, Post 573, Media 572,
    Attachment 572 and both representative usages.
 3. Read the current Post state token, current Article MediaUsage and current
-   canonical Media/Asset/representative read-backs.
+   canonical Media/Asset/representative read-backs, including the exact
+   attachment mapping/readback result for attachment 572.
 4. Execute only the canonical Capture/Article Media reconciliation boundary;
    never use a generic WordPress writer, direct SQL or a Governance bypass.
 5. Confirm `semantic_delta=NO` and verify that no Knowledge/Graph proposal is
@@ -854,7 +1315,7 @@ When separately authorized, the run must be read-first and fail-closed:
    publish through the typed Article publication boundary and verify final
    rendered output.
 
-## 20. Explicit non-goals
+## 23. Explicit non-goals
 
 - No implementation, migration, deployment, SSH or direct DB write in this
   design checkpoint.
@@ -869,11 +1330,15 @@ When separately authorized, the run must be read-first and fail-closed:
   success state.
 - No change to the physical image upload pipeline, private source-original,
   public WebP derivative policy, batch behavior, Video owner or existing
-  published Article behavior.
+  published Article behavior. In particular, later slices must preserve
+  provided-file safe transport, private source-original retention, the WebP
+  derivative and 1200px max-long-edge/no-upscale/no-crop rules, fast Media
+  commit, ordered last-batch context, partial-batch retry behavior and the
+  no-reupload Article handoff.
 - No claim that Case 573 is publishable without the final evidence chain;
   this design only removes unrelated orchestration blockers.
 
-## 21. Acceptance criteria mapping
+## 24. Acceptance criteria mapping
 
 | Criterion | Design proof |
 |---|---|
@@ -889,3 +1354,12 @@ When separately authorized, the run must be read-first and fail-closed:
 | J | Claim/evidence policy remains meaning-, scope- and law-aware. |
 | K | Media/Video physical and semantic owner boundaries are unchanged. |
 | L | Case 573 proceeds past the implicit Post relation and pre-reconcile Article Media diagnostics, stopping only on a genuine remaining blocker. |
+| M | The same canonical Media can be reused across Model, Classification, Article and Dictionary contexts. |
+| N | Contextual title/alt/caption belongs to MediaUsage and may differ safely by exact target/placement. |
+| O | Neutral Media metadata remains scope-safe; Article, Dictionary and Attachment editorial data do not leak backward automatically. |
+| P | Exact binary/mapping reuse is separated from visual-similarity discovery; useful distinct views remain distinct Media. |
+| Q | Image Editor re-adoption preserves the existing Media identity, source/public asset lifecycle and unrelated Usage records. |
+| R | Attachment readback inconsistency is typed/reconciled or blocked without duplicate Media. |
+| S | VisualSupport and Dictionary illustration reuse remain projection/application boundaries, not semantic truth or binary stores. |
+| T | Dictionary preferred illustration is stable but replaceable, and delegated concepts do not create competing indexable pages. |
+| U | The physical upload/WebP/private-source, Video, Graph registry, Governance and public claim laws remain unchanged. |
