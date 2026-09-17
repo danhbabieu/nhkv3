@@ -11634,3 +11634,71 @@ DEPLOYMENT: The canonical `scripts/nhk-deploy-verify` wrapper is present and
 the deployment-config environment is set, but it requires a clean checkout.
 Deployment is pending the bounded commit and wrapper verification; remote
 runtime/build identity and live read-back remain unverified.
+
+# Checkpoint — 2026-09-17 — Generic Capture semantic reconciliation (LOCAL ONLY)
+
+SCOPE: Repaired the generic root causes surfaced by the Capture/Hermle audit:
+canonical-subject Knowledge scope derivation, semantic-role separation of
+operator instructions, existing Authority delta planning, governed Knowledge
+subject relations, and idempotent retry/read-after-uncertain-apply behavior.
+No Hermle-specific branch, live/staging semantic mutation, direct SQL write,
+generic WordPress writer, Governance bypass, deployment or push was used.
+
+ROOT_CAUSE_1: `TextInputInterpreter` supplied `variant` as the fallback for
+identity/history/company statements, and continuation accepted that fallback
+before the canonical subject was locked. FIX_1: configuration/music remain
+variant-scoped and media observations remain specimen-scoped; general claims
+are marked unresolved until the locked canonical subject, facet and explicit
+context derive the scope. The continuation now prefers the canonical primary
+subject and fails closed on explicit incompatible scope.
+
+ROOT_CAUSE_2: instruction detection only recognized a narrow set of leading
+phrases, so an operator sentence such as “Bổ sung các nguồn chính thức phục
+vụ hồ sơ thương hiệu Hermle.” fell through as a user Knowledge candidate.
+FIX_2: added a generic operator-verb plus workflow-object semantic-role
+classifier with assertion precedence. Instructions remain in non-semantic
+context; instruction-only input produces zero Knowledge candidates, while
+factual imperatives remain claims. No persisted accidental claim was retired.
+
+ROOT_CAUSE_3: structured Authority input only promoted description as an
+implicit delta and did not expose exact before/after or a no-op reason.
+FIX_3: registered explicit fields are collected generically, server identity
+ownership and exact reuse remain intact, UPDATE candidates bind UUID/type/
+revision/dependencies plus before/after/delta, and identical values return
+`NOOP_VALUES_MATCH` reuse. Existing re-plan fingerprint behavior therefore
+detects revision/delta drift before approved apply.
+
+ROOT_CAUSE_4: Knowledge continuation treated `subject_id` as sufficient and
+did not emit the canonical Graph `about` child. FIX_4: every new Knowledge
+candidate emits a second governed relation candidate with dependency binding
+to the Knowledge read-back, target type/UUID/revision, registered `about`
+predicate and provenance/evidence policy fields. Active-edge read-back reuses
+without duplication; unresolved, inactive, incompatible or evidence-missing
+cases remain review/block states. Plugin wiring reads the Graph edge from the
+subject side and never writes Graph directly.
+
+RATE_LIMIT_ROOT_CAUSE: `EXTERNAL_RATE_LIMIT` is outside this repository’s
+local domain runtime; no MCP connector/HTTP throttle owner is available in
+the local test process. The local continuation boundary previously preserved
+idempotency keys but could re-apply a proposal whose state was already
+`APPLIED` when canonical read-back was missing.
+
+RATE_LIMIT_FIX_OR_BOUNDARY: classify legacy 429/Retry-After/rate-limit errors
+as `FAILED_RETRYABLE/EXTERNAL_RATE_LIMIT`; preserve the same proposal and
+idempotency key on resume; and for `APPLIED` replay require/reuse canonical
+read-back from the lifecycle or the owner dependency reader, never invoke
+Controlled Apply again. The external connector remains deployment-gated.
+
+VERIFICATION: RED regression run failed at the seven intended old behaviors
+before the fixes. Final focused Capture/Authority/semantic suite PASS — 99
+tests / 405 assertions. NHK Contract suite PASS — 6 tests / 48 assertions.
+Full NHK Unit suite reached 1,705 tests / 8,329 assertions with one unrelated
+pre-existing `DemoCutoverCliContractTest` failure
+(`REMOTE_DEPLOYMENT_FAILED` vs expected missing-config diagnostic), 14
+warnings and 18 deprecations. Targeted PHP lint, full `composer lint` and
+`git diff --check` pass. Integration was not run: `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB` are unset; no fake integration result is claimed.
+
+STATUS: `GENERIC_CAPTURE_SEMANTIC_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+The exact Hermle package remains a future bounded acceptance run after fresh
+documentation/build verification and read-only duplicate audit.

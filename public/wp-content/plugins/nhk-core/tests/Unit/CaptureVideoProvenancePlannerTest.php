@@ -693,8 +693,8 @@ final class CaptureVideoProvenancePlannerTest extends TestCase
             if ($proposal->state === ProposalState::APPROVED) $governance->proposals[$proposalId] = $proposal->transition(ProposalState::APPLIED, 'test');
             return ['canonical_id' => $canonicalId, 'canonical_readback' => ['canonical_id' => $canonicalId, 'entity_type' => $kind === 'claim' ? 'knowledge' : $kind, 'active' => true, 'revision' => 1], 'idempotent' => false];
         };
-        $stateReader = static function (array $plan) use (&$state): array {
-            return $state + ['subject' => ['id' => '30515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model']];
+        $stateReader = static function (array $plan) use (&$state, $videoId): array {
+            return $state + ['video' => ['canonical_id' => $videoId, 'revision' => 1, 'active' => true], 'subject' => ['id' => '30515de5-efe5-48e1-aec5-34130509a4dc', 'type' => 'model']];
         };
         $policies = new GovernanceAutomationPolicyResolver(['source', 'knowledge', 'evidence', 'video'], new class implements AutomationPolicyStorage {
             public function read(): array { return ['source' => 'AUTO_PUBLISH', 'knowledge' => 'AUTO_PUBLISH', 'evidence' => 'AUTO_PUBLISH', 'video' => 'AUTO_PUBLISH']; }

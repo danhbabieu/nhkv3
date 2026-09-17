@@ -563,7 +563,7 @@ final class Plugin {
                 $captureClaimReuse,
                 new CaptureVideoProvenancePlanner(new \NHK\Core\Application\Video\VideoThumbnailSelector(\NHK\Core\Application\Video\VideoThumbnailSelector::wordpressProbe(...))),
                 $governanceRuntime->videoReconciliation,
-                static function (array $plan) use ($sources, $claims, $evidence, $proposalRepository): array {
+                static function (array $plan) use ($sources, $claims, $evidence, $videos, $proposalRepository): array {
                     $provenance = is_array($plan['capture_video_provenance'] ?? null) ? $plan['capture_video_provenance'] : $plan;
                     $dependencies = (array) ($provenance['dependencies'] ?? []);
                     $sourcePayload = is_array(($dependencies[0]['payload'] ?? null)) ? $dependencies[0]['payload'] : [];
@@ -574,12 +574,15 @@ final class Plugin {
                     $proposal = null;
                     $key = trim((string) ($provenance['video_proposal']['idempotency_key'] ?? ''));
                     if ($key !== '') $proposal = $proposalRepository->findByIdempotencyKey($key);
+                    $videoId = trim((string) ($provenance['video_proposal']['subject_id'] ?? $provenance['video_proposal']['payload']['canonical_id'] ?? ''));
+                    $video = $videoId !== '' ? $videos->findByCanonicalId($videoId) : null;
                     $about = is_array($provenance['relation'] ?? null) ? $provenance['relation'] : [];
                     return [
                         'subject' => isset($about['target_uuid']) ? ['id' => (string) $about['target_uuid'], 'type' => (string) ($about['target_type'] ?? '')] : null,
                         'source' => $source === null ? null : ['canonical_id' => $source->canonicalId, 'revision' => $source->revision, 'active' => $source->active, 'title' => $source->title, 'source_type' => $source->sourceType, 'locator' => $source->locator, 'metadata' => $source->metadata],
                         'claim' => $claim === null ? null : ['canonical_id' => $claim->canonicalId, 'revision' => $claim->revision, 'active' => $claim->active, 'claim_text' => $claim->claimText, 'claim_type' => $claim->claimType, 'provenance' => $claim->provenance],
                         'evidence' => array_map(static fn ($item): array => ['canonical_id' => $item->canonicalId, 'revision' => $item->revision, 'claim_id' => $item->claimId, 'source_id' => $item->sourceId, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'active' => $item->active, 'metadata' => $item->metadata], $evidenceRows),
+                        'video' => $video === null ? null : ['canonical_id' => $video->canonicalId, 'revision' => $video->revision, 'active' => $video->active],
                         'proposal' => $proposal === null ? null : [$proposal->id, $proposal->revision, $proposal->state->value, $proposal->subjectId],
                     ];
                 },

@@ -280,7 +280,7 @@ final class GovernedCaptureContinuationService
                 'origin' => 'CAPTURE_ARTICLE_SUBJECT_BINDING',
             ], 'capture:article-about:' . $articleEndpoint . ':' . (string) $primary['type'] . ':' . (string) $primary['id']);
         }
-        if ($includeSemanticChildren && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent)) !== null) {
+        if ($includeSemanticChildren && ($intent === 'KNOWLEDGE_DELTA' || count($variants) === 1) && ($subject = $this->knowledgeSubject($subjects, $variants, $intent, $primary)) !== null) {
             $deltaText = trim((string) ($context['continuation_delta_text'] ?? ''));
             $candidates = $deltaText !== ''
                 ? [['text' => $deltaText, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]
@@ -371,8 +371,9 @@ final class GovernedCaptureContinuationService
     }
 
     /** @param list<array<string,mixed>> $subjects @param list<array<string,mixed>> $variants */
-    private function knowledgeSubject(array $subjects, array $variants, string $intent): ?array
+    private function knowledgeSubject(array $subjects, array $variants, string $intent, array $primary = []): ?array
     {
+        if ($intent === 'KNOWLEDGE_DELTA' && UuidCodec::isValid((string) ($primary['id'] ?? '')) && trim((string) ($primary['type'] ?? '')) !== '') return $primary;
         if ($intent === 'KNOWLEDGE_DELTA') return $subjects[0] ?? null;
         return count($variants) === 1 ? $variants[0] : null;
     }
@@ -681,7 +682,7 @@ final class GovernedCaptureContinuationService
             // An uncertain retry must never invoke Controlled Apply again.
             // Reuse the persisted canonical read-back; if the lifecycle did
             // not expose it, stop until a read boundary can verify the owner.
-            $readback = is_array($review['canonical_readback'] ?? null) ? $review['canonical_readback'] : (is_array($review['apply']['canonical_readback'] ?? null) ? $review['apply']['canonical_readback'] : null);
+            $readback = is_array($review['canonical_readback'] ?? null) ? $review['canonical_readback'] : (is_array($review['apply']['canonical_readback'] ?? null) ? $review['apply']['canonical_readback'] : $this->uncertainApplyReadback($plan, $proposal));
             if (!is_array($readback)) throw new \RuntimeException('CANONICAL_READBACK_REQUIRED_AFTER_APPLIED');
             $applied = ['canonical_id' => $readback['canonical_id'] ?? null, 'canonical_readback' => $readback, 'idempotent' => true];
             $lifecycle[] = 'CONTROLLED_APPLY';
@@ -712,6 +713,19 @@ final class GovernedCaptureContinuationService
             return ['proposal_id' => $replacementId !== '' ? $replacementId : $proposal->id, 'status' => 'APPLIED', 'canonical_id' => $repaired['canonical_id'] ?? null, 'canonical_readback' => $repaired['canonical_readback'] ?? null, 'repair' => $repaired, 'idempotent' => false];
         }
         throw new \RuntimeException((string) ($repaired['reason'] ?? 'VIDEO_PROPOSAL_REPAIR_REQUIRED'));
+    }
+
+    /** @return array<string,mixed>|null */
+    private function uncertainApplyReadback(array $plan, Proposal $proposal): ?array
+    {
+        if ($this->videoDependencyState === null) return null;
+        try { $state = ($this->videoDependencyState)($plan + ['proposal_id' => $proposal->id]); } catch (\Throwable) { return null; }
+        if (!is_array($state)) return null;
+        $kind = $proposal->entityType === 'knowledge' ? 'claim' : $proposal->entityType;
+        $record = $state[$kind] ?? null;
+        [$canonicalId, $revision, $active] = $this->canonicalStateTuple($record);
+        if (!UuidCodec::isValid($canonicalId) || !$active) return null;
+        return ['canonical_id' => $canonicalId, 'entity_type' => $proposal->entityType, 'active' => true, 'revision' => $revision];
     }
 
     /** @return array<string,mixed> */
