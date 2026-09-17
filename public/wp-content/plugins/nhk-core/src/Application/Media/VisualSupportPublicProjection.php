@@ -14,6 +14,7 @@ final class VisualSupportPublicProjection
         $asset = (new PublicMediaAssetSelector())->canonical(array_values(array_filter($assets, static fn (mixed $candidate): bool => $candidate instanceof MediaAsset && $candidate->mediaId === $media->canonicalId)));
         if ($asset === null) return null;
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));
-        return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'url' => (new PublicMediaAssetUrlResolver())->path($filename), 'visual_intent' => $requirement->visualIntent, 'feature_key' => $requirement->featureKey];
+        if (trim($filename) === '') return null;
+        return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'url' => (new PublicMediaAssetUrlResolver())->path($filename), 'title' => $media->canonicalName, 'alt' => $media->canonicalName, 'caption' => '', 'metadata_source' => 'MEDIA_NEUTRAL', 'visual_intent' => $requirement->visualIntent, 'feature_key' => $requirement->featureKey];
     }
 }

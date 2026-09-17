@@ -41,6 +41,25 @@ final class EntityMediaProjection
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) && trim((string) $asset->metadata['canonical_filename']) !== '' ? (string) $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));
         if ($filename === '') return null;
         $path = (new PublicMediaAssetUrlResolver())->path($filename);
-        return ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'alt' => $usage->altText, 'caption' => $usage->caption, 'width' => $asset->width, 'height' => $asset->height, 'role' => $usage->role, 'sort_order' => $usage->sortOrder];
+        $metadata = $this->metadataFor($usage, $media);
+        return array_merge($metadata, ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'width' => $asset->width, 'height' => $asset->height, 'role' => $usage->role, 'sort_order' => $usage->sortOrder, 'eligible' => true, 'state' => 'COMPLETE']);
+    }
+
+    /** @return array{title:string,alt:string,caption:string,metadata_source:string} */
+    private function metadataFor(MediaUsage $usage, Media $media): array
+    {
+        $values = [];
+        $usedUsage = false;
+        foreach (['title', 'alt', 'caption'] as $field) {
+            $usageValue = $field === 'alt' ? $usage->altText : ($field === 'caption' ? $usage->caption : $usage->title);
+            $value = trim((string) $usageValue);
+            if ($value !== '') {
+                $usedUsage = true;
+                $values[$field] = $value;
+            } else {
+                $values[$field] = $media->canonicalName;
+            }
+        }
+        return array_merge($values, ['metadata_source' => $usedUsage ? ($usage->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'SUBJECT_REPRESENTATIVE' : 'MEDIA_USAGE') : 'MEDIA_NEUTRAL']);
     }
 }
