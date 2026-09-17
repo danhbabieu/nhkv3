@@ -1,5 +1,50 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Authority staging scope propagation (LOCAL READY)
+
+SCOPE: Repaired the canonical Authority Capture → governed Proposal path so a
+staging Project Build continuation receives one server-issued, signed scope
+packet before Proposal creation. No staging/live apply, Atmos relation,
+semantic DB mutation, deployment or push was performed.
+
+ROOT_CAUSE: `OperationScopedStagingGuard` correctly failed closed because
+Authority proposals created by `GovernedAuthorityPlanExecutor` carried only
+`project_build_audit`; `AuthorityCaptureService` did not ask the shared
+`StagingAcceptanceScopeVerifier` for a scope and the Proposal payload therefore
+had no `staging_acceptance`. The v-4 apply request carries only the Proposal ID;
+scope is intentionally Proposal/Capture context, not a connector-supplied
+bypass. Separately, `AuthorityIntentPlanner` inferred `article` from raw text
+without honoring typed `purpose=AUTHORITY`, producing the invalid
+`requested=true, mode=MIXED` diagnostic.
+
+FIX: The shared scope owner now issues exact Authority-plan bindings keyed by
+Capture/request fingerprint, plan fingerprint, candidate ID, entity/operation,
+subject, target and expected revision, with the existing HMAC/expiry/admission
+gate. The executor persists that packet on every governed Proposal and includes
+its fingerprint in command identity, so pre-fix proposals without scope are
+not silently reused on retry. Authority-only planning now suppresses Article
+diagnostics; MIXED remains the only typed path that can own an Article.
+Relation candidates remain in the same Governance/Graph path and are not
+created by this checkpoint.
+
+CAPABILITY_CHAIN: descriptor `nhk.proposal.apply` → Ability
+`nhk-v3/proposal-apply` → `nhk_apply_proposals` permission callback →
+`McpGovernanceHandler` → `ControlledApplyService` → shared
+`OperationScopedStagingGuard`/`StagingAcceptanceScopeVerifier` → canonical
+Authority/Graph executor → canonical read-back. Connector v-4 supplies only
+`id`; Capture continuation is the scope-bearing owner.
+
+VERIFICATION: Focused scope/Authority/Governance suite passes 97 tests / 450
+assertions; NHK Contract passes 6 tests / 48 assertions; full NHK Unit reaches
+1,804 tests / 8,856 assertions with one pre-existing unrelated
+`DemoCutoverCliContractTest` diagnostic mismatch. `composer lint` passes,
+`git diff --check` passes, and changed-scope secret scan is clean. Integration
+is environment-blocked because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are
+unset. Live retry remains pending fresh deployed build/documentation/bootstrap
+and the separately authorized staging scope admission.
+
+STATUS: `AUTHORITY_STAGING_SCOPE_LOCAL_READY / LIVE_ACCEPTANCE_NOT_RUN`
+
 # Checkpoint — 2026-09-18 — Typed Capture relation reconciliation (LOCAL READY)
 
 SCOPE: Added the generic typed `authority_intent.relation_intents[]` Capture
