@@ -47,9 +47,9 @@ final class CaptureArticlePreflightHandoff
             'evidence' => ['slug' => $slug, 'permalink' => $permalink],
         ];
         $requirements['rendered_public'] = [
-            'applicability' => 'REQUIRED',
+            'applicability' => in_array($renderedPublicStatus, ['unavailable', 'not_present'], true) ? 'NOT_APPLICABLE' : 'REQUIRED',
             'policy' => 'VERIFY',
-            'state' => $renderedPublicStatus === 'verified' ? 'VERIFIED' : 'PENDING',
+            'state' => in_array($renderedPublicStatus, ['unavailable', 'not_present'], true) ? 'SKIPPED' : ($renderedPublicStatus === 'verified' ? 'VERIFIED' : 'PENDING'),
             'evidence' => ['status' => $renderedPublicStatus],
         ];
 
@@ -78,7 +78,7 @@ final class CaptureArticlePreflightHandoff
             'internal_links_valid' => true,
             'structured_data_status' => 'unavailable',
             'public_route_ready' => $publicRouteReady,
-            'rendered_public_verification_status' => 'unavailable',
+            'rendered_public_verification_status' => $renderedPublicStatus,
         ];
     }
 }

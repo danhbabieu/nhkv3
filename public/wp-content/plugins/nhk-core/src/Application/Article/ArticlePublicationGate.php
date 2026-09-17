@@ -70,8 +70,12 @@ final class ArticlePublicationGate
             }
         }
         $renderedRequirement = is_array($requirements['rendered_public'] ?? null) ? $requirements['rendered_public'] : null;
-        if (!$this->skipRequirement('rendered_public', $renderedRequirement)) {
-            if (($evidence['rendered_public_verification_status'] ?? '') === 'unavailable') $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
+        if ($this->skipRequirement('rendered_public', $renderedRequirement)) {
+            if (in_array(strtolower(trim((string) ($evidence['rendered_public_verification_status'] ?? ''))), ['', 'unavailable', 'not_present'], true)) {
+                $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
+            }
+        } else {
+            if (in_array(strtolower(trim((string) ($evidence['rendered_public_verification_status'] ?? ''))), ['', 'unavailable', 'not_present'], true)) $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
             else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
             if ($renderedRequirement !== null && strtoupper(trim((string) ($renderedRequirement['state'] ?? ''))) !== 'VERIFIED') {
                 $this->addBlocker($blockers, 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE');
@@ -108,7 +112,11 @@ final class ArticlePublicationGate
     {
         if ($requirement === null) return false;
         $applicability = strtoupper(trim((string) ($requirement['applicability'] ?? '')));
-        return $applicability === 'NOT_APPLICABLE' || ($name === 'semantic_delta' && $applicability === 'NOT_REQUIRED');
+        return $applicability === 'NOT_APPLICABLE'
+            || ($name === 'semantic_delta'
+                && $applicability === 'NOT_REQUIRED'
+                && strtoupper(trim((string) ($requirement['policy'] ?? 'VERIFY'))) !== 'HARD_BLOCK'
+                && strtoupper(trim((string) ($requirement['state'] ?? 'SKIPPED'))) !== 'BLOCKED');
     }
 
     /** @param list<string> $blockers */

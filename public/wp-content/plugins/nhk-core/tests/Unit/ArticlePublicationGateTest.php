@@ -126,6 +126,45 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
     }
 
+    public function test_gate_does_not_skip_a_hard_blocked_semantic_requirement_marked_not_required(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['semantic_readback_verified'] = false;
+        $evidence['requirements'] = $this->requirements();
+        $evidence['requirements']['semantic_delta'] = [
+            'applicability' => 'NOT_REQUIRED',
+            'policy' => 'HARD_BLOCK',
+            'state' => 'BLOCKED',
+        ];
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
+    }
+
+    public function test_unavailable_rendered_public_verification_is_a_warning_when_not_applicable(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['rendered_public_verification'] = false;
+        $evidence['rendered_public_verification_status'] = 'unavailable';
+        $evidence['requirements'] = $this->requirements();
+        $evidence['requirements']['rendered_public'] = [
+            'applicability' => 'NOT_APPLICABLE',
+            'policy' => 'VERIFY',
+            'state' => 'SKIPPED',
+            'evidence' => ['status' => 'unavailable'],
+        ];
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->blockers);
+        self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->warnings);
+    }
+
     public function test_gate_blocks_unverified_required_article_media_even_when_semantic_is_not_applicable(): void
     {
         $evidence = $this->evidence();

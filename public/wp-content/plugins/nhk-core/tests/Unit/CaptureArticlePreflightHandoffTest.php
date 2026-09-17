@@ -92,6 +92,7 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
         self::assertSame('NOT_APPLICABLE', $evidence['requirements']['semantic_delta']['applicability']);
         self::assertSame('REQUIRED', $evidence['requirements']['article_media']['applicability']);
         self::assertSame('REQUIRED', $evidence['requirements']['public_route']['applicability']);
-        self::assertSame('REQUIRED', $evidence['requirements']['rendered_public']['applicability']);
+        self::assertSame('NOT_APPLICABLE', $evidence['requirements']['rendered_public']['applicability']);
+        self::assertSame('SKIPPED', $evidence['requirements']['rendered_public']['state']);
     }
 }

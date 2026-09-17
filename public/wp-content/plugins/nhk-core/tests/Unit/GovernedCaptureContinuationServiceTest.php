@@ -42,6 +42,29 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertNotContains('wp_post --about--> subject', $this->relationTypes($result));
     }
 
+    public function test_ordinary_article_semantic_skip_emits_truthful_complete_completion_evidence(): void
+    {
+        $subject = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::never())->method('createFromArguments');
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-text-article', 'resume-text-article', [
+            'content_intent' => [
+                'intent' => 'TEXT_ARTICLE',
+                'source' => 'CAPTURE',
+                'semantic_delta' => ['status' => 'NONE'],
+            ],
+            'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'classification'], 'resolved' => [['id' => $subject, 'type' => 'classification']]],
+        ]);
+
+        self::assertSame('SKIPPED', $result['status']);
+        self::assertTrue($result['completion']['complete']);
+        self::assertSame('COMPLETE', $result['completion']['status']);
+        self::assertSame([], $result['completion']['children']);
+        self::assertSame('semantic_delta', $result['completion']['skipped_requirements'][0]['name']);
+    }
+
     public function test_explicit_knowledge_delta_retains_governed_proposal_approval_and_readback(): void
     {
         $subject = UuidCodec::newV7();
