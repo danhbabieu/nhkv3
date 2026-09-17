@@ -12030,10 +12030,15 @@ live/staging or deployment state was changed.
 
 VERIFICATION: Focused Slice 2 suite PASS — 87 tests / 377 assertions, with one
 existing warning. Composer lint and changed-test PHP lint pass. Whole Unit
-reaches 1,779 tests / 8,749 assertions with four unrelated pre-existing
-DemoCutover/media-fixture failures. Guarded WordPress Media integration is
-`INFRASTRUCTURE_UNAVAILABLE` because `NHK_WP_TEST_PATH=public` is unset. Diff
-check and changed-scope secret review pass. Commit `98159528` records the
-test/report fix round.
+reaches 1,779 tests / 8,749 assertions with five unrelated pre-existing
+failures: `DemoCutoverCliContractTest` receives `REMOTE_DEPLOYMENT_FAILED`
+instead of `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; `NhkDeployVerifyCliContractTest`
+receives `REMOTE_DEPLOYMENT_FAILED` instead of `WORKTREE_NOT_CLEAN` or
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; `MediaAssetDeliveryTest` cannot find
+`public/wp-content/uploads/integration-source-original-5.webp`; and two
+`PublicMediaAssetRoutesTest` cases fail because the same fixture is absent.
+Guarded WordPress Media integration is `INFRASTRUCTURE_UNAVAILABLE` because
+`NHK_WP_TEST_PATH=public` is unset. Diff check and changed-scope secret review
+pass. Commit `98159528` records the test/report fix round.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_EVIDENCE_REVIEW_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
