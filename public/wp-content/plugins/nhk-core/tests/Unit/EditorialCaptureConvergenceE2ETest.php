@@ -93,8 +93,55 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
                 self::assertSame(['featured_primary', 'inline_primary'], $context['media']['canonical_readback']['media_usage']['roles']);
                 self::assertSame(['article-featured-usage', 'article-inline-usage'], $context['media']['canonical_readback']['media_usage']['usage_ids']);
                 self::assertSame(['model-111', 'classification-cuckoo', 'dictionary-clock'], array_column($context['media']['representative_usages'], 'endpoint_key'));
+                $articleId = (int) ($context['article_id'] ?? 0);
+                $media = $context['media'];
+                $mediaUsage = $media['canonical_readback']['media_usage'];
+                $draft = new EditorialPostState(
+                    $articleId,
+                    '1:' . $articleId,
+                    'post',
+                    'draft',
+                    'Bài ảnh có readback chuẩn',
+                    'Nội dung biên tập cục bộ.',
+                    '',
+                    'bai-anh-co-readback-chuan',
+                    '/bai-anh-co-readback-chuan/',
+                    1,
+                    1,
+                );
+                $gate = (new ArticlePublicationGate())->check($draft, [
+                    'research_acceptable' => true,
+                    'subject_resolved' => true,
+                    'duplicate_intent_handled' => true,
+                    'category_resolved' => true,
+                    'semantic_plan_complete' => false,
+                    'semantic_readback_verified' => false,
+                    'media_usage_complete' => ($mediaUsage['state'] ?? '') === 'VERIFIED',
+                    'media_snapshot' => [
+                        'featured_primary' => ['media_id' => $media['slot_media']['featured_primary'], 'placeholder' => false],
+                        'inline_primary' => ['media_id' => $media['slot_media']['inline_primary'], 'placeholder' => false],
+                        'canonical_readback' => ['media_usage' => $mediaUsage],
+                        'article_usage_ids' => $mediaUsage['usage_ids'],
+                        'representative_usages' => $media['representative_usages'],
+                    ],
+                    'real_image_requirements_met' => true,
+                    'claim_compliance_acceptable' => true,
+                    'seo_projection_valid' => true,
+                    'internal_links_valid' => true,
+                    'structured_data_valid' => true,
+                    'public_route_ready' => true,
+                    'rendered_public_verification' => true,
+                    'rendered_public_verification_status' => 'verified',
+                    'requirements' => [
+                        'semantic_delta' => ['applicability' => 'NOT_REQUIRED', 'policy' => 'VERIFY', 'state' => 'SKIPPED'],
+                        'article_media' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => $mediaUsage['state'], 'evidence' => ['media_usage' => $mediaUsage]],
+                        'public_route' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+                        'rendered_public' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+                    ],
+                ], $draft->token);
+                self::assertTrue($gate->eligible, 'Unexpected blockers: ' . implode(', ', $gate->blockers));
                 $events[] = 'publication_gate';
-                return ['eligible' => true, 'blockers' => [], 'evidence' => ['media_usage' => $context['media']['canonical_readback']['media_usage']]];
+                return $gate->toArray();
             },
             physicalItems: [['client_file_id' => 'front', 'media_id' => 'media-clock', 'attachment_id' => 77, 'attachment_readback_status' => 'verified']],
         );

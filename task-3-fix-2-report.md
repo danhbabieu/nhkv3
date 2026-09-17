@@ -31,3 +31,31 @@ passed.
 
 Only the Task 3 service and focused test files were staged for the additive
 commit. Existing unrelated `docs/agent-handoff/` work was preserved.
+
+## Slice 2 Article Media Evidence Review Fix Round
+
+Replaced the ArticlePublicationGate media test's preloaded completion/readback
+state with an in-memory `ArticleMediaCoordinator` reconciliation followed by
+`CaptureArticlePreflightHandoff`. The test now asserts the exact verified
+`wp_post:1:573` Article readback, both mandatory registered roles, non-empty
+Usage IDs, `ARTICLE_MEDIA_RECONCILIATION` provenance and no blockers. It also
+snapshots Model, Classification and Dictionary representative Usage tuples
+before and after reconciliation and proves they are unchanged. The Capture
+convergence test now invokes the real `ArticlePublicationGate` against evidence
+built from its canonical Media readback, and the text placeholder research test
+asserts `readyForDraft === false`.
+
+## Verification
+
+- Focused Slice 2 suite: 87 tests, 377 assertions, pass; one existing warning.
+- Whole Unit: 1,779 tests, 8,749 assertions; 4 unrelated pre-existing failures
+  in DemoCutover/media fixture tests, with 15 warnings and 18 deprecations.
+- Guarded WordPress Media integration: `INFRASTRUCTURE_UNAVAILABLE`; all 5
+  tests skipped because `NHK_WP_TEST_PATH=public` is unset.
+- `composer lint`: pass.
+- Changed-test PHP lint: pass.
+- `git diff --check`: pass.
+- Changed-scope secret review: pass; no credential or private-key patterns.
+
+No production code, uploader, Graph relation, Video path, database, live or
+staging state, deployment or push was changed.

@@ -198,6 +198,7 @@ final class ArticleResearchPreflightTest extends TestCase
 
         $result = $service->research('Bài chữ không có ảnh', ['type' => 'brand', 'name' => 'NHK'], ['post_id' => 574]);
 
+        self::assertFalse($result->readyForDraft);
         self::assertFalse($result->mediaPlan['media_complete']);
         self::assertSame('REVIEW_REQUIRED', $result->mediaPlan['state']);
         self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
