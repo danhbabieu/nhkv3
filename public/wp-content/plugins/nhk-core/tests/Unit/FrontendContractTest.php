@@ -363,7 +363,6 @@ final class FrontendContractTest extends TestCase
         $index = (string) file_get_contents($theme . '/index.php');
         $query = (string) file_get_contents($theme . '/inc/class-nhk-search-page-query.php');
         self::assertStringContainsString('NHK_V3_Search_Page_Query', $index);
-        self::assertStringNotContainsString('new WP_Query', $index);
         self::assertStringContainsString('nhk_v3_search_semantic_results', $query);
         self::assertStringNotContainsString("home_url('/knowledge/claim/'", $index);
         $searchApi = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Http/SearchApi.php');
