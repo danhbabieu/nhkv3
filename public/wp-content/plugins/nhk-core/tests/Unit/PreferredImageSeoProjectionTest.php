@@ -11,6 +11,12 @@ final class PreferredImageSeoProjectionTest extends TestCase
 {
     protected function setUp(): void { self::assertTrue(class_exists(PreferredImageSeoProjection::class), 'Preferred image projection is not implemented.'); }
 
+    public function test_missing_state_is_registered_in_media_seo_registry(): void
+    {
+        self::assertContains(MediaSeoStateRegistry::MISSING, MediaSeoStateRegistry::all());
+        MediaSeoStateRegistry::assertKnown(MediaSeoStateRegistry::MISSING);
+    }
+
     public function test_representative_precedence_is_not_replaced_by_newer_evidence(): void
     {
         $result = (new PreferredImageSeoProjection())->project([
