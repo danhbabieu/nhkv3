@@ -285,6 +285,95 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame([], array_filter($plan['create_candidates'], static fn (array $candidate): bool => $candidate['entity_type'] === 'classification'));
     }
 
+    public function test_uuid_only_structured_brand_update_hydrates_canonical_identity_before_create_validation(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $delta = ['country' => 'Germany', 'founded_year' => 1922];
+
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand',
+                'canonical_uuid' => $canonicalId,
+                'payload_delta' => $delta,
+                'allow_create' => false,
+            ]]],
+        ], ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1]);
+
+        self::assertSame([], $plan['blockers']);
+        self::assertSame([], $plan['ambiguities']);
+        self::assertCount(1, $plan['reuse']);
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame($canonicalId, $plan['reuse'][0]['canonical_uuid']);
+        self::assertSame('Hermle', $plan['reuse'][0]['canonical_name']);
+        self::assertSame('nhk:brand:hermle', $plan['reuse'][0]['stable_key']);
+        self::assertSame($canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
+        self::assertSame('Hermle', $plan['update_candidates'][0]['canonical_name']);
+        self::assertSame('nhk:brand:hermle', $plan['update_candidates'][0]['stable_key']);
+        self::assertSame(1, $plan['update_candidates'][0]['expected_revision']);
+        self::assertSame($delta, $plan['update_candidates'][0]['payload_patch']);
+    }
+
+    public function test_uuid_only_update_has_the_same_plan_as_redundant_matching_name(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $base = ['entity_type' => 'brand', 'canonical_uuid' => $canonicalId, 'payload_delta' => ['country' => 'Germany']];
+        $planner = new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types);
+
+        $withoutName = $planner->plan(['authority_intent' => ['mode' => 'PLAN', 'requests' => [$base]]]);
+        $withName = $planner->plan(['authority_intent' => ['mode' => 'PLAN', 'requests' => [$base + ['name' => 'Hermle']]]]);
+
+        self::assertSame($withoutName['plan_fingerprint'], $withName['plan_fingerprint']);
+        self::assertSame($withoutName['reuse'], $withName['reuse']);
+        self::assertSame($withoutName['update_candidates'], $withName['update_candidates']);
+    }
+
+    public function test_uuid_with_conflicting_name_fails_closed_without_overriding_uuid(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand', 'canonical_uuid' => $canonicalId, 'name' => 'Some Other Brand', 'allow_create' => true,
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['reuse']);
+        self::assertSame([], $plan['update_candidates']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertContains('IDENTITY_CONFLICT', array_column($plan['ambiguities'], 'code'));
+    }
+
+    public function test_uuid_not_found_does_not_fallback_to_create_even_when_creation_is_allowed(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand', 'canonical_uuid' => $canonicalId, 'allow_create' => true,
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['reuse']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertContains('AUTHORITY_UUID_NOT_FOUND', array_column($plan['blockers'], 'code'));
+    }
+
+    public function test_uuid_only_matching_payload_is_a_noop_reuse(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', ['country' => 'Germany'], $canonicalId);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand', 'canonical_uuid' => $canonicalId, 'payload_delta' => ['country' => 'Germany'],
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['update_candidates']);
+        self::assertSame('NOOP_VALUES_MATCH', $plan['reuse'][0]['reason']);
+    }
+
     public function test_exact_brand_name_subject_hint_is_locator_only(): void
     {
         $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle');
@@ -377,7 +466,6 @@ final class AuthorityIntentPlannerTest extends TestCase
             'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
                 'entity_type' => 'model',
                 'canonical_uuid' => $canonicalId,
-                'name' => 'Hermle',
                 'allow_create' => true,
             ]]],
         ]);
@@ -394,7 +482,6 @@ final class AuthorityIntentPlannerTest extends TestCase
             'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
                 'entity_type' => 'brand',
                 'canonical_uuid' => $canonicalId,
-                'name' => 'Hermle',
                 'allow_create' => true,
             ]]],
         ]);
@@ -523,6 +610,39 @@ final class AuthorityIntentPlannerTest extends TestCase
 
             self::assertCount(1, $plan['create_candidates'], $type);
             self::assertSame($type, $plan['create_candidates'][0]['entity_type']);
+        }
+    }
+
+    public function test_uuid_only_updates_use_one_generic_path_for_every_registered_authority_type(): void
+    {
+        $fields = [
+            'brand' => ['country' => 'Germany'],
+            'model' => ['description' => 'Updated model.'],
+            'variant' => ['reference' => 'REF-2'],
+            'movement' => ['caliber' => 'CAL-2'],
+            'music' => ['artist' => 'Updated artist'],
+            'component' => ['kind' => 'Updated component'],
+            'classification' => ['description' => 'Updated classification.'],
+            'specimen' => ['notes' => 'Updated notes.'],
+            'product' => ['vendor' => 'Updated vendor'],
+        ];
+
+        foreach ($fields as $type => $delta) {
+            $entity = $this->entity($type, 'nhk:' . $type . ':fixture', ucfirst($type) . ' Fixture');
+            $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+                'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                    'entity_type' => $type,
+                    'canonical_uuid' => $entity->canonicalId,
+                    'payload_delta' => $delta,
+                    'allow_create' => false,
+                ]]],
+            ]);
+
+            self::assertSame([], $plan['blockers'], $type);
+            self::assertSame([], $plan['ambiguities'], $type);
+            self::assertCount(1, $plan['reuse'], $type);
+            self::assertCount(1, $plan['update_candidates'], $type);
+            self::assertSame([], $plan['create_candidates'], $type);
         }
     }
 

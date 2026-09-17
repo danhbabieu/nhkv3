@@ -1,5 +1,41 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — UUID-only Conversational Authority UPDATE repair (LOCAL ONLY)
+
+SCOPE: Repaired the narrow structured `authority_intent.requests[]` Authority
+UPDATE mismatch where an existing canonical UUID was supplied without `name`.
+No staging/live semantic mutation, direct database write, deployment, SSH or
+push was performed.
+
+ROOT_CAUSE: `AuthorityIntentPlanner::resolveRequest()` computed the
+server-owned stable-key preview before attempting canonical UUID resolution.
+An empty optional `name` therefore reached `CanonicalAuthorityStableKeyPolicy`
+and raised `AUTHORITY_STABLE_KEY_NAME_INVALID`, even though the UUID identified
+an existing Authority entity.
+
+FIX: Canonical UUID resolution now short-circuits before create-only
+name/stable-key preview. The planner validates UUID, entity type, active state
+and scope, rejects conflicting redundant name/stable-key locators as typed
+`IDENTITY_CONFLICT` review diagnostics, hydrates canonical name/stable key and
+revision from the repository, then builds the registry-validated UPDATE/REUSE
+plan. Name/stable-key preview remains on the unresolved create/fallback path.
+The implementation is generic across all nine registered Authority types.
+
+VERIFICATION: RED regression reproduced the exact
+`AUTHORITY_STABLE_KEY_NAME_INVALID` stack before the fix. Focused planner and
+Capture/MCP tests pass 48 tests / 244 assertions. The broader Authority,
+Capture, MCP, Governance and E2E unit subset passes 296 tests / 1,824
+assertions. Contract suite passes 6 tests / 48 assertions. Full Unit reaches
+1,760 tests / 8,709 assertions with one pre-existing unrelated
+`DemoCutoverCliContractTest` failure (`REMOTE_DEPLOYMENT_FAILED` versus
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`), 14 warnings and 18 deprecations.
+`composer lint` and `git diff --check` pass; changed-scope secret review has no
+matches. Integration is `ENVIRONMENT_BLOCKED`: `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB` are unset.
+
+STATUS: `CONVERSATIONAL_AUTHORITY_UUID_ONLY_UPDATE_LOCAL_READY /
+INTEGRATION_ENVIRONMENT_BLOCKED`. Live acceptance remains not performed.
+
 # Checkpoint — 2026-09-17 — Systemic Capture retry/addendum boundary repair (LOCAL ONLY)
 
 SCOPE: Repaired the generic existing-Capture retry lifecycle at the canonical

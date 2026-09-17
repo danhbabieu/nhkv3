@@ -227,14 +227,6 @@ final class AuthorityIntentPlanner
             $plan['blockers'][] = ['code' => 'UNSUPPORTED_AUTHORITY_FIELD', 'entity_type' => $type, 'fields' => $unsupported];
             return;
         }
-        // Stable keys for CREATE are always derived by the server policy. A
-        // caller can identify an existing record by UUID/name/alias, but can
-        // never supply the identity that a new canonical record will use.
-        $stableKeyFamily = $family === 'clock_type' ? 'clock-type' : $family;
-        $stableKey = $family === '' && $type === 'classification'
-            ? ''
-            : $this->stableKeys->preview($type, $name, ['family' => $stableKeyFamily]);
-        $matches = [];
         $canonicalUuid = trim((string) ($request['canonical_uuid'] ?? ''));
         if ($canonicalUuid !== '') {
             if (!UuidCodec::isValid($canonicalUuid)) {
@@ -258,8 +250,45 @@ final class AuthorityIntentPlanner
                 $plan['blockers'][] = ['code' => 'AUTHORITY_UUID_SCOPE_MISMATCH', 'entity_type' => $type, 'canonical_uuid' => $canonicalUuid, 'family' => $family];
                 return;
             }
-            $matches[$entityById->canonicalId] = ['entity' => $entityById, 'match' => 'uuid_exact'];
+
+            // UUID is the highest-priority identity locator. Hydrate the
+            // server-owned identity before any create-only name/stable-key
+            // policy is evaluated, and reject conflicting redundant locators.
+            if ($name !== '' && !$this->matchesCanonicalNameOrAlias($entityById, $name)) {
+                $plan['ambiguities'][] = [
+                    'code' => 'IDENTITY_CONFLICT',
+                    'entity_type' => $type,
+                    'canonical_uuid' => $canonicalUuid,
+                    'requested_name' => $name,
+                    'canonical_name' => $entityById->canonicalName,
+                    'review_only' => true,
+                ];
+                return;
+            }
+            if (($request['stable_key'] ?? '') !== '' && (string) $request['stable_key'] !== $entityById->stableKey) {
+                $plan['ambiguities'][] = [
+                    'code' => 'IDENTITY_CONFLICT',
+                    'entity_type' => $type,
+                    'canonical_uuid' => $canonicalUuid,
+                    'requested_stable_key' => (string) $request['stable_key'],
+                    'stable_key' => $entityById->stableKey,
+                    'review_only' => true,
+                ];
+                return;
+            }
+            $updated = $this->updateCandidate($plan, $entityById, $payloadDelta);
+            $this->reuse($plan, $entityById, 'uuid_exact', $family, !$updated && $payloadDelta !== [] ? 'NOOP_VALUES_MATCH' : null);
+            return;
         }
+
+        // Stable keys for CREATE are always derived by the server policy. A
+        // caller can identify an existing record by name/alias, but can never
+        // supply the identity that a new canonical record will use.
+        $stableKeyFamily = $family === 'clock_type' ? 'clock-type' : $family;
+        $stableKey = $family === '' && $type === 'classification'
+            ? ''
+            : $this->stableKeys->preview($type, $name, ['family' => $stableKeyFamily]);
+        $matches = [];
         $entity = $stableKey !== '' ? $this->authority->findByStableKey($type, $stableKey) : null; if ($this->eligibleMatch($entity, $type, $family)) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'stable_key_exact'];
         foreach ($this->authority->listByType($type) as $candidate) {
             if (!$this->eligibleMatch($candidate, $type, $family)) continue;
@@ -290,6 +319,16 @@ final class AuthorityIntentPlanner
         if ($type !== 'classification' || $requestedFamily !== 'clock_type') return true;
         $resolution = $this->profiles->resolveProfile($entity);
         return $resolution->resolved() && $resolution->profileKey === 'clock_type';
+    }
+
+    private function matchesCanonicalNameOrAlias(AuthorityEntity $entity, string $name): bool
+    {
+        $normalized = $this->normalize($name);
+        if ($normalized === '' || $normalized === $this->normalize($entity->canonicalName)) return true;
+        foreach ((array) ($entity->payload['aliases'] ?? []) as $alias) {
+            if (is_string($alias) && $normalized === $this->normalize($alias)) return true;
+        }
+        return false;
     }
 
     /** @param array<string,mixed> $plan */

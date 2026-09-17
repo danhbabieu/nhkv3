@@ -162,6 +162,60 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame([], $plan['create_candidates']);
     }
 
+    public function test_capture_plan_and_apply_replan_preserve_uuid_only_update_delta(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = new AuthorityEntity($canonicalId, 'brand', 'nhk:brand:hermle', 'Hermle', 1, [], AuthorityState::ACTIVE, 1);
+        $types = new EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        $planner = new AuthorityIntentPlanner(new AuthorityCapturePlannerRepository([$entity]), $types);
+        $captures = new TransportCaptureRepository();
+        $forwarded = [];
+        $appliedPlan = null;
+        $authorityCapture = new AuthorityCaptureService(
+            $captures,
+            static function (array $input, CaptureRecord $capture) use ($planner, &$forwarded): array {
+                $forwarded[] = $input['authority_intent']['requests'] ?? [];
+                return $planner->plan($input, [
+                    'capture_id' => $capture->captureId,
+                    'capture_revision' => (int) ($capture->context['planning_revision'] ?? $capture->revision),
+                ]);
+            },
+            null,
+            static function (CaptureRecord $capture, array $plan, array $ids) use (&$appliedPlan): array {
+                $appliedPlan = [$plan, $ids];
+                return ['status' => 'APPLIED', 'apply_results' => [['canonical_id' => '01a090fd-9a71-7665-af5f-08f6e25b533e']]];
+            },
+        );
+        $request = [
+            'entity_type' => 'brand',
+            'canonical_uuid' => $canonicalId,
+            'payload_delta' => ['country' => 'Germany', 'founded_year' => 1922],
+            'allow_create' => false,
+        ];
+
+        $first = $authorityCapture->execute([
+            'idempotency_key' => 'uuid-only-capture-update',
+            'purpose' => 'AUTHORITY',
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [$request]],
+        ]);
+        $planned = $first->context['authority_plan'];
+        $updateId = $planned['update_candidates'][0]['candidate_id'];
+        $done = $authorityCapture->continueWithApproval($first->captureId, [
+            'authority_intent' => [
+                'mode' => 'APPLY_APPROVED_PLAN',
+                'approved_plan_fingerprint' => $first->context['plan_fingerprint'],
+                'approved_candidate_ids' => [$updateId],
+            ],
+        ]);
+
+        self::assertSame([[$request], [$request]], $forwarded);
+        self::assertSame('APPLIED', $done->status);
+        self::assertSame([$planned, [$updateId]], $appliedPlan);
+        self::assertSame($canonicalId, $appliedPlan[0]['update_candidates'][0]['canonical_uuid']);
+        self::assertSame($request['payload_delta'], $appliedPlan[0]['update_candidates'][0]['payload_patch']);
+    }
+
     public function test_unauthorized_authority_plan_is_blocked_before_dispatch(): void
     {
         $documentation = new McpDocumentationRegistry();
