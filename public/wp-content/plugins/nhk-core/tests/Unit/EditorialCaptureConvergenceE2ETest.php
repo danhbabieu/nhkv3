@@ -55,6 +55,62 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame(['physical', 'draft', 'semantic', 'media', 'publication', 'final'], $events);
     }
 
+    public function test_publication_handoff_carries_verified_article_media_readback_separately_from_representatives(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $articleMediaReadback = null;
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            media: static function (array $context) use (&$articleMediaReadback, &$events): array {
+                $events[] = 'article_media_reconcile';
+                $articleMediaReadback = [
+                    'state' => 'VERIFIED',
+                    'endpoint_type' => 'wp_post',
+                    'endpoint_key' => '1:1001',
+                    'roles' => ['featured_primary', 'inline_primary'],
+                    'usage_ids' => ['article-featured-usage', 'article-inline-usage'],
+                    'source' => 'ARTICLE_MEDIA_RECONCILIATION',
+                    'blockers' => [],
+                ];
+                return [
+                    'status' => 'RECONCILED',
+                    'canonical_readback' => ['media_usage' => $articleMediaReadback],
+                    'slot_media' => ['featured_primary' => 'media-clock', 'inline_primary' => 'media-clock'],
+                    'representative_usages' => [
+                        ['endpoint_type' => 'model', 'endpoint_key' => 'model-111', 'role' => 'representative', 'usage_id' => 'model-usage'],
+                        ['endpoint_type' => 'classification', 'endpoint_key' => 'classification-cuckoo', 'role' => 'representative', 'usage_id' => 'classification-usage'],
+                        ['endpoint_type' => 'dictionary_concept', 'endpoint_key' => 'dictionary-clock', 'role' => 'representative', 'usage_id' => 'dictionary-usage'],
+                    ],
+                ];
+            },
+            publication: static function (array $context) use (&$articleMediaReadback, &$events): array {
+                $events[] = 'article_research';
+                self::assertSame($articleMediaReadback, $context['media']['canonical_readback']['media_usage']);
+                self::assertSame(['featured_primary', 'inline_primary'], $context['media']['canonical_readback']['media_usage']['roles']);
+                self::assertSame(['article-featured-usage', 'article-inline-usage'], $context['media']['canonical_readback']['media_usage']['usage_ids']);
+                self::assertSame(['model-111', 'classification-cuckoo', 'dictionary-clock'], array_column($context['media']['representative_usages'], 'endpoint_key'));
+                $events[] = 'publication_gate';
+                return ['eligible' => true, 'blockers' => [], 'evidence' => ['media_usage' => $context['media']['canonical_readback']['media_usage']]];
+            },
+            physicalItems: [['client_file_id' => 'front', 'media_id' => 'media-clock', 'attachment_id' => 77, 'attachment_readback_status' => 'verified']],
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'capture-article-media-readback',
+            'intent' => 'IMAGE_ARTICLE',
+            'title' => 'Bài ảnh có readback chuẩn',
+            'text' => 'Nội dung biên tập cục bộ.',
+        ]);
+
+        self::assertSame(['physical', 'draft', 'semantic', 'article_media_reconcile', 'article_research', 'publication_gate', 'final'], $events);
+        self::assertSame('VERIFIED', $articleMediaReadback['state']);
+        self::assertSame([], $result->diagnostics['publication']['blockers']);
+    }
+
     public function test_text_article_pipeline_replays_same_capture_and_owner_writes(): void
     {
         $captures = new Pr5CaptureRepository();

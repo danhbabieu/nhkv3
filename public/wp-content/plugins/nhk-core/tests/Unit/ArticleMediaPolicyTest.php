@@ -348,9 +348,11 @@ final class ArticleMediaPolicyTest extends TestCase
         $service->addAsset($item->canonicalId, 'derivative', 'uploads/capture-a.webp', hash('sha256', 'capture-a-public'), 'image/webp', 4, 1200, 800, 'PUBLIC');
         $modelUsage = $service->addUsage($item->canonicalId, 'model', 'model-111', 'representative');
         $classificationUsage = $service->addUsage($item->canonicalId, 'classification', 'classification-cuckoo', 'representative');
+        $dictionaryUsage = $service->addUsage($item->canonicalId, 'dictionary_concept', 'dictionary-clock', 'representative');
         $representativesBefore = $this->snapshotUsages([
             ...$usages->listByEndpoint('model', 'model-111'),
             ...$usages->listByEndpoint('classification', 'classification-cuckoo'),
+            ...$usages->listByEndpoint('dictionary_concept', 'dictionary-clock'),
         ]);
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
 
@@ -369,9 +371,11 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame([$item->canonicalId], array_values(array_unique(array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $articleUsages))));
         self::assertSame($modelUsage->usageId, $usages->listByEndpoint('model', 'model-111', 'representative')[0]->usageId);
         self::assertSame($classificationUsage->usageId, $usages->listByEndpoint('classification', 'classification-cuckoo', 'representative')[0]->usageId);
+        self::assertSame($dictionaryUsage->usageId, $usages->listByEndpoint('dictionary_concept', 'dictionary-clock', 'representative')[0]->usageId);
         $representativesAfter = $this->snapshotUsages([
             ...$usages->listByEndpoint('model', 'model-111'),
             ...$usages->listByEndpoint('classification', 'classification-cuckoo'),
+            ...$usages->listByEndpoint('dictionary_concept', 'dictionary-clock'),
         ]);
         self::assertSame($representativesBefore, $representativesAfter);
         self::assertSame('VERIFIED', $result->toArray()['canonical_readback']['media_usage']['state']);

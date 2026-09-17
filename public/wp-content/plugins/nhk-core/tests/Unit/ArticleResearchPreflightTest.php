@@ -161,6 +161,50 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertNotContains('MEDIA_PIPELINE_FAILURE', $result->blockers);
     }
 
+    public function test_text_article_placeholder_readback_remains_non_ready(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'article-text', 'type' => 'brand', 'name' => 'NHK']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [],
+                'categories' => [['slug' => 'tri-thuc']],
+                'knowledge' => [],
+                'sources' => [],
+                'evidence' => [],
+                'media' => [],
+                'videos' => [],
+                'relations' => [],
+                'article_media' => [
+                    'state' => 'PLACEHOLDER',
+                    'media_complete' => false,
+                    'featured_primary' => ['media_id' => 'placeholder-featured', 'placeholder' => true],
+                    'inline_primary' => ['media_id' => 'placeholder-inline', 'placeholder' => true],
+                    'canonical_readback' => [
+                        'media_usage' => [
+                            'state' => 'REVIEW_REQUIRED',
+                            'endpoint_type' => 'wp_post',
+                            'endpoint_key' => '1:574',
+                            'roles' => [],
+                            'usage_ids' => [],
+                            'source' => 'ARTICLE_MEDIA_RECONCILIATION',
+                            'blockers' => ['MEDIAUSAGE_INCOMPLETE', 'ARTICLE_MEDIA_FEATURED_MISSING'],
+                        ],
+                    ],
+                ],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Bài chữ không có ảnh', ['type' => 'brand', 'name' => 'NHK'], ['post_id' => 574]);
+
+        self::assertFalse($result->mediaPlan['media_complete']);
+        self::assertSame('REVIEW_REQUIRED', $result->mediaPlan['state']);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertContains('ARTICLE_MEDIA_FEATURED_MISSING', array_column($result->mediaPlan['diagnostics'], 'code'));
+        self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->mediaPlan['diagnostics'], 'code'));
+    }
+
     public function test_ordinary_article_research_reads_semantic_inventory_without_creating_a_write_plan(): void
     {
         $inventoryReads = 0;

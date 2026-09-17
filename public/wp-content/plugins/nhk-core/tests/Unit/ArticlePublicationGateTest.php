@@ -133,6 +133,42 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertNotContains('classification-usage', $evidence['media_snapshot']['article_usage_ids']);
     }
 
+    public function test_verified_article_usage_readback_passes_with_independent_representative_usages(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['requirements'] = $this->requirements();
+        $evidence['media_snapshot'] = [
+            'featured_primary' => ['media_id' => 'media-clock', 'placeholder' => false],
+            'inline_primary' => ['media_id' => 'media-clock', 'placeholder' => false],
+            'canonical_readback' => [
+                'media_usage' => [
+                    'state' => 'VERIFIED',
+                    'endpoint_type' => 'wp_post',
+                    'endpoint_key' => '1:573',
+                    'roles' => ['featured_primary', 'inline_primary'],
+                    'usage_ids' => ['article-featured-usage', 'article-inline-usage'],
+                    'source' => 'ARTICLE_MEDIA_RECONCILIATION',
+                    'blockers' => [],
+                ],
+            ],
+            'article_usage_ids' => ['article-featured-usage', 'article-inline-usage'],
+            'representative_usages' => [
+                ['endpoint_type' => 'model', 'endpoint_key' => 'model-111', 'role' => 'representative', 'usage_id' => 'model-usage'],
+                ['endpoint_type' => 'classification', 'endpoint_key' => 'classification-cuckoo', 'role' => 'representative', 'usage_id' => 'classification-usage'],
+                ['endpoint_type' => 'dictionary_concept', 'endpoint_key' => 'dictionary-clock', 'role' => 'representative', 'usage_id' => 'dictionary-usage'],
+            ],
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertSame([], $result->blockers, 'Unexpected blockers: ' . implode(', ', $result->blockers));
+        self::assertTrue($result->eligible);
+        self::assertSame(['article-featured-usage', 'article-inline-usage'], $evidence['media_snapshot']['article_usage_ids']);
+        self::assertSame('model-111', $evidence['media_snapshot']['representative_usages'][0]['endpoint_key']);
+        self::assertSame('classification-cuckoo', $evidence['media_snapshot']['representative_usages'][1]['endpoint_key']);
+        self::assertSame('dictionary-clock', $evidence['media_snapshot']['representative_usages'][2]['endpoint_key']);
+    }
+
     public function test_gate_skips_non_applicable_semantic_owner_but_evaluates_required_article_owners(): void
     {
         $evidence = $this->evidence();
