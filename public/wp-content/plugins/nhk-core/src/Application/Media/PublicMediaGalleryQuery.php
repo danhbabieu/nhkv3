@@ -64,7 +64,9 @@ final class PublicMediaGalleryQuery
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
             'article_url' => $articleUrl,
-        ], $image === null ? ['state' => MediaSeoStateRegistry::MISSING] : []);
+        ], $image === null
+            ? ['state' => MediaSeoStateRegistry::MISSING, 'eligible' => false]
+            : ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true]);
     }
 
     /** @return array{image_url:string,width:?int,height:?int}|null */

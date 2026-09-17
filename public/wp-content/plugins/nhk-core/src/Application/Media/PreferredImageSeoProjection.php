@@ -14,6 +14,7 @@ final class PreferredImageSeoProjection
             && ($item['eligible'] ?? true) === true
             && ($item['active'] ?? true) === true
             && (($item['readiness'] ?? 'ready') === 'ready')
+            && (!array_key_exists('state', $item) || $item['state'] === MediaSeoStateRegistry::COMPLETE)
             && ($item['state'] ?? null) !== MediaSeoStateRegistry::MISSING
             && ($item['state'] ?? null) !== MediaSeoStateRegistry::PLACEHOLDER
             && ($item['visibility'] ?? 'PUBLIC') === 'PUBLIC'
