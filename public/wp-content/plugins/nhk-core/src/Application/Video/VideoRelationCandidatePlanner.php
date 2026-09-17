@@ -24,9 +24,16 @@ final class VideoRelationCandidatePlanner
         foreach ($relations as $relation) {
             $targetId = trim((string) ($relation['target_id'] ?? ''));
             $targetType = trim((string) ($relation['target_type'] ?? ''));
+            $sourceType = strtolower(trim((string) ($relation['source_type'] ?? 'video')));
+            $sourceId = trim((string) ($relation['source_uuid'] ?? $relation['source_id'] ?? $relation['source_key'] ?? $videoId));
             $predicate = trim((string) ($relation['predicate'] ?? 'about'));
             $origin = trim((string) ($relation['origin'] ?? 'INFERRED_RELATION'));
             $evidence = is_array($relation['evidence_refs'] ?? null) ? array_values($relation['evidence_refs']) : [];
+            if ($sourceType !== 'video' && strtolower($targetType) === 'video' && strtolower($targetId) === strtolower($videoId)) {
+                if (!UuidCodec::isValid($sourceId)) throw new \InvalidArgumentException('Video relation source must be a canonical UUID.');
+                $targetType = $sourceType;
+                $targetId = $sourceId;
+            }
             if (!UuidCodec::isValid($targetId)) throw new \InvalidArgumentException('Video relation target must be a canonical UUID.');
             if (!in_array($origin, ['EXPLICIT_USER_RELATION', 'INFERRED_RELATION'], true)) throw new \InvalidArgumentException('Video relation origin is invalid.');
             if ($evidence === [] && !$allowDeferredEvidence) throw new VideoRelationEvidenceRequired();

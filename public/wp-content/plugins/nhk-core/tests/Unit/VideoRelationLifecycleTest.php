@@ -8,6 +8,7 @@ use NHK\Core\Application\Governance\{AuthorityProposalExecutor, GovernanceServic
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\Video\VideoService;
 use NHK\Core\Application\Video\VideoCompletenessPolicy;
+use NHK\Core\Application\Video\VideoRelationCandidatePlanner;
 use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Contracts\Governance\ApprovedRelationProposalRepository;
@@ -24,6 +25,48 @@ use PHPUnit\Framework\TestCase;
 
 final class VideoRelationLifecycleTest extends TestCase
 {
+    public function test_inverse_relation_candidate_is_normalized_to_video_outbound_about_direction(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $variantId = '22222222-2222-4222-8222-222222222222';
+        $planner = new VideoRelationCandidatePlanner(
+            new PredicateRegistry(),
+            new class implements EvidenceRepository {
+                public function findByCanonicalId(string $id): ?Evidence { return null; }
+                public function create(Evidence $evidence): Evidence { return $evidence; }
+                public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+                public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
+                public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+            },
+            new class implements KnowledgeRepository {
+                public function findByCanonicalId(string $id): ?KnowledgeClaim { return null; }
+                public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+                public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+                public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+                public function list(bool $includeRetired = false): array { return []; }
+            },
+            new class implements SourceRepository {
+                public function findByCanonicalId(string $id): ?Source { return null; }
+                public function findByStableKey(string $stableKey): ?Source { return null; }
+                public function create(Source $source): Source { return $source; }
+                public function update(Source $source, int $expectedRevision): Source { return $source; }
+                public function list(bool $includeRetired = false): array { return []; }
+            },
+        );
+
+        $candidates = $planner->plan($videoId, [[
+            'source_type' => 'variant', 'source_uuid' => $variantId,
+            'target_type' => 'video', 'target_id' => $videoId,
+            'predicate' => 'about', 'evidence_refs' => [],
+        ]], true);
+
+        self::assertCount(1, $candidates);
+        self::assertSame('video', $candidates[0]->sourceType);
+        self::assertSame($videoId, $candidates[0]->sourceKey);
+        self::assertSame('variant', $candidates[0]->targetType);
+        self::assertSame($variantId, $candidates[0]->targetId);
+    }
+
     public function test_completeness_still_blocks_a_video_without_semantic_attachment(): void
     {
         $result = (new VideoCompletenessPolicy())->evaluate([
@@ -155,6 +198,100 @@ final class VideoRelationLifecycleTest extends TestCase
         self::assertTrue($video->active);
         self::assertSame($videoId, $videos->findByCanonicalId($videoId)?->canonicalId);
         self::assertSame([], $video->metadata['completeness']['blockers']);
+    }
+
+    public function test_video_update_keeps_an_inverse_about_edge_without_creating_a_duplicate_forward_edge(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $variantId = '22222222-2222-4222-8222-222222222222';
+        $wrongClassificationId = '66666666-6666-4666-8666-666666666666';
+        $claimId = '33333333-3333-4333-8333-333333333333';
+        $sourceId = '44444444-4444-4444-8444-444444444444';
+        $evidenceId = '55555555-5555-4555-8555-555555555555';
+        $metadata = [
+            'intake_version' => 1,
+            'semantic_reconciliation_requested' => true,
+            'source' => ['identity_valid' => true, 'availability' => 'available', 'embeddable' => true],
+            'source_rights' => 'PUBLIC_EXTERNAL_REFERENCE',
+            'editorial' => ['title' => 'Corrected', 'summary' => 'Summary', 'body' => 'Body'],
+            'category' => ['primary' => ['key' => '01']],
+            'embed_url' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+            'seo' => ['title' => 'Corrected', 'description' => 'Summary'],
+            'subject_resolution_packet' => ['id' => $wrongClassificationId, 'type' => 'classification'],
+            'semantic_attachments' => [[
+                'target_type' => 'variant', 'target_uuid' => $variantId, 'predicate' => 'about',
+                'evidence_refs' => [['evidence_id' => $evidenceId]],
+            ]],
+        ];
+        $video = new Video($videoId, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video', $metadata);
+        $videos = new class($video) implements VideoRepository {
+            public function __construct(private Video $video) {}
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->video->canonicalId ? $this->video : null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return $platform === $this->video->platform && $externalId === $this->video->externalVideoId ? $this->video : null; }
+            public function create(Video $video): Video { return $this->video = $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $this->video = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata, $video->thumbnailMediaId, $video->active, $expectedRevision + 1); }
+            public function list(bool $includeRetired = false): array { return [$this->video]; }
+        };
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('video', new class($videos) implements \NHK\Core\Contracts\Graph\EndpointResolver {
+            public function __construct(private VideoRepository $videos) {}
+            public function supports(string $endpoint_type): bool { return $endpoint_type === 'video'; }
+            public function exists(NodeReference $reference): bool { return $this->videos->findByCanonicalId($reference->endpoint_key) !== null; }
+            public function normalize(NodeReference $reference): NodeReference { return $reference; }
+        });
+        $endpoints->register('variant', new FakeEndpointResolver('variant', [$variantId]));
+        $endpoints->register('classification', new FakeEndpointResolver('classification', [$wrongClassificationId]));
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $graph->create(new NodeReference('variant', $variantId), 'about', new NodeReference('video', $videoId));
+        $graph->create(new NodeReference('video', $videoId), 'about', new NodeReference('classification', $wrongClassificationId));
+        $claims = new class($claimId) implements KnowledgeRepository {
+            public function __construct(private string $id) {}
+            public function findByCanonicalId(string $id): ?KnowledgeClaim { return $id === $this->id ? new KnowledgeClaim($id, 'claim-key', 'Claim', 'fact') : null; }
+            public function findByStableKey(string $stableKey): ?KnowledgeClaim { return null; }
+            public function create(KnowledgeClaim $claim): KnowledgeClaim { return $claim; }
+            public function update(KnowledgeClaim $claim, int $expectedRevision): KnowledgeClaim { return $claim; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $sources = new class($sourceId) implements SourceRepository {
+            public function __construct(private string $id) {}
+            public function findByCanonicalId(string $id): ?Source { return $id === $this->id ? new Source($id, 'source-key', 'Source', 'website') : null; }
+            public function findByStableKey(string $stableKey): ?Source { return null; }
+            public function create(Source $source): Source { return $source; }
+            public function update(Source $source, int $expectedRevision): Source { return $source; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $evidence = new class($evidenceId, $claimId, $sourceId) implements EvidenceRepository {
+            public function __construct(private string $id, private string $claimId, private string $sourceId) {}
+            public function findByCanonicalId(string $id): ?Evidence { return $id === $this->id ? new Evidence($id, $this->claimId, $this->sourceId, 'supports', 'Excerpt') : null; }
+            public function create(Evidence $evidence): Evidence { return $evidence; }
+            public function update(Evidence $evidence, int $expectedRevision): Evidence { return $evidence; }
+            public function listByClaim(string $claimId, bool $includeRetired = false): array { return []; }
+            public function listBySource(string $sourceId, bool $includeRetired = false): array { return []; }
+        };
+
+        $executor = new AuthorityProposalExecutor(
+            new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()),
+            $graph,
+            null,
+            new VideoService($videos),
+            null,
+            null,
+            null,
+            null,
+            new CanonicalDependencyValidator($claims, $sources, $evidence),
+        );
+        $updated = $executor(new Proposal('video-inverse-keep', $videoId, 'update', [
+            'canonical_id' => $videoId,
+            'title' => 'Video',
+            'metadata' => $metadata,
+        ], 'content', 1, 'dependencies', ProposalState::APPROVED, idempotencyKey: 'video-inverse-keep', targetUuid: $videoId, entityType: 'video'));
+
+        self::assertSame($videoId, $updated->canonicalId);
+        self::assertSame('Corrected', $updated->metadata['editorial']['title']);
+        self::assertSame('Corrected', $updated->metadata['seo']['title']);
+        self::assertNotContains('NO_SEMANTIC_ATTACHMENT', $updated->metadata['completeness']['blockers']);
+        self::assertCount(1, $graph->findIncoming(new NodeReference('video', $videoId), 'about', 0, 10, false)['items']);
+        self::assertCount(0, $graph->findOutgoing(new NodeReference('video', $videoId), 'about', 0, 10, false)['items']);
     }
 
     public function test_historical_video_proposal_discovers_approved_bound_relation(): void

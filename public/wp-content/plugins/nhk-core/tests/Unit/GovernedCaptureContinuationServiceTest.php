@@ -206,6 +206,49 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($replacementId, $result['writes'][0]['proposal_id']);
     }
 
+    public function test_stale_video_update_is_not_dispatched_to_relation_reconciliation(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $proposal = new Proposal($proposalId, $videoId, 'update', [
+            'canonical_id' => $videoId,
+            'metadata' => ['semantic_reconciliation_requested' => true],
+        ], 'content', 1, 'dependency', ProposalState::APPROVED, entityType: 'video', targetUuid: $videoId);
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'approved',
+            'entity_type' => 'video',
+            'operation' => 'update',
+            'subject_id' => $videoId,
+            'target_uuid' => $videoId,
+            'payload' => $proposal->payload,
+            'expected_revision' => 1,
+            'content_fingerprint' => 'content',
+            'dependency_fingerprint' => 'dependency',
+            'revision' => 1,
+        ]);
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn([
+            'ready' => false,
+            'reasons' => ['TARGET_REVISION_CHANGED'],
+        ]);
+
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new \LogicException('stale video update must not apply'),
+            $this->policies(['video'], ['video' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+            proposalReconciliation: static fn (): array => [
+                'status' => 'SYSTEM_BLOCKED',
+                'blockers' => ['RELATION_RECONCILIATION_UNSUPPORTED'],
+            ],
+        );
+
+        $result = $service->execute('capture-video', 'continuation', [], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('SYSTEM_BLOCKED', $result['status']);
+        self::assertSame(['TARGET_REVISION_CHANGED'], $result['blockers']);
+    }
+
     public function test_existing_supported_claim_is_reused_before_continuation_proposal_creation(): void
     {
         $governance = $this->createMock(GovernedLifecycle::class);

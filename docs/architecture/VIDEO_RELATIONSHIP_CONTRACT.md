@@ -42,6 +42,12 @@ validation. The old relation proposal is never edited; a stale governed
 relation command is rebuilt through the reconciliation service and may use
 `relation_create`, `relation_retire` or `relation_reactivate`.
 
+The canonical write direction is always `Video → about → target`. Compatibility
+read-back also inspects an active historical inverse `target → about → Video`,
+normalizes its semantic target to the Video attachment, and keeps/reactivates
+that exact edge without creating a duplicate forward edge. New writes never
+use the inverse direction.
+
 If the correct relation lacks usable Evidence, the editorial subject may be
 corrected but the Video remains non-publishable/review-required. A stale edge
 must not remain active merely because the new relation is pending.

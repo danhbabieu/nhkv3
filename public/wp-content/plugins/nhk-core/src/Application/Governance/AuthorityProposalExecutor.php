@@ -217,10 +217,26 @@ final class AuthorityProposalExecutor
             if ($predicate === '' || $targetType === '' || $targetUuid === '') throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
             $desired[$predicate . '|' . strtolower($targetType) . '|' . strtolower($targetUuid)] = true;
         }
-        $existingPage = $this->graph->findOutgoing(new NodeReference('video', $video->canonicalId), null, 0, 200, true);
-        foreach ((array) ($existingPage['items'] ?? []) as $edge) {
-            if (!$edge instanceof GraphEdge || !$edge->isActive()) continue;
-            $key = strtolower($edge->predicate) . '|' . strtolower($edge->target->reference->endpoint_type) . '|' . strtolower($edge->target->reference->endpoint_key);
+        $existingEdges = [];
+        foreach ([
+            $this->graph->findOutgoing(new NodeReference('video', $video->canonicalId), null, 0, 200, true),
+            // Compatibility read-back: older relation writes may have stored
+            // the same about edge as target -> Video. It is compared by the
+            // semantic target and reused; no forward duplicate is created.
+            $this->graph->findIncoming(new NodeReference('video', $video->canonicalId), 'about', 0, 200, true),
+        ] as $page) {
+            foreach ((array) ($page['items'] ?? []) as $edge) {
+                if (!$edge instanceof GraphEdge || isset($existingEdges[$edge->edge_uuid])) continue;
+                $existingEdges[$edge->edge_uuid] = $edge;
+            }
+        }
+        foreach ($existingEdges as $edge) {
+            if (!$edge->isActive()) continue;
+            $target = $edge->source->reference->endpoint_type === 'video'
+                && $edge->source->reference->endpoint_key === $video->canonicalId
+                ? $edge->target
+                : $edge->source;
+            $key = strtolower($edge->predicate) . '|' . strtolower($target->reference->endpoint_type) . '|' . strtolower($target->reference->endpoint_key);
             if (!isset($desired[$key])) $this->graph->retire($edge->edge_uuid, $edge->revision);
         }
         if ($attachments === []) return [];
@@ -237,9 +253,20 @@ final class AuthorityProposalExecutor
             $target = new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? ''));
             $source = new NodeReference('video', $video->canonicalId);
             $readBack = $this->graph->findEdge($source, $predicate, $target);
+            if ($readBack === null && $predicate === 'about') {
+                $inverse = $this->graph->findIncoming($source, 'about', 0, 200, true);
+                foreach ((array) ($inverse['items'] ?? []) as $candidate) {
+                    if (!$candidate instanceof GraphEdge) continue;
+                    $candidateSource = $candidate->source->reference;
+                    if ($candidateSource->endpoint_type === $target->endpoint_type && $candidateSource->endpoint_key === $target->endpoint_key) {
+                        $readBack = $candidate;
+                        break;
+                    }
+                }
+            }
             if ($readBack !== null && !$readBack->isActive()) $readBack = $this->graph->reactivate($readBack->edge_uuid, $readBack->revision);
             if ($readBack === null) $readBack = $this->graph->create($source, $predicate, $target);
-            $readBack = $this->graph->findEdge($source, $predicate, $target);
+            if ($readBack->source->reference->endpoint_type === 'video' && $readBack->source->reference->endpoint_key === $video->canonicalId) $readBack = $this->graph->findEdge($source, $predicate, $target);
             if ($readBack === null || !$readBack->isActive()) throw new \RuntimeException('VIDEO_RELATION_READBACK_FAILED');
         }
         return $attachments;

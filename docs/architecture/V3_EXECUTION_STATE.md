@@ -11702,3 +11702,42 @@ warnings and 18 deprecations. Targeted PHP lint, full `composer lint` and
 STATUS: `GENERIC_CAPTURE_SEMANTIC_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 The exact Hermle package remains a future bounded acceptance run after fresh
 documentation/build verification and read-only duplicate audit.
+
+# Checkpoint — 2026-09-17 — Video relation reconciliation root-cause fix (LOCAL ONLY)
+
+SCOPE: Repaired the generic Video relation reconciliation path for canonical
+subject correction. No staging/production mutation, deployment, push, direct
+database write, legacy cleanup or unrelated work was performed.
+
+ROOT_CAUSE: `GovernedCaptureContinuationService::runGovernedPlan()` invoked the
+relation-only `RelationProposalReconciliationService` for any proposal with
+`TARGET_REVISION_CHANGED`. A Video proposal therefore received
+`RELATION_RECONCILIATION_UNSUPPORTED` before its governed Video update could
+finish. Separately, Video completeness and attachment reconciliation read only
+outbound edges, so an existing historical inverse `target → about → Video`
+edge was reported missing and a correction could attempt a duplicate forward
+edge.
+
+FIX: Gate stale-proposal relation reconciliation to the registered relation
+operations only. Keep canonical Video writes as `Video → about → target`, while
+compatibility read-back scans both directions, normalizes inverse edges for
+semantic comparison, preserves exact active inverse edges, reactivates retired
+matches, retires stale active targets, and deduplicates a target if both
+directions exist. Video relation candidate packets with inverse endpoint fields
+are normalized at the planner boundary. Evidence dependency validation and
+fail-closed completeness remain unchanged.
+
+HISTORY: `d84e919c` introduced the generic stale-reconciliation callback;
+`7d2deae1` retained the relation-only guard and expanded relation operations.
+No commit after `7d2deae1` changed this Video path; this was a latent contract
+mismatch, not a later-commit Video code regression.
+
+VERIFICATION: Focused Video/Capture/Governance/subject/instruction/search/public
+suite PASS — 113 tests / 461 assertions. Contract suite PASS — 6 tests / 48
+assertions. Full Unit reached 1,709 tests / 8,345 assertions with one unrelated
+pre-existing `DemoCutoverCliContractTest` failure; full PHPUnit remains blocked
+by the existing WordPress/MySQL integration bootstrap and acceptance gates
+(`NHK_WP_TEST_PATH`/`NHK_WP_TEST_DB` unset). `composer lint` and
+`git diff --check` pass. No live completion is claimed.
+
+STATUS: `VIDEO_RELATION_RECONCILIATION_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

@@ -692,7 +692,10 @@ final class GovernedCaptureContinuationService
         $lifecycle[] = 'ELIGIBILITY';
         if (($eligibility['ready'] ?? false) !== true) {
             $reasons = array_values(array_map('strval', (array) ($eligibility['reasons'] ?? ['PROPOSAL_NOT_ELIGIBLE'])));
-            if ($this->proposalReconciliation !== null && in_array('TARGET_REVISION_CHANGED', $reasons, true)) {
+            $reconciliationOperation = (string) ($proposal->operation ?? '');
+            $isRelationProposal = $proposal->entityType === 'relation'
+                && in_array($reconciliationOperation, ['relation_create', 'relation_retire', 'relation_reactivate'], true);
+            if ($this->proposalReconciliation !== null && $isRelationProposal && in_array('TARGET_REVISION_CHANGED', $reasons, true)) {
                 $reconciled = ($this->proposalReconciliation)($proposal, $eligibility, $control);
                 if (is_array($reconciled) && ($reconciled['status'] ?? '') !== '') return $reconciled;
             }

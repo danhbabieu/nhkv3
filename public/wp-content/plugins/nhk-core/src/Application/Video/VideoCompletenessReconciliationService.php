@@ -56,20 +56,37 @@ final class VideoCompletenessReconciliationService
     private function canonicalAttachments(Video $video): array
     {
         $stored = is_array($video->metadata['semantic_attachments'] ?? null) ? $video->metadata['semantic_attachments'] : [];
-        $page = $this->graph->findOutgoing(new NodeReference('video', $video->canonicalId), 'about', 0, 200, false);
+        $videoReference = new NodeReference('video', $video->canonicalId);
+        $pages = [
+            ['direction' => 'outgoing', 'page' => $this->graph->findOutgoing($videoReference, 'about', 0, 200, true)],
+            ['direction' => 'incoming', 'page' => $this->graph->findIncoming($videoReference, 'about', 0, 200, true)],
+        ];
         $attachments = [];
-        foreach ((array) ($page['items'] ?? []) as $edge) {
-            if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive()) continue;
-            $targetType = $edge->target->reference->endpoint_type;
-            $targetUuid = $edge->target->reference->endpoint_key;
-            foreach ($stored as $attachment) {
-                if (!$this->matchesTarget($attachment, $targetType, $targetUuid)) continue;
-                if (!$this->hasValidEvidence($attachment)) continue;
-                $attachment['predicate'] = 'about';
-                $attachment['target_type'] = $targetType;
-                $attachment['target_uuid'] = $targetUuid;
-                $attachments[] = $attachment;
-                break;
+        $seenEdges = [];
+        $seenTargets = [];
+        foreach ($pages as $entry) {
+            foreach ((array) (($entry['page'])['items'] ?? []) as $edge) {
+                if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive() || isset($seenEdges[$edge->edge_uuid])) continue;
+                $seenEdges[$edge->edge_uuid] = true;
+                // New Video relations are stored Video -> target. Older
+                // governed read-backs may expose the same semantic relation
+                // in the inverse direction; normalize it for completeness
+                // without creating a second edge.
+                $target = $entry['direction'] === 'outgoing' ? $edge->target : $edge->source;
+                $targetType = $target->reference->endpoint_type;
+                $targetUuid = $target->reference->endpoint_key;
+                $targetKey = strtolower('about|' . $targetType . '|' . $targetUuid);
+                if (isset($seenTargets[$targetKey])) continue;
+                foreach ($stored as $attachment) {
+                    if (!$this->matchesTarget($attachment, $targetType, $targetUuid)) continue;
+                    if (!$this->hasValidEvidence($attachment)) continue;
+                    $attachment['predicate'] = 'about';
+                    $attachment['target_type'] = $targetType;
+                    $attachment['target_uuid'] = $targetUuid;
+                    $attachments[] = $attachment;
+                    $seenTargets[$targetKey] = true;
+                    break;
+                }
             }
         }
         return $attachments;

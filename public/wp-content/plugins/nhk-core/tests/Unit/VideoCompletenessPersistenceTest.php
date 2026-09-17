@@ -77,6 +77,24 @@ final class VideoCompletenessPersistenceTest extends TestCase
         self::assertSame($fixture['evidence_id'], $fixture['evidence']->findByCanonicalId($fixture['evidence_id'])?->canonicalId);
     }
 
+    public function test_reconciliation_reuses_an_inverse_about_edge_without_reporting_missing_attachment(): void
+    {
+        $fixture = $this->fixture(false, true);
+        $fixture['graph']->create(
+            new NodeReference('brand', $fixture['target_id']),
+            'about',
+            new NodeReference('video', $fixture['video_id']),
+        );
+
+        $service = new VideoCompletenessReconciliationService($fixture['repository'], $fixture['graph'], $fixture['dependencies']);
+        $service->reconcile($fixture['video_id']);
+
+        $fresh = (new RestartableVideoRepository($fixture['store']))->findByCanonicalId($fixture['video_id']);
+        self::assertNotNull($fresh);
+        self::assertNotContains('NO_SEMANTIC_ATTACHMENT', $fresh->metadata['completeness']['blockers']);
+        self::assertCount(1, $fixture['graph_repository']->allEdges(false));
+    }
+
     public function test_existing_stale_video_resume_repairs_persisted_completeness_without_new_owner_or_relation(): void
     {
         $fixture = $this->fixture(true, true);
