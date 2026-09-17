@@ -12210,3 +12210,38 @@ tests and has one existing unrelated DemoCutoverCliContractTest failure
 deployment, push or live/staging mutation was performed.
 
 STATUS: `GOVERNED_CONTENT_AUTOMATION_EXPANSION_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Local runtime verification after schema 022 (LOCAL ONLY)
+
+RUNTIME: The first preflight failure was isolated to the sandbox denying the
+local MySQL TCP probe, not to WordPress or nhk-core. An escalated read-only
+preflight then passed WordPress bootstrap, nhk-core bootstrap, documentation,
+Authority hydration and REST. The local development database was `21/22` and
+the guarded test database was also behind the current target; the official
+UP-only `nhk-core-maintenance.php --operation=migration-up` path brought both
+`nhk_v3` and `nhk_v3_test` to `22/22`. No semantic records were created or
+changed.
+
+VERIFICATION: Preflight is `11/11 PASS`. The current targeted Capture,
+Authority, Governance and automation regression selection passes 70 tests / 348
+assertions; full NHK Unit passes 1,767 tests / 8,738 assertions with 15
+warnings, 18 deprecations and 18 PHPUnit deprecations. Composer PHP lint and
+`git diff --check` pass. Deployment contract tests pass 10 tests / 42
+assertions when the externally configured `NHK_DEMO_DEPLOY_CONFIG` is unset;
+the configured environment otherwise exercises a real adapter and is not a
+valid missing-config test fixture.
+
+INTEGRATION: Guarded `nhk_v3_test` execution was attempted after schema repair.
+The first actionable failure is the existing MCP Ability exposure assertion,
+which predates this checkpoint and does not account for the explicit internal
+admin ability allowlist. The separate media ingest integration also exposes an
+existing PHP/GD palette-image WebP failure (`WORDPRESS_MEDIA_PUBLIC_DERIVATIVE_INVALID`)
+and a `MediaService.php` storage-key regex warning. These are recorded as
+pre-existing integration blockers, not hidden or reclassified as a pass.
+
+LIVE_STATUS: No deployment, PHP-FPM/OPcache reload, SSH, staging/live
+semantic mutation or live acceptance was performed. The implementation
+remains local-ready; external deployment/runtime identity verification remains
+operator-gated.
+
+STATUS: `LOCAL_RUNTIME_VERIFIED / INTEGRATION_PREEXISTING_BLOCKERS / LIVE_ACCEPTANCE_NOT_RUN`.
