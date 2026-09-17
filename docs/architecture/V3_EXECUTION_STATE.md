@@ -47,6 +47,46 @@ manifest hash `5a9b4978a2218480bae8d5aecc0e302ecedce03a4fea3a476dfefdd4d5a26918`
 LIVE_STATUS: `CONVERSATIONAL_AUTHORITY_UPDATE_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 No live/staging mutation, deployment, SSH or push was performed.
 
+# Checkpoint — 2026-09-17 — Staging `/tri-thuc/` identity follow-up (READ-ONLY)
+
+SCOPE: Continued the staging runtime identity investigation without changing
+WordPress data, route logic, deployment state, PHP process state or production.
+
+EVIDENCE: The current checkout is
+`HEAD=4c7373e89f2ed724046b3d3119cf20c546473d73` and contains `078640ee`.
+Before this checkpoint, the local generated manifest carried the stale
+`source_revision=598d50e356e11be043ef120718642766cef9f9e4`; the canonical
+`composer generate:mcp-docs` command regenerated 50 files and now reports
+`source_revision=4c7373e89f2ed724046b3d3119cf20c546473d73`, with snapshot
+parity passing. Local read-only MCP bootstrap reports the same source revision
+and a locally computed build identity.
+
+STAGING_READBACK: A fresh unauthenticated read-only MCP initialize still
+reports `source_revision=d45d33ceb29229013511bb3ee3fba2a3cc6d3572`,
+`build_identity=970ec1f97373086af07396abf785f9ce523b597968db46925d3d10939a657373`,
+`documentation_version=6fb76113f57268ca1f73dd17dd24b9577ca51e66eeca229d2d0e39731ba8a030`
+and `manifest_hash=c0e15c7f03b39e7f1e933fbb5fbf4d17c5374cbfcd938eb16cf816df4923681f`.
+The remote Plugin Editor visibly contains the `category__in => [4]` route
+implementation, but remote runtime file hash, PHP SAPI and FPM/OPcache state
+are not exposed through the available read-only interface. Local CLI values
+(`PHP_SAPI=cli`, OPcache enabled with timestamp validation) are not evidence
+about staging FPM.
+
+LIVE_ROUTE_READBACK: Fresh cache-bypass reads return `/tri-thuc/` HTTP 200 with
+the canonical heading but zero cards and the empty state; samples 72, 71 and
+70 are absent. `/tri-thuc/page/2/` is also HTTP 200 and empty. Both native
+category routes return exactly one HTTP 301 to their canonical presentation
+route, preserving page 2.
+
+ROOT_CAUSE_STATUS: The local generated artifact is now coherent, but staging
+still has an identity mismatch and no supported in-scope PHP-FPM/OPcache reload
+was available. The exact active-process mechanism remains unproven; no reload,
+cache reset, deploy, SSH, database write or semantic mutation was attempted.
+Operator action required: use the staging hosting control plane to perform its
+approved PHP-FPM/handler reload or opcode-cache reset, then rerun fresh MCP
+bootstrap and the route smoke. Do not use this checkpoint as authorization for
+deployment or WordPress data mutation.
+
 # Checkpoint — 2026-09-17 — Staging `/tri-thuc/` read-only runtime audit
 
 SCOPE: Traced the staging `/tri-thuc/` request without creating or changing
