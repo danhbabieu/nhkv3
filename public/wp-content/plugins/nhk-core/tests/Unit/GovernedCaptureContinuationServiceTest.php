@@ -165,7 +165,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $result = $service->execute('capture-1', 'continuation', [], ['proposal_ids' => [$proposalId]]);
 
         self::assertTrue($applied);
-        self::assertSame('APPLIED', $result['status']);
+        self::assertSame('APPLIED', $result['status'], json_encode($result, JSON_UNESCAPED_UNICODE));
         self::assertSame($proposalId, $result['writes'][0]['proposal_id']);
     }
 
@@ -532,10 +532,11 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
     public function test_applied_proposal_replay_uses_persisted_readback_without_reapplying(): void
     {
         $proposalId = UuidCodec::newV7();
+        $claimId = UuidCodec::newV7();
         $governance = $this->createMock(GovernedLifecycle::class);
         $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
             'state' => 'applied', 'entity_type' => 'knowledge', 'operation' => 'ingest', 'subject_id' => UuidCodec::newV7(),
-            'canonical_readback' => ['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 2],
+            'canonical_readback' => ['canonical_id' => $claimId, 'entity_type' => 'knowledge', 'active' => true, 'revision' => 2],
         ]);
         $service = new GovernedCaptureContinuationService($governance, static fn (): array => throw new \LogicException('APPLIED proposal must not be applied again'), $this->policies(), static fn (): bool => true);
 
