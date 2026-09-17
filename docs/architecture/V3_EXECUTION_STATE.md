@@ -12042,3 +12042,30 @@ Guarded WordPress Media integration is `INFRASTRUCTURE_UNAVAILABLE` because
 pass. Commit `98159528` records the test/report fix round.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_EVIDENCE_REVIEW_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Slice 2 canonical Article readback hardening (LOCAL ONLY)
+
+SCOPE: Closed the Slice 2 review finding at the Capture Article publication
+handoff. Canonical Article MediaUsage readback now uses the registered
+`MediaUsageRoleRegistry::mandatoryArticleRoles()` set exactly, rejects any
+extra or duplicate role, requires exactly two unique non-empty Usage IDs, and
+fails closed with `MEDIAUSAGE_INCOMPLETE` on malformed packets. Independent
+regressions cover extra role, duplicate role and duplicate Usage ID while the
+valid canonical packet remains accepted. No new role, endpoint, predicate or
+semantic writer was introduced.
+
+VERIFICATION: Final focused Slice 2 suite PASS — 95 tests / 410 assertions,
+with one existing warning. Handoff subset PASS — 8 tests / 33 assertions.
+`composer lint`, changed-file PHP lint, `git diff --check` and changed-scope
+secret review pass. Whole Unit baseline remains 1,779 tests / 8,749
+assertions with five unrelated failures documented above. Guarded WordPress
+Media integration remains `INFRASTRUCTURE_UNAVAILABLE` because
+`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No live/staging acceptance,
+deployment, push, database write, upload, Video or Graph mutation was
+performed.
+
+REVIEW: Slice 2 review accepted after the exact-readback fix and independent
+regression coverage. Commits `4eff8fbb`, `31facca3`, `8227d139` and
+`a188d12d` are local-only review fixes.
+
+STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
