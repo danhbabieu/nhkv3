@@ -49,6 +49,8 @@ final class GovernedCaptureContinuationService
         private $proposalReconciliation = null,
         /** @var callable(array<string,mixed>):array<string,mixed>|bool|null */
         private $relationState = null,
+        /** @var callable(string,array<string,mixed>):array<string,mixed>|null */
+        private $videoScopeIssuer = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -346,7 +348,7 @@ final class GovernedCaptureContinuationService
                 if (($resume['status'] ?? '') === 'REUSE_EDITORIAL') {
                     $plans[] = ['video_editorial_reuse' => $resume];
                 } else {
-                    $plans[] = $resume;
+                    $plans[] = $this->scopeVideoPlan($captureId, $resume, $context);
                 }
                 continue;
             }
@@ -375,8 +377,23 @@ final class GovernedCaptureContinuationService
                     ? (int) $video['expected_revision']
                     : null,
             );
+            $plans[array_key_last($plans)] = $this->scopeVideoPlan($captureId, $plans[array_key_last($plans)], $context);
         }
         return $plans;
+    }
+
+    /** @param array<string,mixed> $plan @param array<string,mixed> $context @return array<string,mixed> */
+    private function scopeVideoPlan(string $captureId, array $plan, array $context): array
+    {
+        if (($plan['entity_type'] ?? '') !== 'video' || !in_array((string) ($plan['operation'] ?? ''), ['update', 'retire', 'reactivate'], true) || !is_callable($this->videoScopeIssuer)) return $plan;
+        $scope = ($this->videoScopeIssuer)($captureId, $plan);
+        if (!is_array($scope)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
+        $plan['payload']['capture_id'] = $captureId;
+        // The fingerprint is copied only from the server-issued packet; it is
+        // never accepted from connector input.
+        $plan['payload']['capture_fingerprint'] = (string) ($scope['capture_fingerprint'] ?? '');
+        $plan['payload']['staging_acceptance'] = $scope;
+        return $plan;
     }
 
     /** @param list<array<string,mixed>> $subjects @param list<array<string,mixed>> $variants */

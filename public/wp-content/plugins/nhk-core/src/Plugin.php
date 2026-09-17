@@ -706,6 +706,11 @@ final class Plugin {
                     return $relationProposalReconciliation->reconcile($proposal, $control);
                 },
                 relationState: $relationState,
+                videoScopeIssuer: static function (string $captureId, array $plan) use ($captureRepository, $stagingScopeVerifier): array {
+                    $capture = $captureRepository->findById($captureId);
+                    if (!$capture instanceof CaptureRecord) throw new \RuntimeException('STAGING_CAPTURE_NOT_FOUND');
+                    return $stagingScopeVerifier->issueForVideoPlan($capture, $plan);
+                },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

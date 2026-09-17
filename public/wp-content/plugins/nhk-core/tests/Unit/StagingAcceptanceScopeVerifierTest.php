@@ -79,6 +79,62 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         self::assertFalse((new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->verifyProposal($scope, $wrongProposal));
     }
 
+    public function test_relation_scope_binds_both_endpoints_and_revisions(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'relation-scope', hash('sha256', 'relation-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY', 'planning_input' => []], [], []);
+        $candidateId = 'relation-candidate-exact';
+        $source = UuidCodec::newV7();
+        $target = UuidCodec::newV7();
+        $plan = ['plan_fingerprint' => hash('sha256', 'relation-plan'), 'relation_candidates' => [[
+            'candidate_id' => $candidateId,
+            'action' => 'CREATE',
+            'entity_type' => 'relation',
+            'source_type' => 'classification',
+            'source_uuid' => $source,
+            'source_revision' => 1,
+            'predicate' => 'about',
+            'target_type' => 'knowledge',
+            'target_uuid' => $target,
+            'target_revision' => 1,
+        ]]];
+        $verifier = new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true);
+        $scope = $verifier->issueForAuthorityPlan($capture, $plan, [$candidateId]);
+        self::assertSame($source, $scope['candidate_bindings'][0]['source_uuid']);
+        self::assertSame($target, $scope['candidate_bindings'][0]['target_uuid']);
+        self::assertSame(1, $scope['candidate_bindings'][0]['source_revision']);
+        self::assertSame(1, $scope['candidate_bindings'][0]['target_revision']);
+        $proposal = new Proposal(UuidCodec::newV7(), $source, 'relation_create', [
+            'candidate_id' => $candidateId,
+            'source_type' => 'classification', 'source_uuid' => $source,
+            'predicate' => 'about', 'target_type' => 'knowledge', 'target_uuid' => $target,
+            'source_revision' => 1, 'target_revision' => 1,
+            'project_build_audit' => ['capture_id' => $capture->captureId, 'plan_fingerprint' => $plan['plan_fingerprint']],
+            'staging_acceptance' => $scope,
+        ], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'relation-scope', entityType: 'relation');
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+    }
+
+    public function test_video_update_scope_binds_capture_target_operation_and_revision(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'video-scope', hash('sha256', 'video-scope'), 'SEMANTICS_RECONCILED', 'IN_PROGRESS');
+        $videoId = UuidCodec::newV7();
+        $plan = ['entity_type' => 'video', 'operation' => 'update', 'subject_id' => $videoId, 'target_uuid' => $videoId, 'expected_revision' => 5, 'fingerprint' => hash('sha256', 'video-plan')];
+        $verifier = $this->verifier();
+        $scope = $verifier->issueForVideoPlan($capture, $plan);
+        $proposal = new Proposal(UuidCodec::newV7(), $videoId, 'update', [
+            'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint,
+            'canonical_id' => $videoId,
+            'staging_acceptance' => $scope,
+        ], 'content', 5, 'dependency', ProposalState::APPROVED, idempotencyKey: 'video-scope', targetUuid: $videoId, entityType: 'video');
+
+        self::assertTrue($verifier->verifyProposal($scope, $proposal));
+        $tampered = $proposal->payload;
+        $tampered['capture_fingerprint'] = hash('sha256', 'wrong-capture');
+        $wrong = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $tampered, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, targetUuid: $proposal->targetUuid, entityType: $proposal->entityType);
+        self::assertFalse($verifier->verifyProposal($scope, $wrong));
+    }
+
     /** @return array{0:CaptureRecord,1:array<string,mixed>,2:list<array<string,mixed>>} */
     private function fixture(): array
     {

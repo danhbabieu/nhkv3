@@ -34,6 +34,9 @@ final class StagingAcceptanceScope
         'source:ingest' => 'source_evidence_reconciliation',
         'evidence:create' => 'source_evidence_reconciliation',
         'evidence:ingest' => 'source_evidence_reconciliation',
+        'video:update' => 'governed_video_plan',
+        'video:retire' => 'governed_video_plan',
+        'video:reactivate' => 'governed_video_plan',
     ];
 
     /** @param array<string,mixed> $scope */
@@ -58,6 +61,17 @@ final class StagingAcceptanceScope
             return;
         }
         if ((string) ($scope['entity_type'] ?? '') !== $proposal->entityType || (string) ($scope['operation'] ?? '') !== $proposal->operation) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
+
+        if ($expectedFamily === 'governed_video_plan') {
+            $proposalCaptureId = trim((string) ($proposal->payload['capture_id'] ?? ''));
+            if ($proposalCaptureId === '' || !hash_equals($captureId, $proposalCaptureId)) throw new \RuntimeException('STAGING_CAPTURE_SCOPE_MISMATCH');
+            if (!hash_equals((string) ($scope['capture_fingerprint'] ?? ''), (string) ($proposal->payload['capture_fingerprint'] ?? ''))) throw new \RuntimeException('STAGING_CAPTURE_FINGERPRINT_MISMATCH');
+            if ((string) ($scope['entity_type'] ?? '') !== 'video' || (string) ($scope['operation'] ?? '') !== $proposal->operation) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
+            if ((string) ($scope['target_uuid'] ?? '') !== (string) ($proposal->targetUuid ?? $proposal->subjectId)) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+            if ((int) ($scope['expected_revision'] ?? 0) !== (int) $proposal->expectedRevision) throw new \RuntimeException('STAGING_EXPECTED_REVISION_SCOPE_MISMATCH');
+            self::assertNoFuzzyLocator($scope);
+            return;
+        }
 
         $mediaIds = $scope['media_ids'] ?? [];
         if (!is_array($mediaIds) || $mediaIds === [] || !array_is_list($mediaIds)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_INVALID');
@@ -93,6 +107,17 @@ final class StagingAcceptanceScope
         foreach ((array) ($scope['candidate_bindings'] ?? []) as $binding) {
             if (!is_array($binding) || (string) ($binding['candidate_id'] ?? '') !== $candidateId) continue;
             if ((string) ($binding['entity_type'] ?? '') !== $proposal->entityType || (string) ($binding['operation'] ?? '') !== $proposal->operation) continue;
+            if ($proposal->entityType === 'relation') {
+                $payload = $proposal->payload;
+                if ((string) ($binding['source_type'] ?? '') !== (string) ($payload['source_type'] ?? '')
+                    || (string) ($binding['source_uuid'] ?? '') !== (string) ($payload['source_uuid'] ?? '')
+                    || (string) ($binding['predicate'] ?? '') !== (string) ($payload['predicate'] ?? '')
+                    || (string) ($binding['target_type'] ?? '') !== (string) ($payload['target_type'] ?? '')
+                    || (string) ($binding['target_uuid'] ?? '') !== (string) ($payload['target_uuid'] ?? '')
+                    || (int) ($binding['source_revision'] ?? 0) !== (int) ($payload['source_revision'] ?? 0)
+                    || (int) ($binding['target_revision'] ?? 0) !== (int) ($payload['target_revision'] ?? 0)) continue;
+                return;
+            }
             if ((string) ($binding['subject_id'] ?? '') !== $proposal->subjectId || (string) ($binding['target_uuid'] ?? '') !== (string) ($proposal->targetUuid ?? '')) continue;
             $expected = $binding['expected_revision'] ?? null;
             if ($expected !== null && (int) $expected !== (int) $proposal->expectedRevision) continue;

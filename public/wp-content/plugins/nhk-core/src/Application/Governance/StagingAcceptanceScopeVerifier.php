@@ -82,10 +82,54 @@ final class StagingAcceptanceScopeVerifier
             $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
             $subjectId = $isRelation ? (string) ($candidate['source_uuid'] ?? $candidate['source_id'] ?? '') : ($operation === 'create' ? $entityType : (string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? ''));
             $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : '';
-            $all[] = ['candidate_id' => (string) $candidate['candidate_id'], 'entity_type' => $entityType, 'operation' => $operation, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1)) : null];
+            $all[] = $isRelation
+                ? [
+                    'candidate_id' => (string) $candidate['candidate_id'],
+                    'entity_type' => 'relation',
+                    'operation' => 'relation_create',
+                    'subject_id' => $subjectId,
+                    'source_type' => (string) ($candidate['source_type'] ?? ''),
+                    'source_uuid' => $subjectId,
+                    'source_revision' => max(1, (int) ($candidate['source_revision'] ?? 0)),
+                    'predicate' => (string) ($candidate['predicate'] ?? ''),
+                    'target_type' => (string) ($candidate['target_type'] ?? ''),
+                    'target_uuid' => (string) ($candidate['target_uuid'] ?? ''),
+                    'target_revision' => max(1, (int) ($candidate['target_revision'] ?? 0)),
+                    'expected_revision' => null,
+                ]
+                : ['candidate_id' => (string) $candidate['candidate_id'], 'entity_type' => $entityType, 'operation' => $operation, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => !in_array($operation, ['create', 'ingest'], true) ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1)) : null];
         }
         if ($all === []) throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
         $base = ['approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'operation_family' => 'governed_authority_plan', 'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest', 'intent' => (string) ($capture->context['purpose'] ?? 'AUTHORITY'), 'plan_fingerprint' => $planFingerprint, 'candidate_bindings' => $all, 'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds))];
+        $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
+        if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
+    /** @param array<string,mixed> $plan @return array<string,mixed> */
+    public function issueForVideoPlan(CaptureRecord $capture, array $plan): array
+    {
+        $environment = $this->environmentName();
+        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        $operation = strtolower(trim((string) ($plan['operation'] ?? '')));
+        $entityType = strtolower(trim((string) ($plan['entity_type'] ?? '')));
+        $targetUuid = trim((string) ($plan['target_uuid'] ?? $plan['subject_id'] ?? ''));
+        $expectedRevision = (int) ($plan['expected_revision'] ?? 0);
+        $planFingerprint = trim((string) ($plan['fingerprint'] ?? ''));
+        if ($entityType !== 'video' || !in_array($operation, ['update', 'retire', 'reactivate'], true)) throw new \RuntimeException('STAGING_VIDEO_OPERATION_INVALID');
+        if (!UuidCodec::isValid($targetUuid) || $expectedRevision < 1 || !preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_VIDEO_BINDING_REQUIRED');
+        $base = [
+            'approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId,
+            'capture_fingerprint' => $capture->requestFingerprint, 'operation_family' => 'governed_video_plan',
+            'entity_type' => 'video', 'operation' => $operation, 'writer' => 'canonical_governed',
+            'entrypoint' => 'nhk.capture.ingest', 'target_uuid' => $targetUuid,
+            'expected_revision' => $expectedRevision, 'plan_fingerprint' => $planFingerprint,
+            'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds)),
+        ];
         $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
         if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
         $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));

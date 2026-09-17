@@ -1,5 +1,57 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Video W64 staging scope propagation (CODE FIXED / LIVE VERIFY PENDING)
+
+SCOPE: Repaired the generic Capture-owned Video governed update path so a
+server-issued staging acceptance scope is attached before Proposal creation.
+No staging/live mutation, deployment, push or server source edit was
+performed.
+
+ROOT_CAUSE: `GovernedCaptureContinuationService` had no Video scope issuer or
+attachment call. Authority used `AuthorityCaptureService` → shared
+`StagingAcceptanceScopeVerifier` → `GovernedAuthorityPlanExecutor`, but Video
+resume/update plans went directly to `runGovernedPlan()` and reached
+`OperationScopedStagingGuard` without `payload.staging_acceptance`.
+
+FIX: Added the shared verifier's generic `issueForVideoPlan()` packet with
+`governed_video_plan`, exact Capture fingerprint, Video target UUID, operation,
+expected revision, expiry, admission and HMAC. Capture continuation obtains the
+canonical Capture server-side and attaches the packet before Governance
+Proposal creation. The verifier now validates the Video binding fail-closed.
+
+VERIFICATION: Focused Video/Capture/Governance/scope suite passes 49 tests /
+226 assertions with 8 deprecations. `composer lint` passes and `git diff
+--check` passes. No live acceptance was run.
+
+STATUS: `VIDEO_STAGING_SCOPE_LOCAL_READY / LIVE_VERIFY_PENDING`
+
+# Checkpoint — 2026-09-18 — Exact Bahnhäusle relation staging admission (LIVE VERIFIED / NO SEMANTIC MUTATION)
+
+SCOPE: Enabled the existing server-owned WordPress admission filter for the
+single approved Capture/plan/candidate relation continuation. No direct
+relation write, Proposal replacement, database write or APPLY was performed.
+
+ROOT_CAUSE: The staging runtime had the signing key configured but no active
+`nhk_v3_staging_acceptance_admission` filter for this exact acceptance. The
+scope packet also needed relation-specific endpoint and revision bindings so
+the existing verifier could compare the governed Proposal payload exactly.
+
+FIX: `StagingAcceptanceScopeVerifier` now emits relation source/target type,
+UUID, predicate and endpoint revisions in its signed packet, and
+`StagingAcceptanceScope` verifies those fields against the relation payload.
+Staging loaded a separate MU-plugin filter matching only the supplied Capture,
+Capture fingerprint at issue time, plan fingerprint, candidate, relation
+operation, endpoint identities, revisions and unexpired staging scope.
+
+VERIFICATION: Scope unit suite passes 6 tests / 20 assertions. Live safe
+read-back reports `environment=staging`, `filter_loaded=true` and
+`exact_admission=true`; the MU-plugin hash is
+`bd4ac5617f3560750890864135d2e6ade22d1a511b405a298b229ffb2fc6f17d`.
+The earlier staging bootstrap checkpoint recorded the signing key as present
+and readable without exposing its value. No semantic mutation occurred.
+
+STATUS: `EXACT_RELATION_STAGING_ADMITTED / APPLY_DEFERRED_TO_V06`
+
 # Checkpoint — 2026-09-18 — Related media/video orientation parity (LOCAL READY / LIVE VERIFY PENDING)
 
 SCOPE: Extended the existing vertical-first presentation seam to related Video
