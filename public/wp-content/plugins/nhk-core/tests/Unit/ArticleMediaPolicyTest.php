@@ -348,6 +348,10 @@ final class ArticleMediaPolicyTest extends TestCase
         $service->addAsset($item->canonicalId, 'derivative', 'uploads/capture-a.webp', hash('sha256', 'capture-a-public'), 'image/webp', 4, 1200, 800, 'PUBLIC');
         $modelUsage = $service->addUsage($item->canonicalId, 'model', 'model-111', 'representative');
         $classificationUsage = $service->addUsage($item->canonicalId, 'classification', 'classification-cuckoo', 'representative');
+        $representativesBefore = $this->snapshotUsages([
+            ...$usages->listByEndpoint('model', 'model-111'),
+            ...$usages->listByEndpoint('classification', 'classification-cuckoo'),
+        ]);
         $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
 
         $result = $coordinator->ensureForPost(573, [
@@ -365,6 +369,11 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame([$item->canonicalId], array_values(array_unique(array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $articleUsages))));
         self::assertSame($modelUsage->usageId, $usages->listByEndpoint('model', 'model-111', 'representative')[0]->usageId);
         self::assertSame($classificationUsage->usageId, $usages->listByEndpoint('classification', 'classification-cuckoo', 'representative')[0]->usageId);
+        $representativesAfter = $this->snapshotUsages([
+            ...$usages->listByEndpoint('model', 'model-111'),
+            ...$usages->listByEndpoint('classification', 'classification-cuckoo'),
+        ]);
+        self::assertSame($representativesBefore, $representativesAfter);
         self::assertSame('VERIFIED', $result->toArray()['canonical_readback']['media_usage']['state']);
         self::assertCount(2, $articleUsages);
     }
@@ -384,13 +393,25 @@ final class ArticleMediaPolicyTest extends TestCase
         ];
 
         $first = $coordinator->ensureForPost(574, $context);
-        $firstUsageIds = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $usages->listByEndpoint('wp_post', '1:574'));
+        $firstMedia = $media->findByCanonicalId($item->canonicalId);
+        $firstAssets = $this->snapshotAssets($assets->listByMediaId($item->canonicalId));
+        $firstUsages = $this->snapshotUsages($usages->listByEndpoint('wp_post', '1:574'));
         $second = $coordinator->ensureForPost(574, $context);
-        $secondUsageIds = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $usages->listByEndpoint('wp_post', '1:574'));
+        $secondMedia = $media->findByCanonicalId($item->canonicalId);
+        $secondAssets = $this->snapshotAssets($assets->listByMediaId($item->canonicalId));
+        $secondUsages = $this->snapshotUsages($usages->listByEndpoint('wp_post', '1:574'));
 
         self::assertSame([$item->canonicalId], array_values(array_unique($first->slotMedia)));
         self::assertSame($first->slotMedia, $second->slotMedia);
-        self::assertSame($firstUsageIds, $secondUsageIds);
+        self::assertNotNull($firstMedia);
+        self::assertNotNull($secondMedia);
+        self::assertSame($firstMedia->canonicalId, $secondMedia->canonicalId);
+        self::assertSame($firstMedia->stableKey, $secondMedia->stableKey);
+        self::assertSame($this->snapshotMedia($firstMedia), $this->snapshotMedia($secondMedia));
+        self::assertSame($firstAssets, $secondAssets);
+        self::assertSame($firstUsages, $secondUsages);
+        self::assertSame(array_column($firstAssets, 'assetId'), array_column($secondAssets, 'assetId'));
+        self::assertSame(array_column($firstUsages, 'usageId'), array_column($secondUsages, 'usageId'));
         self::assertCount(2, $assets->listByMediaId($item->canonicalId));
         self::assertCount(1, $media->items);
         self::assertCount(2, $usages->listByEndpoint('wp_post', '1:574'));
@@ -442,7 +463,7 @@ final class ArticleMediaPolicyTest extends TestCase
 
         $readback = $result->toArray()['canonical_readback']['media_usage'];
         self::assertContains($readback['state'], ['RECONCILE', 'REVIEW_REQUIRED']);
-        self::assertContains('ARTICLE_MEDIA_ASSET_UNAVAILABLE', $readback['blockers']);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $readback['blockers']);
         self::assertNotSame('VERIFIED', $readback['state']);
     }
 
@@ -710,6 +731,33 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertSame($existing->usageId, $inline[0]->usageId);
         self::assertSame(3, $inline[0]->revision);
         self::assertSame(2, $usages->updates);
+    }
+
+    /** @param list<MediaUsage> $usages @return list<array<string,mixed>> */
+    private function snapshotUsages(array $usages): array
+    {
+        $snapshot = array_map(static fn (MediaUsage $usage): array => get_object_vars($usage), $usages);
+        usort($snapshot, static function (array $left, array $right): int {
+            return strcmp(
+                implode("\0", [(string) ($left['endpointType'] ?? ''), (string) ($left['endpointKey'] ?? ''), (string) ($left['role'] ?? ''), (string) ($left['placementKey'] ?? ''), (string) ($left['usageId'] ?? '')]),
+                implode("\0", [(string) ($right['endpointType'] ?? ''), (string) ($right['endpointKey'] ?? ''), (string) ($right['role'] ?? ''), (string) ($right['placementKey'] ?? ''), (string) ($right['usageId'] ?? '')]),
+            );
+        });
+        return $snapshot;
+    }
+
+    /** @param list<MediaAsset> $assets @return list<array<string,mixed>> */
+    private function snapshotAssets(array $assets): array
+    {
+        $snapshot = array_map(static fn (MediaAsset $asset): array => get_object_vars($asset), $assets);
+        usort($snapshot, static fn (array $left, array $right): int => strcmp((string) ($left['assetId'] ?? ''), (string) ($right['assetId'] ?? '')));
+        return $snapshot;
+    }
+
+    /** @return array<string,mixed> */
+    private function snapshotMedia(Media $media): array
+    {
+        return get_object_vars($media);
     }
 
     /** @return array{0:object,1:object,2:object,3:object,4:MediaService} */

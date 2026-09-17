@@ -19,6 +19,11 @@ final class CaptureMediaIdsReuseTest extends TestCase
         $mediaId = UuidCodec::newV7();
         $articleUsageIds = [UuidCodec::newV7(), UuidCodec::newV7()];
         $researchUsageIds = [];
+        $articleResearch = static function (array $mediaReadback) use (&$events, &$researchUsageIds): array {
+            $events[] = 'article_research';
+            $researchUsageIds = (array) (($mediaReadback['canonical_readback']['media_usage']['usage_ids'] ?? []));
+            return ['status' => 'RESEARCHED', 'article_usage_ids' => $researchUsageIds];
+        };
         $coordinator = new EditorialCaptureCoordinator(
             $captures,
             static fn (array $input): array => ['items' => [['client_file_id' => 'front', 'media_id' => $mediaId, 'attachment_id' => 77, 'attachment_readback_status' => 'verified']]],
@@ -31,10 +36,10 @@ final class CaptureMediaIdsReuseTest extends TestCase
                 return ['status' => 'SKIPPED', 'writes' => [], 'requirements' => ['semantic_delta' => ['applicability' => 'NOT_REQUIRED', 'policy' => 'VERIFY', 'state' => 'SKIPPED']]];
             },
             new ArticleComposer(),
-            static function (array $context) use (&$events, $mediaId, $articleUsageIds): array {
+            static function (array $context) use (&$events, $mediaId, $articleUsageIds, $articleResearch): array {
                 $events[] = 'article_media_reconcile';
                 self::assertSame([$mediaId], $context['capture_owned_media_ids'] ?? []);
-                return [
+                $mediaReadback = [
                     'status' => 'RECONCILED',
                     'canonical_readback' => [
                         'media_usage' => [
@@ -47,11 +52,14 @@ final class CaptureMediaIdsReuseTest extends TestCase
                         ],
                     ],
                 ];
+                // Precise test-only seam: fresh research consumes the
+                // committed MediaUsage readback before the gate callback.
+                $mediaReadback['article_research'] = $articleResearch($mediaReadback);
+                return $mediaReadback;
             },
-            static function (array $context) use (&$events, &$researchUsageIds): array {
-                $events[] = 'article_research';
-                $researchUsageIds = (array) (($context['media']['canonical_readback']['media_usage']['usage_ids'] ?? []));
+            static function (array $context) use (&$events, $articleUsageIds): array {
                 $events[] = 'publication_gate';
+                self::assertSame($articleUsageIds, $context['media']['article_research']['article_usage_ids'] ?? []);
                 return ['eligible' => false, 'blockers' => ['ARTICLE_NOT_PUBLISHED']];
             },
             static fn (array $context): array => ['status' => 'verified'],

@@ -63,7 +63,7 @@ final class ArticleResearchPreflightTest extends TestCase
                     'canonical_readback' => [
                         'media_usage' => [
                             'state' => 'REVIEW_REQUIRED',
-                            'blockers' => ['ARTICLE_MEDIA_ASSET_UNAVAILABLE'],
+                            'blockers' => ['MEDIAUSAGE_INCOMPLETE'],
                         ],
                     ],
                     'representative_usages' => [
@@ -77,7 +77,7 @@ final class ArticleResearchPreflightTest extends TestCase
         $result = $service->research('Đồng hồ lỗi ảnh', ['type' => 'classification', 'name' => 'Đồng hồ lỗi ảnh']);
 
         self::assertFalse($result->readyForDraft);
-        self::assertContains('ARTICLE_MEDIA_ASSET_UNAVAILABLE', $result->blockers);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
         self::assertSame('REVIEW_REQUIRED', $result->mediaPlan['state']);
         self::assertNotContains('model-usage-corrupt', (array) ($result->mediaPlan['article_usage_ids'] ?? []));
     }

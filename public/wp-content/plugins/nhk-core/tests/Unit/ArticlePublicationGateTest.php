@@ -111,6 +111,28 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
     }
 
+    public function test_representative_only_usage_cannot_satisfy_article_media_readiness(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['media_usage_complete'] = false;
+        $evidence['requirements'] = $this->requirements('article_media');
+        $evidence['media_snapshot'] = [
+            'representative_usages' => [
+                ['endpoint_type' => 'model', 'endpoint_key' => 'model-111', 'role' => 'representative', 'usage_id' => 'model-usage'],
+                ['endpoint_type' => 'classification', 'endpoint_key' => 'classification-cuckoo', 'role' => 'representative', 'usage_id' => 'classification-usage'],
+            ],
+            'article_usage_ids' => [],
+        ];
+
+        $result = (new ArticlePublicationGate())->check($this->draft(), $evidence, $this->draft()->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertContains('ARTICLE_MEDIA_FEATURED_MISSING', $result->blockers);
+        self::assertNotContains('model-usage', $evidence['media_snapshot']['article_usage_ids']);
+        self::assertNotContains('classification-usage', $evidence['media_snapshot']['article_usage_ids']);
+    }
+
     public function test_gate_skips_non_applicable_semantic_owner_but_evaluates_required_article_owners(): void
     {
         $evidence = $this->evidence();
