@@ -150,6 +150,42 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertNull($result->diagnostics['deep_enrichment']['new_deep_content_opportunity']);
     }
 
+    public function test_article_publication_context_carries_not_required_semantic_packet(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $events = [];
+        $publicationContext = [];
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            semanticStatus: 'SKIPPED',
+            semanticExtra: ['requirements' => [
+                'semantic_delta' => [
+                    'applicability' => 'NOT_REQUIRED',
+                    'policy' => 'VERIFY',
+                    'state' => 'SKIPPED',
+                    'evidence' => ['intent' => 'IMAGE_ARTICLE', 'status' => 'NONE'],
+                ],
+            ]],
+            publication: static function (array $context) use (&$publicationContext): array {
+                $publicationContext = $context;
+                return ['eligible' => true];
+            },
+        );
+
+        $coordinator->execute([
+            'idempotency_key' => 'pr5-image-article-no-semantic-delta',
+            'intent' => 'IMAGE_ARTICLE',
+            'text' => 'Mô tả biên tập cho hiện vật đã được nhận diện.',
+        ]);
+
+        self::assertArrayHasKey('requirements', $publicationContext);
+        self::assertSame('NOT_REQUIRED', $publicationContext['requirements']['semantic_delta']['applicability']);
+        self::assertSame('SKIPPED', $publicationContext['requirements']['semantic_delta']['state']);
+    }
+
     /**
      * @param array<string,int> $calls
      * @param list<string> $events
@@ -163,6 +199,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?callable $videoPublication = null,
         ?callable $media = null,
         array $semanticExtra = [],
+        ?callable $publication = null,
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
@@ -174,7 +211,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             static function (array $context) use (&$calls, &$events, $semanticStatus, $semanticExtra): array { ++$calls['semantic']; $events[] = 'semantic'; return array_merge(['status' => $semanticStatus, 'writes' => []], $semanticExtra); },
             new ArticleComposer(),
             $media ?? static function (array $context) use (&$calls, &$events): array { ++$calls['media']; $events[] = 'media'; return ['status' => 'RECONCILED']; },
-            static function (array $context) use (&$calls, &$events): array { ++$calls['publication']; $events[] = 'publication'; return ['eligible' => true]; },
+            $publication ?? static function (array $context) use (&$calls, &$events): array { ++$calls['publication']; $events[] = 'publication'; return ['eligible' => true]; },
             static function (array $context) use (&$calls, &$events): array { ++$calls['final']; $events[] = 'final'; return ['status' => 'verified']; },
             null,
             null,

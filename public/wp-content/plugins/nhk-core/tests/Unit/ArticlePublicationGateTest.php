@@ -111,7 +111,27 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('ARTICLE_MEDIA_INLINE_MISSING', $result->warnings);
     }
 
-    /** @return array<string,bool> */
+    public function test_gate_skips_non_applicable_semantic_owner_but_evaluates_required_article_owners(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['semantic_readback_verified'] = false;
+        $evidence['requirements'] = [
+            'semantic_delta' => ['applicability' => 'NOT_APPLICABLE', 'policy' => 'VERIFY', 'state' => 'SKIPPED'],
+            'article_media' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+            'public_route' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+            'rendered_public' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+        ];
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertTrue($result->eligible);
+        self::assertNotContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
+        self::assertNotContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+    }
+
+    /** @return array<string,mixed> */
     private function evidence(): array
     {
         return array_fill_keys([

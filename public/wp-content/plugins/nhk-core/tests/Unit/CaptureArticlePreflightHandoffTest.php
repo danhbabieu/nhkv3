@@ -60,4 +60,38 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
         self::assertTrue($evidence['media_usage_complete']);
         self::assertTrue($evidence['real_image_requirements_met']);
     }
+
+    public function test_handoff_preserves_non_applicable_semantic_requirement_while_article_owners_remain_required(): void
+    {
+        $research = new ArticleResearchResult(
+            ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            ['status' => 'available'], ['classification' => 'NO_OVERLAP'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [],
+            ['status' => 'EXISTING', 'category' => ['id' => 4]], [], [], ['slug_intent' => 'clock'], ['status' => 'PASS'], [], [], true,
+        );
+        $semantic = [
+            'status' => 'SKIPPED',
+            'requirements' => [
+                'semantic_delta' => [
+                    'applicability' => 'NOT_APPLICABLE',
+                    'policy' => 'VERIFY',
+                    'state' => 'SKIPPED',
+                    'evidence' => ['intent' => 'IMAGE_ARTICLE', 'status' => 'NONE'],
+                ],
+            ],
+        ];
+        $media = [
+            'state' => 'MEDIA_COMPLETE',
+            'slots' => [
+                'featured_primary' => ['placeholder' => false, 'state' => 'MEDIA_COMPLETE'],
+                'inline_primary' => ['placeholder' => false, 'state' => 'MEDIA_COMPLETE'],
+            ],
+        ];
+
+        $evidence = (new CaptureArticlePreflightHandoff())->build($research, $media, $semantic, ['post_id' => 573, 'slug' => 'vedette-37', 'permalink' => '/vedette-37/']);
+
+        self::assertSame('NOT_APPLICABLE', $evidence['requirements']['semantic_delta']['applicability']);
+        self::assertSame('REQUIRED', $evidence['requirements']['article_media']['applicability']);
+        self::assertSame('REQUIRED', $evidence['requirements']['public_route']['applicability']);
+        self::assertSame('REQUIRED', $evidence['requirements']['rendered_public']['applicability']);
+    }
 }

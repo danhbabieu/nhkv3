@@ -17,6 +17,116 @@ use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
 {
+    public function test_ordinary_image_article_with_no_semantic_delta_skips_semantic_mutation(): void
+    {
+        $subject = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::never())->method('createFromArguments');
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => [], $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-573-fixture', 'resume-1', [
+            'content_intent' => [
+                'intent' => 'IMAGE_ARTICLE',
+                'source' => 'CAPTURE',
+                'semantic_delta' => ['status' => 'NONE'],
+            ],
+            'article_id' => 573,
+            'article_endpoint_key' => '1:573',
+            'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'classification'], 'resolved' => [['id' => $subject, 'type' => 'classification']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Mô tả biên tập về hiện vật.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]],
+        ]);
+
+        self::assertSame('NOT_REQUIRED', $result['requirements']['semantic_delta']['applicability']);
+        self::assertSame('SKIPPED', $result['requirements']['semantic_delta']['state']);
+        self::assertSame([], $result['plans']);
+        self::assertNotContains('wp_post --about--> subject', $this->relationTypes($result));
+    }
+
+    public function test_explicit_knowledge_delta_retains_governed_proposal_approval_and_readback(): void
+    {
+        $subject = UuidCodec::newV7();
+        $knowledgeProposal = new Proposal(UuidCodec::newV7(), $subject, 'ingest', [], 'knowledge-content', null, 'knowledge-dependency', ProposalState::DRAFT, entityType: 'knowledge');
+        $relationProposal = new Proposal(UuidCodec::newV7(), 'relation', 'relation_create', [], 'relation-content', null, 'relation-dependency', ProposalState::DRAFT, entityType: 'relation');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::exactly(2))->method('createFromArguments')->willReturnOnConsecutiveCalls($knowledgeProposal, $relationProposal);
+        $governance->expects(self::exactly(4))->method('review')->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'knowledge-content', 'dependency_fingerprint' => 'knowledge-dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'knowledge-content', 'dependency_fingerprint' => 'knowledge-dependency'],
+            ['state' => 'draft', 'entity_type' => 'relation', 'content_fingerprint' => 'relation-content', 'dependency_fingerprint' => 'relation-dependency'],
+            ['state' => 'submitted', 'entity_type' => 'relation', 'content_fingerprint' => 'relation-content', 'dependency_fingerprint' => 'relation-dependency'],
+        );
+        $governance->expects(self::exactly(2))->method('submit')->willReturnOnConsecutiveCalls($knowledgeProposal->transition(ProposalState::SUBMITTED), $relationProposal->transition(ProposalState::SUBMITTED));
+        $governance->expects(self::exactly(2))->method('approve')->willReturnOnConsecutiveCalls($knowledgeProposal->transition(ProposalState::APPROVED, 'system'), $relationProposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->expects(self::exactly(2))->method('eligibility')->willReturn(['ready' => true]);
+        $applied = 0;
+        $service = new GovernedCaptureContinuationService($governance, static function () use (&$applied): array {
+            ++$applied;
+            $canonicalId = $applied === 1 ? UuidCodec::newV7() : UuidCodec::newV7();
+            return ['canonical_id' => $canonicalId, 'canonical_readback' => ['canonical_id' => $canonicalId, 'active' => true, 'revision' => 1]];
+        }, $this->policies(['knowledge', 'relation'], ['knowledge' => 'AUTO_PUBLISH', 'relation' => 'AUTO_PUBLISH']), static fn (): bool => true);
+
+        $result = $service->execute('capture-knowledge-delta', 'resume-knowledge-delta', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED']],
+            'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'variant', 'revision' => 2], 'resolved' => [['id' => $subject, 'type' => 'variant', 'revision' => 2]]],
+            'continuation_delta_text' => 'Bổ sung một claim có scope variant.',
+        ]);
+
+        self::assertSame('REQUIRED', $result['requirements']['semantic_delta']['applicability']);
+        self::assertSame('VERIFIED', $result['requirements']['semantic_delta']['state']);
+        self::assertSame(['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY'], $result['governance']['lifecycle']);
+        self::assertCount(2, $result['writes']);
+        self::assertSame('APPLIED', $result['status']);
+    }
+
+    public function test_mixed_approved_semantic_branch_retains_governed_apply_and_readback(): void
+    {
+        $subject = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $canonicalId = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'approved', 'entity_type' => 'knowledge', 'operation' => 'update', 'subject_id' => $subject,
+            'expected_revision' => 2, 'content_fingerprint' => 'mixed-content', 'dependency_fingerprint' => 'mixed-dependency', 'revision' => 1,
+        ]);
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn(['ready' => true]);
+        $service = new GovernedCaptureContinuationService($governance, static fn (string $id): array => ['canonical_id' => $canonicalId, 'canonical_readback' => ['canonical_id' => $canonicalId, 'active' => true, 'revision' => 3]], $this->policies(['knowledge'], ['knowledge' => 'AUTO_PUBLISH']), static fn (): bool => true);
+
+        $result = $service->execute('capture-mixed', 'resume-mixed', [
+            'purpose' => 'MIXED',
+            'content_intent' => ['intent' => 'MIXED', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true]],
+            'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'variant', 'revision' => 2], 'resolved' => [['id' => $subject, 'type' => 'variant', 'revision' => 2]]],
+        ], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('REQUIRED', $result['requirements']['semantic_delta']['applicability']);
+        self::assertSame('VERIFIED', $result['requirements']['semantic_delta']['state']);
+        self::assertSame(['PROPOSAL', 'ELIGIBILITY', 'CONTROLLED_APPLY'], $result['governance']['lifecycle']);
+        self::assertSame($canonicalId, $result['writes'][0]['canonical_readback']['canonical_id']);
+    }
+
+    public function test_stale_subject_revision_hard_blocks_required_semantic_delta(): void
+    {
+        $subject = UuidCodec::newV7();
+        $proposalId = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'approved', 'entity_type' => 'relation', 'operation' => 'relation_create', 'subject_id' => '1:573',
+            'payload' => ['source_type' => 'wp_post', 'source_uuid' => '1:573', 'target_type' => 'variant', 'target_uuid' => $subject, 'target_revision' => 2, 'predicate' => 'about', 'origin' => 'EXPLICIT_USER_RELATION'],
+            'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency', 'revision' => 1,
+        ]);
+        $governance->expects(self::once())->method('eligibility')->with($proposalId)->willReturn(['ready' => false, 'reasons' => ['TARGET_REVISION_CHANGED']]);
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => throw new \LogicException('stale subject must not apply'), $this->policies(['relation']), static fn (): bool => true);
+
+        $result = $service->execute('capture-stale-subject', 'resume-stale-subject', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED']],
+            'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'variant', 'revision' => 3], 'resolved' => [['id' => $subject, 'type' => 'variant', 'revision' => 3]]],
+        ], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('HARD_BLOCK', $result['requirements']['semantic_delta']['policy']);
+        self::assertSame('BLOCKED', $result['requirements']['semantic_delta']['state']);
+        self::assertSame('SYSTEM_BLOCKED', $result['status']);
+        self::assertContains('TARGET_REVISION_CHANGED', $result['blockers']);
+    }
+
     public function test_existing_capture_continuation_runs_governance_and_requires_explicit_approval(): void
     {
         $variant = UuidCodec::newV7();
@@ -596,5 +706,15 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
             public function read(): array { return $this->stored; }
             public function write(array $policies): void {}
         });
+    }
+
+    /** @return list<string> */
+    private function relationTypes(array $result): array
+    {
+        return array_values(array_map(static function (array $plan): string {
+            $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+            if (($plan['entity_type'] ?? '') !== 'relation' || ($payload['source_type'] ?? '') !== 'wp_post' || ($payload['predicate'] ?? '') !== 'about') return '';
+            return 'wp_post --about--> subject';
+        }, array_values(array_filter((array) ($result['plans'] ?? []), 'is_array'))));
     }
 }
