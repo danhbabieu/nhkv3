@@ -132,6 +132,20 @@ final class MediaServiceCompletionTest extends TestCase
         ]]);
     }
 
+    public function test_normalize_asset_spec_rejects_windows_absolute_storage_keys(): void
+    {
+        [, , $service] = $this->stores();
+
+        $this->expectException(\NHK\Core\Domain\Media\MediaException::class);
+        $service->ingest('wp-attachment:1:556-invalid-drive', 'Invalid drive path', 'draft', [], [[
+            'kind' => 'original',
+            'storage_key' => 'C:/uploads/image.jpg',
+            'checksum' => hash('sha256', 'camera-drive'),
+            'mime_type' => 'image/jpeg',
+            'byte_size' => 6,
+        ]]);
+    }
+
     public function test_completion_does_not_update_an_already_public_asset_without_metadata_changes(): void
     {
         [$media, $assets, $service] = $this->stores();

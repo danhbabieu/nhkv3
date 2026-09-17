@@ -146,8 +146,10 @@ final class McpTransportIntegrationTest extends TestCase
                     self::assertSame(['post_id', 'fields', 'expected_state_token'], $ability->get_input_schema()['required']);
                 }
             } else {
-                self::assertFalse($ability->get_meta_item('public'));
-                self::assertFalse($ability->get_meta_item('show_in_rest'));
+                $explicitInternal = in_array($abilityName, McpAbilityRegistration::explicitInternalAdminAbilityAllowlist(), true);
+                self::assertSame($explicitInternal, $ability->get_meta_item('public'), $abilityName);
+                self::assertSame($explicitInternal, $ability->get_meta_item('show_in_rest'), $abilityName);
+                if ($explicitInternal) self::assertSame('internal_admin_only', $ability->get_meta_item('surface'), $abilityName);
             }
             self::assertFalse($ability->get_meta_item('annotations')['readonly']);
         }

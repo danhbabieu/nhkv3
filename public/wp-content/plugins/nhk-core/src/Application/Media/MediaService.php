@@ -297,7 +297,7 @@ final class MediaService
         // semantic boundary; changing the key here breaks attachment
         // read-back when the original filename is a camera name.
         $storageKey = $spec['storage_key'] ?? null;
-        if (!is_string($storageKey) || $storageKey === '' || strlen($storageKey) > 255 || preg_match('/[\x00-\x1F\x7F]/', $storageKey) === 1 || str_contains($storageKey, '\\') || str_starts_with($storageKey, '/') || preg_match('/^[A-Za-z]:[\\\/]/', $storageKey) === 1 || preg_match('#(^|/)\.\.?(/|$)#', $storageKey) === 1) {
+        if (!is_string($storageKey) || $storageKey === '' || strlen($storageKey) > 255 || preg_match('/[\x00-\x1F\x7F]/', $storageKey) === 1 || str_contains($storageKey, '\\') || str_starts_with($storageKey, '/') || preg_match('~^[A-Za-z]:[\\\\/]~', $storageKey) === 1 || preg_match('#(^|/)\.\.?(/|$)#', $storageKey) === 1) {
             throw new MediaException('Media asset storage key is invalid.');
         }
         $spec['storage_key'] = $storageKey;
