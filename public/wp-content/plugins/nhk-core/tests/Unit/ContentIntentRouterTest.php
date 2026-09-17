@@ -356,7 +356,7 @@ final class ContentIntentRouterTest extends TestCase
             new ArticleComposer(),
             static function (array $context) use (&$calls): array { ++$calls['media']; throw new \RuntimeException('LEGACY_MEDIA_RECONCILE_MUST_NOT_RUN'); },
             static function (array $context) use (&$calls): array { ++$calls['publication']; throw new \RuntimeException('PUBLICATION_MUST_NOT_RUN'); },
-            static function (array $context) use (&$calls): array { ++$calls['final']; self::assertSame('COMPLETE', $context['media']['status']); return ['status' => 'verified']; },
+            static function (array $context) use (&$calls): array { ++$calls['final']; self::assertSame('COMPLETE', $context['media']['status']); return ['status' => 'verified', 'frontend_verified' => true]; },
             null,
             null,
             null,

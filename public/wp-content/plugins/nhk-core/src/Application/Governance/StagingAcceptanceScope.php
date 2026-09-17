@@ -46,11 +46,14 @@ final class StagingAcceptanceScope
         $mediaIds = array_values(array_map('strval', $mediaIds));
         foreach ($mediaIds as $mediaId) if (!UuidCodec::isValid($mediaId)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_INVALID');
         if (count(array_unique($mediaIds)) !== count($mediaIds) || !in_array($proposal->subjectId, $mediaIds, true)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_MISMATCH');
+        $bindingMediaId = trim((string) (($proposal->payload['binding']['media']['id'] ?? $proposal->payload['media_id'] ?? $proposal->subjectId)));
+        if ($bindingMediaId !== $proposal->subjectId || !in_array($bindingMediaId, $mediaIds, true)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_MISMATCH');
 
         $target = $scope['target'] ?? null;
         if (!is_array($target) || !UuidCodec::isValid((string) ($target['id'] ?? '')) || (string) ($target['type'] ?? '') === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
         if ((string) $target['id'] !== (string) ($proposal->targetUuid ?? '') || (string) $target['type'] !== (string) ($proposal->payload['binding']['target']['type'] ?? $target['type'])) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
         if (isset($proposal->payload['binding']['target']['id']) && (string) $proposal->payload['binding']['target']['id'] !== (string) $target['id']) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
+        if (isset($target['stable_key'], $proposal->payload['binding']['target']['stable_key']) && (string) $target['stable_key'] !== (string) $proposal->payload['binding']['target']['stable_key']) throw new \RuntimeException('STAGING_TARGET_SCOPE_MISMATCH');
         if (isset($target['stable_key']) && trim((string) $target['stable_key']) === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
 
         self::assertNoFuzzyLocator($scope);

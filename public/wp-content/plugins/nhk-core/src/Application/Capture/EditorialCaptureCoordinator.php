@@ -942,8 +942,9 @@ final class EditorialCaptureCoordinator
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
         $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true);
+        $mediaFrontendVerified = $media['frontend_verified'] ?? ($final['frontend_verified'] ?? null);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
-            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => ($media['frontend_verified'] ?? null), 'blockers' => (array) ($media['blockers'] ?? [])];
+            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => $mediaFrontendVerified, 'blockers' => (array) ($media['blockers'] ?? [])];
         }
         return $children;
     }
