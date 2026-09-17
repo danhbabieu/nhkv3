@@ -386,6 +386,39 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertContains('AUTHORITY_UUID_TYPE_MISMATCH', array_column($plan['blockers'], 'code'));
     }
 
+    public function test_retired_structured_target_requires_explicit_reactivation(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $retired = new AuthorityEntity($canonicalId, 'brand', 'nhk:brand:hermle', 'Hermle', 1, [], AuthorityState::RETIRED, 1);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$retired]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand',
+                'canonical_uuid' => $canonicalId,
+                'name' => 'Hermle',
+                'allow_create' => true,
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertContains('RETIRED_TARGET_REQUIRES_EXPLICIT_REACTIVATION', array_column($plan['blockers'], 'code'));
+    }
+
+    public function test_structured_authority_target_wins_over_conflicting_raw_text(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle');
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'text' => 'Tạo loại Đồng hồ công cộng.',
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand',
+                'name' => 'Hermle',
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame('brand', $plan['reuse'][0]['entity_type']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
     public function test_replanning_same_update_input_is_fingerprint_stable_for_apply_approved_plan(): void
     {
         $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Cũ.']);

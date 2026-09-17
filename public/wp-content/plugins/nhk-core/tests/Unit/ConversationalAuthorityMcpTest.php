@@ -40,6 +40,11 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame(['files'], $capture['connectorMeta']['openai/fileParams']);
         self::assertArrayHasKey('capture_id', $schema['properties']);
         self::assertNotNull(McpAbilityRegistration::abilityNameForTool('nhk.capture.ingest'));
+        $request = ['entity_type' => 'brand', 'name' => 'Hermle', 'payload_delta' => ['country' => 'Germany']];
+        self::assertSame(
+            ['authority_intent' => ['mode' => 'PLAN', 'requests' => [$request]]],
+            McpAbilityRegistration::canonicalTransportArguments('nhk.capture.ingest', ['authority_intent' => ['mode' => 'PLAN', 'requests' => [$request]]]),
+        );
         self::assertSame([
             'type' => 'array',
             'minItems' => 1,
@@ -112,7 +117,7 @@ final class ConversationalAuthorityMcpTest extends TestCase
         $entity = new AuthorityEntity($canonicalId, 'brand', 'nhk:brand:hermle', 'Hermle', 1, [], AuthorityState::ACTIVE, 1);
         $types = new EntityTypeRegistry();
         CanonicalEntityTypeCatalog::registerInto($types);
-        $planner = new AuthorityIntentPlanner(new CaptureAuthorityRepository([$entity]), $types);
+        $planner = new AuthorityIntentPlanner(new AuthorityCapturePlannerRepository([$entity]), $types);
         $captures = new TransportCaptureRepository();
         $forwarded = [];
         $authorityCapture = new AuthorityCaptureService($captures, static function (array $input, CaptureRecord $capture) use ($planner, &$forwarded): array {
@@ -191,7 +196,7 @@ final class TransportCaptureRepository implements CaptureRepository
     public function save(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] = $record; }
 }
 
-final class CaptureAuthorityRepository implements AuthorityRepository
+final class AuthorityCapturePlannerRepository implements AuthorityRepository
 {
     /** @param list<AuthorityEntity> $items */
     public function __construct(private array $items = []) {}

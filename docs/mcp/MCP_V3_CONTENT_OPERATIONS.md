@@ -178,6 +178,18 @@ Classification; Brand and Movement are excluded. “Table Clock + France” is a
 facet composition, not a combined Classification identity. Legacy family data
 is audited before hierarchy apply and unresolved family fails closed.
 
+Structured Authority updates use the canonical optional
+`authority_intent.requests[]` packet. Each request carries the registered
+`entity_type`, an optional exact `canonical_uuid` and/or canonical name, an
+optional family, an optional registry-validated `payload_delta` object and the
+server-checked `allow_create` flag. When present, this packet is preserved
+through Ability/Easy MCP normalization and Capture replan; it is the sole
+source for the requested Authority delta, so raw text cannot override its
+target. `subject_hints[]` remains locator-only: exact UUID/name/alias
+resolution may reuse an active canonical entity, while ambiguity, retired
+targets, malformed deltas and UUID/type mismatch fail closed and never create
+an Authority candidate.
+
 ## 1. MCP architecture
 
 The endpoint is `/wp-json/nhk/v1/mcp`, using JSON-RPC 2.0 and Streamable HTTP.

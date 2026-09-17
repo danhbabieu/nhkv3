@@ -58,6 +58,10 @@ Authority/Graph services provide planning-only, reuse-first decomposition.
 Resolution order is UUID → scoped stable key → exact canonical name → alias →
 bounded lexical review. `subtype_of` owns true same-family Classification
 hierarchy; `classified_as` is limited to Model/Variant/Specimen/Product sources.
+Structured Authority field updates use the canonical optional
+`authority_intent.requests[]` packet across Ability, Easy MCP, MCP transport,
+Capture and planner; `subject_hints[]` is locator-only and cannot create an
+Authority candidate.
 Origin and geography are facet filters, and glass-dome observations remain
 review-scoped. No combined classification, Model inference, taxonomy or
 generic writer fallback is permitted.

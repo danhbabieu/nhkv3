@@ -1,5 +1,52 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Conversational Authority structured update transport (LOCAL ONLY)
+
+SCOPE: Repaired the existing `nhk.capture.ingest` Conversational Authority
+UPDATE flow generically. No Hermle-specific branch, live/staging semantic
+mutation, direct database write, deployment, SSH or push was used.
+
+ROOT_CAUSE: The planner already understood the canonical structured
+`authority_intent.requests[]` packet, but `McpToolCatalog` did not expose that
+packet in the Capture schema. Easy MCP therefore had no structured field-delta
+surface. Independently, `subject_hints[]` was incorrectly converted into
+`classification/clock_type` requests, and Capture approval replan replaced the
+stored structured intent with only `mode=PLAN`, losing the delta before the
+Governance fingerprint check.
+
+IMPLEMENTED: The canonical Capture schema now exposes closed structured
+Authority requests and the Ability/Easy MCP boundary inherits the same schema.
+Structured requests survive transport and Capture replan, take precedence over
+raw text, validate malformed packets and exact UUID/type/retired-target
+conditions fail-closed. Subject hints now resolve only active exact UUID/name/
+alias identities; ambiguity and missing hints never create candidates. Existing
+canonical names in raw text are resolved through the registered Authority
+inventory rather than type-specific lexical branches. Existing identities
+produce REUSE plus one registry-field UPDATE candidate; equal values produce
+`NOOP_VALUES_MATCH`.
+
+CLEANUP: Removed Hermle/France/Cuckoo/Table/Mantel lexical Authority branches
+from the direct planner flow, replaced them with generic inventory and relation
+endpoint resolution, and preserved the existing `create_authorities`/
+`create_relations` response aliases because current consumers and tests use
+them. No unrelated dead code or compatibility mapping was removed.
+
+VERIFICATION: Focused planner/Capture/MCP/Governance/E2E matrix passes 166
+tests / 1,270 assertions; the Authority/Capture/E2E subset passes 48 tests /
+222 assertions; NHK Contract passes 6 tests / 48 assertions. Full NHK Unit
+passes with deployment config unset: 1,739 tests / 8,551 assertions, with 14
+warnings and 18 deprecations plus 18 PHPUnit deprecations. The standalone
+DemoCutover failure reproduces only when `NHK_DEMO_DEPLOY_CONFIG` is set and
+passes when unset. Integration is `ENVIRONMENT_BLOCKED`: `NHK_WP_TEST_PATH`
+and `NHK_WP_TEST_DB` are unset.
+
+DOCS: MCP content operations, control-plane guidance and current status index
+were updated. `composer generate:mcp-docs` generated 50 canonical files with
+manifest hash `5a9b4978a2218480bae8d5aecc0e302ecedce03a4fea3a476dfefdd4d5a26918`.
+
+LIVE_STATUS: `CONVERSATIONAL_AUTHORITY_UPDATE_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+No live/staging mutation, deployment, SSH or push was performed.
+
 # Checkpoint — 2026-09-17 — Staging `/tri-thuc/` read-only runtime audit
 
 SCOPE: Traced the staging `/tri-thuc/` request without creating or changing

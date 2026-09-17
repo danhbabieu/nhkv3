@@ -29,6 +29,16 @@ after Authority read-back. Missing purpose remains Editorial for legacy
 clients. `capture_id`, `purpose`, `authority_intent` and multipart `files[]`
 are part of the canonical MCP schema.
 
+Explicit Authority field updates use the canonical optional
+`authority_intent.requests[]` list. Its registered `entity_type`, exact
+`canonical_uuid`/name locator and `payload_delta` survive the Ability,
+Easy-MCP and MCP transport boundaries unchanged. Structured intent wins over
+raw text; `subject_hints[]` only resolves existing canonical UUID/name/alias
+identities and can never mint a CREATE candidate. The planner emits a single
+same-UUID UPDATE candidate only for changed registry fields, emits
+`REUSE/NOOP_VALUES_MATCH` for equal values, and fails closed for malformed
+deltas, UUID/type mismatch or retired targets.
+
 The planner is planning-only and reuse-first. It decomposes facets such as
 Table Clock + France instead of minting a combined identity, and treats glass
 dome as vocabulary/evidence review rather than an automatic Model, clock type
