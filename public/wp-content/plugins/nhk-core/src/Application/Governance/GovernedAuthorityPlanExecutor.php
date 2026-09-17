@@ -13,7 +13,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
     public function __construct(private McpGovernanceHandler $governance) {}
 
     /** @param array<string,mixed> $plan @param list<string> $approvedCandidateIds @return array<string,mixed> */
-    public function execute(array $plan, string $approvedFingerprint, string $currentFingerprint, array $approvedCandidateIds, ConversationalAuthorityPolicy $policy, string $actor = '0', array $auditContext = []): array
+    public function execute(array $plan, string $approvedFingerprint, string $currentFingerprint, array $approvedCandidateIds, ConversationalAuthorityPolicy $policy, string $actor = '0', array $auditContext = [], ?array $stagingAcceptance = null): array
     {
         if (!hash_equals($approvedFingerprint, $currentFingerprint)) return ['status' => 'PLAN_REAPPROVAL_REQUIRED', 'code' => 'PLAN_REAPPROVAL_REQUIRED', 'proposal_ids' => [], 'approved_candidate_ids' => []];
         if ($policy === ConversationalAuthorityPolicy::OFF) return ['status' => 'AUTHORITY_AUTOMATION_DISABLED', 'code' => 'AUTHORITY_AUTOMATION_DISABLED', 'proposal_ids' => [], 'approved_candidate_ids' => []];
@@ -40,7 +40,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
                 $relationCandidates[] = $candidate;
                 continue;
             }
-            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor, $auditContext);
+            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor, $auditContext, $stagingAcceptance);
             $proposalIds[] = $proposal->id;
             $authorityProposalIds[] = $proposal->id;
             $authorityProposalCandidates[$proposal->id] = $candidate;
@@ -66,7 +66,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
                 ];
                 throw $error;
             }
-            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor, $auditContext);
+            $proposal = $this->createAndSubmit($candidate, $approvedFingerprint, $actor, $auditContext, $stagingAcceptance);
             $proposalIds[] = $proposal->id;
             $relationProposalIds[] = $proposal->id;
         }
@@ -80,9 +80,9 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         return isset($candidate['predicate']) || isset($candidate['source_type']);
     }
 
-    private function createAndSubmit(array $candidate, string $fingerprint, string $actor, array $auditContext = []): \NHK\Core\Domain\Governance\Proposal
+    private function createAndSubmit(array $candidate, string $fingerprint, string $actor, array $auditContext = [], ?array $stagingAcceptance = null): \NHK\Core\Domain\Governance\Proposal
     {
-        $proposal = $this->governance->createFromArguments($this->proposalArguments($candidate, $fingerprint, $actor, $auditContext));
+        $proposal = $this->governance->createFromArguments($this->proposalArguments($candidate, $fingerprint, $actor, $auditContext, $stagingAcceptance));
         return $proposal->state === ProposalState::DRAFT ? $this->governance->submit($proposal->id) : $proposal;
     }
 
@@ -133,7 +133,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
     }
 
     /** @return array<string,mixed> */
-    private function proposalArguments(array $candidate, string $planFingerprint, string $actor, array $auditContext = []): array
+    private function proposalArguments(array $candidate, string $planFingerprint, string $actor, array $auditContext = [], ?array $stagingAcceptance = null): array
     {
         $action = strtoupper((string) ($candidate['action'] ?? 'CREATE'));
         $isRelation = isset($candidate['predicate']) || isset($candidate['source_type']);
@@ -163,12 +163,14 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
             'operation' => $operation,
             'previous_revision' => (int) ($candidate['canonical_revision'] ?? $candidate['source_revision'] ?? $candidate['target_revision'] ?? 0),
         ];
+        if ($stagingAcceptance !== null) $payload['staging_acceptance'] = $stagingAcceptance;
         $contentFingerprint = hash('sha256', CommandCanonicalizer::canonicalize($payload));
         $dependencyIds = array_values(array_filter(array_map('strval', (array) ($candidate['dependencies'] ?? []))));
         $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : null;
         $expectedRevision = !$isRelation && !in_array($operation, ['create', 'ingest'], true)
             ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1))
             : null;
-        return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? ''), 'actor' => $actor];
+        $scopeSuffix = $stagingAcceptance === null ? '' : ':' . hash('sha256', CommandCanonicalizer::canonicalize($stagingAcceptance));
+        return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => (string) ($candidate['canonical_uuid'] ?? $candidate['source_uuid'] ?? $entityType), 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'content_fingerprint' => $contentFingerprint, 'dependency_fingerprint' => hash('sha256', CommandCanonicalizer::canonicalize($dependencyIds)), 'dependency_ids' => $dependencyIds, 'idempotency_key' => 'authority-plan:' . $planFingerprint . ':' . (string) ($candidate['candidate_id'] ?? '') . $scopeSuffix, 'actor' => $actor];
     }
 }

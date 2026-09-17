@@ -16,7 +16,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
 final class AuthorityCaptureService
 {
     /** @param callable(array<string,mixed>,CaptureRecord):array<string,mixed> $planner @param (callable(array<string,mixed>,CaptureRecord):array<string,mixed>)|null $mixedEditorial @param (callable(CaptureRecord,array<string,mixed>,array<string>):array<string,mixed>)|null $applyPlan @param (callable(CaptureRecord,array<string,mixed>):array<string,mixed>)|null $mixedContinuation */
-    public function __construct(private CaptureRepository $captures, private $planner, private $mixedEditorial = null, private $applyPlan = null, private $mixedContinuation = null, ?CompletionCoordinator $completion = null) { $this->completion = $completion ?? new CompletionCoordinator(); }
+    public function __construct(private CaptureRepository $captures, private $planner, private $mixedEditorial = null, private $applyPlan = null, private $mixedContinuation = null, ?CompletionCoordinator $completion = null, private $scopeIssuer = null) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     private CompletionCoordinator $completion;
 
@@ -100,9 +100,11 @@ final class AuthorityCaptureService
         $currentFingerprint = (string) ($plan['plan_fingerprint'] ?? '');
         if ($currentFingerprint === '' || !hash_equals($approvedFingerprint, $currentFingerprint)) throw new \InvalidArgumentException('PLAN_REAPPROVAL_REQUIRED');
         if (!is_callable($this->applyPlan)) throw new \RuntimeException('AUTHORITY_PLAN_EXECUTOR_UNAVAILABLE');
-        $result = ($this->applyPlan)($record, $plan, $approvedIds);
+        $scope = is_callable($this->scopeIssuer) ? ($this->scopeIssuer)($record, $plan, $approvedIds) : null;
+        $result = $scope === null ? ($this->applyPlan)($record, $plan, $approvedIds) : ($this->applyPlan)($record, $plan, $approvedIds, $scope);
         $result['completion'] = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($plan, $approvedIds, $result));
         $context = $record->context;
+        if ($scope !== null) $context['staging_acceptance'] = $scope;
         $saveBase = $record;
         $context['authority_result'] = ['approved_plan_fingerprint' => $approvedFingerprint, 'approved_candidate_ids' => $approvedIds, 'result' => $result];
         $status = strtoupper((string) ($result['status'] ?? '')) === 'APPLIED' ? 'APPLIED' : 'APPROVAL_PENDING';

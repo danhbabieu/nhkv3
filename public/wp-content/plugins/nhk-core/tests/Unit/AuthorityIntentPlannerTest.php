@@ -728,6 +728,16 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertNull($plan['article']);
     }
 
+    public function test_authority_only_purpose_cannot_be_promoted_to_mixed_article_mode(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(
+            ['purpose' => 'AUTHORITY', 'text' => 'Tạo thương hiệu Hermle và một bài giới thiệu.', 'authority_intent' => ['mode' => 'PLAN']],
+            ['capture_id' => UuidCodec::newV7(), 'capture_revision' => 1],
+        );
+
+        self::assertNull($plan['article']);
+    }
+
     public function test_new_hierarchy_endpoints_are_dependencies_of_one_relation_candidate(): void
     {
         $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types))->plan(

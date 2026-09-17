@@ -11,6 +11,14 @@ final class StagingAcceptanceScope
 {
     /** @var array<string,string> */
     private const OPERATION_FAMILIES = [
+        'authority:create' => 'governed_authority_plan',
+        'authority:ingest' => 'governed_authority_plan',
+        'authority:update' => 'governed_authority_plan',
+        'authority:rename' => 'governed_authority_plan',
+        'authority:rekey' => 'governed_authority_plan',
+        'authority:merge' => 'governed_authority_plan',
+        'authority:retire' => 'governed_authority_plan',
+        'authority:reactivate' => 'governed_authority_plan',
         'media:representative_bind' => 'media_usage_reconciliation',
         'media:ingest' => 'media_usage_reconciliation',
         'relation:relation_create' => 'governed_relation_reconciliation',
@@ -36,10 +44,17 @@ final class StagingAcceptanceScope
         if ($proposalCaptureId === '' || !hash_equals(strtolower($captureId), strtolower($proposalCaptureId))) throw new \RuntimeException('STAGING_CAPTURE_SCOPE_MISMATCH');
 
         $operationKey = $proposal->entityType . ':' . $proposal->operation;
-        $expectedFamily = self::OPERATION_FAMILIES[$operationKey] ?? null;
-        if ($expectedFamily === null || (string) ($scope['operation_family'] ?? '') !== $expectedFamily) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
-        if ((string) ($scope['entity_type'] ?? '') !== $proposal->entityType || (string) ($scope['operation'] ?? '') !== $proposal->operation) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
+        $expectedFamily = self::OPERATION_FAMILIES[$operationKey] ?? (self::isAuthorityEntity($proposal->entityType) && in_array($proposal->operation, ['create', 'ingest', 'update', 'rename', 'rekey', 'merge', 'retire', 'reactivate'], true) ? 'governed_authority_plan' : null);
+        $authorityPlanPacket = (string) ($scope['operation_family'] ?? '') === 'governed_authority_plan' && is_array($scope['candidate_bindings'] ?? null);
+        if ($expectedFamily === null || ((string) ($scope['operation_family'] ?? '') !== $expectedFamily && !$authorityPlanPacket)) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
         if ((string) ($scope['writer'] ?? '') !== 'canonical_governed') throw new \RuntimeException('STAGING_DIRECT_WRITER_BLOCKED');
+
+        if ($expectedFamily === 'governed_authority_plan' || $authorityPlanPacket) {
+            self::assertAuthorityBinding($proposal, $scope);
+            self::assertNoFuzzyLocator($scope);
+            return;
+        }
+        if ((string) ($scope['entity_type'] ?? '') !== $proposal->entityType || (string) ($scope['operation'] ?? '') !== $proposal->operation) throw new \RuntimeException('STAGING_OPERATION_SCOPE_MISMATCH');
 
         $mediaIds = $scope['media_ids'] ?? [];
         if (!is_array($mediaIds) || $mediaIds === [] || !array_is_list($mediaIds)) throw new \RuntimeException('STAGING_MEDIA_SCOPE_INVALID');
@@ -57,6 +72,30 @@ final class StagingAcceptanceScope
         if (isset($target['stable_key']) && trim((string) $target['stable_key']) === '') throw new \RuntimeException('STAGING_TARGET_SCOPE_INVALID');
 
         self::assertNoFuzzyLocator($scope);
+    }
+
+    private static function isAuthorityEntity(string $entityType): bool
+    {
+        return in_array($entityType, ['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'], true);
+    }
+
+    /** @param array<string,mixed> $scope */
+    private static function assertAuthorityBinding(Proposal $proposal, array $scope): void
+    {
+        $planFingerprint = trim((string) ($scope['plan_fingerprint'] ?? ''));
+        $audit = is_array($proposal->payload['project_build_audit'] ?? null) ? $proposal->payload['project_build_audit'] : [];
+        if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint) || !hash_equals($planFingerprint, (string) ($audit['plan_fingerprint'] ?? ''))) throw new \RuntimeException('STAGING_PLAN_SCOPE_MISMATCH');
+        $candidateId = trim((string) ($proposal->payload['candidate_id'] ?? ''));
+        if ($candidateId === '') throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
+        foreach ((array) ($scope['candidate_bindings'] ?? []) as $binding) {
+            if (!is_array($binding) || (string) ($binding['candidate_id'] ?? '') !== $candidateId) continue;
+            if ((string) ($binding['entity_type'] ?? '') !== $proposal->entityType || (string) ($binding['operation'] ?? '') !== $proposal->operation) continue;
+            if ((string) ($binding['subject_id'] ?? '') !== $proposal->subjectId || (string) ($binding['target_uuid'] ?? '') !== (string) ($proposal->targetUuid ?? '')) continue;
+            $expected = $binding['expected_revision'] ?? null;
+            if ($expected !== null && (int) $expected !== (int) $proposal->expectedRevision) continue;
+            return;
+        }
+        throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_MISMATCH');
     }
 
     /** @param array<string,mixed> $scope */

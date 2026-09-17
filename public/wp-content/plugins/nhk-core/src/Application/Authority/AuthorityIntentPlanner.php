@@ -47,7 +47,8 @@ final class AuthorityIntentPlanner
             return $candidate;
         }, $plan['create_candidates']);
         $plan['create_relations'] = array_values($plan['relation_candidates']);
-        $hasArticle = preg_match('/\b(?:bài|bài viết|bài giới thiệu|article)\b/iu', $text) === 1;
+        $purpose = strtoupper(trim((string) ($input['purpose'] ?? '')));
+        $hasArticle = $purpose !== 'AUTHORITY' && preg_match('/\b(?:bài|bài viết|bài giới thiệu|article)\b/iu', $text) === 1;
         $plan['article'] = $hasArticle ? ['requested' => true, 'mode' => ($plan['reuse'] !== [] || $plan['create_candidates'] !== []) ? 'MIXED' : 'EDITORIAL'] : null;
         $plan['plan_fingerprint'] = AuthorityPlanFingerprint::compute((string) ($captureContext['capture_id'] ?? ''), max(1, (int) ($captureContext['capture_revision'] ?? 1)), $plan, is_array($captureContext['contract'] ?? null) ? $captureContext['contract'] : (is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : []));
         return $plan;

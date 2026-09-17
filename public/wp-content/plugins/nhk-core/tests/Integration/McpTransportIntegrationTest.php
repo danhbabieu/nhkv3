@@ -125,6 +125,10 @@ final class McpTransportIntegrationTest extends TestCase
                 ], $captureSchema['properties']['resume_children']);
                 self::assertSame(['EDITORIAL', 'AUTHORITY', 'MIXED'], $captureSchema['properties']['purpose']['enum']);
                 self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $captureSchema['properties']['authority_intent']['properties']['mode']['enum']);
+                $relation = $captureSchema['properties']['authority_intent']['properties']['relation_intents'];
+                self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid', 'provenance', 'reason'], array_keys($relation['items']['properties']));
+                self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid'], $relation['items']['required']);
+                self::assertFalse($relation['items']['additionalProperties']);
                 self::assertArrayHasKey('approved_plan_fingerprint', $captureSchema['properties']['authority_intent']['properties']);
                 self::assertArrayHasKey('approved_candidate_ids', $captureSchema['properties']['authority_intent']['properties']);
                 self::assertArrayHasKey('title', $captureSchema['properties']);

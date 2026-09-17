@@ -28,6 +28,10 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame(['files'], $capture['_meta']['openai/fileParams']);
         self::assertSame('array', $capture['inputSchema']['properties']['files']['type']);
         self::assertSame(['download_url', 'file_id'], $capture['inputSchema']['properties']['files']['items']['required']);
+        $relation = $capture['inputSchema']['properties']['authority_intent']['properties']['relation_intents'];
+        self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid', 'provenance', 'reason'], array_keys($relation['items']['properties']));
+        self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid'], $relation['items']['required']);
+        self::assertFalse($relation['items']['additionalProperties']);
     }
 
     public function test_projection_does_not_change_unrelated_tools(): void
@@ -127,6 +131,11 @@ final class EasyMcpNativeFileCompatibilityAdapterTest extends TestCase
         self::assertSame('object', $tools[self::TARGET]['inputSchema']['properties']['files']['items']['type']);
         self::assertSame(['download_url', 'file_id'], $tools[self::TARGET]['inputSchema']['properties']['files']['items']['required']);
         self::assertSame(['files'], $tools[self::TARGET]['_meta']['openai/fileParams']);
+        self::assertArrayHasKey('relation_intents', $tools[self::TARGET]['inputSchema']['properties']['authority_intent']['properties']);
+        self::assertSame(
+            ['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid', 'provenance', 'reason'],
+            array_keys($tools[self::TARGET]['inputSchema']['properties']['authority_intent']['properties']['relation_intents']['items']['properties']),
+        );
         self::assertSame($easyMcpTools[1], $tools['wp_ability_nhk_v3_media_ingest']);
     }
 

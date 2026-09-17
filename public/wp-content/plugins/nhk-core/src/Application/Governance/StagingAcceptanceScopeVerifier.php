@@ -59,6 +59,39 @@ final class StagingAcceptanceScopeVerifier
         return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
     }
 
+    /** @param array<string,mixed> $plan @param list<string> $candidateIds @return array<string,mixed> */
+    public function issueForAuthorityPlan(CaptureRecord $capture, array $plan, array $candidateIds): array
+    {
+        $environment = $this->environmentName();
+        if (in_array($environment, ['production', 'prod'], true)) throw new \RuntimeException('STAGING_PRODUCTION_FORBIDDEN');
+        if ($environment !== 'staging') throw new \RuntimeException('STAGING_SCOPE_ENVIRONMENT_REQUIRED');
+        if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
+        if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
+        $planFingerprint = trim((string) ($plan['plan_fingerprint'] ?? ''));
+        if (!preg_match('/^[a-f0-9]{64}$/i', $planFingerprint)) throw new \RuntimeException('STAGING_PLAN_FINGERPRINT_REQUIRED');
+        $existing = is_array($capture->context['staging_acceptance'] ?? null) ? $capture->context['staging_acceptance'] : null;
+        if ($existing !== null && ($existing['operation_family'] ?? '') === 'governed_authority_plan' && ($existing['plan_fingerprint'] ?? '') === $planFingerprint && $this->verifyPacket($existing)) {
+            $known = array_map(static fn (array $binding): string => (string) ($binding['candidate_id'] ?? ''), array_values(array_filter((array) ($existing['candidate_bindings'] ?? []), 'is_array')));
+            if (array_diff(array_map('strval', $candidateIds), $known) === []) return $existing;
+        }
+        $all = [];
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
+            if (!is_array($candidate) || !in_array((string) ($candidate['candidate_id'] ?? ''), $candidateIds, true) || strtoupper((string) ($candidate['action'] ?? 'CREATE')) === 'REUSE') continue;
+            $isRelation = isset($candidate['predicate']) || isset($candidate['source_type']);
+            $operation = $isRelation ? 'relation_create' : (strtolower((string) ($candidate['action'] ?? 'create')) === 'create' ? 'create' : strtolower((string) ($candidate['action'] ?? 'update')));
+            $entityType = $isRelation ? 'relation' : (string) ($candidate['entity_type'] ?? '');
+            $subjectId = $isRelation ? (string) ($candidate['source_uuid'] ?? $candidate['source_id'] ?? '') : ($operation === 'create' ? $entityType : (string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? ''));
+            $targetUuid = !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? trim((string) ($candidate['canonical_uuid'] ?? $candidate['target_uuid'] ?? '')) : '';
+            $all[] = ['candidate_id' => (string) $candidate['candidate_id'], 'entity_type' => $entityType, 'operation' => $operation, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => !$isRelation && !in_array($operation, ['create', 'ingest'], true) ? max(1, (int) ($candidate['expected_revision'] ?? $candidate['canonical_revision'] ?? 1)) : null];
+        }
+        if ($all === []) throw new \RuntimeException('STAGING_CANDIDATE_SCOPE_REQUIRED');
+        $base = ['approved' => true, 'environment' => 'staging', 'capture_id' => $capture->captureId, 'capture_fingerprint' => $capture->requestFingerprint, 'operation_family' => 'governed_authority_plan', 'writer' => 'canonical_governed', 'entrypoint' => 'nhk.capture.ingest', 'intent' => (string) ($capture->context['purpose'] ?? 'AUTHORITY'), 'plan_fingerprint' => $planFingerprint, 'candidate_bindings' => $all, 'issued_at' => gmdate('c'), 'expires_at' => gmdate('c', time() + max(1, $this->ttlSeconds))];
+        $input = is_array($capture->context['planning_input'] ?? null) ? $capture->context['planning_input'] : [];
+        if (!(bool) ($this->admission)($base, $capture, $input, [])) throw new \RuntimeException('STAGING_SCOPE_NOT_ADMITTED');
+        $fingerprint = hash('sha256', CommandCanonicalizer::canonicalize($base));
+        return $base + ['fingerprint' => $fingerprint, 'signature' => hash_hmac('sha256', $fingerprint, $this->secret())];
+    }
+
     /** @param list<array<string,mixed>> $assets @return array<string,mixed>|null */
     public function forCapture(CaptureRecord $capture, array $input, array $assets): ?array
     {

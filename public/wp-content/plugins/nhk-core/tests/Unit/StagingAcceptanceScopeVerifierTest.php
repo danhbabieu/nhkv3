@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Domain\Capture\CaptureRecord;
+use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -61,6 +62,21 @@ final class StagingAcceptanceScopeVerifierTest extends TestCase
         $production = new StagingAcceptanceScopeVerifier(static fn (): string => 'production', 'test-secret', static fn (): bool => true);
         $this->expectExceptionMessage('STAGING_PRODUCTION_FORBIDDEN');
         $production->issueForCapture($capture, $input, $assets);
+    }
+
+    public function test_authority_plan_scope_is_server_issued_and_binds_exact_candidate(): void
+    {
+        $capture = new CaptureRecord(UuidCodec::newV7(), 'authority-scope', hash('sha256', 'authority-scope'), 'AUTHORITY_PLANNED', 'PLANNED', null, null, [], ['purpose' => 'AUTHORITY', 'planning_input' => ['purpose' => 'AUTHORITY', 'authority_intent' => ['mode' => 'PLAN']]], [], []);
+        $candidateId = 'brand-jaeger';
+        $plan = ['plan_fingerprint' => hash('sha256', 'plan'), 'create_candidates' => [['candidate_id' => $candidateId, 'action' => 'CREATE', 'entity_type' => 'brand']]];
+        $scope = (new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->issueForAuthorityPlan($capture, $plan, [$candidateId]);
+        $proposal = new Proposal(UuidCodec::newV7(), 'brand', 'create', ['candidate_id' => $candidateId, 'project_build_audit' => ['capture_id' => $capture->captureId, 'plan_fingerprint' => $plan['plan_fingerprint']], 'staging_acceptance' => $scope], 'content', null, 'dependency', ProposalState::APPROVED, idempotencyKey: 'authority-scope', entityType: 'brand');
+
+        self::assertTrue((new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->verifyProposal($scope, $proposal));
+        $wrongPayload = $proposal->payload;
+        $wrongPayload['candidate_id'] = 'other-candidate';
+        $wrongProposal = new Proposal($proposal->id, $proposal->subjectId, $proposal->operation, $wrongPayload, $proposal->contentFingerprint, $proposal->expectedRevision, $proposal->dependencyFingerprint, $proposal->state, idempotencyKey: $proposal->idempotencyKey, entityType: $proposal->entityType);
+        self::assertFalse((new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true))->verifyProposal($scope, $wrongProposal));
     }
 
     /** @return array{0:CaptureRecord,1:array<string,mixed>,2:list<array<string,mixed>>} */

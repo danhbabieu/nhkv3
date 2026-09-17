@@ -751,13 +751,13 @@ final class Plugin {
                 static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($draftGateway): array {
                     return $draftGateway->create(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->captureId . ':article', 'title' => (string) ($input['title'] ?? ''), 'content' => (string) ($input['text'] ?? $input['content'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? '')]);
                 },
-                static function (\NHK\Core\Domain\Capture\CaptureRecord $capture, array $plan, array $ids) use ($mcpGovernance, $automationResolver, $authorityPolicyStorage, $semanticWritePolicy): array {
+                static function (\NHK\Core\Domain\Capture\CaptureRecord $capture, array $plan, array $ids, ?array $stagingAcceptance = null) use ($mcpGovernance, $automationResolver, $authorityPolicyStorage, $semanticWritePolicy): array {
                     $generic = \NHK\Core\Domain\Governance\AutomationMode::REVIEW_REQUIRED;
                     foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $type) {
                         if (in_array($automationResolver->resolve($type), [\NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE, \NHK\Core\Domain\Governance\AutomationMode::AUTO_PUBLISH], true)) $generic = \NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE;
                     }
                     $effective = \NHK\Core\Application\Governance\ConversationalAuthorityPolicyResolver::effective($generic, $authorityPolicyStorage->read());
-                    return (new \NHK\Core\Application\Governance\GovernedAuthorityPlanExecutor($mcpGovernance))->execute($plan, (string) ($plan['plan_fingerprint'] ?? ''), (string) ($plan['plan_fingerprint'] ?? ''), $ids, $effective, function_exists('get_current_user_id') ? (string) get_current_user_id() : '0', ['capture_id' => $capture->captureId, 'policy_mode' => $semanticWritePolicy->resolve()->value, 'approval_mode' => $effective->value]);
+                    return (new \NHK\Core\Application\Governance\GovernedAuthorityPlanExecutor($mcpGovernance))->execute($plan, (string) ($plan['plan_fingerprint'] ?? ''), (string) ($plan['plan_fingerprint'] ?? ''), $ids, $effective, function_exists('get_current_user_id') ? (string) get_current_user_id() : '0', ['capture_id' => $capture->captureId, 'policy_mode' => $semanticWritePolicy->resolve()->value, 'approval_mode' => $effective->value], $stagingAcceptance);
                 },
                 static function (\NHK\Core\Domain\Capture\CaptureRecord $record, array $result) use (&$capture): array {
                     if (!$capture instanceof \NHK\Core\Application\Capture\EditorialCaptureCoordinator) return ['status' => 'RECONCILIATION_PENDING', 'code' => 'EDITORIAL_RECONCILIATION_UNAVAILABLE', 'capture_id' => $record->captureId];
@@ -769,6 +769,10 @@ final class Plugin {
                     ]);
                     return ['status' => 'RECONCILED', 'capture_id' => $continued->captureId, 'article_id' => $continued->articleId, 'capture_status' => $continued->status, 'capture_stage' => $continued->stage, 'diagnostics' => $continued->diagnostics, 'capture_record' => $continued];
                 },
+                null,
+                static function (\NHK\Core\Domain\Capture\CaptureRecord $capture, array $plan, array $ids) use ($stagingScopeVerifier): array {
+                    return $stagingScopeVerifier->issueForAuthorityPlan($capture, $plan, $ids);
+                }
             );
             $captureAddendumRepository = new WpdbCaptureAddendumRepository($wpdb);
             $captureSubjectResolver = new SubjectResolutionService(new \NHK\Core\Application\Semantic\CanonicalAuthoritySubjectResolver($authority, $types));
