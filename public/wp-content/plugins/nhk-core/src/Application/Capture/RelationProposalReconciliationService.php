@@ -24,6 +24,8 @@ final class RelationProposalReconciliationService
         private GovernanceAutomationPolicyResolver $policies,
         private $can,
         private $actor = null,
+        /** @var callable(array<string,mixed>):array<string,mixed>|bool|null */
+        private $relationState = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -36,6 +38,8 @@ final class RelationProposalReconciliationService
             $payload = $original->operation === 'relation_create'
                 ? (new RelationRevisionBinder($this->endpoints))->bind($original->payload)
                 : $original->payload;
+            $reused = $this->reusedRelation($original, $payload);
+            if ($reused !== null) return $reused;
             $key = 'relation-reconcile:' . $original->id . ':' . hash('sha256', CommandCanonicalizer::canonicalize($payload));
             $replacement = $this->lifecycle->createFromArguments([
                 'operation' => $original->operation,
@@ -84,6 +88,49 @@ final class RelationProposalReconciliationService
     }
 
     private function actor(): string { return $this->actor !== null ? (string) (($this->actor)()) : 'capture-reconciler'; }
+
+    /** @param array<string,mixed> $payload @return array<string,mixed>|null */
+    private function reusedRelation(Proposal $proposal, array $payload): ?array
+    {
+        if ($this->relationState === null) return null;
+        $identity = [
+            'predicate' => strtolower(trim((string) ($payload['predicate'] ?? ''))),
+            'source_type' => strtolower(trim((string) ($payload['source_type'] ?? ''))),
+            'source_uuid' => strtolower(trim((string) ($payload['source_uuid'] ?? $proposal->subjectId))),
+            'target_type' => strtolower(trim((string) ($payload['target_type'] ?? ''))),
+            'target_uuid' => strtolower(trim((string) ($payload['target_uuid'] ?? $proposal->targetUuid ?? ''))),
+            'direction' => 'SOURCE_TO_TARGET',
+        ];
+        try {
+            $state = ($this->relationState)([
+                'entity_type' => 'relation',
+                'operation' => $proposal->operation,
+                'payload' => $payload,
+                'logical_identity' => $identity,
+            ]);
+        } catch (\Throwable) {
+            return null;
+        }
+        if ($state === true) return ['status' => 'REVIEW_REQUIRED', 'proposal_id' => $proposal->id, 'blockers' => ['RELATION_ACTIVE_READBACK_ID_UNAVAILABLE']];
+        if (!is_array($state) || (strtoupper((string) ($state['status'] ?? '')) !== 'ACTIVE' && ($state['active'] ?? false) !== true)) return null;
+        $canonicalId = trim((string) ($state['canonical_id'] ?? $state['id'] ?? ''));
+        if ($canonicalId === '') return null;
+        return [
+            'status' => 'REUSED_VERIFIED',
+            'proposal_id' => $proposal->id,
+            'canonical_id' => $canonicalId,
+            'canonical_readback' => [
+                'canonical_id' => $canonicalId,
+                'entity_type' => 'relation',
+                'active' => true,
+                'revision' => (int) ($state['revision'] ?? 0),
+                'logical_identity' => $identity,
+                'direction' => (string) ($state['direction'] ?? 'SOURCE_TO_TARGET'),
+            ],
+            'idempotent' => true,
+            'reused' => true,
+        ];
+    }
 
     private function errorCode(\Throwable $error): string
     {

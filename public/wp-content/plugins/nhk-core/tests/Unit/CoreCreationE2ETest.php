@@ -52,6 +52,48 @@ final class CoreCreationE2ETest extends TestCase
         self::assertSame(1, count($runtime['authority']->list('brand')));
     }
 
+    public function test_mcp_existing_brand_update_applies_same_identity_once_with_revision_increment(): void
+    {
+        $runtime = $this->runtime();
+        $existing = $runtime['authority']->create('brand', 'nhk:brand:hermle', 'Hermle');
+        $delta = [
+            'country' => 'Germany',
+            'founded_year' => 1922,
+            'aliases' => ['Franz Hermle & Sohn'],
+            'description' => 'German clock manufacturer founded in 1922.',
+        ];
+        $plan = $this->dispatch($runtime, 'Bổ sung thông tin cho Hermle.', 'brand-update-plan', 'AUTHORITY', [
+            'mode' => 'PLAN',
+            'requests' => [[
+                'entity_type' => 'brand',
+                'canonical_uuid' => $existing->canonicalId,
+                'name' => 'Hermle',
+                'payload_delta' => $delta,
+            ]],
+        ]);
+
+        self::assertCount(1, $plan['context']['authority_plan']['reuse']);
+        self::assertCount(1, $plan['context']['authority_plan']['update_candidates']);
+        self::assertSame($existing->canonicalId, $plan['context']['authority_plan']['update_candidates'][0]['canonical_uuid']);
+        self::assertSame([], $plan['context']['authority_plan']['create_authorities']);
+        self::assertSame([], $plan['context']['authority_plan']['create_relations']);
+
+        $updated = $this->dispatch($runtime, '', 'brand-update-apply', 'AUTHORITY', [
+            'mode' => 'APPLY_APPROVED_PLAN',
+            'approved_plan_fingerprint' => $plan['context']['plan_fingerprint'],
+            'approved_candidate_ids' => [$plan['context']['authority_plan']['update_candidates'][0]['candidate_id']],
+        ], $plan['capture_id']);
+        $canonical = $runtime['authorityRepo']->findByCanonicalId($existing->canonicalId);
+
+        self::assertSame('AUTHORITY_APPLIED', $updated['stage']);
+        self::assertSame($existing->canonicalId, $canonical?->canonicalId);
+        self::assertSame($existing->stableKey, $canonical?->stableKey);
+        self::assertSame(2, $canonical?->revision);
+        self::assertSame($delta, $canonical?->payload);
+        self::assertCount(1, $runtime['authority']->list('brand'));
+        self::assertSame([], $runtime['authority']->list('classification'));
+    }
+
     public function test_mcp_classification_plan_apply_readback_and_replay_reuse_clock_type(): void
     {
         $runtime = $this->runtime();

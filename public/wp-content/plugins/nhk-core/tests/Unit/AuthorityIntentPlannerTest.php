@@ -119,7 +119,7 @@ final class AuthorityIntentPlannerTest extends TestCase
 
         self::assertCount(1, $plan['update_candidates']);
         self::assertSame([], $plan['create_candidates']);
-        self::assertSame([], $plan['reuse']);
+        self::assertCount(1, $plan['reuse']);
         self::assertSame($entity->canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
         self::assertSame($entity->revision, $plan['update_candidates'][0]['expected_revision']);
         self::assertSame(['description' => $description], $plan['update_candidates'][0]['payload_patch']);
@@ -229,7 +229,7 @@ final class AuthorityIntentPlannerTest extends TestCase
 
         self::assertCount(1, $plan['update_candidates']);
         self::assertSame([], $plan['create_candidates']);
-        self::assertSame([], $plan['reuse']);
+        self::assertCount(1, $plan['reuse']);
         self::assertSame(['aliases' => ['Gebrüder Hermle', 'Hermle Uhren'], 'description' => 'Mô tả mới.', 'founded_year' => 1922], $plan['update_candidates'][0]['payload_patch']);
         self::assertSame($entity->canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
         self::assertSame($entity->revision, $plan['update_candidates'][0]['expected_revision']);
@@ -251,6 +251,139 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertCount(1, $plan['reuse']);
         self::assertSame('NOOP_VALUES_MATCH', $plan['reuse'][0]['reason']);
         self::assertSame([], $plan['update_candidates']);
+    }
+
+    public function test_structured_brand_update_is_reused_and_emits_one_exact_update_candidate(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $delta = [
+            'country' => 'Germany',
+            'founded_year' => 1922,
+            'aliases' => ['Franz Hermle & Sohn'],
+            'description' => 'German clock manufacturer founded in 1922.',
+        ];
+
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'text' => 'Bổ sung thông tin cho Hermle.',
+            'subject_hints' => ['Hermle', $canonicalId],
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand',
+                'canonical_uuid' => $canonicalId,
+                'name' => 'Hermle',
+                'payload_delta' => $delta,
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame($canonicalId, $plan['reuse'][0]['canonical_uuid']);
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame($canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
+        self::assertSame(1, $plan['update_candidates'][0]['expected_revision']);
+        self::assertSame($delta, $plan['update_candidates'][0]['payload_patch']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame([], array_filter($plan['create_candidates'], static fn (array $candidate): bool => $candidate['entity_type'] === 'classification'));
+    }
+
+    public function test_exact_brand_name_subject_hint_is_locator_only(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle');
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'subject_hints' => ['Hermle'],
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame('brand', $plan['reuse'][0]['entity_type']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
+    public function test_exact_brand_uuid_subject_hint_is_locator_only(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'subject_hints' => [$canonicalId],
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame($canonicalId, $plan['reuse'][0]['canonical_uuid']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
+    public function test_name_and_uuid_subject_hints_resolve_to_one_canonical_subject(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'subject_hints' => ['Hermle', $canonicalId],
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame($canonicalId, $plan['reuse'][0]['canonical_uuid']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
+    public function test_ambiguous_subject_hint_requires_review_without_creation(): void
+    {
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([
+            $this->entity('brand', 'nhk:brand:hermle', 'Hermle'),
+            $this->entity('model', 'nhk:model:hermle', 'Hermle'),
+        ]), $this->types))->plan([
+            'subject_hints' => ['Hermle'],
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertContains('AMBIGUOUS_SUBJECT_HINT', array_column($plan['ambiguities'], 'code'));
+    }
+
+    public function test_existing_canonical_name_in_text_is_resolved_without_type_specific_lexicon(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:junghans', 'Junghans');
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'text' => 'Ghi chú về Junghans.',
+            'authority_intent' => ['mode' => 'PLAN'],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame('brand', $plan['reuse'][0]['entity_type']);
+        self::assertSame([], $plan['create_candidates']);
+    }
+
+    public function test_malformed_structured_delta_fails_closed(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle');
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand',
+                'name' => 'Hermle',
+                'payload_delta' => 'country=Germany',
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame([], $plan['update_candidates']);
+        self::assertContains('MALFORMED_AUTHORITY_PAYLOAD_DELTA', array_column($plan['blockers'], 'code'));
+    }
+
+    public function test_structured_uuid_type_mismatch_fails_closed_without_creating_other_type(): void
+    {
+        $canonicalId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $canonicalId);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'model',
+                'canonical_uuid' => $canonicalId,
+                'name' => 'Hermle',
+                'allow_create' => true,
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertContains('AUTHORITY_UUID_TYPE_MISMATCH', array_column($plan['blockers'], 'code'));
     }
 
     public function test_replanning_same_update_input_is_fingerprint_stable_for_apply_approved_plan(): void
@@ -458,9 +591,9 @@ final class AuthorityIntentPlannerTest extends TestCase
         );
     }
 
-    private function entity(string $type, string $key, string $name, array $payload = []): AuthorityEntity
+    private function entity(string $type, string $key, string $name, array $payload = [], ?string $canonicalId = null): AuthorityEntity
     {
-        return new AuthorityEntity(UuidCodec::newV7(), $type, $key, $name, 1, $payload, AuthorityState::ACTIVE, 1);
+        return new AuthorityEntity($canonicalId ?? UuidCodec::newV7(), $type, $key, $name, 1, $payload, AuthorityState::ACTIVE, 1);
     }
 }
 

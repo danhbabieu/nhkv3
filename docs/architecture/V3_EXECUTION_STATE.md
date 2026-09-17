@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Staging `/tri-thuc/` read-only runtime audit
+
+SCOPE: Traced the staging `/tri-thuc/` request without creating or changing
+WordPress data, categories, pages, posts, database rows, deployment state or
+production state.
+
+EVIDENCE: Local `HEAD=df6967464cc4d779196f20484d35acac7bb62cc1` contains
+`078640ee`. The staging Plugin Editor read-back contains the repaired
+`PublicEditorialRoutes` implementation and the staging theme read-back uses
+the native global WordPress loop. Read-only staging MCP initialize reports
+`source_revision=d45d33ceb29229013511bb3ee3fba2a3cc6d3572` and
+`build_identity=cf52f3207190ac7dbd36add13c990a367c70bcf6cf273558000a2651dd9f4432`,
+which is not the current checkout release identity. The staging health route
+is healthy, but does not expose request query telemetry. WP Admin read-back
+shows 38 published posts in category ID 4 and no native Page `tri-thuc` among
+the three Pages. `/tri-thuc/` renders the canonical heading but 0 cards and
+the empty branch; category archive requests redirect to `/tri-thuc/` in one
+hop, preserving page 2.
+
+ROOT_CAUSE_STATUS: The data source, Page collision and template handoff are
+not the cause. The confirmed failure boundary is an incoherent staging
+runtime/deployment identity: the runtime-reported release is not the
+checkout containing `078640ee`, while the filesystem read-back contains the
+new route source. The exact sub-mechanism (stale PHP opcode, stale runtime
+manifest, or mixed artifact) is not provable from the currently exposed
+read-only telemetry; no cache clear or service restart was attempted.
+
+VERIFICATION: Focused route/frontend contracts pass 63 tests / 721
+assertions; route/theme PHP lint and `git diff --check` pass. A front-controller
+request-level query trace remains blocked because the local WordPress
+integration database is unavailable and staging exposes no read-only query
+diagnostic. No staging/live mutation, deployment or push was performed.
+
 # Checkpoint — 2026-09-17 — Tri thức presentation archive route repair (LOCAL ONLY)
 
 SCOPE: Repaired the public `/tri-thuc/` presentation route without creating a
@@ -11789,3 +11822,35 @@ by the existing WordPress/MySQL integration bootstrap and acceptance gates
 `git diff --check` pass. No live completion is claimed.
 
 STATUS: `VIDEO_RELATION_RECONCILIATION_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Video relation KEEP and Knowledge retry hardening (LOCAL ONLY)
+
+SCOPE: Hardened the existing Video correction path without changing any live
+Video, Knowledge or Graph row. The relation-only Governance boundary now
+consults a normalized logical relation state before creating a stale
+replacement proposal. Active Video `about` relations stored in the historical
+inverse direction are reusable read-back state, not unsupported deltas or
+duplicate proposals. Desired Video relation Evidence is validated before any
+stale edge retirement so a rejected delta leaves the current Graph unchanged.
+
+KNOWLEDGE_RETRY: The existing read-only ClaimReusePolicy now accepts a bounded
+canonical-search seam and compares scoped supported claims using normalized
+fact features. Plugin wiring supplies up to 200 current canonical claims per
+candidate; it does not create, update, retire or merge Knowledge. The existing
+Capture idempotency and subject-scope gates remain in force.
+
+VERIFICATION: Focused Video/relation/Capture/Knowledge/public suite PASS — 119
+tests / 492 assertions. Unit suite excluding two unrelated user-edited test
+files, WordPress-global MediaBatch tests and the Authority planner edits PASS —
+1,686 tests / 8,334 assertions, with 14 warnings and 18 deprecations.
+`composer lint` and `git diff --check` pass. Full `composer test` remains
+environment/worktree blocked: two user-edited test files declare the same
+support class; WordPress/MySQL integration bootstrap variables are unset; and
+MediaBatch tests require WordPress globals. No live completion is claimed.
+
+BOUNDARY: No server access, Admin mutation, deployment, push, direct database
+write or live semantic mutation was performed. Existing unrelated local
+Authority test edits were preserved and are excluded from the implementation
+commit.
+
+STATUS: `VIDEO_RELATION_KEEP_AND_KNOWLEDGE_RETRY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

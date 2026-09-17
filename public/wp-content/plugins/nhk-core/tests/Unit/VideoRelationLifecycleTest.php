@@ -25,6 +25,55 @@ use PHPUnit\Framework\TestCase;
 
 final class VideoRelationLifecycleTest extends TestCase
 {
+    public function test_missing_evidence_fails_before_retiring_existing_relation(): void
+    {
+        $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
+        $wrongId = '66666666-6666-4666-8666-666666666666';
+        $correctId = '22222222-2222-4222-8222-222222222222';
+        $video = new Video($videoId, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Video');
+        $videos = new class($video) implements VideoRepository {
+            public function __construct(private Video $video) {}
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->video->canonicalId ? $this->video : null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $this->video = $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $this->video = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata, $video->thumbnailMediaId, $video->active, $expectedRevision + 1); }
+            public function list(bool $includeRetired = false): array { return [$this->video]; }
+        };
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('video', new FakeEndpointResolver('video', [$videoId]));
+        $endpoints->register('classification', new FakeEndpointResolver('classification', [$wrongId]));
+        $endpoints->register('variant', new FakeEndpointResolver('variant', [$correctId]));
+        $graph = new GraphService(new InMemoryGraphRepository(), $endpoints, new PredicateRegistry(), new InMemoryAuditSink());
+        $wrong = $graph->create(new NodeReference('video', $videoId), 'about', new NodeReference('classification', $wrongId));
+        $executor = new AuthorityProposalExecutor(
+            new AuthorityService(new InMemoryAuthorityRepository(), new EntityTypeRegistry()),
+            $graph,
+            null,
+            new VideoService($videos),
+        );
+
+        try {
+            $executor(new Proposal('video-evidence-order', $videoId, 'update', [
+                'canonical_id' => $videoId,
+                'title' => 'Corrected',
+                'metadata' => [
+                    'intake_version' => 1,
+                    'semantic_reconciliation_requested' => true,
+                    'semantic_attachments' => [[
+                        'target_type' => 'variant', 'target_uuid' => $correctId,
+                        'predicate' => 'about', 'evidence_refs' => [],
+                    ]],
+                ],
+            ], 'content', 1, 'dependencies', ProposalState::APPROVED, idempotencyKey: 'video-evidence-order', targetUuid: $videoId, entityType: 'video'));
+            self::fail('Expected missing evidence to fail closed.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('EVIDENCE_REFS_REQUIRED', $error->getMessage());
+        }
+
+        self::assertTrue($wrong->isActive());
+        self::assertCount(1, $graph->findOutgoing(new NodeReference('video', $videoId), 'about', 0, 10, false)['items']);
+    }
+
     public function test_inverse_relation_candidate_is_normalized_to_video_outbound_about_direction(): void
     {
         $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';

@@ -534,6 +534,44 @@ final class Plugin {
                 },
             );
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints, [$publicProjectionVerifier, 'verify']);
+            $relationState = static function (array $plan) use ($graphService): array {
+                $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+                $sourceType = strtolower(trim((string) ($payload['source_type'] ?? '')));
+                $sourceUuid = trim((string) ($payload['source_uuid'] ?? ''));
+                $targetType = strtolower(trim((string) ($payload['target_type'] ?? '')));
+                $targetUuid = trim((string) ($payload['target_uuid'] ?? ''));
+                $predicate = strtolower(trim((string) ($payload['predicate'] ?? '')));
+                if ($sourceType === '' || $sourceUuid === '' || $targetType === '' || $targetUuid === '' || $predicate === '') return [];
+                $source = new \NHK\Core\Domain\Graph\NodeReference($sourceType, $sourceUuid);
+                $target = new \NHK\Core\Domain\Graph\NodeReference($targetType, $targetUuid);
+                try {
+                    $edge = $graphService->findEdge($source, $predicate, $target);
+                    if ($edge !== null && $edge->isActive()) return ['status' => 'ACTIVE', 'canonical_id' => $edge->edge_uuid, 'revision' => $edge->revision, 'active' => true, 'direction' => 'SOURCE_TO_TARGET'];
+                    // Video's historical compatibility read-back permits the
+                    // same logical about relation to be stored target -> Video.
+                    // This is a read-only identity normalization; it never
+                    // creates an inverse edge or broadens other predicates.
+                    if ($predicate === 'about' && $sourceType === 'video') {
+                        $inverse = $graphService->findIncoming($source, 'about', 0, 200, true);
+                        foreach ((array) ($inverse['items'] ?? []) as $candidate) {
+                            if (!$candidate instanceof \NHK\Core\Domain\Graph\GraphEdge || !$candidate->isActive()) continue;
+                            $candidateSource = $candidate->source->reference;
+                            if ($candidateSource->endpoint_type === $targetType && $candidateSource->endpoint_key === $targetUuid) return ['status' => 'ACTIVE', 'canonical_id' => $candidate->edge_uuid, 'revision' => $candidate->revision, 'active' => true, 'direction' => 'INVERSE'];
+                        }
+                    }
+                    if ($predicate === 'about' && $targetType === 'video') {
+                        $forward = $graphService->findOutgoing($target, 'about', 0, 200, true);
+                        foreach ((array) ($forward['items'] ?? []) as $candidate) {
+                            if (!$candidate instanceof \NHK\Core\Domain\Graph\GraphEdge || !$candidate->isActive()) continue;
+                            $candidateTarget = $candidate->target->reference;
+                            if ($candidateTarget->endpoint_type === $sourceType && $candidateTarget->endpoint_key === $sourceUuid) return ['status' => 'ACTIVE', 'canonical_id' => $candidate->edge_uuid, 'revision' => $candidate->revision, 'active' => true, 'direction' => 'INVERSE'];
+                        }
+                    }
+                } catch (\Throwable) {
+                    return [];
+                }
+                return [];
+            };
             $relationProposalReconciliation = new RelationProposalReconciliationService(
                 $mcpGovernance,
                 $governance,
@@ -542,6 +580,7 @@ final class Plugin {
                 $automationResolver,
                 static fn (string $capability): bool => current_user_can($capability),
                 static fn (): string => function_exists('get_current_user_id') ? (string) get_current_user_id() : '0',
+                $relationState,
             );
             $clockTypeLifecycle = new \NHK\Core\Application\Authority\ClockTypeCreationLifecycle(
                 new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types),
@@ -550,7 +589,26 @@ final class Plugin {
             );
             add_filter('nhk_v3_clock_type_creation_lifecycle', fn (mixed $current): mixed => $current ?? $clockTypeLifecycle, 10, 1);
             $captureRepository = new WpdbCaptureRepository($wpdb);
-            $captureClaimReuse = new ClaimReusePolicy();
+            $captureClaimReuse = new ClaimReusePolicy(static function (array $candidate) use ($claims): array {
+                $subjectId = trim((string) ($candidate['subject_id'] ?? ''));
+                $scope = trim((string) ($candidate['scope'] ?? ''));
+                if ($subjectId === '' || $scope === '') return [];
+                $matches = [];
+                foreach (array_slice($claims->list(), 0, 200) as $claim) {
+                    $metadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
+                    if ((string) ($metadata['subject_id'] ?? '') !== $subjectId || (string) ($metadata['scope'] ?? '') !== $scope) continue;
+                    $matches[] = [
+                        'claim_id' => $claim->canonicalId,
+                        'claim_revision' => $claim->revision,
+                        'text' => $claim->claimText,
+                        'subject_id' => $subjectId,
+                        'scope' => $scope,
+                        'provenance' => (string) ($claim->provenance['origin'] ?? 'CANONICAL_KNOWLEDGE'),
+                        'evidence_status' => (string) ($metadata['evidence_status'] ?? ''),
+                    ];
+                }
+                return $matches;
+            });
             $videoEditorialResume = new \NHK\Core\Application\Video\VideoEditorialResumePlanner($videos, new VideoEditorialGenerator(), new VideoSeoProjection());
             $canonicalDependencies = new CanonicalDependencyValidator($claims, $sources, $evidence);
             $videoRelationCandidates = new VideoRelationCandidatePlanner(new PredicateRegistry(), $evidence, $claims, $sources, $canonicalDependencies);
@@ -602,23 +660,7 @@ final class Plugin {
                 proposalReconciliation: static function (\NHK\Core\Domain\Governance\Proposal $proposal, array $eligibility, array $control) use ($relationProposalReconciliation): array {
                     return $relationProposalReconciliation->reconcile($proposal, $control);
                 },
-                relationState: static function (array $plan) use ($graphService): array {
-                    $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
-                    $sourceType = trim((string) ($payload['source_type'] ?? ''));
-                    $sourceUuid = trim((string) ($payload['source_uuid'] ?? ''));
-                    $targetType = trim((string) ($payload['target_type'] ?? ''));
-                    $targetUuid = trim((string) ($payload['target_uuid'] ?? ''));
-                    $predicate = trim((string) ($payload['predicate'] ?? ''));
-                    if ($sourceType === '' || $sourceUuid === '' || $targetType === '' || $targetUuid === '' || $predicate === '') return [];
-                    try {
-                        $edge = $graphService->findEdge(
-                            new \NHK\Core\Domain\Graph\NodeReference($sourceType, $sourceUuid),
-                            $predicate,
-                            new \NHK\Core\Domain\Graph\NodeReference($targetType, $targetUuid),
-                        );
-                    } catch (\Throwable) { return []; }
-                    return $edge !== null && $edge->isActive() ? ['status' => 'ACTIVE', 'canonical_id' => $edge->edge_uuid, 'revision' => $edge->revision, 'active' => true] : [];
-                },
+                relationState: $relationState,
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

@@ -10,10 +10,64 @@ use NHK\Core\Contracts\Graph\EndpointRevisionReader;
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
 final class RelationProposalReconciliationServiceTest extends TestCase
 {
+    public function test_active_logical_relation_is_reused_without_creating_a_replacement_proposal(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $videoId = UuidCodec::newV7();
+        $variantId = UuidCodec::newV7();
+        $original = new Proposal($proposalId, $videoId, 'relation_create', [
+            'source_type' => 'video', 'source_uuid' => $videoId,
+            'target_type' => 'variant', 'target_uuid' => $variantId,
+            'predicate' => 'about', 'source_revision' => 1, 'target_revision' => 1,
+        ], 'content', null, 'dependency', ProposalState::APPROVED, entityType: 'relation');
+        $lifecycle = $this->createMock(GovernedLifecycle::class);
+        $lifecycle->expects(self::never())->method('createFromArguments');
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('video', new class($videoId) implements EndpointRevisionReader {
+            public function __construct(private string $id) {}
+            public function supports(string $endpoint_type): bool { return $endpoint_type === 'video'; }
+            public function exists(NodeReference $reference): bool { return $reference->endpoint_key === $this->id; }
+            public function normalize(NodeReference $reference): NodeReference { return $reference; }
+            public function revision(NodeReference $reference): ?int { return 2; }
+        });
+        $endpoints->register('variant', new class($variantId) implements EndpointRevisionReader {
+            public function __construct(private string $id) {}
+            public function supports(string $endpoint_type): bool { return $endpoint_type === 'variant'; }
+            public function exists(NodeReference $reference): bool { return $reference->endpoint_key === $this->id; }
+            public function normalize(NodeReference $reference): NodeReference { return $reference; }
+            public function revision(NodeReference $reference): ?int { return 3; }
+        });
+
+        $service = new RelationProposalReconciliationService(
+            $lifecycle,
+            new GovernanceService(new InMemoryProposalRepository()),
+            $endpoints,
+            static fn (): array => throw new \LogicException('active relation must not apply'),
+            new GovernanceAutomationPolicyResolver(['relation'], new class implements AutomationPolicyStorage {
+                public function read(): array { return ['relation' => 'AUTO_PUBLISH']; }
+                public function write(array $policies): void {}
+            }),
+            static fn (string $capability): bool => true,
+            static fn (): string => 'capture-reconciler',
+            static fn (array $plan): array => [
+                'status' => 'ACTIVE', 'canonical_id' => 'edge-1', 'revision' => 4,
+                'direction' => 'INVERSE', 'logical_identity' => $plan['logical_identity'] ?? null,
+            ],
+        );
+
+        $result = $service->reconcile($original);
+
+        self::assertSame('REUSED_VERIFIED', $result['status']);
+        self::assertSame($proposalId, $result['proposal_id']);
+        self::assertSame('edge-1', $result['canonical_id']);
+        self::assertTrue($result['idempotent']);
+    }
+
     public function test_stale_relation_is_rebuilt_with_fresh_endpoint_revisions_before_apply(): void
     {
         $proposalId = UuidCodec::newV7();

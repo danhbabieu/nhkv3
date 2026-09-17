@@ -45,6 +45,24 @@ final class McpToolCatalog
                     'type' => 'object',
                     'properties' => [
                         'mode' => ['type' => 'string', 'enum' => ['PLAN', 'APPLY_APPROVED_PLAN']],
+                        'requests' => [
+                            'type' => 'array',
+                            'minItems' => 1,
+                            'maxItems' => 20,
+                            'items' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'entity_type' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 64],
+                                    'canonical_uuid' => self::uuidField(),
+                                    'name' => ['type' => 'string', 'maxLength' => 500],
+                                    'family' => ['type' => 'string', 'maxLength' => 64],
+                                    'payload_delta' => ['type' => 'object'],
+                                    'allow_create' => ['type' => 'boolean'],
+                                ],
+                                'required' => ['entity_type'],
+                                'additionalProperties' => false,
+                            ],
+                        ],
                         'approved_plan_fingerprint' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'],
                         'approved_candidate_ids' => ['type' => 'array', 'minItems' => 1, 'items' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191]],
                     ],

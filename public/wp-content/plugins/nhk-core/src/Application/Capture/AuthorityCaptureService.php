@@ -93,7 +93,9 @@ final class AuthorityCaptureService
             && (($previous['result']['status'] ?? '') === 'APPLIED' || $record->stage === CaptureStage::AUTHORITY_APPLIED->value)) return $record;
         $planningInput = is_array($record->context['planning_input'] ?? null) ? $record->context['planning_input'] : ['text' => (string) ($record->context['raw_input'] ?? ''), 'purpose' => $purpose->value];
         $planningInput['purpose'] = $purpose->value;
-        $planningInput['authority_intent'] = ['mode' => 'PLAN'];
+        $planningIntent = is_array($planningInput['authority_intent'] ?? null) ? $planningInput['authority_intent'] : [];
+        $planningIntent['mode'] = 'PLAN';
+        $planningInput['authority_intent'] = $planningIntent;
         $plan = ($this->planner)($planningInput, $record);
         $currentFingerprint = (string) ($plan['plan_fingerprint'] ?? '');
         if ($currentFingerprint === '' || !hash_equals($approvedFingerprint, $currentFingerprint)) throw new \InvalidArgumentException('PLAN_REAPPROVAL_REQUIRED');

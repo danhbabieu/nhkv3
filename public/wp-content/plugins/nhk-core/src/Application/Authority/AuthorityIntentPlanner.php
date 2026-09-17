@@ -18,9 +18,11 @@ final class AuthorityIntentPlanner
     public function plan(array $input, array $captureContext = []): array
     {
         $text = trim((string) ($input['text'] ?? $input['content'] ?? ''));
-        $requests = $this->requests($text, $input);
-        $plan = ['reuse' => [], 'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [], 'rejected_or_composed_facets' => [], 'ambiguities' => [], 'blockers' => []];
+        $blockers = [];
+        $requests = $this->requests($text, $input, $blockers);
+        $plan = ['reuse' => [], 'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [], 'rejected_or_composed_facets' => [], 'ambiguities' => [], 'blockers' => $blockers];
         foreach ($requests as $request) $this->resolveRequest($request, $plan);
+        $this->resolveSubjectHints((array) ($input['subject_hints'] ?? []), $plan);
         $this->relationRequests($text, $plan);
         if ($this->contains($text, 'đồng hồ để bàn') && $this->contains($text, 'pháp')) $plan['rejected_or_composed_facets'][] = ['reason' => 'COMPOSED_FACETS_NOT_NEW_IDENTITY', 'requested' => 'Đồng hồ để bàn Pháp', 'components' => ['table-clock', 'origin.france']];
         if ($this->contains($text, 'ly úp') || $this->contains($text, 'glass dome')) $plan['ambiguities'][] = ['code' => 'GLASS_DOME_SEMANTIC_REVIEW_REQUIRED', 'text' => 'Ly úp / glass dome phải được phân loại theo vocabulary/evidence; không tự tạo type, model hoặc subtype.'];
@@ -36,21 +38,72 @@ final class AuthorityIntentPlanner
     }
 
     /** @return list<array<string,mixed>> */
-    private function requests(string $text, array $input): array
+    private function requests(string $text, array $input, array &$blockers): array
     {
-        $requests = $this->structuredRequests($input);
+        $hasStructuredRequest = $this->hasStructuredRequest($input);
+        $requests = $this->structuredRequests($input, $blockers);
+        if ($hasStructuredRequest) return $this->uniqueRequests($requests);
+
+        return $this->textRequests($text);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function textRequests(string $text): array
+    {
+        $requests = [];
         $queryOnly = preg_match('/(?:đã\s+có\s+chưa|có\s+cần\s+tạo|có\s+phải\s+tạo|đã\s+tồn\s+tại|có\s+không)/iu', $text) === 1;
         $allowCreate = !$queryOnly && preg_match('/\b(?:tạo|thêm|create|new)\b/iu', $text) === 1;
         if (preg_match('/tạo\s+thương hiệu\s+(.+?)(?:\s+(?:và|rồi)\s+(?:một\s+)?bài\b|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'brand', 'name' => trim($match[1]), 'allow_create' => true];
         if (preg_match('/(?:tạo|thêm)\s+loại\s+(.+?)(?:\s+(?:thuộc|nằm\s+dưới)\s+|[.!?]|$)/iu', $text, $match) === 1) $requests[] = ['type' => 'classification', 'name' => trim($match[1]), 'family' => 'clock_type', 'allow_create' => true];
-        if ($this->contains($text, 'đồng hồ để bàn')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ để bàn', 'family' => 'clock_type', 'allow_create' => $allowCreate];
-        if ($this->contains($text, 'đồng hồ cúc cu')) $requests[] = ['type' => 'classification', 'name' => 'Đồng hồ cúc cu', 'family' => 'clock_type', 'allow_create' => $allowCreate];
-        if ($this->contains($text, 'mantel clock')) $requests[] = ['type' => 'classification', 'name' => 'Mantel Clock', 'family' => 'clock_type', 'allow_create' => $allowCreate];
-        if ($this->contains($text, 'pháp') || $this->contains($text, 'france')) $requests[] = ['type' => 'classification', 'name' => 'Pháp', 'family' => 'origin', 'allow_create' => $allowCreate];
-        if ($this->contains($text, 'hermle') && !array_filter($requests, static fn (array $item): bool => $item['type'] === 'brand' && strtolower($item['name']) === 'hermle')) $requests[] = ['type' => 'brand', 'name' => 'Hermle', 'allow_create' => $allowCreate];
-        foreach ((array) ($input['subject_hints'] ?? []) as $hint) if (is_string($hint) && trim($hint) !== '') $requests[] = ['type' => 'classification', 'name' => trim($hint), 'family' => 'clock_type', 'allow_create' => $allowCreate];
+        foreach ($this->existingNamedRequests($text, $allowCreate) as $request) $requests[] = $request;
+        foreach ($this->relationEndpointRequests($text, $allowCreate) as $request) $requests[] = $request;
+        if ($queryOnly && preg_match('/(?:^|\b)đồng hồ\s+(.+?)\s+(?:đã\s+có\s+chưa|đã\s+tồn\s+tại|có\s+không)\b/iu', $text, $match) === 1) {
+            $requests[] = ['type' => 'classification', 'name' => trim($match[1]), 'family' => 'clock_type', 'allow_create' => false];
+        }
         foreach ($this->genericTypedRequests($text, $allowCreate) as $request) $requests[] = $request;
         return $this->uniqueRequests($requests);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function existingNamedRequests(string $text, bool $allowCreate): array
+    {
+        $normalizedText = $this->normalize($text);
+        $requests = [];
+        foreach ($this->types->all() as $definition) {
+            foreach ($this->authority->listByType($definition->type) as $entity) {
+                $name = trim($entity->canonicalName);
+                if ($name === '' || mb_strlen($name) < 3 || !str_contains($normalizedText, $this->normalize($name))) continue;
+                $requests[] = [
+                    'type' => $entity->entityType,
+                    'name' => $name,
+                    'family' => (string) ($entity->payload['family'] ?? ''),
+                    'allow_create' => $allowCreate,
+                ];
+            }
+        }
+        return $requests;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function relationEndpointRequests(string $text, bool $allowCreate): array
+    {
+        if (preg_match('/(.+?)\s+(?:thuộc|nằm\s+dưới)\s+(.+?)(?:[.!?]|$)/iu', $text, $match) !== 1) return [];
+        $sourceName = trim((string) preg_replace('/^(?:tạo|thêm|create)\s+(?:loại\s+)?/iu', '', trim($match[1])));
+        $targetName = trim((string) preg_replace('/^(?:loại)\s+/iu', '', trim($match[2])));
+        if ($sourceName === '' || $targetName === '') return [];
+        return [
+            ['type' => 'classification', 'name' => $sourceName, 'family' => 'clock_type', 'allow_create' => $allowCreate],
+            ['type' => 'classification', 'name' => $targetName, 'family' => 'clock_type', 'allow_create' => $allowCreate],
+        ];
+    }
+
+    private function hasStructuredRequest(array $input): bool
+    {
+        $intent = is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [];
+        foreach (['requests', 'entity_type', 'type', 'canonical_uuid', 'uuid', 'name', 'canonical_name'] as $key) {
+            if (array_key_exists($key, $intent) || array_key_exists($key, $input)) return true;
+        }
+        return array_key_exists('authority_requests', $input);
     }
 
     /**
@@ -60,22 +113,37 @@ final class AuthorityIntentPlanner
      *
      * @return list<array<string,mixed>>
      */
-    private function structuredRequests(array $input): array
+    private function structuredRequests(array $input, array &$blockers): array
     {
         $intent = is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [];
+        $hasRaw = array_key_exists('requests', $intent) || array_key_exists('authority_requests', $input);
         $raw = $intent['requests'] ?? $input['authority_requests'] ?? [];
-        if (!is_array($raw) || !array_is_list($raw)) $raw = [];
+        if ($hasRaw && (!is_array($raw) || !array_is_list($raw))) {
+            $blockers[] = ['code' => 'MALFORMED_AUTHORITY_REQUESTS'];
+            $raw = [];
+        }
         if ($raw === [] && (isset($intent['entity_type']) || isset($intent['type']) || isset($intent['canonical_uuid']) || isset($intent['name']))) $raw = [$intent];
         if ($raw === [] && (isset($input['entity_type']) || isset($input['type']) || isset($input['canonical_uuid']) || isset($input['name']))) $raw = [$input];
 
         $requests = [];
         foreach ($raw as $item) {
-            if (!is_array($item)) continue;
+            if (!is_array($item)) {
+                $blockers[] = ['code' => 'MALFORMED_AUTHORITY_REQUEST'];
+                continue;
+            }
             $type = trim((string) ($item['entity_type'] ?? $item['type'] ?? ''));
             $name = trim((string) ($item['name'] ?? $item['canonical_name'] ?? ''));
-            if ($type === '' && $name === '') continue;
+            if ($type === '' && $name === '') {
+                $blockers[] = ['code' => 'MALFORMED_AUTHORITY_REQUEST'];
+                continue;
+            }
+            $deltaKey = null;
+            foreach (['payload_delta', 'fields', 'desired_payload', 'payload'] as $key) if (array_key_exists($key, $item)) { $deltaKey = $key; break; }
             $delta = $item['payload_delta'] ?? $item['fields'] ?? $item['desired_payload'] ?? $item['payload'] ?? [];
-            if (!is_array($delta)) $delta = [];
+            if ($deltaKey !== null && (!is_array($delta) || ($delta !== [] && array_is_list($delta)))) {
+                $blockers[] = ['code' => 'MALFORMED_AUTHORITY_PAYLOAD_DELTA', 'entity_type' => $type];
+                continue;
+            }
             if ($delta === []) {
                 $controlKeys = array_flip(['mode', 'requests', 'entity_type', 'type', 'name', 'canonical_name', 'canonical_uuid', 'uuid', 'stable_key', 'family', 'allow_create', 'payload_delta', 'fields', 'desired_payload', 'payload']);
                 $explicitFields = array_diff_key($item, $controlKeys);
@@ -167,7 +235,31 @@ final class AuthorityIntentPlanner
             ? ''
             : $this->stableKeys->preview($type, $name, ['family' => $stableKeyFamily]);
         $matches = [];
-        if (UuidCodec::isValid((string) ($request['canonical_uuid'] ?? ''))) { $entity = $this->authority->findByCanonicalId((string) $request['canonical_uuid']); if ($this->eligibleMatch($entity, $type, $family)) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'uuid_exact']; }
+        $canonicalUuid = trim((string) ($request['canonical_uuid'] ?? ''));
+        if ($canonicalUuid !== '') {
+            if (!UuidCodec::isValid($canonicalUuid)) {
+                $plan['blockers'][] = ['code' => 'INVALID_AUTHORITY_UUID', 'entity_type' => $type, 'canonical_uuid' => $canonicalUuid];
+                return;
+            }
+            $entityById = $this->authority->findByCanonicalId($canonicalUuid);
+            if (!$entityById instanceof AuthorityEntity) {
+                $plan['blockers'][] = ['code' => 'AUTHORITY_UUID_NOT_FOUND', 'entity_type' => $type, 'canonical_uuid' => $canonicalUuid];
+                return;
+            }
+            if ($entityById->entityType !== $type) {
+                $plan['blockers'][] = ['code' => 'AUTHORITY_UUID_TYPE_MISMATCH', 'entity_type' => $type, 'canonical_uuid' => $canonicalUuid, 'actual_entity_type' => $entityById->entityType];
+                return;
+            }
+            if (!$entityById->active()) {
+                $plan['blockers'][] = ['code' => 'RETIRED_TARGET_REQUIRES_EXPLICIT_REACTIVATION', 'entity_type' => $type, 'canonical_uuid' => $canonicalUuid];
+                return;
+            }
+            if (!$this->eligibleMatch($entityById, $type, $family)) {
+                $plan['blockers'][] = ['code' => 'AUTHORITY_UUID_SCOPE_MISMATCH', 'entity_type' => $type, 'canonical_uuid' => $canonicalUuid, 'family' => $family];
+                return;
+            }
+            $matches[$entityById->canonicalId] = ['entity' => $entityById, 'match' => 'uuid_exact'];
+        }
         $entity = $stableKey !== '' ? $this->authority->findByStableKey($type, $stableKey) : null; if ($this->eligibleMatch($entity, $type, $family)) $matches[$entity->canonicalId] = ['entity' => $entity, 'match' => 'stable_key_exact'];
         foreach ($this->authority->listByType($type) as $candidate) {
             if (!$this->eligibleMatch($candidate, $type, $family)) continue;
@@ -177,7 +269,8 @@ final class AuthorityIntentPlanner
         if (count($matches) > 1) { $plan['ambiguities'][] = ['code' => 'IDENTITY_CONFLICT', 'entity_type' => $type, 'name' => $name, 'candidate_ids' => array_keys($matches)]; return; }
         if (count($matches) === 1) {
             $match = array_values($matches)[0];
-            if (!$this->updateCandidate($plan, $match['entity'], $payloadDelta)) $this->reuse($plan, $match['entity'], $match['match'], $family, $payloadDelta !== [] ? 'NOOP_VALUES_MATCH' : null);
+            $updated = $this->updateCandidate($plan, $match['entity'], $payloadDelta);
+            $this->reuse($plan, $match['entity'], $match['match'], $family, !$updated && $payloadDelta !== [] ? 'NOOP_VALUES_MATCH' : null);
             return;
         }
         $retired = $this->retiredExact($type, $stableKey, $name);
@@ -240,6 +333,47 @@ final class AuthorityIntentPlanner
     {
         $delta = $request['payload_delta'] ?? [];
         return is_array($delta) && !array_is_list($delta) ? $delta : [];
+    }
+
+    /** @param list<mixed> $hints @param array<string,mixed> $plan */
+    private function resolveSubjectHints(array $hints, array &$plan): void
+    {
+        foreach ($hints as $rawHint) {
+            if (!is_string($rawHint)) continue;
+            $hint = trim($rawHint);
+            if ($hint === '') continue;
+            $matches = [];
+            if (UuidCodec::isValid($hint)) {
+                $entity = $this->authority->findByCanonicalId($hint);
+                if ($entity instanceof AuthorityEntity) $matches[$entity->canonicalId] = $entity;
+            } else {
+                foreach ($this->types->all() as $definition) {
+                    foreach ($this->authority->listByType($definition->type) as $entity) {
+                        $exactName = $this->normalize($entity->canonicalName) === $this->normalize($hint);
+                        $exactAlias = in_array($this->normalize($hint), array_map(fn (mixed $alias): string => is_string($alias) ? $this->normalize($alias) : '', (array) ($entity->payload['aliases'] ?? [])), true);
+                        if ($exactName || $exactAlias) $matches[$entity->canonicalId] = $entity;
+                    }
+                }
+            }
+            if (count($matches) > 1) {
+                $plan['ambiguities'][] = ['code' => 'AMBIGUOUS_SUBJECT_HINT', 'hint' => $hint, 'candidate_ids' => array_keys($matches), 'review_only' => true];
+                continue;
+            }
+            if (count($matches) === 1) {
+                $entity = array_values($matches)[0];
+                if ($entity->active()) $this->reuseIfAbsent($plan, $entity, 'subject_hint_exact');
+                else $plan['ambiguities'][] = ['code' => 'RETIRED_SUBJECT_HINT', 'hint' => $hint, 'canonical_uuid' => $entity->canonicalId, 'review_only' => true];
+                continue;
+            }
+            $plan['ambiguities'][] = ['code' => 'SUBJECT_HINT_NOT_FOUND', 'hint' => $hint, 'review_only' => true];
+        }
+    }
+
+    /** @param array<string,mixed> $plan */
+    private function reuseIfAbsent(array &$plan, AuthorityEntity $entity, string $match): void
+    {
+        foreach ((array) ($plan['reuse'] ?? []) as $candidate) if (($candidate['canonical_uuid'] ?? '') === $entity->canonicalId) return;
+        $this->reuse($plan, $entity, $match, (string) ($entity->payload['family'] ?? ''));
     }
     private function retiredExact(string $type, string $key, string $name): ?AuthorityEntity { foreach ($this->authority->listByType($type, true) as $entity) if (!$entity->active() && ($entity->stableKey === $key || $this->normalize($entity->canonicalName) === $this->normalize($name))) return $entity; return null; }
     /** @return list<array<string,mixed>> */
