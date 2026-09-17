@@ -12343,3 +12343,47 @@ LIVE_STATUS: No deployment, SSH, server edit, push or live/staging mutation was
 performed. Ready for the user to push/pull and run the approved acceptance.
 
 STATUS: `VIDEO_CAS_REVISION_LOCAL_READY / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-17 — Media Representative Binding acceptance boundary (LOCAL ONLY)
+
+SCOPE: Continued Media Representative Binding and typed Capture
+`MEDIA_ENRICHMENT` verification from the latest local code. No staging or
+production semantic mutation, deployment, push, direct database write or V2
+write was performed.
+
+ROOT_CAUSES: A duplicate operation-create race could return an existing
+MediaBindingOperation with a different request fingerprint; the service then
+continued into usage mutation without rechecking the returned receipt. The
+typed media Capture path also accepted a batch `COMPLETE` status without
+requiring every binding receipt's final read-back to be verified, and its
+completion projection treated `COMPLETE` as partial because it only recognized
+the legacy `RECONCILED` label.
+
+FIXES: MediaBindingService now rechecks idempotency key and fingerprint after
+repository create and returns a conflict before usage mutation. The Capture
+typed path uses the MediaBindingPort, skips NLP/Claims/Graph/Article owners,
+requires per-binding `COMPLETE` plus verified media/usage read-back, and maps
+the service's `COMPLETE` receipt into completion state without fabricating a
+binding. Media completion can consume explicit frontend verification from the
+final read-back. OperationScopedStagingGuard now requires a verified exact
+Capture acceptance scope: operation family, exact Media UUID, exact target
+type/UUID, canonical writer, approval verifier and no fuzzy locators; it
+blocks missing approval/scope and production. The default runtime has no
+staging verifier configured, so both governed apply and direct
+MediaBindingService paths remain fail-closed until a separately approved
+immutable verifier is deployed. Capture typed bindings now propagate their
+capture scope into the same direct-service guard.
+
+REGRESSIONS: Added coverage for idempotency create races, typed Capture
+fast-path owner isolation and one binding-port call, unverified receipt
+blocking, exact scope mismatch (Media/target/operation), direct-writer and
+fuzzy rejection, missing approval, production rejection, canonical scope
+acceptance and the direct MediaBindingService fail-closed path. Focused
+selection passes 80 tests / 725 assertions. Changed-file
+PHP lint passes. Full NHK Unit reaches 1,776 tests / 8,772 assertions with one
+pre-existing `DemoCutoverCliContractTest` failure (`REMOTE_DEPLOYMENT_FAILED`
+versus the test's missing-config expectation), plus existing warnings and
+deprecations. Integration/runtime acceptance is environment-blocked: required
+WordPress/MySQL variables and `NHK_WP_TEST_PATH` are unset.
+
+STATUS: `MEDIA_BINDING_SCOPE_LOCAL_READY / FULL_UNIT_PREEXISTING_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.

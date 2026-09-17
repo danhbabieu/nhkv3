@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
-use NHK\Core\Application\Governance\{ControlledApplyOperationRegistry, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernedSemanticIngestOrchestrator, OperationScopedStagingGuard};
+use NHK\Core\Application\Governance\{ControlledApplyOperationRegistry, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernedSemanticIngestOrchestrator, MediaBindingStagingGuard, OperationScopedStagingGuard};
 use NHK\Core\Domain\Authority\{CanonicalEntityTypeCatalog, EntityTypeRegistry};
 use NHK\Core\Domain\Governance\{AutomationMode, Proposal, ProposalState};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle};
@@ -90,6 +90,21 @@ final class GovernanceAutomationExpansionTest extends TestCase
             self::fail('Production semantic apply must be rejected.');
         } catch (\RuntimeException $error) {
             self::assertSame('STAGING_PRODUCTION_FORBIDDEN', $error->getMessage());
+        }
+    }
+
+    public function test_direct_media_binding_path_is_fail_closed_without_the_same_capture_scope(): void
+    {
+        $guard = new MediaBindingStagingGuard(static fn (): string => 'staging');
+        try {
+            $guard([
+                'capture_id' => UuidCodec::newV7(),
+                'media' => ['id' => UuidCodec::newV7()],
+                'target' => ['type' => 'classification', 'id' => UuidCodec::newV7()],
+            ]);
+            self::fail('Direct MediaBindingService staging calls require a verified scope.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('STAGING_SCOPE_REQUIRED', $error->getMessage());
         }
     }
 

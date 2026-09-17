@@ -586,7 +586,7 @@ final class EditorialCaptureCoordinator
         $receipts = $record->phaseReceipts;
         $this->beginPhase('MEDIA_RECONCILED');
         $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED');
-        $media = $this->mediaBindingService?->bindMany((array) ($input['media_bindings'] ?? []), $record->captureId . ':media-binding', $assets) ?? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []];
+        $media = $this->mediaBindingService?->bindMany((array) ($input['media_bindings'] ?? []), $record->captureId . ':media-binding', $assets, ['capture_id' => $record->captureId, 'staging_acceptance' => $input['staging_acceptance'] ?? null]) ?? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []];
         $this->assertTypedMediaBindingReceipt($media);
         $diagnostics = array_replace($record->diagnostics, ['media_enrichment' => $this->withoutBody($media)]);
         $record = $this->save($record, 'MEDIA_RECONCILED', $assets, $diagnostics, $record->phaseReceipts, 'MEDIA_RECONCILED', null, null, ($media['status'] ?? '') === 'COMPLETE' ? 'COMPLETED' : 'PARTIAL');

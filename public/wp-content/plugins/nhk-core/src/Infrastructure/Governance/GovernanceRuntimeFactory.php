@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Authority\{AuthorityService, SemanticMergeService};
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
-use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, OperationScopedStagingGuard, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
+use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
@@ -104,9 +104,10 @@ final class GovernanceRuntimeFactory
             return ['status' => 'available', 'claims' => array_values($items), 'classification_revision' => $classification->revision];
         };
         $collectorExecutor = new CollectorFacetMaintenanceExecutor($knowledgeService, $collectorBranchReader);
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb));
+        $environment = static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); };
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment));
         $stagingGuard = new OperationScopedStagingGuard(
-            static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },
+            $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
         );
         $controlledApply = new ControlledApplyService(

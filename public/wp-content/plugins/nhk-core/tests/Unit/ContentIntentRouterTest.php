@@ -503,7 +503,7 @@ final class CountingMediaBindingPort implements MediaBindingPort
 
     public function __construct(private array $result) {}
 
-    public function bindMany(array $bindings, string $idempotencyKey, array $assets = []): array
+    public function bindMany(array $bindings, string $idempotencyKey, array $assets = [], array $context = []): array
     {
         ++$this->calls;
         return $this->result;

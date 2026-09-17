@@ -24,11 +24,13 @@ final class MediaBindingService implements MediaBindingPort
         private EntityTypeRegistry $types,
         private ?MediaBindingOperationRepository $operations = null,
         private RepresentativeEligibilityRegistry $eligibility = new RepresentativeEligibilityRegistry(),
+        private $stagingGuard = null,
     ) {}
 
     /** @param array<string,mixed> $request @return array<string,mixed> */
     public function bind(array $request): array
     {
+        if (is_callable($this->stagingGuard)) ($this->stagingGuard)($request);
         $normalized = $this->normalizeRequest($request);
         $key = (string) $normalized['idempotency_key'];
         $fingerprint = $this->fingerprint($normalized);
@@ -83,7 +85,7 @@ final class MediaBindingService implements MediaBindingPort
     }
 
     /** @param list<array<string,mixed>> $bindings @param list<array<string,mixed>> $assets @return array<string,mixed> */
-    public function bindMany(array $bindings, string $idempotencyKey, array $assets = []): array
+    public function bindMany(array $bindings, string $idempotencyKey, array $assets = [], array $context = []): array
     {
         if (!array_is_list($bindings) || $bindings === []) throw new MediaException('MEDIA_BINDINGS_INVALID');
         $results = [];
@@ -99,6 +101,7 @@ final class MediaBindingService implements MediaBindingPort
             $item = $binding;
             $item['media'] = ['id' => $mediaId];
             $item['idempotency_key'] = trim((string) ($binding['idempotency_key'] ?? '')) ?: $idempotencyKey . ':' . $index;
+            $item += $context;
             $results[] = $this->bind($item);
         }
         return ['status' => 'COMPLETE', 'bindings' => $results, 'media_ids' => array_values(array_unique(array_map(static fn (array $item): string => (string) ($item['media_id'] ?? ''), $results)))];
