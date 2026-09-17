@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
-use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, MediaUsageRoleRegistry};
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoStateRegistry, MediaUsage};
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 /**
@@ -55,8 +55,7 @@ final class PublicMediaGalleryQuery
         if (!$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         $image = $this->firstImage($media);
         $usages = $this->usagesForMedia($media);
-        $contextual = $this->preferredUsage($usages);
-        $metadata = $this->metadataFor($contextual, $media);
+        $metadata = $this->metadataFor($media);
         $articleUrl = $this->articleLinks?->firstPublished($usages);
         return array_merge($metadata, [
             'image_url' => $image['image_url'] ?? null,
@@ -65,8 +64,7 @@ final class PublicMediaGalleryQuery
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
             'article_url' => $articleUrl,
-            'url' => $image['image_url'] ?? null,
-        ], $image === null ? ['state' => 'MISSING'] : []);
+        ], $image === null ? ['state' => MediaSeoStateRegistry::MISSING] : []);
     }
 
     /** @return array{image_url:string,width:?int,height:?int}|null */
@@ -105,31 +103,10 @@ final class PublicMediaGalleryQuery
         return array_values(array_filter($this->usages->listByMediaId($media->canonicalId), static fn (mixed $usage): bool => $usage instanceof \NHK\Core\Domain\Media\MediaUsage));
     }
 
-    /** @param list<MediaUsage> $usages */
-    private function preferredUsage(array $usages): ?MediaUsage
-    {
-        foreach ([MediaUsageRoleRegistry::REPRESENTATIVE, MediaUsageRoleRegistry::FEATURED_PRIMARY] as $role) {
-            foreach ($usages as $usage) if ($usage->role === $role) return $usage;
-        }
-        return $usages[0] ?? null;
-    }
-
     /** @return array{title:string,alt:string,caption:string,metadata_source:string} */
-    private function metadataFor(?MediaUsage $usage, Media $media): array
+    private function metadataFor(Media $media): array
     {
-        $values = [];
-        $usedUsage = false;
-        foreach (['title', 'alt', 'caption'] as $field) {
-            $usageValue = $usage === null ? '' : ($field === 'alt' ? $usage->altText : ($field === 'caption' ? $usage->caption : $usage->title));
-            $value = trim((string) $usageValue);
-            if ($value !== '') {
-                $usedUsage = true;
-                $values[$field] = $value;
-            } else {
-                $values[$field] = $media->canonicalName;
-            }
-        }
-        return array_merge($values, ['metadata_source' => $usedUsage ? ($usage?->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'SUBJECT_REPRESENTATIVE' : 'MEDIA_USAGE') : 'MEDIA_NEUTRAL']);
+        return ['title' => $media->canonicalName, 'alt' => $media->canonicalName, 'caption' => $media->canonicalName, 'metadata_source' => 'MEDIA_NEUTRAL'];
     }
 
     private function shorten(string $value): string

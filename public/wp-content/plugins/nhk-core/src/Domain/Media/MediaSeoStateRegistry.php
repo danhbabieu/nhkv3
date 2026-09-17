@@ -15,6 +15,7 @@ final class MediaSeoStateRegistry
     public const LOW_RESOLUTION = 'MEDIA_LOW_RESOLUTION';
     public const RELATION_UNVERIFIED = 'MEDIA_RELATION_UNVERIFIED';
     public const RIGHTS_UNVERIFIED = 'MEDIA_RIGHTS_UNVERIFIED';
+    public const MISSING = 'MISSING';
 
     /** @return list<string> */
     public static function all(): array
@@ -28,6 +29,7 @@ final class MediaSeoStateRegistry
             self::LOW_RESOLUTION,
             self::RELATION_UNVERIFIED,
             self::RIGHTS_UNVERIFIED,
+            self::MISSING,
         ];
     }
 

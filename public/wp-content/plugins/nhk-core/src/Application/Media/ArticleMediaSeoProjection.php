@@ -13,15 +13,23 @@ final class ArticleMediaSeoProjection
     /** @return array<string,mixed> */
     public function forPost(string $endpointKey): array
     {
-        $usages = $this->usages->listByEndpoint('wp_post', $endpointKey, MediaUsageRoleRegistry::FEATURED_PRIMARY);
+        $expectedPlacement = 'article:' . $endpointKey . ':' . MediaUsageRoleRegistry::FEATURED_PRIMARY;
+        $usages = array_values(array_filter(
+            $this->usages->listByEndpoint('wp_post', $endpointKey, MediaUsageRoleRegistry::FEATURED_PRIMARY),
+            static fn (mixed $usage): bool => $usage instanceof \NHK\Core\Domain\Media\MediaUsage
+                && $usage->endpointType === 'wp_post'
+                && $usage->endpointKey === $endpointKey
+                && $usage->role === MediaUsageRoleRegistry::FEATURED_PRIMARY
+                && ($usage->placementKey === '' || $usage->placementKey === $expectedPlacement)
+        ));
         if (count($usages) !== 1) return $this->missing(MediaSeoStateRegistry::INCOMPLETE_FEATURED);
         $usage = $usages[0];
-        $media = $this->media->findByCanonicalId($usages[0]->mediaId);
-        if ($media === null || !$media->active || $media->isSystemPlaceholder()) return $this->missing(MediaSeoStateRegistry::PLACEHOLDER, $usage);
+        $media = $this->media->findByCanonicalId($usage->mediaId);
+        if ($media === null || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return $this->missing(MediaSeoStateRegistry::MISSING, $usage, $media);
         $assets = $this->assets->listByMediaId($media->canonicalId);
         $asset = (new PublicMediaAssetSelector())->canonical($assets);
         if (!$asset instanceof MediaAsset) {
-            return $this->missing('MISSING', $usage, $media);
+            return $this->missing(MediaSeoStateRegistry::MISSING, $usage, $media);
         }
         $representation = [];
         if ($this->wordpress !== null) {
@@ -47,8 +55,8 @@ final class ArticleMediaSeoProjection
         foreach ($fields as $field) {
             $candidates = [
                 ['value' => $field === 'alt' ? $usage->altText : ($field === 'caption' ? $usage->caption : $usage->title), 'source' => 'MEDIA_USAGE'],
-                ['value' => $attachment[$field] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
                 ['value' => $media->canonicalName, 'source' => 'MEDIA_NEUTRAL'],
+                ['value' => $attachment[$field] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
             ];
             foreach ($candidates as $candidate) {
                 $value = trim((string) $candidate['value']);
@@ -69,6 +77,6 @@ final class ArticleMediaSeoProjection
     private function missing(string $state, ?\NHK\Core\Domain\Media\MediaUsage $usage = null, ?\NHK\Core\Domain\Media\Media $media = null): array
     {
         $title = $usage !== null && trim($usage->title) !== '' ? $usage->title : ($media?->canonicalName ?? '');
-        return ['state' => $state, 'eligible' => false, 'url' => null, 'image_url' => null, 'title' => $title, 'alt' => $usage?->altText ?? '', 'caption' => $usage?->caption ?? '', 'metadata_source' => $usage !== null ? 'MEDIA_USAGE' : 'MISSING'];
+        return ['state' => $state, 'eligible' => false, 'url' => null, 'image_url' => null, 'title' => $title, 'alt' => $usage?->altText ?? '', 'caption' => $usage?->caption ?? '', 'metadata_source' => $usage !== null && ($usage->title !== '' || $usage->altText !== '' || $usage->caption !== '') ? 'MEDIA_USAGE' : 'MISSING'];
     }
 }
