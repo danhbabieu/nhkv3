@@ -137,6 +137,53 @@ final class MediaBindingServiceTest extends TestCase
         self::assertSame('REVIEW_REQUIRED', $result['status']);
     }
 
+    public function test_governed_article_media_usage_add_replace_and_remove_preserve_usage_identity(): void
+    {
+        [$service, $usages] = $this->service();
+        $target = ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 573];
+        $added = $service->mutate([
+            'operation' => 'add', 'idempotency_key' => 'article-media-add', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+            'target' => $target, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ]);
+        $usageId = $added['usage_id'];
+        self::assertSame('1:573', $added['readback']['target_id']);
+        self::assertSame(1, $added['usage']['revision']);
+
+        $replaced = $service->mutate([
+            'operation' => 'replace', 'idempotency_key' => 'article-media-replace', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c90'],
+            'target' => $target, 'usage_id' => $usageId, 'expected_usage_revision' => 1, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ]);
+        self::assertSame($usageId, $replaced['usage_id']);
+        self::assertSame('01a0ab0c-fde0-7c01-a89d-fc5eef832c90', $replaced['usage']['media_id']);
+        self::assertSame(2, $replaced['usage']['revision']);
+
+        $removed = $service->mutate([
+            'operation' => 'remove', 'idempotency_key' => 'article-media-remove', 'target' => $target,
+            'usage_id' => $usageId, 'expected_usage_revision' => 2, 'role' => 'inline_supporting', 'placement_key' => 'inline-supporting-1',
+            'selection_source' => 'USER_EXPLICIT', 'selection_policy' => 'PINNED',
+        ]);
+        self::assertSame($usageId, $removed['usage_id']);
+        self::assertSame('retired', $removed['usage']['active_slot']);
+        self::assertCount(1, $usages->listByEndpoint('wp_post', '1:573', 'inline_supporting'));
+    }
+
+    public function test_governed_media_usage_replace_requires_current_revision_and_exact_target(): void
+    {
+        [$service] = $this->service();
+        $this->expectExceptionMessage('MEDIA_USAGE_REVISION_CONFLICT');
+        $added = $service->mutate([
+            'operation' => 'add', 'idempotency_key' => 'article-media-stale-add', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 400], 'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+        ]);
+        $service->mutate([
+            'operation' => 'replace', 'idempotency_key' => 'article-media-stale-replace', 'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c90'],
+            'target' => ['type' => 'wp_post', 'blog_id' => 1, 'post_id' => 400], 'usage_id' => $added['usage_id'], 'expected_usage_revision' => 99,
+            'role' => 'featured_primary', 'placement_key' => 'featured_primary',
+        ]);
+    }
+
     /** @return array{0:MediaBindingService,1:MemoryUsageRepository} */
     private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null): array
     {

@@ -520,7 +520,7 @@ final class Plugin {
             // the other runtime types so Capture never fails merely because
             // its typed Governance plan is a relation.
             $automationTypes = \NHK\Core\Application\Governance\GovernanceAutomationTypeRegistry::all($types);
-            $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
+            $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes, registeredKeys: \NHK\Core\Application\Governance\GovernanceAutomationPolicyRegistry::keys($automationTypes)));
             $publicProjectionVerifier = new \NHK\Core\Application\Governance\PublicProjectionVerifier(
                 static function (string $ownerType, string $id) use ($types, $authority, $media, $videos, $claims, $sources, $evidence): mixed {
                     return match ($ownerType) {

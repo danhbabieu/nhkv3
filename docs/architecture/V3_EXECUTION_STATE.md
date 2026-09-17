@@ -1,5 +1,33 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Staging signing-key configuration (LIVE VERIFIED / NO SEMANTIC MUTATION)
+
+SCOPE: Configured the staging-only `NHK_STAGING_ACCEPTANCE_SCOPE_SECRET` in
+the existing staging WordPress bootstrap outside the repository checkout.
+No code, production, semantic data, Governance proposal, Graph write,
+database write, deployment or push was performed.
+
+ROOT_CAUSE: The checked-out runtime resolves the server-issued staging scope
+secret from the `NHK_STAGING_ACCEPTANCE_SCOPE_SECRET` WordPress constant first,
+then the process environment. Staging had neither configured, so the guard
+correctly failed closed with `STAGING_SCOPE_SIGNING_KEY_REQUIRED`.
+
+FIX: Generated a fresh CSPRNG secret and stored it only in the staging
+`/home/erourxcg/apps/nhkv3/public/wp-config.php` constant with mode 0600. The
+secret is not present in Git, documentation or logs. Hosting exposes no
+`systemctl`, `service` or `php-fpm` reload command over the available SSH
+shell; the subsequent PHP bootstrap flag, maintenance health and HTTP health
+read-backs are fresh evidence that the managed runtime loaded the setting.
+
+VERIFICATION: `SIGNING_KEY_CONFIGURED=YES`, maintenance health `pass`, HTTP
+health 200. Staging canonical-docs `source_revision` matches HEAD
+`d74c960e485c93554e9e95da2943bbf0b685f819`; manifest hash matches the local
+generated snapshot. Focused scope tests pass 5 tests / 15 assertions, lint and
+diff checks pass. Local preflight remains environment-blocked by unavailable
+WordPress/MySQL. No semantic mutation or Atherton Apply was performed.
+
+STATUS: `STAGING_SCOPE_SIGNER_READY / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Documentation identity and Media pre-binding (CODE_SIDE_FIXED / LIVE_NOT_YET_VERIFIED)
 
 SCOPE: Fixed the local implementation slice for canonical documentation

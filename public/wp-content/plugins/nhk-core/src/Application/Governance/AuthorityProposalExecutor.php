@@ -25,7 +25,7 @@ final class AuthorityProposalExecutor
 {
     public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|MediaUsageApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
         $compatibility = $this->operationCompatibility ?? new ControlledApplyOperationRegistry();
         if (!$compatibility->supports($proposal->entityType, $proposal->operation)) throw new OperationCompatibilityException('REGISTRY_GAP', 'Unsupported Controlled Apply combination: ' . $proposal->entityType . '+' . $proposal->operation);
@@ -59,6 +59,15 @@ final class AuthorityProposalExecutor
             $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
             if ($mediaId === '' || $usageId === '' || $readback === []) throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_FAILED');
             return new MediaRepresentativeApplyResult($mediaId, $usageId, $binding, $readback);
+        }
+        if ($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) {
+            if ($this->mediaBinding === null) throw new \RuntimeException('Media usage executor is not configured.');
+            $mutation = $this->mediaBinding->mutate(array_replace($proposal->payload, ['operation' => $proposal->operation]));
+            $mediaId = trim((string) ($mutation['media_id'] ?? ($proposal->payload['media']['id'] ?? '')));
+            $usageId = trim((string) ($mutation['usage_id'] ?? ($mutation['usage']['id'] ?? '')));
+            $readback = is_array($mutation['readback'] ?? null) ? $mutation['readback'] : [];
+            if ($mediaId === '' || $usageId === '' || $readback === []) throw new \RuntimeException('MEDIA_USAGE_FINAL_READBACK_FAILED');
+            return new MediaUsageApplyResult($mediaId, $usageId, $mutation, $readback);
         }
         if ($proposal->entityType === 'video' && $proposal->operation === 'ingest') {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');

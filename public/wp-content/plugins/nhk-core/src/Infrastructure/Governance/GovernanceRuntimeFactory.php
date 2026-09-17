@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Authority\{AuthorityService, SemanticMergeService};
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
-use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, StagingAcceptanceScopeVerifier, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
+use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyRegistry, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, StagingAcceptanceScopeVerifier, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
@@ -133,7 +133,7 @@ final class GovernanceRuntimeFactory
         );
 
         $automationTypes = GovernanceAutomationTypeRegistry::all($types);
-        $reconciliationPolicies = new GovernanceAutomationPolicyResolver($automationTypes, new WpOptionAutomationPolicyStorage($automationTypes));
+        $reconciliationPolicies = new GovernanceAutomationPolicyResolver($automationTypes, new WpOptionAutomationPolicyStorage($automationTypes, registeredKeys: GovernanceAutomationPolicyRegistry::keys($automationTypes)));
         $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
         $publicIdentityService = new PublicIdentityService($publicIdentityRepository, static fn (string $slug): bool => false);
         $videoReconciliation = new \NHK\Core\Application\Video\VideoProposalReconciliationService(

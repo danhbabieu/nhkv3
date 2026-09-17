@@ -84,6 +84,62 @@ final class MediaBindingService implements MediaBindingPort
         }
     }
 
+    /**
+     * Apply a governed MediaUsage mutation.  Governance owns the durable
+     * proposal/approval/apply receipt; this service remains the sole owner of
+     * MediaUsage rows. Removal is a logical retirement and never a DELETE.
+     * @param array<string,mixed> $request
+     * @return array<string,mixed>
+     */
+    public function mutate(array $request): array
+    {
+        if (is_callable($this->stagingGuard)) ($this->stagingGuard)($request);
+        $normalized = $this->normalizeMutationRequest($request);
+        $operation = $normalized['operation'];
+        if ($operation === 'representative_bind') return $this->bind($request);
+
+        $target = $this->resolveMutationTarget($normalized['target']);
+        $media = null;
+        if ($normalized['media'] !== []) $media = $this->resolveMedia($normalized['media']);
+        $existing = in_array($operation, ['replace', 'remove'], true)
+            ? $this->findUsage($target['type'], $target['key'], (string) ($normalized['usage_id'] ?? ''))
+            : null;
+        $updater = $this->usages instanceof MediaUsageUpdater ? $this->usages : null;
+
+        if ($operation === 'add') {
+            if (!$media instanceof Media) throw new MediaException('MEDIA_USAGE_MEDIA_REQUIRED');
+            foreach ($this->activeUsages($target['type'], $target['key']) as $item) {
+                if ($item->role === $normalized['role'] && $item->placementKey === $normalized['placement_key']) throw new MediaException('MEDIA_USAGE_ALREADY_EXISTS');
+            }
+            $usage = $this->usages->create(new MediaUsage(
+                UuidCodec::newV7(), $media->canonicalId, $target['type'], $target['key'], $normalized['role'],
+                $normalized['sort_order'], $normalized['seo']['alt_text'], $normalized['seo']['caption'], [],
+                $normalized['seo']['title'], 1, $normalized['placement_key'], $normalized['selection_source'],
+                $normalized['selection_policy'], $normalized['active_slot'],
+            ));
+            return $this->mutationResult($operation, $media->canonicalId, $usage, null, $target);
+        }
+
+        if (!$existing instanceof MediaUsage) throw new MediaException('MEDIA_USAGE_NOT_FOUND');
+        if ((int) $normalized['expected_usage_revision'] !== $existing->revision) throw new MediaException('MEDIA_USAGE_REVISION_CONFLICT');
+        if (!$updater instanceof MediaUsageUpdater) throw new MediaException('MEDIA_USAGE_UPDATE_UNAVAILABLE');
+        foreach ($this->activeUsages($target['type'], $target['key']) as $item) {
+            if ($item->usageId !== $existing->usageId && $item->role === $existing->role && $item->placementKey === $existing->placementKey) throw new MediaException('MEDIA_USAGE_SLOT_CONFLICT');
+        }
+        $nextMedia = $operation === 'replace' ? $media : $this->resolveMedia(['id' => $existing->mediaId]);
+        if (!$nextMedia instanceof Media) throw new MediaException('MEDIA_USAGE_MEDIA_REQUIRED');
+        $usage = $updater->update(new MediaUsage(
+            $existing->usageId, $nextMedia->canonicalId, $existing->endpointType, $existing->endpointKey,
+            $existing->role, $operation === 'replace' ? $normalized['sort_order'] : $existing->sortOrder,
+            $operation === 'replace' ? $normalized['seo']['alt_text'] : $existing->altText,
+            $operation === 'replace' ? $normalized['seo']['caption'] : $existing->caption,
+            $existing->keywordGroups, $operation === 'replace' ? $normalized['seo']['title'] : $existing->title,
+            $existing->revision, $existing->placementKey, $existing->selectionSource, $existing->selectionPolicy,
+            $operation === 'remove' ? 'retired' : $existing->activeSlot,
+        ));
+        return $this->mutationResult($operation, $nextMedia->canonicalId, $usage, $existing->usageId, $target);
+    }
+
     /** @param list<array<string,mixed>> $bindings @param list<array<string,mixed>> $assets @return array<string,mixed> */
     public function bindMany(array $bindings, string $idempotencyKey, array $assets = [], array $context = []): array
     {
@@ -176,6 +232,68 @@ final class MediaBindingService implements MediaBindingPort
         $seo = is_array($request['seo'] ?? null) ? $request['seo'] : [];
         foreach (['alt_text' => 1000, 'caption' => 2000, 'title' => 255] as $key => $limit) if (strlen((string) ($seo[$key] ?? '')) > $limit) throw new MediaException('MEDIA_BINDING_SEO_INVALID');
         return ['idempotency_key' => trim((string) $request['idempotency_key']), 'media' => $media, 'target' => ['type' => strtolower(trim((string) ($target['type'] ?? ''))), 'id' => $targetId, 'stable_key' => trim((string) ($target['stable_key'] ?? ''))], 'role' => $role, 'selection_source' => $source, 'selection_policy' => $policy, 'seo' => ['alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'title' => (string) ($seo['title'] ?? '')]];
+    }
+
+    /** @param array<string,mixed> $request @return array<string,mixed> */
+    private function normalizeMutationRequest(array $request): array
+    {
+        $operation = strtolower(trim((string) ($request['operation'] ?? '')));
+        if (!in_array($operation, ['add', 'replace', 'remove', 'representative_bind'], true)) throw new MediaException('MEDIA_USAGE_OPERATION_INVALID');
+        if ($operation === 'representative_bind') return ['operation' => $operation, 'target' => (array) ($request['target'] ?? []), 'media' => (array) ($request['media'] ?? [])];
+        if (trim((string) ($request['idempotency_key'] ?? '')) === '') throw new MediaException('MEDIA_USAGE_IDEMPOTENCY_REQUIRED');
+        $target = is_array($request['target'] ?? null) ? $request['target'] : [];
+        $type = strtolower(trim((string) ($target['type'] ?? '')));
+        if ($type === '') throw new MediaException('MEDIA_USAGE_TARGET_REQUIRED');
+        $role = trim((string) ($request['role'] ?? ($type === 'wp_post' ? MediaUsageRoleRegistry::INLINE_SUPPORTING : MediaUsageRoleRegistry::REPRESENTATIVE)));
+        MediaUsageRoleRegistry::assertKnown($role);
+        if ($type !== 'wp_post' && $role !== MediaUsageRoleRegistry::REPRESENTATIVE) throw new MediaException('MEDIA_USAGE_AUTHORITY_ROLE_INVALID');
+        if ($type === 'wp_post' && $role === MediaUsageRoleRegistry::REPRESENTATIVE) throw new MediaException('MEDIA_USAGE_ARTICLE_ROLE_INVALID');
+        $media = is_array($request['media'] ?? null) ? $request['media'] : [];
+        if ($operation !== 'remove' && $media === []) throw new MediaException('MEDIA_USAGE_MEDIA_REQUIRED');
+        $source = strtoupper(trim((string) ($request['selection_source'] ?? 'USER_EXPLICIT')));
+        $policy = strtoupper(trim((string) ($request['selection_policy'] ?? 'PINNED')));
+        if (!in_array($source, ['USER_EXPLICIT', 'SYSTEM_AUTO'], true) || !in_array($policy, ['PINNED', 'AUTO'], true) || ($source === 'USER_EXPLICIT' && $policy !== 'PINNED') || ($source === 'SYSTEM_AUTO' && $policy !== 'AUTO')) throw new MediaException('MEDIA_USAGE_SELECTION_INVALID');
+        $seo = is_array($request['seo'] ?? null) ? $request['seo'] : [];
+        foreach (['alt_text' => 1000, 'caption' => 2000, 'title' => 255] as $key => $limit) if (strlen((string) ($seo[$key] ?? '')) > $limit) throw new MediaException('MEDIA_USAGE_SEO_INVALID');
+        $expected = (int) ($request['expected_usage_revision'] ?? 0);
+        if (in_array($operation, ['replace', 'remove'], true) && $expected < 1) throw new MediaException('MEDIA_USAGE_REVISION_REQUIRED');
+        $placement = trim((string) ($request['placement_key'] ?? ($type === 'wp_post' ? $role : 'representative')));
+        if ($placement === '') throw new MediaException('MEDIA_USAGE_PLACEMENT_REQUIRED');
+        return ['operation' => $operation, 'target' => $target, 'media' => $media, 'role' => $role, 'selection_source' => $source, 'selection_policy' => $policy, 'seo' => ['alt_text' => (string) ($seo['alt_text'] ?? ''), 'caption' => (string) ($seo['caption'] ?? ''), 'title' => (string) ($seo['title'] ?? '')], 'sort_order' => max(0, (int) ($request['sort_order'] ?? 0)), 'placement_key' => $placement, 'active_slot' => $operation === 'remove' ? 'retired' : ($type === 'wp_post' ? null : 'representative'), 'usage_id' => trim((string) ($request['usage_id'] ?? '')), 'expected_usage_revision' => $expected];
+    }
+
+    /** @param array<string,mixed> $reference @return array{type:string,key:string} */
+    private function resolveMutationTarget(array $reference): array
+    {
+        $type = strtolower(trim((string) ($reference['type'] ?? '')));
+        if ($type === 'wp_post') {
+            $blog = (int) ($reference['blog_id'] ?? (function_exists('get_current_blog_id') ? get_current_blog_id() : 1));
+            $post = (int) ($reference['post_id'] ?? $reference['id'] ?? 0);
+            if ($blog < 1 || $post < 1 || (function_exists('get_post') && !get_post($post))) throw new MediaException('MEDIA_USAGE_ARTICLE_NOT_FOUND');
+            return ['type' => 'wp_post', 'key' => $blog . ':' . $post];
+        }
+        if (!$this->types->has($type)) throw new MediaException('MEDIA_USAGE_TARGET_TYPE_INVALID');
+        $target = $this->resolveTarget($reference);
+        return ['type' => $target->entityType, 'key' => $target->canonicalId];
+    }
+
+    /** @return list<MediaUsage> */
+    private function activeUsages(string $type, string $key): array
+    {
+        return array_values(array_filter($this->usages->listByEndpoint($type, $key), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired'));
+    }
+
+    private function findUsage(string $type, string $key, string $usageId): ?MediaUsage
+    {
+        if ($usageId === '' || !UuidCodec::isValid($usageId)) throw new MediaException('MEDIA_USAGE_ID_INVALID');
+        foreach ($this->usages->listByEndpoint($type, $key) as $usage) if ($usage instanceof MediaUsage && $usage->usageId === $usageId) return $usage;
+        return null;
+    }
+
+    /** @return array<string,mixed> */
+    private function mutationResult(string $operation, string $mediaId, MediaUsage $usage, ?string $previousUsageId, array $target): array
+    {
+        return ['status' => 'COMPLETE', 'operation' => $operation, 'media_id' => $mediaId, 'usage_id' => $usage->usageId, 'previous_usage_id' => $previousUsageId, 'usage' => $this->usageArray($usage), 'readback' => ['status' => 'verified', 'media_id' => $mediaId, 'target_type' => $target['type'], 'target_id' => $target['key'], 'usage_id' => $usage->usageId, 'role' => $usage->role, 'active_slot' => $usage->activeSlot, 'revision' => $usage->revision]];
     }
 
     /** @param array<string,mixed> $request */

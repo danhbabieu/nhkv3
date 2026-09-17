@@ -67,4 +67,19 @@ final class GovernanceAutomationPolicyTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $resolver->resolve('note');
     }
+
+    public function test_operation_policy_overrides_owner_policy_using_canonical_target_context(): void
+    {
+        $resolver = new GovernanceAutomationPolicyResolver(
+            ['wp_post', 'media', 'classification'],
+            new class implements AutomationPolicyStorage {
+                public function read(): array { return ['wp_post' => 'REVIEW_REQUIRED', 'wp_post:media:add' => 'AUTO_APPROVE', 'classification:media:representative_bind' => 'AUTO_PUBLISH']; }
+                public function write(array $policies): void {}
+            },
+        );
+
+        self::assertSame(AutomationMode::AUTO_APPROVE, $resolver->resolveForNode(['entity_type' => 'media', 'operation' => 'add', 'target' => ['type' => 'wp_post']]));
+        self::assertSame(AutomationMode::AUTO_PUBLISH, $resolver->resolveForNode(['entity_type' => 'media', 'operation' => 'representative_bind', 'target' => ['type' => 'classification']]));
+        self::assertSame(AutomationMode::REVIEW_REQUIRED, $resolver->resolveForNode(['entity_type' => 'wp_post', 'operation' => 'update']));
+    }
 }

@@ -38,7 +38,7 @@ final class GovernedSemanticIngestOrchestrator
             $proposal = $this->governance->createFromArguments($node);
             $this->governance->submit($proposal->id);
             $review = $this->governance->review($proposal->id);
-            $mode = $this->policyResolver?->resolve((string) ($node['entity_type'] ?? ''));
+            $mode = $this->policyResolver?->resolveForNode($node);
             if (($review['state'] ?? '') !== 'submitted') {
                 if ($mode !== null) {
                     $results[] = $this->blocked($proposal->id, $mode, 'review', ['REVIEW_STATE_INVALID'], (string) ($review['state'] ?? ''));

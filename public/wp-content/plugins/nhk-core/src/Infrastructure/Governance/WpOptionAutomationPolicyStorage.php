@@ -9,13 +9,17 @@ use NHK\Core\Domain\Governance\AutomationMode;
 
 final class WpOptionAutomationPolicyStorage implements AutomationPolicyStorage
 {
-    /** @param list<string> $registeredTypes */
+    /** @param list<string> $registeredTypes @param list<string>|null $registeredKeys */
     public function __construct(
         private array $registeredTypes,
         private string $optionName = 'nhk_governance_automation_policy',
         private $getOption = null,
         private $updateOption = null,
+        private ?array $registeredKeys = null,
     ) {}
+
+    /** @return list<string> */
+    private function keys(): array { return $this->registeredKeys ?? $this->registeredTypes; }
 
     public function read(): array
     {
@@ -27,7 +31,7 @@ final class WpOptionAutomationPolicyStorage implements AutomationPolicyStorage
 
         $result = [];
         foreach ($value as $type => $mode) {
-            if (!is_string($type) || !in_array($type, $this->registeredTypes, true)) continue;
+            if (!is_string($type) || !in_array($type, $this->keys(), true)) continue;
             if (!is_string($mode)) continue;
             $result[$type] = $mode;
         }
@@ -38,7 +42,7 @@ final class WpOptionAutomationPolicyStorage implements AutomationPolicyStorage
     {
         $clean = [];
         foreach ($policies as $type => $mode) {
-            if (!is_string($type) || !in_array($type, $this->registeredTypes, true)) throw new InvalidArgumentException('Unknown governance automation type: ' . (string) $type);
+            if (!is_string($type) || !in_array($type, $this->keys(), true)) throw new InvalidArgumentException('Unknown governance automation policy key: ' . (string) $type);
             if (!is_string($mode)) throw new InvalidArgumentException('Invalid governance automation mode.');
             $clean[$type] = AutomationMode::fromStored($mode)->value;
         }
