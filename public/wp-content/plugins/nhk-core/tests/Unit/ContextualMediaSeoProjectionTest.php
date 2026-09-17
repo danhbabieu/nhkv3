@@ -9,7 +9,7 @@ use NHK\Core\Application\Media\{ArticleMediaSeoProjection, MediaService, PublicM
 use NHK\Core\Contracts\Dictionary\DictionaryConceptRepository;
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, WordPressArticleMediaAdapter};
 use NHK\Core\Domain\Dictionary\DictionaryConcept;
-use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage, VisualSupportRequirement};
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoStateRegistry, MediaUsage, VisualSupportRequirement};
 use PHPUnit\Framework\TestCase;
 
 final class ContextualMediaSeoProjectionTest extends TestCase
@@ -64,12 +64,41 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         $result = (new ArticleMediaSeoProjection($media, $assets, $usages, $adapter))->forPost('1:60');
 
         self::assertSame('Alt canonical', $result['alt']);
-        self::assertSame('Original attachment title', $result['title']);
-        self::assertSame('Original attachment caption', $result['caption']);
+        self::assertSame('Media name must survive', $result['title']);
+        self::assertSame('Media name must survive', $result['caption']);
         self::assertSame('MEDIA_USAGE', $result['metadata_source']);
         self::assertSame('Media name must survive', $media->findByCanonicalId($item->canonicalId)?->canonicalName);
         self::assertSame(['title' => 'Original attachment title', 'alt' => 'Original attachment alt', 'caption' => 'Original attachment caption'], $adapter->metadata);
         self::assertSame($item->canonicalId, $asset->mediaId);
+    }
+
+    public function test_article_ignores_featured_usage_with_an_unrelated_placement(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('wrong-placement', 'Wrong placement', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/wrong-placement.webp', hash('sha256', 'wrong-placement'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'wrong-placement.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:62', 'featured_primary', 0, 'Không được chọn', '', [], '', 'article:1:62:inline_primary');
+
+        $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:62');
+
+        self::assertFalse($result['eligible']);
+        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertNull($result['url']);
+    }
+
+    public function test_article_requires_ready_media_even_when_public_asset_exists(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('draft-media', 'Draft media', 'draft');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/draft-media.webp', hash('sha256', 'draft-media'), 'image/webp', 10, 1200, 800, 'PUBLIC', ['canonical_filename' => 'draft-media.webp']);
+        $service->addUsage($item->canonicalId, 'wp_post', '1:63', 'featured_primary', 0, 'Không được công khai');
+
+        $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:63');
+
+        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertFalse($result['eligible']);
+        self::assertNull($result['url']);
+        self::assertNull($result['image_url']);
     }
 
     public function test_private_source_without_public_asset_is_explicit_missing_and_has_no_public_url(): void
@@ -87,7 +116,7 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertNull($result['image_url']);
     }
 
-    public function test_gallery_uses_usage_context_without_mutating_global_media_metadata(): void
+    public function test_gallery_without_subject_context_uses_neutral_media_metadata_without_mutating_global_media_metadata(): void
     {
         [$media, $assets, $usages, $service] = $this->stores();
         $item = $service->create('gallery-context', 'Tên Media toàn cục', 'ready');
@@ -96,10 +125,11 @@ final class ContextualMediaSeoProjectionTest extends TestCase
 
         $result = (new PublicMediaGalleryQuery($media, $assets, null, $usages))->forMedia($item->canonicalId);
 
-        self::assertSame('Tiêu đề ngữ cảnh', $result['title']);
-        self::assertSame('Alt ngữ cảnh', $result['alt']);
-        self::assertSame('Chú thích ngữ cảnh', $result['caption']);
-        self::assertSame('SUBJECT_REPRESENTATIVE', $result['metadata_source']);
+        self::assertSame('Tên Media toàn cục', $result['title']);
+        self::assertSame('Tên Media toàn cục', $result['alt']);
+        self::assertSame('Tên Media toàn cục', $result['caption']);
+        self::assertSame('MEDIA_NEUTRAL', $result['metadata_source']);
+        self::assertArrayNotHasKey('url', $result);
         self::assertSame('Tên Media toàn cục', $media->findByCanonicalId($item->canonicalId)?->canonicalName);
     }
 
