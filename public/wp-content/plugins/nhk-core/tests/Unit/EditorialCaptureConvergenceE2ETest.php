@@ -311,6 +311,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         self::assertSame([], $semanticResult['writes']);
         self::assertSame([], $governance->events);
         self::assertSame('NOT_REQUIRED', $publicationContext['requirements']['semantic_delta']['applicability']);
+        self::assertSame('VERIFY', $publicationContext['requirements']['semantic_delta']['policy']);
         self::assertSame('SKIPPED', $publicationContext['requirements']['semantic_delta']['state']);
         self::assertTrue($result->diagnostics['publication']['eligible']);
         self::assertSame('PASS', $result->diagnostics['publication']['outcome']);

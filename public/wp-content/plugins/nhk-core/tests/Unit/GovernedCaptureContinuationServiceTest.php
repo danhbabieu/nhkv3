@@ -122,7 +122,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         $result = $service->execute('capture-mixed', 'resume-mixed', [
             'purpose' => 'MIXED',
-            'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true]],
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED']],
             'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'variant', 'revision' => 2], 'resolved' => [['id' => $subject, 'type' => 'variant', 'revision' => 2]]],
         ], ['proposal_ids' => [$proposalId]]);
 
