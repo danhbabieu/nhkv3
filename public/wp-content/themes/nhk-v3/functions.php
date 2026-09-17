@@ -189,7 +189,7 @@ function nhk_v3_public_archive_title(): string
 
 function nhk_v3_public_editorial_label(string $route): string
 {
-    return ['tri-thuc' => 'Tri thức', 'goc-chia-se' => 'Góc chia sẻ'][$route] ?? '';
+    return ['tri-thuc' => 'Tri thức đồng hồ', 'goc-chia-se' => 'Góc chia sẻ'][$route] ?? '';
 }
 
 function nhk_v3_public_url(mixed $value): string

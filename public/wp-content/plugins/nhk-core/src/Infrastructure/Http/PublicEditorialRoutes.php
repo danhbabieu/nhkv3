@@ -5,11 +5,18 @@ namespace NHK\Core\Infrastructure\Http;
 
 final class PublicEditorialRoutes
 {
+    private const TRI_THUC_ROUTE = 'tri-thuc';
+    private const TRI_THUC_CATEGORY_ID = 4;
+    private const TRI_THUC_CATEGORY_SLUG = 'tri-thuc-dong-ho';
+
     public function register(): void
     {
         add_filter('query_vars', function (array $vars): array { if (!in_array('nhk_editorial_route', $vars, true)) $vars[] = 'nhk_editorial_route'; return $vars; });
         add_action('init', [$this, 'rewrite']);
         add_action('template_redirect', [$this, 'legacySearchRedirect'], 1);
+        add_action('template_redirect', [$this, 'canonicalCategoryRedirect'], 2);
+        add_action('pre_get_posts', [$this, 'prepareArchiveQuery']);
+        add_filter('redirect_canonical', [$this, 'suppressPresentationRedirect'], 10, 2);
         add_filter('template_include', [$this, 'template']);
     }
 
@@ -26,9 +33,33 @@ final class PublicEditorialRoutes
     public function rewrite(): void
     {
         foreach (['tri-thuc', 'goc-chia-se'] as $slug) {
-            add_rewrite_rule('^' . $slug . '/page/([1-9][0-9]*)/?$', 'index.php?nhk_editorial_route=' . $slug . '&category_name=' . $slug . '&paged=$matches[1]', 'top');
-            add_rewrite_rule('^' . $slug . '/?$', 'index.php?nhk_editorial_route=' . $slug . '&category_name=' . $slug, 'top');
+            $query = 'index.php?nhk_editorial_route=' . $slug;
+            if ($slug !== self::TRI_THUC_ROUTE) $query .= '&category_name=' . $slug;
+            add_rewrite_rule('^' . $slug . '/page/([1-9][0-9]*)/?$', $query . '&paged=$matches[1]', 'top');
+            add_rewrite_rule('^' . $slug . '/?$', $query, 'top');
         }
+    }
+
+    public function prepareArchiveQuery(\WP_Query $query): void
+    {
+        if (!$query->is_main_query() || (string) $query->get('nhk_editorial_route') !== self::TRI_THUC_ROUTE) return;
+        foreach (self::triThucArchiveQuery() as $key => $value) $query->set($key, $value);
+    }
+
+    public function canonicalCategoryRedirect(): void
+    {
+        if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli') return;
+        if ((string) get_query_var('nhk_editorial_route') === self::TRI_THUC_ROUTE || !is_category()) return;
+        $term = get_queried_object();
+        if (!is_object($term) || (string) ($term->taxonomy ?? '') !== 'category' || (int) ($term->term_id ?? 0) !== self::TRI_THUC_CATEGORY_ID || (string) ($term->slug ?? '') !== self::TRI_THUC_CATEGORY_SLUG) return;
+        $page = max(1, (int) get_query_var('paged', 1));
+        wp_safe_redirect(self::triThucPresentationPath($page), 301, 'NHK canonical Tri thức archive');
+        exit;
+    }
+
+    public function suppressPresentationRedirect(mixed $redirect, string $requested): mixed
+    {
+        return (string) get_query_var('nhk_editorial_route') === self::TRI_THUC_ROUTE ? false : $redirect;
     }
 
     public function template(string $template): string
@@ -40,5 +71,23 @@ final class PublicEditorialRoutes
         status_header(200);
         $found = locate_template('index.php');
         return $found !== '' ? $found : $template;
+    }
+
+    /** @return array<string,mixed> */
+    private static function triThucArchiveQuery(): array
+    {
+        return [
+            'category__in' => [4],
+            'post_type' => 'post',
+            'post_status' => 'publish',
+            'orderby' => 'date',
+            'order' => 'DESC',
+        ];
+    }
+
+    private static function triThucPresentationPath(int $page): string
+    {
+        $page = max(1, $page);
+        return home_url('/tri-thuc/' . ($page > 1 ? 'page/' . $page . '/' : ''));
     }
 }

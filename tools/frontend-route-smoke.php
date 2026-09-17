@@ -62,6 +62,8 @@ $routes = [
     '/?s=watch' => 200,
     '/?s=odo&paged=2' => 200,
     '/category/uncategorized/' => 200,
+    '/category/tri-thuc-dong-ho/' => 301,
+    '/category/tri-thuc-dong-ho/page/2/' => 301,
     '/tim-kiem/?q=odo' => 301,
     '/so-sanh/' => 200,
     '/brand/' => 301,
@@ -85,6 +87,8 @@ $contentMarkers = [
 ];
 $locationMarkers = [
     '/tim-kiem/?q=odo' => '/?s=odo',
+    '/category/tri-thuc-dong-ho/' => '/tri-thuc/',
+    '/category/tri-thuc-dong-ho/page/2/' => '/tri-thuc/page/2/',
     '/brand/' => '/thuong-hieu/',
     '/model/' => '/mau/',
     '/movement/' => '/bo-may/',
@@ -98,7 +102,7 @@ $locationMarkers = [
     ...$optionalRedirects,
 ];
 $metadataMarkers = [
-    '/tri-thuc/' => ['<title>Tri thức — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/tri-thuc/"'],
+    '/tri-thuc/' => ['<title>Tri thức đồng hồ — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/tri-thuc/"'],
     '/goc-chia-se/' => ['<title>Góc chia sẻ — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/goc-chia-se/"'],
     '/category/uncategorized/' => ['<title>Chủ đề: Chưa phân loại — Đồng Hồ Nhà Kho</title>', '<link rel="canonical" href="' . $base . '/category/uncategorized/"'],
     '/__nhk-route-must-404__/' => ['<title>Không tìm thấy trang — Đồng Hồ Nhà Kho</title>', 'noindex, follow'],

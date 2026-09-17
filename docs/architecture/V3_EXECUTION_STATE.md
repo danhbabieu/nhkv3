@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Tri thức presentation archive route repair (LOCAL ONLY)
+
+SCOPE: Repaired the public `/tri-thuc/` presentation route without creating a
+category, changing the canonical taxonomy, changing post slugs, writing the
+database, deploying staging or modifying production.
+
+ROOT_CAUSE: The route rewrite queried the non-existent `tri-thuc` category
+slug, then forced HTTP 200. The canonical category is ID 4 / slug
+`tri-thuc-dong-ho`, so the WordPress main query returned no posts.
+
+FIX: `/tri-thuc/` and its paginated aliases now use the native WordPress post
+query scoped to category ID 4, `publish`, `date DESC`. The native category
+archive redirects one hop to `/tri-thuc/` (preserving page number), while the
+presentation route suppresses reverse canonical redirects. The archive loop
+uses the existing responsive post-card grid, native permalinks and safe image
+fallback.
+
+LOCAL_VERIFICATION: Focused route coverage passes 8 tests / 37 assertions;
+FrontendContractTest passes 55 tests / 682 assertions; changed PHP files lint
+clean. Full Unit has one pre-existing unrelated DemoCutover CLI failure, the
+WordPress routing integration cannot connect to the configured database, and
+the localhost route smoke is blocked because no HTTP server is listening.
+No staging/live mutation, deployment or push was performed.
+
 # Checkpoint — 2026-09-17 — Image orientation normalization (LOCAL ONLY)
 
 SCOPE: Repaired only the shared WordPress physical image path's EXIF
