@@ -102,6 +102,23 @@ final class ContentIntentRouterTest extends TestCase
         self::assertFalse($route['article_required']);
     }
 
+    public function test_existing_capture_reuse_preserves_mixed_semantic_delta_handoff(): void
+    {
+        $route = (new ContentIntentRouter())->reusePersisted(
+            [
+                'intent' => 'IMAGE_ARTICLE',
+                'purpose' => 'MIXED',
+                'article_required' => true,
+                'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true],
+            ],
+            ['text' => 'Bài viết tiếp tục sau khi semantic branch được duyệt.', 'intent' => 'IMAGE_ARTICLE'],
+            [['kind' => 'image', 'media_id' => UuidCodec::newV7()]],
+        );
+
+        self::assertSame('MIXED', $route['purpose']);
+        self::assertSame(['status' => 'REQUIRED', 'approved' => true], $route['semantic_delta']);
+    }
+
     public function test_existing_media_enrichment_asset_followup_preserves_intent_and_skips_article_owner(): void
     {
         $repository = new IntentCaptureRepository();

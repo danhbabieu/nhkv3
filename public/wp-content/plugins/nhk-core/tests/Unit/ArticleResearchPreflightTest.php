@@ -87,6 +87,43 @@ final class ArticleResearchPreflightTest extends TestCase
         self::assertNotContains('MEDIA_PIPELINE_FAILURE', $result->blockers);
     }
 
+    public function test_ordinary_article_research_reads_semantic_inventory_without_creating_a_write_plan(): void
+    {
+        $inventoryReads = 0;
+        $dictionaryPreviews = 0;
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'variant-vedette-37', 'type' => 'variant', 'name' => 'Vedette 37']],
+            static function (array $context) use (&$inventoryReads): array {
+                ++$inventoryReads;
+                return [
+                    'status' => 'available',
+                    'posts' => [],
+                    'categories' => [['slug' => 'tri-thuc-dong-ho']],
+                    'knowledge' => [['id' => 'existing-claim', 'subject_id' => 'variant-vedette-37', 'evidence_status' => 'SUPPORTED_WITHIN_SCOPE']],
+                    'sources' => [],
+                    'evidence' => [],
+                    'media' => [],
+                    'videos' => [],
+                    'relations' => [],
+                ];
+            },
+            static fn (array $candidate): array => ['eligible' => false],
+            static function (string $text, array $context) use (&$dictionaryPreviews): array {
+                ++$dictionaryPreviews;
+                return ['status' => 'PREVIEW', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => [], 'blocking' => false];
+            },
+        );
+
+        $result = $service->research('Vedette 37 có mặt số xanh.', ['type' => 'variant', 'name' => 'Vedette 37']);
+
+        self::assertSame(1, $inventoryReads);
+        self::assertSame(1, $dictionaryPreviews);
+        self::assertSame(['existing-claim'], array_column($result->knowledgeInventory['claims'], 'id'));
+        self::assertArrayNotHasKey('writes', $result->knowledgeInventory);
+        self::assertArrayNotHasKey('proposals', $result->knowledgeInventory);
+        self::assertNotContains('SEMANTIC_WRITE_REQUIRED', $result->blockers);
+    }
+
     public function test_new_factual_claim_without_applied_evidence_is_a_hard_preflight_blocker(): void
     {
         $service = new ArticleResearchPreflight(
