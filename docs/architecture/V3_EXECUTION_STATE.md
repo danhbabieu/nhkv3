@@ -11789,3 +11789,35 @@ by the existing WordPress/MySQL integration bootstrap and acceptance gates
 `git diff --check` pass. No live completion is claimed.
 
 STATUS: `VIDEO_RELATION_RECONCILIATION_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Video relation KEEP and Knowledge retry hardening (LOCAL ONLY)
+
+SCOPE: Ported only the direct Video relation/Knowledge regression fix from
+`670ea8c5` onto its parent. No staging/production mutation, deployment, push,
+direct database write or unrelated Authority/MCP/CoreCreation behavior was
+ported.
+
+ROOT_CAUSE: An active logical relation could be treated as a new relation
+proposal during correction, while the relation reconciler had no canonical
+read-back reuse boundary. Video completeness also retired stale edges before
+validating Evidence dependencies, allowing a rejected correction to change
+Graph state.
+
+FIX: Relation reconciliation now performs canonical logical-identity read-back
+and returns `REUSED_VERIFIED` for an active relation, including the Video
+compatibility inverse direction. Video attachment validation verifies all
+Evidence dependencies before stale-edge retirement. Claim reuse performs a
+bounded canonical search and reuses equivalent supported claims without
+creating another Knowledge record. Existing Capture stale-relation gating,
+subject-conflict protection and instruction filtering remain inherited from
+the base commit.
+
+VERIFICATION: TDD RED showed the three intended failures; after the minimal
+port the focused direct regression suite passes — 14 tests / 58 assertions.
+The full focused Capture/Video/Graph/Knowledge/subject/instruction/search/public
+suite passes — 116 tests / 474 assertions. `composer lint`, `git diff --check`
+and secret scan pass. Deployment preflight passes runtime/documentation checks
+but is `ENVIRONMENT_BLOCKED` by local WordPress bootstrap
+(`WORDPRESS_BOOTSTRAP_FAILED`); no live completion is claimed.
+
+STATUS: `VIDEO_RELATION_CLEAN_PATCH_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

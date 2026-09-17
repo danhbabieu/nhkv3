@@ -217,6 +217,19 @@ final class AuthorityProposalExecutor
             if ($predicate === '' || $targetType === '' || $targetUuid === '') throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
             $desired[$predicate . '|' . strtolower($targetType) . '|' . strtolower($targetUuid)] = true;
         }
+        // Validate every desired relation and its Evidence dependency before
+        // changing any existing edge. A rejected delta must leave the current
+        // Graph state untouched, even when the caller is outside a transaction.
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
+            $evidenceRefs = is_array($attachment['evidence_refs'] ?? null) ? $attachment['evidence_refs'] : [];
+            if ($evidenceRefs === []) throw new \RuntimeException('EVIDENCE_REFS_REQUIRED');
+            if ($this->dependencies === null) throw new \RuntimeException('CANONICAL_DEPENDENCY_VALIDATOR_UNAVAILABLE');
+            foreach ($evidenceRefs as $reference) {
+                if (!is_array($reference) || !isset($reference['evidence_id'])) throw new \RuntimeException('CANONICAL_EVIDENCE_REQUIRED');
+                $this->dependencies->evidence((string) $reference['evidence_id']);
+            }
+        }
         $existingEdges = [];
         foreach ([
             $this->graph->findOutgoing(new NodeReference('video', $video->canonicalId), null, 0, 200, true),
@@ -241,14 +254,6 @@ final class AuthorityProposalExecutor
         }
         if ($attachments === []) return [];
         foreach ($attachments as $attachment) {
-            if (!is_array($attachment)) throw new \RuntimeException('PROPOSAL_VALIDATION_FAILED');
-            $evidenceRefs = is_array($attachment['evidence_refs'] ?? null) ? $attachment['evidence_refs'] : [];
-            if ($evidenceRefs === []) throw new \RuntimeException('EVIDENCE_REFS_REQUIRED');
-            if ($this->dependencies === null) throw new \RuntimeException('CANONICAL_DEPENDENCY_VALIDATOR_UNAVAILABLE');
-            foreach ($evidenceRefs as $reference) {
-                if (!is_array($reference) || !isset($reference['evidence_id'])) throw new \RuntimeException('CANONICAL_EVIDENCE_REQUIRED');
-                $this->dependencies->evidence((string) $reference['evidence_id']);
-            }
             $predicate = (string) ($attachment['predicate'] ?? '');
             $target = new NodeReference((string) ($attachment['target_type'] ?? ''), (string) ($attachment['target_uuid'] ?? $attachment['target_key'] ?? ''));
             $source = new NodeReference('video', $video->canonicalId);

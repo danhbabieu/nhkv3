@@ -6,6 +6,11 @@ namespace NHK\Core\Application\Semantic;
 /** Read-only Claim reuse decision; it never creates or mutates Knowledge. */
 final class ClaimReusePolicy
 {
+    /** @param callable(array<string,mixed>):list<array<string,mixed>>|null $canonicalSearch */
+    public function __construct(private $canonicalSearch = null)
+    {
+    }
+
     /** @param array<string,mixed> $candidate @param list<array<string,mixed>> $claims @return array<string,mixed>|null */
     public function find(array $candidate, array $claims): ?array
     {
@@ -14,7 +19,15 @@ final class ClaimReusePolicy
         $text = trim((string) ($candidate['text'] ?? ''));
         if ($subjectId === '' || $scope === '' || $text === '') return null;
 
-        foreach ($claims as $claim) {
+        $canonicalClaims = [];
+        if ($this->canonicalSearch !== null) {
+            try {
+                $canonicalClaims = ($this->canonicalSearch)($candidate);
+            } catch (\Throwable) {
+                $canonicalClaims = [];
+            }
+        }
+        foreach (array_merge($claims, is_array($canonicalClaims) ? $canonicalClaims : []) as $claim) {
             if (!is_array($claim)) continue;
             if (trim((string) ($claim['subject_id'] ?? '')) !== $subjectId || trim((string) ($claim['scope'] ?? '')) !== $scope) continue;
             if (trim((string) ($claim['provenance'] ?? '')) === '' || (string) ($claim['evidence_status'] ?? '') !== 'SUPPORTED_WITHIN_SCOPE') continue;
@@ -43,8 +56,12 @@ final class ClaimReusePolicy
         $value = str_replace(['marteaux', 'marteau', 'búa'], 'búa', $value);
         $value = str_replace(['hai', 'two'], '2', $value);
         $value = str_replace(['giai điệu', 'bài nhạc', 'melody', 'melodies'], 'music', $value);
-        preg_match_all('/\d+|côn|búa|music/u', $value, $matches);
-        return array_values(array_unique($matches[0] ?? []));
+        preg_match_all('/\d+|[\p{L}]{2,}/u', $value, $matches);
+        $stopWords = ['có', 'cấu', 'hình', 'là', 'một', 'được', 'và', 'thuộc', 'nhóm', 'the', 'with', 'this'];
+        return array_values(array_unique(array_filter($matches[0] ?? [], static function (string $feature) use ($stopWords): bool {
+            $normalized = function_exists('mb_strtolower') ? mb_strtolower($feature) : strtolower($feature);
+            return !in_array($normalized, $stopWords, true);
+        })));
     }
 
     private function normalize(string $value): string

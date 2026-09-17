@@ -8,6 +8,27 @@ use PHPUnit\Framework\TestCase;
 
 final class ClaimReusePolicyTest extends TestCase
 {
+    public function test_canonical_search_reuses_equivalent_claim_when_retrieval_did_not_return_it(): void
+    {
+        $claim = [
+            'claim_id' => '01a06d45-aa68-7d08-b6a0-7cccb84ae75b',
+            'claim_revision' => 3,
+            'text' => 'Đây là Junghans W64, cấu hình 5 côn đồng bạch, thuộc nhóm Đồng hồ vai bò.',
+            'subject_id' => '24eaeba5-b5f9-420f-a2fe-50b1f2a6130f',
+            'scope' => 'variant',
+            'provenance' => 'CATALOG_SUPPORTED',
+            'evidence_status' => 'SUPPORTED_WITHIN_SCOPE',
+        ];
+
+        $reused = (new ClaimReusePolicy(static fn (array $candidate): array => [$claim]))->find([
+            'text' => 'Junghans W64 có cấu hình 5 côn đồng bạch và thuộc nhóm Đồng hồ vai bò.',
+            'subject_id' => $claim['subject_id'],
+            'scope' => 'variant',
+        ], []);
+
+        self::assertSame($claim, $reused);
+    }
+
     public function test_reuses_supported_equivalent_configuration_claim_at_the_same_variant_scope(): void
     {
         $claim = [
