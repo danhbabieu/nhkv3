@@ -8,6 +8,80 @@ use PHPUnit\Framework\TestCase;
 
 final class ArticleResearchPreflightTest extends TestCase
 {
+    public function test_post_reconcile_inventory_exposes_canonical_article_usage_ids_separately_from_representatives(): void
+    {
+        $articleUsageIds = ['article-usage-featured', 'article-usage-inline'];
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'subject-vedette-37', 'type' => 'variant', 'name' => 'Vedette 37']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [],
+                'categories' => [['name' => 'Tri thức đồng hồ', 'slug' => 'tri-thuc-dong-ho']],
+                'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'article_media' => [
+                    'canonical_readback' => [
+                        'media_usage' => [
+                            'state' => 'VERIFIED',
+                            'endpoint_type' => 'wp_post',
+                            'endpoint_key' => '1:573',
+                            'roles' => ['featured_primary', 'inline_primary'],
+                            'usage_ids' => $articleUsageIds,
+                            'source' => 'ARTICLE_MEDIA_RECONCILIATION',
+                        ],
+                    ],
+                    'representative_usages' => [
+                        ['endpoint_type' => 'model', 'endpoint_key' => 'model-111', 'role' => 'representative', 'usage_id' => 'model-usage'],
+                        ['endpoint_type' => 'classification', 'endpoint_key' => 'classification-cuckoo', 'role' => 'representative', 'usage_id' => 'classification-usage'],
+                    ],
+                    'media_complete' => true,
+                ],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Vedette 37', ['type' => 'variant', 'name' => 'Vedette 37'], ['post_id' => 573]);
+
+        self::assertSame($articleUsageIds, $result->mediaPlan['article_usage_ids']);
+        self::assertSame('1:573', $result->mediaPlan['article_endpoint_key']);
+        self::assertSame('VERIFIED', $result->mediaPlan['article_media_state']);
+        self::assertNotContains('model-usage', $result->mediaPlan['article_usage_ids']);
+        self::assertNotContains('classification-usage', $result->mediaPlan['article_usage_ids']);
+    }
+
+    public function test_missing_or_corrupt_article_asset_is_a_typed_blocker_even_when_representative_usage_exists(): void
+    {
+        $service = new ArticleResearchPreflight(
+            static fn (array $subject): array => ['status' => 'resolved', 'primary' => ['id' => 'subject-corrupt', 'type' => 'classification', 'name' => 'Đồng hồ lỗi ảnh']],
+            static fn (array $context): array => [
+                'status' => 'available',
+                'posts' => [],
+                'categories' => [['name' => 'Tri thức đồng hồ', 'slug' => 'tri-thuc-dong-ho']],
+                'knowledge' => [], 'sources' => [], 'evidence' => [], 'media' => [], 'videos' => [], 'relations' => [],
+                'article_media' => [
+                    'state' => 'REVIEW_REQUIRED',
+                    'media_complete' => false,
+                    'canonical_readback' => [
+                        'media_usage' => [
+                            'state' => 'REVIEW_REQUIRED',
+                            'blockers' => ['ARTICLE_MEDIA_ASSET_UNAVAILABLE'],
+                        ],
+                    ],
+                    'representative_usages' => [
+                        ['endpoint_type' => 'model', 'endpoint_key' => 'model-corrupt', 'role' => 'representative', 'usage_id' => 'model-usage-corrupt'],
+                    ],
+                ],
+            ],
+            static fn (array $candidate): array => ['eligible' => false],
+        );
+
+        $result = $service->research('Đồng hồ lỗi ảnh', ['type' => 'classification', 'name' => 'Đồng hồ lỗi ảnh']);
+
+        self::assertFalse($result->readyForDraft);
+        self::assertContains('ARTICLE_MEDIA_ASSET_UNAVAILABLE', $result->blockers);
+        self::assertSame('REVIEW_REQUIRED', $result->mediaPlan['state']);
+        self::assertNotContains('model-usage-corrupt', (array) ($result->mediaPlan['article_usage_ids'] ?? []));
+    }
+
     public function test_research_reuses_subject_and_classifies_overlap_relations_and_public_links(): void
     {
         $service = new ArticleResearchPreflight(

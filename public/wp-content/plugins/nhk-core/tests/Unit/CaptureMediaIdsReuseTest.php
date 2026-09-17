@@ -12,6 +12,63 @@ use PHPUnit\Framework\TestCase;
 
 final class CaptureMediaIdsReuseTest extends TestCase
 {
+    public function test_capture_to_article_reconciles_media_before_research_and_publication_gate(): void
+    {
+        $captures = new CaptureMediaIdsCaptureRepository();
+        $events = [];
+        $mediaId = UuidCodec::newV7();
+        $articleUsageIds = [UuidCodec::newV7(), UuidCodec::newV7()];
+        $researchUsageIds = [];
+        $coordinator = new EditorialCaptureCoordinator(
+            $captures,
+            static fn (array $input): array => ['items' => [['client_file_id' => 'front', 'media_id' => $mediaId, 'attachment_id' => 77, 'attachment_readback_status' => 'verified']]],
+            static fn (array $input): array => ['post_id' => 573, 'state_token' => 'state-573'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => []),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static function (array $context) use (&$events): array {
+                $events[] = 'semantic_writeback';
+                return ['status' => 'SKIPPED', 'writes' => [], 'requirements' => ['semantic_delta' => ['applicability' => 'NOT_REQUIRED', 'policy' => 'VERIFY', 'state' => 'SKIPPED']]];
+            },
+            new ArticleComposer(),
+            static function (array $context) use (&$events, $mediaId, $articleUsageIds): array {
+                $events[] = 'article_media_reconcile';
+                self::assertSame([$mediaId], $context['capture_owned_media_ids'] ?? []);
+                return [
+                    'status' => 'RECONCILED',
+                    'canonical_readback' => [
+                        'media_usage' => [
+                            'state' => 'VERIFIED',
+                            'endpoint_type' => 'wp_post',
+                            'endpoint_key' => '1:573',
+                            'roles' => ['featured_primary', 'inline_primary'],
+                            'usage_ids' => $articleUsageIds,
+                            'source' => 'ARTICLE_MEDIA_RECONCILIATION',
+                        ],
+                    ],
+                ];
+            },
+            static function (array $context) use (&$events, &$researchUsageIds): array {
+                $events[] = 'article_research';
+                $researchUsageIds = (array) (($context['media']['canonical_readback']['media_usage']['usage_ids'] ?? []));
+                $events[] = 'publication_gate';
+                return ['eligible' => false, 'blockers' => ['ARTICLE_NOT_PUBLISHED']];
+            },
+            static fn (array $context): array => ['status' => 'verified'],
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'capture-article-media-ordering',
+            'intent' => 'IMAGE_ARTICLE',
+            'title' => 'Bài ảnh kiểm tra thứ tự MediaUsage',
+            'text' => 'Nội dung biên tập cục bộ.',
+        ]);
+
+        self::assertSame(['semantic_writeback', 'article_media_reconcile', 'article_research', 'publication_gate'], $events);
+        self::assertSame($articleUsageIds, $researchUsageIds);
+        self::assertSame(573, $result->articleId);
+    }
+
     public function test_attach_assets_accepts_existing_media_ids_without_physical_files(): void
     {
         $captures = new CaptureMediaIdsCaptureRepository();

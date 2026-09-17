@@ -25,6 +25,35 @@ use PHPUnit\Framework\TestCase;
  */
 final class EditorialCaptureConvergenceE2ETest extends TestCase
 {
+    public function test_committed_capture_media_ids_reach_article_reconciliation_before_publication_gate(): void
+    {
+        $captures = new Pr5CaptureRepository();
+        $events = [];
+        $calls = ['draft' => 0, 'semantic' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $mediaId = UuidCodec::newV7();
+        $seenCaptureOwnedMediaIds = null;
+        $coordinator = $this->coordinator(
+            $captures,
+            $calls,
+            $events,
+            media: static function (array $context) use (&$seenCaptureOwnedMediaIds): array {
+                $seenCaptureOwnedMediaIds = $context['capture_owned_media_ids'] ?? null;
+                return ['status' => 'RECONCILED', 'canonical_readback' => ['media_usage' => ['state' => 'VERIFIED', 'usage_ids' => [UuidCodec::newV7(), UuidCodec::newV7()]]]];
+            },
+            physicalItems: [['client_file_id' => 'front', 'media_id' => $mediaId, 'attachment_id' => 77, 'attachment_readback_status' => 'verified']],
+        );
+
+        $coordinator->execute([
+            'idempotency_key' => 'capture-article-media-forwarding',
+            'intent' => 'IMAGE_ARTICLE',
+            'title' => 'Bài ảnh kiểm tra Capture',
+            'text' => 'Nội dung biên tập cục bộ.',
+        ]);
+
+        self::assertSame([$mediaId], $seenCaptureOwnedMediaIds);
+        self::assertSame(['physical', 'draft', 'semantic', 'media', 'publication', 'final'], $events);
+    }
+
     public function test_text_article_pipeline_replays_same_capture_and_owner_writes(): void
     {
         $captures = new Pr5CaptureRepository();

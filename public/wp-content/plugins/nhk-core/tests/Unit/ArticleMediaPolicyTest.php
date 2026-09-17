@@ -340,6 +340,112 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertNotContains('ARTICLE_MEDIA_INLINE_MISSING', array_column($result->diagnostics, 'code'));
     }
 
+    public function test_capture_media_is_reconciled_into_article_slots_without_touching_representative_usages(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $item = $service->create('capture-media-a', 'Capture media A', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/capture-a.jpg', hash('sha256', 'capture-a-source'), 'image/jpeg', 8, 2400, 1600, 'PRIVATE');
+        $service->addAsset($item->canonicalId, 'derivative', 'uploads/capture-a.webp', hash('sha256', 'capture-a-public'), 'image/webp', 4, 1200, 800, 'PUBLIC');
+        $modelUsage = $service->addUsage($item->canonicalId, 'model', 'model-111', 'representative');
+        $classificationUsage = $service->addUsage($item->canonicalId, 'classification', 'classification-cuckoo', 'representative');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(573, [
+            'capture_id' => 'capture-573',
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE'],
+            'capture_owned_media_ids' => [$item->canonicalId],
+            'single_real_image_exception' => true,
+            'subject_ids' => ['subject-vedette-37'],
+        ]);
+
+        $articleUsages = array_values(array_filter(
+            $usages->listByEndpoint('wp_post', '1:573'),
+            static fn (MediaUsage $usage): bool => in_array($usage->role, ['featured_primary', 'inline_primary'], true),
+        ));
+        self::assertSame([$item->canonicalId], array_values(array_unique(array_map(static fn (MediaUsage $usage): string => $usage->mediaId, $articleUsages))));
+        self::assertSame($modelUsage->usageId, $usages->listByEndpoint('model', 'model-111', 'representative')[0]->usageId);
+        self::assertSame($classificationUsage->usageId, $usages->listByEndpoint('classification', 'classification-cuckoo', 'representative')[0]->usageId);
+        self::assertSame('VERIFIED', $result->toArray()['canonical_readback']['media_usage']['state']);
+        self::assertCount(2, $articleUsages);
+    }
+
+    public function test_capture_media_replay_keeps_media_and_article_usage_identities_without_new_assets(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $item = $service->create('capture-replay', 'Capture replay', 'ready');
+        $service->addAsset($item->canonicalId, 'original', 'uploads/capture-replay.jpg', hash('sha256', 'capture-replay-source'), 'image/jpeg', 8, 2400, 1600, 'PRIVATE');
+        $service->addAsset($item->canonicalId, 'derivative', 'uploads/capture-replay.webp', hash('sha256', 'capture-replay-public'), 'image/webp', 4, 1200, 800, 'PUBLIC');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+        $context = [
+            'capture_id' => 'capture-replay',
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE'],
+            'capture_owned_media_ids' => [$item->canonicalId],
+            'single_real_image_exception' => true,
+        ];
+
+        $first = $coordinator->ensureForPost(574, $context);
+        $firstUsageIds = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $usages->listByEndpoint('wp_post', '1:574'));
+        $second = $coordinator->ensureForPost(574, $context);
+        $secondUsageIds = array_map(static fn (MediaUsage $usage): string => $usage->usageId, $usages->listByEndpoint('wp_post', '1:574'));
+
+        self::assertSame([$item->canonicalId], array_values(array_unique($first->slotMedia)));
+        self::assertSame($first->slotMedia, $second->slotMedia);
+        self::assertSame($firstUsageIds, $secondUsageIds);
+        self::assertCount(2, $assets->listByMediaId($item->canonicalId));
+        self::assertCount(1, $media->items);
+        self::assertCount(2, $usages->listByEndpoint('wp_post', '1:574'));
+    }
+
+    public function test_one_image_exception_is_only_for_one_ready_image_article_media(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $first = $service->create('capture-multi-a', 'Capture multi A', 'ready');
+        $second = $service->create('capture-multi-b', 'Capture multi B', 'ready');
+        foreach ([[$first, 'multi-a'], [$second, 'multi-b']] as [$item, $stem]) {
+            $service->addAsset($item->canonicalId, 'original', 'uploads/' . $stem . '.jpg', hash('sha256', $stem . '-source'), 'image/jpeg', 8, 2400, 1600, 'PRIVATE');
+            $service->addAsset($item->canonicalId, 'derivative', 'uploads/' . $stem . '.webp', hash('sha256', $stem . '-public'), 'image/webp', 4, 1200, 800, 'PUBLIC');
+        }
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $multi = $coordinator->ensureForPost(575, [
+            'capture_id' => 'capture-multi',
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE'],
+            'capture_owned_media_ids' => [$first->canonicalId, $second->canonicalId],
+            'single_real_image_exception' => true,
+        ]);
+        $text = $coordinator->ensureForPost(576, [
+            'capture_id' => 'capture-text-with-image',
+            'content_intent' => ['intent' => 'TEXT_ARTICLE'],
+            'capture_owned_media_ids' => [$first->canonicalId],
+            'single_real_image_exception' => true,
+        ]);
+
+        self::assertSame([$first->canonicalId, $second->canonicalId], array_values(array_unique($multi->slotMedia)));
+        self::assertNotSame($multi->slotMedia['featured_primary'], $multi->slotMedia['inline_primary']);
+        self::assertSame($first->canonicalId, $text->slotMedia['featured_primary']);
+        self::assertTrue($text->slots['inline_primary']['placeholder']);
+    }
+
+    public function test_missing_capture_asset_is_typed_reconcile_blocker_and_not_satisfied_by_representative_usage(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $item = $service->create('capture-corrupt', 'Capture corrupt asset', 'ready');
+        $service->addUsage($item->canonicalId, 'model', 'model-corrupt', 'representative');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(577, [
+            'capture_id' => 'capture-corrupt',
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE'],
+            'capture_owned_media_ids' => [$item->canonicalId],
+            'single_real_image_exception' => true,
+        ]);
+
+        $readback = $result->toArray()['canonical_readback']['media_usage'];
+        self::assertContains($readback['state'], ['RECONCILE', 'REVIEW_REQUIRED']);
+        self::assertContains('ARTICLE_MEDIA_ASSET_UNAVAILABLE', $readback['blockers']);
+        self::assertNotSame('VERIFIED', $readback['state']);
+    }
+
     public function test_repeated_supporting_media_requires_explicit_unique_placements_and_converges_without_binary_duplication(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
