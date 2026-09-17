@@ -159,6 +159,16 @@ final class FrontendPresentationContractTest extends TestCase
         self::assertStringNotContainsString('foreach ((array) ($video[\'provenance\'] ?? []) as $key => $value)', $video);
     }
 
+    public function test_related_video_cards_share_orientation_aware_frames(): void
+    {
+        foreach (['entity.php', 'single.php'] as $template) {
+            $source = $this->read($template);
+            self::assertStringContainsString('nhk_v3_media_orientation_class', $source);
+            self::assertStringContainsString('video-thumb <?php echo esc_attr($orientation); ?>', $source);
+        }
+        self::assertStringContainsString('.visual-frame.nhk-media--portrait', $this->read('presentation.css'));
+    }
+
     public function test_display_fallback_asset_exists_and_is_not_a_semantic_media_writer(): void
     {
         $fallback = $this->theme . '/assets/default-archive.svg';

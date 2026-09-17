@@ -1,5 +1,23 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Related media/video orientation parity (LOCAL READY / LIVE VERIFY PENDING)
+
+SCOPE: Extended the existing vertical-first presentation seam to related Video
+cards rendered in Entity dossier and Article detail templates. No semantic
+record, identity, route, database or live state was changed.
+
+FIX: Related video thumbnails now consume canonical thumbnail dimensions,
+receive the same `nhk-media--portrait|landscape|square|unknown` classes and use
+orientation-aware visual frames. This removes the remaining duplicated 16:10
+presentation path from related-content blocks.
+
+VERIFICATION: Changed PHP templates lint clean; frontend presentation regression
+passes 81 tests / 820 assertions with one existing warning and 19 PHPUnit
+deprecations; diff check and changed-scope secret scan pass. Live staging DNS
+resolution remains unavailable, so visual acceptance was not performed.
+
+STATUS: `RELATED_MEDIA_ORIENTATION_LOCAL_READY / LIVE_VERIFY_PENDING`
+
 # Checkpoint — 2026-09-18 — Vertical-first frontend presentation seam (LOCAL READY / LIVE VERIFY PENDING)
 
 SCOPE: Repaired the shared public frontend presentation for intrinsic media

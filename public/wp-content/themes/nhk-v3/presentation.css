@@ -50,6 +50,9 @@
 .nhk-media--unknown .video-poster{aspect-ratio:16/9}
 .nhk-media--portrait .video-poster{max-width:min(100%,360px);margin-inline:auto}
 .visual-frame img,.card-image img,.featured-image img,.entity-card-image img,.entity-hero-visual img,.media-figure img{object-fit:contain}
+.visual-frame.nhk-media--portrait{aspect-ratio:4/5;max-width:min(100%,360px);margin-inline:auto}
+.visual-frame.nhk-media--square{aspect-ratio:1}
+.visual-frame.nhk-media--landscape{aspect-ratio:4/3}
 .video-play{position:absolute;inset:auto auto 14px 14px;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,253,249,.94);color:var(--nhk-accent);box-shadow:0 5px 18px rgba(57,41,28,.15)}
 @media(max-width:48rem){.local-section-nav{margin-inline:calc(-1 * var(--nhk-gutter, 14px));padding-inline:var(--nhk-gutter, 14px)}.local-section-nav ul{overflow-x:auto;padding-bottom:2px}.entity-card-body{padding:15px}.visual-rail{gap:14px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
