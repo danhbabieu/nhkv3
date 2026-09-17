@@ -28,7 +28,7 @@ external runtime state were changed.
 
 ## Verification
 
-- Focused gate/research/media/E2E suite: **PASS** — 87 tests, 368 assertions,
+- Focused gate/research/media/E2E suite: **PASS** — 87 tests, 377 assertions,
   1 existing warning.
 - Whole plugin Unit suite: **BASELINE FAILURES OUTSIDE THIS TASK** — 1,779
   tests, 8,749 assertions, 5 failures. `DemoCutoverCliContractTest` receives
@@ -52,7 +52,14 @@ external runtime state were changed.
 This report is included in the documentation-only correction commit because
 the review fix corrects its recorded whole-Unit baseline.
 
+Commit provenance:
+
+- Initial scoped tests: `116417a6`
+- Review-fix commit: `98159528`
+- Documentation correction: `c06ec16b`
+
 ## Commit
 
-- SHA: `116417a6`
-- Message: `test: verify canonical article media evidence`
+- Initial scoped-tests SHA: `116417a6`
+- Review-fix SHA: `98159528`
+- Documentation-correction SHA: `c06ec16b`
