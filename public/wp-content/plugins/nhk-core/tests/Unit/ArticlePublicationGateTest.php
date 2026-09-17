@@ -237,6 +237,18 @@ final class ArticlePublicationGateTest extends TestCase
         }
     }
 
+    public function test_legacy_evidence_without_rendered_requirement_keeps_boolean_compatibility(): void
+    {
+        $evidence = $this->evidence();
+        unset($evidence['rendered_public_verification_status'], $evidence['requirements']);
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertTrue($result->eligible);
+        self::assertSame([], $result->blockers);
+    }
+
     public function test_gate_blocks_unverified_required_article_media_even_when_semantic_is_not_applicable(): void
     {
         $evidence = $this->evidence();

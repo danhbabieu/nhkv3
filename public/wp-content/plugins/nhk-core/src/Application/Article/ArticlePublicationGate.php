@@ -72,7 +72,10 @@ final class ArticlePublicationGate
         $renderedRequirement = is_array($requirements['rendered_public'] ?? null) ? $requirements['rendered_public'] : null;
         $renderedPublicStatus = strtolower(trim((string) ($evidence['rendered_public_verification_status'] ?? '')));
         $renderedPublicCompatibilityState = in_array($renderedPublicStatus, ['unavailable', 'not_present'], true);
-        if ($this->skipRequirement('rendered_public', $renderedRequirement)) {
+        if ($renderedRequirement === null) {
+            if ($renderedPublicCompatibilityState) $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
+            else $this->requireTrue($evidence, 'rendered_public_verification', 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $blockers);
+        } elseif ($this->skipRequirement('rendered_public', $renderedRequirement)) {
             if ($renderedPublicCompatibilityState) {
                 $warnings[] = 'RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE';
             } elseif ($renderedPublicStatus !== 'verified' || ($evidence['rendered_public_verification'] ?? false) !== true) {
