@@ -9,6 +9,7 @@ use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, P
 use NHK\Core\Contracts\Graph\EndpointRevisionReader;
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference};
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
+use NHK\Core\Infrastructure\Graph\WpPostEndpointResolver;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
@@ -73,24 +74,28 @@ final class RelationProposalReconciliationServiceTest extends TestCase
         $proposalId = UuidCodec::newV7();
         $replacementId = UuidCodec::newV7();
         $targetId = UuidCodec::newV7();
-        $original = new Proposal($proposalId, '1:485', 'relation_create', [
-            'source_type' => 'wp_post', 'source_uuid' => '1:485',
+        $post = (object) [
+            'ID' => 575,
+            'post_modified_gmt' => '0000-00-00 00:00:00',
+            'post_modified' => '2026-09-15 07:56:04',
+        ];
+        $draftRevision = strtotime('2026-09-15 07:56:04 UTC');
+        $original = new Proposal($proposalId, '1:575', 'relation_create', [
+            'source_type' => 'wp_post', 'source_uuid' => '1:575',
             'target_type' => 'classification', 'target_uuid' => $targetId,
             'predicate' => 'about', 'source_revision' => 1, 'target_revision' => 1,
         ], 'original-content', null, 'original-dependency', ProposalState::APPROVED, entityType: 'relation');
-        $replacement = new Proposal($replacementId, '1:485', 'relation_create', [
-            'source_type' => 'wp_post', 'source_uuid' => '1:485',
+        $replacement = new Proposal($replacementId, '1:575', 'relation_create', [
+            'source_type' => 'wp_post', 'source_uuid' => '1:575',
             'target_type' => 'classification', 'target_uuid' => $targetId,
-            'predicate' => 'about', 'source_revision' => 2, 'target_revision' => 1,
+            'predicate' => 'about', 'source_revision' => $draftRevision, 'target_revision' => 1,
         ], 'replacement-content', null, 'replacement-dependency', ProposalState::DRAFT, entityType: 'relation');
 
         $endpoints = new EndpointTypeRegistry();
-        $endpoints->register('wp_post', new class implements EndpointRevisionReader {
-            public function supports(string $endpoint_type): bool { return $endpoint_type === 'wp_post'; }
-            public function exists(NodeReference $reference): bool { return true; }
-            public function normalize(NodeReference $reference): NodeReference { return $reference; }
-            public function revision(NodeReference $reference): ?int { return 2; }
-        });
+        $endpoints->register('wp_post', new WpPostEndpointResolver(
+            static fn (int $postId): object|null => $postId === 575 ? $post : null,
+            static fn (): int => 1,
+        ));
         $endpoints->register('classification', new class($targetId) implements EndpointRevisionReader {
             public function __construct(private string $id) {}
             public function supports(string $endpoint_type): bool { return $endpoint_type === 'classification'; }
@@ -100,7 +105,7 @@ final class RelationProposalReconciliationServiceTest extends TestCase
         });
 
         $lifecycle = $this->createMock(GovernedLifecycle::class);
-        $lifecycle->expects(self::once())->method('createFromArguments')->with(self::callback(static fn (array $args): bool => ($args['idempotency_key'] ?? '') !== $original->idempotencyKey && ($args['payload']['source_revision'] ?? 0) === 2))->willReturn($replacement);
+        $lifecycle->expects(self::once())->method('createFromArguments')->with(self::callback(static fn (array $args): bool => ($args['idempotency_key'] ?? '') !== $original->idempotencyKey && ($args['payload']['source_revision'] ?? 0) === $draftRevision))->willReturn($replacement);
         $lifecycle->expects(self::once())->method('submit')->with($replacementId)->willReturn($replacement->transition(ProposalState::SUBMITTED));
         $lifecycle->expects(self::exactly(2))->method('review')->with($replacementId)->willReturnOnConsecutiveCalls(
             ['state' => 'draft', 'content_fingerprint' => 'replacement-content', 'dependency_fingerprint' => 'replacement-dependency'],

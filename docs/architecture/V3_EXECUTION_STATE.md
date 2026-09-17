@@ -11941,3 +11941,37 @@ Authority test edits were preserved and are excluded from the implementation
 commit.
 
 STATUS: `VIDEO_RELATION_KEEP_AND_KNOWLEDGE_RETRY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Capture Article endpoint revision normalization (LOCAL ONLY)
+
+SCOPE: Fixed the generic Capture → native WordPress Article draft →
+Governance relation-reconciliation failure for date-floating drafts. No
+staging/production mutation, deployment, push, direct database write or live
+Capture resume was performed.
+
+ROOT_CAUSE: WordPress date-floating drafts can expose
+`post_modified_gmt = '0000-00-00 00:00:00'` while native `post_modified` is a
+valid local timestamp. `WpPostEndpointResolver` treated the zero-date GMT
+sentinel as authoritative, so `RelationRevisionBinder` received no
+`wp_post` endpoint revision and failed closed with
+`Relation endpoint revision is unavailable`. The Article `state_token` was
+correctly separate and was not used as a relation revision.
+
+FIX: `WpPostEndpointResolver` now accepts a valid GMT modification timestamp
+first and falls back only when needed to native `post_modified`, converting it
+through WordPress `get_gmt_from_date()` when available. Empty, zero-date or
+invalid values on both fields remain unavailable and fail closed. No Post ID,
+default revision, state token or Governance bypass is used. The stale relation
+reconciliation regression now exercises this adapter with a date-floating
+draft and verifies the fresh bound source revision before apply.
+
+VERIFICATION: Focused Capture/Article/Governance suite PASS — 101 tests / 404
+assertions. Full `NHK Unit` suite reached 1,741 tests / 8,564 assertions with
+one unrelated pre-existing `DemoCutoverCliContractTest` failure
+(`REMOTE_DEPLOYMENT_FAILED` vs expected missing-config diagnostic), 14
+warnings and 18 deprecations. Targeted PHP lint and `git diff --check` pass;
+the full plugin `composer lint` command was invoked and emitted only syntax
+success output, with its long-running shell result not surfaced by the command
+runner. No integration or runtime acceptance was run.
+
+STATUS: `CAPTURE_ARTICLE_ENDPOINT_REVISION_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

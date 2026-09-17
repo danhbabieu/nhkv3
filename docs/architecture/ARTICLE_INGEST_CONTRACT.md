@@ -69,6 +69,15 @@ surface; without it they fail closed with `DIRECT_WRITE_BLOCKED` and
    contract and remain idempotent.
 4. Create or update the native WordPress Post as a draft. The Post identity is
    the registered `wp_post` endpoint with stable key `<blog_id>:<post_id>`.
+   For relation revision binding, the `wp_post` endpoint revision is the
+   normalized native WordPress modification timestamp: use a valid
+   `post_modified_gmt`, and for date-floating drafts whose GMT field is the
+   zero-date sentinel, convert the native `post_modified` through the
+   WordPress timezone boundary. This endpoint revision is distinct from the
+   Article `state_token`, the Capture receipt revision and the Graph edge
+   revision. If both native modification timestamps are empty or invalid, the
+   relation must fail closed; it must not substitute a Post ID, default
+   revision or state token.
 5. Submit and apply semantic mutations through the existing
    Proposal → Human Approval → Eligibility → Controlled Apply → repository →
    audit boundary. Direct Graph or semantic repository writes are not a

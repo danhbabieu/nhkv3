@@ -18,9 +18,21 @@ final class WpPostEndpointResolver implements EndpointRevisionReader {
         [, $postId] = array_map('intval', explode(':', $reference->endpoint_key, 2));
         $post = $this->post($postId);
         if ($post === null) return null;
-        $modified = trim((string) ($post->post_modified_gmt ?? $post->post_modified ?? ''));
-        $revision = $modified === '' ? false : strtotime($modified . (str_contains($modified, 'UTC') ? '' : ' UTC'));
-        return is_int($revision) && $revision > 0 ? $revision : null;
+        return $this->timestamp($post->post_modified_gmt ?? null, true)
+            ?? $this->timestamp($post->post_modified ?? null, false);
+    }
+
+    private function timestamp(mixed $value, bool $isGmt): ?int
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === '' || $value === '0000-00-00 00:00:00') return null;
+        if (!$isGmt) {
+            $value = function_exists('get_gmt_from_date') ? (string) get_gmt_from_date($value) : $value . ' UTC';
+        } elseif (!preg_match('/(?:UTC|Z|[+-][0-9]{2}:?[0-9]{2})$/i', $value)) {
+            $value .= ' UTC';
+        }
+        $timestamp = strtotime($value);
+        return is_int($timestamp) && $timestamp > 0 ? $timestamp : null;
     }
     private function post(int $postId): ?object
     {

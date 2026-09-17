@@ -62,6 +62,55 @@ final class RelationRevisionBindingTest extends TestCase
         self::assertSame(1, $bound['target_revision']);
     }
 
+    public function test_binds_wp_post_revision_from_date_floating_draft_local_modified_timestamp(): void
+    {
+        $post = (object) [
+            'ID' => 575,
+            'post_modified_gmt' => '0000-00-00 00:00:00',
+            'post_modified' => '2026-09-15 07:56:04',
+        ];
+        $resolver = new WpPostEndpointResolver(
+            static fn (int $postId): object|null => $postId === 575 ? $post : null,
+            static fn (): int => 1,
+        );
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', $resolver);
+        $endpoints->register('classification', new RevisionedResolver('classification', ['classification-1' => 2]));
+
+        $bound = (new RelationRevisionBinder($endpoints))->bind([
+            'source_type' => 'wp_post', 'source_uuid' => '1:575',
+            'target_type' => 'classification', 'target_uuid' => 'classification-1',
+            'predicate' => 'about',
+        ]);
+
+        self::assertSame(strtotime('2026-09-15 07:56:04 UTC'), $bound['source_revision']);
+        self::assertSame(2, $bound['target_revision']);
+    }
+
+    public function test_missing_wp_post_modification_timestamp_still_fails_closed(): void
+    {
+        $post = (object) [
+            'ID' => 575,
+            'post_modified_gmt' => '0000-00-00 00:00:00',
+            'post_modified' => '0000-00-00 00:00:00',
+        ];
+        $endpoints = new EndpointTypeRegistry();
+        $endpoints->register('wp_post', new WpPostEndpointResolver(
+            static fn (int $postId): object|null => $postId === 575 ? $post : null,
+            static fn (): int => 1,
+        ));
+        $endpoints->register('classification', new RevisionedResolver('classification', ['classification-1' => 2]));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Relation endpoint revision is unavailable: wp_post:1:575');
+
+        (new RelationRevisionBinder($endpoints))->bind([
+            'source_type' => 'wp_post', 'source_uuid' => '1:575',
+            'target_type' => 'classification', 'target_uuid' => 'classification-1',
+            'predicate' => 'about',
+        ]);
+    }
+
 }
 
 final class RevisionedResolver implements EndpointRevisionReader
