@@ -93,6 +93,7 @@ final class VideoEditorialResumePlannerTest extends TestCase
         $context = ['continuation_delta_text' => '', 'subject_resolution' => ['primary' => ['id' => '22222222-2222-4222-8222-222222222222', 'type' => 'variant', 'name' => 'Odo 36/8']], 'retrieval' => ['selected_claims' => []]];
         $first = $planner->plan(['payload' => ['canonical_id' => $videoId]], $context);
         $repository->replaceMetadata($videoId, $first['payload']['metadata']);
+        $repository->replaceTitle($videoId, (string) $first['payload']['title']);
         $second = $planner->plan(['payload' => ['canonical_id' => $videoId]], $context);
 
         self::assertSame('REBUILD_EDITORIAL', $first['status']);
@@ -127,6 +128,28 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertSame($video->canonicalId, $retry['target_uuid']);
         self::assertSame($video->revision, $retry['expected_revision']);
         self::assertNotSame('Video tham chiếu NHK', $retry['payload']['metadata']['editorial']['title']);
+    }
+
+    public function test_matching_fingerprint_with_stale_top_level_canonical_title_rebuilds_same_video(): void
+    {
+        $video = $this->videoWithCanonicalPackage();
+        $repository = new VideoEditorialResumeTestRepository($video);
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $context = $this->resumeContext();
+        $first = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+
+        // The persisted child fingerprint and metadata package are current,
+        // but the canonical owner's reader-facing title is still stale.
+        $repository->replaceMetadata($video->canonicalId, $first['payload']['metadata']);
+        $repository->replaceTitle($video->canonicalId, 'Video tham chiếu NHK');
+
+        $retry = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+
+        self::assertSame('REBUILD_EDITORIAL', $retry['status']);
+        self::assertSame('STALE_EDITORIAL_REPLAY', $retry['payload']['metadata']['editorial_reconciliation']['diagnostic']);
+        self::assertSame($video->canonicalId, $retry['target_uuid']);
+        self::assertSame($video->canonicalId, $retry['payload']['canonical_id']);
+        self::assertNotSame('Video tham chiếu NHK', $retry['payload']['title']);
     }
 
     public function test_matching_fingerprint_replays_captured_editorial_package_and_updates_canonical_title(): void
@@ -250,5 +273,10 @@ final class VideoEditorialResumeTestRepository implements VideoRepository
     {
         $video = $this->items[$id];
         $this->items[$id] = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $metadata, $video->thumbnailMediaId, $video->active, $video->revision);
+    }
+    public function replaceTitle(string $id, string $title): void
+    {
+        $video = $this->items[$id];
+        $this->items[$id] = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $title, $video->metadata, $video->thumbnailMediaId, $video->active, $video->revision);
     }
 }

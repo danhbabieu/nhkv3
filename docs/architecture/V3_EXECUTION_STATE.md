@@ -12003,3 +12003,38 @@ Integration/runtime acceptance was not run; no live/staging mutation,
 deployment or push occurred.
 
 STATUS: `VIDEO_EDITORIAL_REUSE_CANONICAL_PARITY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Video stale canonical title replay fix (LOCAL ONLY)
+
+SCOPE: Fixed the resume reuse boundary for an existing Video whose persisted
+editorial fingerprint and metadata package match the desired replay, while the
+canonical reader-facing `Video.title` is still stale. `VideoEditorialResumePlanner`
+now includes the top-level canonical title in parity before it can return
+`REUSE_EDITORIAL`; a mismatch returns the existing governed same-UUID
+`REBUILD_EDITORIAL` path with `STALE_EDITORIAL_REPLAY`. No completion blocker was
+used as a substitute for the pre-reuse parity decision.
+
+PROJECTION: The governed retry applies the same Video UUID, preserves the
+existing `about` relation, refreshes Search title plus SEO/Open Graph/
+VideoObject title projections, and retains canonical read-back before the
+Capture child can be recorded as applied. The public URL audit regression uses
+the updated W64 editorial name and derives the W64 slug instead of the legacy
+`video-tham-chieu-nha-kho` slug; no Public Identity mutation was executed.
+
+REGRESSION: Added coverage for fingerprint+canonical match reuse, stale
+top-level title update, stale metadata replay, same UUID, relation KEEP,
+Search/SEO projection refresh, completion guard behavior, Knowledge dedupe
+coverage, and W64 public-url audit derivation.
+
+VERIFICATION: Focused Video/Capture/Search/SEO/public-url suite PASS — 244
+tests / 1,474 assertions. Full NHK Unit reached 1,752 tests / 8,611
+assertions with four unrelated existing failures/errors: two
+`EditorialCaptureContinuationTest` missing-method errors, the known
+`DemoCutoverCliContractTest` remote-config diagnostic mismatch, and an
+unrelated `McpContractTest` retry-schema mismatch. Full Unit excluding those
+three unrelated test groups PASS — 1,690 tests / 7,910 assertions, with 14
+warnings and 18 deprecations. `composer lint`, `git diff --check` and the
+repository secret scan pass. No integration/runtime acceptance, server edit,
+deployment, push or live mutation was performed.
+
+STATUS: `VIDEO_STALE_CANONICAL_TITLE_REPLAY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

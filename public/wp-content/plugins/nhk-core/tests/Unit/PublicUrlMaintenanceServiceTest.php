@@ -26,6 +26,31 @@ final class PublicUrlMaintenanceServiceTest extends TestCase
         self::assertSame([], $writes);
     }
 
+    public function test_video_audit_after_editorial_update_derives_w64_slug_instead_of_legacy_video_slug(): void
+    {
+        $service = new PublicUrlMaintenanceService(
+            static fn(): array => [[
+                'kind' => 'video',
+                'owner_id' => '01a0aaf8-2a84-7287-bbd8-70af4d5485e4',
+                'route_type' => 'video',
+                'scope' => 'root',
+                'name' => 'Đồng hồ vai bò Junghans W64 5 côn đồng bạch – chất âm rất đáng chơi',
+                'current_slug' => 'video-tham-chieu-nha-kho',
+                'qualifiers' => [],
+            ]],
+            static fn(array $item, string $slug): bool => false,
+            static function(array $item, string $key): void {},
+        );
+
+        $audit = $service->audit();
+
+        self::assertSame('READY', $audit['status']);
+        self::assertSame('CHANGE', $audit['items'][0]['action']);
+        self::assertSame('dong-ho-vai-bo-junghans-w64-5-con-dong-bach-chat-am-rat-dang-choi', $audit['items'][0]['desired_slug']);
+        self::assertStringContainsString('junghans-w64', $audit['items'][0]['desired_slug']);
+        self::assertNotSame('video-tham-chieu-nha-kho', $audit['items'][0]['desired_slug']);
+    }
+
     public function test_reproject_requires_explicit_pre_public_confirmation(): void
     {
         $service = new PublicUrlMaintenanceService(static fn(): array => [], static fn(array $item, string $slug): bool => false, static fn(array $item, string $key) => null);

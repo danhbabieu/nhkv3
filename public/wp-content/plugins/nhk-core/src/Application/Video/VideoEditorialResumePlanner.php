@@ -182,11 +182,14 @@ final class VideoEditorialResumePlanner
     {
         $metadata = is_array($video->metadata) ? $video->metadata : [];
         $source = is_array($desired['package']['source'] ?? null) ? $desired['package']['source'] : [];
+        $desiredTitle = trim((string) ($desired['editorial']['title'] ?? ''));
         $storedSource = is_array($metadata['source'] ?? null)
             ? $metadata['source']
             : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
 
         return $video->canonicalId === (string) ($desired['package']['canonical_id'] ?? '')
+            && $desiredTitle !== ''
+            && $video->title === $desiredTitle
             && $video->platform === (string) ($source['platform'] ?? $video->platform)
             && $video->externalVideoId === (string) ($source['external_video_id'] ?? $video->externalVideoId)
             && $video->canonicalUrl === (string) ($source['canonical_source_url'] ?? $video->canonicalUrl)
