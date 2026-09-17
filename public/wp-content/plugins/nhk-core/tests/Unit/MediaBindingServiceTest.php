@@ -97,6 +97,36 @@ final class MediaBindingServiceTest extends TestCase
         $service->bind($base + ['seo' => ['caption' => 'payload changed']]);
     }
 
+    public function test_duplicate_operation_create_race_rechecks_the_returned_receipt_fingerprint(): void
+    {
+        $operations = new RaceOperationRepository();
+        $operations->existing = new MediaBindingOperation(
+            UuidCodec::newV7(),
+            'race-key',
+            str_repeat('b', 64),
+            null,
+            'classification',
+            '01a07614-832d-7f27-959c-74eb0cd63f3e',
+            'representative',
+            'USER_EXPLICIT',
+            'PINNED',
+        );
+        [$service, $usages] = $this->service(true, $operations);
+
+        try {
+            $service->bind([
+                'idempotency_key' => 'race-key',
+                'media' => ['id' => '01a0ab0c-fde0-7c01-a89d-fc5eef832c89'],
+                'target' => ['type' => 'classification', 'id' => '01a07614-832d-7f27-959c-74eb0cd63f3e'],
+            ]);
+            self::fail('The duplicate operation race must be rejected before usage mutation.');
+        } catch (MediaException $error) {
+            self::assertSame('IDEMPOTENCY_CONFLICT', $error->getMessage());
+        }
+
+        self::assertCount(0, $usages->listByEndpoint('classification', '01a07614-832d-7f27-959c-74eb0cd63f3e', 'representative'));
+    }
+
     public function test_auto_discovery_requires_registered_scope_and_returns_review_on_tie(): void
     {
         [$service] = $this->service();
@@ -108,7 +138,7 @@ final class MediaBindingServiceTest extends TestCase
     }
 
     /** @return array{0:MediaBindingService,1:MemoryUsageRepository} */
-    private function service(bool $activeTarget = true): array
+    private function service(bool $activeTarget = true, ?MediaBindingOperationRepository $operations = null): array
     {
         $mediaId = '01a0ab0c-fde0-7c01-a89d-fc5eef832c89';
         $media = new MemoryMediaRepository([
@@ -125,7 +155,7 @@ final class MediaBindingServiceTest extends TestCase
         $types = new EntityTypeRegistry();
         $types->register(new EntityTypeDefinition('classification', 1, true));
         $usages = new MemoryUsageRepository();
-        return [new MediaBindingService($media, $assets, $usages, $authority, $types, new MemoryOperationRepository()), $usages];
+        return [new MediaBindingService($media, $assets, $usages, $authority, $types, $operations ?? new MemoryOperationRepository()), $usages];
     }
 }
 
@@ -176,4 +206,35 @@ final class MemoryOperationRepository implements MediaBindingOperationRepository
     public function findByIdempotencyKey(string $key): ?MediaBindingOperation { foreach ($this->items as $item) if ($item->idempotencyKey === $key) return $item; return null; }
     public function create(MediaBindingOperation $operation): MediaBindingOperation { $this->items[] = $operation; return $operation; }
     public function save(MediaBindingOperation $operation, int $expectedRevision): MediaBindingOperation { foreach ($this->items as $index => $item) if ($item->operationId === $operation->operationId) { if ($item->revision !== $expectedRevision) throw new MediaException('conflict'); $this->items[$index] = $operation; return $operation; } throw new MediaException('missing'); }
+}
+
+final class RaceOperationRepository implements MediaBindingOperationRepository
+{
+    public ?MediaBindingOperation $existing = null;
+    private bool $firstLookup = true;
+
+    public function findByOperationId(string $id): ?MediaBindingOperation
+    {
+        return $this->existing?->operationId === $id ? $this->existing : null;
+    }
+
+    public function findByIdempotencyKey(string $key): ?MediaBindingOperation
+    {
+        if ($this->firstLookup) {
+            $this->firstLookup = false;
+            return null;
+        }
+        return $this->existing?->idempotencyKey === $key ? $this->existing : null;
+    }
+
+    public function create(MediaBindingOperation $operation): MediaBindingOperation
+    {
+        return $this->existing ?? $operation;
+    }
+
+    public function save(MediaBindingOperation $operation, int $expectedRevision): MediaBindingOperation
+    {
+        $this->existing = $operation;
+        return $operation;
+    }
 }

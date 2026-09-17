@@ -15,7 +15,6 @@ final class PublicEditorialRoutes
         add_action('init', [$this, 'rewrite']);
         add_action('template_redirect', [$this, 'legacySearchRedirect'], 1);
         add_action('template_redirect', [$this, 'canonicalCategoryRedirect'], 2);
-        add_action('pre_get_posts', [$this, 'prepareArchiveQuery']);
         add_filter('redirect_canonical', [$this, 'suppressPresentationRedirect'], 10, 2);
         add_filter('template_include', [$this, 'template']);
     }
@@ -40,12 +39,6 @@ final class PublicEditorialRoutes
         }
     }
 
-    public function prepareArchiveQuery(\WP_Query $query): void
-    {
-        if (!$query->is_main_query() || (string) $query->get('nhk_editorial_route') !== self::TRI_THUC_ROUTE) return;
-        foreach (self::triThucArchiveQuery() as $key => $value) $query->set($key, $value);
-    }
-
     public function canonicalCategoryRedirect(): void
     {
         if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST) || PHP_SAPI === 'cli') return;
@@ -65,24 +58,21 @@ final class PublicEditorialRoutes
     public function template(string $template): string
     {
         $route = (string) get_query_var('nhk_editorial_route');
+
+        if ($route === self::TRI_THUC_ROUTE) {
+            global $wp_query;
+            if (isset($wp_query) && is_object($wp_query)) { $wp_query->is_404 = false; $wp_query->is_archive = true; }
+            status_header(200);
+            $found = locate_template('tri-thuc.php');
+            return $found !== '' ? $found : $template;
+        }
+
         if ($route === '' || term_exists($route, 'category')) return $template;
         global $wp_query;
         if (isset($wp_query) && is_object($wp_query)) { $wp_query->is_404 = false; $wp_query->is_archive = true; }
         status_header(200);
         $found = locate_template('index.php');
         return $found !== '' ? $found : $template;
-    }
-
-    /** @return array<string,mixed> */
-    private static function triThucArchiveQuery(): array
-    {
-        return [
-            'category__in' => [4],
-            'post_type' => 'post',
-            'post_status' => 'publish',
-            'orderby' => 'date',
-            'order' => 'DESC',
-        ];
     }
 
     private static function triThucPresentationPath(int $page): string

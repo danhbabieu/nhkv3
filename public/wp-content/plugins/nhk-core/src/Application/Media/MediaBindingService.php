@@ -45,7 +45,14 @@ final class MediaBindingService
         } else {
             $target = (array) $normalized['target'];
             $operation = new MediaBindingOperation(UuidCodec::newV7(), $key, $fingerprint, null, (string) $target['type'], (string) $target['id'], (string) $normalized['role'], (string) $normalized['selection_source'], (string) $normalized['selection_policy'], metadata: ['seo' => $normalized['seo']]);
-            $operation = $this->operations?->create($operation) ?? $operation;
+            if ($this->operations !== null) {
+                $created = $this->operations->create($operation);
+                if ($created->idempotencyKey !== $key || !hash_equals($created->requestFingerprint, $fingerprint)) {
+                    throw new MediaException('IDEMPOTENCY_CONFLICT');
+                }
+                $operation = $created;
+                if ($operation->status === 'COMPLETE') return $operation->toArray();
+            }
         }
 
         try {
