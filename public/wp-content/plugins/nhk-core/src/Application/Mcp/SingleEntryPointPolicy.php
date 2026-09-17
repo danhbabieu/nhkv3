@@ -33,6 +33,7 @@ final class SingleEntryPointPolicy
         'nhk.media.upload-batch',
         'nhk.media.widget-upload',
         'nhk.media.ingest',
+        'nhk.media.bind',
         'nhk.video.ingest',
         'nhk.knowledge.ingest',
         'nhk.source.ingest',

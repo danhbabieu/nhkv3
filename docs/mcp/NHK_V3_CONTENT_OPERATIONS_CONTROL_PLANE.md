@@ -165,8 +165,20 @@ Capture received → physical attachments stored/read back → text interpreted
 → subjects resolved
 → bounded Claims retrieved → governed semantic proposal/apply/read-back
 → Article composed/updated → MediaUsage reconciled
+
 → publication gate → final native read-back
 ```
+
+An exact typed Media binding is a bounded exception to the long semantic path:
+physical Media read-back → exact target resolution → `MediaBindingService` →
+MediaUsage representative reconciliation → SEO/projection invalidation →
+canonical read-back. It does not require an Article, NLP, Claims or Graph
+traversal. `nhk.media.bind` uses the same owner for an existing Media.
+
+The binding receipt stages are `VALIDATE`, `RESOLVE_MEDIA`, `RESOLVE_TARGET`,
+`PLAN`, `APPLY_USAGE`, `RECONCILE_REPRESENTATIVE`, `SEO_INVALIDATE`,
+`PROJECTION_INVALIDATE`, `FINAL_READBACK`, and `COMPLETE`; retries never create a
+second Usage for the same idempotent request.
 
 Text-only input is valid. Multipart files remain binary transport data and are
 never put into JSON, Knowledge, Evidence or Graph storage. The Capture stores

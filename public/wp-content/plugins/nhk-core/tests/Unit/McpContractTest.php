@@ -71,6 +71,8 @@ final class McpContractTest extends TestCase
             'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore',
             'nhk.entity.get',
             'nhk.media.get',
+            'nhk.media.binding.get',
+            'nhk.media.bind',
             'nhk.media.upload-batch',
             'nhk.media.widget-upload',
             'nhk.media.upload-widget.open',
@@ -184,6 +186,8 @@ final class McpContractTest extends TestCase
         self::assertSame('internal_admin_only', $tools['nhk.knowledge.ingest']['surface']);
         self::assertArrayHasKey('video', $tools['nhk.capture.ingest']['inputSchema']['properties']);
         self::assertSame(['VIDEO', 'IMAGE_ARTICLE', 'TEXT_ARTICLE', 'KNOWLEDGE_DELTA', 'MEDIA_ENRICHMENT'], $tools['nhk.capture.ingest']['inputSchema']['properties']['intent']['enum']);
+        self::assertArrayHasKey('media_bindings', $tools['nhk.capture.ingest']['inputSchema']['properties']);
+        self::assertSame(['representative'], $tools['nhk.media.bind']['inputSchema']['properties']['role']['enum']);
         self::assertContains('nhk.article.publish', SingleEntryPointPolicy::internalOnlyTools());
     }
 
@@ -436,6 +440,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/category-resolve',
             'nhk-v3/entity-get',
             'nhk-v3/media-get',
+            'nhk-v3/media-binding-get',
             'nhk-v3/media-attachment-get',
             'nhk-v3/media-upload-widget-open',
             'nhk-v3/video-get',
@@ -469,6 +474,7 @@ final class McpContractTest extends TestCase
             'nhk-v3/article-restore',
             'nhk-v3/video-ingest',
             'nhk-v3/media-ingest',
+            'nhk-v3/media-bind',
             'nhk-v3/media-upload-batch',
             'nhk-v3/media-widget-upload',
             'nhk-v3/knowledge-ingest',

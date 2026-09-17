@@ -83,6 +83,9 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertSame('image/webp', $detail['assets'][0]['mime_type']);
         self::assertSame('representative', $detail['usages'][0]['role']);
         self::assertSame('variant', $detail['usages'][0]['endpoint_type']);
+        self::assertSame('SYSTEM_AUTO', $detail['usages'][0]['selection_source']);
+        self::assertSame('AUTO', $detail['usages'][0]['selection_policy']);
+        self::assertNull($detail['usages'][0]['active_slot']);
         self::assertSame('available', $detail['frontend_state']);
         self::assertArrayHasKey('completion', $detail);
         self::assertSame('BLOCKED', $detail['completion']['frontend_state']);

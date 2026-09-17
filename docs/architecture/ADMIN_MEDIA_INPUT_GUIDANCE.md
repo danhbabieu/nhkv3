@@ -112,6 +112,16 @@ in another Article, Product, Specimen or projection.
 Existing legacy attachments are read-only unless a separately governed repair
 or migration task explicitly authorizes changes.
 
+## Representative binding UX — 2026-09-17
+
+The normal image panel exposes: select an existing or newly uploaded Media,
+select an exact registered entity, choose `representative`, choose Pin or Auto,
+and enter contextual alt text/caption/title. The panel submits typed
+`media_bindings[]` through Capture for new submissions or `nhk.media.bind` for
+an existing Media. It does not ask an editor for proposal UUIDs, fingerprints,
+revisions or raw JSON. Both paths delegate to `MediaBindingService`; contextual
+SEO remains on MediaUsage and never overwrites global attachment metadata.
+
 An editor may also select an existing first-party WordPress Media URL through
 Capture. The URL is resolved to the exact attachment by WordPress storage
 metadata and read back locally; it is not downloaded or imported again. URL

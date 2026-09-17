@@ -46,6 +46,8 @@ final class McpDispatchRegistry
         'nhk.article.restore' => 'nhk.article.restore',
         'nhk.entity.get' => 'nhk.entity.get',
         'nhk.media.get' => 'nhk.media.get',
+        'nhk.media.binding.get' => 'nhk.media.binding.get',
+        'nhk.media.bind' => 'nhk.media.bind',
         'nhk.media.upload-batch' => 'nhk.media.upload-batch',
         'nhk.media.widget-upload' => 'nhk.media.widget-upload',
         'nhk.media.upload-widget.open' => 'nhk.media.upload-widget.open',

@@ -51,7 +51,7 @@ final class AdminMediaAdapter
         return [
             'media' => ['id' => $media->canonicalId, 'title' => $media->canonicalName, 'stable_key' => $media->stableKey, 'readiness' => $media->readiness, 'active' => $media->active, 'provenance' => $media->provenance, 'revision' => $media->revision, 'placeholder' => $media->isSystemPlaceholder()],
             'assets' => array_map(static fn (MediaAsset $asset): array => ['id' => $asset->assetId, 'kind' => $asset->kind, 'mime_type' => $asset->mimeType, 'byte_size' => $asset->byteSize, 'width' => $asset->width, 'height' => $asset->height, 'visibility' => $asset->visibility], $assets),
-            'usages' => array_map(static fn (MediaUsage $usage): array => ['usage_id' => $usage->usageId, 'role' => $usage->role, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'sort_order' => $usage->sortOrder, 'alt' => $usage->altText, 'caption' => $usage->caption], $usages),
+            'usages' => array_map(static fn (MediaUsage $usage): array => ['usage_id' => $usage->usageId, 'role' => $usage->role, 'endpoint_type' => $usage->endpointType, 'endpoint_key' => $usage->endpointKey, 'sort_order' => $usage->sortOrder, 'selection_source' => $usage->selectionSource, 'selection_policy' => $usage->selectionPolicy, 'active_slot' => $usage->activeSlot, 'alt' => $usage->altText, 'caption' => $usage->caption, 'title' => $usage->title], $usages),
             'semantic_role' => $usages[0]->role ?? null,
             'relation_count' => count(array_filter($usages, static fn (MediaUsage $usage): bool => $usage->endpointType !== 'wp_post')),
             'usage_count' => count($usages),

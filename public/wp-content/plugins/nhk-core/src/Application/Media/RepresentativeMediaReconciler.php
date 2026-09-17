@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
-use NHK\Core\Domain\Media\{Media, MediaUsage, MediaUsageRoleRegistry};
+use NHK\Core\Domain\Media\{Media, MediaUsage, MediaUsageRoleRegistry, RepresentativeEligibilityRegistry};
 
 /**
  * Deterministic presentation-only representative reconciliation.
@@ -20,6 +20,7 @@ final class RepresentativeMediaReconciler
         private MediaAssetRepository $assets,
         private MediaUsageRepository $usages,
         private MediaService $mediaService,
+        private RepresentativeEligibilityRegistry $eligibility = new RepresentativeEligibilityRegistry(),
     ) {}
 
     /** @param list<array<string,mixed>> $candidates @return array<string,mixed> */
@@ -27,7 +28,7 @@ final class RepresentativeMediaReconciler
     {
         $eligible = [];
         foreach ($candidates as $candidate) {
-            if (!is_array($candidate) || ($candidate['scope_justified'] ?? false) !== true) continue;
+            if (!is_array($candidate) || !$this->eligibility->isEligible($endpointType, $candidate)) continue;
             $mediaId = trim((string) ($candidate['media_id'] ?? ''));
             $media = $mediaId !== '' ? $this->media->findByCanonicalId($mediaId) : null;
             if (!$media instanceof Media || !$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder() || $this->assets->listByMediaId($mediaId) === []) continue;
@@ -42,6 +43,7 @@ final class RepresentativeMediaReconciler
 
         $current = $this->usages->listByEndpoint($endpointType, $endpointKey, MediaUsageRoleRegistry::REPRESENTATIVE)[0] ?? null;
         if ($current instanceof MediaUsage && $current->mediaId === $best['media_id']) return ['status' => 'KEPT', 'media_id' => $best['media_id'], 'score' => $best['score'], 'actions' => [['action' => 'KEEP', 'usage_id' => $current->usageId]]];
+        if ($current instanceof MediaUsage && $current->selectionPolicy === 'PINNED') return ['status' => 'OWNER_REVIEW_REQUIRED', 'media_id' => $current->mediaId, 'candidate_media_id' => $best['media_id'], 'actions' => [['action' => 'PINNED_REPRESENTATIVE_PROTECTED', 'usage_id' => $current->usageId]]];
         $actions = [];
         if ($current instanceof MediaUsage) {
             if (!$this->usages instanceof MediaUsageUpdater) return ['status' => 'OWNER_REVIEW_REQUIRED', 'media_id' => $current->mediaId, 'candidate_media_id' => $best['media_id'], 'actions' => [['action' => 'DEMOTE', 'usage_id' => $current->usageId]]];

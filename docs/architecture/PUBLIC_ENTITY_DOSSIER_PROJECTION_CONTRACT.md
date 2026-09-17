@@ -166,6 +166,12 @@ A Brand gallery therefore contains Media directly assigned to that Brand unless
 an explicit Graph relation separately exposes another Media item in a relation
 section.
 
+For `primary_media`, the resolver reads exactly one active `representative`
+MediaUsage for the requested entity, then follows its canonical Media to an
+eligible PUBLIC MediaAsset. The binding does not create a Graph edge and a
+missing/private/ineligible asset remains an honest unavailable projection;
+another reachable node's MediaUsage is not substituted.
+
 The implementation must not recursively scrape every descendant's MediaUsage
 into one Brand gallery, because doing so erases the distinction between direct
 Brand media and media belonging to a Model, Variant, Movement, or Specimen.

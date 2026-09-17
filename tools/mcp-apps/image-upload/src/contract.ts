@@ -21,6 +21,17 @@ export type UploadManifest = {
   success_count: number;
   failure_count: number;
   items: UploadedItem[];
+  batch_id?: string;
+  user_context?: string;
+};
+
+export type BatchContext = {
+  batch_id?: string;
+  ordered_media_ids: string[];
+  items: Array<Record<string, unknown>>;
+  user_context: string;
+  media_commit_status: "COMPLETE" | "PARTIAL";
+  enrichment_status: "NOT_RUN" | "PENDING" | "PARTIAL" | "COMPLETE";
 };
 
 export type WidgetDiagnostic = {
@@ -256,7 +267,13 @@ export function extractUploadManifest(result: ToolResult): UploadManifest {
     const ordinals = items.map((item) => item.ordinal);
     if (new Set(ordinals).size !== ordinals.length || ordinals.some((ordinal) => ordinal === undefined || ordinal < 0 || ordinal >= requested)) throw new Error("SERVER_TOOL_RESULT_INVALID");
   }
-  return { status, requested_count: requested, success_count: success, failure_count: failure, items };
+  const batchId = typeof record.batch_id === "string" && record.batch_id !== "" ? record.batch_id : undefined;
+  const userContext = typeof record.user_context === "string"
+    ? record.user_context
+    : typeof record.context === "string"
+      ? record.context
+      : "";
+  return { status, requested_count: requested, success_count: success, failure_count: failure, items, ...(batchId ? { batch_id: batchId } : {}), user_context: userContext };
 }
 
 export function assertUploadManifestCounts(manifest: UploadManifest): void {
@@ -282,11 +299,29 @@ function redactDiagnostic(value: string): string {
   return value.replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]");
 }
 
-export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagnostic[] = [], uploadStatus: WidgetUploadStatus = items.length > 0 ? "complete" : "idle"): {
-  modelContent: { uploaded_media: Array<Record<string, unknown>> };
-  privateContent: { upload_status: WidgetUploadStatus; diagnostics: WidgetDiagnostic[] };
+export function buildBatchContext(items: UploadedItem[], manifest: Pick<UploadManifest, "batch_id" | "user_context" | "requested_count" | "failure_count"> | null = null, enrichmentStatus: BatchContext["enrichment_status"] = "NOT_RUN"): BatchContext {
+  return {
+    ...(manifest?.batch_id ? { batch_id: manifest.batch_id } : {}),
+    ordered_media_ids: items.filter((item) => item.status === "SUCCESS" && typeof item.media_id === "string").map((item) => item.media_id as string),
+    items: items.map((item, index) => ({
+      position: (item.ordinal ?? index) + 1,
+      ...(item.media_id ? { media_id: item.media_id } : {}),
+      ...(item.attachment_id ? { attachment_id: item.attachment_id } : {}),
+      status: item.status || "SUCCESS",
+      ...(item.error_code ? { error_code: item.error_code } : {}),
+    })),
+    user_context: manifest?.user_context ?? "",
+    media_commit_status: (manifest?.failure_count ?? 0) > 0 ? "PARTIAL" : "COMPLETE",
+    enrichment_status: enrichmentStatus,
+  };
+}
+
+export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagnostic[] = [], uploadStatus: WidgetUploadStatus = items.length > 0 ? "complete" : "idle", manifest: Pick<UploadManifest, "batch_id" | "user_context" | "requested_count" | "failure_count"> | null = null, enrichmentStatus: BatchContext["enrichment_status"] = "NOT_RUN"): {
+  modelContent: { uploaded_media: Array<Record<string, unknown>>; batch_context: BatchContext };
+  privateContent: { upload_status: WidgetUploadStatus; media_commit_status: BatchContext["media_commit_status"]; enrichment_status: BatchContext["enrichment_status"]; diagnostics: WidgetDiagnostic[] };
   imageIds: string[];
 } {
+  const batchContext = buildBatchContext(items, manifest, enrichmentStatus);
   return {
     modelContent: {
       uploaded_media: items.map((item) => ({
@@ -295,9 +330,12 @@ export function buildWidgetState(items: UploadedItem[], diagnostics: WidgetDiagn
         public_filename: item.public_filename,
         status: item.status || "uploaded",
       })),
+      batch_context: batchContext,
     },
     privateContent: {
       upload_status: uploadStatus,
+      media_commit_status: batchContext.media_commit_status,
+      enrichment_status: batchContext.enrichment_status,
       diagnostics: diagnostics.map((diagnostic) => ({
         ...diagnostic,
         ...(diagnostic.error ? { error: redactDiagnostic(diagnostic.error) } : {}),

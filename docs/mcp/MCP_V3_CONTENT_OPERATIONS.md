@@ -252,6 +252,21 @@ does not fetch the URL, use fuzzy filename matching, create an attachment or
 become a second Media writer. `existing_media_urls[]`, `media_ids[]` and
 `files[]` are mutually exclusive physical input forms for one packet.
 
+For exact Media-to-entity work, Capture also accepts typed `media_bindings[]`.
+Each item identifies `media_ref` (`item_index` for a newly ingested item or an
+existing canonical `media_id`), an exact registered `target`, the
+`representative` role, explicit `selection_source`/`selection_policy`, and
+contextual SEO. After physical read-back, this branch delegates directly to
+`MediaBindingService`; `MEDIA_ENRICHMENT` does not require an Article and the
+typed fast path skips NLP, Claim retrieval and Graph traversal.
+
+`nhk.media.bind` is the high-level governed existing-Media operation. It accepts
+canonical UUID, stable key, exact attachment ID or approved exact first-party
+URL locators and never downloads or re-imports a URL. `nhk.media.binding.get`
+reads the durable receipt by operation ID or idempotency key. A retry with the
+same fingerprint resumes the receipt; a changed payload returns
+`IDEMPOTENCY_CONFLICT`.
+
 The Capture tool is capability-gated by `nhk_ingest_articles`; its optional
 `files[]` are native multipart parts and never base64, paths or JSON bytes.
 The text-only path is valid and still runs interpretation, subject resolution,
@@ -435,6 +450,8 @@ availability; local HTTP wire smoke remains an environment check.
 | `nhk.capture.ingest` | Editorial Capture + bounded semantic enrichment | WRITE | Yes | Capture revision + Article draft token when Article intent requires it | Bounded neighborhood read; relation writes remain governed | PR1 intent routing implemented; guarded runtime acceptance remains pending |
 | `nhk.entity.get` | Authority | READ | No | N/A | No raw edge | READY for registered type + UUID |
 | `nhk.media.get` | Media + public assets/usages | READ | No | N/A | No raw edge | READY for active ready Media/public assets |
+| `nhk.media.binding.get` | Durable Media binding receipt | READ | No | N/A | No raw edge | READY; operation ID or idempotency key |
+| `nhk.media.bind` | Exact Media → registered Entity `representative` MediaUsage | WRITE / INTERNAL | Yes | Durable staged receipt, Usage revision and final read-back | No Graph edge; contextual SEO on Usage | READY for exact locators; pinned representative protected from system auto |
 | `nhk.media.ingest` | Media/MediaAsset/MediaUsage or governed WordPress image attachment | WRITE / INTERNAL | Yes | Both paths enter the governed Media service; file path creates/resolves one Media, retains PRIVATE source-original and projects PUBLIC derivatives/attachment | Usage is placement; attachment is storage/projection only | Internal/admin compatibility boundary; new submissions use Capture |
 | `nhk.media.attachment.get` | WordPress image attachment | READ | No | N/A | No semantic inference | READY for read-back |
 | `nhk.video.ingest` | Video external reference + semantic intake preview | WRITE / INTERNAL | Yes | Apply creates revision | Approved attachment candidates apply through Graph | Internal/admin compatibility boundary; new submissions use Capture; optional Knowledge output is planning-only |

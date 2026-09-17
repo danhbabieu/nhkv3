@@ -757,3 +757,18 @@ read-back event. Local tests cover the required missing/later-Media/reuse/
 replay/private/scope/evidence cases. Target deployment and live MCP
 bootstrap/get remain externally gated until the authorized deployment
 procedure runs and reads back the new documentation identity.
+
+## Active cross-domain law — Canonical Media Binding — 2026-09-17
+
+The active Media, Admin, Visual Support, MCP, SEO and Public Entity Dossier
+contracts now define `MediaBindingService` as the sole application owner for
+exact `Media → MediaUsage → target → representative` binding. The runtime
+contract includes typed Capture `media_bindings[]`, `nhk.media.bind`, durable
+binding receipts, contextual Usage SEO, `USER_EXPLICIT/PINNED` versus
+`SYSTEM_AUTO/AUTO`, and a unique active representative slot. Exact binding
+does not require Article/NLP/Claim/Graph work; bounded auto-discovery remains
+eligible-recipe and scope-evidence based, with ties returning review.
+
+Local evidence: focused binding/MCP/Capture/Media regression passes, changed
+PHP lint and `git diff --check` pass. WordPress staging/live read-back remains
+UNVERIFIED; no staging or production mutation was performed.

@@ -29,7 +29,7 @@ final class McpToolCatalog
             self::tool('nhk.entity.neighborhood', 'Read a bounded semantic neighborhood from canonical Graph relations.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'profile' => ['type' => 'string', 'enum' => ['brand', 'model', 'variant', 'classification', 'specimen']], 'max_hops' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]], ['type', 'id', 'profile']),
             self::tool('nhk.article.preflight', 'Read-only preflight for an existing WordPress Post semantic reconciliation.', self::articleProperties(false), ['intent']),
             self::tool('nhk.article.ingest', 'Resume a governed Article semantic reconciliation using the same idempotency key; Phase 1 is reconcile-only.', self::articleProperties(true), ['idempotency_key', 'intent'], true),
-            self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, resolve bounded semantic context, reconcile MediaUsage when an Article exists and return the current read-back.', [
+            self::tool('nhk.capture.ingest', 'Capture new editorial input or continue one existing Capture; classify intent before creating an Article, preserve canonical owners, reconcile typed MediaUsage bindings even without an Article, resolve bounded semantic context when required and return the current read-back.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'capture_id' => self::uuidField(),
                 'followup_mode' => ['type' => 'string', 'enum' => ['ATTACH_ASSETS'], 'description' => 'Required when files are attached to an existing Capture. Legacy text-only addenda continue to reject files.'],
@@ -71,6 +71,7 @@ final class McpToolCatalog
                 'items' => ['type' => 'array', 'items' => ['type' => 'object']],
                 'media_ids' => ['type' => 'array', 'items' => self::uuidField()],
                 'existing_media_urls' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1]],
+                'media_bindings' => ['type' => 'array', 'maxItems' => 20, 'items' => self::mediaBindingField()],
                 'publish' => ['type' => 'boolean'],
                 'governance' => [
                     'type' => 'object',
@@ -131,6 +132,16 @@ final class McpToolCatalog
             self::tool('nhk.article.restore', 'Restore one trashed native WordPress Post to draft with state-token CAS.', ['post_id' => ['type' => 'integer', 'minimum' => 1], 'expected_state_token' => ['type' => 'string', 'pattern' => '^[a-fA-F0-9]{64}$'], 'idempotency_key' => ['type' => 'string', 'minLength' => 1]], ['post_id', 'expected_state_token', 'idempotency_key'], true),
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
+            self::tool('nhk.media.binding.get', 'Read one durable Media binding operation receipt by operation_id or idempotency_key.', ['operation_id' => self::uuidField(), 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191]], []),
+            self::tool('nhk.media.bind', 'Bind an existing canonical Media to one exact Authority Entity as a contextual representative usage with durable idempotency and final read-back.', [
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'media' => ['type' => 'object', 'properties' => ['id' => self::uuidField(), 'stable_key' => ['type' => 'string'], 'attachment_id' => ['type' => 'integer', 'minimum' => 1], 'url' => ['type' => 'string', 'format' => 'uri']], 'additionalProperties' => false],
+                'target' => ['type' => 'object', 'properties' => ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'stable_key' => ['type' => 'string']], 'required' => ['type'], 'additionalProperties' => false],
+                'role' => ['type' => 'string', 'enum' => ['representative']],
+                'selection_source' => ['type' => 'string', 'enum' => ['USER_EXPLICIT', 'SYSTEM_AUTO']],
+                'selection_policy' => ['type' => 'string', 'enum' => ['PINNED', 'AUTO']],
+                'seo' => ['type' => 'object', 'properties' => ['alt_text' => ['type' => 'string', 'maxLength' => 1000], 'caption' => ['type' => 'string', 'maxLength' => 2000], 'title' => ['type' => 'string', 'maxLength' => 255]], 'additionalProperties' => false],
+            ], ['idempotency_key', 'media', 'target'], true),
             self::tool('nhk.media.upload-batch', 'Upload one or more image files through the canonical multipart WordPress attachment and governed Media boundary.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [
@@ -357,6 +368,24 @@ final class McpToolCatalog
                 'sort_order' => ['type' => 'integer', 'minimum' => 0],
             ],
             'required' => ['endpoint_type', 'endpoint_key', 'role'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    private static function mediaBindingField(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'media_ref' => ['type' => 'object', 'properties' => ['item_index' => ['type' => 'integer', 'minimum' => 0], 'media_id' => self::uuidField()], 'additionalProperties' => false],
+                'target' => ['type' => 'object', 'properties' => ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'stable_key' => ['type' => 'string']], 'required' => ['type'], 'additionalProperties' => false],
+                'role' => ['type' => 'string', 'enum' => ['representative']],
+                'selection_source' => ['type' => 'string', 'enum' => ['USER_EXPLICIT', 'SYSTEM_AUTO']],
+                'selection_policy' => ['type' => 'string', 'enum' => ['PINNED', 'AUTO']],
+                'seo' => ['type' => 'object', 'properties' => ['alt_text' => ['type' => 'string', 'maxLength' => 1000], 'caption' => ['type' => 'string', 'maxLength' => 2000], 'title' => ['type' => 'string', 'maxLength' => 255]], 'additionalProperties' => false],
+            ],
+            'required' => ['media_ref', 'target'],
             'additionalProperties' => false,
         ];
     }

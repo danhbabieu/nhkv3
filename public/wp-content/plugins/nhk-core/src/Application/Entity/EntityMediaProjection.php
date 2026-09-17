@@ -23,12 +23,12 @@ final class EntityMediaProjection
             $item = $this->item($usage);
             if ($item === null) continue;
             $gallery[] = $item;
-            if ($usage->role === MediaUsageRoleRegistry::REPRESENTATIVE || $usage->role === MediaUsageRoleRegistry::FEATURED_PRIMARY || $usage->role === 'featured') $representative[] = $item;
+            if (($usage->role === MediaUsageRoleRegistry::REPRESENTATIVE && ($usage->activeSlot === null || $usage->activeSlot === 'representative')) || ($endpointType === 'wp_post' && in_array($usage->role, [MediaUsageRoleRegistry::FEATURED_PRIMARY, 'featured'], true))) $representative[] = $item;
             if (in_array($usage->role, [MediaUsageRoleRegistry::EVIDENCE, MediaUsageRoleRegistry::TECHNICAL_DETAIL], true)) $evidence[] = $item;
         }
         $sort = static fn(array $left, array $right): int => [$left['sort_order'], $left['stable_key']] <=> [$right['sort_order'], $right['stable_key']];
         usort($representative, $sort); usort($evidence, $sort); usort($gallery, $sort);
-        return ['representative' => $representative[0] ?? ($gallery[0] ?? null), 'evidence' => $evidence, 'gallery' => $gallery];
+        return ['representative' => $representative[0] ?? null, 'evidence' => $evidence, 'gallery' => $gallery];
     }
 
     /** @return array<string,mixed>|null */

@@ -72,6 +72,13 @@ subject/scope/facet/feature/intent validation → suitability ranking →
 MediaUsage/contextual binding → Governance when semantic relation state is
 affected → final read-back → affected projection invalidation/rebuild`.
 
+Representative binding is a separate application workflow from this ledger.
+It describes whole-node presentation coverage and is reconciled by
+`MediaBindingService` with one active target slot. A Visual Support Requirement
+describes a feature/detail view and may reuse the same canonical Media, but it
+must not promote that Media to a node representative or create a Graph edge as
+a shortcut.
+
 The lookup is indexed by semantic candidate keys and limited by a runtime
 budget; it never scans the database. Replay is idempotent. A better candidate
 may replace a previous binding only through deterministic suitability and

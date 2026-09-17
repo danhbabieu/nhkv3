@@ -49,3 +49,14 @@ VisualSupportRequirement ledger, not by the representative-image rule. A
 binding may serve many consumers through one canonical Media, while public
 SEO selects only an eligible derivative and never exposes the internal ledger
 or treats MediaUsage as Evidence.
+
+### Contextual representative binding — 2026-09-17
+
+Contextual `alt_text`, `caption` and optional `title` belong to the target
+MediaUsage. Reusing one Media for a Classification, Specimen and Article may
+therefore produce different accessible/editorial copy without mutating global
+WordPress attachment metadata. `USER_EXPLICIT/PINNED` representative selection
+is stable against `SYSTEM_AUTO/AUTO` replacement; only an explicit or
+owner-authorized binding can replace it. The projection resolves the active
+representative Usage first, then selects an eligible PUBLIC source-derived asset,
+never by upload recency and never by a thumbnail.

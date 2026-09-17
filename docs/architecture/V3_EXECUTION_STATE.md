@@ -11540,3 +11540,54 @@ through the canonical owner-approved process, then resume the existing Capture
 attachment #555, canonical Media, WebP `900x1200`, SEO path, featured-primary
 MediaUsage, Classification representative and frontend read-back before
 claiming completion.
+
+# Checkpoint — 2026-09-17 — Canonical Media binding workflow (LOCAL ONLY)
+
+SCOPE: Implemented the general exact Media → MediaUsage → registered target
+binding workflow for existing Media and Capture uploads. No live/staging
+semantic mutation, attachment import, Media repair or Case #567 write was
+performed.
+
+ROOT_CAUSE: The prior Capture contract represented the relationship indirectly
+through prose, subject hints and semantic discovery. It had no typed
+Media-to-target binding, no sole application owner for representative
+reconciliation, no PINNED/AUTO distinction and no durable receipt to recover a
+timeout after Usage apply. Consequently an exact Media/target request could
+resolve both identities yet finish with `usages=[]`.
+
+ARCHITECTURE: `MediaBindingService` now owns exact binding, locator resolution,
+contextual Usage SEO, representative replacement and final read-back. Capture
+supports typed `media_bindings[]` and runs an Article-free fast path for
+`MEDIA_ENRICHMENT`; `nhk.media.bind` and `nhk.media.binding.get` use the same
+service/receipt boundary. `USER_EXPLICIT/PINNED` is protected from
+`SYSTEM_AUTO/AUTO`; replacement demotes the old Usage and never deletes
+Media/MediaAsset/source-original. First-party URL and attachment-ID locators
+reuse canonical Media without downloading or re-importing.
+
+SCHEMA: Added contextual selection metadata, nullable `active_slot`, a unique
+active representative slot key, and `nhk_media_binding_operations` with
+idempotency/fingerprint/revision/stage/read-back fields. Migration 022 is UP
+only and guarded; the baseline Media usage definition is compatible with the
+new columns. `RepresentativeEligibilityRegistry` provides bounded typed
+recipes for auto-discovery; missing scope or score ties return review and
+Graph reachability is never treated as eligibility.
+
+VERIFICATION: Binding/MCP/Capture/Media/Admin/Dossier focused regression passed
+142 tests / 1,124 assertions, with 1 warning and PHPUnit deprecations. Changed
+PHP lint, `composer lint`, `git diff --check` and targeted secret review pass.
+The full local Unit run reached 1,689 tests / 8,279 assertions with one
+unrelated pre-existing `DemoCutoverCliContractTest` failure. WordPress Integration/live
+read-back could not be executed honestly because `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB` are unset; no staging or production validation is claimed.
+
+CASE_567: Golden unit regression proves exact Media
+`01a0ab0c-fde0-7c01-a89d-fc5eef832c89` / attachment 567 to Classification
+`01a07614-832d-7f27-959c-74eb0cd63f3e` with
+`USER_EXPLICIT/PINNED`, one representative Usage, receipt replay and no
+duplicate Media. Entity dossier/frontend and real WordPress read-back remain
+deployment-gated and therefore UNVERIFIED.
+
+REMAINING_GAPS: Migration 022 and the Capture `/anh/...` physical reuse branch
+still need guarded WordPress integration evidence; projection invalidation is
+exposed through canonical hooks and must be verified with the deployed SEO and
+dossier subscribers. No final production cutover is authorized.

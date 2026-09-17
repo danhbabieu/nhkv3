@@ -19,12 +19,12 @@ use NHK\Core\Infrastructure\Migration\OwnerPublicationDecisionMigration013;
 use NHK\Core\Infrastructure\Migration\PublicIdentityMigration014;
 use NHK\Core\Infrastructure\Migration\DictionaryMigration015;
 use NHK\Core\Infrastructure\Migration\ClaimProjectionMigration016;
-use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
+use NHK\Core\Infrastructure\Migration\{EditorialCaptureAddendumMigration018, EditorialCaptureMigration017, GovernanceSubjectBindingMigration020, MediaBindingOperationMigration022, MediaUsageMetadataMigration021, VisualSupportRequirementMigration019};
 use NHK\Core\Infrastructure\Migration\MigrationDatabaseGuard;
 use NHK\Core\Application\Governance\GovernanceCapabilities;
 use NHK\Core\Application\Runtime\SemanticWritePolicyResolver;
 use NHK\Core\Application\Mcp\{McpAbilityRegistration, McpArticleIngestHandler, McpGovernanceHandler, McpReadHandler, McpSemanticContextResolver, McpToolCatalog, McpTransport, McpDocumentationRegistry};
-use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService};
+use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\Capture\{CaptureArticlePreflightHandoff, CaptureEditorialWriteGuard, CaptureVideoProvenancePlanner, CaptureVideoPublicationVerifier, ClockTypeShadowClassifier, EditorialCaptureContinuationService, EditorialCaptureCoordinator, GovernedCaptureContinuationService, RelationProposalReconciliationService};
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimReusePolicy, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
@@ -48,7 +48,7 @@ use NHK\Core\Infrastructure\Mcp\ChatGptMcpGateway;
 use NHK\Core\Infrastructure\Mcp\EasyMcpNativeFileCompatibilityAdapter;
 use NHK\Core\Infrastructure\Admin\AdminPage;
 use NHK\Core\Infrastructure\Admin\AdminShell;
-use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
+use NHK\Core\Infrastructure\Media\{WpdbMediaAssetRepository, WpdbMediaBindingOperationRepository, WpdbMediaRepository, WpdbMediaUsageRepository, WordPressImageSitemapProvider, WordPressMediaAttachmentBridge, WordPressMediaAttachmentIngestor, WordPressMediaAttachmentWriteGuard};
 use NHK\Core\Infrastructure\Video\WpdbVideoRepository;
 use NHK\Core\Infrastructure\PublicIdentity\WpdbPublicIdentityRepository;
 use NHK\Core\Application\PublicIdentity\HistoricPublicRouteService;
@@ -85,7 +85,7 @@ final class Plugin {
     public static function boot(string $pluginFile): void {
         // Keep an already-installed site aware of the code's migration target;
         // activation is not required for an upgrade health check to be honest.
-        update_option('nhk_core_migration_target', MediaUsageMetadataMigration021::VERSION, false);
+        update_option('nhk_core_migration_target', MediaBindingOperationMigration022::VERSION, false);
         if (self::runtimeMigrationsEnabled()) self::runPendingMigrations();
         add_action('nhk_v3_media_canonical_readback', static function (\NHK\Core\Domain\Media\Media $media, array $assets, array $contexts = []): void {
             global $wpdb;
@@ -267,6 +267,7 @@ final class Plugin {
             (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection()))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
+            $mediaBindingService = new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb));
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
@@ -687,7 +688,7 @@ final class Plugin {
             $publicUrlMaintenance = (new \NHK\Core\Infrastructure\PublicIdentity\WordPressPublicUrlMaintenanceRuntime($wpdb, $authority, $types, $publicContexts, $videos, $media, $assets, $publicIdentityRepository))->service();
             $capture = new EditorialCaptureCoordinator(
                 $captureRepository,
-                static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments): array {
+                static function (array $input) use ($imageIngest, $existingMediaResolver, $existingAttachmentUrlResolver, $wordpressAttachments, $mediaBindingService, $assets): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -708,11 +709,26 @@ final class Plugin {
                             $items = [];
                             foreach ($existingUrls as $url) {
                                 $url = trim((string) $url);
+                                $attachmentId = 0;
                                 $trace('URL_RESOLUTION', 'STARTED', ['capture_id' => (string) ($input['idempotency_key'] ?? '')]);
-                                $relative = $existingAttachmentUrlResolver->relativeUploadPath($url);
-                                if (isset($seen[$relative])) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_DUPLICATE');
-                                $seen[$relative] = true;
-                                $attachmentId = $existingAttachmentUrlResolver->resolve($url);
+                                $relative = '';
+                                $canonicalMedia = null;
+                                if (is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== []) {
+                                    try { $canonicalMedia = $mediaBindingService->resolveMediaReference(['url' => $url]); } catch (\Throwable) { $canonicalMedia = null; }
+                                }
+                                if ($canonicalMedia instanceof \NHK\Core\Domain\Media\Media) {
+                                    foreach ($assets->listByMediaId($canonicalMedia->canonicalId) as $mappedAsset) {
+                                        $candidateAttachmentId = (int) ($mappedAsset->metadata['wordpress_attachment_id'] ?? 0);
+                                        if ($candidateAttachmentId > 0) { $attachmentId = $candidateAttachmentId; $relative = basename($url); break; }
+                                    }
+                                    if (($attachmentId ?? 0) < 1) throw new \InvalidArgumentException('MEDIA_BINDING_ATTACHMENT_MAPPING_NOT_FOUND');
+                                } else {
+                                    $relative = $existingAttachmentUrlResolver->relativeUploadPath($url);
+                                }
+                                $dedupeKey = $canonicalMedia instanceof \NHK\Core\Domain\Media\Media ? $canonicalMedia->canonicalId : $relative;
+                                if (isset($seen[$dedupeKey])) throw new \InvalidArgumentException('EXISTING_MEDIA_URL_DUPLICATE');
+                                $seen[$dedupeKey] = true;
+                                $attachmentId = $attachmentId > 0 ? $attachmentId : $existingAttachmentUrlResolver->resolve($url);
                                 $trace('URL_RESOLUTION', 'VERIFIED', ['attachment_id' => $attachmentId]);
                                 $trace('ATTACHMENT_READBACK', 'STARTED', ['attachment_id' => $attachmentId]);
                                 $readback = $wordpressAttachments->read($attachmentId);
@@ -730,6 +746,7 @@ final class Plugin {
                                     'attachment_readback_status' => 'verified',
                                     'upload_status' => 'REUSED',
                                     'reused' => true,
+                                    'media_id' => $canonicalMedia instanceof \NHK\Core\Domain\Media\Media ? $canonicalMedia->canonicalId : '',
                                     'media_context' => $media,
                                     'sort_order' => count($items),
                                 ];
@@ -799,7 +816,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -810,6 +827,12 @@ final class Plugin {
                     };
                     $assets = is_array($context['assets'] ?? null) ? $context['assets'] : [];
                     $mediaIds = array_values(array_filter(array_map(static fn (mixed $asset): string => is_array($asset) ? trim((string) ($asset['media_id'] ?? '')) : '', $assets)));
+                    $bindingResults = [];
+                    $typedBindings = is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [];
+                    if ($typedBindings !== []) {
+                        $bindingBatch = $mediaBindingService->bindMany($typedBindings, (string) ($context['capture']['capture_id'] ?? '') . ':media-binding', $assets);
+                        $bindingResults = is_array($bindingBatch['bindings'] ?? null) ? $bindingBatch['bindings'] : [];
+                    }
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
                         $incomplete = [];
@@ -860,6 +883,7 @@ final class Plugin {
                             'media_usage' => $usageReadback,
                             'canonical_readback' => ['media_ids' => array_values(array_unique($mediaIds)), 'media_usage' => $usageReadback],
                             'frontend_verified' => null,
+                            'binding_results' => $bindingResults,
                         ];
                     }
                     $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
@@ -894,6 +918,7 @@ final class Plugin {
                     $payload = $result->toArray();
                     $payload['force_inline_reconcile'] = true;
                     $payload['editorial_state_token'] = $result->editorialStateToken;
+                    $payload['binding_results'] = $bindingResults;
                     return $payload;
                 },
                 static function (array $context) use ($draftGateway, $articleEditorial, $articleResearch, $articlePreflightHandoff): array {
@@ -937,14 +962,20 @@ final class Plugin {
                 },
                 static function (array $context) use ($articleEditorial): array {
                     $articleId = (int) ($context['article_id'] ?? 0);
+                    $media = is_array($context['media'] ?? null) ? $context['media'] : [];
+                    $bindingResults = array_values(array_filter((array) ($media['bindings'] ?? []), 'is_array'));
+                    if ($bindingResults !== []) {
+                        $bindingVerified = count(array_filter($bindingResults, static fn (array $binding): bool => ($binding['status'] ?? '') === 'COMPLETE' && (($binding['readback']['status'] ?? '') === 'verified'))) === count($bindingResults);
+                        if (!$bindingVerified) return ['status' => 'unavailable', 'reason' => 'MEDIA_BINDING_FINAL_READBACK_UNAVAILABLE', 'media_binding_count' => count($bindingResults)];
+                    }
                     if ($articleId < 1) {
-                        $payload = ['stage' => 'CAPTURE_FINAL_CANONICAL_READBACK', 'status' => 'VERIFIED', 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'article_owner' => 'NOT_REQUIRED', 'at' => gmdate('c')];
+                        $payload = ['stage' => 'CAPTURE_FINAL_CANONICAL_READBACK', 'status' => 'VERIFIED', 'capture_id' => (string) ($context['capture']['capture_id'] ?? ''), 'article_owner' => 'NOT_REQUIRED', 'media_binding_count' => count($bindingResults), 'at' => gmdate('c')];
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
                         if (function_exists('error_log')) {
                             $encoded = function_exists('wp_json_encode') ? wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                             error_log('[nhk.capture.stage] ' . (is_string($encoded) ? $encoded : 'CAPTURE_FINAL_CANONICAL_READBACK'));
                         }
-                        return ['status' => 'verified', 'post' => null, 'article_owner' => 'NOT_REQUIRED'];
+                        return ['status' => 'verified', 'post' => null, 'article_owner' => 'NOT_REQUIRED', 'media_binding_count' => count($bindingResults)];
                     }
                     $post = $articleEditorial->read($articleId);
                     return $post === null ? ['status' => 'unavailable'] : ['status' => 'verified', 'post' => $post->snapshot()];
@@ -1040,6 +1071,7 @@ final class Plugin {
                 new \NHK\Core\Application\Capture\ContentIntentRouter(),
                 new VisualOpportunityDetector(),
                 new VisualSupportRequirementService(new \NHK\Core\Infrastructure\Media\WpdbVisualSupportRequirementRepository($wpdb)),
+                $mediaBindingService,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];
@@ -1051,7 +1083,7 @@ final class Plugin {
             $recoveryBinding = defined('NHK_RUNTIME_MODE') && strtolower((string) NHK_RUNTIME_MODE) === 'recovery'
                 ? new \NHK\Core\Application\Mcp\RecoveryMcpRuntimeBinding($wpdb)
                 : null;
-            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy), $recoveryBinding))->register();
+            (new McpApi(new McpTransport($mcpRead, $mcpGovernance, static fn (string $capability): bool => current_user_can($capability), static fn (string $value): bool => in_array($value, $allowedOrigins, true), $articleHandler, $videoIntake, $wordpressAttachments, $categoryGateway, $draftGateway, new CanonicalDependencyValidator($claims, $sources, $evidence), $publicUrlMaintenance, $mediaBatchUpload, $documentation, $capture, $captureContinuation, $authorityCapture, static function (): bool { return (new MigrationStatus())->runtimeSchemaReady(); }, $imageIngest, semanticWritePolicy: $semanticWritePolicy, mediaBinding: $mediaBindingService), $recoveryBinding))->register();
             do_action('nhk_mcp_register_tools', McpToolCatalog::tools(), $mcpRead, $mcpGovernance);
         });
         add_action('admin_menu', [AdminPage::class, 'register']);
@@ -1135,12 +1167,13 @@ final class Plugin {
         if ((int) get_option('nhk_core_migration_current', 0) < VisualSupportRequirementMigration019::VERSION || !VisualSupportRequirementMigration019::schemaReady($wpdb)) (new VisualSupportRequirementMigration019())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < GovernanceSubjectBindingMigration020::VERSION || !GovernanceSubjectBindingMigration020::schemaReady($wpdb)) (new GovernanceSubjectBindingMigration020())->up();
         if ((int) get_option('nhk_core_migration_current', 0) < MediaUsageMetadataMigration021::VERSION || !MediaUsageMetadataMigration021::schemaReady($wpdb)) (new MediaUsageMetadataMigration021())->up();
+        if ((int) get_option('nhk_core_migration_current', 0) < MediaBindingOperationMigration022::VERSION || !MediaBindingOperationMigration022::schemaReady($wpdb)) (new MediaBindingOperationMigration022())->up();
     }
     public static function activate(): void {
         global $wpdb;
         MigrationDatabaseGuard::assertUpAllowed((string) $wpdb->get_var('SELECT DATABASE()'), 'PLUGIN_ACTIVATION_MIGRATIONS');
         add_option('nhk_core_migration_current', 0, '', false);
-        add_option('nhk_core_migration_target', MediaUsageMetadataMigration021::VERSION, '', false);
+        add_option('nhk_core_migration_target', MediaBindingOperationMigration022::VERSION, '', false);
         (new GraphMigration001())->up();
         (new AuthorityMigration002())->up();
         (new GovernanceMigration003())->up();

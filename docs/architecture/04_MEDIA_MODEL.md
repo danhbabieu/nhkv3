@@ -151,6 +151,33 @@ technical usefulness, clarity/resolution, provenance confidence và obstruction;
 MediaAsset hay provenance. Representative không phải Claim và không tự tạo
 Graph edge.
 
+## Canonical Media binding service — 2026-09-17
+
+`MediaBindingService` là application owner duy nhất của workflow
+`Media → MediaUsage → exact target → role`. Capture, Admin, MCP và upload
+widget không ghi `nhk_media_usages` trực tiếp. Typed `media_bindings[]` của
+Capture dùng `media_ref.item_index` sau physical ingest hoặc `media_ref.media_id`;
+`nhk.media.bind` dùng cùng service cho Media đã tồn tại.
+
+Representative user chọn dùng `selection_source=USER_EXPLICIT` và
+`selection_policy=PINNED`; system reconciliation dùng `SYSTEM_AUTO` và `AUTO`.
+Mỗi endpoint/target chỉ có một active representative slot, được bảo vệ bởi
+optimistic revision/CAS ở Usage và unique active-slot constraint ở schema.
+Thay thế chỉ demote usage cũ, không xóa Media, MediaAsset hay source-original.
+Mỗi mutation có durable binding receipt và final canonical read-back; retry cùng
+fingerprint tiếp tục receipt, còn payload đổi dưới cùng idempotency key bị từ chối.
+
+URL first-party hoặc attachment ID chỉ là exact locator đã được chứng minh bằng
+asset/WordPress metadata. Không download URL, không filename similarity, không
+Graph traversal/NLP cho exact typed binding và không tạo Graph edge để biểu diễn
+representative.
+
+Auto-discovery is exposed as a bounded candidate recipe, not as unrestricted
+Graph traversal: `RepresentativeEligibilityRegistry` admits only registered
+target types with explicit scope evidence, then `MediaBindingService` scores
+the candidates. A tie or missing scope returns `REVIEW_REQUIRED`; reachable
+Knowledge/Brand/parent nodes and filename/title similarity are never promoted.
+
 ## Canonical file-to-Media workflow — 2026-09-08
 
 Đường upload file canonical là:

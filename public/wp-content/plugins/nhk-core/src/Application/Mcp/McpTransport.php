@@ -6,7 +6,7 @@ namespace NHK\Core\Application\Mcp;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Video\VideoIntakeService;
 use NHK\Core\Contracts\Media\WordPressMediaAttachmentIngestor;
-use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService};
+use NHK\Core\Application\Media\{ImageIngestEntrypoint, MediaBatchUploadService, MediaBindingService};
 use NHK\Core\Application\WordPress\{CategoryGateway, EditorialDraftGateway};
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\PublicUrlMaintenanceService;
@@ -43,6 +43,7 @@ final class McpTransport
         private $runtimeWriteReady = null,
         private ?ImageIngestEntrypoint $imageIngest = null,
         private ?SemanticWritePolicyResolver $semanticWritePolicy = null,
+        private ?MediaBindingService $mediaBinding = null,
     ) {}
 
     /** @return array{status:int,body:?array} */
@@ -141,7 +142,7 @@ final class McpTransport
             'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
-            'nhk.media.ingest' => 'nhk_create_proposals',
+            'nhk.media.ingest', 'nhk.media.bind' => 'nhk_create_proposals',
             'nhk.media.upload-batch' => 'upload_files',
             'nhk.media.widget-upload' => 'upload_files',
             'nhk.video.ingest' => 'nhk_create_proposals',
@@ -190,6 +191,8 @@ final class McpTransport
             'nhk.article.restore' => $this->drafts?->restore((int) ($arguments['post_id'] ?? 0), (string) ($arguments['expected_state_token'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('EDITORIAL_DRAFT_GATEWAY_UNAVAILABLE'),
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
+            'nhk.media.binding.get' => $this->mediaBinding?->get((string) ($arguments['operation_id'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE'),
+            'nhk.media.bind' => $this->mediaBinding?->bind($arguments) ?? throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE'),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),
             'nhk.media.upload-batch' => $this->batchUpload($arguments, $files),
             'nhk.media.widget-upload' => $this->widgetUpload($arguments),
