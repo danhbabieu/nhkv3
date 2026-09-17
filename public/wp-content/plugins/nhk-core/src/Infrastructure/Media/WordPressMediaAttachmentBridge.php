@@ -459,7 +459,11 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         if ($url === '') throw new \RuntimeException('WORDPRESS_MEDIA_ATTACHMENT_UNAVAILABLE');
         $width = is_array($src) ? (int) ($src[1] ?? 0) : (int) ($asset->width ?? 0);
         $height = is_array($src) ? (int) ($src[2] ?? 0) : (int) ($asset->height ?? 0);
-        return ['attachment_id' => $attachmentId, 'url' => $url, 'src' => $url, 'srcset' => $url . ' ' . (int) ($asset->width ?? $width) . 'w', 'sizes' => function_exists('wp_get_attachment_image_sizes') ? (string) wp_get_attachment_image_sizes($attachmentId, 'large') : '', 'width' => (int) ($asset->width ?? $width), 'height' => (int) ($asset->height ?? $height), 'alt' => $alt];
+        $post = function_exists('get_post') ? get_post($attachmentId) : null;
+        $title = is_object($post) ? trim((string) ($post->post_title ?? '')) : '';
+        $caption = is_object($post) ? trim((string) ($post->post_excerpt ?? '')) : '';
+        $storedAlt = function_exists('get_post_meta') ? trim((string) get_post_meta($attachmentId, '_wp_attachment_image_alt', true)) : '';
+        return ['attachment_id' => $attachmentId, 'url' => $url, 'src' => $url, 'srcset' => $url . ' ' . (int) ($asset->width ?? $width) . 'w', 'sizes' => function_exists('wp_get_attachment_image_sizes') ? (string) wp_get_attachment_image_sizes($attachmentId, 'large') : '', 'width' => (int) ($asset->width ?? $width), 'height' => (int) ($asset->height ?? $height), 'title' => $title, 'alt' => $alt !== '' ? $alt : $storedAlt, 'caption' => $caption];
     }
 
     private function assertAttachment(int $attachmentId): void

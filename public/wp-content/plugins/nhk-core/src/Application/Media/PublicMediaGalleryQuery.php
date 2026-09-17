@@ -89,10 +89,6 @@ final class PublicMediaGalleryQuery
 
     private function summary(Media $media): string
     {
-        foreach ($this->usagesForMedia($media) as $usage) {
-            $caption = trim(preg_replace('/\s+/u', ' ', $usage->caption) ?? '');
-            if ($caption !== '') return $this->shorten($caption);
-        }
         return 'Ảnh tư liệu trong kho hình ảnh NHK.';
     }
 

@@ -23,7 +23,7 @@ final class PreferredImageSeoProjection
         $selected = $eligible[0] ?? null;
         if ($selected === null) return ['state' => MediaSeoStateRegistry::MISSING, 'eligible' => false, 'url' => null, 'title' => '', 'alt' => '', 'caption' => '', 'metadata_source' => 'MISSING', 'reasons' => ['REPRESENTATIVE_IMAGE_MISSING']];
         $metadata = $this->metadataFor($selected);
-        return array_merge($metadata, ['state' => 'COMPLETE', 'eligible' => true, 'url' => $selected['url'], 'reasons' => []]);
+        return array_merge($metadata, ['state' => MediaSeoStateRegistry::COMPLETE, 'eligible' => true, 'url' => $selected['url'], 'reasons' => []]);
     }
 
     /** @param array<string,mixed> $candidates */

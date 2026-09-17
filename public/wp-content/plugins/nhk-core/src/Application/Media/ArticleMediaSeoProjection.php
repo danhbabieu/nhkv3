@@ -20,7 +20,7 @@ final class ArticleMediaSeoProjection
                 && $usage->endpointType === 'wp_post'
                 && $usage->endpointKey === $endpointKey
                 && $usage->role === MediaUsageRoleRegistry::FEATURED_PRIMARY
-                && ($usage->placementKey === '' || $usage->placementKey === $expectedPlacement)
+                && $usage->placementKey === $expectedPlacement
         ));
         if (count($usages) !== 1) return $this->missing(MediaSeoStateRegistry::INCOMPLETE_FEATURED);
         $usage = $usages[0];
@@ -53,11 +53,16 @@ final class ArticleMediaSeoProjection
         $values = [];
         $usedSources = [];
         foreach ($fields as $field) {
-            $candidates = [
-                ['value' => $field === 'alt' ? $usage->altText : ($field === 'caption' ? $usage->caption : $usage->title), 'source' => 'MEDIA_USAGE'],
-                ['value' => $media->canonicalName, 'source' => 'MEDIA_NEUTRAL'],
-                ['value' => $attachment[$field] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
-            ];
+            $candidates = $field === 'caption'
+                ? [
+                    ['value' => $usage->caption, 'source' => 'MEDIA_USAGE'],
+                    ['value' => $attachment['caption'] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
+                ]
+                : [
+                    ['value' => $field === 'alt' ? $usage->altText : $usage->title, 'source' => 'MEDIA_USAGE'],
+                    ['value' => $media->canonicalName, 'source' => 'MEDIA_NEUTRAL'],
+                    ['value' => $attachment[$field] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
+                ];
             foreach ($candidates as $candidate) {
                 $value = trim((string) $candidate['value']);
                 if ($value === '') continue;
