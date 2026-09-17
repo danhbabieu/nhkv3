@@ -29,9 +29,13 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         $authorityProposalIds = [];
         $authorityProposalCandidates = [];
         $relationCandidates = [];
+        $reusedRelations = [];
         foreach ($selected as $candidateId) {
             $candidate = $byId[(string) $candidateId];
-            if (strtoupper((string) ($candidate['action'] ?? '')) === 'REUSE') continue;
+            if (strtoupper((string) ($candidate['action'] ?? '')) === 'REUSE') {
+                if ($this->isRelation($candidate)) $reusedRelations[] = $candidate;
+                continue;
+            }
             if ($this->isRelation($candidate)) {
                 $relationCandidates[] = $candidate;
                 continue;
@@ -68,7 +72,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
         }
 
         if ($policy === ConversationalAuthorityPolicy::AUTO_APPROVE_AFTER_OWNER_CONFIRMATION) $applyResults = array_merge($applyResults, $this->approveAndApply($relationProposalIds, $actor));
-        return ['status' => $policy === ConversationalAuthorityPolicy::REVIEW_REQUIRED ? 'REVIEW_REQUIRED' : 'APPLIED', 'proposal_ids' => $proposalIds, 'approved_candidate_ids' => $selected, 'apply_results' => $applyResults, 'idempotent' => false];
+        return ['status' => $policy === ConversationalAuthorityPolicy::REVIEW_REQUIRED ? 'REVIEW_REQUIRED' : 'APPLIED', 'proposal_ids' => $proposalIds, 'approved_candidate_ids' => $selected, 'apply_results' => $applyResults, 'reused_relations' => $reusedRelations, 'idempotent' => $reusedRelations !== [] && $proposalIds === []];
     }
 
     private function isRelation(array $candidate): bool
@@ -124,7 +128,7 @@ final class GovernedAuthorityPlanExecutor implements GovernedAuthorityPlanApplie
     private function candidates(array $plan): array
     {
         $all = [];
-        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) if (is_array($candidate)) $all[] = $candidate;
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) if (is_array($candidate)) $all[] = $candidate;
         return $all;
     }
 

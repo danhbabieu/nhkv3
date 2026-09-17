@@ -6,13 +6,14 @@ namespace NHK\Core\Application\Authority;
 use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Domain\Authority\{AuthorityEntity, EntityTypeRegistry};
 use NHK\Core\Application\Entity\EntityProfileResolver;
+use NHK\Core\Application\Graph\ExplicitRelationIntentPlanner;
 use NHK\Core\Application\PublicIdentity\CanonicalPublicSlugPolicy;
 use NHK\Core\Shared\Uuid\UuidCodec;
 
 /** Planning-only interpreter and canonical inventory resolver. */
 final class AuthorityIntentPlanner
 {
-    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private CanonicalAuthorityStableKeyPolicy $stableKeys = new CanonicalAuthorityStableKeyPolicy(), private EntityProfileResolver $profiles = new EntityProfileResolver()) {}
+    public function __construct(private AuthorityRepository $authority, private EntityTypeRegistry $types, private CanonicalAuthorityStableKeyPolicy $stableKeys = new CanonicalAuthorityStableKeyPolicy(), private EntityProfileResolver $profiles = new EntityProfileResolver(), private ?ExplicitRelationIntentPlanner $relationIntents = null) {}
 
     /** @param array<string,mixed> $input @param array<string,mixed> $captureContext @return array<string,mixed> */
     public function plan(array $input, array $captureContext = []): array
@@ -20,10 +21,25 @@ final class AuthorityIntentPlanner
         $text = trim((string) ($input['text'] ?? $input['content'] ?? ''));
         $blockers = [];
         $requests = $this->requests($text, $input, $blockers);
-        $plan = ['reuse' => [], 'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [], 'rejected_or_composed_facets' => [], 'ambiguities' => [], 'blockers' => $blockers];
+        $plan = ['reuse' => [], 'create_candidates' => [], 'update_candidates' => [], 'relation_candidates' => [], 'relation_reuse' => [], 'rejected_or_composed_facets' => [], 'ambiguities' => [], 'blockers' => $blockers];
         foreach ($requests as $request) $this->resolveRequest($request, $plan);
         $this->resolveSubjectHints((array) ($input['subject_hints'] ?? []), $plan);
-        $this->relationRequests($text, $plan);
+        $authorityIntent = is_array($input['authority_intent'] ?? null) ? $input['authority_intent'] : [];
+        if (array_key_exists('relation_intents', $authorityIntent)) {
+            if ($this->relationIntents === null) {
+                $plan['blockers'][] = ['code' => 'RELATION_INTENT_PLANNER_UNAVAILABLE'];
+            } elseif (!is_array($authorityIntent['relation_intents'])) {
+                $plan['blockers'][] = ['code' => 'RELATION_INTENTS_MALFORMED'];
+            } else {
+                $relationPlan = $this->relationIntents->plan($authorityIntent['relation_intents']);
+                $plan['relation_candidates'] = array_merge($plan['relation_candidates'], (array) ($relationPlan['relation_candidates'] ?? []));
+                $plan['relation_reuse'] = array_merge($plan['relation_reuse'], (array) ($relationPlan['relation_reuse'] ?? []));
+                $plan['blockers'] = array_merge($plan['blockers'], (array) ($relationPlan['blockers'] ?? []));
+                $plan['ambiguities'] = array_merge($plan['ambiguities'], (array) ($relationPlan['ambiguities'] ?? []));
+            }
+        } else {
+            $this->relationRequests($text, $plan);
+        }
         if ($this->contains($text, 'đồng hồ để bàn') && $this->contains($text, 'pháp')) $plan['rejected_or_composed_facets'][] = ['reason' => 'COMPOSED_FACETS_NOT_NEW_IDENTITY', 'requested' => 'Đồng hồ để bàn Pháp', 'components' => ['table-clock', 'origin.france']];
         if ($this->contains($text, 'ly úp') || $this->contains($text, 'glass dome')) $plan['ambiguities'][] = ['code' => 'GLASS_DOME_SEMANTIC_REVIEW_REQUIRED', 'text' => 'Ly úp / glass dome phải được phân loại theo vocabulary/evidence; không tự tạo type, model hoặc subtype.'];
         $plan['create_authorities'] = array_map(static function (array $candidate): array {
@@ -103,7 +119,7 @@ final class AuthorityIntentPlanner
         foreach (['requests', 'entity_type', 'type', 'canonical_uuid', 'uuid', 'name', 'canonical_name'] as $key) {
             if (array_key_exists($key, $intent) || array_key_exists($key, $input)) return true;
         }
-        return array_key_exists('authority_requests', $input);
+        return array_key_exists('authority_requests', $input) || array_key_exists('relation_intents', $intent);
     }
 
     /**

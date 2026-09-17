@@ -17,7 +17,7 @@ final class AuthorityPlanFingerprint
             'candidate_ids' => self::candidateIds($plan),
             'candidates' => $plan,
             'canonical_uuid_revision_closure' => $contract['canonical_uuid_revision_closure'] ?? [],
-            'relation_packets' => $contract['relation_packets'] ?? ($plan['relation_candidates'] ?? []),
+            'relation_packets' => $contract['relation_packets'] ?? array_merge((array) ($plan['relation_candidates'] ?? []), (array) ($plan['relation_reuse'] ?? [])),
             'dependency_closure' => $contract['dependency_closure'] ?? [],
             'documentation_version' => (string) ($contract['documentation_version'] ?? ''),
             'manifest_hash' => (string) ($contract['manifest_hash'] ?? ''),
@@ -37,7 +37,7 @@ final class AuthorityPlanFingerprint
     private static function candidateIds(array $plan): array
     {
         $ids = [];
-        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) if (is_array($candidate) && isset($candidate['candidate_id'])) $ids[] = (string) $candidate['candidate_id'];
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) foreach ((array) ($plan[$bucket] ?? []) as $candidate) if (is_array($candidate) && isset($candidate['candidate_id'])) $ids[] = (string) $candidate['candidate_id'];
         $ids = array_values(array_unique($ids)); sort($ids, SORT_STRING); return $ids;
     }
 }

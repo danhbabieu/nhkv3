@@ -27,6 +27,18 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame(['EDITORIAL', 'AUTHORITY', 'MIXED'], $schema['properties']['purpose']['enum']);
         self::assertSame(['PLAN', 'APPLY_APPROVED_PLAN'], $schema['properties']['authority_intent']['properties']['mode']['enum']);
         self::assertSame('array', $schema['properties']['authority_intent']['properties']['requests']['type']);
+        self::assertSame('array', $schema['properties']['authority_intent']['properties']['relation_intents']['type']);
+        self::assertSame([
+            'source_type',
+            'source_uuid',
+            'predicate',
+            'target_type',
+            'target_uuid',
+            'provenance',
+            'reason',
+        ], array_keys($schema['properties']['authority_intent']['properties']['relation_intents']['items']['properties']));
+        self::assertSame(['source_type', 'source_uuid', 'predicate', 'target_type', 'target_uuid'], $schema['properties']['authority_intent']['properties']['relation_intents']['items']['required']);
+        self::assertTrue($schema['properties']['authority_intent']['properties']['relation_intents']['items']['additionalProperties'] === false);
         self::assertSame([
             'entity_type',
             'canonical_uuid',
@@ -44,6 +56,19 @@ final class ConversationalAuthorityMcpTest extends TestCase
         self::assertSame(
             ['authority_intent' => ['mode' => 'PLAN', 'requests' => [$request]]],
             McpAbilityRegistration::canonicalTransportArguments('nhk.capture.ingest', ['authority_intent' => ['mode' => 'PLAN', 'requests' => [$request]]]),
+        );
+        $relation = [
+            'source_type' => 'classification',
+            'source_uuid' => '01a07cbc-3595-7e63-8c1b-5b308c644125',
+            'predicate' => 'about',
+            'target_type' => 'knowledge',
+            'target_uuid' => '01a08156-c400-7739-a40f-61185cd62fcd',
+            'provenance' => 'EXPLICIT_USER_RELATION',
+            'reason' => 'Canonical relation reconciliation.',
+        ];
+        self::assertSame(
+            ['authority_intent' => ['mode' => 'PLAN', 'relation_intents' => [$relation]]],
+            McpAbilityRegistration::canonicalTransportArguments('nhk.capture.ingest', ['authority_intent' => ['mode' => 'PLAN', 'relation_intents' => [$relation]]]),
         );
         self::assertSame([
             'type' => 'array',

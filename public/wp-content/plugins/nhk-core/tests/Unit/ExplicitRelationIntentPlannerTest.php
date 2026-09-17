@@ -1,0 +1,211 @@
+<?php
+declare(strict_types=1);
+
+namespace NHK\Tests\Unit;
+
+use NHK\Core\Application\Graph\ExplicitRelationIntentPlanner;
+use NHK\Core\Application\Authority\AuthorityIntentPlanner;
+use NHK\Core\Contracts\Graph\EndpointRevisionReader;
+use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
+use NHK\Core\Shared\Uuid\UuidCodec;
+use PHPUnit\Framework\TestCase;
+
+final class ExplicitRelationIntentPlannerTest extends TestCase
+{
+    private const SOURCE = '01a07cbc-3595-7e63-8c1b-5b308c644125';
+    private const TARGET = '01a08156-c400-7739-a40f-61185cd62fcd';
+
+    public function test_missing_existing_classification_about_knowledge_edge_produces_typed_candidate(): void
+    {
+        $planner = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ]);
+
+        $result = $planner->plan([$this->intent()]);
+
+        self::assertCount(1, $result['relation_candidates']);
+        self::assertSame([], $result['relation_reuse']);
+        self::assertSame('classification', $result['relation_candidates'][0]['source_type']);
+        self::assertSame(self::SOURCE, $result['relation_candidates'][0]['source_uuid']);
+        self::assertSame(1, $result['relation_candidates'][0]['source_revision']);
+        self::assertSame('about', $result['relation_candidates'][0]['predicate']);
+        self::assertSame('knowledge', $result['relation_candidates'][0]['target_type']);
+        self::assertSame(self::TARGET, $result['relation_candidates'][0]['target_uuid']);
+        self::assertSame(1, $result['relation_candidates'][0]['target_revision']);
+        self::assertSame('EXPLICIT_USER_RELATION', $result['relation_candidates'][0]['provenance']);
+    }
+
+    public function test_exact_active_edge_is_reused_without_candidate_or_duplicate(): void
+    {
+        $edgeId = UuidCodec::newV7();
+        $planner = $this->planner(
+            [
+                'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+                'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+            ],
+            [$this->key() => ['status' => 'ACTIVE', 'canonical_id' => $edgeId, 'revision' => 1]],
+        );
+
+        $result = $planner->plan([$this->intent()]);
+
+        self::assertSame([], $result['relation_candidates']);
+        self::assertCount(1, $result['relation_reuse']);
+        self::assertSame('EXISTING', $result['relation_reuse'][0]['status']);
+        self::assertSame($edgeId, $result['relation_reuse'][0]['canonical_id']);
+        self::assertTrue($result['relation_reuse'][0]['idempotent']);
+    }
+
+    public function test_unsupported_predicate_is_a_typed_blocker(): void
+    {
+        $planner = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ]);
+
+        $result = $planner->plan([$this->intent(['predicate' => 'invented_predicate'])]);
+
+        self::assertContains('RELATION_PREDICATE_UNSUPPORTED', array_column($result['blockers'], 'code'));
+        self::assertSame([], $result['relation_candidates']);
+    }
+
+    public function test_invalid_source_uuid_fails_closed(): void
+    {
+        $planner = $this->planner(['knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]]]);
+
+        $result = $planner->plan([$this->intent(['source_uuid' => 'not-a-uuid'])]);
+
+        self::assertContains('RELATION_SOURCE_UUID_INVALID', array_column($result['blockers'], 'code'));
+    }
+
+    public function test_invalid_target_uuid_fails_closed(): void
+    {
+        $planner = $this->planner(['classification' => [self::SOURCE => ['active' => true, 'revision' => 1]]]);
+
+        $result = $planner->plan([$this->intent(['target_uuid' => 'not-a-uuid'])]);
+
+        self::assertContains('RELATION_TARGET_UUID_INVALID', array_column($result['blockers'], 'code'));
+    }
+
+    public function test_wrong_endpoint_type_fails_closed(): void
+    {
+        $planner = $this->planner([
+            'knowledge' => [self::SOURCE => ['active' => true, 'revision' => 1], self::TARGET => ['active' => true, 'revision' => 1]],
+        ]);
+
+        $result = $planner->plan([$this->intent(['source_type' => 'knowledge', 'target_type' => 'classification', 'predicate' => 'subtype_of'])]);
+
+        self::assertContains('RELATION_ENDPOINT_TYPES_UNSUPPORTED', array_column($result['blockers'], 'code'));
+    }
+
+    public function test_retired_endpoint_fails_closed(): void
+    {
+        $planner = $this->planner([
+            'classification' => [self::SOURCE => ['active' => false, 'revision' => 2]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ]);
+
+        $result = $planner->plan([$this->intent()]);
+
+        self::assertContains('RELATION_SOURCE_INACTIVE', array_column($result['blockers'], 'code'));
+    }
+
+    public function test_multiple_intents_have_bounded_deterministic_order(): void
+    {
+        $second = '01a08156-c400-7739-a40f-61185cd62fce';
+        $planner = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [
+                self::TARGET => ['active' => true, 'revision' => 1],
+                $second => ['active' => true, 'revision' => 1],
+            ],
+        ]);
+
+        $result = $planner->plan([
+            $this->intent(['target_uuid' => $second]),
+            $this->intent(['target_uuid' => self::TARGET]),
+        ]);
+
+        self::assertSame([self::TARGET, $second], array_column($result['relation_candidates'], 'target_uuid'));
+    }
+
+    public function test_prose_without_typed_relation_intent_does_not_create_a_relation(): void
+    {
+        self::assertSame([], (new \NHK\Core\Application\Authority\AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types()))->plan([
+            'text' => 'Bahnhäusle nói về một tri thức hiện có.',
+            'authority_intent' => ['mode' => 'PLAN'],
+        ])['relation_candidates']);
+    }
+
+    public function test_authority_capture_plan_consumes_typed_relation_intents_without_parsing_prose(): void
+    {
+        $relationPlanner = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ]);
+        $planner = new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types(), relationIntents: $relationPlanner);
+
+        $plan = $planner->plan([
+            'text' => 'Bahnhäusle nói về một tri thức hiện có.',
+            'authority_intent' => ['mode' => 'PLAN', 'relation_intents' => [$this->intent()]],
+        ]);
+
+        self::assertCount(1, $plan['relation_candidates']);
+        self::assertSame(self::SOURCE, $plan['relation_candidates'][0]['source_uuid']);
+        self::assertSame(self::TARGET, $plan['relation_candidates'][0]['target_uuid']);
+    }
+
+    private function types(): \NHK\Core\Domain\Authority\EntityTypeRegistry
+    {
+        $types = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
+        \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($types);
+        return $types;
+    }
+
+    /** @param array<string,mixed> $changes @return array<string,mixed> */
+    private function intent(array $changes = []): array
+    {
+        return array_replace([
+            'source_type' => 'classification',
+            'source_uuid' => self::SOURCE,
+            'predicate' => 'about',
+            'target_type' => 'knowledge',
+            'target_uuid' => self::TARGET,
+            'provenance' => 'EXPLICIT_USER_RELATION',
+            'reason' => 'Explicit canonical relation request.',
+        ], $changes);
+    }
+
+    /** @param array<string,array<string,array{active:bool,revision:int}>> $states @param array<string,array<string,mixed>> $edges */
+    private function planner(array $states, array $edges = []): ExplicitRelationIntentPlanner
+    {
+        $endpoints = new \NHK\Core\Domain\Graph\EndpointTypeRegistry();
+        foreach ($states as $type => $records) $endpoints->register($type, new PlannerEndpointResolver($type, $records));
+        return new ExplicitRelationIntentPlanner(
+            $endpoints,
+            new PredicateRegistry(),
+            static function (NodeReference $reference) use ($states): ?array {
+                return $states[$reference->endpoint_type][$reference->endpoint_key] ?? null;
+            },
+            static function (array $packet) use ($edges): ?array {
+                $key = strtolower((string) ($packet['source_type'] ?? '')) . ':' . strtolower((string) ($packet['source_uuid'] ?? '')) . '|' . strtolower((string) ($packet['predicate'] ?? '')) . '|' . strtolower((string) ($packet['target_type'] ?? '')) . ':' . strtolower((string) ($packet['target_uuid'] ?? ''));
+                return $edges[$key] ?? null;
+            },
+        );
+    }
+
+    private function key(): string
+    {
+        return 'classification:' . strtolower(self::SOURCE) . '|about|knowledge:' . strtolower(self::TARGET);
+    }
+}
+
+final class PlannerEndpointResolver implements EndpointRevisionReader
+{
+    /** @param array<string,array{active:bool,revision:int}> $records */
+    public function __construct(private string $type, private array $records) {}
+    public function supports(string $endpoint_type): bool { return $endpoint_type === $this->type; }
+    public function exists(NodeReference $reference): bool { return isset($this->records[$reference->endpoint_key]); }
+    public function normalize(NodeReference $reference): NodeReference { return new NodeReference($this->type, strtolower(trim($reference->endpoint_key))); }
+    public function revision(NodeReference $reference): ?int { return $this->records[$reference->endpoint_key]['revision'] ?? null; }
+}

@@ -139,7 +139,7 @@ final class AuthorityCaptureService
     private function completionChildren(array $plan, array $approvedIds, array $result): array
     {
         $candidates = [];
-        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates'] as $bucket) {
+        foreach (['reuse', 'create_candidates', 'update_candidates', 'relation_candidates', 'relation_reuse'] as $bucket) {
             foreach ((array) ($plan[$bucket] ?? []) as $candidate) {
                 if (is_array($candidate)) $candidates[(string) ($candidate['candidate_id'] ?? '')] = $candidate;
             }
@@ -150,7 +150,7 @@ final class AuthorityCaptureService
             $candidate = $candidates[(string) $candidateId] ?? [];
             if (!is_array($candidate)) continue;
             $type = strtolower(trim((string) ($candidate['entity_type'] ?? 'relation')));
-            $canonicalId = trim((string) ($candidate['canonical_uuid'] ?? ''));
+            $canonicalId = trim((string) ($candidate['canonical_uuid'] ?? $candidate['canonical_id'] ?? ''));
             $apply = null;
             if (strtoupper((string) ($candidate['action'] ?? 'REUSE')) !== 'REUSE') {
                 $applyRows = (array) ($result['apply_results'] ?? []);

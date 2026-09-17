@@ -261,13 +261,18 @@ final class Plugin {
             $publicEligibility = new PublicEntityEligibilityPolicy($authority, $types, $publicRoutes, $publicContexts);
             $publicCollection = new PublicEntityCollectionQuery($authority, $types, new PublicIdentityContract($types), $publicEligibility, $publicRoutes, new BrandAggregationQuery($graphService, $authority, $types, $publicRoutes, $publicEligibility), static fn (): bool => $publicStatus->authorityStorageReady(), new EntityMediaProjection($media, $assets, $usages), new EntityKnowledgeProjection($claims, $evidence, $sources, $publicStatus));
             $governanceRuntime = GovernanceRuntimeFactory::fromWordPress($wpdb, $sharedAttachmentBridge);
+            $stagingScopeVerifier = $governanceRuntime->stagingScopeVerifier ?? new \NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier(
+                static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },
+                defined('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') ? (string) constant('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') : (string) (getenv('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') ?: ''),
+                static function (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $capture, array $input, array $assets): bool { return function_exists('apply_filters') && (bool) apply_filters('nhk_v3_staging_acceptance_admission', false, $scope, $capture, $input, $assets); },
+            );
             $proposalRepository = $governanceRuntime->proposals;
             $governance = $governanceRuntime->governance;
             $eligibility = $governanceRuntime->eligibility;
             (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection()))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
-            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }));
+            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new \NHK\Core\Application\Governance\MediaBindingStagingGuard(static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); }, [$stagingScopeVerifier, 'verifyBindingRequest']));
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
@@ -572,6 +577,44 @@ final class Plugin {
                 }
                 return [];
             };
+            // Typed Capture relation intents must resolve active canonical
+            // endpoints and exact endpoint revisions before Governance sees a
+            // proposal. This closure is read-only; it never creates or
+            // updates semantic records.
+            $relationIntentEndpointState = static function (\NHK\Core\Domain\Graph\NodeReference $reference) use ($authority, $media, $videos, $claims, $sources, $evidence, $endpoints): ?array {
+                $record = match ($reference->endpoint_type) {
+                    'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product' => $authority->findByCanonicalId($reference->endpoint_key),
+                    'media' => $media->findByCanonicalId($reference->endpoint_key),
+                    'video' => $videos->findByCanonicalId($reference->endpoint_key),
+                    'knowledge' => $claims->findByCanonicalId($reference->endpoint_key),
+                    'source' => $sources->findByCanonicalId($reference->endpoint_key),
+                    'evidence' => $evidence->findByCanonicalId($reference->endpoint_key),
+                    'wp_post' => function_exists('get_post') ? get_post((int) (explode(':', $reference->endpoint_key, 2)[1] ?? 0)) : null,
+                    default => null,
+                };
+                if (!is_object($record)) return null;
+                $active = match ($reference->endpoint_type) {
+                    'brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product' => method_exists($record, 'active') && $record->active(),
+                    'wp_post' => (string) ($record->post_status ?? '') !== 'trash',
+                    default => ($record->active ?? false) === true,
+                };
+                $resolver = $endpoints->resolver($reference->endpoint_type);
+                if (!$resolver instanceof \NHK\Core\Contracts\Graph\EndpointRevisionReader) return null;
+                $revision = $resolver->revision($reference);
+                return ['active' => $active, 'revision' => $revision];
+            };
+            $relationIntentState = static function (array $packet) use ($graphService): array {
+                $source = new \NHK\Core\Domain\Graph\NodeReference((string) ($packet['source_type'] ?? ''), (string) ($packet['source_uuid'] ?? ''));
+                $target = new \NHK\Core\Domain\Graph\NodeReference((string) ($packet['target_type'] ?? ''), (string) ($packet['target_uuid'] ?? ''));
+                try {
+                    $edge = $graphService->findEdge($source, (string) ($packet['predicate'] ?? ''), $target);
+                    if ($edge === null) return [];
+                    return ['status' => $edge->isActive() ? 'ACTIVE' : 'RETIRED', 'canonical_id' => $edge->edge_uuid, 'revision' => $edge->revision];
+                } catch (\Throwable) {
+                    return [];
+                }
+            };
+            $explicitRelationIntentPlanner = new \NHK\Core\Application\Graph\ExplicitRelationIntentPlanner($endpoints, $predicates, $relationIntentEndpointState, $relationIntentState);
             $relationProposalReconciliation = new RelationProposalReconciliationService(
                 $mcpGovernance,
                 $governance,
@@ -686,7 +729,7 @@ final class Plugin {
             $capture = null;
             $authorityCapture = new \NHK\Core\Application\Capture\AuthorityCaptureService(
                 $captureRepository,
-                static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($authority, $types, $documentation, $automationResolver, $authorityPolicyStorage): array {
+                static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($authority, $types, $documentation, $automationResolver, $authorityPolicyStorage, $explicitRelationIntentPlanner): array {
                     $checkpoint = $documentation->bootstrap();
                     $generic = \NHK\Core\Domain\Governance\AutomationMode::REVIEW_REQUIRED;
                     foreach (['brand', 'model', 'variant', 'movement', 'music', 'component', 'classification', 'specimen', 'product'] as $type) if (in_array($automationResolver->resolve($type), [\NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE, \NHK\Core\Domain\Governance\AutomationMode::AUTO_PUBLISH], true)) $generic = \NHK\Core\Domain\Governance\AutomationMode::AUTO_APPROVE;
@@ -703,7 +746,7 @@ final class Plugin {
                         'predicate_registry_fingerprint' => hash('sha256', json_encode(array_map(static fn ($definition): array => [$definition->key, $definition->allowed_source_types, $definition->allowed_target_types, $definition->outbound_cardinality, $definition->inbound_cardinality], $predicateRegistry->all()), JSON_THROW_ON_ERROR)),
                         'semantic_contract_version' => 'authority-graph-2026-09-11',
                     ]);
-                    return (new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types))->plan($input, ['capture_id' => $capture->captureId, 'capture_revision' => (int) ($capture->context['planning_revision'] ?? $capture->revision), 'contract' => $contract]);
+                    return (new \NHK\Core\Application\Authority\AuthorityIntentPlanner($authority, $types, relationIntents: $explicitRelationIntentPlanner))->plan($input, ['capture_id' => $capture->captureId, 'capture_revision' => (int) ($capture->context['planning_revision'] ?? $capture->revision), 'contract' => $contract]);
                 },
                 static function (array $input, \NHK\Core\Domain\Capture\CaptureRecord $capture) use ($draftGateway): array {
                     return $draftGateway->create(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->captureId . ':article', 'title' => (string) ($input['title'] ?? ''), 'content' => (string) ($input['text'] ?? $input['content'] ?? ''), 'excerpt' => (string) ($input['excerpt'] ?? '')]);
@@ -1166,6 +1209,7 @@ final class Plugin {
                 new VisualOpportunityDetector(),
                 new VisualSupportRequirementService(new \NHK\Core\Infrastructure\Media\WpdbVisualSupportRequirementRepository($wpdb)),
                 $mediaBindingService,
+                $stagingScopeVerifier,
             );
             $captureContinuation = new EditorialCaptureContinuationService($captureRepository, $captureAddendumRepository, $capture, static function (array $input) use ($imageIngest, $existingMediaResolver): array {
                 $mediaIds = is_array($input['media_ids'] ?? null) ? array_values($input['media_ids']) : [];

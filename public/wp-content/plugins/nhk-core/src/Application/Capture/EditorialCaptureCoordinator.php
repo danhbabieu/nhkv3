@@ -11,6 +11,7 @@ use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Mcp\McpDocumentationRegistry;
+use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Governance\Exception\{GovernanceException, ProposalIdempotencyConflict, ProposalIdempotencyStaleBinding, ProposalSubjectBindingInvalid};
 use NHK\Core\Domain\Video\VideoRelationEvidenceRequired;
 
@@ -50,6 +51,7 @@ final class EditorialCaptureCoordinator
         private ?\NHK\Core\Application\Media\VisualOpportunityDetector $visualOpportunityDetector = null,
         private ?\NHK\Core\Application\Media\VisualSupportRequirementService $visualSupportRequirements = null,
         private ?MediaBindingPort $mediaBindingService = null,
+        private ?StagingAcceptanceScopeVerifier $stagingScopeVerifier = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -568,9 +570,17 @@ final class EditorialCaptureCoordinator
     /** @param list<array<string,mixed>> $assets @param array<string,mixed> $diagnostics @param array<string,mixed> $receipts */
     private function runTypedMediaBindingFastPath(CaptureRecord $record, array $input, array $assets, array $diagnostics, array $receipts): CaptureRecord
     {
+        foreach ((array) ($input['media_bindings'] ?? []) as $binding) {
+            if (strtoupper(trim((string) ($binding['selection_source'] ?? 'USER_EXPLICIT'))) === 'SYSTEM_AUTO') throw new \RuntimeException('MEDIA_BINDING_GOVERNANCE_REQUIRED');
+        }
+        $scope = $this->stagingScopeVerifier?->forCapture($record, $input, $assets);
+        unset($input['staging_acceptance']);
+        if ($scope !== null) $input['staging_acceptance'] = $scope;
         $intent = ['status' => 'resolved', 'intent' => 'MEDIA_ENRICHMENT', 'source' => 'EXPLICIT_TYPED_BINDING', 'article_required' => false, 'media_required' => true, 'diagnostics' => [], 'signals' => ['typed_media_binding' => true]];
         $diagnostics['content_intent'] = $intent;
-        $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', null, null, 'IN_PROGRESS', null, $record->context + ['content_intent' => $intent]);
+        $context = $record->context + ['content_intent' => $intent];
+        if ($scope !== null) $context['staging_acceptance'] = $scope;
+        $record = $this->save($record, CaptureStage::INTERPRETED, $assets, $diagnostics, $receipts, 'INTERPRETED', null, null, 'IN_PROGRESS', null, $context);
         $diagnostics = $record->diagnostics;
         $receipts = $record->phaseReceipts;
         $this->beginPhase('KNOWLEDGE_RETRIEVED');

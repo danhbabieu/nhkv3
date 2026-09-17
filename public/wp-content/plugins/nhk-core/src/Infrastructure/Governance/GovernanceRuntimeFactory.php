@@ -5,7 +5,7 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Authority\{AuthorityService, SemanticMergeService};
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
-use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
+use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, MediaBindingStagingGuard, OperationScopedStagingGuard, ProposalEligibilityService, StagingAcceptanceScopeVerifier, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
 use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
@@ -105,10 +105,19 @@ final class GovernanceRuntimeFactory
         };
         $collectorExecutor = new CollectorFacetMaintenanceExecutor($knowledgeService, $collectorBranchReader);
         $environment = static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); };
-        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment));
+        $scopeSecret = defined('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') ? (string) constant('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') : (string) (getenv('NHK_STAGING_ACCEPTANCE_SCOPE_SECRET') ?: '');
+        $stagingScopeVerifier = new StagingAcceptanceScopeVerifier(
+            $environment,
+            $scopeSecret,
+            static function (array $scope, \NHK\Core\Domain\Capture\CaptureRecord $capture, array $input, array $assets): bool {
+                return function_exists('apply_filters') && (bool) apply_filters('nhk_v3_staging_acceptance_admission', false, $scope, $capture, $input, $assets);
+            },
+        );
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb), stagingGuard: new MediaBindingStagingGuard($environment, [$stagingScopeVerifier, 'verifyBindingRequest']));
         $stagingGuard = new OperationScopedStagingGuard(
             $environment,
             static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
+            scopeVerifier: [$stagingScopeVerifier, 'verifyProposal'],
         );
         $controlledApply = new ControlledApplyService(
             $proposalRepository,
@@ -148,6 +157,6 @@ final class GovernanceRuntimeFactory
             static function (string $proposalId) use ($applyAttempts): bool { return $applyAttempts->findSuccessful($proposalId) !== null; },
         );
 
-        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation, $automationTypes, $mediaBinding);
+        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation, $automationTypes, $mediaBinding, $stagingScopeVerifier);
     }
 }
