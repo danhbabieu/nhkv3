@@ -21,6 +21,37 @@ final class CaptureArticlePreflightHandoff
         $semanticApplied = (string) ($semanticWriteBack['status'] ?? '') === 'APPLIED';
         $slug = trim((string) ($articleState['slug'] ?? ''));
         $permalink = trim((string) ($articleState['permalink'] ?? ''));
+        $publicRouteReady = $slug !== '' && $permalink !== '';
+        $renderedPublicStatus = strtolower(trim((string) ($articleState['rendered_public_verification_status'] ?? 'unavailable')));
+        $requirements = is_array($semanticWriteBack['requirements'] ?? null) ? $semanticWriteBack['requirements'] : [];
+        $semanticStatus = strtoupper(trim((string) ($semanticWriteBack['status'] ?? 'NONE')));
+        $semanticRequirement = is_array($requirements['semantic_delta'] ?? null)
+            ? $requirements['semantic_delta']
+            : [
+                'applicability' => $semanticStatus === 'SKIPPED' ? 'NOT_REQUIRED' : 'REQUIRED',
+                'policy' => $semanticStatus === 'SYSTEM_BLOCKED' ? 'HARD_BLOCK' : (in_array($semanticStatus, ['REVIEW_REQUIRED', 'PENDING'], true) ? 'HUMAN_REVIEW' : 'VERIFY'),
+                'state' => $semanticApplied ? 'VERIFIED' : ($semanticStatus === 'SYSTEM_BLOCKED' ? 'BLOCKED' : ($semanticStatus === 'SKIPPED' ? 'SKIPPED' : 'PENDING')),
+                'evidence' => ['intent' => '', 'status' => $semanticStatus],
+            ];
+        $requirements['semantic_delta'] = $semanticRequirement;
+        $requirements['article_media'] = [
+            'applicability' => 'REQUIRED',
+            'policy' => 'VERIFY',
+            'state' => $mediaComplete ? 'VERIFIED' : 'PENDING',
+            'evidence' => ['media_complete' => $mediaComplete],
+        ];
+        $requirements['public_route'] = [
+            'applicability' => 'REQUIRED',
+            'policy' => 'VERIFY',
+            'state' => $publicRouteReady ? 'VERIFIED' : 'PENDING',
+            'evidence' => ['slug' => $slug, 'permalink' => $permalink],
+        ];
+        $requirements['rendered_public'] = [
+            'applicability' => 'REQUIRED',
+            'policy' => 'VERIFY',
+            'state' => $renderedPublicStatus === 'verified' ? 'VERIFIED' : 'PENDING',
+            'evidence' => ['status' => $renderedPublicStatus],
+        ];
 
         return [
             'fresh_preflight' => true,
@@ -35,6 +66,7 @@ final class CaptureArticlePreflightHandoff
             'category_resolved' => $category === 'EXISTING',
             'semantic_plan_complete' => $research->readyForDraft,
             'semantic_readback_verified' => $semanticApplied,
+            'requirements' => $requirements,
             'media_usage_complete' => $mediaComplete,
             'media_snapshot' => $media,
             'media_guidance' => is_array($research->mediaPlan['guidance'] ?? null) ? $research->mediaPlan['guidance'] : (is_array($media['guidance'] ?? null) ? $media['guidance'] : []),
@@ -45,7 +77,7 @@ final class CaptureArticlePreflightHandoff
             'seo_projection_valid' => trim((string) ($research->seoBlueprint['slug_intent'] ?? '')) !== '',
             'internal_links_valid' => true,
             'structured_data_status' => 'unavailable',
-            'public_route_ready' => $slug !== '' && $permalink !== '',
+            'public_route_ready' => $publicRouteReady,
             'rendered_public_verification_status' => 'unavailable',
         ];
     }

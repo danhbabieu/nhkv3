@@ -169,6 +169,7 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
                     'evidence' => ['intent' => 'IMAGE_ARTICLE', 'status' => 'NONE'],
                 ],
             ]],
+            physicalItems: [['client_file_id' => 'front', 'media_id' => 'media-front']],
             publication: static function (array $context) use (&$publicationContext): array {
                 $publicationContext = $context;
                 return ['eligible' => true];
@@ -200,10 +201,11 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
         ?callable $media = null,
         array $semanticExtra = [],
         ?callable $publication = null,
+        array $physicalItems = [],
     ): EditorialCaptureCoordinator {
         return new EditorialCaptureCoordinator(
             $captures,
-            static function (array $input) use (&$events): array { $events[] = 'physical'; return ['items' => []]; },
+            static function (array $input) use (&$events, $physicalItems): array { $events[] = 'physical'; return ['items' => $physicalItems]; },
             static function (array $input) use (&$calls, &$events): array { ++$calls['draft']; $events[] = 'draft'; return ['post_id' => 1001, 'state_token' => 'article-token']; },
             new TextInputInterpreter(),
             new SubjectResolutionService(static fn (string $hint): array => []),
