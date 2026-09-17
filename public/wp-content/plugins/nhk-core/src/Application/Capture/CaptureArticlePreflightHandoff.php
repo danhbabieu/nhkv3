@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Capture;
 
 use NHK\Core\Domain\Article\ArticleResearchResult;
+use NHK\Core\Domain\Media\MediaUsageRoleRegistry;
 
 /** Converts a fresh Article owner read into publication-gate evidence. */
 final class CaptureArticlePreflightHandoff
@@ -101,9 +102,17 @@ final class CaptureArticlePreflightHandoff
     /** @param array<string,mixed> $mediaUsage @param array<string,mixed> $articleState */
     private function validArticleMediaReadback(array $mediaUsage, array $articleState): bool
     {
-        $requiredRoles = ['featured_primary', 'inline_primary'];
-        $roles = array_values(array_unique(array_filter(array_map('strval', (array) ($mediaUsage['roles'] ?? [])), static fn (string $role): bool => trim($role) !== '')));
-        $usageIds = array_values(array_unique(array_filter(array_map('strval', (array) ($mediaUsage['usage_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
+        $requiredRoles = MediaUsageRoleRegistry::mandatoryArticleRoles();
+        $roles = array_values(array_map('strval', (array) ($mediaUsage['roles'] ?? [])));
+        $usageIds = array_values(array_map('strval', (array) ($mediaUsage['usage_ids'] ?? [])));
+        $rolesAreExact = count($roles) === count($requiredRoles)
+            && count(array_unique($roles)) === count($roles)
+            && array_diff($roles, $requiredRoles) === []
+            && array_diff($requiredRoles, $roles) === [];
+        $usageIdsAreExact = count($usageIds) === count($requiredRoles)
+            && count(array_unique($usageIds)) === count($usageIds)
+            && !in_array('', $usageIds, true)
+            && !in_array('', array_map('trim', $usageIds), true);
         $postId = (int) ($articleState['post_id'] ?? 0);
         $blogId = max(1, (int) ($articleState['blog_id'] ?? (function_exists('get_current_blog_id') ? get_current_blog_id() : 1)));
         $expectedEndpointKey = trim((string) ($articleState['endpoint_key'] ?? ''));
@@ -112,9 +121,8 @@ final class CaptureArticlePreflightHandoff
             && (string) ($mediaUsage['endpoint_type'] ?? '') === 'wp_post'
             && $expectedEndpointKey !== ''
             && trim((string) ($mediaUsage['endpoint_key'] ?? '')) === $expectedEndpointKey
-            && array_diff($requiredRoles, $roles) === []
-            && count($usageIds) >= count($requiredRoles)
-            && count($usageIds) === count(array_unique($usageIds))
+            && $rolesAreExact
+            && $usageIdsAreExact
             && trim((string) ($mediaUsage['source'] ?? '')) === 'ARTICLE_MEDIA_RECONCILIATION'
             && (array) ($mediaUsage['blockers'] ?? []) === [];
     }
