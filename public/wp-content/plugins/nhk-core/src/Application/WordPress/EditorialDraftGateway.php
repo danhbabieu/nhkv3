@@ -48,6 +48,13 @@ final class EditorialDraftGateway
             try { (new ManagedArticleSectionParser())->removeOwned($current->content, array_values(array_filter($managedExpectations, 'is_array'))); }
             catch (ManagedArticleSectionConflict $error) { return ['ok' => false, 'reason' => 'EDITORIAL_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token, 'conflict' => $error->getMessage()]; }
         }
+        // A successful CAS with no effective editorial delta must remain a
+        // read-only operation. In particular, never call wp_update_post for
+        // an empty/no-op packet: native WordPress may still advance
+        // post_modified_gmt or invoke write-capable hooks for it.
+        if ($fields === [] || $this->isNoop($current, $fields)) {
+            return ['ok' => true, 'post' => $current->snapshot(), 'state_token' => $current->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
+        }
         $captureOwned = trim($captureId) !== '';
         if ($captureOwned) CaptureEditorialWriteGuard::enter();
         try {
@@ -56,6 +63,22 @@ final class EditorialDraftGateway
             if ($captureOwned) CaptureEditorialWriteGuard::leave();
         }
         return ['ok' => true, 'post' => $updated->snapshot(), 'state_token' => $updated->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
+    }
+
+    /** @param array<string,mixed> $fields */
+    private function isNoop(EditorialPostState $current, array $fields): bool
+    {
+        $map = [
+            'post_title' => 'title',
+            'post_content' => 'content',
+            'post_excerpt' => 'excerpt',
+            'post_name' => 'slug',
+        ];
+        foreach ($fields as $field => $value) {
+            if (!isset($map[$field])) return false;
+            if ((string) $value !== (string) $current->{$map[$field]}) return false;
+        }
+        return true;
     }
 
     /** Publish only after every cross-boundary verification has been supplied and passed. */

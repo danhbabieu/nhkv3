@@ -8,7 +8,7 @@ final class GraphService implements GraphReader {
     public function __construct(private GraphRepository $repository, private EndpointTypeRegistry $endpoints, private PredicateRegistry $predicates, private AuditSink $audit, private ?ClassificationHierarchyPolicy $hierarchy = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
     public function create(NodeReference $source, string $predicate, NodeReference $target): GraphEdge {
         $definition=$this->predicates->get($predicate); $source=$this->endpoints->assertExists($source); $target=$this->endpoints->assertExists($target);
-        if ($definition->key === 'classified_as') ($this->classifiedAs ?? throw new \RuntimeException('CLASSIFIED_AS_POLICY_UNAVAILABLE'))->assertCandidate(['source_type' => $source->endpoint_type, 'scope' => $source->endpoint_type, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']);
+        if ($definition->key === 'classified_as') ($this->classifiedAs ?? throw new \RuntimeException('CLASSIFIED_AS_POLICY_UNAVAILABLE'))->assertCandidate(['source_type' => $source->endpoint_type, 'scope' => $source->endpoint_type, 'target_type' => $target->endpoint_type, 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']);
         RelationPolicy::assertCanCreate($definition->key, $source->endpoint_type, $target->endpoint_type);
         if (!$definition->allows($source->endpoint_type,$target->endpoint_type)) { if(!in_array($source->endpoint_type,$definition->allowed_source_types,true)) throw new InvalidRelationSourceType('Invalid relation source type.'); throw new InvalidRelationTargetType('Invalid relation target type.'); }
         if (!$definition->allow_self_relation && $source->key()===$target->key()) throw new InvalidRelationTargetType('Self relation is not allowed.');

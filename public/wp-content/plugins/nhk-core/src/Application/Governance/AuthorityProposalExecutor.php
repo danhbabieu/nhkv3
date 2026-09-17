@@ -23,7 +23,7 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
 
     public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
@@ -157,10 +157,12 @@ final class AuthorityProposalExecutor
                 throw new \InvalidArgumentException('Relation endpoint identity is required.');
             }
             if ((string) ($proposal->payload['predicate'] ?? '') === 'classified_as') {
-                (new ClassifiedAsPolicy())->assertCandidate([
+                ($this->classifiedAs ?? new ClassifiedAsPolicy())->assertCandidate([
                     'source_type' => $sourceType,
                     'scope' => (string) ($proposal->payload['scope'] ?? $sourceType),
                     'provenance' => (string) ($proposal->payload['provenance'] ?? ''),
+                    'target_type' => (string) ($proposal->payload['target_type'] ?? ''),
+                    'target_family' => (string) ($proposal->payload['target_family'] ?? ''),
                 ]);
             }
             return $this->graph->create(

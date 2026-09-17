@@ -15,6 +15,8 @@ use NHK\Core\Application\Media\ArticleMediaCoordinator;
 
 final class ArticleIngestCoordinator
 {
+    private const MAX_PROPOSALS_PER_OPERATION = 100;
+    private const MAX_APPLIES_PER_REQUEST = 25;
     public function __construct(
         private ArticleOperationReceiptRepository $receipts,
         private ?ArticleIngestPreflight $preflight = null,
@@ -30,6 +32,9 @@ final class ArticleIngestCoordinator
 
     /** @var array<string,mixed> */
     private array $mediaDiagnostics = [];
+    /** @var array<string,int> */
+    private array $timings = [];
+    private float $startedAt = 0.0;
 
     /** @param array<string,mixed> $input */
     public function execute(array $input): ArticleOperationReceipt
@@ -67,11 +72,16 @@ final class ArticleIngestCoordinator
     /** @param array<string,mixed> $input */
     private function resume(ArticleOperationReceipt $receipt, array $input): ArticleOperationReceipt
     {
+        $started = microtime(true);
+        $this->startedAt = $started;
+        $this->timings = [];
+        $this->mediaDiagnostics = [];
         if (!$this->preflight || !$this->planner || !$this->editorial || !$this->governance || !$this->proposals) return $this->save($receipt, 'preflight', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'ARTICLE_COORDINATOR_DEPENDENCIES_NOT_WIRED']);
         $target = is_array($input['target_wp_post'] ?? null) ? $input['target_wp_post'] : [];
         $postId = $receipt->wpPostId;
         if ($postId === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'WP_POST_TARGET_REQUIRED']);
         $state = $this->editorial->read($postId);
+        $this->timings['editorial_state_read_ms'] = $this->elapsed($started);
         if ($state === null) return $this->save($receipt, 'preflight', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE']);
         // A prior bounded phase (notably MediaUsage/editorial placement) may
         // have advanced the native token. Refresh and continue from the
@@ -84,6 +94,7 @@ final class ArticleIngestCoordinator
                 $selected = is_array($input['article_media']['selected'] ?? null) ? array_map('strval', $input['article_media']['selected']) : [];
                 $supporting = is_array($input['article_media']['supporting_media_ids'] ?? null) ? array_values(array_map('strval', $input['article_media']['supporting_media_ids'])) : [];
                 $this->mediaDiagnostics = $this->articleMedia->ensureForPost($postId, $mediaContext, $selected, $supporting)->toArray();
+                $this->timings['media_reconciliation_ms'] = $this->elapsed($started);
             } catch (\Throwable $error) {
                 $conflict = str_contains(strtoupper($error->getMessage()), 'EDITORIAL_STATE_CHANGED');
                 return $this->save($receipt, 'media', $conflict ? ArticleIngestOutcome::RECONCILIATION_CONFLICT : ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => $conflict ? 'EDITORIAL_STATE_CHANGED' : 'ARTICLE_MEDIA_COORDINATION_FAILED', 'error' => $error->getMessage()], $state->token);
@@ -93,6 +104,7 @@ final class ArticleIngestCoordinator
         }
         $commands = is_array($input['semantic_bundle']['commands'] ?? null) ? $input['semantic_bundle']['commands'] : [];
         $preflight = $this->preflight->check($receipt->wpEndpointKey ?? '', 'reconcile', $commands, (string) ($target['endpoint_type'] ?? 'wp_post'));
+        $this->timings['semantic_preflight_ms'] = $this->elapsed($started);
         if (!$preflight->accepted) {
             $outcome = in_array('UNSUPPORTED_OPERATION', $preflight->reasons, true) ? ArticleIngestOutcome::UNSUPPORTED_OPERATION : ArticleIngestOutcome::SEMANTIC_PREFLIGHT_REJECTED;
             return $this->save($receipt, 'preflight', $outcome, false, ['reasons' => $preflight->reasons], $state->token);
@@ -102,6 +114,10 @@ final class ArticleIngestCoordinator
                 $planned = $this->planner->plan($receipt->operationId, $commands);
             } catch (\InvalidArgumentException $error) {
                 return $this->save($receipt, 'preflight', ArticleIngestOutcome::SEMANTIC_PREFLIGHT_REJECTED, false, ['code' => 'ARTICLE_PROPOSAL_PLAN_INVALID', 'error' => $error->getMessage()], $state->token);
+            }
+            $this->timings['relation_plan_ms'] = $this->elapsed($started);
+            if (count($planned) > self::MAX_PROPOSALS_PER_OPERATION) {
+                return $this->save($receipt, 'preflight', ArticleIngestOutcome::SEMANTIC_PREFLIGHT_REJECTED, true, ['code' => 'ARTICLE_SEMANTIC_PLAN_LIMIT', 'limit' => self::MAX_PROPOSALS_PER_OPERATION, 'planned' => count($planned)], $state->token);
             }
             if ($planned === []) {
                 if ($this->verification === null) return $this->save($receipt, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true, ['code' => 'ARTICLE_VERIFICATION_NOT_WIRED'], $state->token);
@@ -142,6 +158,7 @@ final class ArticleIngestCoordinator
         $applied = $receipt->appliedProposalIds;
         $proposalStates = $receipt->proposalStates;
         $applyAttempts = $receipt->applyAttempts;
+        $appliedThisRun = 0;
         if ($this->apply === null) return $this->save($receipt, 'semantic_apply', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'CONTROLLED_APPLY_UNAVAILABLE'], $state->token, $receipt->proposalIds, $applied, null, $proposalStates, $applyAttempts);
         foreach ($receipt->proposalIds as $proposalId) {
             if (in_array($proposalId, $applied, true)) continue;
@@ -154,8 +171,13 @@ final class ArticleIngestCoordinator
                 try {
                     $result = $this->apply->apply($proposalId);
                     $applied[] = $proposalId;
+                    $appliedThisRun++;
                     $proposalStates[$proposalId] = ProposalState::APPLIED->value;
                     if (isset($result['attempt_no'])) $applyAttempts[$proposalId] = (int) $result['attempt_no'];
+                    if ($appliedThisRun >= self::MAX_APPLIES_PER_REQUEST) {
+                        $this->timings['semantic_apply_ms'] = $this->elapsed($started);
+                        return $this->save($receipt, 'semantic_apply', ArticleIngestOutcome::GOVERNANCE_PENDING, true, ['code' => 'ARTICLE_APPLY_BATCH_LIMIT_REACHED', 'limit' => self::MAX_APPLIES_PER_REQUEST], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts);
+                    }
                 } catch (\Throwable $error) {
                     $message = strtolower($error->getMessage());
                     $outcome = str_contains($message, 'revision') ? ArticleIngestOutcome::STALE_SEMANTIC_REVISION : ArticleIngestOutcome::SEMANTIC_APPLY_FAILED;
@@ -171,6 +193,7 @@ final class ArticleIngestCoordinator
         $current = $this->editorial->read($postId);
         if ($current === null) return $this->save($receipt, 'verification', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'WP_POST_UNAVAILABLE'], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts);
         $verified = $this->verification->verify($state, $current, $receipt->proposalIds, array_values(array_unique($applied)));
+        $this->timings['verification_ms'] = $this->elapsed($started);
         return $verified->verified
             ? $this->save($receipt, 'complete', ArticleIngestOutcome::COMPLETED, false, [], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts)
             : $this->save($receipt, 'verification', ArticleIngestOutcome::VERIFICATION_FAILED, true, ['reasons' => $verified->reasons], $state->token, $receipt->proposalIds, array_values(array_unique($applied)), null, $proposalStates, $applyAttempts);
@@ -182,7 +205,10 @@ final class ArticleIngestCoordinator
     {
         $diagnostics = $receipt->diagnostics;
         if ($this->mediaDiagnostics !== []) $diagnostics['media'] = $this->mediaDiagnostics;
+        if ($this->timings !== []) $diagnostics['timings_ms'] = $this->timings + ['total_ms' => $this->startedAt > 0 ? $this->elapsed($this->startedAt) : 0];
         $updated = new ArticleOperationReceipt($receipt->operationId, $receipt->idempotencyKey, $receipt->requestFingerprint, $receipt->intent, $receipt->wpEndpointKey, $receipt->wpPostId, $stage, $outcome, $retryable, $proposalIds !== [] ? $proposalIds : $receipt->proposalIds, $applied !== [] ? $applied : $receipt->appliedProposalIds, $failure, $receipt->revision + 1, $receipt->createdAt, $receipt->updatedAt, $token ?? $receipt->wpStateToken, $dependencyMap ?? $receipt->dependencyMap, $proposalStates ?? $receipt->proposalStates, $applyAttempts ?? $receipt->applyAttempts, $diagnostics);
         return $this->receipts->save($updated);
     }
+
+    private function elapsed(float $started): int { return (int) round((microtime(true) - $started) * 1000); }
 }

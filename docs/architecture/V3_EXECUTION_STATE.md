@@ -1,5 +1,25 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Image upload fast path and safe Article handoff (LOCAL ONLY)
+
+SCOPE: Added the ChatGPT image widget's upload-only fast commit and separate
+Article handoff. The existing physical materialization, validation, attachment,
+private-original, public-WebP and canonical Media adoption/read-back pipeline
+was not refactored. No staging/live mutation, deploy or push was performed.
+
+FIX: `Tải ảnh lên` now stops after Media commit/read-back and publishes ordered
+batch continuation metadata. A partial batch retains successful children and
+retries only failed children under bounded child idempotency keys. The
+collapsible `Tạo bài viết` panel maps its optional title/body to
+`Capture.title`/`Capture.text`, reuses the committed Media IDs and blocks
+incomplete batches; the 500-character `Ngữ cảnh bộ ảnh` remains contextual
+metadata only. No Album/Batch semantic owner or Video behavior was added.
+
+LOCAL_VERIFICATION: Widget typecheck, 32 widget tests and the Vite production
+build pass. PHP lint, focused PHP tests, full-suite status, secret review and
+diff checks remain pending at this checkpoint. Live acceptance remains
+fail-closed under the existing bounded `STAGING_ACCEPTANCE_SCOPE`.
+
 # Checkpoint — 2026-09-17 — Video root-cause contract repair (LOCAL ONLY)
 
 SCOPE: Repaired the local Video subject-resolution, governed relation delta,
@@ -11591,3 +11611,24 @@ REMAINING_GAPS: Migration 022 and the Capture `/anh/...` physical reuse branch
 still need guarded WordPress integration evidence; projection invalidation is
 exposed through canonical hooks and must be verified with the deployed SEO and
 dossier subscribers. No final production cutover is authorized.
+
+# Checkpoint — 2026-09-17 — Public Clock runtime blocker repair (LOCAL GATES)
+
+SCOPE: Repaired the four requested local runtime blockers without staging
+semantic mutation: editorial CAS/no-op native-write protection (P0), shared
+`classified_as` policy parity across Graph, eligibility and Apply (P1), bounded
+Article research/inventory plus durable semantic apply batches and timings (P2),
+and canonical-owner/public projection verification after AUTO_PUBLISH (P3).
+
+VERIFICATION: Focused blocker suite PASS — 44 tests / 170 assertions. Changed
+PHP lint and `git diff --check` pass. The full PHPUnit run reached 1,835 tests,
+8,383 assertions, 34 environment/integration errors, 19 failures and 112
+skips. The errors are the existing WordPress/MySQL bootstrap and acceptance
+environment gates; unrelated unit failures include the pre-existing DemoCutover
+contract, Capture continuation and image-upload contract worktree changes.
+No staging deploy or live acceptance is claimed at this checkpoint.
+
+DEPLOYMENT: The canonical `scripts/nhk-deploy-verify` wrapper is present and
+the deployment-config environment is set, but it requires a clean checkout.
+Deployment is pending the bounded commit and wrapper verification; remote
+runtime/build identity and live read-back remain unverified.

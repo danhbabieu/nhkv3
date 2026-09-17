@@ -89,7 +89,7 @@ final class GovernedSemanticIngestOrchestrator
                     continue;
                 }
                 try {
-                    $frontend = ($this->projection)($applied);
+                    $frontend = ($this->projection)($applied, $this->currentOwnerType, (string) ($applied['canonical_id'] ?? $applied['canonical_readback']['canonical_id'] ?? ''));
                 } catch (\Throwable $error) {
                     $results[] = $this->blocked($approved->id, $mode, 'projection', [$error->getMessage()], 'applied', $applied);
                     continue;

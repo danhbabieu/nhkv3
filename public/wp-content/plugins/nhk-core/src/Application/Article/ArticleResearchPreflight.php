@@ -16,16 +16,21 @@ final class ArticleResearchPreflight
 
     public function research(string $topic, array $subject = [], array $articleContext = []): ArticleResearchResult
     {
+        $started = microtime(true);
+        $timings = [];
         $blockers = [];
         $warnings = [];
         try { $resolution = ($this->subjectResolver)(['topic' => $topic, 'subject' => $subject]); }
         catch (\Throwable $e) { return $this->blocked(['SUBJECT_RESOLUTION_UNAVAILABLE'], ['subject_error' => $e->getMessage()]); }
+        $timings['subject_resolution_ms'] = $this->elapsed($started);
         $resolution = is_array($resolution) ? $resolution : ['status' => 'unavailable'];
         if (($resolution['status'] ?? '') === 'ambiguous') $blockers[] = 'AMBIGUOUS_SUBJECT';
         elseif (($resolution['status'] ?? '') !== 'resolved' || !is_array($resolution['primary'] ?? null)) $blockers[] = ($resolution['status'] ?? '') === 'unavailable' ? 'SUBJECT_RESOLUTION_UNAVAILABLE' : 'SUBJECT_NOT_FOUND';
 
-        try { $inventory = ($this->inventoryReader)(['topic' => $topic, 'subject_resolution' => $resolution, 'article_context' => $articleContext, 'limit' => 50]); }
+        $stage = microtime(true);
+        try { $inventory = ($this->inventoryReader)(['topic' => $topic, 'subject_resolution' => $resolution, 'article_context' => $articleContext, 'limit' => 100]); }
         catch (\Throwable $e) { return $this->blocked($blockers === [] ? ['RUNTIME_UNAVAILABLE'] : $blockers, ['status' => 'unavailable', 'reason' => $e->getMessage()]); }
+        $timings['inventory_ms'] = $this->elapsed($stage);
         $inventory = is_array($inventory) ? $inventory : ['status' => 'unavailable'];
         if (($inventory['status'] ?? '') !== 'available') $blockers[] = (string) ($inventory['reason'] ?? 'RUNTIME_UNAVAILABLE');
         $subjectIds = [];
@@ -76,6 +81,7 @@ final class ArticleResearchPreflight
             $dictionaryPlan = ['status' => 'UNAVAILABLE', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => ['DICTIONARY_PLANNING_UNAVAILABLE'], 'blocking' => false];
         }
         foreach ((array) ($dictionaryPlan['warnings'] ?? []) as $warning) if (is_string($warning) && trim($warning) !== '') $warnings[] = $warning;
+        $timings['planning_ms'] = $this->elapsed($started);
 
         $claimDiagnostics = $this->claimComplianceDiagnostics(is_array($inventory['knowledge'] ?? null) ? $inventory['knowledge'] : [], is_array($resolution['primary'] ?? null) ? $resolution['primary'] : []);
         $compliance = ['status' => 'HUMAN_REVIEW_REQUIRED', 'code' => 'PUBLIC_CLAIM_COMPLIANCE_BLOCKED', 'warnings' => ['PUBLIC_CLAIMS_REQUIRE_EVIDENCE_SCOPE'], 'diagnostics' => $claimDiagnostics, 'review_required' => true];
@@ -89,10 +95,13 @@ final class ArticleResearchPreflight
             if (($articleMedia['inline_primary']['placeholder'] ?? false) === true) $mediaPlan['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING'];
         }
         if (!isset($mediaPlan['guidance']) || !is_array($mediaPlan['guidance'])) $mediaPlan['guidance'] = $this->mediaGuidance($articleMedia, $resolution, $mediaComplete);
-        return new ArticleResearchResult($resolution, $inventory, $overlap, ['claims' => $inventory['knowledge'] ?? [], 'sources' => $inventory['sources'] ?? [], 'evidence' => $inventory['evidence'] ?? []], $relations, $links, $category, $mediaPlan, ['candidates' => $inventory['videos'] ?? []], $blueprint, $compliance, array_values(array_unique($blockers)), array_values(array_unique($warnings)), $blockers === [], $dictionaryPlan);
+        $timings['total_ms'] = $this->elapsed($started);
+        return new ArticleResearchResult($resolution, $inventory, $overlap, ['claims' => $inventory['knowledge'] ?? [], 'sources' => $inventory['sources'] ?? [], 'evidence' => $inventory['evidence'] ?? []], $relations, $links, $category, $mediaPlan, ['candidates' => $inventory['videos'] ?? []], $blueprint, $compliance, array_values(array_unique($blockers)), array_values(array_unique($warnings)), $blockers === [], $dictionaryPlan, ['timings_ms' => $timings, 'bounds' => ['inventory_limit' => 100, 'relation_limit' => 50, 'evidence_per_claim_limit' => 5]]);
     }
 
-    private function blocked(array $blockers, array $inventory): ArticleResearchResult { return new ArticleResearchResult([], $inventory, ['classification' => 'UNCERTAIN'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [], ['status' => 'UNKNOWN'], ['candidates' => [], 'media_complete' => false], ['candidates' => []], [], ['status' => 'UNAVAILABLE'], array_values(array_unique($blockers)), [], false, ['status' => 'UNAVAILABLE', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => ['DICTIONARY_PLANNING_UNAVAILABLE'], 'blocking' => false]); }
+    private function blocked(array $blockers, array $inventory): ArticleResearchResult { return new ArticleResearchResult([], $inventory, ['classification' => 'UNCERTAIN'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [], ['status' => 'UNKNOWN'], ['candidates' => [], 'media_complete' => false], ['candidates' => []], [], ['status' => 'UNAVAILABLE'], array_values(array_unique($blockers)), [], false, ['status' => 'UNAVAILABLE', 'resolved_terms' => [], 'ambiguous_terms' => [], 'candidate_terms' => [], 'internal_link_candidates' => [], 'warnings' => ['DICTIONARY_PLANNING_UNAVAILABLE'], 'blocking' => false], ['timings_ms' => []]); }
+
+    private function elapsed(float $started): int { return (int) round((microtime(true) - $started) * 1000); }
     private function overlap(string $topic, string $subjectId, array $posts, int $currentPostId = 0): array
     {
         $posts = array_values(array_filter($posts, static function (mixed $post) use ($currentPostId): bool {

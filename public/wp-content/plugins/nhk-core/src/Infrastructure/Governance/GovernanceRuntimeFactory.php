@@ -43,7 +43,8 @@ final class GovernanceRuntimeFactory
         CoreEndpointResolverRegistrar::register($endpoints, $types, $authority, $media, $videos, $claims, $sources, $evidence);
         $graphRepository = new WpdbGraphRepository($wpdb);
         $predicates = new PredicateRegistry();
-        $graphService = new GraphService($graphRepository, $endpoints, $predicates, new GraphAuditSink(), new ClassificationHierarchyPolicy($authority, $graphRepository), new ClassifiedAsPolicy());
+        $classifiedAsPolicy = new ClassifiedAsPolicy();
+        $graphService = new GraphService($graphRepository, $endpoints, $predicates, new GraphAuditSink(), new ClassificationHierarchyPolicy($authority, $graphRepository), $classifiedAsPolicy);
         $proposalRepository = new WpdbProposalRepository($wpdb);
         $governanceAudit = new GovernanceAuditSink($wpdb);
         $transactionManager = new WpdbTransactionManager($wpdb);
@@ -55,7 +56,7 @@ final class GovernanceRuntimeFactory
             if ($record === null) return false;
             return method_exists($record, 'active') ? (bool) $record->active() : (bool) ($record->active ?? false);
         };
-        $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence), new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), new SubjectResolutionService(new CanonicalAuthoritySubjectResolver($authority, $types)), $targetActive));
+        $eligibility = new ProposalEligibilityService($proposalRepository, new DependencyGraph(new WpdbDependencyRepository($wpdb)), new WpdbEligibilityReader($authority, $proposalRepository, $graphRepository, $media, $videos, $claims, $sources, $evidence), new VideoProposalEligibilityEvaluator($videos, $endpoints, new PredicateRegistry(), new CanonicalDependencyValidator($claims, $sources, $evidence), new SubjectResolutionService(new CanonicalAuthoritySubjectResolver($authority, $types)), $targetActive), $classifiedAsPolicy);
         $authorityService = new AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink($governanceAudit));
         $mediaService = new MediaService($media, $assets, $usages);
         $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
@@ -107,7 +108,7 @@ final class GovernanceRuntimeFactory
             $proposalRepository,
             $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
-            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness),
+            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy),
             $governanceAudit,
             $eligibility,
             new NoOpApplyExecutionHook(),

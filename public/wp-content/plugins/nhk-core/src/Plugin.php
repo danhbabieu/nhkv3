@@ -360,10 +360,13 @@ final class Plugin {
                     return ['status' => 'resolved', 'primary' => $subjects[0], 'subjects' => $subjects, 'resolved' => $resolved['resolved']];
                 },
                 static function (array $input) use ($authority, $types, $claims, $sources, $evidence, $media, $usages, $videos, $graphService, $predicates): array {
+                    $started = microtime(true);
+                    $timings = [];
                     $primary = is_array($input['subject_resolution']['primary'] ?? null) ? $input['subject_resolution']['primary'] : [];
                     $subjects = is_array($input['subject_resolution']['subjects'] ?? null) ? $input['subject_resolution']['subjects'] : ($primary !== [] ? [$primary] : []);
                     $subjectIds = array_values(array_unique(array_filter(array_map(static fn (mixed $subject): string => is_array($subject) ? trim((string) ($subject['id'] ?? '')) : '', $subjects))));
-                    $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 50, 'no_found_rows' => true])) : [];
+                    $posts = function_exists('get_posts') ? array_map(static fn (\WP_Post $post): array => ['id' => (string) $post->ID, 'title' => (string) $post->post_title, 'published' => $post->post_status === 'publish', 'subject_ids' => []], get_posts(['post_type' => 'post', 'post_status' => ['publish', 'draft', 'private'], 'posts_per_page' => 100, 'no_found_rows' => true])) : [];
+                    $timings['editorial_inventory_ms'] = (int) round((microtime(true) - $started) * 1000);
                     $articlePostId = (int) ($input['article_context']['post_id'] ?? 0);
                     $defaultCategoryId = function_exists('get_option') ? (int) get_option('default_category', 0) : 0;
                     $currentCategories = $articlePostId > 0 && function_exists('get_the_category')
@@ -392,7 +395,7 @@ final class Plugin {
                                 $reference = new \NHK\Core\Domain\Graph\NodeReference((string) $subject['type'], (string) $subject['id']);
                                 $after = 0;
                                 do {
-                                    $page = $graphService->findIncoming($reference, 'about', $after, 200, false, 'knowledge');
+                                    $page = $graphService->findIncoming($reference, 'about', $after, 100, false, 'knowledge');
                                     foreach ((array) ($page['items'] ?? []) as $edge) {
                                         if (!$edge instanceof \NHK\Core\Domain\Graph\GraphEdge || !$edge->isActive()) continue;
                                         $claim = $claims->findByCanonicalId($edge->source->reference->endpoint_key);
@@ -403,6 +406,7 @@ final class Plugin {
                                         $branchKnowledge[$claim->canonicalId] = $claim;
                                         $branchKnowledgeSubjects[$claim->canonicalId][] = (string) $subject['id'];
                                     }
+                                    if (count($branchKnowledge) >= 100) break;
                                     $next = $page['next_cursor'] ?? null;
                                     if ($next === null) break;
                                     if (!is_int($next) || $next <= $after) return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE'];
@@ -411,32 +415,32 @@ final class Plugin {
                             }
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
+                    $timings['graph_knowledge_ms'] = (int) round((microtime(true) - $started) * 1000);
                     $knowledgeRows = [];
                     $sourceRows = [];
                     $evidenceRows = [];
                     $knowledgeClaims = $branchKnowledge;
-                    foreach ($claims->list() as $claim) {
-                        $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
-                        $claimSubjectId = trim((string) ($claimMetadata['subject_id'] ?? ''));
-                        if ($subjectIds !== [] && !in_array($claimSubjectId, $subjectIds, true)) continue;
-                        if ($subjectIds !== [] && $claimSubjectId === '') continue;
-                        $knowledgeClaims[$claim->canonicalId] = $claim;
-                    }
-                    foreach ($knowledgeClaims as $claim) {
+                    // Never scan the entire Knowledge corpus for a resolved
+                    // subject. The Graph-owned branch above is the bounded
+                    // canonical candidate set; the unscoped fallback is only
+                    // retained for non-subject research calls.
+                    if ($subjectIds === []) foreach (array_slice($claims->list(), 0, 100) as $claim) $knowledgeClaims[$claim->canonicalId] = $claim;
+                    foreach (array_slice($knowledgeClaims, 0, 100) as $claim) {
                         $claimMetadata = is_array($claim->provenance['metadata'] ?? null) ? $claim->provenance['metadata'] : [];
                         $claimSubjectId = trim((string) ($claimMetadata['subject_id'] ?? ''));
                         $claimSubjectIds = array_values(array_unique(array_filter(array_map('strval', (array) ($branchKnowledgeSubjects[$claim->canonicalId] ?? [])))));
-                        $claimEvidence = array_slice($evidence->listByClaim($claim->canonicalId), 0, 20);
+                        $claimEvidence = array_slice($evidence->listByClaim($claim->canonicalId), 0, 5);
                         $evidenceForClaim = [];
                         foreach ($claimEvidence as $item) {
                             $source = $sources->findByCanonicalId($item->sourceId);
                             $evidenceForClaim[] = ['id' => $item->canonicalId, 'relation' => $item->relation, 'excerpt' => $item->excerpt, 'locator' => $item->locator, 'active' => $item->active, 'public' => $item->isPublic(), 'source' => $source ? ['id' => $source->canonicalId, 'title' => $source->title, 'locator' => $source->locator, 'public' => $source->isPublic(), 'active' => $source->active] : null];
-                            $evidenceRows[] = $evidenceForClaim[array_key_last($evidenceForClaim)];
+                            if (count($evidenceRows) < 200) $evidenceRows[] = $evidenceForClaim[array_key_last($evidenceForClaim)];
                             if ($source !== null && count($sourceRows) < 50) $sourceRows[$source->canonicalId] = ['id' => $source->canonicalId, 'title' => $source->title, 'locator' => $source->locator, 'public' => $source->isPublic(), 'active' => $source->active];
                         }
                         $support = array_values(array_filter($evidenceForClaim, static fn (array $item): bool => $item['relation'] === 'supports' && $item['active'] === true));
                         $knowledgeRows[] = ['id' => $claim->canonicalId, 'subject_id' => $claimSubjectId !== '' ? $claimSubjectId : ($claimSubjectIds[0] ?? ''), 'subject_ids' => $claimSubjectIds, 'text' => $claim->claimText, 'scope' => $claim->claimType, 'active' => $claim->active, 'public' => $claim->isPublic(), 'evidence' => $evidenceForClaim, 'evidence_status' => $support === [] ? ($claimEvidence === [] ? 'NO_EVIDENCE' : 'INSUFFICIENT_EVIDENCE') : 'SUPPORTED_WITHIN_SCOPE'];
                     }
+                    $timings['knowledge_evidence_ms'] = (int) round((microtime(true) - $started) * 1000);
                     $mediaRows = [];
                     foreach ($subjectIds as $subjectId) {
                         foreach ($usages->listByEndpoint('classification', $subjectId) as $usage) {
@@ -471,7 +475,8 @@ final class Plugin {
                             $posts = array_values(array_filter($posts, static fn (array $post): bool => array_intersect($post['subject_ids'], $subjectIds) !== []));
                         } catch (\Throwable) { return ['status' => 'unavailable', 'reason' => 'GRAPH_RESEARCH_UNAVAILABLE']; }
                     }
-                    return ['status' => 'available', 'posts' => $posts, 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['id' => (int) $category->term_id, 'name' => $category->name, 'slug' => $category->slug, 'is_default' => (int) $category->term_id === $defaultCategoryId], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => array_values($knowledgeRows), 'sources' => array_values($sourceRows), 'evidence' => $evidenceRows, 'media' => array_values($mediaRows), 'videos' => array_values($videoRows), 'relations' => $relations];
+                    $timings['total_ms'] = (int) round((microtime(true) - $started) * 1000);
+                    return ['status' => 'available', 'posts' => array_slice($posts, 0, 100), 'current_categories' => $currentCategories, 'article_media' => $articleMedia, 'categories' => function_exists('get_categories') ? array_map(static fn ($category): array => ['id' => (int) $category->term_id, 'name' => $category->name, 'slug' => $category->slug, 'is_default' => (int) $category->term_id === $defaultCategoryId], get_categories(['hide_empty' => false, 'number' => 50])) : [], 'authority' => $authorityRows, 'knowledge' => array_values($knowledgeRows), 'sources' => array_values($sourceRows), 'evidence' => array_slice($evidenceRows, 0, 200), 'media' => array_values($mediaRows), 'videos' => array_values($videoRows), 'relations' => array_slice($relations, 0, 50), 'diagnostics' => ['timings_ms' => $timings, 'bounds' => ['posts' => 100, 'knowledge' => 100, 'evidence_per_claim' => 5, 'evidence_total' => 200, 'relations' => 50]]];
                 },
                 [$articlePublicEligibility, 'evaluate'],
             );
@@ -511,7 +516,24 @@ final class Plugin {
             // its typed Governance plan is a relation.
             $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence', 'relation'])));
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
-            $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints);
+            $publicProjectionVerifier = new \NHK\Core\Application\Governance\PublicProjectionVerifier(
+                static function (string $ownerType, string $id) use ($types, $authority, $media, $videos, $claims, $sources, $evidence): mixed {
+                    return match ($ownerType) {
+                        'video' => $videos->findByCanonicalId($id),
+                        'media' => $media->findByCanonicalId($id),
+                        'knowledge' => $claims->findByCanonicalId($id),
+                        'source' => $sources->findByCanonicalId($id),
+                        'evidence' => $evidence->findByCanonicalId($id),
+                        default => $types->has($ownerType) ? $authority->findByCanonicalId($id) : null,
+                    };
+                },
+                static function (string $ownerType, mixed $owner) use ($publicEligibility, $publicRoutes): ?string {
+                    if ($ownerType === 'video' && is_object($owner)) return PublicRouteResolver::videoPath((string) ($owner->title ?? ''), (string) ($owner->externalVideoId ?? ''));
+                    if ($owner instanceof \NHK\Core\Domain\Authority\AuthorityEntity) return $publicEligibility->evaluate($owner)->eligible ? $publicRoutes->path($owner) : null;
+                    return null;
+                },
+            );
+            $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints, [$publicProjectionVerifier, 'verify']);
             $relationProposalReconciliation = new RelationProposalReconciliationService(
                 $mcpGovernance,
                 $governance,

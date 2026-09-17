@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
 use NHK\Core\Contracts\Governance\{EligibilityReader, ProposalRepository};
+use NHK\Core\Application\Graph\ClassifiedAsPolicy;
 use NHK\Core\Domain\Governance\{DependencyGraph, EligibilityResult, ProposalState, ProposalSubjectBindingValidator};
 
 final class ProposalEligibilityService
 {
-    public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null) {}
+    public function __construct(private ProposalRepository $proposals, private DependencyGraph $dependencies, private EligibilityReader $reader, private ?VideoProposalEligibilityEvaluator $video = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
 
     public function check(string $proposalId): EligibilityResult
     {
@@ -38,6 +39,19 @@ final class ProposalEligibilityService
             if ($proposal->subjectId !== '' && $this->reader->targetRevision($proposal->subjectId) !== $sourceRevision) $reasons[] = 'SOURCE_REVISION_CHANGED';
             if ($proposal->targetUuid !== null && $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         } elseif ($proposal->operation === 'relation_create') {
+            if (($proposal->payload['predicate'] ?? '') === 'classified_as') {
+                try {
+                    ($this->classifiedAs ?? new ClassifiedAsPolicy())->assertCandidate([
+                        'source_type' => (string) ($proposal->payload['source_type'] ?? ''),
+                        'scope' => (string) ($proposal->payload['scope'] ?? ''),
+                        'provenance' => (string) ($proposal->payload['provenance'] ?? ''),
+                        'target_type' => (string) ($proposal->payload['target_type'] ?? ''),
+                        'target_family' => (string) ($proposal->payload['target_family'] ?? ''),
+                    ]);
+                } catch (\Throwable $error) {
+                    $reasons[] = $error->getMessage();
+                }
+            }
             $sourceRevision = (int) ($proposal->payload['source_revision'] ?? 0);
             $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);
             $sourceId = (string) ($proposal->payload['source_uuid'] ?? $proposal->subjectId);

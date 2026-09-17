@@ -83,6 +83,28 @@ final class EditorialDraftGatewayTest extends TestCase
         self::assertSame('Tóm tắt retry hợp lệ.', $fresh['post']['excerpt']);
     }
 
+    public function test_empty_or_noop_update_does_not_call_native_writer(): void
+    {
+        $posts = new ObservingEditorialStore();
+        $gateway = new EditorialDraftGateway($posts, new FakeReceiptRepo());
+        $created = $gateway->create([
+            'idempotency_key' => 'cas-noop-1',
+            'title' => 'Public Clock',
+            'content' => 'Bản nháp.',
+            'excerpt' => 'Tóm tắt.',
+        ]);
+
+        $result = $gateway->update(1, [
+            'post_title' => 'Public Clock',
+            'post_content' => 'Bản nháp.',
+            'post_excerpt' => 'Tóm tắt.',
+        ], (string) $created['state_token']);
+
+        self::assertTrue($result['ok']);
+        self::assertSame(0, $posts->updates);
+        self::assertSame((string) $created['state_token'], $result['state_token']);
+    }
+
     public function test_capture_draft_write_never_allows_unscoped_historical_media_into_any_editorial_write(): void
     {
         // This is intentionally a pre-fix regression: the current native

@@ -26,6 +26,7 @@ final class McpGovernanceHandler implements GovernedLifecycle
         private ?ControlledApplyService $apply = null,
         private ?GovernanceAutomationPolicyResolver $policyResolver = null,
         private ?EndpointTypeRegistry $endpoints = null,
+        private $projectionVerifier = null,
     ) {}
 
     /** @return array<string,mixed> */
@@ -37,6 +38,7 @@ final class McpGovernanceHandler implements GovernedLifecycle
             static fn (array $review): bool => true,
             fn (string $id): array => $this->apply($id),
             $this->policyResolver,
+            $this->projectionVerifier,
         );
         return $this->ingestOrchestrator->run([$arguments])[0];
     }
