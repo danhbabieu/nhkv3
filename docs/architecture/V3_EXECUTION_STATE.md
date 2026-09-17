@@ -12015,3 +12015,25 @@ No live/staging acceptance, deployment, push or external state mutation was
 attempted.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Slice 2 Task 3 publication evidence review fix (LOCAL ONLY)
+
+SCOPE: Replaced the vacuous publication-gate media evidence fixture with an
+in-memory ArticleMediaCoordinator reconciliation and
+CaptureArticlePreflightHandoff. The test proves verified `wp_post` Article
+Usage readback for both mandatory registered roles and preserves Model,
+Classification and Dictionary representative Usage tuples. The Capture
+convergence test now invokes the real ArticlePublicationGate on canonical Media
+readback evidence, and text placeholder research explicitly remains not ready
+for draft. No production code, Media upload, Video, Graph, database,
+live/staging or deployment state was changed.
+
+VERIFICATION: Focused Slice 2 suite PASS — 87 tests / 377 assertions, with one
+existing warning. Composer lint and changed-test PHP lint pass. Whole Unit
+reaches 1,779 tests / 8,749 assertions with four unrelated pre-existing
+DemoCutover/media-fixture failures. Guarded WordPress Media integration is
+`INFRASTRUCTURE_UNAVAILABLE` because `NHK_WP_TEST_PATH=public` is unset. Diff
+check and changed-scope secret review pass. Commit `98159528` records the
+test/report fix round.
+
+STATUS: `SLICE_2_ARTICLE_MEDIA_EVIDENCE_REVIEW_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
