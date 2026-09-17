@@ -104,6 +104,28 @@ after the Constitution.
   package remains historical evidence and is not part of this Public Clock
   run. Future content families require a newly authorized bounded package.
 
+- Additional bounded staging acceptance scope for the existing 400-day Clock
+  Capture continuation:
+  - environment: `staging`
+  - allowed_capture_ids:
+    - `01a0ae4c-0fe7-72b1-8222-ece526ce0faa`
+  - allowed_owner_ids:
+    - `01a0a868-2918-7dac-81dc-bfc25e710068`
+  - allowed_post_ids: `[575]`
+  - allowed_media_ids: `[01a0ae48-1008-7213-a91f-dde21d36e66b]`
+  - allowed_attachment_ids: `[574]`
+  - allowed_operation_families:
+    - capture_continuation
+    - governed_relation_reconciliation
+    - media_usage_reconciliation
+    - article_reconciliation
+    - article_body_correction
+    - article_publication
+    - presentation_readiness
+    - frontend_projection_readback
+    - canonical_readback
+  - fail_closed_outside_scope: `true`
+
 - Additional bounded staging acceptance scope for Media binding case 567:
   - environment: `staging`
   - host: `https://demo.1945.vn`
