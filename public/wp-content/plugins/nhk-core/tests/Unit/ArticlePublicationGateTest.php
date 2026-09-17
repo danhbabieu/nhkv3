@@ -162,6 +162,26 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
     }
 
+    public function test_gate_does_not_skip_pending_semantic_requirements_under_non_required_applicability(): void
+    {
+        foreach (['NOT_APPLICABLE', 'NOT_REQUIRED'] as $applicability) {
+            $evidence = $this->evidence();
+            $evidence['semantic_readback_verified'] = false;
+            $evidence['requirements'] = $this->requirements();
+            $evidence['requirements']['semantic_delta'] = [
+                'applicability' => $applicability,
+                'policy' => 'HUMAN_REVIEW',
+                'state' => 'PENDING',
+            ];
+
+            $draft = $this->draft();
+            $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+            self::assertFalse($result->eligible);
+            self::assertContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
+        }
+    }
+
     public function test_unavailable_rendered_public_verification_is_a_warning_when_not_applicable(): void
     {
         $evidence = $this->evidence();
@@ -188,6 +208,23 @@ final class ArticlePublicationGateTest extends TestCase
         foreach ([null, ''] as $status) {
             $evidence = $this->evidence();
             $evidence['rendered_public_verification'] = false;
+            if ($status === null) unset($evidence['rendered_public_verification_status']);
+            else $evidence['rendered_public_verification_status'] = $status;
+            $evidence['requirements'] = $this->requirements();
+
+            $draft = $this->draft();
+            $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+            self::assertFalse($result->eligible);
+            self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->blockers);
+        }
+    }
+
+    public function test_rendered_public_status_must_be_verified_even_when_boolean_is_true(): void
+    {
+        foreach ([null, '', 'unknown', 'invalid', 'unverified'] as $status) {
+            $evidence = $this->evidence();
+            $evidence['rendered_public_verification'] = true;
             if ($status === null) unset($evidence['rendered_public_verification_status']);
             else $evidence['rendered_public_verification_status'] = $status;
             $evidence['requirements'] = $this->requirements();
@@ -245,12 +282,14 @@ final class ArticlePublicationGateTest extends TestCase
     /** @return array<string,mixed> */
     private function evidence(): array
     {
-        return array_fill_keys([
+        $evidence = array_fill_keys([
             'research_acceptable', 'subject_resolved', 'duplicate_intent_handled',
             'category_resolved', 'semantic_plan_complete', 'semantic_readback_verified',
             'media_usage_complete', 'real_image_requirements_met', 'claim_compliance_acceptable',
             'seo_projection_valid', 'internal_links_valid', 'structured_data_valid', 'public_route_ready', 'rendered_public_verification',
         ], true);
+        $evidence['rendered_public_verification_status'] = 'verified';
+        return $evidence;
     }
 
     /** @return array<string,array<string,string>> */
