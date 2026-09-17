@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Admin;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Media\MediaPreBindingReadiness;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaUsage};
 
 final class AdminMediaAdapter
@@ -82,13 +83,18 @@ final class AdminMediaAdapter
             $privateOriginal = $privateOriginal || ($asset->kind === 'original' && $asset->visibility === 'PRIVATE');
             $publicDerivative = $publicDerivative || ($asset->kind === 'derivative' && $asset->visibility === 'PUBLIC');
         }
+        $readiness = (new MediaPreBindingReadiness())->check($media, $assets);
         return (new CompletionCoordinator())->finalize('media', $media->canonicalId, [
             'canonical_readback' => ['canonical_id' => $media->canonicalId],
             'dependency_state' => $privateOriginal ? 'COMPLETE' : 'PARTIAL',
             'relation_or_usage_state' => $usages === [] ? 'NOT_APPLICABLE' : 'COMPLETE',
             'public_eligible' => $media->active && $media->readiness === 'ready' && $publicDerivative,
-            'frontend_state' => 'BLOCKED',
-            'blockers' => $media->active && $media->readiness === 'ready' && $publicDerivative ? ['MEDIA_FRONTEND_READBACK_REQUIRED'] : ['MEDIA_PUBLIC_DERIVATIVE_REQUIRED'],
+            // Media has no standalone public page. Pre-binding frontend
+            // readiness is proven by the canonical Media plus a valid public
+            // derivative; it must not wait for the representative Usage that
+            // a later projection may create.
+            'frontend_state' => $readiness['ready'] === true ? 'VERIFIED' : 'BLOCKED',
+            'blockers' => $readiness['ready'] === true ? [] : [(string) ($readiness['reason'] ?? 'MEDIA_PUBLIC_DERIVATIVE_REQUIRED')],
         ]);
     }
 }

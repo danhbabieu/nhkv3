@@ -229,7 +229,10 @@ final class McpDocumentationRegistry
         // Prefer it over a possibly stale repository checkout at the hosting
         // root; deployment transfers the plugin artifact, not that checkout.
         $snapshot = $pluginRoot . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'canonical-docs';
-        if ($this->runtimeVersion === 'unknown') return [$repoRoot, $snapshot, $pluginRoot . DIRECTORY_SEPARATOR . 'resources'];
+        // The runtime version is not a source-selection signal. A deployed
+        // plugin may be loaded before its version constant is defined (for
+        // example through an Ability/bridge bootstrap), but it must still
+        // read the same immutable snapshot as the normal MCP transport.
         return [$snapshot, $repoRoot, $pluginRoot . DIRECTORY_SEPARATOR . 'resources'];
     }
 
@@ -266,7 +269,12 @@ final class McpDocumentationRegistry
         if ((int) $decoded['schema_version'] !== self::MANIFEST_SCHEMA_VERSION) self::invalidManifest('schema_version_mismatch', ['expected' => self::MANIFEST_SCHEMA_VERSION, 'actual' => $decoded['schema_version']]);
         if (!is_string($decoded['documentation_version']) || preg_match('/^[a-f0-9]{64}$/i', $decoded['documentation_version']) !== 1) self::invalidManifest('documentation_version_invalid');
         if (!is_string($decoded['runtime_version']) || $decoded['runtime_version'] === '') self::invalidManifest('runtime_version_missing');
-        if ($decoded['runtime_version'] !== $this->runtimeVersion) throw new McpDocumentationException('DOC_RUNTIME_MISMATCH', null, ['diagnostic' => 'runtime_version_mismatch', 'expected' => $this->runtimeVersion, 'actual' => $decoded['runtime_version']]);
+        if ($this->runtimeVersion !== 'unknown' && $decoded['runtime_version'] !== $this->runtimeVersion) throw new McpDocumentationException('DOC_RUNTIME_MISMATCH', null, ['diagnostic' => 'runtime_version_mismatch', 'expected' => $this->runtimeVersion, 'actual' => $decoded['runtime_version']]);
+        // An early bridge bootstrap may not have loaded the plugin header
+        // constant yet. The verified snapshot is then the only authoritative
+        // source of the runtime version; adopt it for all subsequent
+        // projections from this registry instance.
+        if ($this->runtimeVersion === 'unknown') $this->runtimeVersion = (string) $decoded['runtime_version'];
         if ($decoded['source_revision'] !== null && (!is_string($decoded['source_revision']) || preg_match('/^[a-f0-9]{40}$/i', $decoded['source_revision']) !== 1)) self::invalidManifest('source_revision_invalid');
         $sourceRevision = self::readSourceRevision($root);
         if ($sourceRevision !== null && $decoded['source_revision'] !== $sourceRevision) self::invalidManifest('source_revision_mismatch', ['expected' => $sourceRevision, 'actual' => $decoded['source_revision']]);

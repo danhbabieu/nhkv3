@@ -88,7 +88,7 @@ final class AdminDomainAdapterTest extends TestCase
         self::assertNull($detail['usages'][0]['active_slot']);
         self::assertSame('available', $detail['frontend_state']);
         self::assertArrayHasKey('completion', $detail);
-        self::assertSame('BLOCKED', $detail['completion']['frontend_state']);
+        self::assertSame('VERIFIED', $detail['completion']['frontend_state']);
     }
 
     public function test_content_adapter_has_only_editorial_and_video_tabs(): void

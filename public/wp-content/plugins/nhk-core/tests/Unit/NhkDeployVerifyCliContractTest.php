@@ -65,4 +65,12 @@ final class NhkDeployVerifyCliContractTest extends TestCase
             self::assertStringContainsString("'{$field}'", $runner, $field);
         }
     }
+
+    public function test_deploy_verifier_passes_the_complete_bootstrap_packet(): void
+    {
+        $runner = (string) file_get_contents(dirname(__DIR__, 6) . '/tools/nhk-deploy-verify.php');
+        self::assertStringContainsString('$verifier->verify($baseUrl, $localBootstrap, $expectedBuildIdentity)', $runner);
+        self::assertStringNotContainsString('$verifier->verify($baseUrl, $expectedManifest, $expectedBuildIdentity)', $runner);
+        self::assertStringContainsString("throw new RuntimeException('DOC_BOOTSTRAP_INVALID')", $runner);
+    }
 }

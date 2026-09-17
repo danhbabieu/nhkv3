@@ -16,7 +16,10 @@ final class RemoteMcpDocumentationVerifier
         private readonly ?string $authorizationHeader = null,
     ) {}
 
-    /** @param array<string,mixed> $expectedBootstrap */
+    /**
+     * @param array<string,mixed> $expectedBootstrap Complete canonical
+     *        documentation bootstrap packet, never the nested manifest only.
+     */
     public function verify(string $baseUrl, array $expectedBootstrap, string $expectedBuildIdentity): StageResult
     {
         $url = $this->endpoint($baseUrl);

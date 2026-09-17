@@ -63,9 +63,8 @@ $pluginRoot = $root . '/public/wp-content/plugins/nhk-core';
 try {
     if ($runtimeVersion === null) throw new RuntimeException('PLUGIN_VERSION_UNAVAILABLE');
     $localBootstrap = (new McpDocumentationRegistry($pluginRoot . '/resources/canonical-docs', $runtimeVersion))->bootstrap();
-    $expectedManifest = is_array($localBootstrap['manifest'] ?? null) ? $localBootstrap['manifest'] : [];
     $expectedBuildIdentity = (string) ($localBootstrap['build_identity'] ?? '');
-    if ($expectedManifest === [] || !preg_match('/^[a-f0-9]{64}$/', $expectedBuildIdentity)) throw new RuntimeException('DOC_MANIFEST_INVALID');
+    if ($localBootstrap === [] || !preg_match('/^[a-f0-9]{64}$/', $expectedBuildIdentity)) throw new RuntimeException('DOC_BOOTSTRAP_INVALID');
     if (!hash_equals($head, (string) ($localBootstrap['source_revision'] ?? ''))) throw new RuntimeException('DOC_BUILD_STALE');
 } catch (Throwable $e) {
     finish(['status' => 'failed', 'reason_code' => $e->getMessage() ?? 'DOC_BUILD_FAILED'], $json, 2);
@@ -103,7 +102,7 @@ $verifier = new RemoteMcpDocumentationVerifier(static function (string $url, str
     curl_close($handle);
     return ['status' => $status, 'body' => is_string($response) ? $response : ''];
 }, $authorizationHeader);
-$verification = $verifier->verify($baseUrl, $expectedManifest, $expectedBuildIdentity);
+$verification = $verifier->verify($baseUrl, $localBootstrap, $expectedBuildIdentity);
 if (!$verification->isPass()) {
     finish([
         'status' => $verification->status,
@@ -116,13 +115,13 @@ finish([
     'status' => 'pass',
     'source_revision' => $localBootstrap['source_revision'],
     'runtime_version' => $localBootstrap['runtime_version'],
-    'documentation_version' => $expectedManifest['documentation_version'],
-    'manifest_hash' => $expectedManifest['manifest_hash'],
+    'documentation_version' => $localBootstrap['documentation_version'],
+    'manifest_hash' => $localBootstrap['manifest_hash'],
     'build_identity' => $expectedBuildIdentity,
     'catalog_version' => $localBootstrap['catalog_version'],
     'resource_version' => $localBootstrap['resource_version'],
     'release_identity' => $localBootstrap['release_identity'],
-    'documents' => count((array) ($expectedManifest['files'] ?? [])),
+    'documents' => count((array) ($localBootstrap['manifest']['files'] ?? [])),
     'deployment_identifier' => $deployment->identifier,
     'verification' => 'direct-mcp-bootstrap-and-list',
 ], $json, 0);

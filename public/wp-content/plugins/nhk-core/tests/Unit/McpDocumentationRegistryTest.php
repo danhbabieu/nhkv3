@@ -122,6 +122,55 @@ final class McpDocumentationRegistryTest extends TestCase
         self::assertStringEndsWith('/resources/canonical-docs', $roots[0]);
     }
 
+    public function test_snapshot_remains_authoritative_when_runtime_version_is_not_yet_defined(): void
+    {
+        $method = new \ReflectionMethod(McpDocumentationRegistry::class, 'roots');
+        $method->setAccessible(true);
+        $roots = $method->invoke(new McpDocumentationRegistry());
+
+        self::assertStringEndsWith('/resources/canonical-docs', $roots[0]);
+        self::assertNotSame(dirname(__DIR__, 6), $roots[0]);
+    }
+
+    public function test_bootstrap_get_and_list_project_one_snapshot_identity(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-parity-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        try {
+            $registry = new McpDocumentationRegistry($directory, 'runtime-parity');
+            McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-parity', '2026-09-09T00:00:00+00:00');
+            $bootstrap = $registry->bootstrap();
+            $listed = $registry->list();
+            $document = $registry->get('AGENTS.md', 1, 1);
+
+            foreach ([$listed, $document] as $projection) {
+                self::assertSame($bootstrap['documentation_version'], $projection['documentation_version']);
+                self::assertSame($bootstrap['manifest_hash'], $projection['manifest_hash']);
+            }
+            self::assertSame($bootstrap['manifest_hash'], $bootstrap['manifest']['manifest_hash']);
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
+    public function test_registry_cannot_cache_across_a_replaced_release_snapshot(): void
+    {
+        $directory = sys_get_temp_dir() . '/nhk-docs-release-cache-' . bin2hex(random_bytes(5));
+        self::assertTrue(mkdir($directory, 0755, true));
+        try {
+            McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-a', '2026-09-09T00:00:00+00:00');
+            $registry = new McpDocumentationRegistry($directory, 'runtime-a');
+            $registry->bootstrap();
+
+            McpDocumentationRegistry::buildSnapshot(dirname(__DIR__, 6), $directory, 'runtime-b', '2026-09-09T00:00:00+00:00');
+
+            $this->expectExceptionMessage('DOC_RUNTIME_MISMATCH');
+            $registry->list();
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
     public function test_manifest_list_get_and_bootstrap_are_deterministic_and_paginated(): void
     {
         $directory = sys_get_temp_dir() . '/nhk-docs-' . bin2hex(random_bytes(5));
@@ -266,5 +315,13 @@ final class McpDocumentationRegistryTest extends TestCase
         $manifest['manifest_hash'] = hash('sha256', json_encode($hashInput, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
         self::assertNotFalse(file_put_contents($path, json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n"));
         chmod($path, 0444);
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) return;
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($iterator as $item) $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+        rmdir($directory);
     }
 }

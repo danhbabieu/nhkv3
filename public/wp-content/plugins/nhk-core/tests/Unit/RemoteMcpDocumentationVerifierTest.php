@@ -51,6 +51,22 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('DOC_MANIFEST_MISMATCH', $result->reasonCode);
     }
 
+    public function test_manifest_only_is_not_a_canonical_bootstrap_packet(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $manifest = [
+            'runtime_version' => $expected['runtime_version'],
+            'source_revision' => $expected['source_revision'],
+            'documentation_version' => $expected['documentation_version'],
+            'manifest_hash' => $expected['manifest_hash'],
+            'files' => $expected['files'],
+        ];
+
+        $result = $this->verifierFor($expected)->verify('https://demo.example', $manifest, str_repeat('f', 64));
+
+        self::assertSame('MCP_BOOTSTRAP_UNAVAILABLE', $result->reasonCode);
+    }
+
     public function test_optional_read_grant_is_forwarded_without_changing_the_endpoint(): void
     {
         $expected = $this->expectedBootstrap();

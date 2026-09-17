@@ -122,6 +122,20 @@ final class McpContractTest extends TestCase
         self::assertStringContainsString('Mandatory Read-First Router', $document['body']['result']['structuredContent']['content']);
     }
 
+    public function test_mcp_documentation_projections_share_one_snapshot_identity(): void
+    {
+        $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'read');
+        $bootstrap = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'nhk.documentation.bootstrap', 'arguments' => []]])['body']['result']['structuredContent'];
+        $list = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'nhk.documentation.list', 'arguments' => []]])['body']['result']['structuredContent'];
+        $get = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.documentation.get', 'arguments' => ['path' => 'AGENTS.md']]])['body']['result']['structuredContent'];
+
+        foreach ([$list, $get] as $projection) {
+            self::assertSame($bootstrap['documentation_version'], $projection['documentation_version']);
+            self::assertSame($bootstrap['manifest_hash'], $projection['manifest_hash']);
+        }
+        self::assertSame($bootstrap['manifest_hash'], $bootstrap['manifest']['manifest_hash']);
+    }
+
     public function test_canonical_documentation_tools_support_list_and_line_ranges(): void
     {
         $transport = new McpTransport($this->readHandler(), new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())), static fn (string $capability): bool => $capability === 'read');
