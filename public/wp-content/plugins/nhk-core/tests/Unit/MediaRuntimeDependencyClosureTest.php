@@ -19,6 +19,7 @@ final class MediaRuntimeDependencyClosureTest extends TestCase
             'NHK\\Core\\Application\\Media\\PublicMediaAssetSelector' => 'src/Application/Media/PublicMediaAssetSelector.php',
             'NHK\\Core\\Infrastructure\\Media\\WordPressMediaAttachmentBridge' => 'src/Infrastructure/Media/WordPressMediaAttachmentBridge.php',
             'NHK\\Core\\Infrastructure\\Media\\WordPressMediaAttachmentIngestor' => 'src/Infrastructure/Media/WordPressMediaAttachmentIngestor.php',
+            'NHK\\Core\\Infrastructure\\Media\\WordPressImageOrientationNormalizer' => 'src/Infrastructure/Media/WordPressImageOrientationNormalizer.php',
         ];
 
         foreach ($classes as $class => $relativePath) {

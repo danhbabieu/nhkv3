@@ -1,5 +1,29 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Image orientation normalization (LOCAL ONLY)
+
+SCOPE: Repaired only the shared WordPress physical image path's EXIF
+orientation stage. No Capture, Article, Media semantics, filename/storage
+policy, frontend, staging/live data, deploy or push was changed.
+
+ROOT_CAUSE: `maybe_exif_rotate()` is a `WP_Image_Editor` method, not a global
+WordPress function. The ingestor's `function_exists('maybe_exif_rotate')`
+guard therefore skipped normalization, measured raw dimensions, resized raw
+pixels and saved the wrongly oriented public WebP.
+
+FIX: The loaded editor now invokes its `maybe_exif_rotate()` method exactly
+once before `get_size()`, proportional resize and WebP save. Public output and
+attachment read-back remain the existing 1200px long-edge path; source-original
+remains private under the same Media identity.
+
+LOCAL_VERIFICATION: Pixel-level GD/WordPress-editor coverage passes for
+portrait/landscape Orientation=1, EXIF 6, EXIF 8, no EXIF and no-upscale
+inputs. Focused coverage passes 12 tests / 151 assertions, plugin PHP lint
+passes, and `git diff --check` passes. Full suite reaches completion with
+pre-existing unrelated failures/errors and WordPress DB bootstrap failures;
+guarded Media integration is blocked by the local `nhk_v3_test` connection.
+No live/staging mutation, deployment or push was performed.
+
 # Checkpoint — 2026-09-17 — Image upload fast path and safe Article handoff (LOCAL ONLY)
 
 SCOPE: Added the ChatGPT image widget's upload-only fast commit and separate

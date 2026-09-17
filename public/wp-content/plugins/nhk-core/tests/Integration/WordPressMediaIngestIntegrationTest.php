@@ -191,6 +191,83 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
         }
     }
 
+    /** @dataProvider exifOrientationCases */
+    public function test_real_file_ingest_normalizes_exif_orientation_before_attachment_readback(int $orientation, string $topColor, string $bottomColor): void
+    {
+        global $wpdb;
+        $source = $this->createOrientedJpeg($orientation);
+        $attachmentId = 0;
+        $mediaId = '';
+        $sourceRelative = '';
+        $publicPath = '';
+        try {
+            $media = new WpdbMediaRepository($wpdb);
+            $assets = new WpdbMediaAssetRepository($wpdb);
+            $bridge = new WordPressMediaAttachmentBridge(
+                $wpdb,
+                new MediaService($media, $assets, new WpdbMediaUsageRepository($wpdb)),
+                $media,
+                $assets,
+            );
+            $result = (new WordPressMediaAttachmentIngestor($bridge))->ingest(
+                ['error' => UPLOAD_ERR_OK, 'tmp_name' => $source],
+                'exif-orientation-' . $orientation . '.jpg',
+                'EXIF orientation ' . $orientation,
+                1200,
+                1200,
+                86,
+            );
+            $attachmentId = (int) $result['attachment_id'];
+            $mediaId = (string) ($result['media_id'] ?? '');
+            self::assertSame(['width' => 900, 'height' => 1200], ['width' => (int) $result['width'], 'height' => (int) $result['height']]);
+            self::assertSame('image/webp', $result['mime']);
+
+            $attachedRelative = (string) get_post_meta($attachmentId, '_wp_attached_file', true);
+            $publicPath = rtrim((string) wp_upload_dir()['basedir'], '/\\') . '/' . ltrim($attachedRelative, '/');
+            self::assertFileExists($publicPath);
+            $publicInfo = getimagesize($publicPath);
+            self::assertIsArray($publicInfo);
+            self::assertSame(900, (int) $publicInfo[0]);
+            self::assertSame(1200, (int) $publicInfo[1]);
+            self::assertSame('image/webp', (string) ($publicInfo['mime'] ?? ''));
+            $image = imagecreatefromwebp($publicPath);
+            self::assertInstanceOf(\GdImage::class, $image);
+            $this->assertDominantColor($image, 450, 300, $topColor);
+            $this->assertDominantColor($image, 450, 900, $bottomColor);
+            $outputExif = @exif_read_data($publicPath);
+            self::assertFalse(is_array($outputExif) && isset($outputExif['Orientation']));
+
+            $sourceRelative = (string) get_post_meta($attachmentId, '_nhk_source_original_file', true);
+            self::assertStringStartsWith('private/', $sourceRelative);
+            $mediaAssets = (new WpdbMediaAssetRepository($wpdb))->listByMediaId($mediaId);
+            $publicAssets = array_values(array_filter($mediaAssets, static fn ($asset): bool => $asset->kind === 'derivative' && $asset->visibility === 'PUBLIC'));
+            self::assertCount(1, $publicAssets);
+            self::assertSame(900, $publicAssets[0]->width);
+            self::assertSame(1200, $publicAssets[0]->height);
+            self::assertNotNull((new WordPressMediaAttachmentIngestor())->read($attachmentId));
+        } finally {
+            if ($attachmentId > 0 && function_exists('wp_delete_attachment')) wp_delete_attachment($attachmentId, true);
+            if ($mediaId !== '') {
+                $internalId = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}nhk_media WHERE canonical_uuid=%s", UuidCodec::toBinary($mediaId)));
+                $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_usages WHERE media_id=%d", $internalId));
+                $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media_assets WHERE media_id=%d", $internalId));
+                $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}nhk_media WHERE id=%d", $internalId));
+            }
+            if ($sourceRelative !== '') try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceRelative); } catch (\Throwable) { }
+            if ($publicPath !== '' && is_file($publicPath)) @unlink($publicPath);
+            if (is_file($source)) unlink($source);
+        }
+    }
+
+    /** @return array<string,array{int,string,string}> */
+    public static function exifOrientationCases(): array
+    {
+        return [
+            'orientation 6' => [6, 'red', 'blue'],
+            'orientation 8' => [8, 'blue', 'red'],
+        ];
+    }
+
     public function test_structured_reference_uses_gateway_materialization_then_native_attachment_adoption(): void
     {
         global $wpdb;
@@ -252,6 +329,40 @@ final class WordPressMediaIngestIntegrationTest extends TestCase
             }
             if ($sourceRelative !== '') try { PrivateMediaSourceStorage::fromWordPress()->delete($sourceRelative); } catch (\Throwable) { }
             if (function_exists('delete_option')) delete_option('nhk_media_upload_batch_' . hash('sha256', $idempotencyKey));
+        }
+    }
+
+    private function createOrientedJpeg(int $orientation): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'nhk-orientation-integration-');
+        self::assertIsString($path);
+        $image = imagecreatetruecolor(1536, 1152);
+        $red = imagecolorallocate($image, 230, 30, 30);
+        $blue = imagecolorallocate($image, 30, 30, 230);
+        imagefilledrectangle($image, 0, 0, 767, 1151, $red);
+        imagefilledrectangle($image, 768, 0, 1535, 1151, $blue);
+        self::assertTrue(imagejpeg($image, $path, 100));
+
+        $jpeg = file_get_contents($path);
+        self::assertIsString($jpeg);
+        $tiff = 'II' . pack('v', 42) . pack('V', 8) . pack('v', 1)
+            . pack('v', 0x0112) . pack('v', 3) . pack('V', 1)
+            . pack('v', $orientation) . pack('v', 0) . pack('V', 0);
+        $app1 = "Exif\0\0" . $tiff;
+        self::assertTrue((bool) file_put_contents(
+            $path,
+            substr($jpeg, 0, 2) . "\xFF\xE1" . pack('n', strlen($app1) + 2) . $app1 . substr($jpeg, 2),
+        ));
+        return $path;
+    }
+
+    private function assertDominantColor(\GdImage $image, int $x, int $y, string $expected): void
+    {
+        $rgb = imagecolorsforindex($image, imagecolorat($image, $x, $y));
+        if ($expected === 'red') {
+            self::assertGreaterThan($rgb['blue'] + 80, $rgb['red']);
+        } else {
+            self::assertGreaterThan($rgb['red'] + 80, $rgb['blue']);
         }
     }
 }

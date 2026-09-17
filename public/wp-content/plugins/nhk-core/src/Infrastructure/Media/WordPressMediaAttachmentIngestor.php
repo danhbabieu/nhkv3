@@ -60,15 +60,12 @@ final class WordPressMediaAttachmentIngestor implements WordPressMediaAttachment
             $this->allowedMime((string) $sourceInfo['mime']);
             $this->assertResourceBudget((int) ($sourceInfo[0] ?? 0), (int) ($sourceInfo[1] ?? 0));
 
-            // EXIF orientation is applied before dimensions are measured and
-            // before the aspect-preserving resize.
-            if (function_exists('maybe_exif_rotate')) {
-                $rotated = maybe_exif_rotate($work);
-                if (is_wp_error($rotated)) throw new \RuntimeException('WORDPRESS_MEDIA_AUTO_ORIENT_FAILED');
-            }
             $this->normalizePaletteImage($work);
             $editor = wp_get_image_editor($work);
             if (is_wp_error($editor)) throw new \RuntimeException('WORDPRESS_MEDIA_EDITOR_UNAVAILABLE');
+            // The editor owns EXIF transforms. Normalize its pixels before
+            // measuring effective dimensions or calculating the resize target.
+            (new WordPressImageOrientationNormalizer())->normalize($editor);
             $size = method_exists($editor, 'get_size') ? $editor->get_size() : [];
             $width = (int) ($size['width'] ?? 0);
             $height = (int) ($size['height'] ?? 0);
