@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Vertical-first frontend presentation seam (LOCAL READY / LIVE VERIFY PENDING)
+
+SCOPE: Repaired the shared public frontend presentation for intrinsic media
+orientation and the `/video/` archive/detail display. No semantic data, Media,
+Video, Article, URL identity, database, staging or production state was
+changed.
+
+ROOT_CAUSE: Shared presentation CSS applied `object-fit: cover` to semantic
+visuals and fixed 4:3/16:9 frames, while Video detail rendered all provenance
+fields (including source locator) as visible facts and passed repetitive/raw
+summary text directly to cards.
+
+FIX: Added presentation-only dimension/orientation helpers using canonical
+projection width/height metadata, shared orientation classes for media/video
+cards, contain-based image fitting, adaptive portrait/square/landscape video
+frames, width/height attributes when known, and defensive Video summary/body
+filtering for URL-only, title-duplicate and boilerplate copy. Source locator
+remains a separate accessible `Mở nguồn video` action; raw URL is no longer
+rendered as prose or provenance fact.
+
+VERIFICATION: PHP lint passes for changed templates/functions; focused
+Frontend/Media presentation suite passes 80 tests / 812 assertions with one
+existing warning and 19 PHPUnit deprecations; `git diff --check` passes.
+Deployment and live desktop/mobile visual acceptance were not performed.
+
+STATUS: `VERTICAL_FIRST_PRESENTATION_LOCAL_READY / LIVE_VERIFY_PENDING`
+
 # Checkpoint — 2026-09-18 — Staging signing-key configuration (LIVE VERIFIED / NO SEMANTIC MUTATION)
 
 SCOPE: Configured the staging-only `NHK_STAGING_ACCEPTANCE_SCOPE_SECRET` in

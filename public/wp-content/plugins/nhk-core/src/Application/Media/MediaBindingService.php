@@ -340,7 +340,7 @@ final class MediaBindingService implements MediaBindingPort
     /** @param array<string,mixed> $normalized @return array{usage:MediaUsage,previous_usage_id:?string,reconciliation:string} */
     private function applyUsage(Media $media, string $targetType, string $targetId, array $normalized, MediaBindingOperation $operation): array
     {
-        $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, MediaUsageRoleRegistry::REPRESENTATIVE), static fn (mixed $item): bool => $item instanceof MediaUsage));
+        $current = array_values(array_filter($this->usages->listByEndpoint($targetType, $targetId, MediaUsageRoleRegistry::REPRESENTATIVE), static fn (mixed $item): bool => $item instanceof MediaUsage && $item->activeSlot !== 'retired'));
         if (count($current) > 1) throw new MediaException('MEDIA_BINDING_REPRESENTATIVE_SLOT_CONFLICT');
         $existing = $current[0] ?? null;
         if ($existing instanceof MediaUsage && $existing->selectionPolicy === 'PINNED' && $normalized['selection_source'] === 'SYSTEM_AUTO' && $existing->mediaId !== $media->canonicalId) throw new MediaException('PINNED_REPRESENTATIVE_PROTECTED');

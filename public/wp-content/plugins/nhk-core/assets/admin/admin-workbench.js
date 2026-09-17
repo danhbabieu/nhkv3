@@ -206,4 +206,55 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', governanceQueueControls);
     else governanceQueueControls();
+
+    function mediaUsageWorkspace() {
+        var usageForm = document.getElementById('nhk-media-usage-form');
+        var uploadForm = document.getElementById('nhk-media-upload-form');
+        var output = document.getElementById('nhk-media-usage-result');
+        if (!usageForm || !output) return;
+        var config = window.nhkV3Admin || {};
+        var base = config.root || (window.location.origin + '/wp-json/');
+        var headers = {'X-WP-Nonce': config.nonce || ''};
+        function show(value) { output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
+        if (uploadForm) uploadForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var data = new FormData(uploadForm);
+            data.append('idempotency_key', 'nhk-admin-media-' + Date.now());
+            data.append('metadata[description]', 'NHK V3 Media upload');
+            show('Đang upload qua Media/Asset canonical...');
+            fetch(base + 'nhk/v1/admin/media/upload', {method: 'POST', headers: headers, body: data}).then(function (response) {
+                return response.json().then(function (body) { if (!response.ok) throw new Error(body.message || body.code || 'UPLOAD_FAILED'); return body; });
+            }).then(function (body) {
+                var item = body.items && body.items[0] ? body.items[0] : null;
+                if (item && item.media_id) document.getElementById('nhk-media-usage-media').value = item.media_id;
+                show(body);
+            }).catch(function (error) { show(error.message); });
+        });
+        usageForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var type = document.getElementById('nhk-media-usage-target-type').value;
+            var targetId = document.getElementById('nhk-media-usage-target-id').value.trim();
+            var body = {
+                idempotency_key: 'nhk-admin-usage-' + Date.now(),
+                operation: document.getElementById('nhk-media-usage-operation').value,
+                media: {id: document.getElementById('nhk-media-usage-media').value.trim()},
+                target: {type: type},
+                role: document.getElementById('nhk-media-usage-role').value,
+                placement_key: document.getElementById('nhk-media-usage-role').value,
+                selection_source: 'USER_EXPLICIT', selection_policy: 'PINNED'
+            };
+            if (type === 'wp_post') body.target.post_id = Number(targetId); else body.target.id = targetId;
+            var usageId = document.getElementById('nhk-media-usage-id').value.trim();
+            var revision = document.getElementById('nhk-media-usage-revision').value;
+            if (usageId) body.usage_id = usageId;
+            if (revision) body.expected_usage_revision = Number(revision);
+            show('Đang tạo Proposal và chạy Governance policy...');
+            fetch(base + 'nhk/v1/admin/media/usage', {method: 'POST', headers: Object.assign({'Content-Type': 'application/json'}, headers), body: JSON.stringify(body)}).then(function (response) {
+                return response.json().then(function (result) { if (!response.ok) throw new Error(result.message || result.code || 'MEDIA_USAGE_FAILED'); return result; });
+            }).then(show).catch(function (error) { show(error.message); });
+        });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mediaUsageWorkspace);
+    else mediaUsageWorkspace();
 }());

@@ -180,6 +180,7 @@ final class ArticleMediaCoordinator
     private function existingSlotMedia(string $endpointKey, string $slot): ?Media
     {
         foreach ($this->usages->listByEndpoint('wp_post', $endpointKey, $slot) as $usage) {
+            if ($usage->activeSlot === 'retired') continue;
             $media = $this->media->findByCanonicalId($usage->mediaId);
             if ($media !== null) return $media;
         }
@@ -292,6 +293,7 @@ final class ArticleMediaCoordinator
             $existing = $this->usages->listByEndpoint('wp_post', $endpointKey, $slot);
             usort($existing, static fn (\NHK\Core\Domain\Media\MediaUsage $left, \NHK\Core\Domain\Media\MediaUsage $right): int => $left->usageId <=> $right->usageId);
             foreach ($existing as $usage) {
+                if ($usage->activeSlot === 'retired') continue;
                 if ($usage->mediaId !== $mediaId) continue;
                 $candidate = new \NHK\Core\Domain\Media\MediaUsage($usage->usageId, $mediaId, 'wp_post', $endpointKey, $slot, 0, $blueprint->plannedAltIntent, '', $blueprint->keywordGroups, $blueprint->plannedTitle, $usage->revision, $usage->placementKey !== '' ? $usage->placementKey : $placementKey);
                 if ($usage->sortOrder === $candidate->sortOrder && $usage->altText === $candidate->altText && $usage->caption === $candidate->caption && $usage->keywordGroups === $candidate->keywordGroups && $usage->title === $candidate->title && $usage->placementKey === $candidate->placementKey) return $usage;

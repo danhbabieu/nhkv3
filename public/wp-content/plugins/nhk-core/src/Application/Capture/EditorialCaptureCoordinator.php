@@ -86,6 +86,7 @@ final class EditorialCaptureCoordinator
                 'excerpt' => trim((string) ($input['excerpt'] ?? '')),
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
                 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [],
+                'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
                 // Retry may re-enter a child owner without accepting a new
                 // editorial payload. Persist only workflow controls that are
@@ -185,7 +186,7 @@ final class EditorialCaptureCoordinator
             // deliberately runs before interpretation/Graph/Claim work so a
             // user-selected representative cannot time out in semantic
             // discovery after the physical Media is already available.
-            if ($this->mediaBindingService !== null && strtoupper(trim((string) ($input['intent'] ?? ''))) === 'MEDIA_ENRICHMENT' && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== []) {
+            if ($this->mediaBindingService !== null && strtoupper(trim((string) ($input['intent'] ?? ''))) === 'MEDIA_ENRICHMENT' && is_array($input['media_bindings'] ?? null) && $input['media_bindings'] !== [] && (array) ($input['media_operations'] ?? []) === []) {
                 return $this->runTypedMediaBindingFastPath($record, $input, $assets, $diagnostics, $receipts);
             }
             $this->beginPhase('INTERPRETED');
@@ -363,7 +364,7 @@ final class EditorialCaptureCoordinator
             $diagnostics['visual_support'] = ['status' => $visualRequirements === [] ? 'not_requested' : 'optional_enrichment', 'requirements' => $visualRequirements];
 
             $inputMetadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
-            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
+            $semanticContext = ['capture_id' => $record->captureId, 'article_id' => $record->articleId, 'article_endpoint_key' => $record->articleId !== null ? ((function_exists('get_current_blog_id') ? (int) get_current_blog_id() : 1) . ':' . (int) $record->articleId) : '', 'raw_input' => $text, 'continuation_delta_text' => trim((string) ($input['continuation_delta_text'] ?? '')), 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'interpretation' => $interpretation, 'subject_resolution' => $resolution, 'content_intent' => $intent, 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support'], 'visual_context' => is_array($input['visual_context'] ?? null) ? $input['visual_context'] : [], 'observations' => is_array($input['observations'] ?? null) ? $input['observations'] : [], 'provenance_packets' => is_array($inputMetadata['provenance_packets'] ?? null) ? $inputMetadata['provenance_packets'] : [], 'existing_capture_continuation' => ($input['existing_capture_continuation'] ?? false) === true, 'continuation_idempotency_key' => (string) ($input['continuation_idempotency_key'] ?? ''), 'governance' => is_array($input['governance'] ?? null) ? $input['governance'] : [], 'prior_diagnostics' => $diagnostics];
             $isMediaEnrichment = strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'MEDIA_ENRICHMENT';
             if ($isMediaEnrichment) {
                 // MEDIA_ENRICHMENT owns Media and MediaUsage only. Do not
@@ -472,7 +473,7 @@ final class EditorialCaptureCoordinator
                 $record = $this->save($record, CaptureStage::COMPOSED, $assets, $diagnostics, $receipts, 'COMPOSED', $record->articleId, $record->articleStateToken);
             }
 
-            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
+            $mediaContext = ['capture' => $record->toArray(), 'article_id' => $record->articleId, 'assets' => $assets, 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [], 'media_operations' => is_array($input['media_operations'] ?? null) ? $input['media_operations'] : [], 'subject_resolution' => $resolution, 'subject_resolution_packet' => $resolution['primary'] ?? null, 'content_intent' => $intent, 'composition' => $this->withoutBody($composition), 'visual_opportunities' => $visualOpportunities, 'visual_support' => $diagnostics['visual_support']];
             if ($videoThumbnailFallback !== null) $mediaContext['video_thumbnail_fallback'] = $videoThumbnailFallback;
             $media = ($this->mediaReconcile)($mediaContext);
             $diagnostics['media_usage'] = $this->withoutBody($media);

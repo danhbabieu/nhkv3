@@ -47,7 +47,7 @@ final class OperationScopedStagingGuard implements StagingGuard
     private function capabilities(Proposal $proposal): array
     {
         $capabilities = ['nhk_apply_proposals'];
-        if ($proposal->entityType === 'media' && $proposal->operation === 'representative_bind') $capabilities[] = 'nhk_internal_content_operations';
+        if ($proposal->entityType === 'media' && in_array($proposal->operation, ['representative_bind', 'add', 'replace', 'remove'], true)) $capabilities[] = 'nhk_internal_content_operations';
         // wp_post relation operations write Graph only. Native editorial
         // publication is separately authorized by OwnerPublicationService and
         // ArticlePublicationGate, never by this semantic apply guard.

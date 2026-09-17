@@ -132,9 +132,31 @@ final class FrontendPresentationContractTest extends TestCase
     public function test_video_detail_has_first_party_sections_and_keeps_youtube_as_source_only(): void
     {
         $source = $this->read('video.php');
-        foreach (['video-frame', 'Tri thức liên quan', 'Nguồn và provenance', 'Bài viết liên quan', 'Hình ảnh liên quan', 'Liên kết nội bộ', 'Mở nguồn video'] as $needle) self::assertStringContainsString($needle, $source);
+        foreach (['video-frame', 'Tri thức liên quan', 'Nguồn tham chiếu', 'Bài viết liên quan', 'Hình ảnh liên quan', 'Liên kết nội bộ', 'Mở nguồn video'] as $needle) self::assertStringContainsString($needle, $source);
         self::assertStringContainsString('embed_url', $source);
         self::assertStringContainsString('video[\'url\']', $source);
+    }
+
+    public function test_shared_media_presentation_is_intrinsic_ratio_aware_and_safe_for_all_orientations(): void
+    {
+        $functions = $this->read('functions.php');
+        $css = $this->read('presentation.css');
+        foreach (['nhk_v3_media_orientation', 'nhk-media--portrait', 'nhk-media--landscape', 'nhk-media--square', 'nhk-media--unknown'] as $needle) {
+            self::assertStringContainsString($needle, $functions . $css);
+        }
+        self::assertStringContainsString('object-fit:contain', $css);
+        self::assertStringNotContainsString('object-fit:cover', $css);
+        self::assertStringContainsString('aspect-ratio:9/16', $this->read('media-video.css'));
+    }
+
+    public function test_video_copy_removes_url_only_duplicate_and_boilerplate_summaries_without_moving_source_cta(): void
+    {
+        $functions = $this->read('functions.php');
+        $video = $this->read('video.php');
+        self::assertStringContainsString('nhk_v3_video_summary', $functions . $video);
+        foreach (['^https?://', 'mời các bác xem video', 'video đồng hồ cổ'] as $needle) self::assertStringContainsString($needle, $functions);
+        self::assertStringContainsString('Mở nguồn video', $video);
+        self::assertStringNotContainsString('foreach ((array) ($video[\'provenance\'] ?? []) as $key => $value)', $video);
     }
 
     public function test_display_fallback_asset_exists_and_is_not_a_semantic_media_writer(): void

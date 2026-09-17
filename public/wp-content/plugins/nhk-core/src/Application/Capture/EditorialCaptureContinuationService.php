@@ -22,7 +22,7 @@ final class EditorialCaptureContinuationService
         if (!UuidCodec::isValid($captureId)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_CAPTURE_ID_INVALID');
         if ($key === '') return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_REQUIRED');
         if (strtoupper(trim((string) ($input['resume_mode'] ?? ''))) !== 'RETRY') return $this->retryFailure($captureId, 'CAPTURE_RETRY_MODE_REQUIRED');
-        foreach (['text', 'content', 'title', 'excerpt', 'subject_hints', 'observations', 'metadata', 'media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'publish', 'video', 'files', 'followup_mode', 'intent', 'purpose'] as $field) {
+        foreach (['text', 'content', 'title', 'excerpt', 'subject_hints', 'observations', 'metadata', 'media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'media_operations', 'publish', 'video', 'files', 'followup_mode', 'intent', 'purpose'] as $field) {
             if (!array_key_exists($field, $input)) continue;
             $value = $input[$field];
             if (is_array($value) ? $value !== [] : ($value === true || trim((string) $value) !== '')) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED');
@@ -217,6 +217,7 @@ final class EditorialCaptureContinuationService
             'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
             'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : [],
             'media_bindings' => is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [],
+            'media_operations' => is_array($context['media_operations'] ?? null) ? $context['media_operations'] : [],
             'intent' => (string) ($intent['intent'] ?? ($original['intent'] ?? '')),
             'publish' => ($original['publish'] ?? false) === true,
             'video' => is_array($original['video'] ?? null) ? $original['video'] : [],

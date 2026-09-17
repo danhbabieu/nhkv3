@@ -83,7 +83,31 @@ final class WpdbMediaUsageRepository implements MutableMediaUsageRepository, Med
 
     public function removeByEndpointRole(string $endpointType, string $endpointKey, string $role): int
     {
-        return max(0, (int) $this->database->query($this->database->prepare("DELETE FROM {$this->table} WHERE endpoint_type=%s AND endpoint_key=%s AND usage_role=%s", $endpointType, $endpointKey, $role)));
+        $rows = $this->database->get_results($this->database->prepare("SELECT * FROM {$this->table} WHERE endpoint_type=%s AND endpoint_key=%s AND usage_role=%s ORDER BY id", $endpointType, $endpointKey, $role), ARRAY_A);
+        $retired = 0;
+        foreach ($rows ?: [] as $row) {
+            $usage = is_array($row) ? $this->hydrate($row) : null;
+            if (!$usage instanceof MediaUsage || $usage->activeSlot === 'retired') continue;
+            $this->update(new MediaUsage(
+                $usage->usageId,
+                $usage->mediaId,
+                $usage->endpointType,
+                $usage->endpointKey,
+                $usage->role,
+                $usage->sortOrder,
+                $usage->altText,
+                $usage->caption,
+                $usage->keywordGroups,
+                $usage->title,
+                $usage->revision,
+                $usage->placementKey,
+                $usage->selectionSource,
+                $usage->selectionPolicy,
+                'retired',
+            ));
+            $retired++;
+        }
+        return $retired;
     }
 
     private function hydrate(array $row): ?MediaUsage

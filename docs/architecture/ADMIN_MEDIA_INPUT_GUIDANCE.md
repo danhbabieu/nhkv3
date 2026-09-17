@@ -205,3 +205,28 @@ affected consumers. This is a read model over the application ledger and
 MediaUsage, not a new writer or a raw UUID/fingerprint/JSON workflow. A node
 missing representative media must remain visibly distinct from a semantic
 feature missing technical/contextual illustration.
+
+## Existing MediaUsage maintenance workflow — 2026-09-18
+
+The internal Admin Media workspace supports upload, add, replace, remove and
+representative binding for an exact Article (`wp_post`) or registered Authority
+target. Upload uses the existing `MediaBatchUploadService` to create/adopt the
+physical attachment and canonical Media; it does not apply semantic Usage by
+itself. The editor then selects the Media, target, operation, role and optional
+contextual SEO fields and submits the mutation.
+
+The Admin REST adapter creates the same `entity_type=media` Governance
+proposal used by MCP. `GovernanceAutomationPolicyResolver` resolves the
+operation-scoped key, `ProposalEligibilityService` validates the exact Media,
+target and Usage revision, and `ControlledApplyService` delegates the mutation
+to `MediaBindingService`. AUTO mode completes through this shared path; REVIEW
+mode appears in the existing **Duyệt dữ liệu** queue. No second Media queue or
+direct table writer exists.
+
+Replace preserves the existing Usage UUID. Remove is logical retirement and
+does not delete Media, MediaAsset or MediaUsage history. For Article targets,
+public visibility still requires `OwnerPublicationApplicationService` and
+`ArticlePublicationGate`; an approved Usage is not permission to bypass the
+Article publication contract. The form displays proposal/apply status and
+canonical read-back rather than asking the editor for raw proposal IDs or
+fingerprints.

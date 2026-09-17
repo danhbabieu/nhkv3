@@ -30,6 +30,7 @@ use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, ClaimR
 use NHK\Core\Application\Article\{ArticleIngestCoordinator, ArticleIngestPreflight, ArticleResearchPreflight, ArticleVerificationReader, SemanticProposalPlanner, OwnerPublicationApplicationService};
 use NHK\Core\Infrastructure\Http\ReadApi;
 use NHK\Core\Infrastructure\Http\AdminWorkbenchReadApi;
+use NHK\Core\Infrastructure\Http\AdminMediaUsageApi;
 use NHK\Core\Infrastructure\Http\GovernanceApi;
 use NHK\Core\Infrastructure\Http\VideoRelationAdminApi;
 use NHK\Core\Infrastructure\Http\SearchApi;
@@ -539,6 +540,7 @@ final class Plugin {
                 },
             );
             $mcpGovernance = new McpGovernanceHandler($governance, $eligibility, $controlledApply, $automationResolver, $endpoints, [$publicProjectionVerifier, 'verify']);
+            (new AdminMediaUsageApi($mediaBindingService, $mcpGovernance, $mediaBatchUpload))->register();
             $relationState = static function (array $plan) use ($graphService): array {
                 $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
                 $sourceType = strtolower(trim((string) ($payload['source_type'] ?? '')));
@@ -957,7 +959,7 @@ final class Plugin {
                     return $governanceResult + ['candidate_writes' => array_merge($candidates, $videoCandidates), 'reused_claims' => $reusedClaims, 'relation_hints' => (array) ($interpretation['relation_hints'] ?? []), 'subject_resolution' => $context['subject_resolution'] ?? [], 'governance_available' => $mcpGovernance instanceof McpGovernanceHandler];
                 },
                 new ArticleComposer(),
-                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService): array {
+                static function (array $context) use ($articleMedia, $mediaService, $usages, $mediaBindingService, $mcpGovernance): array {
                     $trace = static function (string $stage, string $status, array $details = []): void {
                         $payload = array_merge(['stage' => $stage, 'status' => $status, 'at' => gmdate('c')], $details);
                         if (function_exists('do_action')) { try { do_action('nhk_v3_capture_stage_trace', $payload); } catch (\Throwable) { } }
@@ -973,6 +975,26 @@ final class Plugin {
                     if ($typedBindings !== []) {
                         $bindingBatch = $mediaBindingService->bindMany($typedBindings, (string) ($context['capture']['capture_id'] ?? '') . ':media-binding', $assets);
                         $bindingResults = is_array($bindingBatch['bindings'] ?? null) ? $bindingBatch['bindings'] : [];
+                    }
+                    $governedMediaOperations = [];
+                    foreach ((array) ($context['media_operations'] ?? []) as $index => $mediaOperation) {
+                        if (!is_array($mediaOperation)) throw new \RuntimeException('MEDIA_USAGE_OPERATION_INVALID');
+                        $operation = strtolower(trim((string) ($mediaOperation['operation'] ?? '')));
+                        $mediaRef = is_array($mediaOperation['media'] ?? null) ? $mediaOperation['media'] : (is_array($mediaOperation['media_ref'] ?? null) ? $mediaOperation['media_ref'] : []);
+                        $media = $mediaBindingService->resolveMediaReference($mediaRef);
+                        $target = is_array($mediaOperation['target'] ?? null) ? $mediaOperation['target'] : [];
+                        $targetUuid = null;
+                        if (strtolower(trim((string) ($target['type'] ?? ''))) !== 'wp_post') {
+                            $resolvedTarget = $mediaBindingService->resolveTargetReference($target);
+                            $target = ['type' => $resolvedTarget->entityType, 'id' => $resolvedTarget->canonicalId];
+                            $targetUuid = $resolvedTarget->canonicalId;
+                        }
+                        $payload = array_replace($mediaOperation, ['operation' => $operation, 'media' => ['id' => $media->canonicalId], 'target' => $target]);
+                        $governedMediaOperations[] = $mcpGovernance->ingestFromArguments([
+                            'operation' => $operation, 'entity_type' => 'media', 'subject_id' => $media->canonicalId, 'target_uuid' => $targetUuid,
+                            'expected_revision' => null, 'idempotency_key' => (string) ($mediaOperation['idempotency_key'] ?? ($context['capture']['capture_id'] ?? '') . ':media-operation:' . $index),
+                            'target' => $target, 'payload' => $payload,
+                        ]);
                     }
                     if (strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'MEDIA_ENRICHMENT') {
                         $trace('MEDIA_USAGE_RECONCILIATION', 'STARTED', ['capture_id' => (string) ($context['capture']['capture_id'] ?? '')]);
@@ -1025,6 +1047,7 @@ final class Plugin {
                             'canonical_readback' => ['media_ids' => array_values(array_unique($mediaIds)), 'media_usage' => $usageReadback],
                             'frontend_verified' => null,
                             'binding_results' => $bindingResults,
+                            'governed_media_operations' => $governedMediaOperations,
                         ];
                     }
                     $resolution = is_array($context['subject_resolution'] ?? null) ? $context['subject_resolution'] : [];
@@ -1060,6 +1083,7 @@ final class Plugin {
                     $payload['force_inline_reconcile'] = true;
                     $payload['editorial_state_token'] = $result->editorialStateToken;
                     $payload['binding_results'] = $bindingResults;
+                    $payload['governed_media_operations'] = $governedMediaOperations;
                     return $payload;
                 },
                 static function (array $context) use ($draftGateway, $articleEditorial, $articleResearch, $articlePreflightHandoff): array {
@@ -1242,6 +1266,11 @@ final class Plugin {
                 'nonce' => wp_create_nonce('wp_rest'),
             ]);
             wp_enqueue_script('nhk-v3-admin-shell');
+            if (str_starts_with($page, 'nhk-v3')) {
+                wp_register_script('nhk-v3-admin-workbench', plugins_url('assets/admin/admin-workbench.js', $pluginFile), [], $version, true);
+                wp_localize_script('nhk-v3-admin-workbench', 'nhkV3Admin', ['root' => esc_url_raw(rest_url('nhk/v1/')), 'nonce' => wp_create_nonce('wp_rest')]);
+                wp_enqueue_script('nhk-v3-admin-workbench');
+            }
         });
     }
     private static function canonicalInventory(EntityTypeRegistry $types, object $authority, object $media, object $videos, object $claims, object $sources, object $evidence): CanonicalInventoryService

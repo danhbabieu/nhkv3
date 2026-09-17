@@ -20,7 +20,7 @@ final class MediaUsageReconciler
     {
         $currentByIdentity = [];
         foreach ($current as $usage) {
-            if (!$usage instanceof MediaUsage || $usage->endpointType !== $endpointType || $usage->endpointKey !== $endpointKey) continue;
+            if (!$usage instanceof MediaUsage || $usage->activeSlot === 'retired' || $usage->endpointType !== $endpointType || $usage->endpointKey !== $endpointKey) continue;
             $identity = $usage->role . "\0" . $usage->placementKey;
             if (isset($currentByIdentity[$identity])) return $this->review('DUPLICATE_CURRENT_USAGE', $usage->role);
             $currentByIdentity[$identity] = $usage;

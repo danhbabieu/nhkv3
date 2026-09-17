@@ -308,3 +308,31 @@ facet, feature and context are mandatory; same brand/model, filename,
 keyword, gallery, checksum or near visual match is not enough. Visual support
 does not create Evidence, Claim or Graph truth, and public projections omit
 private, review, placeholder, unavailable or ineligible Media.
+
+## Governed MediaUsage mutations — 2026-09-18
+
+The shared Governance pipeline exposes four operation-scoped MediaUsage
+capabilities: `media:add`, `media:replace`, `media:remove` and
+`media:representative_bind`. The resolver checks the most specific
+target/owner/operation key, then owner/operation, then the legacy owner key;
+an absent key is `REVIEW_REQUIRED`.
+
+Admin and MCP submit these as ordinary Governance proposals. The proposal is
+checked by `ProposalSubjectBindingValidator` and `ProposalEligibilityService`,
+applied by `ControlledApplyService`, and delegated to `MediaBindingService`,
+which remains the sole MediaUsage writer. The Admin **Duyệt dữ liệu** page is
+the only review queue; no Media approval queue or parallel approval service is
+created.
+
+`add` creates one Usage for an exact target/role/placement; `replace` keeps the
+Usage UUID and uses expected Usage revision CAS; `remove` keeps the row and
+marks its active slot `retired`. Retired rows are excluded from active
+reconciliation and public projection. All operations return Media and Usage
+read-back and remain idempotent at the Governance proposal/attempt boundary.
+
+For `wp_post`, an applied MediaUsage mutation is still subject to
+`OwnerPublicationApplicationService` and `ArticlePublicationGate` before an
+AUTO_PUBLISH result can become public. Authority targets (Classification,
+Brand, Model and Movement) use the representative role only. Movement
+generation/type remains the registered Movement payload contract; no new
+entity type, endpoint type or registry entry is invented by MediaUsage.

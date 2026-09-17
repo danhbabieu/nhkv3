@@ -110,6 +110,13 @@ final class McpToolCatalog
                 'media_ids' => ['type' => 'array', 'items' => self::uuidField()],
                 'existing_media_urls' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'format' => 'uri', 'minLength' => 1]],
                 'media_bindings' => ['type' => 'array', 'maxItems' => 20, 'items' => self::mediaBindingField()],
+                'media_operations' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'object', 'properties' => [
+                    'operation' => ['type' => 'string', 'enum' => ['add', 'replace', 'remove', 'representative_bind']],
+                    'media_ref' => ['type' => 'object'], 'media' => ['type' => 'object'], 'target' => ['type' => 'object'],
+                    'usage_id' => self::uuidField(), 'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1],
+                    'role' => ['type' => 'string'], 'placement_key' => ['type' => 'string', 'maxLength' => 191],
+                    'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191], 'seo' => ['type' => 'object'],
+                ], 'required' => ['operation', 'target'], 'additionalProperties' => false]],
                 'publish' => ['type' => 'boolean'],
                 'governance' => [
                     'type' => 'object',
@@ -180,6 +187,19 @@ final class McpToolCatalog
                 'selection_policy' => ['type' => 'string', 'enum' => ['PINNED', 'AUTO']],
                 'seo' => ['type' => 'object', 'properties' => ['alt_text' => ['type' => 'string', 'maxLength' => 1000], 'caption' => ['type' => 'string', 'maxLength' => 2000], 'title' => ['type' => 'string', 'maxLength' => 255]], 'additionalProperties' => false],
             ], ['idempotency_key', 'media', 'target'], true),
+            self::tool('nhk.media.usage', 'Create one governed MediaUsage add, replace, remove or representative binding operation. The target is exact; policy, proposal, eligibility, Controlled Apply and canonical read-back remain the shared Governance pipeline.', [
+                'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
+                'operation' => ['type' => 'string', 'enum' => ['add', 'replace', 'remove', 'representative_bind']],
+                'media' => ['type' => 'object', 'properties' => ['id' => self::uuidField()], 'required' => ['id'], 'additionalProperties' => false],
+                'target' => ['type' => 'object', 'properties' => ['type' => ['type' => 'string', 'minLength' => 1], 'id' => ['type' => 'string', 'minLength' => 1], 'post_id' => ['type' => 'integer', 'minimum' => 1], 'blog_id' => ['type' => 'integer', 'minimum' => 1], 'stable_key' => ['type' => 'string']], 'required' => ['type'], 'additionalProperties' => false],
+                'usage_id' => self::uuidField(),
+                'expected_usage_revision' => ['type' => 'integer', 'minimum' => 1],
+                'role' => ['type' => 'string', 'enum' => ['featured_primary', 'inline_primary', 'inline_supporting', 'representative', 'evidence', 'technical_detail']],
+                'placement_key' => ['type' => 'string', 'maxLength' => 191],
+                'selection_source' => ['type' => 'string', 'enum' => ['USER_EXPLICIT', 'SYSTEM_AUTO']],
+                'selection_policy' => ['type' => 'string', 'enum' => ['PINNED', 'AUTO']],
+                'seo' => ['type' => 'object'],
+            ], ['idempotency_key', 'operation', 'media', 'target'], true),
             self::tool('nhk.media.upload-batch', 'Upload one or more image files through the canonical multipart WordPress attachment and governed Media boundary.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 20, 'items' => [

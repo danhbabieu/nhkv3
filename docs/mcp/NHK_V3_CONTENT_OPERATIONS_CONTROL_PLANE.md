@@ -513,3 +513,26 @@ candidate/resolved Media, reason and affected consumers. Capture remains the
 normal intake. Media read-back performs the bounded reverse reconciliation;
 the control plane does not accept raw requirement UUID/fingerprint/JSON writes
 and does not treat MediaUsage as Evidence or Claim.
+
+## Governed MediaUsage capability — 2026-09-18
+
+`nhk.media.usage` is the internal MCP adapter for one exact MediaUsage
+operation. Its operation enum is `add`, `replace`, `remove` or
+`representative_bind`; its target is an exact registered Authority UUID/stable
+key or an exact WordPress post endpoint. The adapter creates a normal
+`entity_type=media` proposal and delegates policy, eligibility, Controlled
+Apply and read-back to the existing Governance services.
+
+Operation-scoped policy keys are target-aware where configured, for example
+`classification:media:representative_bind`, `wp_post:media:add` and
+`media:replace`, with legacy owner keys retained for compatibility. Admin and
+MCP share this resolver and the existing Admin proposal queue. They do not
+introduce a parallel Media approval system.
+
+`MediaBindingService` owns the MediaUsage mutation; Graph remains the owner of
+relations. Article targets do not publish merely because a Usage proposal was
+approved: AUTO_PUBLISH must still pass
+`OwnerPublicationApplicationService` and `ArticlePublicationGate`. Movement
+generation/type is available only through the canonical Movement contract and
+its registered `generation`/`movement_type` fields; a Media operation cannot
+mint a new registry entry.

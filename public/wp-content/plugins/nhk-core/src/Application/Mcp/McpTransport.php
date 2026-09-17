@@ -142,7 +142,7 @@ final class McpTransport
             'nhk.capture.ingest' => 'nhk_ingest_articles',
             'nhk.category.create', 'nhk.category.update', 'nhk.category.assign', 'nhk.category.unassign', 'nhk.category.delete', 'nhk.article.draft.create', 'nhk.article.draft.update', 'nhk.article.publish', 'nhk.article.publish.review', 'nhk.article.publish.approve', 'nhk.article.trash', 'nhk.article.restore' => 'nhk_ingest_articles',
             'nhk.proposal.create' => 'nhk_create_proposals',
-            'nhk.media.ingest', 'nhk.media.bind' => 'nhk_create_proposals',
+            'nhk.media.ingest', 'nhk.media.bind', 'nhk.media.usage' => 'nhk_create_proposals',
             'nhk.media.upload-batch' => 'upload_files',
             'nhk.media.widget-upload' => 'upload_files',
             'nhk.video.ingest' => 'nhk_create_proposals',
@@ -193,6 +193,7 @@ final class McpTransport
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.binding.get' => $this->mediaBinding?->get((string) ($arguments['operation_id'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE'),
             'nhk.media.bind' => $this->mediaBind($arguments),
+            'nhk.media.usage' => $this->mediaUsage($arguments),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),
             'nhk.media.upload-batch' => $this->batchUpload($arguments, $files),
             'nhk.media.widget-upload' => $this->widgetUpload($arguments),
@@ -615,6 +616,36 @@ final class McpTransport
         return $this->ingestProposal($proposal);
     }
 
+    /** Route every generic MediaUsage mutation through the shared Governance pipeline. */
+    private function mediaUsage(array $arguments): array
+    {
+        if ($this->mediaBinding === null) throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE');
+        $media = $this->mediaBinding->resolveMediaReference((array) ($arguments['media'] ?? []));
+        $targetReference = is_array($arguments['target'] ?? null) ? $arguments['target'] : [];
+        $targetType = strtolower(trim((string) ($targetReference['type'] ?? '')));
+        $targetUuid = null;
+        $target = $targetReference;
+        if ($targetType !== 'wp_post') {
+            $resolved = $this->mediaBinding->resolveTargetReference($targetReference);
+            $targetUuid = $resolved->canonicalId;
+            $target = ['type' => $resolved->entityType, 'id' => $resolved->canonicalId];
+        }
+        $operation = strtolower(trim((string) ($arguments['operation'] ?? '')));
+        $payload = $arguments;
+        $payload['media'] = ['id' => $media->canonicalId];
+        $payload['target'] = $target;
+        $proposal = $this->governance->createFromArguments([
+            'operation' => $operation,
+            'entity_type' => 'media',
+            'subject_id' => $media->canonicalId,
+            'target_uuid' => $targetUuid,
+            'expected_revision' => $operation === 'representative_bind' ? $media->revision : null,
+            'idempotency_key' => (string) ($arguments['idempotency_key'] ?? ''),
+            'payload' => $payload,
+        ]);
+        return $this->ingestProposal($proposal);
+    }
+
     /** @return array<string,mixed> */
     private function fileArgumentMetadata(array $arguments, array $files): array
     {
@@ -773,6 +804,7 @@ final class McpTransport
                 'entity_type' => $proposal->entityType,
                 'subject_id' => $proposal->subjectId,
                 'target_uuid' => $proposal->targetUuid,
+                'target' => is_array($proposal->payload['target'] ?? null) ? $proposal->payload['target'] : (is_array($proposal->payload['binding']['target'] ?? null) ? $proposal->payload['binding']['target'] : []),
                 'expected_revision' => $proposal->expectedRevision,
                 'payload' => $proposal->payload,
                 'content_fingerprint' => $proposal->contentFingerprint,

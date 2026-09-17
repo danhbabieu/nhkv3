@@ -38,6 +38,22 @@ final class ProposalEligibilityService
             if ($mediaRevision < 1 || $this->reader->targetRevision($proposal->subjectId) !== $mediaRevision) $reasons[] = 'MEDIA_REVISION_CHANGED';
             if ($proposal->targetUuid === null || $targetRevision < 1 || $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
         }
+        if ($proposal->entityType === 'media' && in_array($proposal->operation, ['add', 'replace', 'remove'], true)) {
+            $target = is_array($proposal->payload['target'] ?? null) ? $proposal->payload['target'] : [];
+            $targetType = strtolower(trim((string) ($target['type'] ?? '')));
+            if ($targetType === 'wp_post') {
+                $blog = (int) ($target['blog_id'] ?? 1);
+                $post = (int) ($target['post_id'] ?? $target['id'] ?? 0);
+                $endpointKey = $blog . ':' . $post;
+                if ($blog < 1 || $post < 1 || !$this->reader->targetExists($endpointKey)) $reasons[] = 'ARTICLE_TARGET_NOT_FOUND';
+            } elseif ($proposal->targetUuid === null || !$this->reader->targetExists($proposal->targetUuid)) {
+                $reasons[] = 'MEDIA_USAGE_TARGET_NOT_FOUND';
+            }
+            if (in_array($proposal->operation, ['replace', 'remove'], true)) {
+                if (!preg_match('/^[0-9A-Fa-f-]{36}$/', (string) ($proposal->payload['usage_id'] ?? ''))) $reasons[] = 'MEDIA_USAGE_ID_REQUIRED';
+                if ((int) ($proposal->payload['expected_usage_revision'] ?? 0) < 1) $reasons[] = 'MEDIA_USAGE_REVISION_REQUIRED';
+            }
+        }
         if ($proposal->operation === 'merge') {
             $sourceRevision = (int) ($proposal->payload['source_revision'] ?? $proposal->expectedRevision);
             $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);

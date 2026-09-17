@@ -136,6 +136,50 @@ add_filter('the_content_feed', 'nhk_v3_public_content_filter', 20);
 
 function nhk_v3_excerpt(): string { return wp_trim_words(wp_strip_all_tags(get_the_excerpt()), 28); }
 
+/**
+ * Presentation-only media classification. Dimensions must come from the
+ * canonical projection; filenames, titles and URLs are never used as hints.
+ */
+function nhk_v3_media_orientation(mixed $width, mixed $height): string
+{
+    $width = is_numeric($width) ? (int) $width : 0;
+    $height = is_numeric($height) ? (int) $height : 0;
+    if ($width < 1 || $height < 1) return 'unknown';
+    $ratio = $width / $height;
+    if (abs($ratio - 1.0) <= 0.08) return 'square';
+    return $ratio < 1.0 ? 'portrait' : 'landscape';
+}
+
+function nhk_v3_media_orientation_class(mixed $width, mixed $height): string
+{
+    return 'nhk-media--' . nhk_v3_media_orientation($width, $height);
+}
+
+/** @return array{width:int,height:int} */
+function nhk_v3_media_dimensions(array $item): array
+{
+    $thumbnail = is_array($item['thumbnail'] ?? null) ? $item['thumbnail'] : [];
+    return [
+        'width' => max(0, (int) ($item['width'] ?? $thumbnail['width'] ?? 0)),
+        'height' => max(0, (int) ($item['height'] ?? $thumbnail['height'] ?? 0)),
+    ];
+}
+
+function nhk_v3_video_summary(mixed $value, string $title = ''): string
+{
+    $summary = trim(wp_strip_all_tags((string) $value));
+    if ($summary === '' || ($title !== '' && mb_strtolower($summary) === mb_strtolower(trim($title)))) return '';
+    if (preg_match('~^https?://\S+$~i', $summary)) return '';
+    $boilerplate = [
+        'mời các bác xem video', 'video đồng hồ cổ', 'xem thêm tại link',
+        'xem video này', 'video tham chiếu được nhk chuẩn hóa từ nguồn bên ngoài',
+    ];
+    $normalized = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $summary)));
+    foreach ($boilerplate as $phrase) if ($normalized === $phrase || str_starts_with($normalized, $phrase . ' ')) return '';
+    $summary = preg_replace('~https?://\S+~i', '', $summary) ?: $summary;
+    return trim($summary);
+}
+
 function nhk_v3_entity_label(string $type, string $profile = ''): string
 {
     if ($profile === 'clock_type') return 'nhóm đồng hồ';

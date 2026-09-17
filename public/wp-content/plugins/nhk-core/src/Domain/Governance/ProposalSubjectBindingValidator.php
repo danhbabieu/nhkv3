@@ -33,10 +33,11 @@ final class ProposalSubjectBindingValidator
             }
             return true;
         }
-        if ($type === 'media' && $operation === 'representative_bind') {
+        if ($type === 'media' && in_array($operation, ['representative_bind', 'add', 'replace', 'remove'], true)) {
             return UuidCodec::isValid($proposal->subjectId)
-                && is_array($proposal->payload['binding'] ?? null)
-                && (string) ($proposal->payload['binding']['role'] ?? 'representative') === 'representative';
+                && ($operation !== 'representative_bind'
+                    ? is_array($proposal->payload['media'] ?? null) && (string) ($proposal->payload['media']['id'] ?? $proposal->subjectId) === $proposal->subjectId
+                    : is_array($proposal->payload['binding'] ?? null) && (string) ($proposal->payload['binding']['role'] ?? 'representative') === 'representative');
         }
         if ($type === 'component' && in_array($operation, ['merge', 'rekey', 'update', 'rename', 'retire', 'reactivate'], true)) {
             if (!UuidCodec::isValid($proposal->subjectId)) return false;

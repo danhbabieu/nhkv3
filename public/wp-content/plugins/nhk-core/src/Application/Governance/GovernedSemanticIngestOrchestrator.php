@@ -31,7 +31,13 @@ final class GovernedSemanticIngestOrchestrator
         $results = [];
         $verified = [];
         foreach ($nodes as $node) {
-            $this->currentOwnerType = strtolower(trim((string) ($node['entity_type'] ?? '')));
+            $nodeOwner = strtolower(trim((string) ($node['entity_type'] ?? '')));
+            $nodeTarget = is_array($node['target'] ?? null) ? $node['target'] : [];
+            // MediaUsage is owned by MediaBindingService, but an Article
+            // mutation still publishes through the Article owner boundary.
+            $this->currentOwnerType = $nodeOwner === 'media' && strtolower(trim((string) ($nodeTarget['type'] ?? ''))) === 'wp_post'
+                ? 'wp_post'
+                : $nodeOwner;
             foreach ((array) ($node['dependency_ids'] ?? []) as $dependencyId) {
                 if (!isset($verified[(string) $dependencyId])) throw new \RuntimeException('DEPENDENCY_NOT_VERIFIED');
             }

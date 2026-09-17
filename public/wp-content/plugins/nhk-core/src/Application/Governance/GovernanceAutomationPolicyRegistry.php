@@ -12,7 +12,7 @@ final class GovernanceAutomationPolicyRegistry
     public static function keys(array $owners): array
     {
         $keys = array_values(array_unique(array_map('strval', $owners)));
-        $targets = array_values(array_unique(array_merge($keys, ['wp_post'])));
+        $targets = array_values(array_unique(array_merge(['wp_post'], array_diff($keys, ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence', 'relation']))));
         foreach ($targets as $target) foreach (['add', 'replace', 'remove', 'representative_bind'] as $operation) $keys[] = $target . ':media:' . $operation;
         foreach (['media:add', 'media:replace', 'media:remove', 'media:representative_bind'] as $operation) $keys[] = $operation;
         return array_values(array_unique($keys));
