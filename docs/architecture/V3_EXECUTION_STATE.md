@@ -11970,3 +11970,28 @@ No new entity type, predicate, endpoint type, media role, uploader, Video
 branch, schema mutation, deployment or live/staging write was introduced.
 
 STATUS: `SLICE_1_INTENT_SCOPED_PUBLICATION_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Slice 2 Article MediaUsage ordering (LOCAL ONLY)
+
+SCOPE: Reconciled committed Capture Media IDs into Article `featured_primary`
+and `inline_primary` MediaUsage rows before fresh Article research and
+publication evidence. Representative Model/Classification usages remain on
+their original endpoints. No physical upload, Video, Graph, live/staging,
+direct database or deployment state was changed.
+
+IMPLEMENTED: Article media reconciliation now returns canonical Article Usage
+readback with endpoint, roles, Usage IDs, source and typed blockers. The
+Capture coordinator forwards `capture_owned_media_ids` and the explicit
+pre-research reconciliation marker. Publication research and the preflight
+handoff carry the canonical media evidence; placeholder, missing-asset and
+non-verified readback states remain blockers. The one-real-image exception is
+limited to one ready/public Capture Media for `IMAGE_ARTICLE`.
+
+VERIFICATION: Exact Task 2 focused suite PASS — 65 tests / 277 assertions,
+with one pre-existing PHPUnit warning. Targeted PHP lint for every modified
+production file, `composer lint`, `git diff --check` and changed-file secret
+review pass. Guarded WordPress integration is unavailable because
+`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No live/staging acceptance,
+deployment, push or external state mutation was attempted.
+
+STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

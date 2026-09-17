@@ -36,7 +36,8 @@ final class EditorialCaptureConvergenceE2ETest extends TestCase
             $captures,
             $calls,
             $events,
-            media: static function (array $context) use (&$seenCaptureOwnedMediaIds): array {
+            media: static function (array $context) use (&$seenCaptureOwnedMediaIds, &$events): array {
+                $events[] = 'media';
                 $seenCaptureOwnedMediaIds = $context['capture_owned_media_ids'] ?? null;
                 return ['status' => 'RECONCILED', 'canonical_readback' => ['media_usage' => ['state' => 'VERIFIED', 'usage_ids' => [UuidCodec::newV7(), UuidCodec::newV7()]]]];
             },

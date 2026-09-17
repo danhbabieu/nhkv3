@@ -15,8 +15,10 @@ final class CaptureArticlePreflightHandoff
         $primary = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         $overlap = (string) ($research->overlap['classification'] ?? 'UNCERTAIN');
         $category = (string) ($research->categoryPlan['status'] ?? 'UNKNOWN');
-        $mediaComplete = ($media['media_complete'] ?? false) === true
-            || (($media['slots']['featured_primary']['placeholder'] ?? true) === false);
+        $mediaUsage = is_array($media['canonical_readback']['media_usage'] ?? null) ? $media['canonical_readback']['media_usage'] : [];
+        $mediaComplete = (($media['media_complete'] ?? false) === true
+            || (($media['slots']['featured_primary']['placeholder'] ?? true) === false))
+            && ($mediaUsage === [] || strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED');
         $compliance = (string) ($research->compliance['status'] ?? '');
         $semanticApplied = (string) ($semanticWriteBack['status'] ?? '') === 'APPLIED';
         $slug = trim((string) ($articleState['slug'] ?? ''));
@@ -38,7 +40,7 @@ final class CaptureArticlePreflightHandoff
             'applicability' => 'REQUIRED',
             'policy' => 'VERIFY',
             'state' => $mediaComplete ? 'VERIFIED' : 'PENDING',
-            'evidence' => ['media_complete' => $mediaComplete],
+            'evidence' => ['media_complete' => $mediaComplete, 'media_usage' => $mediaUsage],
         ];
         $requirements['public_route'] = [
             'applicability' => 'REQUIRED',
@@ -52,16 +54,22 @@ final class CaptureArticlePreflightHandoff
             'state' => in_array($renderedPublicStatus, ['unavailable', 'not_present'], true) ? 'SKIPPED' : ($renderedPublicStatus === 'verified' ? 'VERIFIED' : 'PENDING'),
             'evidence' => ['status' => $renderedPublicStatus],
         ];
+        $freshPreflightBlockers = array_values(array_unique(array_merge(
+            array_values(array_map('strval', $research->blockers)),
+            array_values(array_map('strval', (array) ($mediaUsage['blockers'] ?? []))),
+        )));
+        $researchAcceptable = $research->blockers === []
+            && ($mediaUsage === [] || strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED');
 
         return [
             'fresh_preflight' => true,
-            'fresh_preflight_blockers' => array_values(array_map('strval', $research->blockers)),
+            'fresh_preflight_blockers' => $freshPreflightBlockers,
             'fresh_overlap' => $research->overlap,
             'fresh_category_plan' => $research->categoryPlan,
             'subject_resolution' => $resolution,
             'subject_resolved' => ($resolution['status'] ?? '') === 'resolved' && trim((string) ($primary['id'] ?? '')) !== '',
             'subject_persistence_status' => (string) ($resolution['persistence']['status'] ?? ''),
-            'research_acceptable' => $research->blockers === [],
+            'research_acceptable' => $researchAcceptable,
             'duplicate_intent_handled' => in_array($overlap, ['NO_OVERLAP', 'COMPLEMENTARY_CONTENT'], true),
             'category_resolved' => $category === 'EXISTING',
             'semantic_plan_complete' => $research->readyForDraft,
@@ -69,6 +77,7 @@ final class CaptureArticlePreflightHandoff
             'requirements' => $requirements,
             'media_usage_complete' => $mediaComplete,
             'media_snapshot' => $media,
+            'media_usage_readback' => $mediaUsage,
             'media_guidance' => is_array($research->mediaPlan['guidance'] ?? null) ? $research->mediaPlan['guidance'] : (is_array($media['guidance'] ?? null) ? $media['guidance'] : []),
             'real_image_requirements_met' => $mediaComplete,
             'claim_compliance_acceptable' => in_array($compliance, ['PASS', 'APPROVED', 'SAFE'], true),

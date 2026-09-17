@@ -385,6 +385,8 @@ final class Plugin {
                         if (($articleMedia['featured_primary']['placeholder'] ?? true) === true) $articleMedia['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_FEATURED_MISSING'];
                         if (($articleMedia['inline_primary']['placeholder'] ?? true) === true) $articleMedia['diagnostics'][] = ['code' => 'ARTICLE_MEDIA_INLINE_MISSING'];
                     }
+                    $reconciledArticleMedia = is_array($input['article_context']['article_media'] ?? null) ? $input['article_context']['article_media'] : [];
+                    if ($reconciledArticleMedia !== []) $articleMedia = array_replace_recursive($articleMedia, $reconciledArticleMedia);
                     $authorityRows = [];
                     foreach ($types->all() as $definition) foreach ($authority->listByType($definition->type) as $entity) $authorityRows[] = ['id' => $entity->canonicalId, 'type' => $entity->entityType, 'name' => $entity->canonicalName, 'active' => $entity->active()];
                     $branchKnowledge = [];
@@ -993,6 +995,7 @@ final class Plugin {
                         'capture_has_physical_assets' => $mediaIds !== [],
                         'capture_owned_media_ids' => $mediaIds,
                         'content_intent' => $context['content_intent'] ?? [],
+                        'article_media_reconciliation' => 'REQUIRED_BEFORE_PUBLICATION_RESEARCH',
                         'single_real_image_exception' => strtoupper(trim((string) ($context['content_intent']['intent'] ?? ''))) === 'IMAGE_ARTICLE' && count(array_values(array_unique($mediaIds))) === 1,
                         'subject_scope_locked' => $mediaSubjectIds !== [],
                         'allow_unscoped_reuse' => false,
@@ -1027,6 +1030,7 @@ final class Plugin {
                         'excerpt' => (string) ($current?->excerpt ?? ''),
                         'body' => (string) ($current?->content ?? ''),
                         'planned_title' => $topic,
+                        'article_media' => is_array($context['media'] ?? null) ? $context['media'] : [],
                     ]);
                     $evidence = $articlePreflightHandoff->build(
                         // The handoff supplies the gate's locked
