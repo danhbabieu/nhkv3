@@ -49,6 +49,7 @@ final class McpPublicUrlMaintenanceContractTest extends TestCase
             $ability,
             'nhk-v3/media-widget-upload',
             'nhk-v3/media-bind',
+            'nhk-v3/media-usage',
             'nhk-v3/proposal-submit',
             'nhk-v3/proposal-approve',
             'nhk-v3/proposal-apply',
