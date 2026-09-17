@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Governance\{ControlledApplyService, GovernanceService, ProposalEligibilityService};
+use NHK\Core\Application\Media\MediaBindingService;
 use NHK\Core\Application\Video\VideoProposalReconciliationService;
 use NHK\Core\Contracts\Governance\ProposalRepository;
 
@@ -15,5 +16,7 @@ final class GovernanceRuntime
         public readonly ProposalEligibilityService $eligibility,
         public readonly ControlledApplyService $controlledApply,
         public readonly ?VideoProposalReconciliationService $videoReconciliation = null,
+        public readonly array $automationTypes = [],
+        public readonly ?MediaBindingService $mediaBinding = null,
     ) {}
 }

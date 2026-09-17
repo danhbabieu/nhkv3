@@ -1,7 +1,7 @@
 # Governed Content Automation Expansion — Architectural Spec
 
 **Date:** 2026-09-17
-**Status:** Architectural specification; implementation not started
+**Status:** Approved architectural specification; implementation checkpoint completed 2026-09-17
 **Scope:** MediaUsage representative, Knowledge, Classification, Brand, Model,
 Movement generation/type, and registered Relationships
 **Baseline:** Cúc cu Media binding case 567
@@ -286,10 +286,10 @@ read-back requirements.
 
 ### 4.5 Movement generation/type — contract gap must close first
 
-The current canonical Movement definition contains only the registered fields
-`manufacturer`, `caliber`, `description`, `frequency_hz`, and `jewels`. The
-current registry contains no canonical `movement_generation`, `movement_type`,
-`generation` field, profile, operation, or predicate.
+The contract decision is to retain Movement as the canonical Authority owner
+and register optional `generation` and `movement_type` string attributes. The
+decision and registry change are recorded in
+`docs/architecture/MOVEMENT_GENERATION_TYPE_CONTRACT.md`.
 
 Therefore implementation must not:
 
@@ -301,21 +301,10 @@ Therefore implementation must not:
 - let automation accept the value because it appears in a fixture or legacy
   record.
 
-Before code implementation, the contract layer must decide exactly one of the
-following canonical models:
-
-1. registered Movement payload attributes, with field type/format,
-   revision/read-back, public projection and policy scope; or
-2. registered Classification profile(s), with explicit Movement-to-Classification
-   predicate/source scope and eligibility; or
-3. another already registered owner model, if the current canonical contracts
-   establish one.
-
-The decision must register the vocabulary, ownership, uniqueness/cardinality,
-provenance requirements, public behavior, Proposal operation compatibility,
-Eligibility reason codes, Controlled Apply executor path, and regression tests.
-Until that decision is approved and registered, all Movement generation/type
-automation is `REGISTRY_GAP` and fails closed.
+The registered attributes use the existing Authority create/update operation,
+optimistic revision/read-back and `movement` policy owner. They remain optional;
+no vocabulary, relation cardinality or public route is implied. Unknown or
+empty values remain fail-closed at the existing Authority boundary.
 
 ### 4.6 Relationships
 
@@ -516,32 +505,32 @@ The existing Public Clock UUID/owner and any staging IDs must be read from the
 current approved runtime package at acceptance time; this spec does not create
 or expand a new data scope.
 
-## 9. Contract changes required before implementation
+## 9. Contract decisions and implementation status
 
-Implementation is blocked until these contract decisions are recorded and
-registered:
+The following contract decisions are recorded and registered for implementation:
 
-1. **Policy context contract:** define the canonical registered dimensions for
-   type, operation, profile/family, predicate and capability; define fallback
-   and strictness precedence.
-2. **Media representative operation contract:** decide which representative
-   commands require Governance approval and which explicit pinned bindings may
-   remain immediate placement operations; register the operation descriptor,
-   payload, revisions, Eligibility and read-back.
-3. **Movement generation/type contract:** choose the canonical owner model and
-   register fields/profile/predicate, scope, provenance, cardinality, public
-   projection, operation compatibility and reason codes. Until then retain
-   `REGISTRY_GAP`.
-4. **Relation policy contract:** define whether automation is allowed per
-   relation operation only or per registered predicate/endpoint rule; default
-   missing narrow rules to review.
-5. **Article automation contract:** define the handoff from semantic
-   `AUTO_PUBLISH` to `ArticlePublicationGate` and
-   `OwnerPublicationApplicationService`; do not call projection success native
-   publication.
-6. **Staging guard contract:** define the operation/capability-scoped guard,
-   signed build/documentation context, bounds, audit event, failure codes and
-   transition from current exact-ID packages.
+1. **Policy context contract:** owner policy remains keyed by registered owner
+   type; operation/capability strictness is enforced at apply by the shared
+   operation registry and staging guard. Future narrower persisted rules must
+   use registered keys and default missing narrow rules to review.
+2. **Media representative operation contract:** `media:representative_bind`
+   governs `SYSTEM_AUTO/AUTO` selection; explicit `USER_EXPLICIT/PINNED`
+   remains the existing immediate placement operation. The Proposal carries
+   Media and target revisions; apply delegates to MediaBindingService and its
+   receipt/read-back remains authoritative for MediaUsage.
+3. **Movement generation/type contract:** use registered optional Authority
+   attributes `generation` and `movement_type`; see
+   `MOVEMENT_GENERATION_TYPE_CONTRACT.md`. No new owner, predicate or queue.
+4. **Relation policy contract:** relation operations remain Graph-owned and
+   registered; predicate/endpoint eligibility remains mandatory, with missing
+   narrow policy defaulting to review.
+5. **Article automation contract:** semantic `wp_post` AUTO_PUBLISH now requires
+   the injected publication boundary, which calls
+   `OwnerPublicationApplicationService::request` and therefore
+   `ArticlePublicationGate` before native publish.
+6. **Staging guard contract:** `OperationScopedStagingGuard` is the shared
+   operation/capability guard with bounded payload/dependency checks and
+   fail-closed diagnostics; exact-ID packages remain historical evidence.
 7. **Policy persistence/audit contract:** retain the existing option adapter if
    appropriate, but emit policy changes through shared append-only Governance
    audit; do not create a second policy audit model.
@@ -550,10 +539,12 @@ registered:
    source. `relation` and all newly registered contexts must not drift between
    runtime and UI.
 
-## 10. Implementation sequence after contract approval
+## 10. Implementation sequence and checkpoint
 
-No implementation is part of this spec commit. Once the contracts above are
-approved, work proceeds in this order:
+The approved implementation checkpoint covers the registry, shared executor,
+Eligibility, Media representative delegation, Article publication boundary,
+Admin/queue parity and staging guard. Further production/staging acceptance is
+still separately gated.
 
 1. Update canonical operation/profile/policy registries and generated contract
    snapshots.
@@ -607,7 +598,8 @@ approved, work proceeds in this order:
 - every registered relation predicate endpoint/cardinality/evidence rule;
 - changed endpoint revision invalidates Eligibility;
 - unknown predicate/type/operation returns registry gap;
-- Movement generation/type remains blocked until its contract is registered.
+- Movement generation/type uses the registered Movement Authority attributes;
+  unknown fields still fail closed.
 
 ### Admin and staging
 

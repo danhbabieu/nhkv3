@@ -267,7 +267,7 @@ final class Plugin {
             (new AdminWorkbenchReadApi($media, $videos, $claims, $authority, $sources, $evidence, $graphService, $proposalRepository, $eligibility, $assets, $usages, new EntityProfileAdminProjection()))->register();
             $authorityService = new \NHK\Core\Application\Authority\AuthorityService($authority, $types, new \NHK\Core\Infrastructure\Authority\WpdbAuditSink(new \NHK\Core\Infrastructure\Governance\WpdbAuditSink($wpdb)));
             $mediaService = new MediaService($media, $assets, $usages);
-            $mediaBindingService = new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb));
+            $mediaBindingService = $governanceRuntime->mediaBinding ?? new MediaBindingService($media, $assets, $usages, $authority, $types, new WpdbMediaBindingOperationRepository($wpdb));
             $attachmentBridge = $sharedAttachmentBridge ?? new WordPressMediaAttachmentBridge($wpdb, $mediaService, $media, $assets);
             $sharedAttachmentBridge = $attachmentBridge;
             $knowledgeService = new KnowledgeService($claims, $sources, $evidence);
@@ -514,7 +514,7 @@ final class Plugin {
             // binding). Register the existing relation boundary alongside
             // the other runtime types so Capture never fails merely because
             // its typed Governance plan is a relation.
-            $automationTypes = array_values(array_unique(array_merge(array_map(static fn ($definition): string => $definition->type, $types->all()), ['wp_post', 'media', 'video', 'knowledge', 'source', 'evidence', 'relation'])));
+            $automationTypes = \NHK\Core\Application\Governance\GovernanceAutomationTypeRegistry::all($types);
             $automationResolver = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver($automationTypes, new \NHK\Core\Infrastructure\Governance\WpOptionAutomationPolicyStorage($automationTypes));
             $publicProjectionVerifier = new \NHK\Core\Application\Governance\PublicProjectionVerifier(
                 static function (string $ownerType, string $id) use ($types, $authority, $media, $videos, $claims, $sources, $evidence): mixed {
@@ -666,6 +666,16 @@ final class Plugin {
             $categoryGateway = new CategoryGateway(new WpCategoryStore());
             $editorialPosts = new WpEditorialPostStore($articleEditorial);
             $ownerPublication = new OwnerPublicationApplicationService($editorialPosts, new WpdbOwnerPublicationDecisionRepository($wpdb), static fn (PublicationPrincipal $principal): bool => current_user_can('nhk_ingest_articles') && current_user_can('publish_posts'), null, $articleReceipts);
+            $mcpGovernance->setPublicationBoundary(static function (\NHK\Core\Domain\Governance\Proposal $proposal, array $applied) use ($ownerPublication): array {
+                $payload = $proposal->payload;
+                $postId = (int) ($payload['post_id'] ?? 0);
+                $token = trim((string) ($payload['expected_state_token'] ?? ''));
+                $evidence = is_array($payload['evidence'] ?? null) ? $payload['evidence'] : [];
+                if ($postId < 1 || $token === '') return ['frontend_available' => false, 'diagnostics' => ['ARTICLE_PUBLICATION_INPUT_INVALID']];
+                $result = $ownerPublication->request($postId, $token, $evidence, $proposal->idempotencyKey . ':article', new PublicationPrincipal('0', 'governance', $proposal->id));
+                $published = ($result['outcome'] ?? '') === 'PASS' && (($result['post']['status'] ?? '') === 'publish');
+                return ['frontend_available' => $published, 'public_url' => (string) ($result['public_url'] ?? ''), 'publication' => $result, 'canonical_readback' => $applied['canonical_readback'] ?? null];
+            });
             $draftGateway = new EditorialDraftGateway($editorialPosts, $articleReceipts, $ownerPublication);
             $semanticWritePolicy = new SemanticWritePolicyResolver();
             $documentation = new McpDocumentationRegistry(null, null, $semanticWritePolicy);

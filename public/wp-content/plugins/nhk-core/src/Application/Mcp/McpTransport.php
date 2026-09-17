@@ -192,7 +192,7 @@ final class McpTransport
             'nhk.entity.get' => $this->read->entityGet((string) ($arguments['type'] ?? ''), (string) ($arguments['id'] ?? '')),
             'nhk.media.get' => $this->read->mediaGet((string) ($arguments['id'] ?? '')),
             'nhk.media.binding.get' => $this->mediaBinding?->get((string) ($arguments['operation_id'] ?? ''), (string) ($arguments['idempotency_key'] ?? '')) ?? throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE'),
-            'nhk.media.bind' => $this->mediaBinding?->bind($arguments) ?? throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE'),
+            'nhk.media.bind' => $this->mediaBind($arguments),
             'nhk.media.ingest' => $this->mediaIngest($arguments, $files),
             'nhk.media.upload-batch' => $this->batchUpload($arguments, $files),
             'nhk.media.widget-upload' => $this->widgetUpload($arguments),
@@ -582,6 +582,37 @@ final class McpTransport
             'usages' => is_array($arguments['usages'] ?? null) ? $arguments['usages'] : [],
         ];
         return $this->ingestProposal($this->governance->createFromArguments($mediaArguments));
+    }
+
+    /** Route system-selected representative bindings through the shared Governance pipeline. */
+    private function mediaBind(array $arguments): array
+    {
+        if ($this->mediaBinding === null) throw new \RuntimeException('MEDIA_BINDING_SERVICE_UNAVAILABLE');
+        $source = strtoupper(trim((string) ($arguments['selection_source'] ?? 'USER_EXPLICIT')));
+        if ($source !== 'SYSTEM_AUTO') return $this->mediaBinding->bind($arguments);
+        $media = $this->mediaBinding->resolveMediaReference(is_array($arguments['media'] ?? null) ? $arguments['media'] : []);
+        $targetReference = is_array($arguments['target'] ?? null) ? $arguments['target'] : [];
+        $target = $this->mediaBinding->resolveTargetReference($targetReference);
+        $binding = $arguments;
+        $binding['selection_source'] = 'SYSTEM_AUTO';
+        $binding['selection_policy'] = 'AUTO';
+        $binding['media'] = ['id' => $media->canonicalId];
+        $binding['target'] = ['type' => $target->entityType, 'id' => $target->canonicalId];
+        $proposal = $this->governance->createFromArguments([
+            'operation' => 'representative_bind',
+            'entity_type' => 'media',
+            'subject_id' => $media->canonicalId,
+            'target_uuid' => $target->canonicalId,
+            'expected_revision' => $media->revision,
+            'idempotency_key' => (string) ($arguments['idempotency_key'] ?? ''),
+            'payload' => [
+                'binding' => $binding,
+                'media_revision' => $media->revision,
+                'target_revision' => $target->revision,
+                'target_uuid' => $target->canonicalId,
+            ],
+        ]);
+        return $this->ingestProposal($proposal);
     }
 
     /** @return array<string,mixed> */

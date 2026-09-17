@@ -5,6 +5,7 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use JsonException;
 use NHK\Core\Application\Governance\ControlledApplyOperationRegistry;
+use NHK\Core\Application\Governance\GovernanceAutomationTypeRegistry;
 use NHK\Core\Contracts\Governance\GovernanceQueueQuery;
 use NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog;
 use NHK\Core\Domain\Governance\ProposalState;
@@ -34,8 +35,9 @@ final class WpdbGovernanceQueueQuery implements GovernanceQueueQuery
 
     public static function isAllowedType(string $value): bool
     {
-        $authorityTypes = array_map(static fn ($definition): string => $definition->type, CanonicalEntityTypeCatalog::definitions());
-        return in_array($value, array_merge($authorityTypes, ['knowledge', 'source', 'evidence', 'media', 'video', 'wp_post', 'relation']), true);
+        $types = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
+        CanonicalEntityTypeCatalog::registerInto($types);
+        return in_array($value, GovernanceAutomationTypeRegistry::all($types), true);
     }
 
     /** @return array<string,mixed> */

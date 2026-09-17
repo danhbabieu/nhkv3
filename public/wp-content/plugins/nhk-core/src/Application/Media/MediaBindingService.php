@@ -109,6 +109,12 @@ final class MediaBindingService
         return $this->resolveMedia($reference);
     }
 
+    /** Resolve an exact Authority target for governed staging/eligibility preflight. */
+    public function resolveTargetReference(array $reference): \NHK\Core\Domain\Authority\AuthorityEntity
+    {
+        return $this->resolveTarget($reference);
+    }
+
     /**
      * Bind one Media to the highest-scoring eligible target from a bounded,
      * caller-supplied neighborhood. This method never traverses Graph and

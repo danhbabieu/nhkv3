@@ -32,6 +32,12 @@ final class ProposalEligibilityService
         // do not send it through the generic canonical-target check before
         // the relation-specific revision checks below.
         if ($proposal->operation !== 'relation_create' && !$isCreation && $proposal->subjectId !== '' && !$this->reader->targetExists($proposal->targetUuid ?: $proposal->subjectId)) $reasons[] = 'TARGET_NOT_FOUND';
+        if ($proposal->entityType === 'media' && $proposal->operation === 'representative_bind') {
+            $mediaRevision = (int) ($proposal->payload['media_revision'] ?? $proposal->expectedRevision ?? 0);
+            $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);
+            if ($mediaRevision < 1 || $this->reader->targetRevision($proposal->subjectId) !== $mediaRevision) $reasons[] = 'MEDIA_REVISION_CHANGED';
+            if ($proposal->targetUuid === null || $targetRevision < 1 || $this->reader->targetRevision($proposal->targetUuid) !== $targetRevision) $reasons[] = 'TARGET_REVISION_CHANGED';
+        }
         if ($proposal->operation === 'merge') {
             $sourceRevision = (int) ($proposal->payload['source_revision'] ?? $proposal->expectedRevision);
             $targetRevision = (int) ($proposal->payload['target_revision'] ?? 0);

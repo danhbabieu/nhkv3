@@ -5,7 +5,7 @@ namespace NHK\Core\Domain\Authority;
 
 final class CanonicalEntityTypeCatalog
 {
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
     /** @return list<EntityTypeDefinition> */
     public static function definitions(): array
     {
@@ -13,7 +13,7 @@ final class CanonicalEntityTypeCatalog
             new EntityTypeDefinition('brand', 1, true, ['aliases', 'description', 'country', 'founded_year'], [], ['aliases' => 'array', 'description' => 'string', 'country' => 'string', 'founded_year' => 'int']),
             new EntityTypeDefinition('model', 1, true, ['brand_uuid', 'aliases', 'description', 'launch_year'], [], ['brand_uuid' => 'string', 'aliases' => 'array', 'description' => 'string', 'launch_year' => 'int'], ['brand_uuid' => 'uuid']),
             new EntityTypeDefinition('variant', 1, true, ['model_uuid', 'aliases', 'description', 'reference'], [], ['model_uuid' => 'string', 'aliases' => 'array', 'description' => 'string', 'reference' => 'string'], ['model_uuid' => 'uuid']),
-            new EntityTypeDefinition('movement', 1, true, ['manufacturer', 'caliber', 'description', 'frequency_hz', 'jewels'], [], ['manufacturer' => 'string', 'caliber' => 'string', 'description' => 'string', 'frequency_hz' => 'float', 'jewels' => 'int']),
+            new EntityTypeDefinition('movement', 2, true, ['manufacturer', 'caliber', 'description', 'frequency_hz', 'jewels', 'generation', 'movement_type'], [], ['manufacturer' => 'string', 'caliber' => 'string', 'description' => 'string', 'frequency_hz' => 'float', 'jewels' => 'int', 'generation' => 'string', 'movement_type' => 'string']),
             new EntityTypeDefinition('music', 1, true, ['artist', 'album', 'description', 'release_year'], [], ['artist' => 'string', 'album' => 'string', 'description' => 'string', 'release_year' => 'int']),
             new EntityTypeDefinition('component', 1, true, ['kind', 'manufacturer', 'description'], [], ['kind' => 'string', 'manufacturer' => 'string', 'description' => 'string']),
             new EntityTypeDefinition('classification', 1, true, ['family', 'description'], [], ['family' => 'string', 'description' => 'string']),

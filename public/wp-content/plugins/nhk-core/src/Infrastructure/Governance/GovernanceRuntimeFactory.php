@@ -5,10 +5,10 @@ namespace NHK\Core\Infrastructure\Governance;
 
 use NHK\Core\Application\Authority\{AuthorityService, SemanticMergeService};
 use NHK\Core\Application\Collector\CollectorFacetMaintenanceExecutor;
-use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceService, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
+use NHK\Core\Application\Governance\{AuthorityProposalExecutor, CanonicalApplyReadBackVerifier, ControlledApplyService, GovernanceAutomationPolicyResolver, GovernanceAutomationTypeRegistry, GovernanceService, OperationScopedStagingGuard, ProposalEligibilityService, VideoProposalEligibilityEvaluator, WordPressGovernanceAuthorizer};
 use NHK\Core\Application\Graph\{ClassifiedAsPolicy, ClassificationHierarchyPolicy, GraphService};
 use NHK\Core\Application\Knowledge\{CanonicalDependencyValidator, KnowledgeService};
-use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
+use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoService};
 use NHK\Core\Application\Semantic\{CanonicalAuthoritySubjectResolver, SubjectResolutionService};
 use NHK\Core\Contracts\Governance\ProposalRepository;
@@ -104,19 +104,26 @@ final class GovernanceRuntimeFactory
             return ['status' => 'available', 'claims' => array_values($items), 'classification_revision' => $classification->revision];
         };
         $collectorExecutor = new CollectorFacetMaintenanceExecutor($knowledgeService, $collectorBranchReader);
+        $mediaBinding = new MediaBindingService($media, $assets, $usages, $authority, $types, new \NHK\Core\Infrastructure\Media\WpdbMediaBindingOperationRepository($wpdb));
+        $stagingGuard = new OperationScopedStagingGuard(
+            static function (): string { return defined('WP_ENVIRONMENT_TYPE') ? strtolower((string) constant('WP_ENVIRONMENT_TYPE')) : (function_exists('wp_get_environment_type') ? strtolower((string) wp_get_environment_type()) : strtolower((string) (getenv('WP_ENVIRONMENT_TYPE') ?: 'unknown'))); },
+            static fn (string $capability): bool => function_exists('current_user_can') && current_user_can($capability),
+        );
         $controlledApply = new ControlledApplyService(
             $proposalRepository,
             $applyAttempts = new WpdbApplyAttemptRepository($wpdb),
             $transactionManager,
-            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy),
+            new AuthorityProposalExecutor($authorityService, $graphService, $mediaService, new VideoService($videos), $knowledgeService, new MediaIngestGateway($mediaService, $attachmentBridge), $merge, dependencies: $dependencyValidator, completeness: new VideoCompletenessPolicy(), relationProposals: $proposalRepository, historicalEvidence: $historicalEvidence, collectorFacetExecutor: $collectorExecutor, videoCompletenessReconciliation: $videoCompleteness, classifiedAs: $classifiedAsPolicy, mediaBinding: $mediaBinding),
             $governanceAudit,
             $eligibility,
             new NoOpApplyExecutionHook(),
             new WordPressGovernanceAuthorizer(),
             $canonicalReadBack,
+            $stagingGuard,
         );
 
-        $reconciliationPolicies = new \NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver(['video'], new WpOptionAutomationPolicyStorage(['video']));
+        $automationTypes = GovernanceAutomationTypeRegistry::all($types);
+        $reconciliationPolicies = new GovernanceAutomationPolicyResolver($automationTypes, new WpOptionAutomationPolicyStorage($automationTypes));
         $publicIdentityRepository = new WpdbPublicIdentityRepository($wpdb);
         $publicIdentityService = new PublicIdentityService($publicIdentityRepository, static fn (string $slug): bool => false);
         $videoReconciliation = new \NHK\Core\Application\Video\VideoProposalReconciliationService(
@@ -140,6 +147,6 @@ final class GovernanceRuntimeFactory
             static function (string $proposalId) use ($applyAttempts): bool { return $applyAttempts->findSuccessful($proposalId) !== null; },
         );
 
-        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation);
+        return new GovernanceRuntime($proposalRepository, $governance, $eligibility, $controlledApply, $videoReconciliation, $automationTypes, $mediaBinding);
     }
 }

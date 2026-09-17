@@ -12176,3 +12176,37 @@ VERIFICATION: Spec self-review, repository status inspection and
 was run. Existing unrelated Capture worktree changes were preserved.
 
 STATUS: `GOVERNED_CONTENT_AUTOMATION_EXPANSION_SPEC_LOCAL_READY`.
+
+# Checkpoint — 2026-09-17 — Governed content automation expansion implementation (LOCAL ONLY)
+
+SCOPE: Implemented the approved expansion on the existing Governance path.
+Movement remains Authority with registered optional `generation` and
+`movement_type` fields (catalog 1.1.0 / Movement schema 2); no parallel owner,
+approval system, queue or predicate was introduced. Added the canonical
+`media:representative_bind` operation for SYSTEM_AUTO/AUTO selection, with
+AuthorityProposalExecutor delegating to MediaBindingService and preserving its
+MediaBindingOperation receipt plus final MediaUsage read-back. USER_EXPLICIT/
+PINNED remains the existing immediate placement boundary.
+
+PIPELINE: GovernanceAutomationTypeRegistry now supplies Plugin, runtime
+factory, Admin settings and queue filtering. ControlledApplyOperationRegistry,
+ProposalSubjectBindingValidator and ProposalEligibilityService carry the
+representative operation and Media/target revision checks. OperationScoped-
+StagingGuard is attached to ControlledApplyService and authorizes by operation
+and capability with bounded payload/dependency checks; it contains no semantic
+object-ID whitelist.
+
+PUBLICATION: Semantic wp_post AUTO_PUBLISH requires the injected publication
+boundary and calls OwnerPublicationApplicationService::request, which invokes
+ArticlePublicationGate before native publication. Missing or blocked boundary
+returns an honest blocker. Relations remain Graph-owned and Admin review remains
+the existing Proposal queue.
+
+VERIFICATION: Changed-file PHP lint and `git diff --check` pass. Focused
+Governance/Authority/Media/Article/MCP/Admin and Cúc cu/400-day/Public Clock
+regression selection passed — 96 tests / 851 assertions. Full Unit ran 1,767
+tests and has one existing unrelated DemoCutoverCliContractTest failure
+(remote deployment diagnostic mismatch); no integration/runtime acceptance,
+deployment, push or live/staging mutation was performed.
+
+STATUS: `GOVERNED_CONTENT_AUTOMATION_EXPANSION_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

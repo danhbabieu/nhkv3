@@ -8,7 +8,7 @@ use NHK\Core\Application\Authority\SemanticMergeService;
 use NHK\Core\Application\Authority\SemanticRekeyMediaIsolation;
 use NHK\Core\Application\Graph\GraphService;
 use NHK\Core\Application\Graph\ClassifiedAsPolicy;
-use NHK\Core\Application\Media\{MediaIngestGateway, MediaService};
+use NHK\Core\Application\Media\{MediaBindingService, MediaIngestGateway, MediaService};
 use NHK\Core\Application\Video\{HistoricalVideoRelationEvidenceReconciliation, VideoCompletenessPolicy, VideoCompletenessReconciliationService, VideoService};
 use NHK\Core\Application\Knowledge\KnowledgeService;
 use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
@@ -23,9 +23,9 @@ use NHK\Core\Domain\Knowledge\{Evidence, KnowledgeClaim, Source};
 
 final class AuthorityProposalExecutor
 {
-    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null) {}
+    public function __construct(private AuthorityService $authority, private ?GraphService $graph = null, private ?MediaService $media = null, private ?VideoService $video = null, private ?KnowledgeService $knowledge = null, private ?MediaIngestGateway $mediaGateway = null, private ?SemanticMergeService $merge = null, private ?OperationCompatibility $operationCompatibility = null, private ?CanonicalDependencyValidator $dependencies = null, private ?VideoCompletenessPolicy $completeness = null, private ?ApprovedRelationProposalRepository $relationProposals = null, private ?HistoricalVideoRelationEvidenceReconciliation $historicalEvidence = null, private $collectorFacetExecutor = null, private ?VideoCompletenessReconciliationService $videoCompletenessReconciliation = null, private ?ClassifiedAsPolicy $classifiedAs = null, private ?MediaBindingService $mediaBinding = null) {}
 
-    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|\NHK\Core\Domain\Authority\SemanticMergeReceipt
+    public function __invoke(Proposal $proposal): AuthorityEntity|GraphEdge|Media|Video|KnowledgeClaim|Source|Evidence|MediaRepresentativeApplyResult|\NHK\Core\Domain\Authority\SemanticMergeReceipt
     {
         $compatibility = $this->operationCompatibility ?? new ControlledApplyOperationRegistry();
         if (!$compatibility->supports($proposal->entityType, $proposal->operation)) throw new OperationCompatibilityException('REGISTRY_GAP', 'Unsupported Controlled Apply combination: ' . $proposal->entityType . '+' . $proposal->operation);
@@ -48,6 +48,17 @@ final class AuthorityProposalExecutor
                 is_array($payload['assets'] ?? null) ? $payload['assets'] : [],
                 is_array($payload['usages'] ?? null) ? $payload['usages'] : [],
             );
+        }
+        if ($proposal->entityType === 'media' && $proposal->operation === 'representative_bind') {
+            if ($this->mediaBinding === null) throw new \RuntimeException('Media binding executor is not configured.');
+            $request = is_array($proposal->payload['binding'] ?? null) ? $proposal->payload['binding'] : $proposal->payload;
+            $binding = $this->mediaBinding->bind($request);
+            $usage = is_array($binding['usage'] ?? null) ? $binding['usage'] : [];
+            $mediaId = trim((string) ($binding['media_id'] ?? $usage['media_id'] ?? ($request['media']['id'] ?? '')));
+            $usageId = trim((string) ($usage['id'] ?? $binding['usage_id'] ?? $binding['resulting_usage_id'] ?? ''));
+            $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
+            if ($mediaId === '' || $usageId === '' || $readback === []) throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_FAILED');
+            return new MediaRepresentativeApplyResult($mediaId, $usageId, $binding, $readback);
         }
         if ($proposal->entityType === 'video' && $proposal->operation === 'ingest') {
             if (!$this->video) throw new \RuntimeException('Video executor is not configured.');

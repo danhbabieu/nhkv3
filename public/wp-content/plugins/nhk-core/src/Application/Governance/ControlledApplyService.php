@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace NHK\Core\Application\Governance;
 
-use NHK\Core\Contracts\Governance\{ApplyAttemptRepository,ApplyExecutionHook,GovernanceAuditSink,GovernanceAuthorizer,ProposalRepository};
+use NHK\Core\Contracts\Governance\{ApplyAttemptRepository,ApplyExecutionHook,GovernanceAuditSink,GovernanceAuthorizer,ProposalRepository,StagingGuard};
 use NHK\Core\Contracts\Shared\TransactionManager;
 use NHK\Core\Domain\Governance\{ApplyAttempt,ProposalState,ProposalSubjectBindingValidator};
 use NHK\Core\Governance\Exception\{InvalidProposalTransition,ProposalNotFound};
@@ -12,7 +12,7 @@ use NHK\Core\Contracts\Article\ArticleApplyService;
 /** Transaction owner for governed authority mutations. The executor must use the same wpdb connection. */
 final class ControlledApplyService implements ArticleApplyService
 {
-    public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null, private ?GovernanceAuthorizer $authorizer=null, private ?CanonicalApplyReadBackVerifier $readBack=null) {}
+    public function __construct(private ProposalRepository $proposals, private ApplyAttemptRepository $attempts, private TransactionManager $transactions, private $executor, private ?GovernanceAuditSink $audit=null, private ?ProposalEligibilityService $eligibility=null, private ?ApplyExecutionHook $hook=null, private ?GovernanceAuthorizer $authorizer=null, private ?CanonicalApplyReadBackVerifier $readBack=null, private ?StagingGuard $stagingGuard=null) {}
 
     /** @return array{proposal_id:string,attempt_no:int,result_entity_uuid:?string,canonical_id:?string,canonical_readback:?array,idempotent:bool} */
     public function apply(string $proposalId): array
@@ -25,6 +25,7 @@ final class ControlledApplyService implements ArticleApplyService
                 if($proposal->state===ProposalState::APPLIED){$success=$this->attempts->findSuccessful($proposalId); $resultId=$success?->resultEntityUuid; $readBack=$this->readBack?->verify($proposal, (string) $resultId); return ['proposal_id'=>$proposalId,'attempt_no'=>$success?->number??0,'result_entity_uuid'=>$resultId,'canonical_id'=>$resultId,'canonical_readback'=>$readBack,'idempotent'=>true];}
                 if($proposal->state!==ProposalState::APPROVED)throw new InvalidProposalTransition('Only approved proposals can be applied.');
                 ProposalSubjectBindingValidator::assertValid($proposal);
+                $this->stagingGuard?->assertAllowed($proposal);
                 if($this->eligibility && !($this->eligibility->check($proposalId))->ready)throw new InvalidProposalTransition('Proposal is not eligible for apply.');
                 $attempt=new ApplyAttempt(UuidCodec::newV7(),$proposalId,$this->attempts->nextAttemptNumberLocked($proposalId),'running',null,null,null,$started);
             $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted(); $this->auditEvent('ApplyStarted',$proposalId,$proposal->actor!==null?(int)$proposal->actor:null,$this->auditContext($proposal,['attempt_no'=>$attempt->number]));
@@ -91,6 +92,7 @@ final class ControlledApplyService implements ArticleApplyService
         }
         if ($proposal->state !== ProposalState::APPROVED) throw new InvalidProposalTransition('Only approved proposals can be applied.');
         ProposalSubjectBindingValidator::assertValid($proposal);
+        $this->stagingGuard?->assertAllowed($proposal);
         if ($this->eligibility && !($this->eligibility->check($proposalId))->ready) throw new InvalidProposalTransition('Proposal is not eligible for apply.');
         $attempt = new ApplyAttempt(UuidCodec::newV7(), $proposalId, $this->attempts->nextAttemptNumberLocked($proposalId), 'running', null, null, null, $started);
         $this->attempts->createRunning($attempt); $this->hook?->afterAttemptStarted();

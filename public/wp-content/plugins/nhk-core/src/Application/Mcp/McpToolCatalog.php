@@ -152,7 +152,7 @@ final class McpToolCatalog
             self::tool('nhk.entity.get', 'Read one active Authority entity by type and UUID.', ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField()], ['type', 'id']),
             self::tool('nhk.media.get', 'Read one active Media identity and its public assets.', ['id' => self::uuidField()], ['id']),
             self::tool('nhk.media.binding.get', 'Read one durable Media binding operation receipt by operation_id or idempotency_key.', ['operation_id' => self::uuidField(), 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191]], []),
-            self::tool('nhk.media.bind', 'Bind an existing canonical Media to one exact Authority Entity as a contextual representative usage with durable idempotency and final read-back.', [
+            self::tool('nhk.media.bind', 'Bind an existing canonical Media to one exact Authority Entity as a contextual representative usage with durable idempotency and final read-back. USER_EXPLICIT/PINNED uses the placement boundary; SYSTEM_AUTO/AUTO is wrapped in the shared Governance representative_bind Proposal flow.', [
                 'idempotency_key' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 191],
                 'media' => ['type' => 'object', 'properties' => ['id' => self::uuidField(), 'stable_key' => ['type' => 'string'], 'attachment_id' => ['type' => 'integer', 'minimum' => 1], 'url' => ['type' => 'string', 'format' => 'uri']], 'additionalProperties' => false],
                 'target' => ['type' => 'object', 'properties' => ['type' => ['type' => 'string', 'minLength' => 1], 'id' => self::uuidField(), 'stable_key' => ['type' => 'string']], 'required' => ['type'], 'additionalProperties' => false],

@@ -19,6 +19,7 @@ use NHK\Core\Contracts\Governance\GovernedLifecycle;
 final class McpGovernanceHandler implements GovernedLifecycle
 {
     private ?GovernedSemanticIngestOrchestrator $ingestOrchestrator = null;
+    private $publicationBoundary = null;
 
     public function __construct(
         private GovernanceService $governance,
@@ -28,6 +29,13 @@ final class McpGovernanceHandler implements GovernedLifecycle
         private ?EndpointTypeRegistry $endpoints = null,
         private $projectionVerifier = null,
     ) {}
+
+    /** Set the only Article publication boundary used by AUTO_PUBLISH. */
+    public function setPublicationBoundary(callable $boundary): void
+    {
+        $this->publicationBoundary = $boundary;
+        $this->ingestOrchestrator = null;
+    }
 
     /** @return array<string,mixed> */
     public function ingestFromArguments(array $arguments): array
@@ -39,6 +47,9 @@ final class McpGovernanceHandler implements GovernedLifecycle
             fn (string $id): array => $this->apply($id),
             $this->policyResolver,
             $this->projectionVerifier,
+            null,
+            null,
+            $this->publicationBoundary,
         );
         return $this->ingestOrchestrator->run([$arguments])[0];
     }
@@ -75,9 +86,16 @@ final class McpGovernanceHandler implements GovernedLifecycle
         $entityType = (string) ($arguments['entity_type'] ?? '');
         $subjectId = (string) ($arguments['subject_id'] ?? '');
         $payload = is_array($arguments['payload'] ?? null) ? $arguments['payload'] : [];
+        $targetUuid = isset($arguments['target_uuid']) ? trim((string) $arguments['target_uuid']) : null;
+        $targetUuid = $targetUuid !== '' ? $targetUuid : null;
         if ($operation === 'relation_create') {
             if ($this->endpoints === null) throw new \RuntimeException('Relation endpoint revision resolver is unavailable.');
             $payload = (new RelationRevisionBinder($this->endpoints))->bind($payload);
+        }
+        if ($operation === 'representative_bind' && $entityType === 'media') {
+            $binding = is_array($payload['binding'] ?? null) ? $payload['binding'] : [];
+            if ($subjectId === '') $subjectId = trim((string) ($payload['media_id'] ?? ($binding['media']['id'] ?? '')));
+            if ($targetUuid === null) $targetUuid = trim((string) ($payload['target_uuid'] ?? ($binding['target']['id'] ?? ''))) ?: null;
         }
         if ($operation === 'relation_create' && trim((string) ($payload['source_uuid'] ?? '')) !== '') {
             $subjectId = trim((string) $payload['source_uuid']);
@@ -88,12 +106,13 @@ final class McpGovernanceHandler implements GovernedLifecycle
         } elseif ($subjectId === '' && $operation === 'relation_create') {
             $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
         }
-        $targetUuid = isset($arguments['target_uuid']) ? trim((string) $arguments['target_uuid']) : null;
-        $targetUuid = $targetUuid !== '' ? $targetUuid : null;
         if ($subjectId === '' && $entityType === 'video' && $targetUuid !== null) $subjectId = $targetUuid;
         $expectedRevision = $operation === 'relation_create' ? null : (array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null
             ? max(1, (int) $arguments['expected_revision'])
-            : (in_array($operation, ['create', 'ingest'], true) && $targetUuid === null ? null : 1));
+            : ($operation === 'representative_bind'
+                ? max(1, (int) ($payload['media_revision'] ?? 1))
+                : (in_array($operation, ['create', 'ingest'], true) && $targetUuid === null ? null : 1)));
+        if ($operation === 'representative_bind' && ($subjectId === '' || $targetUuid === null)) throw new \InvalidArgumentException('MEDIA_REPRESENTATIVE_BINDING_IDENTITY_REQUIRED');
         $dependencyIds = is_array($arguments['dependency_ids'] ?? null) ? array_values(array_filter(array_map('strval', $arguments['dependency_ids']))) : [];
         $binding = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'target_uuid' => $targetUuid, 'expected_revision' => $expectedRevision, 'payload' => $payload, 'dependency_ids' => $dependencyIds];
         $contentFingerprint = trim((string) ($arguments['content_fingerprint'] ?? '')) ?: hash('sha256', CommandCanonicalizer::canonicalize($binding));

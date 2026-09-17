@@ -22,6 +22,7 @@ final class GovernedSemanticIngestOrchestrator
         private $projection = null,
         private ?GovernanceAuditSink $audit = null,
         ?CompletionCoordinator $completion = null,
+        private $articlePublication = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param list<array<string,mixed>> $nodes @return list<array<string,mixed>> */
@@ -84,6 +85,25 @@ final class GovernedSemanticIngestOrchestrator
             }
             $this->audit?->recordEvent('GovernanceAutomationApplied', 'proposal', $approved->id, 0, ['actor_kind' => 'system', 'mode' => $mode?->value ?? 'legacy']);
             if ($mode === AutomationMode::AUTO_PUBLISH) {
+                if ($this->currentOwnerType === 'wp_post') {
+                    if (!is_callable($this->articlePublication)) {
+                        $results[] = $this->blocked($approved->id, $mode, 'article_publication', ['ARTICLE_PUBLICATION_BOUNDARY_UNAVAILABLE'], 'applied', $applied);
+                        continue;
+                    }
+                    try {
+                        $frontend = ($this->articlePublication)($approved, $applied);
+                    } catch (\Throwable $error) {
+                        $results[] = $this->blocked($approved->id, $mode, 'article_publication', [$error->getMessage()], 'applied', $applied);
+                        continue;
+                    }
+                    if (!is_array($frontend) || ($frontend['frontend_available'] ?? false) !== true) {
+                        $results[] = $this->blocked($approved->id, $mode, 'article_publication', ['ARTICLE_PUBLICATION_GATE_BLOCKED'], 'applied', $applied, is_array($frontend) ? $frontend : []);
+                        continue;
+                    }
+                    $this->audit?->recordEvent('GovernanceAutomationPublished', 'proposal', $approved->id, 0, ['actor_kind' => 'system', 'mode' => $mode->value, 'publication_boundary' => 'OwnerPublicationApplicationService+ArticlePublicationGate']);
+                    $results[] = $this->result($approved->id, $mode, 'published', 'article_publication', 'applied', $applied, $frontend);
+                    continue;
+                }
                 if ($this->projection === null) {
                     $results[] = $this->blocked($approved->id, $mode, 'projection', ['PROJECTION_VERIFIER_UNAVAILABLE'], 'applied', $applied);
                     continue;

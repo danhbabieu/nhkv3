@@ -180,7 +180,7 @@ final class AdminWorkbenchPage
     {
         $registry = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
         \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($registry);
-        $labels = ['wp_post' => 'Bài viết / Content', 'media' => 'Hình ảnh / Media', 'video' => 'Video', 'knowledge' => 'Tri thức / Knowledge', 'source' => 'Nguồn / Source', 'evidence' => 'Evidence'];
+        $labels = ['wp_post' => 'Bài viết / Content', 'media' => 'Hình ảnh / Media', 'video' => 'Video', 'knowledge' => 'Tri thức / Knowledge', 'source' => 'Nguồn / Source', 'evidence' => 'Evidence', 'relation' => 'Quan hệ / Relationship'];
         $types = [];
         foreach ($registry->all() as $definition) $types[$definition->type] = ['label' => $labels[$definition->type] ?? $definition->type, 'description' => 'Dữ liệu canonical được xử lý qua Governance.'];
         foreach ($labels as $type => $label) if (!isset($types[$type])) $types[$type] = ['label' => $label, 'description' => 'Dữ liệu được tiếp nhận qua boundary hiện hành.'];
