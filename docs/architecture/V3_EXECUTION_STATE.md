@@ -12273,6 +12273,42 @@ operator-gated.
 
 STATUS: `LOCAL_RUNTIME_VERIFIED / INTEGRATION_PREEXISTING_BLOCKERS / LIVE_ACCEPTANCE_NOT_RUN`.
 
+# Checkpoint — 2026-09-17 — Video UPDATE canonical revision propagation (LOCAL ONLY)
+
+SCOPE: Repaired the local Video UPDATE proposal producer path for the W64
+correction regression. No SSH, staging/live semantic mutation, direct database
+write, deployment or push was performed. Existing unrelated working-tree
+changes were preserved.
+
+ROOT_CAUSE: `VideoEditorialResumePlanner` correctly read canonical Video
+revision 5, but its idempotency identity did not include the canonical
+revision. A persisted proposal for the same editorial fingerprint could
+therefore be reused after it had captured expected revision 1. That stale
+proposal reached Governance review and correctly failed CAS eligibility as
+`TARGET_REVISION_CHANGED`.
+
+FIX: Video UPDATE resume proposal idempotency keys now include the canonical
+revision, so a proposal bound to revision 1 cannot be reused for a fresh
+revision-5 canonical read. The MCP Governance handler also rejects a missing
+or non-positive expected revision for UPDATE before proposal creation. CREATE/
+ingest defaults and Governance CAS behavior remain unchanged.
+
+REGRESSION: The Capture call-site test proves canonical revision 5 → resume
+candidate 5 → created/persisted proposal 5 → Apply/read-back revision 6, with
+the same Video UUID. Planner coverage fails closed before proposal creation
+when canonical Video read-back is unavailable. Governance coverage proves
+explicit revision persistence and rejects missing UPDATE revision.
+
+VERIFICATION: Focused Video/Capture/Governance/SEO/retry regression selection
+passes 181 tests / 744 assertions. Full Unit + Contract reaches 1,777 tests /
+8,792 assertions with two pre-existing CollectorProfile contract errors and
+one pre-existing DemoCutover diagnostic mismatch. Integration remains
+environment-blocked by the local WordPress bootstrap/`NHK_WP_TEST_PATH` guard.
+`composer lint` exits 0; `git diff --check` exits 0; changed-diff secret scan
+has no matches.
+
+STATUS: `VIDEO_UPDATE_REVISION_PROPAGATION_LOCAL_READY / INTEGRATION_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
+
 # Checkpoint — 2026-09-17 — Video resume CAS revision propagation (LOCAL ONLY)
 
 SCOPE: Repaired the existing Capture Video resume path so a governed Video

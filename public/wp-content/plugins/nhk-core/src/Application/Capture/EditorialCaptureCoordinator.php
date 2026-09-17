@@ -6,6 +6,7 @@ namespace NHK\Core\Application\Capture;
 use NHK\Core\Application\Completion\CompletionCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
+use NHK\Core\Contracts\Media\MediaBindingPort;
 use NHK\Core\Domain\Capture\{CaptureRecord, CaptureStage};
 use NHK\Core\Domain\Capture\CapturePurpose;
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -48,7 +49,7 @@ final class EditorialCaptureCoordinator
         private ?ContentIntentRouter $contentIntentRouter = null,
         private ?\NHK\Core\Application\Media\VisualOpportunityDetector $visualOpportunityDetector = null,
         private ?\NHK\Core\Application\Media\VisualSupportRequirementService $visualSupportRequirements = null,
-        private ?\NHK\Core\Application\Media\MediaBindingService $mediaBindingService = null,
+        private ?MediaBindingPort $mediaBindingService = null,
     ) { $this->completion = $completion ?? new CompletionCoordinator(); }
 
     /** @param array<string,mixed> $input */
@@ -586,9 +587,23 @@ final class EditorialCaptureCoordinator
         $this->beginPhase('MEDIA_RECONCILED');
         $record = $this->startReceipt($record, $assets, $diagnostics, $receipts, 'MEDIA_RECONCILED');
         $media = $this->mediaBindingService?->bindMany((array) ($input['media_bindings'] ?? []), $record->captureId . ':media-binding', $assets) ?? ['status' => 'PARTIAL', 'bindings' => [], 'media_ids' => []];
-        $diagnostics = $record->diagnostics + ['media_enrichment' => $this->withoutBody($media)];
+        $this->assertTypedMediaBindingReceipt($media);
+        $diagnostics = array_replace($record->diagnostics, ['media_enrichment' => $this->withoutBody($media)]);
         $record = $this->save($record, 'MEDIA_RECONCILED', $assets, $diagnostics, $record->phaseReceipts, 'MEDIA_RECONCILED', null, null, ($media['status'] ?? '') === 'COMPLETE' ? 'COMPLETED' : 'PARTIAL');
         return $this->finishNonArticleIntent($record, $record->assets, $record->diagnostics, $record->phaseReceipts, $intent, $retrieved, $writes, ['status' => 'not_requested', 'items' => [], 'blockers' => []], [], $media);
+    }
+
+    /** @param array<string,mixed> $media */
+    private function assertTypedMediaBindingReceipt(array $media): void
+    {
+        if (strtoupper(trim((string) ($media['status'] ?? ''))) !== 'COMPLETE') throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_REQUIRED');
+        $bindings = $media['bindings'] ?? null;
+        if (!is_array($bindings) || $bindings === []) throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_REQUIRED');
+        foreach ($bindings as $binding) {
+            if (!is_array($binding) || strtoupper(trim((string) ($binding['status'] ?? ''))) !== 'COMPLETE') throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_REQUIRED');
+            $readback = $binding['readback'] ?? null;
+            if (!is_array($readback) || strtolower(trim((string) ($readback['status'] ?? ''))) !== 'verified' || trim((string) ($readback['media_id'] ?? '')) === '' || trim((string) ($readback['usage_id'] ?? '')) === '') throw new \RuntimeException('MEDIA_BINDING_FINAL_READBACK_REQUIRED');
+        }
     }
 
     private function hasStage(CaptureRecord $record, CaptureStage $stage): bool
@@ -926,8 +941,9 @@ final class EditorialCaptureCoordinator
         $mediaIds = array_values(array_unique(array_filter(array_map('strval', (array) ($media['media_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
         $singleMediaId = trim((string) ($media['media_id'] ?? $media['canonical_id'] ?? ''));
         if ($singleMediaId !== '') $mediaIds[] = $singleMediaId;
+        $mediaComplete = in_array(strtoupper(trim((string) ($media['status'] ?? ''))), ['COMPLETE', 'RECONCILED'], true);
         foreach (array_values(array_unique($mediaIds)) as $mediaId) {
-            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => ($media['status'] ?? '') === 'RECONCILED' ? ['id' => $mediaId] : null, 'relation_or_usage_state' => ($media['status'] ?? '') === 'RECONCILED' ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && ($media['status'] ?? '') === 'RECONCILED'), 'frontend_verified' => ($media['frontend_verified'] ?? null), 'blockers' => (array) ($media['blockers'] ?? [])];
+            $children[] = ['owner_type' => 'media', 'owner_id' => $mediaId, 'canonical_readback' => $mediaComplete ? ['id' => $mediaId] : null, 'relation_or_usage_state' => $mediaComplete ? 'COMPLETE' : 'PARTIAL', 'public_eligible' => ($media['media_complete'] ?? false) === true || (($media['media_complete'] ?? null) === null && $mediaComplete), 'frontend_verified' => ($media['frontend_verified'] ?? null), 'blockers' => (array) ($media['blockers'] ?? [])];
         }
         return $children;
     }

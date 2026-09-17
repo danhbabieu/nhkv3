@@ -37,27 +37,95 @@ final class GovernanceAutomationExpansionTest extends TestCase
         self::assertNotContains('media_usage', GovernanceAutomationTypeRegistry::all($types));
     }
 
-    public function test_staging_guard_is_operation_and_capability_scoped_without_object_allowlist(): void
+    public function test_staging_guard_requires_approved_capture_scope_and_exact_binding(): void
     {
-        $proposal = new Proposal(
-            UuidCodec::newV7(),
-            UuidCodec::newV7(),
-            'representative_bind',
-            ['binding' => ['role' => 'representative'], 'media_revision' => 1, 'target_revision' => 1],
-            'content',
-            1,
-            'dependency',
-            ProposalState::APPROVED,
-            idempotencyKey: 'representative-bind',
-            targetUuid: UuidCodec::newV7(),
-            entityType: 'media',
-        );
-        $guard = new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (string $capability): bool => in_array($capability, ['nhk_apply_proposals', 'nhk_internal_content_operations'], true));
-        $guard->assertAllowed($proposal);
+        $proposal = $this->scopedMediaProposal();
+        $this->stagingGuard()->assertAllowed($proposal);
 
-        $denied = new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (string $capability): bool => $capability === 'nhk_apply_proposals');
+        $denied = new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (string $capability): bool => $capability === 'nhk_apply_proposals', scopeVerifier: static fn (array $scope, Proposal $proposal): bool => true);
         $this->expectExceptionMessage('STAGING_CAPABILITY_REQUIRED:nhk_internal_content_operations');
         $denied->assertAllowed($proposal);
+    }
+
+    public function test_staging_guard_blocks_missing_scope_wrong_media_wrong_target_and_wrong_operation(): void
+    {
+        $base = $this->scopedMediaProposal();
+        $missing = new Proposal($base->id, $base->subjectId, $base->operation, array_diff_key($base->payload, ['staging_acceptance' => true]), $base->contentFingerprint, $base->expectedRevision, $base->dependencyFingerprint, $base->state, idempotencyKey: $base->idempotencyKey, targetUuid: $base->targetUuid, entityType: $base->entityType);
+        try {
+            $this->stagingGuard()->assertAllowed($missing);
+            self::fail('Missing staging scope must be rejected.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('STAGING_SCOPE_REQUIRED', $error->getMessage());
+        }
+
+        foreach ([
+            [['media_ids' => ['01a0aefd-7e93-772c-98df-33f7abbc11e9']], 'STAGING_MEDIA_SCOPE_MISMATCH'],
+            [['target' => ['type' => 'classification', 'id' => '01a09e44-539a-7f1a-938a-d7d91bb689a4']], 'STAGING_TARGET_SCOPE_MISMATCH'],
+            [['operation_family' => 'knowledge_delta'], 'STAGING_OPERATION_SCOPE_MISMATCH'],
+            [['writer' => 'direct_writer'], 'STAGING_DIRECT_WRITER_BLOCKED'],
+            [['target' => ['type' => 'classification', 'id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3', 'name' => 'Đồng hồ công cộng']], 'STAGING_EXACT_TARGET_REQUIRED'],
+        ] as [$overrides, $message]) {
+            try {
+                $this->stagingGuard()->assertAllowed($this->scopedMediaProposal($overrides));
+                self::fail('Out-of-scope staging proposal must be rejected.');
+            } catch (\RuntimeException $error) {
+                self::assertSame($message, $error->getMessage());
+            }
+        }
+    }
+
+    public function test_staging_guard_blocks_missing_approval_and_production(): void
+    {
+        $unapproved = new OperationScopedStagingGuard(static fn (): string => 'staging', static fn (string $capability): bool => true, scopeVerifier: static fn (array $scope, Proposal $proposal): bool => false);
+        try {
+            $unapproved->assertAllowed($this->scopedMediaProposal());
+            self::fail('Unapproved staging scope must be rejected.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('STAGING_SCOPE_NOT_APPROVED', $error->getMessage());
+        }
+
+        $production = new OperationScopedStagingGuard(static fn (): string => 'production', static fn (string $capability): bool => true, scopeVerifier: static fn (array $scope, Proposal $proposal): bool => true);
+        try {
+            $production->assertAllowed($this->scopedMediaProposal());
+            self::fail('Production semantic apply must be rejected.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('STAGING_PRODUCTION_FORBIDDEN', $error->getMessage());
+        }
+    }
+
+    private function stagingGuard(): OperationScopedStagingGuard
+    {
+        return new OperationScopedStagingGuard(
+            static fn (): string => 'staging',
+            static fn (string $capability): bool => in_array($capability, ['nhk_apply_proposals', 'nhk_internal_content_operations'], true),
+            scopeVerifier: static fn (array $scope, Proposal $proposal): bool => ($scope['approved'] ?? false) === true,
+        );
+    }
+
+    private function scopedMediaProposal(array $scopeOverrides = [], array $payloadOverrides = []): Proposal
+    {
+        $mediaId = '01a0aefd-7e93-772c-98df-33f7abbc11e8';
+        $targetId = '01a09e44-539a-7f1a-938a-d7d91bb689a3';
+        $captureId = '01a0ae4c-0fe7-72b1-8222-ece526ce0faa';
+        $scope = array_replace([
+            'approved' => true,
+            'capture_id' => $captureId,
+            'operation_family' => 'media_usage_reconciliation',
+            'entity_type' => 'media',
+            'operation' => 'representative_bind',
+            'writer' => 'canonical_governed',
+            'media_ids' => [$mediaId],
+            'target' => ['type' => 'classification', 'id' => $targetId, 'stable_key' => 'nhk:classification:clock-type.dong-ho-cong-cong'],
+        ], $scopeOverrides);
+        $payload = array_replace_recursive([
+            'binding' => ['media' => ['id' => $mediaId], 'target' => ['type' => 'classification', 'id' => $targetId], 'role' => 'representative'],
+            'media_revision' => 1,
+            'target_revision' => 1,
+            'project_build_audit' => ['capture_id' => $captureId],
+            'staging_acceptance' => $scope,
+        ], $payloadOverrides);
+
+        return new Proposal(UuidCodec::newV7(), $mediaId, 'representative_bind', $payload, 'content', 1, 'dependency', ProposalState::APPROVED, idempotencyKey: 'representative-bind', targetUuid: $targetId, entityType: 'media');
     }
 
     public function test_article_auto_publish_uses_the_publication_boundary(): void

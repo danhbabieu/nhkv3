@@ -7,6 +7,7 @@ use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
+use NHK\Core\Contracts\Media\MediaBindingPort;
 use NHK\Core\Domain\Capture\CaptureRecord;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -330,6 +331,116 @@ final class ContentIntentRouterTest extends TestCase
         self::assertSame('RECONCILED', $result->diagnostics['media_enrichment']['status']);
     }
 
+    public function test_typed_media_enrichment_uses_one_binding_port_and_completes_only_after_verified_receipt(): void
+    {
+        $mediaId = '01a0aefd-7e93-772c-98df-33f7abbc11e8';
+        $binding = new CountingMediaBindingPort([
+            'status' => 'COMPLETE',
+            'media_ids' => [$mediaId],
+            'bindings' => [[
+                'status' => 'COMPLETE',
+                'media_id' => $mediaId,
+                'usage' => ['id' => UuidCodec::newV7()],
+                'readback' => ['status' => 'verified', 'media_id' => $mediaId, 'usage_id' => UuidCodec::newV7()],
+            ]],
+        ]);
+        $calls = ['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 0];
+        $coordinator = new EditorialCaptureCoordinator(
+            new IntentCaptureRepository(),
+            static fn (array $input): array => ['items' => [['kind' => 'image', 'media_id' => $mediaId, 'attachment_readback_status' => 'verified']]],
+            static function (array $input) use (&$calls): array { ++$calls['draft']; throw new \RuntimeException('ARTICLE_DRAFT_MUST_NOT_RUN'); },
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => throw new \RuntimeException('SUBJECT_RESOLUTION_MUST_NOT_RUN')),
+            new ClaimRetrievalEngine(static function (array $subject): array { throw new \RuntimeException('CLAIMS_MUST_NOT_RUN'); }, static function (array $subject, array $neighborhood): array { throw new \RuntimeException('GRAPH_MUST_NOT_RUN'); }),
+            static function (array $context): array { throw new \RuntimeException('SEMANTIC_WRITE_MUST_NOT_RUN'); },
+            new ArticleComposer(),
+            static function (array $context) use (&$calls): array { ++$calls['media']; throw new \RuntimeException('LEGACY_MEDIA_RECONCILE_MUST_NOT_RUN'); },
+            static function (array $context) use (&$calls): array { ++$calls['publication']; throw new \RuntimeException('PUBLICATION_MUST_NOT_RUN'); },
+            static function (array $context) use (&$calls): array { ++$calls['final']; self::assertSame('COMPLETE', $context['media']['status']); return ['status' => 'verified']; },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            contentIntentRouter: new ContentIntentRouter(),
+            mediaBindingService: $binding,
+        );
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'typed-media-enrichment',
+            'intent' => 'MEDIA_ENRICHMENT',
+            'text' => 'Bổ sung ảnh đại diện.',
+            'media_ids' => [$mediaId],
+            'media_bindings' => [[
+                'media_ref' => ['item_index' => 0],
+                'target' => ['type' => 'classification', 'id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3'],
+                'role' => 'representative',
+                'selection_source' => 'USER_EXPLICIT',
+                'selection_policy' => 'PINNED',
+            ]],
+        ]);
+
+        self::assertNull($result->articleId);
+        self::assertSame('COMPLETE', $result->status);
+        self::assertSame(1, $binding->calls);
+        self::assertSame(['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 1], $calls);
+        self::assertSame('not_requested', $result->diagnostics['claim_retrieval']['status']);
+        self::assertSame('SKIPPED', $result->diagnostics['semantic_write_back']['status']);
+    }
+
+    public function test_typed_media_enrichment_does_not_complete_on_unverified_binding_receipt(): void
+    {
+        $mediaId = '01a0aefd-7e93-772c-98df-33f7abbc11e8';
+        $binding = new CountingMediaBindingPort(['status' => 'COMPLETE', 'media_ids' => [$mediaId], 'bindings' => [['status' => 'COMPLETE', 'media_id' => $mediaId, 'readback' => ['status' => 'pending']]]]);
+        $coordinator = $this->typedMediaCoordinator($binding);
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'typed-media-enrichment-unverified',
+            'intent' => 'MEDIA_ENRICHMENT',
+            'text' => 'Bổ sung ảnh đại diện.',
+            'media_bindings' => [[
+                'media_ref' => ['item_index' => 0],
+                'target' => ['type' => 'classification', 'id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3'],
+                'role' => 'representative',
+                'selection_source' => 'USER_EXPLICIT',
+                'selection_policy' => 'PINNED',
+            ]],
+        ]);
+
+        self::assertNotSame('COMPLETE', $result->status);
+        self::assertSame('MEDIA_BINDING_FINAL_READBACK_REQUIRED', $result->diagnostics['failure']['code']);
+    }
+
+    private function typedMediaCoordinator(CountingMediaBindingPort $binding): EditorialCaptureCoordinator
+    {
+        return new EditorialCaptureCoordinator(
+            new IntentCaptureRepository(),
+            static fn (array $input): array => ['items' => [['kind' => 'image', 'media_id' => '01a0aefd-7e93-772c-98df-33f7abbc11e8', 'attachment_readback_status' => 'verified']]],
+            static fn (array $input): array => throw new \RuntimeException('ARTICLE_DRAFT_MUST_NOT_RUN'),
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static fn (string $hint): array => throw new \RuntimeException('SUBJECT_RESOLUTION_MUST_NOT_RUN')),
+            new ClaimRetrievalEngine(static function (array $subject): array { throw new \RuntimeException('CLAIMS_MUST_NOT_RUN'); }, static function (array $subject, array $neighborhood): array { throw new \RuntimeException('GRAPH_MUST_NOT_RUN'); }),
+            static fn (array $context): array => throw new \RuntimeException('SEMANTIC_WRITE_MUST_NOT_RUN'),
+            new ArticleComposer(),
+            static fn (array $context): array => throw new \RuntimeException('LEGACY_MEDIA_RECONCILE_MUST_NOT_RUN'),
+            static fn (array $context): array => throw new \RuntimeException('PUBLICATION_MUST_NOT_RUN'),
+            static fn (array $context): array => ['status' => 'verified'],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            contentIntentRouter: new ContentIntentRouter(),
+            mediaBindingService: $binding,
+        );
+    }
+
     public function test_video_replay_keeps_one_capture_and_does_not_create_an_article(): void
     {
         $repository = new IntentCaptureRepository();
@@ -384,4 +495,17 @@ final class IntentCaptureRepository implements CaptureRepository
     public function create(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] ??= $record; }
 
     public function save(CaptureRecord $record): CaptureRecord { return $this->records[$record->idempotencyKey] = $record; }
+}
+
+final class CountingMediaBindingPort implements MediaBindingPort
+{
+    public int $calls = 0;
+
+    public function __construct(private array $result) {}
+
+    public function bindMany(array $bindings, string $idempotencyKey, array $assets = []): array
+    {
+        ++$this->calls;
+        return $this->result;
+    }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Authority\AuthorityRepository;
-use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaBindingOperationRepository, MediaBindingPort, MediaRepository, MediaUsageRepository, MediaUsageUpdater};
 use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Media\{Media, MediaAsset, MediaBindingOperation, MediaException, MediaUsage, MediaUsageRoleRegistry, RepresentativeEligibilityRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
@@ -14,7 +14,7 @@ use NHK\Core\Shared\Uuid\UuidCodec;
  * Callers provide an exact target or an explicitly supported Media locator;
  * this service never uses NLP, Graph traversal or filename similarity as proof.
  */
-final class MediaBindingService
+final class MediaBindingService implements MediaBindingPort
 {
     public function __construct(
         private MediaRepository $media,
