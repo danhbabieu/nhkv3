@@ -36,10 +36,11 @@ final class RemoteMcpDocumentationVerifier
             $list = $this->tool($url, 'nhk.documentation.list', 4);
             $document = $this->tool($url, 'nhk.documentation.get', 5, ['path' => 'AGENTS.md', 'start_line' => 1, 'line_count' => 1]);
             $alias = $this->tool($url, 'nhk.docs.bootstrap', 6);
+            $expectedFiles = $this->filesFromExpected($expectedBootstrap);
             if (!hash_equals($expectedBuildIdentity, (string) ($bootstrap['build_identity'] ?? ''))) return StageResult::blocked('DEPLOYMENT_NOT_ACTIVE');
-            if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
-            if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'] ?? null, $expectedBootstrap['files'])) return StageResult::failed('DOC_MANIFEST_MISMATCH');
-            if (!$this->sameIdentity($alias, $expectedBootstrap) || ($document['path'] ?? null) !== 'AGENTS.md' || !$this->sameDocumentHash($document, $expectedBootstrap['files'], 'AGENTS.md')) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameIdentity($bootstrap, $expectedBootstrap) || !$this->sameFiles($this->filesFromBootstrap($bootstrap), $expectedFiles)) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameIdentity($list, $expectedBootstrap) || !$this->sameFiles($list['files'] ?? null, $expectedFiles)) return StageResult::failed('DOC_MANIFEST_MISMATCH');
+            if (!$this->sameIdentity($alias, $expectedBootstrap) || ($document['path'] ?? null) !== 'AGENTS.md' || !$this->sameDocumentHash($document, $expectedFiles, 'AGENTS.md')) return StageResult::failed('DOC_MANIFEST_MISMATCH');
             if (!$this->sameReleaseIdentity($bootstrap, $expectedBootstrap)) return StageResult::failed('RELEASE_TUPLE_MISMATCH');
             if (!$this->callableProbe($url)) return StageResult::failed('MCP_CAPABILITY_PARITY_MISMATCH');
         } catch (\Throwable) {
@@ -90,7 +91,7 @@ final class RemoteMcpDocumentationVerifier
         return preg_match('/^[a-f0-9]{64}$/i', (string) ($expected['documentation_version'] ?? '')) === 1
             && preg_match('/^[a-f0-9]{64}$/i', (string) ($expected['manifest_hash'] ?? '')) === 1
             && preg_match('/^[a-f0-9]{64}$/i', $buildIdentity) === 1
-            && is_array($expected['files'] ?? null)
+            && $this->fileMap($expected['files'] ?? ($expected['manifest']['files'] ?? null)) !== null
             && isset($expected['runtime_version'], $expected['source_revision'], $expected['catalog_version'], $expected['resource_version'], $expected['release_identity']);
     }
 
@@ -140,6 +141,12 @@ final class RemoteMcpDocumentationVerifier
 
     /** @param array<string,mixed> $bootstrap */
     private function filesFromBootstrap(array $bootstrap): mixed
+    {
+        return $bootstrap['files'] ?? ($bootstrap['manifest']['files'] ?? null);
+    }
+
+    /** @param array<string,mixed> $bootstrap @return mixed */
+    private function filesFromExpected(array $bootstrap): mixed
     {
         return $bootstrap['files'] ?? ($bootstrap['manifest']['files'] ?? null);
     }

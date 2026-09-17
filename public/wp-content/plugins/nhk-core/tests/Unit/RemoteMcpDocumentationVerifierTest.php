@@ -92,6 +92,29 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         self::assertSame('pass', $verifier->verify('https://demo.example', $expected, str_repeat('f', 64))->status);
     }
 
+    public function test_registry_bootstrap_expected_payload_uses_nested_manifest_files(): void
+    {
+        $expected = $this->expectedBootstrap();
+        $files = $expected['files'];
+        $expected['manifest'] = ['files' => $files];
+        unset($expected['files']);
+        $actual = $expected;
+        $actual['manifest'] = ['files' => $files];
+        $verifier = new RemoteMcpDocumentationVerifier(function (string $url, string $method, array $headers, string $body) use ($actual, $files): array {
+            $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            if (($request['method'] ?? null) === 'initialize') return ['status' => 200, 'body' => json_encode(['result' => ['protocolVersion' => '2026-07-28']], JSON_THROW_ON_ERROR)];
+            if (($request['method'] ?? null) === 'tools/list') return ['status' => 200, 'body' => json_encode(['result' => ['tools' => [['name' => 'nhk.documentation.bootstrap'], ['name' => 'nhk.documentation.get'], ['name' => 'nhk.documentation.list'], ['name' => 'nhk.docs.bootstrap'], ['name' => 'nhk.article.publish.review']]]], JSON_THROW_ON_ERROR)];
+            $tool = (string) ($request['params']['name'] ?? '');
+            if (in_array($tool, ['nhk.documentation.bootstrap', 'nhk.docs.bootstrap'], true)) return $this->jsonResponse($actual);
+            if ($tool === 'nhk.documentation.list') return $this->jsonResponse(['documentation_version' => $actual['documentation_version'], 'manifest_hash' => $actual['manifest_hash'], 'files' => $files]);
+            return $this->jsonResponse($this->documentPayload(['documentation_version' => $actual['documentation_version'], 'manifest_hash' => $actual['manifest_hash'], 'files' => $files]));
+        });
+
+        $result = $verifier->verify('https://demo.example', $expected, str_repeat('f', 64));
+
+        self::assertSame('pass', $result->status, (string) $result->reasonCode);
+    }
+
     public function test_old_build_identity_is_not_reported_as_active(): void
     {
         $expected = $this->expectedBootstrap();
