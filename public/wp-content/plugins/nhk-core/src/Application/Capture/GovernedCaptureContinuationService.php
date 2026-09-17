@@ -852,7 +852,7 @@ final class GovernedCaptureContinuationService
         if ($this->relationState === null) return null;
         try { $state = ($this->relationState)($plan); } catch (\Throwable) { return null; }
         if ($state === true) return ['entity_type' => 'relation', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['RELATION_ACTIVE_READBACK_ID_UNAVAILABLE']];
-        if (!is_array($state) || strtoupper((string) ($state['status'] ?? '')) !== 'ACTIVE') return null;
+        if (!is_array($state) || (strtoupper((string) ($state['status'] ?? '')) !== 'ACTIVE' && ($state['active'] ?? false) !== true)) return null;
         $canonicalId = trim((string) ($state['canonical_id'] ?? $state['id'] ?? ''));
         if ($canonicalId === '') return null;
         return [
