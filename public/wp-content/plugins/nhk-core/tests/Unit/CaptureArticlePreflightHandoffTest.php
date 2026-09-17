@@ -123,7 +123,7 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
         self::assertSame('VERIFIED', $evidence['requirements']['article_media']['state']);
     }
 
-    public function test_capture_article_rejects_unregistered_roles_and_extra_usage_ids_in_media_readback(): void
+    public function test_capture_article_rejects_an_extra_unregistered_role_with_exactly_two_unique_usage_ids(): void
     {
         $research = new ArticleResearchResult(
             ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
@@ -138,7 +138,7 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
                     'endpoint_type' => 'wp_post',
                     'endpoint_key' => '1:573',
                     'roles' => ['featured_primary', 'inline_primary', 'contextual'],
-                    'usage_ids' => ['usage-featured', 'usage-inline', 'usage-contextual'],
+                    'usage_ids' => ['usage-featured', 'usage-inline'],
                     'source' => 'ARTICLE_MEDIA_RECONCILIATION',
                 ],
             ],
@@ -156,7 +156,7 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
         self::assertSame('PENDING', $evidence['requirements']['article_media']['state']);
     }
 
-    public function test_capture_article_rejects_duplicate_roles_and_usage_ids_in_media_readback(): void
+    public function test_capture_article_rejects_a_duplicate_role_with_exactly_two_unique_usage_ids(): void
     {
         $research = new ArticleResearchResult(
             ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
@@ -171,7 +171,39 @@ final class CaptureArticlePreflightHandoffTest extends TestCase
                     'endpoint_type' => 'wp_post',
                     'endpoint_key' => '1:573',
                     'roles' => ['featured_primary', 'inline_primary', 'featured_primary'],
-                    'usage_ids' => ['usage-featured', 'usage-inline', 'usage-featured'],
+                    'usage_ids' => ['usage-featured', 'usage-inline'],
+                    'source' => 'ARTICLE_MEDIA_RECONCILIATION',
+                ],
+            ],
+        ];
+
+        $evidence = (new CaptureArticlePreflightHandoff())->build($research, $media, ['status' => 'SKIPPED'], [
+            'post_id' => 573,
+            'slug' => 'clock',
+            'permalink' => '/clock/',
+        ]);
+
+        self::assertFalse($evidence['media_usage_complete']);
+        self::assertFalse($evidence['research_acceptable']);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $evidence['fresh_preflight_blockers']);
+    }
+
+    public function test_capture_article_rejects_duplicate_usage_ids_with_exactly_two_role_entries(): void
+    {
+        $research = new ArticleResearchResult(
+            ['status' => 'resolved', 'primary' => ['id' => 'classification-1', 'type' => 'classification']],
+            ['status' => 'available'], ['classification' => 'NO_OVERLAP'], ['claims' => [], 'sources' => [], 'evidence' => []], [], [],
+            ['status' => 'EXISTING', 'category' => ['id' => 4]], [], [], ['slug_intent' => 'clock'], ['status' => 'PASS'], [], [], true,
+        );
+        $media = [
+            'article_media_reconciliation' => 'REQUIRED_BEFORE_PUBLICATION_RESEARCH',
+            'canonical_readback' => [
+                'media_usage' => [
+                    'state' => 'VERIFIED',
+                    'endpoint_type' => 'wp_post',
+                    'endpoint_key' => '1:573',
+                    'roles' => ['featured_primary', 'inline_primary'],
+                    'usage_ids' => ['usage-featured', 'usage-featured'],
                     'source' => 'ARTICLE_MEDIA_RECONCILIATION',
                 ],
             ],
