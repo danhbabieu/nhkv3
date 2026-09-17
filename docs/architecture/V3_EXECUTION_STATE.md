@@ -1,5 +1,46 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Typed Capture relation reconciliation (LOCAL READY)
+
+SCOPE: Added the generic typed `authority_intent.relation_intents[]` Capture
+boundary for exact existing-record Graph reconciliation. No staging/live
+mutation, deployment, direct SQL, direct Graph write or Governance bypass was
+performed. The supplied Bahnhäusle/Capture IDs remain outside the current
+bounded staging acceptance scope.
+
+ROOT_CAUSE: Capture had no typed general relation-intent field. Authority
+planning only recognized Authority requests and a narrow prose parser for
+`subtype_of`; therefore an explicit classification → `about` → knowledge
+request could be silently reduced to Authority reuse with no relation
+candidate, blocker or diagnostic.
+
+FIX: The MCP catalog now declares bounded typed relation intents and the
+existing Ability/Easy MCP pass-through preserves them. A generic planner
+validates registered endpoint types/predicates, exact canonical existence,
+active state and endpoint revisions, reuses exact active edges idempotently,
+and emits typed candidates/blockers for missing, invalid, unsupported,
+inactive or retired cases. Typed intents suppress prose relation inference.
+Candidates and relation reuse participate in the existing plan fingerprint,
+Capture replan/conflict path and Capture-owned Governance executor; relation
+creation still uses Proposal → Approval → Eligibility → Controlled Apply →
+Graph canonical read-back.
+
+VERIFICATION: Focused typed relation/Capture/MCP/Authority/Governance tests
+pass 78 tests / 338 assertions, including full relation lifecycle and
+revision/identity/predicate fingerprint coverage. MCP catalog, Ability/Easy
+MCP parity and Plugin wiring tests pass 69 tests / 697 assertions (one
+deprecation). Full Unit runs 1,797 tests / 8,836 assertions with one
+pre-existing unrelated `DemoCutoverCliContractTest` failure
+(`REMOTE_DEPLOYMENT_FAILED` vs `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`), 17
+warnings and 18 deprecations. Contract suite passes 6 tests / 48 assertions.
+Changed-scope PHP lint, `git diff --check` and secret review pass.
+Integration is ENVIRONMENT_BLOCKED because `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB` are unset. Live acceptance is not performed because the
+exact supplied live IDs are outside the current bounded scope and no deploy
+was requested/verified.
+
+STATUS: `CAPTURE_TYPED_RELATION_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED_BY_SCOPE`
+
 # Checkpoint — 2026-09-17 — Dedicated `/tri-thuc/` WordPress archive template (LOCAL READY)
 
 SCOPE: Repaired only the `/tri-thuc/` frontend route/template handoff. No
@@ -12272,6 +12313,29 @@ remains local-ready; external deployment/runtime identity verification remains
 operator-gated.
 
 STATUS: `LOCAL_RUNTIME_VERIFIED / INTEGRATION_PREEXISTING_BLOCKERS / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-18 — Integration contract and Media path validation repair (LOCAL ONLY)
+
+ROOT_CAUSE: The guarded MCP integration assertion still assumed every
+non-Capture governed Ability was hidden, while the current explicit internal
+admin allowlist intentionally makes selected bounded continuations discoverable
+to Easy MCP. Separately, `MediaService` used a malformed slash-delimited
+Windows-drive regex; valid storage keys therefore emitted a PHP regex warning
+and the intended absolute-path guard was not reliable.
+
+FIX: The integration assertion now derives expected exposure from the existing
+explicit internal allowlist, preserving hidden `media-ingest` behavior and
+capability gating. The Media validation regex uses a safe delimiter and has a
+Windows absolute-path regression test. No new semantic vocabulary, writer,
+fixture ID or external mutation was introduced.
+
+VERIFICATION: MCP Ability integration contract passes 1 test / 190 assertions.
+Focused Media/MCP Unit selection passes 20 tests / 128 assertions. Full Unit
+was already green on this HEAD with the deployment environment unset. Guarded
+Integration remains separately blocked by the pre-existing GD palette-image
+WebP fixture failure; no live/staging acceptance, deployment or reload was run.
+
+STATUS: `INTEGRATION_CONTRACT_REPAIRED / MEDIA_PATH_GUARD_REPAIRED / LIVE_ACCEPTANCE_NOT_RUN`.
 
 # Checkpoint — 2026-09-17 — Video UPDATE canonical revision propagation (LOCAL ONLY)
 

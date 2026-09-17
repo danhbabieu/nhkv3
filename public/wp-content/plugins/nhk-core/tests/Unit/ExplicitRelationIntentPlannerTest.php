@@ -5,7 +5,10 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Graph\ExplicitRelationIntentPlanner;
 use NHK\Core\Application\Authority\AuthorityIntentPlanner;
+use NHK\Core\Application\Authority\AuthorityPlanFingerprint;
+use NHK\Core\Contracts\Authority\AuthorityRepository;
 use NHK\Core\Contracts\Graph\EndpointRevisionReader;
+use NHK\Core\Domain\Authority\AuthorityEntity;
 use NHK\Core\Domain\Graph\{EndpointTypeRegistry, NodeReference, PredicateRegistry};
 use NHK\Core\Shared\Uuid\UuidCodec;
 use PHPUnit\Framework\TestCase;
@@ -131,7 +134,7 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
 
     public function test_prose_without_typed_relation_intent_does_not_create_a_relation(): void
     {
-        self::assertSame([], (new \NHK\Core\Application\Authority\AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types()))->plan([
+        self::assertSame([], (new \NHK\Core\Application\Authority\AuthorityIntentPlanner($this->authorityRepository(), $this->types()))->plan([
             'text' => 'Bahnhäusle nói về một tri thức hiện có.',
             'authority_intent' => ['mode' => 'PLAN'],
         ])['relation_candidates']);
@@ -143,7 +146,7 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
             'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
             'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
         ]);
-        $planner = new AuthorityIntentPlanner(new PlannerAuthorityRepository(), $this->types(), relationIntents: $relationPlanner);
+        $planner = new AuthorityIntentPlanner($this->authorityRepository(), $this->types(), relationIntents: $relationPlanner);
 
         $plan = $planner->plan([
             'text' => 'Bahnhäusle nói về một tri thức hiện có.',
@@ -155,11 +158,65 @@ final class ExplicitRelationIntentPlannerTest extends TestCase
         self::assertSame(self::TARGET, $plan['relation_candidates'][0]['target_uuid']);
     }
 
+    public function test_relation_candidate_identity_changes_when_endpoint_revision_changes(): void
+    {
+        $first = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ])->plan([$this->intent()]);
+        $second = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 2]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ])->plan([$this->intent()]);
+        $third = $this->planner([
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 2]],
+        ])->plan([$this->intent()]);
+
+        self::assertNotSame($first['relation_candidates'][0]['candidate_id'], $second['relation_candidates'][0]['candidate_id']);
+        self::assertNotSame($first['relation_candidates'][0]['candidate_id'], $third['relation_candidates'][0]['candidate_id']);
+    }
+
+    public function test_relation_candidate_fingerprint_changes_when_predicate_or_endpoint_identity_changes(): void
+    {
+        $otherClassification = UuidCodec::newV7();
+        $states = [
+            'classification' => [self::SOURCE => ['active' => true, 'revision' => 1]],
+            'knowledge' => [self::TARGET => ['active' => true, 'revision' => 1]],
+        ];
+        $base = $this->planner($states)->plan([$this->intent()]);
+        $predicate = $this->planner(['classification' => $states['classification'] + [$otherClassification => ['active' => true, 'revision' => 1]]])->plan([
+            $this->intent(['predicate' => 'subtype_of', 'target_type' => 'classification', 'target_uuid' => $otherClassification]),
+        ]);
+        $otherTarget = UuidCodec::newV7();
+        $identity = $this->planner($states + ['knowledge' => $states['knowledge'] + [$otherTarget => ['active' => true, 'revision' => 1]]])->plan([$this->intent(['target_uuid' => $otherTarget])]);
+
+        $baseId = $base['relation_candidates'][0]['candidate_id'];
+        self::assertNotSame($baseId, $predicate['relation_candidates'][0]['candidate_id']);
+        self::assertNotSame($baseId, $identity['relation_candidates'][0]['candidate_id']);
+        self::assertNotSame(
+            AuthorityPlanFingerprint::compute('capture', 1, $base),
+            AuthorityPlanFingerprint::compute('capture', 1, $identity),
+        );
+    }
+
     private function types(): \NHK\Core\Domain\Authority\EntityTypeRegistry
     {
         $types = new \NHK\Core\Domain\Authority\EntityTypeRegistry();
         \NHK\Core\Domain\Authority\CanonicalEntityTypeCatalog::registerInto($types);
         return $types;
+    }
+
+    private function authorityRepository(): AuthorityRepository
+    {
+        return new class implements AuthorityRepository {
+            public function findByCanonicalId(string $id): ?AuthorityEntity { return null; }
+            public function findByStableKey(string $type, string $key): ?AuthorityEntity { return null; }
+            public function create(AuthorityEntity $entity): AuthorityEntity { return $entity; }
+            public function update(AuthorityEntity $entity, int $expectedRevision): AuthorityEntity { return $entity; }
+            public function rekey(AuthorityEntity $entity, string $oldStableKey, string $newStableKey, int $expectedRevision): AuthorityEntity { return $entity; }
+            public function listByType(string $type, bool $includeRetired = false): array { return []; }
+        };
     }
 
     /** @param array<string,mixed> $changes @return array<string,mixed> */

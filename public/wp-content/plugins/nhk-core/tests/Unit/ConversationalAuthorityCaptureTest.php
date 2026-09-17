@@ -157,6 +157,48 @@ final class ConversationalAuthorityCaptureTest extends TestCase
         self::assertSame(6, $done->revision);
         self::assertSame(901, $done->articleId);
     }
+
+    public function test_changed_typed_relation_request_with_same_idempotency_key_is_a_capture_conflict(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $service = new AuthorityCaptureService($captures, static fn (array $input, CaptureRecord $capture): array => [
+            'relation_candidates' => [['candidate_id' => 'relation-' . ($input['authority_intent']['relation_intents'][0]['target_uuid'] ?? '')]],
+            'plan_fingerprint' => str_repeat('d', 64),
+        ]);
+        $base = ['source_type' => 'classification', 'source_uuid' => '01a07cbc-3595-7e63-8c1b-5b308c644125', 'predicate' => 'about', 'target_type' => 'knowledge', 'target_uuid' => '01a08156-c400-7739-a40f-61185cd62fcd'];
+        $input = ['idempotency_key' => 'typed-relation-conflict', 'purpose' => 'AUTHORITY', 'text' => '', 'authority_intent' => ['mode' => 'PLAN', 'relation_intents' => [$base]]];
+        $first = $service->execute($input);
+        $changed = $input;
+        $changed['authority_intent']['relation_intents'][0]['target_uuid'] = '01a08156-c400-7739-a40f-61185cd62fce';
+        $conflict = $service->execute($changed);
+
+        self::assertSame($first->captureId, $conflict->captureId);
+        self::assertSame('IDEMPOTENCY_CONFLICT', $conflict->status);
+        self::assertSame('CAPTURE_IDEMPOTENCY_KEY_REUSED', $conflict->diagnostics['failure']['code']);
+    }
+
+    public function test_typed_relation_intent_is_preserved_across_approval_replan(): void
+    {
+        $captures = new AuthorityCaptureRepository();
+        $seen = [];
+        $intent = ['source_type' => 'classification', 'source_uuid' => '01a07cbc-3595-7e63-8c1b-5b308c644125', 'predicate' => 'about', 'target_type' => 'knowledge', 'target_uuid' => '01a08156-c400-7739-a40f-61185cd62fcd'];
+        $service = new AuthorityCaptureService(
+            $captures,
+            static function (array $input, CaptureRecord $capture) use (&$seen, $intent): array {
+                $seen[] = $input['authority_intent']['relation_intents'];
+                return ['relation_candidates' => [['candidate_id' => 'typed-relation']], 'plan_fingerprint' => str_repeat('e', 64)];
+            },
+            null,
+            static fn (CaptureRecord $capture, array $plan, array $ids): array => ['status' => 'APPLIED'],
+        );
+        $input = ['idempotency_key' => 'typed-relation-replan', 'purpose' => 'AUTHORITY', 'text' => 'prose must not alter relation', 'authority_intent' => ['mode' => 'PLAN', 'relation_intents' => [$intent]]];
+        $first = $service->execute($input);
+        $service->continueWithApproval($first->captureId, ['authority_intent' => ['mode' => 'APPLY_APPROVED_PLAN', 'approved_plan_fingerprint' => str_repeat('e', 64), 'approved_candidate_ids' => ['typed-relation']]]);
+
+        self::assertCount(2, $seen);
+        self::assertSame($seen[0], $seen[1]);
+        self::assertSame($intent, $seen[1][0]);
+    }
 }
 
 final class AuthorityCaptureRepository implements CaptureRepository
