@@ -1,5 +1,42 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Documentation identity and Media pre-binding (CODE_SIDE_FIXED / LIVE_NOT_YET_VERIFIED)
+
+SCOPE: Fixed the local implementation slice for canonical documentation
+identity, deploy-verifier bootstrap ownership and Media pre-binding frontend
+readiness. No staging/production deploy, reload, semantic-data mutation,
+push or pull was performed in this checkpoint.
+
+ROOT_CAUSE: When the plugin runtime version constant was not yet defined, the
+documentation registry selected the repository source before the deployed
+snapshot, allowing separate documentation identities across bootstrap/get/list
+entry points. The canonical deploy verifier passed the nested manifest to an
+API requiring the complete bootstrap packet. Admin Media completion also
+hard-coded `MEDIA_FRONTEND_READBACK_REQUIRED` even when a ready canonical Media
+had a valid public derivative; representative MediaUsage is downstream of this
+readiness and cannot be its proof.
+
+FIX: Snapshot selection is now authoritative regardless of early runtime
+bootstrap timing; an unknown runtime adopts the verified snapshot version and a
+replacement release fails closed rather than crossing a cached identity. The
+deploy verifier now passes and projects the complete local bootstrap packet,
+including the full release tuple. `MediaPreBindingReadiness` validates ready,
+active Media plus a structurally valid public derivative without requiring
+MediaUsage or representative binding; invalid/private-only/missing-derivative
+cases remain blocked.
+
+VERIFICATION: Documentation/deploy/media focused suites pass 95 tests / 321
+assertions, the MCP contract plus those suites pass 65 tests / 921 assertions,
+and the broader Capture/Governance/Ability/MCP/media regression selection passes
+127 tests / 830 assertions. Full Unit reaches 1,814 tests / 8,886 assertions
+with only the known unrelated `DemoCutoverCliContractTest` mismatch
+(`REMOTE_DEPLOYMENT_FAILED` vs `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`). PHP lint
+and diff/secret checks remain required before any user-run deployment.
+
+STATUS: `CODE_SIDE_FIXED / LIVE_NOT_YET_VERIFIED`; staging acceptance remains
+blocked until the user deploys the new revision and performs fresh live
+bootstrap/get/list and target read-only acceptance.
+
 # Checkpoint — 2026-09-18 — Authority staging scope propagation (LOCAL READY)
 
 SCOPE: Repaired the canonical Authority Capture → governed Proposal path so a

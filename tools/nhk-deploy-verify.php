@@ -147,18 +147,18 @@ function validBaseUrl(string $baseUrl, string $target): bool
         && !isset($parts['user'], $parts['pass']);
 }
 
-/** @param array<string,mixed> $manifest @return array<string,mixed> */
-function safeIdentity(array $manifest, string $buildIdentity): array
+/** @param array<string,mixed> $bootstrap @return array<string,mixed> */
+function safeIdentity(array $bootstrap, string $buildIdentity): array
 {
     return [
-        'source_revision' => $manifest['source_revision'] ?? null,
-        'runtime_version' => $manifest['runtime_version'] ?? null,
-        'documentation_version' => $manifest['documentation_version'] ?? null,
-        'manifest_hash' => $manifest['manifest_hash'] ?? null,
+        'source_revision' => $bootstrap['source_revision'] ?? null,
+        'runtime_version' => $bootstrap['runtime_version'] ?? null,
+        'documentation_version' => $bootstrap['documentation_version'] ?? null,
+        'manifest_hash' => $bootstrap['manifest_hash'] ?? null,
         'build_identity' => $buildIdentity,
-        'catalog_version' => $manifest['catalog_version'] ?? null,
-        'resource_version' => $manifest['resource_version'] ?? null,
-        'release_identity' => $manifest['release_identity'] ?? null,
+        'catalog_version' => $bootstrap['catalog_version'] ?? null,
+        'resource_version' => $bootstrap['resource_version'] ?? null,
+        'release_identity' => $bootstrap['release_identity'] ?? null,
     ];
 }
 
