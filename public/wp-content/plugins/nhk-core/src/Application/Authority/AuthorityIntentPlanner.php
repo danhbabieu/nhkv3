@@ -243,6 +243,8 @@ final class AuthorityIntentPlanner
             $plan['blockers'][] = ['code' => 'UNSUPPORTED_AUTHORITY_FIELD', 'entity_type' => $type, 'fields' => $unsupported];
             return;
         }
+        $structuralParent = $this->structuralParent($type, $payloadDelta, $plan);
+        if ($structuralParent === false) return;
         $canonicalUuid = trim((string) ($request['canonical_uuid'] ?? ''));
         if ($canonicalUuid !== '') {
             if (!UuidCodec::isValid($canonicalUuid)) {
@@ -294,6 +296,7 @@ final class AuthorityIntentPlanner
             }
             $updated = $this->updateCandidate($plan, $entityById, $payloadDelta);
             $this->reuse($plan, $entityById, 'uuid_exact', $family, !$updated && $payloadDelta !== [] ? 'NOOP_VALUES_MATCH' : null);
+            if (is_array($structuralParent)) $this->planStructuralRelation($plan, $entityById, $structuralParent);
             return;
         }
 
@@ -316,6 +319,7 @@ final class AuthorityIntentPlanner
             $match = array_values($matches)[0];
             $updated = $this->updateCandidate($plan, $match['entity'], $payloadDelta);
             $this->reuse($plan, $match['entity'], $match['match'], $family, !$updated && $payloadDelta !== [] ? 'NOOP_VALUES_MATCH' : null);
+            if (is_array($structuralParent)) $this->planStructuralRelation($plan, $match['entity'], $structuralParent);
             return;
         }
         $retired = $this->retiredExact($type, $stableKey, $name);
@@ -326,7 +330,85 @@ final class AuthorityIntentPlanner
         if ($type === 'classification' && $family === '') { $plan['blockers'][] = ['code' => 'CLASSIFICATION_FAMILY_REQUIRED', 'entity_type' => $type, 'name' => $name]; return; }
         if ($type === 'classification' && $family === 'clock-type') { $plan['blockers'][] = ['code' => 'LEGACY_CLOCK_TYPE_FAMILY_WRITE_REJECTED', 'entity_type' => $type, 'family' => $family, 'name' => $name]; return; }
         $entityPayload = array_replace($family !== '' ? ['family' => $family] : [], $payloadDelta);
-        $plan['create_candidates'][] = ['candidate_id' => $this->candidateId('CREATE', $type, $stableKey), 'action' => 'CREATE', 'entity_type' => $type, 'family' => $family !== '' ? $family : null, 'proposed_canonical_name' => $name, 'name' => $name, 'aliases' => [], 'description' => (string) ($entityPayload['description'] ?? ''), 'entity_payload' => $entityPayload, 'stable_key_preview' => $stableKey, 'proposed_stable_key' => $stableKey, 'scope' => 'capture', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'ambiguities' => [], 'blockers' => [], 'dependencies' => [], 'review_diagnostics' => []];
+        $candidate = ['candidate_id' => $this->candidateId('CREATE', $type, $stableKey), 'action' => 'CREATE', 'entity_type' => $type, 'family' => $family !== '' ? $family : null, 'proposed_canonical_name' => $name, 'name' => $name, 'aliases' => [], 'description' => (string) ($entityPayload['description'] ?? ''), 'entity_payload' => $entityPayload, 'stable_key_preview' => $stableKey, 'proposed_stable_key' => $stableKey, 'scope' => 'capture', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE', 'ambiguities' => [], 'blockers' => [], 'dependencies' => [], 'review_diagnostics' => []];
+        $plan['create_candidates'][] = $candidate;
+        if (is_array($structuralParent)) $this->planStructuralRelation($plan, $candidate, $structuralParent);
+    }
+
+    /** @param array<string,mixed> $payloadDelta @param array<string,mixed> $plan @return array{predicate:string,target_type:string,target:AuthorityEntity}|null|false */
+    private function structuralParent(string $type, array $payloadDelta, array &$plan): array|false|null
+    {
+        $field = match ($type) {
+            'model' => ['brand_uuid', 'model_of', 'brand'],
+            'variant' => ['model_uuid', 'variant_of', 'model'],
+            default => null,
+        };
+        if ($field === null || !array_key_exists($field[0], $payloadDelta)) return null;
+        $parentUuid = $payloadDelta[$field[0]];
+        if (!is_string($parentUuid) || !UuidCodec::isValid(trim($parentUuid))) {
+            $plan['blockers'][] = ['code' => 'AUTHORITY_STRUCTURAL_PARENT_UUID_INVALID', 'entity_type' => $type, 'field' => $field[0]];
+            return false;
+        }
+        $parent = $this->authority->findByCanonicalId(trim($parentUuid));
+        if (!$parent instanceof AuthorityEntity) {
+            $plan['blockers'][] = ['code' => 'AUTHORITY_STRUCTURAL_PARENT_NOT_FOUND', 'entity_type' => $type, 'field' => $field[0], 'parent_uuid' => trim($parentUuid)];
+            return false;
+        }
+        if ($parent->entityType !== $field[2]) {
+            $plan['blockers'][] = ['code' => 'AUTHORITY_STRUCTURAL_PARENT_TYPE_MISMATCH', 'entity_type' => $type, 'field' => $field[0], 'parent_uuid' => $parent->canonicalId, 'expected_type' => $field[2], 'actual_type' => $parent->entityType];
+            return false;
+        }
+        if (!$parent->active()) {
+            $plan['blockers'][] = ['code' => 'AUTHORITY_STRUCTURAL_PARENT_INACTIVE', 'entity_type' => $type, 'field' => $field[0], 'parent_uuid' => $parent->canonicalId];
+            return false;
+        }
+        return ['predicate' => $field[1], 'target_type' => $field[2], 'target' => $parent];
+    }
+
+    /** @param array<string,mixed> $plan @param array<string,mixed>|AuthorityEntity $source @param array{predicate:string,target_type:string,target:AuthorityEntity} $parent */
+    private function planStructuralRelation(array &$plan, array|AuthorityEntity $source, array $parent): void
+    {
+        $sourceType = $source instanceof AuthorityEntity ? $source->entityType : (string) ($source['entity_type'] ?? '');
+        $sourceUuid = $source instanceof AuthorityEntity ? $source->canonicalId : trim((string) ($source['canonical_uuid'] ?? ''));
+        $sourceCandidateId = !($source instanceof AuthorityEntity) && strtoupper((string) ($source['action'] ?? '')) === 'CREATE'
+            ? trim((string) ($source['candidate_id'] ?? ''))
+            : '';
+        $target = $parent['target'];
+        $packet = [
+            'source_type' => $sourceType,
+            'source_uuid' => $sourceUuid,
+            'predicate' => $parent['predicate'],
+            'target_type' => $parent['target_type'],
+            'target_uuid' => $target->canonicalId,
+            'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
+            'reason' => 'Exact structural parent binding from registered Authority payload field.',
+        ];
+        if ($sourceCandidateId !== '') {
+            $plan['relation_candidates'][] = [
+                'candidate_id' => $this->candidateId('RELATION', $parent['predicate'], $sourceCandidateId . '|' . $target->canonicalId),
+                'action' => 'CREATE', 'entity_type' => 'relation', 'predicate' => $parent['predicate'],
+                'source_type' => $sourceType, 'source_uuid' => null, 'source_candidate_id' => $sourceCandidateId,
+                'source_revision' => 0, 'target_type' => $parent['target_type'], 'target_uuid' => $target->canonicalId,
+                'target_revision' => $target->revision, 'provenance' => $packet['provenance'], 'reason' => $packet['reason'],
+                'scope' => 'capture', 'dependencies' => [$sourceCandidateId], 'review_diagnostics' => [],
+            ];
+            return;
+        }
+        if ($this->relationIntents !== null) {
+            $relationPlan = $this->relationIntents->plan([$packet]);
+            $plan['relation_candidates'] = array_merge($plan['relation_candidates'], (array) ($relationPlan['relation_candidates'] ?? []));
+            $plan['relation_reuse'] = array_merge($plan['relation_reuse'], (array) ($relationPlan['relation_reuse'] ?? []));
+            $plan['blockers'] = array_merge($plan['blockers'], (array) ($relationPlan['blockers'] ?? []));
+            $plan['ambiguities'] = array_merge($plan['ambiguities'], (array) ($relationPlan['ambiguities'] ?? []));
+            return;
+        }
+        $plan['relation_candidates'][] = [
+            'candidate_id' => $this->candidateId('RELATION', $parent['predicate'], $sourceUuid . '|' . $target->canonicalId),
+            'action' => 'CREATE', 'entity_type' => 'relation', 'predicate' => $parent['predicate'],
+            'source_type' => $sourceType, 'source_uuid' => $sourceUuid, 'source_revision' => $source instanceof AuthorityEntity ? $source->revision : (int) ($source['canonical_revision'] ?? 0),
+            'target_type' => $parent['target_type'], 'target_uuid' => $target->canonicalId, 'target_revision' => $target->revision,
+            'provenance' => $packet['provenance'], 'reason' => $packet['reason'], 'scope' => 'capture', 'dependencies' => [], 'review_diagnostics' => [],
+        ];
     }
 
     private function eligibleMatch(?AuthorityEntity $entity, string $type, string $requestedFamily): bool

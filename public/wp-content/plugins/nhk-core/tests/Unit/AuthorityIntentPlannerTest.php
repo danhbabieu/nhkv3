@@ -744,6 +744,70 @@ final class AuthorityIntentPlannerTest extends TestCase
         );
     }
 
+    public function test_structured_model_create_with_exact_brand_parent_plans_model_of_dependency(): void
+    {
+        $brandId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([
+            $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [], $brandId),
+        ]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'model',
+                'name' => 'Atherton',
+                'payload_delta' => ['brand_uuid' => $brandId, 'description' => 'A model.'],
+                'allow_create' => true,
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['create_candidates']);
+        self::assertCount(1, $plan['relation_candidates']);
+        self::assertSame('model_of', $plan['relation_candidates'][0]['predicate']);
+        self::assertSame($plan['create_candidates'][0]['candidate_id'], $plan['relation_candidates'][0]['source_candidate_id']);
+        self::assertSame($brandId, $plan['relation_candidates'][0]['target_uuid']);
+        self::assertSame([$plan['create_candidates'][0]['candidate_id']], $plan['relation_candidates'][0]['dependencies']);
+    }
+
+    public function test_structured_variant_update_with_exact_model_parent_plans_variant_of_relation(): void
+    {
+        $modelId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $variantId = '01a090fd-9a71-7665-af5f-08f6e25b533f';
+        $repository = new PlannerAuthorityRepository([
+            $this->entity('model', 'nhk:model:hermle.atherton', 'Atherton', [], $modelId),
+            $this->entity('variant', 'nhk:variant:hermle.atherton.black', 'Black', [], $variantId),
+        ]);
+        $plan = (new AuthorityIntentPlanner($repository, $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'variant',
+                'canonical_uuid' => $variantId,
+                'payload_delta' => ['model_uuid' => $modelId],
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['relation_candidates']);
+        self::assertSame('variant_of', $plan['relation_candidates'][0]['predicate']);
+        self::assertSame($variantId, $plan['relation_candidates'][0]['source_uuid']);
+        self::assertSame($modelId, $plan['relation_candidates'][0]['target_uuid']);
+        self::assertSame([], $plan['blockers']);
+    }
+
+    public function test_structural_parent_binding_fails_closed_for_missing_or_wrong_type_parent(): void
+    {
+        $modelId = '01a090fd-9a71-7665-af5f-08f6e25b533e';
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([
+            $this->entity('model', 'nhk:model:hermle.atherton', 'Atherton', [], $modelId),
+        ]), $this->types))->plan([
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'model',
+                'name' => 'Missing Parent Model',
+                'payload_delta' => ['brand_uuid' => $modelId],
+                'allow_create' => true,
+            ]]],
+        ]);
+
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame([], $plan['relation_candidates']);
+        self::assertContains('AUTHORITY_STRUCTURAL_PARENT_TYPE_MISMATCH', array_column($plan['blockers'], 'code'));
+    }
+
     private function entity(string $type, string $key, string $name, array $payload = [], ?string $canonicalId = null): AuthorityEntity
     {
         return new AuthorityEntity($canonicalId ?? UuidCodec::newV7(), $type, $key, $name, 1, $payload, AuthorityState::ACTIVE, 1);
