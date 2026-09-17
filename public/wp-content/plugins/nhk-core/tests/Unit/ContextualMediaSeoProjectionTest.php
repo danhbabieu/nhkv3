@@ -64,8 +64,8 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         $result = (new ArticleMediaSeoProjection($media, $assets, $usages, $adapter))->forPost('1:60');
 
         self::assertSame('Alt canonical', $result['alt']);
-        self::assertSame('Attachment title fallback', $result['title']);
-        self::assertSame('Attachment caption fallback', $result['caption']);
+        self::assertSame('Original attachment title', $result['title']);
+        self::assertSame('Original attachment caption', $result['caption']);
         self::assertSame('MEDIA_USAGE', $result['metadata_source']);
         self::assertSame('Media name must survive', $media->findByCanonicalId($item->canonicalId)?->canonicalName);
         self::assertSame(['title' => 'Original attachment title', 'alt' => 'Original attachment alt', 'caption' => 'Original attachment caption'], $adapter->metadata);
@@ -177,7 +177,7 @@ final class ContextualAttachmentDouble implements WordPressArticleMediaAdapter
     public function synchronize(int $postId, array $result): array { return $this->read($postId); }
     public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array
     {
-        return ['url' => '/attachment.webp', 'src' => '/attachment.webp', 'srcset' => '/attachment.webp 1200w', 'sizes' => '100vw', 'width' => 1200, 'height' => 800, 'title' => 'Attachment title fallback', 'alt' => 'Attachment alt fallback', 'caption' => 'Attachment caption fallback', 'attachment_id' => 902];
+        return ['url' => '/attachment.webp', 'src' => '/attachment.webp', 'srcset' => '/attachment.webp 1200w', 'sizes' => '100vw', 'width' => 1200, 'height' => 800, 'title' => $this->metadata['title'], 'alt' => $this->metadata['alt'], 'caption' => $this->metadata['caption'], 'attachment_id' => 902];
     }
     public function adoptAttachment(int $attachmentId): ?string { return null; }
 }
