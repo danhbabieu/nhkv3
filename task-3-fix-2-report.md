@@ -48,8 +48,14 @@ asserts `readyForDraft === false`.
 ## Verification
 
 - Focused Slice 2 suite: 87 tests, 377 assertions, pass; one existing warning.
-- Whole Unit: 1,779 tests, 8,749 assertions; 4 unrelated pre-existing failures
-  in DemoCutover/media fixture tests, with 15 warnings and 18 deprecations.
+- Whole Unit: 1,779 tests, 8,749 assertions; 5 unrelated pre-existing failures:
+  `DemoCutoverCliContractTest` receives `REMOTE_DEPLOYMENT_FAILED` instead of
+  `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; `NhkDeployVerifyCliContractTest`
+  receives `REMOTE_DEPLOYMENT_FAILED` instead of `WORKTREE_NOT_CLEAN` or
+  `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`; `MediaAssetDeliveryTest` cannot find
+  `public/wp-content/uploads/integration-source-original-5.webp`; and two
+  `PublicMediaAssetRoutesTest` cases fail because the same fixture is absent.
+  The run also reports 15 warnings and 18 deprecations.
 - Guarded WordPress Media integration: `INFRASTRUCTURE_UNAVAILABLE`; all 5
   tests skipped because `NHK_WP_TEST_PATH=public` is unset.
 - `composer lint`: pass.
