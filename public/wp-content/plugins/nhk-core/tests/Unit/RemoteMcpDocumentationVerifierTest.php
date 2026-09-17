@@ -97,6 +97,9 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         $expected = $this->expectedBootstrap();
         $files = $expected['files'];
         $expected['manifest'] = ['files' => $files];
+        $expected['entry_point'] = 'AGENTS.md';
+        $expected['read_first'] = 'projection content';
+        $expected['runtime_status'] = ['surface' => 'mcp'];
         unset($expected['files']);
         $actual = $expected;
         $actual['manifest'] = ['files' => $files];

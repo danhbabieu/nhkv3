@@ -105,11 +105,11 @@ final class RemoteMcpDocumentationVerifier
     /** @param array<string,mixed> $actual @param array<string,mixed> $expected */
     private function sameReleaseIdentity(array $actual, array $expected): bool
     {
-        foreach (['runtime_version', 'source_revision', 'catalog_version', 'resource_version', 'release_identity'] as $field) {
+        $identityFields = ['environment', 'semantic_write_policy', 'project_build_enabled', 'source_revision', 'runtime_version', 'build_identity', 'documentation_version', 'manifest_hash', 'catalog_version', 'resource_version'];
+        foreach ([...$identityFields, 'release_identity'] as $field) {
             if (!array_key_exists($field, $expected) || !array_key_exists($field, $actual) || (string) $actual[$field] !== (string) $expected[$field]) return false;
         }
-        $identity = $expected;
-        unset($identity['release_identity'], $identity['files'], $identity['manifest']);
+        $identity = array_intersect_key($expected, array_fill_keys($identityFields, true));
         return McpReleaseIdentity::hash($identity) === (string) $expected['release_identity'];
     }
 
