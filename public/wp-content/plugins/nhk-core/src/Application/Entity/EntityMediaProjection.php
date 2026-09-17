@@ -42,7 +42,7 @@ final class EntityMediaProjection
         if ($filename === '') return null;
         $path = (new PublicMediaAssetUrlResolver())->path($filename);
         $metadata = $this->metadataFor($usage, $media);
-        return array_merge($metadata, ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'width' => $asset->width, 'height' => $asset->height, 'role' => $usage->role, 'sort_order' => $usage->sortOrder, 'eligible' => true, 'state' => 'COMPLETE']);
+        return array_merge($metadata, ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'stable_key' => $media->stableKey, 'url' => function_exists('home_url') ? (string) home_url($path) : $path, 'width' => $asset->width, 'height' => $asset->height, 'role' => $usage->role, 'sort_order' => $usage->sortOrder]);
     }
 
     /** @return array{title:string,alt:string,caption:string,metadata_source:string} */

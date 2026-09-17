@@ -65,10 +65,8 @@ final class PublicMediaGalleryQuery
             'height' => $image['height'] ?? null,
             'has_real_image' => $image !== null,
             'article_url' => $articleUrl,
-            'eligible' => $image !== null,
-            'state' => $image !== null ? 'COMPLETE' : 'MISSING',
             'url' => $image['image_url'] ?? null,
-        ]);
+        ], $image === null ? ['state' => 'MISSING'] : []);
     }
 
     /** @return array{image_url:string,width:?int,height:?int}|null */
