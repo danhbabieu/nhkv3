@@ -30,8 +30,11 @@ final class EditorialCaptureContinuationService
         $capture = $this->captures->findById($captureId);
         if (!$capture instanceof CaptureRecord) return $this->retryFailure($captureId, 'CAPTURE_NOT_FOUND');
         if (!hash_equals($capture->idempotencyKey, $key)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_MISMATCH', $capture);
-        if (in_array($capture->stage, [CaptureStage::READY_FOR_PUBLICATION->value, CaptureStage::PUBLISHED->value], true)) return ['capture' => $capture->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => 'REPLAYED', 'code' => null]];
-        if ($capture->status !== 'FAILED_RETRYABLE') return $this->retryFailure($captureId, 'CAPTURE_RETRY_NOT_ALLOWED', $capture);
+        $completionResumable = $this->completionAllowsRetry($capture, $input);
+        if (!$completionResumable && in_array($capture->stage, [CaptureStage::READY_FOR_PUBLICATION->value, CaptureStage::PUBLISHED->value], true)) {
+            return ['capture' => $capture->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => 'REPLAYED', 'code' => null]];
+        }
+        if ($capture->status !== 'FAILED_RETRYABLE' && !$completionResumable) return $this->retryFailure($captureId, 'CAPTURE_RETRY_NOT_ALLOWED', $capture);
 
         $retryInput = $this->rehydrateRetryInput($capture, $input);
         try {
@@ -229,6 +232,34 @@ final class EditorialCaptureContinuationService
     private function retryFailure(string $captureId, string $code, ?CaptureRecord $capture = null): array
     {
         return ['capture' => $capture?->toArray() ?? ['capture_id' => $captureId, 'status' => 'unavailable'], 'retry' => ['mode' => 'RETRY', 'status' => 'FAILED', 'code' => $code]];
+    }
+
+    private function completionAllowsRetry(CaptureRecord $capture, array $input): bool
+    {
+        $completion = is_array($capture->diagnostics['completion'] ?? null) ? $capture->diagnostics['completion'] : [];
+        $completionStatus = strtoupper(trim((string) ($completion['status'] ?? '')));
+        if (!in_array($completionStatus, ['PARTIAL', 'REVIEW_REQUIRED'], true)) return false;
+
+        $hintPacket = is_array($capture->diagnostics['resume_hints'] ?? null)
+            ? $capture->diagnostics['resume_hints']
+            : (is_array($completion['resume_hints'] ?? null) ? $completion['resume_hints'] : []);
+        $hints = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($hintPacket['resume_children'] ?? [])))));
+        $requested = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($input['resume_children'] ?? [])))));
+        if ($requested === []) $requested = $hints;
+        if ($hints === [] || $requested === [] || array_diff($requested, $hints) !== []) return false;
+
+        $missing = (array) ($completion['missing_required_owners'] ?? []);
+        $children = (array) ($completion['children'] ?? []);
+        foreach ($requested as $child) {
+            foreach ($missing as $owner) {
+                if (is_array($owner) && strtolower(trim((string) ($owner['owner_type'] ?? ''))) === $child) return true;
+            }
+            foreach ($children as $owner) {
+                if (!is_array($owner) || strtolower(trim((string) ($owner['owner_type'] ?? ''))) !== $child) continue;
+                if (($owner['complete'] ?? false) !== true || strtoupper(trim((string) ($owner['status'] ?? ''))) !== 'COMPLETE') return true;
+            }
+        }
+        return false;
     }
 
     private function fingerprint(array $input, ?CaptureAddendumRecord $existing = null): string

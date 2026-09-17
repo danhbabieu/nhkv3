@@ -108,6 +108,70 @@ final class EditorialCaptureContinuationTest extends TestCase
         self::assertArrayNotHasKey('semantic', $events);
     }
 
+    public function test_partial_completion_with_video_resume_hint_allows_retry_even_when_capture_status_is_review_required(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->resumableVideoCapture('REVIEW_REQUIRED', 'PARTIAL');
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+        ]);
+
+        self::assertNotSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['code']);
+        self::assertSame(1, $events['semantic']);
+        self::assertCount(0, $addenda->records);
+        self::assertTrue($events['existing_capture_continuation']);
+    }
+
+    public function test_review_required_completion_with_incomplete_video_owner_allows_retry(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->resumableVideoCapture('REVIEW_REQUIRED', 'REVIEW_REQUIRED');
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+            'resume_children' => ['video'],
+        ]);
+
+        self::assertNotSame('CAPTURE_RETRY_NOT_ALLOWED', $result['retry']['code']);
+        self::assertSame(1, $events['semantic']);
+        self::assertCount(0, $addenda->records);
+    }
+
+    public function test_complete_capture_without_missing_owner_is_read_only_no_op(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->resumableVideoCapture('PARTIAL', 'COMPLETE', false);
+        $capture = new CaptureRecord($capture->captureId, $capture->idempotencyKey, $capture->requestFingerprint, CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', $capture->articleId, $capture->articleStateToken, $capture->assets, $capture->context, $capture->diagnostics, $capture->phaseReceipts, $capture->revision, $capture->createdAt, $capture->updatedAt);
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $result = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+        ]);
+
+        self::assertSame('REPLAYED', $result['retry']['status']);
+        self::assertNull($result['retry']['code']);
+        self::assertArrayNotHasKey('semantic', $events);
+        self::assertCount(0, $addenda->records);
+    }
+
     public function test_transport_routes_explicit_retry_to_retry_boundary_not_addendum_boundary(): void
     {
         $captures = new ContinuationCaptureRepository();
@@ -705,6 +769,32 @@ final class EditorialCaptureContinuationTest extends TestCase
     private function capture(): CaptureRecord
     {
         return new CaptureRecord(UuidCodec::newV7(), 'capture-original-' . bin2hex(random_bytes(2)), hash('sha256', 'original'), CaptureStage::READY_FOR_PUBLICATION->value, 'PARTIAL', 342, 'state-342', [], ['raw_input' => 'Ghi chú ban đầu.', 'subject_hints' => ['Odo 30']], ['composition' => ['title' => 'Bài 342']], []);
+    }
+
+    private function resumableVideoCapture(string $captureStatus, string $completionStatus, bool $missing = true): CaptureRecord
+    {
+        $videoId = UuidCodec::newV7();
+        $completion = [
+            'status' => $completionStatus,
+            'complete' => !$missing,
+            'required_owners' => [['owner_type' => 'video', 'owner_id' => $videoId]],
+            'missing_required_owners' => $missing ? [['owner_type' => 'video', 'owner_id' => $videoId]] : [],
+            'children' => $missing ? [['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'PARTIAL', 'complete' => false]] : [['owner_type' => 'video', 'owner_id' => $videoId, 'status' => 'COMPLETE', 'complete' => true]],
+            'resume_hints' => ['resume_children' => $missing ? ['video'] : []],
+        ];
+        return new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-resumable-video-' . bin2hex(random_bytes(2)),
+            hash('sha256', 'resumable-video'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            $captureStatus,
+            null,
+            null,
+            [],
+            ['raw_input' => 'W64 editorial input.', 'content_intent' => ['intent' => 'VIDEO', 'article_required' => false]],
+            ['completion' => $completion, 'resume_hints' => $completion['resume_hints']],
+            [],
+        );
     }
 
     /** @param array<string,int|string> $events */

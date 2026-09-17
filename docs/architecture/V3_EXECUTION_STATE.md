@@ -12122,3 +12122,30 @@ repository secret scan pass. No integration/runtime acceptance, server edit,
 deployment, push or live mutation was performed.
 
 STATUS: `VIDEO_STALE_CANONICAL_TITLE_REPLAY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Partial Capture Video retry eligibility (LOCAL ONLY)
+
+SCOPE: Corrected the Capture retry boundary so completion truth, not only the
+top-level `CaptureRecord.status`, decides whether an existing Capture can
+resume a required child. A `PARTIAL` or `REVIEW_REQUIRED` completion with an
+incomplete/unverified required owner and an explicit matching
+`resume_hints.resume_children` entry now permits retry when the original
+Capture UUID/idempotency key matches and no editorial payload is supplied.
+
+NO_OP: A complete Capture with no missing required owner remains read-only and
+returns the existing replay/no-op result. Wrong idempotency keys, changed
+payloads and unsupported/missing resume hints remain fail-closed. Retry calls
+the coordinator's persisted-checkpoint retry path, not the addendum path.
+
+REGRESSION: Added coverage for PARTIAL + Video hint, REVIEW_REQUIRED +
+incomplete Video owner, COMPLETE/no missing owner no-op, exact key and
+unchanged payload guards, and zero addenda on retry. Existing W64 stale-title
+coverage continues to verify same-UUID `STALE_EDITORIAL_REPLAY` update,
+canonical read-back, Search/SEO refresh and duplicate-owner protection.
+
+VERIFICATION: Focused Capture/Video/MCP/completion suite PASS — 116 tests /
+986 assertions, with 7 deprecations and 19 PHPUnit deprecations.
+`composer lint`, `git diff --check` and repository secret scan pass. No
+integration/runtime acceptance, server edit, deployment or push was performed.
+
+STATUS: `CAPTURE_PARTIAL_VIDEO_RETRY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
