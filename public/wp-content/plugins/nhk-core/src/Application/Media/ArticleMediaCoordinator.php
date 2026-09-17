@@ -49,7 +49,8 @@ final class ArticleMediaCoordinator
             && $contentIntent === 'IMAGE_ARTICLE'
             && ($context['single_real_image_exception'] ?? false) === true
             && trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) !== ''
-            && trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) === trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? ''));
+            && trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')) === trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::INLINE_PRIMARY] ?? ''))
+            && $this->mediaIsReadyAndPublic(trim((string) ($selectedMediaBySlot[MediaUsageRoleRegistry::FEATURED_PRIMARY] ?? '')));
         $singleRealImage = $singleRealImage || $explicitSingleMediaSelection;
         $enforceDistinctMandatoryMedia = $contentIntent !== '' && !$singleRealImage;
         $allowHistoricalReuse = !$captureMediaContext
@@ -80,7 +81,6 @@ final class ArticleMediaCoordinator
         }
         foreach ($captureOwnedMediaIds as $captureOwnedMediaId) {
             if (!$this->mediaIsReadyAndPublic($captureOwnedMediaId)) {
-                $diagnostics[] = ['code' => 'ARTICLE_MEDIA_ASSET_UNAVAILABLE', 'media_id' => $captureOwnedMediaId];
                 $diagnostics[] = ['code' => 'MEDIAUSAGE_INCOMPLETE', 'media_id' => $captureOwnedMediaId];
             }
         }
@@ -244,14 +244,29 @@ final class ArticleMediaCoordinator
                 continue;
             }
             $usage = $rows[0];
+            $expectedMediaId = trim((string) ($slots[$role]['media_id'] ?? ''));
+            $usageId = trim($usage->usageId);
+            $usageMediaId = trim($usage->mediaId);
+            $valid = $usage->endpointType === 'wp_post'
+                && $usage->endpointKey === $endpointKey
+                && $usage->role === $role
+                && $usageId !== ''
+                && $expectedMediaId !== ''
+                && $usageMediaId === $expectedMediaId
+                && !$this->mediaIsPlaceholder($usageMediaId)
+                && $this->mediaIsReadyAndPublic($usageMediaId);
+            if (!$valid) {
+                $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
+                $blockers[] = $role === MediaUsageRoleRegistry::FEATURED_PRIMARY ? 'ARTICLE_MEDIA_FEATURED_MISSING' : 'ARTICLE_MEDIA_INLINE_MISSING';
+                continue;
+            }
             $usageRows[] = $usage;
-            $usageIds[] = $usage->usageId;
+            $usageIds[] = $usageId;
             $roles[] = $role;
-            if (($slots[$role]['placeholder'] ?? true) === true) $blockers[] = 'MEDIAUSAGE_INCOMPLETE';
         }
         foreach ($diagnostics as $diagnostic) {
             $code = is_array($diagnostic) ? trim((string) ($diagnostic['code'] ?? '')) : '';
-            if (in_array($code, ['MEDIAUSAGE_INCOMPLETE', 'ARTICLE_MEDIA_ASSET_UNAVAILABLE'], true)) $blockers[] = $code;
+            if (in_array($code, ['MEDIAUSAGE_INCOMPLETE', 'ARTICLE_MEDIA_FEATURED_MISSING', 'ARTICLE_MEDIA_INLINE_MISSING'], true)) $blockers[] = $code;
         }
         $blockers = array_values(array_unique($blockers));
         return [
@@ -265,6 +280,11 @@ final class ArticleMediaCoordinator
                 'blockers' => $blockers,
             ],
         ];
+    }
+
+    private function mediaIsPlaceholder(string $mediaId): bool
+    {
+        return $this->media->findByCanonicalId($mediaId)?->isSystemPlaceholder() ?? true;
     }
 
     /** @param list<string> $used */

@@ -11987,11 +11987,31 @@ handoff carry the canonical media evidence; placeholder, missing-asset and
 non-verified readback states remain blockers. The one-real-image exception is
 limited to one ready/public Capture Media for `IMAGE_ARTICLE`.
 
-VERIFICATION: Exact Task 2 focused suite PASS — 65 tests / 277 assertions,
-with one pre-existing PHPUnit warning. Targeted PHP lint for every modified
-production file, `composer lint`, `git diff --check` and changed-file secret
-review pass. Guarded WordPress integration is unavailable because
-`NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No live/staging acceptance,
-deployment, push or external state mutation was attempted.
+VERIFICATION: The initial implementation suite passed locally, but review
+identified unresolved fail-closed gaps in Capture Article canonical MediaUsage
+readback and explicit single-image readiness. This checkpoint is superseded by
+the Task 2 fix round below and must not be treated as local-ready acceptance
+until that fix round passes. Guarded WordPress integration is unavailable
+because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset. No live/staging
+acceptance, deployment, push or external state mutation was attempted.
+
+STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_FIX_REQUIRED / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Slice 2 Task 2 fail-closed fix round (LOCAL ONLY)
+
+SCOPE: Closed the review findings without broadening the approved Task 2
+boundary. Capture Article publication now requires a structurally valid
+`canonical_readback.media_usage` packet when the explicit pre-research
+reconciliation marker is present; Article slot readback validates endpoint,
+role, usage identity, expected Media identity and ready/public asset state;
+unregistered asset diagnostics are no longer emitted; and an unready explicit
+single-image selection cannot satisfy both mandatory slots.
+
+VERIFICATION: Task 2 focused plus handoff/gate tests PASS — 91 tests / 381
+assertions, with one pre-existing PHPUnit warning. Targeted PHP lint,
+`composer lint` and `git diff --check` pass. Guarded WordPress integration
+remains unavailable because `NHK_WP_TEST_PATH` and `NHK_WP_TEST_DB` are unset.
+No live/staging acceptance, deployment, push or external state mutation was
+attempted.
 
 STATUS: `SLICE_2_ARTICLE_MEDIA_ORDERING_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

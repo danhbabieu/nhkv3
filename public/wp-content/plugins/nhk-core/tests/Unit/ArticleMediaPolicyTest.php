@@ -467,6 +467,65 @@ final class ArticleMediaPolicyTest extends TestCase
         self::assertNotSame('VERIFIED', $readback['state']);
     }
 
+    public function test_canonical_readback_rejects_usage_media_identity_mismatch_after_wordpress_synchronization(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $selected = $service->create('selected-after-sync', 'Selected after sync', 'ready');
+        $service->addAsset($selected->canonicalId, 'derivative', 'uploads/selected-after-sync.webp', hash('sha256', 'selected-after-sync'), 'image/webp', 4, 1200, 800, 'PUBLIC');
+        $wrong = $service->create('wrong-after-sync', 'Wrong after sync', 'ready');
+        $service->addAsset($wrong->canonicalId, 'derivative', 'uploads/wrong-after-sync.webp', hash('sha256', 'wrong-after-sync'), 'image/webp', 4, 1200, 800, 'PUBLIC');
+        $adapter = new class($usages, $wrong->canonicalId) implements WordPressArticleMediaAdapter {
+            public function __construct(private object $usages, private string $wrongMediaId) {}
+            public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
+            public function synchronize(int $postId, array $result): array
+            {
+                $rows = $this->usages->listByEndpoint('wp_post', '1:' . $postId, 'featured_primary');
+                if ($rows !== []) {
+                    $usage = $rows[0];
+                    $this->usages->items[$usage->usageId] = new MediaUsage($usage->usageId, $this->wrongMediaId, $usage->endpointType, $usage->endpointKey, $usage->role, $usage->sortOrder, $usage->altText, $usage->caption, $usage->keywordGroups, $usage->title, $usage->revision, $usage->placementKey);
+                }
+                return $this->read($postId);
+            }
+            public function attachmentForMedia(Media $media, MediaAsset $asset, string $contextualAlt = '', array $context = []): array { return []; }
+            public function adoptAttachment(int $attachmentId): ?string { return null; }
+        };
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1, $adapter);
+
+        $result = $coordinator->ensureForPost(601, [
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE'],
+            'capture_owned_media_ids' => [$selected->canonicalId],
+            'single_real_image_exception' => true,
+        ]);
+        $readback = $result->toArray()['canonical_readback']['media_usage'];
+
+        self::assertSame('REVIEW_REQUIRED', $readback['state']);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $readback['blockers']);
+        self::assertContains('ARTICLE_MEDIA_FEATURED_MISSING', $readback['blockers']);
+        self::assertNotContains('ARTICLE_MEDIA_ASSET_UNAVAILABLE', array_column($result->diagnostics, 'code'));
+    }
+
+    public function test_unready_explicit_single_image_selection_does_not_collapse_both_article_slots(): void
+    {
+        [$media, $assets, $usages, $blueprints, $service] = $this->stores();
+        $unready = $service->create('selected-without-public-asset', 'Selected without public asset', 'ready');
+        $fallback = $service->create('eligible-fallback', 'Eligible fallback', 'ready');
+        $service->addAsset($fallback->canonicalId, 'derivative', 'uploads/eligible-fallback.webp', hash('sha256', 'eligible-fallback'), 'image/webp', 4, 1200, 800, 'PUBLIC');
+        $coordinator = new ArticleMediaCoordinator($service, $media, $assets, $usages, $blueprints, 1);
+
+        $result = $coordinator->ensureForPost(602, [
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE'],
+            'single_real_image_exception' => true,
+        ], [
+            'featured_primary' => $unready->canonicalId,
+            'inline_primary' => $unready->canonicalId,
+        ]);
+
+        self::assertNotSame($result->slotMedia['featured_primary'], $result->slotMedia['inline_primary']);
+        self::assertNotContains($unready->canonicalId, $result->slotMedia);
+        self::assertSame(1, count(array_filter($result->slots, static fn (array $slot): bool => $slot['placeholder'] === true)));
+        self::assertContains($fallback->canonicalId, $result->slotMedia);
+    }
+
     public function test_repeated_supporting_media_requires_explicit_unique_placements_and_converges_without_binary_duplication(): void
     {
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();

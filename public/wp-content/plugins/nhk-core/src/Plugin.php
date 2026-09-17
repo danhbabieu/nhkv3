@@ -1003,6 +1003,7 @@ final class Plugin {
                         'video_thumbnail_fallback' => $context['video_thumbnail_fallback'] ?? null,
                     ], $selected, array_slice($mediaIds, 2));
                     $payload = $result->toArray();
+                    $payload['article_media_reconciliation'] = 'REQUIRED_BEFORE_PUBLICATION_RESEARCH';
                     $payload['force_inline_reconcile'] = true;
                     $payload['editorial_state_token'] = $result->editorialStateToken;
                     $payload['binding_results'] = $bindingResults;

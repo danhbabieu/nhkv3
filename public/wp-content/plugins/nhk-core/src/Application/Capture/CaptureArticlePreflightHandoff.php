@@ -16,9 +16,13 @@ final class CaptureArticlePreflightHandoff
         $overlap = (string) ($research->overlap['classification'] ?? 'UNCERTAIN');
         $category = (string) ($research->categoryPlan['status'] ?? 'UNKNOWN');
         $mediaUsage = is_array($media['canonical_readback']['media_usage'] ?? null) ? $media['canonical_readback']['media_usage'] : [];
-        $mediaComplete = (($media['media_complete'] ?? false) === true
-            || (($media['slots']['featured_primary']['placeholder'] ?? true) === false))
-            && ($mediaUsage === [] || strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED');
+        $captureMediaReconciliationRequired = ($media['article_media_reconciliation'] ?? '') === 'REQUIRED_BEFORE_PUBLICATION_RESEARCH';
+        $mediaReadbackValid = $this->validArticleMediaReadback($mediaUsage, $articleState);
+        $mediaComplete = $captureMediaReconciliationRequired
+            ? $mediaReadbackValid
+            : ((($media['media_complete'] ?? false) === true
+                || (($media['slots']['featured_primary']['placeholder'] ?? true) === false))
+                && ($mediaUsage === [] || strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED'));
         $compliance = (string) ($research->compliance['status'] ?? '');
         $semanticApplied = (string) ($semanticWriteBack['status'] ?? '') === 'APPLIED';
         $slug = trim((string) ($articleState['slug'] ?? ''));
@@ -40,7 +44,7 @@ final class CaptureArticlePreflightHandoff
             'applicability' => 'REQUIRED',
             'policy' => 'VERIFY',
             'state' => $mediaComplete ? 'VERIFIED' : 'PENDING',
-            'evidence' => ['media_complete' => $mediaComplete, 'media_usage' => $mediaUsage],
+            'evidence' => ['media_complete' => $mediaComplete, 'media_usage' => $mediaUsage, 'reconciliation' => $captureMediaReconciliationRequired ? 'REQUIRED_BEFORE_PUBLICATION_RESEARCH' : 'LEGACY_COMPATIBILITY'],
         ];
         $requirements['public_route'] = [
             'applicability' => 'REQUIRED',
@@ -57,9 +61,12 @@ final class CaptureArticlePreflightHandoff
         $freshPreflightBlockers = array_values(array_unique(array_merge(
             array_values(array_map('strval', $research->blockers)),
             array_values(array_map('strval', (array) ($mediaUsage['blockers'] ?? []))),
+            $captureMediaReconciliationRequired && !$mediaReadbackValid ? ['MEDIAUSAGE_INCOMPLETE'] : [],
         )));
         $researchAcceptable = $research->blockers === []
-            && ($mediaUsage === [] || strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED');
+            && ($captureMediaReconciliationRequired
+                ? $mediaComplete
+                : ($mediaUsage === [] || strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED'));
 
         return [
             'fresh_preflight' => true,
@@ -89,5 +96,26 @@ final class CaptureArticlePreflightHandoff
             'public_route_ready' => $publicRouteReady,
             'rendered_public_verification_status' => $renderedPublicStatus,
         ];
+    }
+
+    /** @param array<string,mixed> $mediaUsage @param array<string,mixed> $articleState */
+    private function validArticleMediaReadback(array $mediaUsage, array $articleState): bool
+    {
+        $requiredRoles = ['featured_primary', 'inline_primary'];
+        $roles = array_values(array_unique(array_filter(array_map('strval', (array) ($mediaUsage['roles'] ?? [])), static fn (string $role): bool => trim($role) !== '')));
+        $usageIds = array_values(array_unique(array_filter(array_map('strval', (array) ($mediaUsage['usage_ids'] ?? [])), static fn (string $id): bool => trim($id) !== '')));
+        $postId = (int) ($articleState['post_id'] ?? 0);
+        $blogId = max(1, (int) ($articleState['blog_id'] ?? (function_exists('get_current_blog_id') ? get_current_blog_id() : 1)));
+        $expectedEndpointKey = trim((string) ($articleState['endpoint_key'] ?? ''));
+        if ($expectedEndpointKey === '' && $postId > 0) $expectedEndpointKey = $blogId . ':' . $postId;
+        return strtoupper(trim((string) ($mediaUsage['state'] ?? ''))) === 'VERIFIED'
+            && (string) ($mediaUsage['endpoint_type'] ?? '') === 'wp_post'
+            && $expectedEndpointKey !== ''
+            && trim((string) ($mediaUsage['endpoint_key'] ?? '')) === $expectedEndpointKey
+            && array_diff($requiredRoles, $roles) === []
+            && count($usageIds) >= count($requiredRoles)
+            && count($usageIds) === count(array_unique($usageIds))
+            && trim((string) ($mediaUsage['source'] ?? '')) === 'ARTICLE_MEDIA_RECONCILIATION'
+            && (array) ($mediaUsage['blockers'] ?? []) === [];
     }
 }
