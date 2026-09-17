@@ -11941,3 +11941,32 @@ Authority test edits were preserved and are excluded from the implementation
 commit.
 
 STATUS: `VIDEO_RELATION_KEEP_AND_KNOWLEDGE_RETRY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Intent-scoped publication gates Slice 1 (LOCAL ONLY)
+
+SCOPE: Completed the approved Slice 1 publication/semantic-delta implementation
+family on the isolated feature worktree. Ordinary Article intents now carry an
+explicit semantic `NOT_REQUIRED`/`SKIPPED` requirement and do not create
+semantic Governance work; explicit Knowledge/Authority/MIXED branches retain
+the governed proposal, approval, controlled-apply and canonical readback path.
+
+IMPLEMENTED: Applicability-aware continuation planning, publication evidence
+packets, completion evidence for clean semantic skips, strict blocker handling,
+rendered-public compatibility for legacy packets, persisted intent handoff
+preservation, and local regression coverage for Article, explicit delta,
+identity/CAS and publication-gate boundaries.
+
+VERIFICATION: Slice 1 focused suite PASS — 60 tests / 306 assertions. Relevant
+contract suite PASS — 6 tests / 48 assertions. Related completion/router/research
+tests PASS — 43 tests / 147 assertions. Legacy publication compatibility tests
+PASS — 19 tests / 91 assertions. `composer lint`, PHP lint and
+`git diff --check` pass. Whole Unit remains limited by five unrelated
+environment/fixture failures: deployment configuration expectations and three
+missing media fixture files. WordPress integration variables are unavailable;
+no integration or live/staging mutation is claimed.
+
+REVIEW: Task reviews and Slice 1 review accepted with no P0/P1/P2 findings.
+No new entity type, predicate, endpoint type, media role, uploader, Video
+branch, schema mutation, deployment or live/staging write was introduced.
+
+STATUS: `SLICE_1_INTENT_SCOPED_PUBLICATION_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
