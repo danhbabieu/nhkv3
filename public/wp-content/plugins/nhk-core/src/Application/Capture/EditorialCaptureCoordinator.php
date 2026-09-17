@@ -84,8 +84,24 @@ final class EditorialCaptureCoordinator
                 'metadata' => is_array($input['metadata'] ?? null) ? $input['metadata'] : [],
                 'media_bindings' => is_array($input['media_bindings'] ?? null) ? $input['media_bindings'] : [],
                 'documentation_checkpoint' => is_array($input['documentation_checkpoint'] ?? null) ? $input['documentation_checkpoint'] : [],
+                // Retry may re-enter a child owner without accepting a new
+                // editorial payload. Persist only workflow controls that are
+                // not already represented by Capture context/assets; the
+                // native Post remains the sole Article-body owner.
+                'original_request' => [
+                    'intent' => trim((string) ($input['intent'] ?? '')),
+                    'publish' => ($input['publish'] ?? false) === true,
+                    'video' => is_array($input['video'] ?? null) ? $this->withoutBody($input['video']) : [],
+                ],
             ],
         ));
+        return $this->run($record, $input);
+    }
+
+    /** Resume the persisted Capture checkpoint without creating an addendum. */
+    public function retry(CaptureRecord $record, array $input): CaptureRecord
+    {
+        $this->documentation?->assertCheckpoint((array) ($input['documentation_checkpoint'] ?? []));
         return $this->run($record, $input);
     }
 

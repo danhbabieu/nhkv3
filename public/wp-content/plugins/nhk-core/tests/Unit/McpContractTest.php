@@ -603,6 +603,7 @@ final class McpContractTest extends TestCase
         self::assertArrayHasKey('capture_id', $tool['inputSchema']['properties']);
         self::assertSame('string', $tool['inputSchema']['properties']['capture_id']['type']);
         self::assertSame('uuid', $tool['inputSchema']['properties']['capture_id']['format']);
+        self::assertSame(['type' => 'string', 'enum' => ['RETRY']], $tool['inputSchema']['properties']['resume_mode']);
         self::assertSame([
             'type' => 'array',
             'minItems' => 1,

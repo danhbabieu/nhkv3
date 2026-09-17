@@ -427,6 +427,7 @@ final class McpTransport
         $hasExistingMediaUrls = isset($arguments['existing_media_urls']) && (array) $arguments['existing_media_urls'] !== [];
         $hasProvidedFiles = isset($arguments['files']) && (array) $arguments['files'] !== [];
         if (($hasMediaIds && ($hasProvidedFiles || $files !== [] || $hasExistingMediaUrls)) || ($hasExistingMediaUrls && ($hasProvidedFiles || $files !== []))) throw new \InvalidArgumentException('CAPTURE_PHYSICAL_INPUT_AMBIGUOUS');
+        if (strtoupper(trim((string) ($arguments['resume_mode'] ?? ''))) === 'RETRY' && !isset($arguments['capture_id'])) throw new \InvalidArgumentException('CAPTURE_RETRY_REQUIRES_CAPTURE_ID');
         if (is_array($arguments['resume_children'] ?? null) && $arguments['resume_children'] !== [] && !isset($arguments['capture_id'])) {
             throw new \InvalidArgumentException('CAPTURE_RESUME_REQUIRES_CAPTURE_ID');
         }
@@ -448,6 +449,7 @@ final class McpTransport
         if ($this->capture === null) throw new \RuntimeException('EDITORIAL_CAPTURE_UNAVAILABLE');
         if (isset($arguments['capture_id'])) {
             if ($this->captureContinuation === null) throw new \RuntimeException('EDITORIAL_CAPTURE_CONTINUATION_UNAVAILABLE');
+            if (strtoupper(trim((string) ($arguments['resume_mode'] ?? ''))) === 'RETRY') return $this->captureContinuation->retry($arguments);
             return $this->captureContinuation->execute($arguments);
         }
         return $this->capture->execute($arguments)->toArray();

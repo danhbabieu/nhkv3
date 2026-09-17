@@ -1,5 +1,53 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Systemic Capture retry/addendum boundary repair (LOCAL ONLY)
+
+SCOPE: Repaired the generic existing-Capture retry lifecycle at the canonical
+`nhk.capture.ingest` boundary. No live/staging Capture resume, Governance Apply,
+publication, deployment, SSH, direct SQL or push was performed.
+
+ROOT_CAUSE: Editorial requests carrying `capture_id` were unconditionally sent
+to `EditorialCaptureContinuationService::execute()`, where every supplied
+idempotency key was interpreted in the Capture Addendum namespace. Retrying a
+failed original Capture with its original logical key therefore could not reach
+the persisted Capture checkpoint and returned
+`CAPTURE_ADDENDUM_IDEMPOTENCY_CONFLICT`. Independently, the current local
+`WpPostEndpointResolver` already falls back from WordPress's zero-date GMT
+sentinel to native local modification time, and
+`CoreEndpointResolverRegistrar` registers that resolver. The observed live
+revision error is therefore still a deployed-runtime identity/reload question,
+not authorization to bypass Graph revision binding.
+
+FIX: Registered closed `resume_mode=RETRY` routing. Retry requires the exact
+`capture_id` and original Capture idempotency key, rejects a changed editorial
+payload, rehydrates persisted context/assets/Article identity/documentation
+checkpoint, carries the existing-Capture marker and original Governance key,
+and resumes through the same governed lifecycle without an Addendum, duplicate
+Capture, Article or physical phase replay. Completed Capture retry is a
+read-only replay. Default text and `ATTACH_ASSETS` continuations remain the
+separate Addendum namespace and behavior. Fresh Capture context now retains
+only body-free workflow controls needed to rehydrate publish/video control;
+WordPress remains the Article body owner.
+
+VERIFICATION: New retry/addendum/transport regressions plus Capture/MCP/Graph/
+Governance suite pass — 98 tests / 910 assertions (with expected PHPUnit
+deprecations). Full `NHK Unit` reaches 1,753 tests / 8,637 assertions with one
+pre-existing unrelated `DemoCutoverCliContractTest` failure
+(`REMOTE_DEPLOYMENT_FAILED` vs `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`), 14
+warnings and 18 deprecations. `composer lint` passes for the whole plugin,
+changed-file PHP lint passes, `git diff --check` passes and the diff secret
+review has no matches. Integration/runtime acceptance was not run because it
+would require the configured WordPress/MySQL environment and live authority.
+
+RUNTIME_IDENTITY_LOCAL: At this checkpoint HEAD is
+`7255f5259fb9a5164eaa5b688a08d33fcf3b479e`; local documentation bootstrap
+reports source/build/release/manifest identities from the current checkout.
+The canonical resolver has one production class/registration path; local CLI
+is PHP 8.5.7 with `PHP_SAPI=cli`, root Composer autoload and OPcache disabled.
+These CLI facts are not evidence about staging FPM/OPcache.
+
+STATUS: `CAPTURE_SYSTEMIC_RETRY_LOCAL_READY / LIVE_RUNTIME_RELOAD_AND_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-17 — Conversational Authority structured update transport (LOCAL ONLY)
 
 SCOPE: Repaired the existing `nhk.capture.ingest` Conversational Authority

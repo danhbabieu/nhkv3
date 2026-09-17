@@ -4,16 +4,152 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\{EditorialCaptureContinuationService, EditorialCaptureCoordinator};
+use NHK\Core\Application\Mcp\{McpDocumentationRegistry, McpGovernanceHandler, McpReadHandler, McpTransport};
+use NHK\Core\Application\Governance\GovernanceService;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\{CaptureAddendumRepository, CaptureRepository};
+use NHK\Core\Contracts\Authority\AuthorityRepository;
+use NHK\Core\Contracts\Knowledge\{EvidenceRepository, KnowledgeRepository, SourceRepository};
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
+use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Authority\EntityTypeRegistry;
 use NHK\Core\Domain\Capture\{CaptureAddendumRecord, CaptureRecord, CaptureStage};
 use NHK\Core\Domain\Video\VideoRelationEvidenceRequired;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid;
+use NHK\Tests\Support\InMemoryProposalRepository;
 use PHPUnit\Framework\TestCase;
 
 final class EditorialCaptureContinuationTest extends TestCase
 {
+    public function test_retry_resumes_original_capture_key_without_creating_addendum_or_replaying_physical_phases(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-original-retry',
+            hash('sha256', 'original-retry'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            342,
+            'state-342',
+            [],
+            [
+                'raw_input' => 'Ghi chú ban đầu.',
+                'subject_hints' => ['Odo 30'],
+                'title' => 'Bài 342',
+                'excerpt' => 'Tóm tắt.',
+                'metadata' => ['provenance_packets' => ['sources' => [['stable_key' => 'nhk:source:test']]]],
+                'content_intent' => ['intent' => 'TEXT_ARTICLE', 'article_required' => true],
+                'documentation_checkpoint' => ['manifest_hash' => str_repeat('a', 64), 'documentation_version' => str_repeat('b', 64)],
+                'original_request' => ['publish' => false],
+            ],
+            ['failure' => ['code' => 'CAPTURE_GOVERNANCE_FAILED', 'classification' => 'FAILED_RETRYABLE']],
+            ['SEMANTICS_RECONCILED' => ['status' => 'FAILED', 'result' => 'FAILED_RETRYABLE']],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $first = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+        ]);
+        $second = $service->retry([
+            'capture_id' => $capture->captureId,
+            'idempotency_key' => $capture->idempotencyKey,
+            'resume_mode' => 'RETRY',
+        ]);
+
+        self::assertSame('RETRY', $first['retry']['mode']);
+        self::assertSame($capture->captureId, $first['capture']['capture_id']);
+        self::assertSame($capture->idempotencyKey, $first['capture']['idempotency_key']);
+        self::assertSame($capture->captureId, $second['capture']['capture_id']);
+        self::assertCount(0, $addenda->records);
+        self::assertArrayNotHasKey('physical', $events);
+        self::assertArrayNotHasKey('draft', $events);
+        self::assertSame(1, $events['semantic']);
+        self::assertSame(['sources' => [['stable_key' => 'nhk:source:test']]], $events['provenance_packets']);
+        self::assertTrue($events['existing_capture_continuation']);
+        self::assertSame($capture->idempotencyKey, $events['continuation_idempotency_key']);
+    }
+
+    public function test_retry_requires_exact_original_key_and_rejects_new_editorial_payload(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = new CaptureRecord(
+            UuidCodec::newV7(),
+            'capture-retry-key',
+            hash('sha256', 'retry-key'),
+            CaptureStage::SEMANTICS_RECONCILED->value,
+            'FAILED_RETRYABLE',
+            null,
+            null,
+            [],
+            ['raw_input' => 'Nội dung gốc.', 'content_intent' => ['intent' => 'KNOWLEDGE_DELTA', 'article_required' => false]],
+            ['failure' => ['code' => 'CAPTURE_GOVERNANCE_FAILED']],
+            [],
+        );
+        $captures->create($capture);
+        $events = [];
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $this->coordinator($captures, $events));
+
+        $wrongKey = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => 'different-key', 'resume_mode' => 'RETRY']);
+        $payload = $service->retry(['capture_id' => $capture->captureId, 'idempotency_key' => $capture->idempotencyKey, 'resume_mode' => 'RETRY', 'text' => 'Không được đổi payload.']);
+
+        self::assertSame('FAILED', $wrongKey['retry']['status']);
+        self::assertSame('CAPTURE_RETRY_IDEMPOTENCY_KEY_MISMATCH', $wrongKey['retry']['code']);
+        self::assertSame('FAILED', $payload['retry']['status']);
+        self::assertSame('CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED', $payload['retry']['code']);
+        self::assertCount(0, $addenda->records);
+        self::assertArrayNotHasKey('semantic', $events);
+    }
+
+    public function test_transport_routes_explicit_retry_to_retry_boundary_not_addendum_boundary(): void
+    {
+        $captures = new ContinuationCaptureRepository();
+        $addenda = new ContinuationAddendumRepository();
+        $capture = $this->capture();
+        $captures->create($capture);
+        $events = [];
+        $coordinator = $this->coordinator($captures, $events);
+        $service = new EditorialCaptureContinuationService($captures, $addenda, $coordinator);
+        $documentation = new McpDocumentationRegistry();
+        $checkpoint = $documentation->bootstrap();
+        $transport = new McpTransport(
+            new McpReadHandler(
+                $this->createMock(AuthorityRepository::class), new EntityTypeRegistry(),
+                $this->createMock(MediaRepository::class), $this->createMock(MediaAssetRepository::class),
+                $this->createMock(MediaUsageRepository::class), $this->createMock(VideoRepository::class),
+                $this->createMock(KnowledgeRepository::class), $this->createMock(EvidenceRepository::class),
+                null, $this->createMock(SourceRepository::class), null, null, null,
+            ),
+            new McpGovernanceHandler(new GovernanceService(new InMemoryProposalRepository())),
+            static fn (string $capability): bool => true,
+            documentation: $documentation,
+            capture: $coordinator,
+            captureContinuation: $service,
+        );
+
+        $response = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => [
+            'name' => 'nhk.capture.ingest',
+            'arguments' => [
+                'capture_id' => $capture->captureId,
+                'idempotency_key' => $capture->idempotencyKey,
+                'resume_mode' => 'RETRY',
+                'documentation_checkpoint' => ['manifest_hash' => $checkpoint['manifest_hash'], 'documentation_version' => $checkpoint['documentation_version']],
+            ],
+        ]]);
+
+        self::assertSame(200, $response['status']);
+        self::assertSame('RETRY', $response['body']['result']['structuredContent']['retry']['mode']);
+        self::assertArrayNotHasKey('addendum', $response['body']['result']['structuredContent']);
+        self::assertCount(0, $addenda->records);
+    }
+
     public function test_existing_capture_continuation_preserves_governed_provenance_packets(): void
     {
         $captures = new ContinuationCaptureRepository();
@@ -581,7 +717,7 @@ final class EditorialCaptureContinuationTest extends TestCase
             new TextInputInterpreter(),
             new SubjectResolutionService(static fn (string $hint): array => []),
             new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
-            $semantic ?? static function (array $context) use (&$events): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; $events['merged_text'] = $context['raw_input']; $events['provenance_packets'] = $context['provenance_packets'] ?? null; return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
+            $semantic ?? static function (array $context) use (&$events): array { $events['semantic'] = ($events['semantic'] ?? 0) + 1; $events['merged_text'] = $context['raw_input']; $events['provenance_packets'] = $context['provenance_packets'] ?? null; $events['existing_capture_continuation'] = ($context['existing_capture_continuation'] ?? false) === true; $events['continuation_idempotency_key'] = $context['continuation_idempotency_key'] ?? null; return ['status' => 'REVIEW_REQUIRED', 'writes' => []]; },
             new ArticleComposer(),
             static function (array $context) use (&$events): array { $events['media'] = ($events['media'] ?? 0) + 1; return ['status' => 'RECONCILED']; },
             static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],

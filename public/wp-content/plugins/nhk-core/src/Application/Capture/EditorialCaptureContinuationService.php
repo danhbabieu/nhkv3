@@ -14,6 +14,34 @@ final class EditorialCaptureContinuationService
     /** @param callable(array<string,mixed>):array|null $assetIngest */
     public function __construct(private CaptureRepository $captures, private CaptureAddendumRepository $addenda, private EditorialCaptureCoordinator $coordinator, private $assetIngest = null) {}
 
+    /** @return array{capture:array<string,mixed>,retry:array<string,mixed>} */
+    public function retry(array $input): array
+    {
+        $captureId = trim((string) ($input['capture_id'] ?? ''));
+        $key = trim((string) ($input['idempotency_key'] ?? ''));
+        if (!UuidCodec::isValid($captureId)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_CAPTURE_ID_INVALID');
+        if ($key === '') return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_REQUIRED');
+        if (strtoupper(trim((string) ($input['resume_mode'] ?? ''))) !== 'RETRY') return $this->retryFailure($captureId, 'CAPTURE_RETRY_MODE_REQUIRED');
+        foreach (['text', 'content', 'title', 'excerpt', 'subject_hints', 'observations', 'metadata', 'media', 'items', 'media_ids', 'existing_media_urls', 'media_bindings', 'publish', 'video', 'files', 'followup_mode', 'intent', 'purpose'] as $field) {
+            if (!array_key_exists($field, $input)) continue;
+            $value = $input[$field];
+            if (is_array($value) ? $value !== [] : ($value === true || trim((string) $value) !== '')) return $this->retryFailure($captureId, 'CAPTURE_RETRY_PAYLOAD_NOT_ALLOWED');
+        }
+        $capture = $this->captures->findById($captureId);
+        if (!$capture instanceof CaptureRecord) return $this->retryFailure($captureId, 'CAPTURE_NOT_FOUND');
+        if (!hash_equals($capture->idempotencyKey, $key)) return $this->retryFailure($captureId, 'CAPTURE_RETRY_IDEMPOTENCY_KEY_MISMATCH', $capture);
+        if (in_array($capture->stage, [CaptureStage::READY_FOR_PUBLICATION->value, CaptureStage::PUBLISHED->value], true)) return ['capture' => $capture->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => 'REPLAYED', 'code' => null]];
+        if ($capture->status !== 'FAILED_RETRYABLE') return $this->retryFailure($captureId, 'CAPTURE_RETRY_NOT_ALLOWED', $capture);
+
+        $retryInput = $this->rehydrateRetryInput($capture, $input);
+        try {
+            $continued = $this->coordinator->retry($capture, $retryInput);
+            return ['capture' => $continued->toArray(), 'retry' => ['mode' => 'RETRY', 'status' => $continued->status, 'code' => $continued->diagnostics['failure']['code'] ?? null]];
+        } catch (\Throwable $error) {
+            return $this->retryFailure($captureId, $this->code($error), $this->captures->findById($captureId));
+        }
+    }
+
     /** @return array{capture:array<string,mixed>,addendum:array<string,mixed>} */
     public function execute(array $input): array
     {
@@ -162,6 +190,45 @@ final class EditorialCaptureContinuationService
             if (is_array($input['visual_context'] ?? null)) $payload['visual_context'] = $input['visual_context'];
         }
         return $payload;
+    }
+
+    /** @return array<string,mixed> */
+    private function rehydrateRetryInput(CaptureRecord $capture, array $control): array
+    {
+        $context = $capture->context;
+        $intent = is_array($context['content_intent'] ?? null) ? $context['content_intent'] : [];
+        $original = is_array($context['original_request'] ?? null) ? $context['original_request'] : [];
+        $governance = is_array($control['governance'] ?? null) ? $control['governance'] : [];
+        $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($control['resume_children'] ?? [])))));
+        if ($children === []) {
+            $children = array_values(array_unique(array_map('strtolower', array_map('strval', (array) ($capture->diagnostics['resume_hints']['resume_children'] ?? [])))));
+        }
+        if ($children !== []) $governance['resume_children'] = $children;
+        return [
+            'purpose' => (string) ($context['purpose'] ?? 'EDITORIAL'),
+            'idempotency_key' => $capture->idempotencyKey,
+            'text' => (string) ($context['raw_input'] ?? ''),
+            'title' => (string) ($context['title'] ?? ''),
+            'excerpt' => (string) ($context['excerpt'] ?? ''),
+            'subject_hints' => is_array($context['subject_hints'] ?? null) ? array_values($context['subject_hints']) : [],
+            'observations' => is_array($context['observations'] ?? null) ? $context['observations'] : [],
+            'metadata' => is_array($context['metadata'] ?? null) ? $context['metadata'] : [],
+            'media_bindings' => is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [],
+            'intent' => (string) ($intent['intent'] ?? ($original['intent'] ?? '')),
+            'publish' => ($original['publish'] ?? false) === true,
+            'video' => is_array($original['video'] ?? null) ? $original['video'] : [],
+            'documentation_checkpoint' => is_array($control['documentation_checkpoint'] ?? null) ? $control['documentation_checkpoint'] : (is_array($context['documentation_checkpoint'] ?? null) ? $context['documentation_checkpoint'] : []),
+            'governance' => $governance,
+            'existing_capture_retry' => true,
+            'existing_capture_continuation' => true,
+            'continuation_idempotency_key' => $capture->idempotencyKey,
+        ];
+    }
+
+    /** @return array{capture:array<string,mixed>,retry:array<string,mixed>} */
+    private function retryFailure(string $captureId, string $code, ?CaptureRecord $capture = null): array
+    {
+        return ['capture' => $capture?->toArray() ?? ['capture_id' => $captureId, 'status' => 'unavailable'], 'retry' => ['mode' => 'RETRY', 'status' => 'FAILED', 'code' => $code]];
     }
 
     private function fingerprint(array $input, ?CaptureAddendumRecord $existing = null): string

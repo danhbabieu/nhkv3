@@ -247,6 +247,13 @@ The bounded semantic resolver, Claim retrieval, Capture-owned Governance
 proposal/apply/read-back and Article/MediaUsage reconciliation run again for
 the existing Capture, followed by the same final read-back.
 
+An existing failed Capture is resumed separately from an addendum by sending
+`resume_mode=RETRY` with the exact original Capture idempotency key. Retry
+rehydrates the persisted request context and resumes its durable failed phase;
+it accepts no new editorial payload, never creates an addendum, and does not
+replay completed physical or Article-draft creation phases. A changed key,
+payload, documentation checkpoint or non-retryable Capture state fails closed.
+
 ## Capture composition and current-state reconciliation — 2026-09-09
 
 Một Capture tạo Article draft chỉ khi Content Intent là `IMAGE_ARTICLE` hoặc

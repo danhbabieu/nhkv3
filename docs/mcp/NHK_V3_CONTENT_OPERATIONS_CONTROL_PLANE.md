@@ -218,6 +218,25 @@ canonical read-back. The coordinator therefore reports `READY_FOR_PUBLICATION`
 or `REVIEW_REQUIRED` until semantic and owner-publication gates return verified
 read-backs.
 
+#### Existing-Capture retry/resume boundary
+
+`nhk.capture.ingest` distinguishes a failed Capture retry from an editorial
+addendum with the closed control field `resume_mode=RETRY`. A retry requires
+`capture_id` and the exact original Capture `idempotency_key`; it rehydrates the
+persisted Capture context, assets, Article identity/token, phase receipts and
+Governance control packet, then resumes the failed durable checkpoint. It does
+not create a Capture Addendum, accept replacement text/files/video, replay
+physical ingest or create a second Article/Media identity. A key mismatch,
+changed retry payload, unavailable checkpoint or non-retryable state fails
+closed. A completed Capture replay is read-only and returns its existing
+canonical state.
+
+The default `capture_id` continuation remains a real text or asset addendum:
+it uses a separate addendum idempotency key/fingerprint and may append a
+governed delta. This separation prevents a retry from becoming
+`CAPTURE_ADDENDUM_IDEMPOTENCY_CONFLICT` while preserving addendum conflict and
+governance-replay semantics.
+
 #### Existing-Capture continuation
 
 `nhk.capture.ingest` also supports a text-only addendum when `capture_id` is
