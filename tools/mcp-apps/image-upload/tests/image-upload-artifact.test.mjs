@@ -45,14 +45,18 @@ test("the final UI exposes exactly the two Vietnamese image actions", async () =
   assert.doesNotMatch(html, /Tải ảnh đã chọn/);
 });
 
-test("the View routes the two actions through one shared ordered Capture handoff", async () => {
+test("the View keeps upload-only fast and hands off to Capture only for Article", async () => {
   const view = await source();
 
-  assert.match(view, /"MEDIA_ENRICHMENT"/);
-  assert.match(view, /"IMAGE_ARTICLE"/);
+  assert.match(view, /async function uploadOnly/);
+  assert.match(view, /async function createArticle/);
+  assert.doesNotMatch(view, /uploadOnly[\s\S]{0,500}CAPTURE_TOOL_NAME/);
   assert.match(view, /media_ids:/);
   assert.match(view, /wp_ability_nhk_v3_capture_ingest/);
-  assert.doesNotMatch(view, /name:\s*CAPTURE_TOOL_NAME,[\s\S]{0,700}files:/);
+  assert.match(view, /title: articleTitle\.value\.trim\(\)/);
+  assert.match(view, /text: articleText\.value/);
+  assert.match(view, /metadata: \{ image_context: namingContext \}/);
+  assert.match(view, /publish: false/);
 });
 
 test("upload controls are gated by the connected lifecycle", async () => {
@@ -83,7 +87,10 @@ test("the View requires operator naming context and emits the required diagnosti
   const view = await source();
 
   assert.match(html, /id="context"/);
-  assert.match(html, /Mô tả ảnh \/ nội dung/);
+  assert.match(html, /Ngữ cảnh bộ ảnh/);
+  assert.match(html, /id="article-title"/);
+  assert.match(html, /id="article-text"/);
+  assert.match(html, /<details id="article-panel">/);
   for (const stage of [
     "BOOT", "RESOURCE_LOADED", "HOST_CAPABILITIES_READ", "FILE_SELECTED",
     "FILE_PREVIEW_READY", "HOST_FILE_UPLOAD_START", "HOST_FILE_UPLOAD_DONE",

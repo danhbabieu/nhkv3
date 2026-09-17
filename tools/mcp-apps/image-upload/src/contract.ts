@@ -30,7 +30,7 @@ export type BatchContext = {
   ordered_media_ids: string[];
   items: Array<Record<string, unknown>>;
   user_context: string;
-  media_commit_status: "COMPLETE" | "PARTIAL";
+  media_commit_status: "NOT_RUN" | "COMPLETE" | "PARTIAL";
   enrichment_status: "NOT_RUN" | "PENDING" | "PARTIAL" | "COMPLETE";
 };
 
@@ -43,7 +43,7 @@ export type WidgetDiagnostic = {
   tool?: string;
 };
 
-export type WidgetUploadStatus = "idle" | "complete" | "error";
+export type WidgetUploadStatus = "idle" | "partial" | "complete" | "error";
 
 export type SelectedImage =
   | { kind: "local"; file: File }
@@ -287,6 +287,27 @@ export function assertUploadManifestCount(manifest: UploadManifest, expected: nu
   if (manifest.status !== "success" || manifest.requested_count !== expected || manifest.success_count !== expected || manifest.failure_count !== 0 || manifest.items.some((item) => item.status !== "SUCCESS")) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
 }
 
+export function mergeUploadManifest(previous: UploadManifest, retry: UploadManifest, retriedOrdinals: number[]): UploadManifest {
+  if (retry.items.length !== retriedOrdinals.length) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+  const merged = previous.items.map((item, index) => ({ ...item, ordinal: item.ordinal ?? index }));
+  retry.items.forEach((item, index) => {
+    const ordinal = retriedOrdinals[index];
+    if (!Number.isInteger(ordinal) || ordinal < 0 || ordinal >= previous.requested_count) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
+    merged[ordinal] = { ...item, ordinal };
+  });
+  const successCount = merged.filter((item) => item.status === "SUCCESS").length;
+  const failureCount = merged.length - successCount;
+  return {
+    status: failureCount === 0 ? "success" : "partial_success",
+    requested_count: previous.requested_count,
+    success_count: successCount,
+    failure_count: failureCount,
+    items: merged,
+    ...(previous.batch_id || retry.batch_id ? { batch_id: previous.batch_id ?? retry.batch_id } : {}),
+    user_context: retry.user_context || previous.user_context,
+  };
+}
+
 export function extractUploads(result: ToolResult): UploadedItem[] {
   try {
     return extractUploadManifest(result).items;
@@ -311,7 +332,7 @@ export function buildBatchContext(items: UploadedItem[], manifest: Pick<UploadMa
       ...(item.error_code ? { error_code: item.error_code } : {}),
     })),
     user_context: manifest?.user_context ?? "",
-    media_commit_status: (manifest?.failure_count ?? 0) > 0 ? "PARTIAL" : "COMPLETE",
+    media_commit_status: manifest === null ? "NOT_RUN" : (manifest.failure_count ?? 0) > 0 ? "PARTIAL" : "COMPLETE",
     enrichment_status: enrichmentStatus,
   };
 }

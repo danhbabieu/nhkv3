@@ -52,6 +52,11 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame('success', $result['items'][0]['status']);
         self::assertSame('/anh/safe-1.webp', $result['uploads'][0]['canonical_url']);
         self::assertSame('verified', $result['uploads'][0]['attachment_readback_status']);
+        self::assertNotEmpty($result['batch_id']);
+        self::assertSame('Mặt trước đồng hồ Odo 36/10', $result['user_context']);
+        self::assertSame(['media-1'], $result['ordered_media_ids']);
+        self::assertSame('COMPLETE', $result['media_commit_status']);
+        self::assertSame('NOT_RUN', $result['enrichment_status']);
         self::assertSame([['widget-one', ['source' => 'chatgpt_widget', 'description' => 'Mặt trước đồng hồ Odo 36/10'], 'file_one']], $calls);
         self::assertSame(1, $materializerCalls);
     }
@@ -74,6 +79,8 @@ final class McpWidgetUploadTest extends TestCase
         self::assertCount(2, $result['uploads']);
         self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
         self::assertSame(['success', 'success'], array_column($result['items'], 'status'));
+        self::assertCount(2, $result['ordered_media_ids']);
+        self::assertSame('COMPLETE', $result['media_commit_status']);
         self::assertSame(1, $materializerCalls);
     }
 
@@ -96,6 +103,9 @@ final class McpWidgetUploadTest extends TestCase
         self::assertSame(1, $result['failure_count']);
         self::assertSame([0, 1], array_column($result['items'], 'ordinal'));
         self::assertSame(['success', 'error'], array_column($result['items'], 'status'));
+        self::assertSame(['media-1'], $result['ordered_media_ids']);
+        self::assertSame('PARTIAL', $result['media_commit_status']);
+        self::assertSame('NOT_RUN', $result['enrichment_status']);
         self::assertArrayNotHasKey('download_url', $result['items'][1]);
     }
 
@@ -242,7 +252,7 @@ final class McpWidgetUploadTest extends TestCase
                 if ($key === 'widget-partial') {
                     return ['items' => [$manifest[0]], 'errors' => [['client_file_id' => 'file_b', 'code' => 'TRUSTED_FILE_READ_FAILED']]];
                 }
-                return ['items' => $manifest];
+                return ['batch_id' => 'batch-' . $key, 'items' => $manifest];
             },
             static function (mixed $references) use (&$materializerCalls): array {
                 $materializerCalls++;

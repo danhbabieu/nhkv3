@@ -112,6 +112,25 @@ in another Article, Product, Specimen or projection.
 Existing legacy attachments are read-only unless a separately governed repair
 or migration task explicitly authorizes changes.
 
+## Image widget fast commit and Article handoff
+
+The ChatGPT image widget keeps `Ngữ cảnh bộ ảnh` as a short contextual field
+(maximum 500 characters) for the existing safe physical naming boundary. The
+upload action stops after attachment and canonical Media read-back and returns
+an ordered batch/continuation context with per-item status, canonical Media
+IDs and `enrichment_status=NOT_RUN`; it does not start Capture or downstream
+research. A partial batch retains successful items and typed failed children.
+Retrying it resubmits only failed children and retains successful Media IDs.
+
+The collapsible `Tạo bài viết` panel has separate optional title and long-form
+content fields. They map to `Capture.title` and `Capture.text` under
+`intent=IMAGE_ARTICLE`; the short image context remains metadata and never
+becomes `Media.description` or Article body. The handoff reuses the committed
+Media IDs and must not re-upload bytes or create duplicate attachments/Media.
+Article/enrichment failure is reported separately from an already successful
+Media commit. Batch context is workflow continuation metadata only and does
+not create an Album or other semantic owner; Video behavior is unchanged.
+
 ## Representative binding UX — 2026-09-17
 
 The normal image panel exposes: select an existing or newly uploaded Media,

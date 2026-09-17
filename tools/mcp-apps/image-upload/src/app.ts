@@ -1,5 +1,5 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { assertUploadManifestCount, buildWidgetState, extractUploadManifest, inspectToolResult, normalizeSelectedFiles, shouldProcessToolResultNotification, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
+import { assertUploadManifestCounts, buildWidgetState, extractUploadManifest, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification, type BatchContext, type SelectedImage, type ToolResult, type ToolResultNotificationSource, type UploadedItem, type UploadManifest, type WidgetDiagnostic, type WidgetUploadStatus } from "./contract";
 
 // Easy MCP exposes the internal/admin boundary under the registered
 // WordPress Ability name. callServerTool must use that exact runtime name;
@@ -10,7 +10,7 @@ const DOCUMENTATION_TOOL_NAME = "wp_ability_nhk_v3_documentation_bootstrap";
 const RESOURCE_URI = "ui://nhk/image-upload.html";
 const IMAGE_TYPES = /^(image\/jpeg|image\/png|image\/gif|image\/webp)$/;
 const IMAGE_ACCEPT = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "ERROR"] as const;
+const STATES = ["CONNECTING", "READY", "UPLOADING", "SUCCESS", "PARTIAL", "ERROR"] as const;
 type WidgetState = (typeof STATES)[number];
 
 type ChatGptFileApi = {
@@ -62,6 +62,8 @@ async function start(): Promise<void> {
   const status = byId<HTMLDivElement>("status");
   const results = byId<HTMLDivElement>("results");
   const context = byId<HTMLInputElement>("context");
+  const articleTitle = byId<HTMLInputElement>("article-title");
+  const articleText = byId<HTMLTextAreaElement>("article-text");
   const diagnosticsView = byId<HTMLDivElement>("diagnostics");
   const host = window.openai;
   const app = new App({ name: "NHK Image Upload", version: "1.0.0" });
@@ -69,10 +71,12 @@ async function start(): Promise<void> {
   let uploading = false;
   let selected: SelectedImage[] = [];
   let uploaded: UploadedItem[] = [];
+  let batchManifest: UploadManifest | null = null;
+  let enrichmentStatus: BatchContext["enrichment_status"] = "NOT_RUN";
   let diagnostics: WidgetDiagnostic[] = [];
   let uploadStatus: WidgetUploadStatus = "idle";
-  let failedIntent: "MEDIA_ENRICHMENT" | "IMAGE_ARTICLE" | null = null;
   let retryOperationKey: string | null = null;
+  let retryAttempt = 0;
 
   function renderDiagnostics(): void {
     diagnosticsView.replaceChildren();
@@ -99,7 +103,7 @@ async function start(): Promise<void> {
   function setState(next: WidgetState, message: string): void {
     state.textContent = next;
     status.dataset.state = next;
-    status.className = next === "ERROR" ? "failure" : next === "SUCCESS" ? "success" : "";
+    status.className = next === "ERROR" || next === "PARTIAL" ? "failure" : next === "SUCCESS" ? "success" : "";
     status.textContent = message;
   }
 
@@ -148,13 +152,21 @@ async function start(): Promise<void> {
 
   function saveWidgetState(): void {
     if (!connected || typeof host?.setWidgetState !== "function") return;
-    void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus));
+    void host.setWidgetState(buildWidgetState(uploaded, diagnostics, uploadStatus, batchManifest, enrichmentStatus));
+  }
+
+  function publishBatchContext(): void {
+    const state = buildWidgetState(uploaded, diagnostics, uploadStatus, batchManifest, enrichmentStatus);
+    if (connected && app.getHostCapabilities()?.updateModelContext) {
+      void app.updateModelContext({ structuredContent: state.modelContent.batch_context });
+    }
+    saveWidgetState();
   }
 
   function handleToolResult(result: ToolResult, expectedCount?: number, source: ToolResultNotificationSource = "widget-upload"): UploadedItem[] {
     if (!shouldProcessToolResultNotification(source)) return [];
     const manifest = extractUploadManifest(result);
-    if (expectedCount !== undefined) assertUploadManifestCount(manifest, expectedCount);
+    if (expectedCount !== undefined && manifest.requested_count !== expectedCount) throw new Error("MEDIA_READBACK_COUNT_MISMATCH");
     uploaded = manifest.items;
     renderUploads(uploaded);
     return uploaded;
@@ -179,10 +191,16 @@ async function start(): Promise<void> {
     if (typeof record.capture_id !== "string" && typeof record.capture?.capture_id !== "string") throw new Error("CAPTURE_READBACK_UNAVAILABLE");
   }
 
-  async function materializeSelectedImages(operationKey: string, namingContext: string): Promise<UploadedItem[]> {
-    if (uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return uploaded;
+  async function materializeSelectedImages(operationKey: string, namingContext: string, attempt: number): Promise<UploadManifest> {
+    if (batchManifest !== null && batchManifest.success_count === batchManifest.requested_count && uploaded.length === selected.length && uploaded.every((item) => Boolean(item.media_id))) return batchManifest;
+    const retryingPartialBatch = batchManifest?.status === "partial_success";
+    const sourceOrdinals = selected
+      .map((_item, index) => index)
+      .filter((index) => !retryingPartialBatch || batchManifest?.items[index]?.status !== "SUCCESS");
+    if (retryingPartialBatch && sourceOrdinals.length === 0) return batchManifest!;
     const references: Array<{ download_url: string; file_id: string; mime_type: string; file_name: string }> = [];
-    for (const item of selected) {
+    for (const index of sourceOrdinals) {
+      const item = selected[index];
       const fileName = item.kind === "local" ? item.file.name : item.fileName;
       recordDiagnostic("HOST_FILE_UPLOAD_START", "START", "HOST_FILE_UPLOAD_REQUESTED");
       setState("UPLOADING", `Đang tải ${fileName}…`);
@@ -199,35 +217,81 @@ async function start(): Promise<void> {
 
     const result = await app.callServerTool({
       name: SERVER_TOOL_NAME,
-      arguments: { idempotency_key: `${operationKey}:media`, metadata: { description: namingContext }, files: references },
+      arguments: { idempotency_key: `${operationKey}${retryingPartialBatch ? `:retry:${attempt}` : ":media"}`, metadata: { description: namingContext }, files: references },
     });
     recordDiagnostic("SERVER_TOOL_CALL_RESULT", "DONE", "SERVER_TOOL_RESULT_RECEIVED");
-    const returned = handleToolResult(result as ToolResult, selected.length, "widget-upload");
+    const manifest = extractUploadManifest(result as ToolResult);
+    assertUploadManifestCounts(manifest);
+    const logicalManifest = retryingPartialBatch ? mergeUploadManifest(batchManifest!, manifest, sourceOrdinals) : manifest;
+    const returned = handleToolResult({ structuredContent: logicalManifest }, undefined, "widget-upload");
+    batchManifest = logicalManifest;
+    enrichmentStatus = "NOT_RUN";
     recordDiagnostic("ATTACHMENT_READBACK_START", "START", "ATTACHMENT_READBACK_REQUESTED");
-    if (!returned.every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
+    if (!returned.filter((item) => item.status === "SUCCESS").every((item) => (item.attachment_id ?? 0) > 0 && item.attachment_readback_status === "verified")) throw new Error("ATTACHMENT_READBACK_UNVERIFIED");
     recordDiagnostic("ATTACHMENT_READBACK_DONE", "DONE", "ATTACHMENT_READBACK_VERIFIED");
-    if (!returned.every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
+    if (!returned.filter((item) => item.status === "SUCCESS").every((item) => Boolean(item.media_id) && Boolean(item.canonical_url) && Boolean(item.public_filename) && (item.width ?? 0) > 0 && (item.height ?? 0) > 0 && Boolean(item.mime) && (item.filesize ?? 0) > 0)) throw new Error("MEDIA_READBACK_UNVERIFIED");
     recordDiagnostic("MEDIA_READBACK_DONE", "DONE", "MEDIA_READBACK_VERIFIED");
-    return returned;
+    return logicalManifest;
   }
 
-  async function runFinalAction(intent: "MEDIA_ENRICHMENT" | "IMAGE_ARTICLE"): Promise<void> {
+  async function uploadOnly(): Promise<void> {
     if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
     const namingContext = context.value.trim();
     if (namingContext === "") {
       recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
-      setState("ERROR", "Hãy nhập mô tả ảnh hoặc nội dung trước khi thực hiện.");
+      setState("ERROR", "Hãy nhập ngữ cảnh bộ ảnh trước khi tải ảnh lên.");
       return;
     }
     uploading = true;
     uploadStatus = "idle";
+    enrichmentStatus = "NOT_RUN";
     renderSelection();
     setState("UPLOADING", "Đang xử lý ảnh đã chọn…");
-    const operationKey = failedIntent === intent && retryOperationKey !== null ? retryOperationKey : createIdempotencyKey();
+    const operationKey = retryOperationKey ?? createIdempotencyKey();
 
     try {
       recordDiagnostic("SERVER_TOOL_CALL_START", "START", "SERVER_TOOL_CALL_REQUESTED");
-      uploaded = await materializeSelectedImages(operationKey, namingContext);
+      const isRetry = batchManifest?.status === "partial_success";
+      if (isRetry) retryAttempt += 1;
+      const manifest = await materializeSelectedImages(operationKey, namingContext, retryAttempt);
+      uploadStatus = manifest.status === "success" ? "complete" : "partial";
+      publishBatchContext();
+      retryOperationKey = manifest.status === "partial_success" ? operationKey : null;
+      if (manifest.status === "success") retryAttempt = 0;
+      recordDiagnostic("MEDIA_COMMITTED", "DONE", manifest.status === "success" ? "MEDIA_COMMIT_COMPLETE" : "MEDIA_COMMIT_PARTIAL");
+      if (manifest.status === "success") {
+        setState("SUCCESS", `Đã tải ${manifest.success_count}/${manifest.requested_count} ảnh. Có thể tạo bài viết ở mục bên dưới.`);
+      } else {
+        setState("PARTIAL", `Đã tải ${manifest.success_count}/${manifest.requested_count} ảnh. Vui lòng thử lại ảnh lỗi.`);
+      }
+    } catch (error) {
+      uploadStatus = "error";
+      retryOperationKey = operationKey;
+      recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
+      setState("ERROR", `Tải ảnh thất bại: ${safeErrorMessage(error)}`);
+    } finally {
+      uploading = false;
+      renderSelection();
+    }
+  }
+
+  async function createArticle(): Promise<void> {
+    if (!connected || uploading || !supportsFileUpload() || selected.length === 0) return;
+    const namingContext = context.value.trim();
+    if (namingContext === "") {
+      recordDiagnostic("ERROR", "ERROR", "TRUSTWORTHY_FILENAME_CONTEXT_REQUIRED");
+      setState("ERROR", "Hãy nhập ngữ cảnh bộ ảnh trước khi tạo bài viết.");
+      return;
+    }
+    uploading = true;
+    enrichmentStatus = "PENDING";
+    renderSelection();
+    setState("UPLOADING", "Đang chuẩn bị bài viết từ Media đã tải…");
+    const operationKey = retryOperationKey ?? createIdempotencyKey();
+    try {
+      if (batchManifest?.status === "partial_success") throw new Error("PARTIAL_BATCH_NOT_READY");
+      const manifest = await materializeSelectedImages(operationKey, namingContext, 0);
+      if (manifest.status !== "success") throw new Error("PARTIAL_BATCH_NOT_READY");
       const docs = await app.callServerTool({ name: DOCUMENTATION_TOOL_NAME, arguments: {} });
       const checkpoint = checkpointFrom(docs as ToolResult);
       const capture = await app.callServerTool({
@@ -235,28 +299,31 @@ async function start(): Promise<void> {
         arguments: {
           idempotency_key: `${operationKey}:capture`,
           documentation_checkpoint: checkpoint,
-          intent: intent === "MEDIA_ENRICHMENT" ? "MEDIA_ENRICHMENT" : "IMAGE_ARTICLE",
-          text: namingContext,
-          title: namingContext,
+          intent: "IMAGE_ARTICLE",
+          title: articleTitle.value.trim(),
+          text: articleText.value,
+          metadata: { image_context: namingContext },
           media_ids: uploaded.map((item) => item.media_id).filter((id): id is string => Boolean(id)),
-          publish: intent === "IMAGE_ARTICLE",
+          publish: false,
         },
       });
       recordDiagnostic("CAPTURE_READBACK_START", "START", "CAPTURE_READBACK_REQUESTED");
       assertCaptureResult(capture as ToolResult);
       recordDiagnostic("CAPTURE_READBACK_DONE", "DONE", "CAPTURE_READBACK_VERIFIED");
+      enrichmentStatus = "COMPLETE";
       uploadStatus = "complete";
-      saveWidgetState();
-      failedIntent = null;
+      publishBatchContext();
       retryOperationKey = null;
-      recordDiagnostic("READY_FOR_USE", "DONE", "CAPTURE_WORKFLOW_COMPLETE");
-      setState("SUCCESS", intent === "MEDIA_ENRICHMENT" ? `Đã tải lên ${uploaded.length} ảnh.` : "Đã tạo bài viết từ ảnh đã chọn.");
+      retryAttempt = 0;
+      recordDiagnostic("READY_FOR_USE", "DONE", "MEDIA_COMMIT_READY");
+      setState("SUCCESS", "Đã tạo bài viết từ Media đã tải.");
     } catch (error) {
-      uploadStatus = "error";
-      failedIntent = intent;
+      enrichmentStatus = "PARTIAL";
+      uploadStatus = uploaded.some((item) => item.status === "SUCCESS") ? "complete" : "error";
       retryOperationKey = operationKey;
       recordDiagnostic("ERROR", "ERROR", diagnosticCode(error), error);
-      setState("ERROR", `${intent === "MEDIA_ENRICHMENT" ? "Tải ảnh" : "Tạo bài viết"} thất bại: ${safeErrorMessage(error)}`);
+      publishBatchContext();
+      setState("ERROR", `Tạo bài viết thất bại: ${safeErrorMessage(error)}`);
     } finally {
       uploading = false;
       renderSelection();
@@ -279,8 +346,10 @@ async function start(): Promise<void> {
   };
   input.addEventListener("change", () => {
     uploaded = [];
-    failedIntent = null;
+    batchManifest = null;
+    enrichmentStatus = "NOT_RUN";
     retryOperationKey = null;
+    retryAttempt = 0;
     selected = asFiles(input.files)
       .filter((file) => IMAGE_TYPES.test(file.type))
       .map((file) => ({ kind: "local" as const, file }));
@@ -292,8 +361,10 @@ async function start(): Promise<void> {
     if (!connected || typeof host?.selectFiles !== "function") return;
     try {
       uploaded = [];
-      failedIntent = null;
+      batchManifest = null;
+      enrichmentStatus = "NOT_RUN";
       retryOperationKey = null;
+      retryAttempt = 0;
       selected = normalizeSelectedFiles(await host.selectFiles());
       recordDiagnostic("FILE_SELECTED", "DONE", "LIBRARY_FILE_SELECTED");
       recordDiagnostic("FILE_PREVIEW_READY", "DONE", "LIBRARY_FILE_PREVIEW_READY");
@@ -303,8 +374,8 @@ async function start(): Promise<void> {
       setState("ERROR", `Chọn ảnh thất bại: ${safeErrorMessage(error)}`);
     }
   });
-  create.addEventListener("click", () => void runFinalAction("IMAGE_ARTICLE"));
-  upload.addEventListener("click", () => void runFinalAction("MEDIA_ENRICHMENT"));
+  create.addEventListener("click", () => void createArticle());
+  upload.addEventListener("click", () => void uploadOnly());
 
   setState("CONNECTING", "Đang kết nối tới MCP Apps host…");
   recordDiagnostic("BOOT", "DONE", "WIDGET_BOOT");
@@ -317,7 +388,7 @@ async function start(): Promise<void> {
     select.hidden = typeof host?.selectFiles !== "function";
     select.disabled = typeof host?.selectFiles !== "function";
     setState("READY", supportsFileUpload()
-      ? "Sẵn sàng. Chọn ảnh và nhập mô tả ảnh hoặc nội dung."
+      ? "Sẵn sàng. Chọn ảnh và nhập ngữ cảnh bộ ảnh."
       : "Đã kết nối nhưng host không hỗ trợ uploadFile và getFileDownloadUrl.");
     renderSelection();
   } catch (error: unknown) {

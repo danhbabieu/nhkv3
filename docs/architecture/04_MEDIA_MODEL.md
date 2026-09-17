@@ -32,6 +32,16 @@ mutation. It may hand its ordered canonical `media_ids` to Capture later; that
 path reuses the existing attachment/Media and does not re-download or
 duplicate it.
 
+The widget's upload-only action is a fast Media commit boundary. It returns a
+safe ordered batch/continuation context after attachment and Media read-back;
+the context is workflow metadata, not an Album, Authority entity, Graph edge,
+Knowledge record or Media owner. Optional enrichment remains `NOT_RUN`,
+`PENDING` or `PARTIAL` until an existing downstream workflow is explicitly
+continued. The Article action keeps its long body in `Capture.text` and sends
+the previously committed ordered Media IDs to `IMAGE_ARTICLE`, so a long
+Article request never travels through the 500-character media description and
+successful Media is never uploaded a second time.
+
 Article-scoped image title, alt text and caption are contextual placement
 metadata. They belong to the Article-owned MediaUsage/managed placement and do
 not overwrite the canonical Media name or the global WordPress attachment

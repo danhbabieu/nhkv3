@@ -16,8 +16,10 @@ incomplete batches; the 500-character `Ngữ cảnh bộ ảnh` remains contextu
 metadata only. No Album/Batch semantic owner or Video behavior was added.
 
 LOCAL_VERIFICATION: Widget typecheck, 32 widget tests and the Vite production
-build pass. PHP lint, focused PHP tests, full-suite status, secret review and
-diff checks remain pending at this checkpoint. Live acceptance remains
+build pass. Focused PHP coverage passes — 41 tests / 205 assertions — and PHP
+lint passes. The full suite remains environment-blocked by existing WordPress
+integration bootstrap errors plus unrelated Governance/CLI failures; diff and
+secret checks are complete below this checkpoint. Live acceptance remains
 fail-closed under the existing bounded `STAGING_ACCEPTANCE_SCOPE`.
 
 # Checkpoint — 2026-09-17 — Video root-cause contract repair (LOCAL ONLY)

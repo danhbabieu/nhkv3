@@ -731,8 +731,26 @@ returns only attachment/Media read-back fields and a safe opaque client
 `file_id` when one is available; session-scoped URI transport references and
 signed URLs are not returned in model-visible content. The widget state keeps
 `modelContent.uploaded_media`, private upload status and authorized
-`imageIds`. A follow-up action passes Media IDs to the existing Capture flow;
-it never uploads the same physical file again.
+`imageIds`, plus a machine-readable `batch_context` containing `batch_id`,
+ordered Media IDs, per-item status/attachment identity, the raw short user
+context, `media_commit_status` and `enrichment_status`. The widget also sends
+that batch context through `ui/update-model-context` when the host advertises
+the capability, so the next ChatGPT turn can reuse the exact ordered Media
+IDs without filename or public-URL guessing.
+
+The widget has two distinct phases. `Tải ảnh lên` performs only the fast
+physical Media commit and canonical attachment/Media read-back; it does not
+call Capture, research, SEO, Graph, Knowledge, Article or publication work.
+Its result is `MEDIA_COMMITTED`/`COMPLETE` with enrichment `NOT_RUN`, or an
+explicit partial per-item manifest. Retrying a partial batch submits only the
+failed children under a new bounded child idempotency key and retains the
+successful children. `Tạo bài viết` is a separate collapsible
+handoff: its short `Ngữ cảnh bộ ảnh` stays contextual metadata, while the
+Article title and long-form text map to `Capture.title` and `Capture.text`.
+It calls the existing `nhk.capture.ingest` with `intent=IMAGE_ARTICLE` and
+the already returned ordered `media_ids`; it never uploads the bytes again.
+An incomplete batch cannot be handed off as an Article, and a downstream
+Article/enrichment failure does not invalidate already committed Media.
 
 The same widget tools are also registered on the WordPress Ability surface as
 `nhk-v3/media-widget-upload` and `nhk-v3/media-upload-widget-open`. The upload

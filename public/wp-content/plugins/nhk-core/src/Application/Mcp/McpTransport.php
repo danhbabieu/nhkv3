@@ -341,8 +341,14 @@ final class McpTransport
             $uploads[] = $upload;
             $safeItems[] = $upload;
         }
+        $status = $uploads === [] ? 'error' : ($safeErrors === [] ? 'success' : 'partial_success');
         return [
-            'status' => $uploads === [] ? 'error' : ($safeErrors === [] ? 'success' : 'partial_success'),
+            'status' => $status,
+            'batch_id' => isset($manifest['batch_id']) ? (string) $manifest['batch_id'] : null,
+            'user_context' => $description,
+            'ordered_media_ids' => array_values(array_map(static fn (array $item): string => (string) ($item['media_id'] ?? ''), array_filter($uploads, static fn (array $item): bool => trim((string) ($item['media_id'] ?? '')) !== ''))),
+            'media_commit_status' => $status === 'success' ? 'COMPLETE' : ($status === 'partial_success' ? 'PARTIAL' : 'FAILED'),
+            'enrichment_status' => 'NOT_RUN',
             'requested_count' => count($references),
             'success_count' => count($uploads),
             'failure_count' => count($safeItems) - count($uploads),

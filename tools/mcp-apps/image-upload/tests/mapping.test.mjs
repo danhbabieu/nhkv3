@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertUploadManifestCount, assertUploadManifestCounts, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, normalizeSelectedFiles, shouldProcessToolResultNotification } from "../src/contract.ts";
+import { assertUploadManifestCount, assertUploadManifestCounts, buildWidgetState, extractPayload, extractUploadManifest, extractUploads, inspectToolResult, mergeUploadManifest, normalizeSelectedFiles, shouldProcessToolResultNotification } from "../src/contract.ts";
 
 test("does not parse the tool result that opened the widget as an upload result", () => {
   assert.equal(shouldProcessToolResultNotification("open"), false);
@@ -45,10 +45,21 @@ test("maps one widget-upload result without exposing its signed URL", () => {
     code: "MEDIA_READBACK_VERIFIED",
     uri: "ui://nhk/image-upload.html",
     tool: "nhk.media.widget-upload",
-  }]), {
-    modelContent: { uploaded_media: [{ attachment_id: 41, media_id: "media-one", public_filename: "one.webp", status: "SUCCESS" }] },
+    }]), {
+    modelContent: {
+      uploaded_media: [{ attachment_id: 41, media_id: "media-one", public_filename: "one.webp", status: "SUCCESS" }],
+      batch_context: {
+        ordered_media_ids: ["media-one"],
+        items: [{ position: 1, media_id: "media-one", attachment_id: 41, status: "SUCCESS" }],
+        user_context: "",
+        media_commit_status: "NOT_RUN",
+        enrichment_status: "NOT_RUN",
+      },
+    },
     privateContent: {
       upload_status: "complete",
+      media_commit_status: "NOT_RUN",
+      enrichment_status: "NOT_RUN",
       diagnostics: [{
         stage: "MEDIA_READBACK_DONE",
         status: "DONE",
@@ -154,6 +165,61 @@ test("preserves multi-image upload order in rendered and persisted mapping", () 
 
   assert.deepEqual(result.map((item) => item.media_id), ["media-one", "media-two"]);
   assert.deepEqual(buildWidgetState(result).imageIds, ["file-one", "file-two"]);
+});
+
+test("preserves durable batch context and excludes transport URLs", () => {
+  const manifest = extractUploadManifest({ structuredContent: {
+    batch_id: "batch-one",
+    user_context: "máy, mặt trước, logo",
+    status: "success",
+    requested_count: 2,
+    success_count: 2,
+    failure_count: 0,
+    items: [
+      { ordinal: 0, status: "success", media_id: "media-one", attachment_id: 41 },
+      { ordinal: 1, status: "success", media_id: "media-two", attachment_id: 42, download_url: "https://signed.invalid/x" },
+    ],
+  } });
+  const state = buildWidgetState(manifest.items, [], "complete", manifest);
+  assert.deepEqual(state.modelContent.batch_context, {
+    batch_id: "batch-one",
+    ordered_media_ids: ["media-one", "media-two"],
+    items: [
+      { position: 1, media_id: "media-one", attachment_id: 41, status: "SUCCESS" },
+      { position: 2, media_id: "media-two", attachment_id: 42, status: "SUCCESS" },
+    ],
+    user_context: "máy, mặt trước, logo",
+    media_commit_status: "COMPLETE",
+    enrichment_status: "NOT_RUN",
+  });
+  assert.equal(JSON.stringify(state).includes("signed.invalid"), false);
+});
+
+test("retries only failed children while retaining successful batch items", () => {
+  const merged = mergeUploadManifest({
+    batch_id: "batch-retry",
+    user_context: "máy ảnh",
+    status: "partial_success",
+    requested_count: 3,
+    success_count: 2,
+    failure_count: 1,
+    items: [
+      { ordinal: 0, status: "SUCCESS", media_id: "media-one", attachment_id: 41 },
+      { ordinal: 1, status: "FAILED", error_code: "PROVIDED_FILE_HTTP_STATUS" },
+      { ordinal: 2, status: "SUCCESS", media_id: "media-three", attachment_id: 43 },
+    ],
+  }, {
+    status: "success",
+    requested_count: 1,
+    success_count: 1,
+    failure_count: 0,
+    items: [{ ordinal: 0, status: "SUCCESS", media_id: "media-two", attachment_id: 42 }],
+    user_context: "máy ảnh",
+  }, [1]);
+
+  assert.equal(merged.status, "success");
+  assert.deepEqual(merged.items.map((item) => item.media_id), ["media-one", "media-two", "media-three"]);
+  assert.deepEqual(merged.items.map((item) => item.ordinal), [0, 1, 2]);
 });
 
 test("preserves a typed error from a nested Ability result envelope", () => {

@@ -28,7 +28,7 @@ final class McpAppsImageUploadTest extends TestCase
         self::assertStringContainsString('getFileDownloadUrl', $resource['contents'][0]['text']);
         self::assertStringContainsString('setWidgetState', $resource['contents'][0]['text']);
         self::assertStringContainsString('wp_ability_nhk_v3_capture_ingest', $resource['contents'][0]['text']);
-        self::assertStringContainsString('Dùng các ảnh NHK đã tải trong Capture tiếp theo', $resource['contents'][0]['text']);
+        self::assertStringContainsString('Ảnh được tải trước; bài viết có thể tạo sau từ đúng Media vừa tải.', $resource['contents'][0]['text']);
     }
 
     public function test_mcp_transport_exposes_resource_methods_and_render_tool(): void
@@ -41,7 +41,7 @@ final class McpAppsImageUploadTest extends TestCase
 
         $read = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'resources/read', 'params' => ['uri' => 'ui://nhk/image-upload.html']]);
         self::assertSame(200, $read['status']);
-        self::assertStringContainsString('Dùng các ảnh NHK đã tải trong Capture tiếp theo', $read['body']['result']['contents'][0]['text']);
+        self::assertStringContainsString('Ảnh được tải trước; bài viết có thể tạo sau từ đúng Media vừa tải.', $read['body']['result']['contents'][0]['text']);
 
         $open = $transport->dispatch(['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call', 'params' => ['name' => 'nhk.media.upload-widget.open', 'arguments' => []]]);
         self::assertSame(200, $open['status']);
