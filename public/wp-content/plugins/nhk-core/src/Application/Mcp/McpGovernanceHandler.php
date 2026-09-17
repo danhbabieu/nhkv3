@@ -107,6 +107,9 @@ final class McpGovernanceHandler implements GovernedLifecycle
             $subjectId = trim((string) ($payload['source_key'] ?? '')) ?: 'relation';
         }
         if ($subjectId === '' && $entityType === 'video' && $targetUuid !== null) $subjectId = $targetUuid;
+        if ($operation === 'update' && (!array_key_exists('expected_revision', $arguments) || (int) $arguments['expected_revision'] < 1)) {
+            throw new \InvalidArgumentException('EXPECTED_REVISION_REQUIRED_FOR_UPDATE');
+        }
         $expectedRevision = $operation === 'relation_create' ? null : (array_key_exists('expected_revision', $arguments) && $arguments['expected_revision'] !== null
             ? max(1, (int) $arguments['expected_revision'])
             : ($operation === 'representative_bind'

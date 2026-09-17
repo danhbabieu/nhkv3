@@ -553,6 +553,83 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame($relationTarget, $updated?->metadata['semantic_attachments'][0]['target_uuid']);
     }
 
+    public function test_stale_persisted_video_proposal_revision_is_rebuilt_from_current_resume_plan(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $repository = new class($videoId) implements VideoRepository {
+            public Video $video;
+
+            public function __construct(string $id)
+            {
+                $this->video = new Video($id, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Nguồn video', [
+                    'source' => ['external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'source_title' => 'Nguồn video'],
+                    'editorial_input_fingerprint' => 'placeholder',
+                    'editorial' => ['title' => 'Video tham chiếu NHK', 'summary' => 'OLD SUMMARY', 'body' => 'OLD BODY', 'why_this_matters' => 'OLD WHY'],
+                ], null, true, 5);
+            }
+
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->video->canonicalId ? $this->video : null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return $platform === $this->video->platform && $externalId === $this->video->externalVideoId ? $this->video : null; }
+            public function create(Video $video): Video { return $this->video = $video; }
+            public function update(Video $video, int $expectedRevision): Video
+            {
+                if ($this->video->revision !== $expectedRevision) throw new \RuntimeException('Video revision conflict.');
+                return $this->video = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata, $video->thumbnailMediaId, $video->active, $expectedRevision + 1);
+            }
+            public function list(bool $includeRetired = false): array { return [$this->video]; }
+            public function replaceMetadata(array $metadata): void { $this->video = new Video($this->video->canonicalId, $this->video->platform, $this->video->externalVideoId, $this->video->canonicalUrl, $this->video->title, $metadata, $this->video->thumbnailMediaId, $this->video->active, $this->video->revision); }
+            public function replaceTitle(string $title): void { $this->video = new Video($this->video->canonicalId, $this->video->platform, $this->video->externalVideoId, $this->video->canonicalUrl, $title, $this->video->metadata, $this->video->thumbnailMediaId, $this->video->active, $this->video->revision); }
+        };
+        $context = [
+            'capture_id' => 'capture-resume',
+            'continuation_delta_text' => '',
+            'subject_resolution' => ['primary' => ['id' => '22222222-2222-4222-8222-222222222222', 'type' => 'variant', 'name' => 'Junghans W64']],
+            'retrieval' => ['selected_claims' => []],
+        ];
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $currentPlan = $planner->plan(['payload' => ['canonical_id' => $videoId]], $context);
+        $repository->replaceMetadata($currentPlan['payload']['metadata']);
+        $repository->replaceTitle('Video tham chiếu NHK');
+        $currentPlan = $planner->plan(['payload' => ['canonical_id' => $videoId]], $context);
+        self::assertSame(5, $currentPlan['expected_revision']);
+
+        $staleProposal = new Proposal(UuidCodec::newV7(), $videoId, 'update', $currentPlan['payload'], 'content', 1, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:capture-resume:video-editorial:' . $currentPlan['fingerprint'], targetUuid: $videoId, entityType: 'video');
+        $freshProposal = null;
+        $createdExpectedRevision = null;
+        $governance = new class($staleProposal, $freshProposal, $createdExpectedRevision, $videoId) implements GovernedLifecycle {
+            public function __construct(private Proposal $stale, private ?Proposal &$fresh, private ?int &$createdRevision, private string $videoId) {}
+            public function findByIdempotencyKey(string $key): ?Proposal { return $key === $this->stale->idempotencyKey ? $this->stale : null; }
+            public function createFromArguments(array $arguments): Proposal
+            {
+                $this->createdRevision = $arguments['expected_revision'] ?? null;
+                if (($arguments['entity_type'] ?? '') !== 'video' || ($arguments['operation'] ?? '') !== 'update' || ($arguments['target_uuid'] ?? '') !== $this->videoId || ($arguments['expected_revision'] ?? null) !== 5) throw new \RuntimeException('CURRENT_VIDEO_REVISION_NOT_PROPAGATED');
+                return $this->fresh = new Proposal(UuidCodec::newV7(), $this->videoId, 'update', $arguments['payload'], 'content', (int) $arguments['expected_revision'], 'dependency', ProposalState::DRAFT, idempotencyKey: (string) $arguments['idempotency_key'], targetUuid: $this->videoId, entityType: 'video');
+            }
+            public function submit(string $id): Proposal { return $this->fresh = $this->fresh?->transition(ProposalState::SUBMITTED) ?? throw new \RuntimeException('FRESH_VIDEO_PROPOSAL_MISSING'); }
+            public function review(string $id): array { return ['state' => $this->fresh?->state->value ?? 'draft', 'entity_type' => 'video', 'operation' => 'update', 'subject_id' => $this->videoId, 'target_uuid' => $this->videoId, 'expected_revision' => $this->fresh?->expectedRevision, 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']; }
+            public function approve(string $id, string $contentFingerprint, string $dependencyFingerprint, string $actor): Proposal { return $this->fresh = $this->fresh?->transition(ProposalState::APPROVED, $actor) ?? throw new \RuntimeException('FRESH_VIDEO_PROPOSAL_MISSING'); }
+            public function eligibility(string $id): array { return ['ready' => true]; }
+        };
+        $apply = static function (string $proposalId) use (&$freshProposal, $repository): array {
+            $updated = (new VideoService($repository))->update($freshProposal->payload['canonical_id'], $freshProposal->payload['title'], $freshProposal->payload['metadata'], null, $freshProposal->expectedRevision ?? 0);
+            return ['canonical_id' => $updated->canonicalId, 'canonical_readback' => ['canonical_id' => $updated->canonicalId, 'active' => $updated->active, 'revision' => $updated->revision, 'title' => $updated->title]];
+        };
+        $service = new GovernedCaptureContinuationService($governance, $apply, $this->policies(['video'], ['video' => 'AUTO_PUBLISH']), static fn (): bool => true, null, null, null, null, null, null, null, null, $planner);
+
+        $result = $service->execute('capture-resume', 'resume-editorial', $context + [
+            'capture_id' => 'capture-resume',
+            'existing_capture_continuation' => true,
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]],
+        ], ['resume_children' => ['video']]);
+
+        self::assertSame(5, $createdExpectedRevision);
+        self::assertSame(5, $freshProposal?->expectedRevision);
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame($videoId, $result['writes'][0]['canonical_id']);
+        self::assertSame($videoId, $repository->findByCanonicalId($videoId)?->canonicalId);
+        self::assertSame(6, $repository->findByCanonicalId($videoId)?->revision);
+    }
+
     public function test_invalid_hydrated_video_subject_uses_governed_replacement_boundary(): void
     {
         $videoId = UuidCodec::newV7();

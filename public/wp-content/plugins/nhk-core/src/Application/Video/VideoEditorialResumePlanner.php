@@ -92,7 +92,11 @@ final class VideoEditorialResumePlanner
             'subject_id' => $video->canonicalId,
             'target_uuid' => $video->canonicalId,
             'expected_revision' => $video->revision,
-            'idempotency_key' => 'capture:' . (string) ($context['capture_id'] ?? $video->canonicalId) . ':video-editorial:' . $fingerprint,
+            // The canonical revision is part of the governed command identity.
+            // A prior proposal for the same semantic fingerprint may carry an
+            // obsolete CAS revision; never let that proposal be reused for a
+            // newer canonical read.
+            'idempotency_key' => 'capture:' . (string) ($context['capture_id'] ?? $video->canonicalId) . ':video-editorial:revision:' . $video->revision . ':' . $fingerprint,
             'fingerprint' => $fingerprint,
             'payload' => [
                 'canonical_id' => $video->canonicalId,

@@ -1,5 +1,32 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-17 — Dedicated `/tri-thuc/` WordPress archive template (LOCAL READY)
+
+SCOPE: Repaired only the `/tri-thuc/` frontend route/template handoff. No
+taxonomy, category, post body, staging/production data, direct database write or
+semantic mutation was performed.
+
+ROOT_CAUSE: The presentation route still depended on the generic `index.php`
+branch and a `pre_get_posts` mutation of the main query. That left the public
+archive render coupled to route/query-var handoff instead of making the
+presentation template own its required native WordPress query.
+
+FIX: `/tri-thuc/` now selects a dedicated `tri-thuc.php` template. That template
+creates a direct `WP_Query` for published `post` records in category ID 4,
+ordered by date descending and paged from the current route, renders cards from
+that query's loop, and paginates from `max_num_pages`. The route no longer
+registers the `pre_get_posts` archive mutation. The existing one-hop redirect
+from `/category/tri-thuc-dong-ho/` remains unchanged, including page 2.
+
+VERIFICATION: TDD RED reproduced the missing-template/old-handoff contract;
+GREEN focused route tests pass 9 tests / 52 assertions. Frontend contract and
+presentation tests pass 79 tests / 815 assertions with one existing warning.
+Changed PHP files lint clean, `git diff --check` passes and changed-scope secret
+review has no matches. Staging deploy and fresh live HTML read-back remain
+pending this checkpoint.
+
+STATUS: `TRI_THUC_DEDICATED_TEMPLATE_LOCAL_READY / LIVE_VERIFY_PENDING`.
+
 # Checkpoint — 2026-09-17 — UUID-only Conversational Authority UPDATE repair (LOCAL ONLY)
 
 SCOPE: Repaired the narrow structured `authority_intent.requests[]` Authority
@@ -12245,3 +12272,38 @@ remains local-ready; external deployment/runtime identity verification remains
 operator-gated.
 
 STATUS: `LOCAL_RUNTIME_VERIFIED / INTEGRATION_PREEXISTING_BLOCKERS / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-17 — Video resume CAS revision propagation (LOCAL ONLY)
+
+SCOPE: Repaired the existing Capture Video resume path so a governed Video
+UPDATE cannot reuse a stale Proposal whose CAS revision was read from an older
+canonical state. No server edit, SSH, deployment, push or live/staging
+semantic mutation was performed.
+
+ROOT_CAUSE: `VideoEditorialResumePlanner` read the current canonical Video
+revision correctly, but its idempotency key contained only Capture and
+editorial fingerprint. `GovernedCaptureContinuationService` therefore reused
+an older persisted Proposal for the same fingerprint even when that Proposal
+carried `expected_revision=1` and the current canonical read carried revision
+5. The candidate revision was not lost by Proposal persistence; the stale
+Proposal was selected before a new Proposal was created.
+
+FIX: Video UPDATE command identity now includes the canonical revision, so a
+stale Proposal cannot satisfy a newer CAS read. `McpGovernanceHandler` also
+fails closed when an UPDATE omits or supplies an invalid expected revision.
+Canonical Video read failure remains fail-closed before Proposal creation.
+Same Video UUID and governed apply/read-back semantics are preserved.
+
+VERIFICATION: Focused Video/Capture/Governance suite passes 60 tests / 230
+assertions. Provenance, Video reconciliation, relation, SEO/search,
+Public-URL and Knowledge-focused selection passes 106 tests / 411 assertions.
+`composer lint` passes, `git diff --check` passes and changed-scope secret
+review has no matches. Full Unit reaches 1,771 tests with two unrelated
+failures in `DemoCutoverCliContractTest` and `TriThucArchiveRouteTest`; full
+Integration/Contract execution remains environment-blocked by missing
+WordPress/MySQL bootstrap (`stdClass::query()`, missing `NHK_WP_TEST_PATH`).
+
+LIVE_STATUS: No deployment, SSH, server edit, push or live/staging mutation was
+performed. Ready for the user to push/pull and run the approved acceptance.
+
+STATUS: `VIDEO_CAS_REVISION_LOCAL_READY / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.

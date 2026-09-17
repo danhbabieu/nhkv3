@@ -353,6 +353,40 @@ final class GovernanceCoreTest extends TestCase
         self::assertSame('submitted', $review['state']);
     }
 
+    public function test_video_update_persists_explicit_expected_revision_and_rejects_missing_revision(): void
+    {
+        $repository = new InMemoryProposalRepository();
+        $handler = new McpGovernanceHandler(new GovernanceService($repository));
+        $videoId = UuidCodec::newV7();
+        $proposal = $handler->createFromArguments([
+            'operation' => 'update',
+            'entity_type' => 'video',
+            'subject_id' => $videoId,
+            'target_uuid' => $videoId,
+            'expected_revision' => 5,
+            'payload' => ['canonical_id' => $videoId, 'title' => 'W64'],
+            'idempotency_key' => 'video-update-revision-5',
+        ]);
+
+        self::assertSame(5, $proposal->expectedRevision);
+        self::assertSame(5, $repository->find($proposal->id)?->expectedRevision);
+
+        try {
+            $handler->createFromArguments([
+                'operation' => 'update',
+                'entity_type' => 'video',
+                'subject_id' => $videoId,
+                'target_uuid' => $videoId,
+                'payload' => ['canonical_id' => $videoId, 'title' => 'W64'],
+                'idempotency_key' => 'video-update-missing-revision',
+            ]);
+            self::fail('Expected missing Video update revision to fail closed.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertSame('EXPECTED_REVISION_REQUIRED_FOR_UPDATE', $error->getMessage());
+        }
+        self::assertNull($repository->findByIdempotencyKey('video-update-missing-revision'));
+    }
+
     #[RunInSeparateProcess]
     public function test_relation_create_does_not_return_an_unreadable_in_memory_proposal(): void
     {

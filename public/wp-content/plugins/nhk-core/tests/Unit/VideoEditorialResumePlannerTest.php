@@ -81,6 +81,21 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertSame($plan['payload']['metadata']['editorial_input_fingerprint'], $repository->findByCanonicalId($videoId)?->metadata['editorial_input_fingerprint']);
     }
 
+    public function test_video_resume_fails_closed_before_proposal_when_canonical_owner_cannot_be_read(): void
+    {
+        $repository = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+
+        $this->expectExceptionMessage('VIDEO_CANONICAL_READBACK_UNAVAILABLE');
+        $planner->plan(['payload' => ['canonical_id' => '01a0aaf8-2a84-7287-bbd8-70af4d5485e4']], $this->resumeContext());
+    }
+
     public function test_same_effective_resume_input_reuses_existing_fingerprint_without_update_plan(): void
     {
         $videoId = '01a07971-2fe3-77da-9424-998cf6f249e0';
