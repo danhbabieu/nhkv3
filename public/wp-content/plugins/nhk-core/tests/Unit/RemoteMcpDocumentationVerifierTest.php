@@ -218,6 +218,7 @@ final class RemoteMcpDocumentationVerifierTest extends TestCase
         ] + ['release_identity' => McpReleaseIdentity::hash([
             'runtime_version' => '0.1.0', 'source_revision' => str_repeat('1', 40),
             'documentation_version' => str_repeat('d', 64), 'manifest_hash' => str_repeat('e', 64),
+            'build_identity' => str_repeat('f', 64),
             'catalog_version' => str_repeat('a', 64), 'resource_version' => str_repeat('b', 64),
             'environment' => 'staging', 'semantic_write_policy' => 'PROJECT_BUILD_ONLY', 'project_build_enabled' => true,
         ])];

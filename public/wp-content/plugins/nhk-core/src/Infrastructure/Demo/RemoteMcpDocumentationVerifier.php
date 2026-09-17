@@ -109,7 +109,7 @@ final class RemoteMcpDocumentationVerifier
             if (!array_key_exists($field, $expected) || !array_key_exists($field, $actual) || (string) $actual[$field] !== (string) $expected[$field]) return false;
         }
         $identity = $expected;
-        unset($identity['release_identity'], $identity['files'], $identity['manifest'], $identity['build_identity']);
+        unset($identity['release_identity'], $identity['files'], $identity['manifest']);
         return McpReleaseIdentity::hash($identity) === (string) $expected['release_identity'];
     }
 
