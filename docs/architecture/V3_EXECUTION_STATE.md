@@ -12486,3 +12486,28 @@ pass. Integration/live acceptance remains blocked by the documented local
 WordPress/MySQL bootstrap prerequisites.
 
 STATUS: `DYNAMIC_MEDIA_SCOPE_LOCAL_READY / FULL_UNIT_ONE_UNRELATED_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-18 — Video UPDATE expected-revision propagation (LOCAL ONLY)
+
+SCOPE: Traced and repaired the local Capture Video candidate → semantic
+write-back → Governance Proposal command path. No staging/production mutation,
+deployment, SSH, push or public URL reprojection was performed.
+
+ROOT_CAUSE: The fallback Video candidate mapper in
+`GovernedCaptureContinuationService::plans()` rebuilt the Governance arguments
+without copying the candidate's `expected_revision`. A valid UPDATE therefore
+reached `McpGovernanceHandler` without its canonical CAS revision and correctly
+failed closed before Proposal creation.
+
+FIX: The mapper now preserves the candidate's explicit `expected_revision`
+when rebuilding Video commands. Governance validation remains unchanged; no
+default, target UUID or repository fallback is introduced. CREATE/ingest
+commands remain unaffected.
+
+VERIFICATION: Focused Capture/Video/Governance selection passes 154 tests /
+625 assertions. Changed-scope PHP lint, `git diff --check` and secret review
+pass. Existing stale-resume coverage confirms canonical revision 5 reaches the
+Governance command, persists on the Proposal, and increments to 6 only after
+CAS apply.
+
+STATUS: `VIDEO_EXPECTED_REVISION_LOCAL_READY / NO_LIVE_ACCEPTANCE / READY_FOR_USER_PUSH_PULL`.

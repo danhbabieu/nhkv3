@@ -365,7 +365,16 @@ final class GovernedCaptureContinuationService
                 ])];
                 continue;
             }
-            $plans[] = $this->arguments($entityType, $operation, $subjectId, $payload, 'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)));
+            $plans[] = $this->arguments(
+                $entityType,
+                $operation,
+                $subjectId,
+                $payload,
+                'capture:' . $captureId . ':video:' . hash('sha256', CommandCanonicalizer::canonicalize($payload)),
+                array_key_exists('expected_revision', $video) && $video['expected_revision'] !== null
+                    ? (int) $video['expected_revision']
+                    : null,
+            );
         }
         return $plans;
     }
@@ -883,9 +892,11 @@ final class GovernedCaptureContinuationService
     }
 
     /** @return array<string,mixed> */
-    private function arguments(string $entityType, string $operation, string $subjectId, array $payload, string $idempotencyKey): array
+    private function arguments(string $entityType, string $operation, string $subjectId, array $payload, string $idempotencyKey, ?int $expectedRevision = null): array
     {
-        return ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'payload' => $payload, 'idempotency_key' => $idempotencyKey];
+        $arguments = ['operation' => $operation, 'entity_type' => $entityType, 'subject_id' => $subjectId, 'payload' => $payload, 'idempotency_key' => $idempotencyKey];
+        if ($expectedRevision !== null) $arguments['expected_revision'] = $expectedRevision;
+        return $arguments;
     }
 
     private function proposalFromReview(string $id, array $review): Proposal

@@ -630,6 +630,31 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame(6, $repository->findByCanonicalId($videoId)?->revision);
     }
 
+    public function test_video_candidate_mapper_preserves_expected_revision_for_governance_update(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $plans = new \ReflectionMethod($service, 'plans');
+        $plans->setAccessible(true);
+
+        $planned = $plans->invoke($service, 'capture-video-update', 'continuation', [
+            'assets' => [[
+                'kind' => 'video',
+                'video_proposal' => [
+                    'operation' => 'update',
+                    'entity_type' => 'video',
+                    'subject_id' => $videoId,
+                    'target_uuid' => $videoId,
+                    'expected_revision' => 5,
+                    'payload' => ['canonical_id' => $videoId, 'title' => 'W64'],
+                ],
+            ]],
+        ], true);
+
+        self::assertSame('update', $planned[0]['operation']);
+        self::assertSame(5, $planned[0]['expected_revision']);
+    }
+
     public function test_invalid_hydrated_video_subject_uses_governed_replacement_boundary(): void
     {
         $videoId = UuidCodec::newV7();
