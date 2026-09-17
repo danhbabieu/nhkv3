@@ -11975,3 +11975,31 @@ success output, with its long-running shell result not surfaced by the command
 runner. No integration or runtime acceptance was run.
 
 STATUS: `CAPTURE_ARTICLE_ENDPOINT_REVISION_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Video editorial reuse canonical parity (LOCAL ONLY)
+
+SCOPE: Corrected the existing Capture Video resume decision so a matching
+editorial input fingerprint is not sufficient for `REUSE_EDITORIAL`. The
+planner now compares the canonical Video UUID, external identity, stored
+fingerprint, editorial package, subject packet, SEO projection and replay
+semantic targets before reuse. A stale replay returns a governed same-UUID
+`video/update` plan with `STALE_EDITORIAL_REPLAY`; the captured editorial
+package is used as the replay expectation when available, preserving the
+requested editorial title without special-casing any subject.
+
+COMPLETION_GUARD: Capture Video publication verification now requires
+canonical editorial read-back parity and rejects a stale Public Identity when
+its persisted path disagrees with the desired SEO projection. No URL
+reprojection or Public Identity mutation was added.
+
+VERIFICATION: Focused Video/Capture/relation/Knowledge/instruction/subject
+suite PASS — 116 tests / 508 assertions. Frontend/Search/public Video/SEO
+suite PASS — 106 tests / 886 assertions. Full `NHK Unit` reached 1,748 tests /
+8,602 assertions with one unrelated `DemoCutoverCliContractTest` failure
+(`REMOTE_DEPLOYMENT_FAILED` vs expected `REMOTE_DEPLOYMENT_CONFIG_REQUIRED`),
+which also fails when run alone and is outside this diff. `composer lint` and
+`git diff --check` pass. Secret scan found no matching repository secrets.
+Integration/runtime acceptance was not run; no live/staging mutation,
+deployment or push occurred.
+
+STATUS: `VIDEO_EDITORIAL_REUSE_CANONICAL_PARITY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.

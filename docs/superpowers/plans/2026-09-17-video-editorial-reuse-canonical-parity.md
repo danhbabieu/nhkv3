@@ -29,7 +29,7 @@
 - Consumes: `VideoEditorialResumePlanner::plan(array $videoProposal, array $context): array`.
 - Produces: tests requiring reuse only after parity and requiring an update for stale canonical payloads.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add tests using deterministic helper fixtures for:
 
@@ -39,7 +39,7 @@ Add tests using deterministic helper fixtures for:
 
 The fixture must assert parity for UUID, platform, external ID, canonical URL, editorial package/title, subject packet, SEO package, `open_graph`, and `video_object`. Build the expected package through the real generator/projection, not copied prose.
 
-- [ ] **Step 2: Run the focused test to verify RED**
+- [x] **Step 2: Run the focused test to verify RED**
 
 ```bash
 vendor/bin/phpunit --configuration phpunit.xml.dist --filter VideoEditorialResumePlannerTest --testdox
@@ -57,21 +57,21 @@ Expected: the new stale-field tests fail because the current planner trusts the 
 - Consumes: canonical `Video`, normalized source/subject/claims, `VideoEditorialGenerator`, and `VideoSeoProjection`.
 - Produces: `REUSE_EDITORIAL` only for fingerprint + parity; otherwise the existing governed update plan with a stale-replay diagnostic.
 
-- [ ] **Step 1: Factor desired-package construction**
+- [x] **Step 1: Factor desired-package construction**
 
 Extract the existing enrichment/editorial/SEO construction into a private method returning the desired `editorial`, `seo`, `subject_resolution_packet`, `enrichment_context`, and `seo_projection`. Preserve current generated output.
 
-- [ ] **Step 2: Add the canonical parity predicate**
+- [x] **Step 2: Add the canonical parity predicate**
 
 Before the fingerprint-match reuse return, reconstruct the desired package and compare the canonical Video UUID, platform, external ID, canonical URL, stored input fingerprint, `metadata.editorial`, `metadata.seo`, `metadata.subject_resolution_packet`, and `metadata.seo_projection` including any required revision/fingerprint token. Compare only fields owned by this editorial package so relation reconciliation can update other metadata independently.
 
 If parity fails, return the normal `REBUILD_EDITORIAL` update payload and add an internal `STALE_EDITORIAL_REPLAY` diagnostic. Do not change the Video UUID, source identity, relation state or URL allocation.
 
-- [ ] **Step 3: Make reuse read-back explicit**
+- [x] **Step 3: Make reuse read-back explicit**
 
 Extend the reuse packet with verified canonical title/package, subject, SEO parity and current revision. It must not imply completion from fingerprint equality alone.
 
-- [ ] **Step 4: Run the focused test to verify GREEN**
+- [x] **Step 4: Run the focused test to verify GREEN**
 
 ```bash
 vendor/bin/phpunit --configuration phpunit.xml.dist --filter VideoEditorialResumePlannerTest --testdox
@@ -90,27 +90,27 @@ vendor/bin/phpunit --configuration phpunit.xml.dist --filter VideoEditorialResum
 - Consumes: planner update/reuse result, governed Video update executor, canonical repository read-back, `VideoSearchDocument`, `MediaVideoPageQuery`, and `CompletionCoordinator`.
 - Produces: same-UUID update after a prior downstream failure, relation KEEP plus editorial update, corrected Search/SEO output, and non-COMPLETE completion for mismatched canonical title.
 
-- [ ] **Step 1: Add retry regression before any extra production change**
+- [x] **Step 1: Add retry regression before any extra production change**
 
 Persist the editorial fingerprint before a simulated downstream relation failure and leave canonical editorial fields stale. An explicit `resume_children=['video']` retry must create a governed `video/update` plan, preserve the UUID, and use the current revision.
 
-- [ ] **Step 2: Add relation KEEP coverage**
+- [x] **Step 2: Add relation KEEP coverage**
 
 Return an active correct `about` relation with KEEP/reused semantics. Assert the editorial update executes exactly once, with no new relation and no duplicate Knowledge.
 
-- [ ] **Step 3: Assert canonical/Search/SEO parity after update**
+- [x] **Step 3: Assert canonical/Search/SEO parity after update**
 
 After the governed update, read the original UUID and assert the corrected title appears in canonical editorial metadata, `VideoSearchDocument::title()`, `seo_projection.title`, Open Graph title and VideoObject name. Assert stale Public Identity/slug is not treated as projection consistency and no URL reprojection is invoked.
 
-- [ ] **Step 4: Add the completion gate regression**
+- [x] **Step 4: Add the completion gate regression**
 
 Assert a Video/Capture completion packet is not `COMPLETE` while canonical read-back has the wrong editorial title or lacks the required parity marker; matching canonical read-back may complete.
 
-- [ ] **Step 5: Preserve unrelated invariants**
+- [x] **Step 5: Preserve unrelated invariants**
 
 Keep regressions for `non_semantic_context`, `SUBJECT_CONFLICT_REVIEW_REQUIRED`, no duplicate Knowledge, no Media/Article 564/image-uploader changes, no W200/RvRFz5D_scc behavior, and no use of proposal `01a0ae3f-6404-7df2-b0c0-55d21b481513`.
 
-- [ ] **Step 6: Run the focused regression slice**
+- [x] **Step 6: Run the focused regression slice**
 
 ```bash
 vendor/bin/phpunit --configuration phpunit.xml.dist --filter 'VideoEditorialResumePlannerTest|GovernedCaptureContinuationServiceTest|VideoCompletenessPersistenceTest|VideoSearch|Search|Projection|Completion' --testdox
@@ -122,11 +122,11 @@ vendor/bin/phpunit --configuration phpunit.xml.dist --filter 'VideoEditorialResu
 - Modify: `docs/architecture/V3_EXECUTION_STATE.md` with a local-code checkpoint after verification
 - Read: `docs/architecture/V2_V3_PARITY_MATRIX.md` before any parity claim
 
-- [ ] **Step 1: Run required focused families**
+- [x] **Step 1: Run required focused families**
 
 Run Existing Capture video resume, Video correction, canonical Video repository, relation KEEP, Search, public/SEO projection, Capture completion, and Knowledge retry tests using the exact files/filters discovered during implementation.
 
-- [ ] **Step 2: Run quality gates**
+- [x] **Step 2: Run quality gates**
 
 ```bash
 composer lint
@@ -136,11 +136,11 @@ rg -n --hidden --glob '!vendor/**' --glob '!node_modules/**' '(BEGIN (RSA|OPENSS
 
 The secret scan must produce no repository secrets; do not print or commit environment files, tokens or credentials.
 
-- [ ] **Step 3: Record the local checkpoint**
+- [x] **Step 3: Record the local checkpoint**
 
 Read the current relevant execution-state section and the full parity matrix. Append the root cause, canonical parity gate, focused test result, and any unavailable integration boundary. Do not claim live/deployed parity.
 
-- [ ] **Step 4: Inspect and commit locally**
+- [x] **Step 4: Inspect and commit locally**
 
 ```bash
 git status --short
