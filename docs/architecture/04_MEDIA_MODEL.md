@@ -182,6 +182,24 @@ asset/WordPress metadata. Không download URL, không filename similarity, khôn
 Graph traversal/NLP cho exact typed binding và không tạo Graph edge để biểu diễn
 representative.
 
+### Capture acceptance scope — server-issued and immutable
+
+Một Capture `MEDIA_ENRICHMENT` ở staging chỉ được phép tiếp tục khi
+`StagingAcceptanceScopeVerifier` phát hành packet từ chính Capture fingerprint,
+exact Media UUID, exact target type/UUID và binding intent. Packet có
+`operation_family`, canonical writer/entrypoint, thời hạn, fingerprint và chữ ký
+HMAC của server; client không thể hợp thức hóa `approved=true`, thay Media,
+target, Capture hoặc operation bằng cách sửa payload.
+
+`MediaBindingStagingGuard` và `OperationScopedStagingGuard` dùng cùng một
+verifier owner. Direct `USER_EXPLICIT/PINNED` đi qua `MediaBindingService`;
+`SYSTEM_AUTO/AUTO` phải đi qua Governance `representative_bind` và không được
+đi tắt qua typed Capture binding. Capture-derived packet không dùng whitelist
+Media UUID lịch sử; các ID tĩnh trong acceptance package cũ chỉ còn là manual
+legacy evidence, không phải authority cho Capture mới. Thiếu secret, admission,
+signature, exact scope, expiry hoặc final read-back đều fail closed; production
+không bao giờ được bật đường staging này.
+
 Auto-discovery is exposed as a bounded candidate recipe, not as unrestricted
 Graph traversal: `RepresentativeEligibilityRegistry` admits only registered
 target types with explicit scope evidence, then `MediaBindingService` scores

@@ -414,6 +414,28 @@ final class ContentIntentRouterTest extends TestCase
         self::assertSame('MEDIA_BINDING_FINAL_READBACK_REQUIRED', $result->diagnostics['failure']['code']);
     }
 
+    public function test_system_auto_typed_capture_requires_governance_and_never_calls_direct_binding(): void
+    {
+        $binding = new CountingMediaBindingPort(['status' => 'COMPLETE', 'media_ids' => [], 'bindings' => []]);
+        $coordinator = $this->typedMediaCoordinator($binding);
+
+        $result = $coordinator->execute([
+            'idempotency_key' => 'typed-media-enrichment-system-auto',
+            'intent' => 'MEDIA_ENRICHMENT',
+            'text' => 'Bổ sung ảnh đại diện tự động.',
+            'media_bindings' => [[
+                'media_ref' => ['item_index' => 0],
+                'target' => ['type' => 'classification', 'id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3'],
+                'role' => 'representative',
+                'selection_source' => 'SYSTEM_AUTO',
+                'selection_policy' => 'AUTO',
+            ]],
+        ]);
+
+        self::assertSame('MEDIA_BINDING_GOVERNANCE_REQUIRED', $result->diagnostics['failure']['code']);
+        self::assertSame(0, $binding->calls);
+    }
+
     private function typedMediaCoordinator(CountingMediaBindingPort $binding): EditorialCaptureCoordinator
     {
         return new EditorialCaptureCoordinator(

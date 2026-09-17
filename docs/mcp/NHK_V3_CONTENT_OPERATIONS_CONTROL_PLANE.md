@@ -185,6 +185,17 @@ MediaUsage representative reconciliation → SEO/projection invalidation →
 canonical read-back. It does not require an Article, NLP, Claims or Graph
 traversal. `nhk.media.bind` uses the same owner for an existing Media.
 
+For staging acceptance, a new Capture does not trust a client-provided approval
+packet or a historical static Media-ID list. The server issues one immutable
+scope from the Capture request fingerprint and exact binding references. The
+scope binds environment, operation family, canonical writer/entrypoint, exact
+Media UUIDs, exact target type/UUID, selection intent, expiry, fingerprint and
+HMAC signature. The direct MediaBinding guard and the governed proposal guard
+share this verifier; missing, expired, altered, wrong-Capture, wrong-Media,
+wrong-target or wrong-operation scope is rejected, and production is always
+blocked. `USER_EXPLICIT/PINNED` stays in the MediaBinding owner, while
+`SYSTEM_AUTO/AUTO` is routed through Governance `representative_bind`.
+
 The binding receipt stages are `VALIDATE`, `RESOLVE_MEDIA`, `RESOLVE_TARGET`,
 `PLAN`, `APPLY_USAGE`, `RECONCILE_REPRESENTATIVE`, `SEO_INVALIDATE`,
 `PROJECTION_INVALIDATE`, `FINAL_READBACK`, and `COMPLETE`; retries never create a

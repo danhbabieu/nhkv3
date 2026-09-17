@@ -12387,3 +12387,38 @@ deprecations. Integration/runtime acceptance is environment-blocked: required
 WordPress/MySQL variables and `NHK_WP_TEST_PATH` are unset.
 
 STATUS: `MEDIA_BINDING_SCOPE_LOCAL_READY / FULL_UNIT_PREEXISTING_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
+
+# Checkpoint — 2026-09-18 — Dynamic Capture-derived Media acceptance scope (LOCAL ONLY)
+
+SCOPE: Completed the local architecture slice for a new staging Capture
+`MEDIA_ENRICHMENT` → representative MediaBinding acceptance boundary. No
+staging/production mutation, deployment, SSH, push, direct database write or
+live acceptance was performed.
+
+ROOT_CAUSE: The earlier boundary could receive `staging_acceptance` from the
+caller and had no single server-issued verifier wired into both direct
+MediaBinding and governed proposal paths. That left the new-Capture path
+dependent on caller-shaped approval data and historical static acceptance IDs.
+
+FIX: `StagingAcceptanceScopeVerifier` now derives exact Media UUIDs from the
+Capture binding/assets and exact target type/UUID, requires server-side
+admission, signs an immutable fingerprint with expiry and rejects production.
+The packet is persisted in Capture context and reused only after exact
+verification. `GovernanceRuntimeFactory` wires one verifier instance into both
+`MediaBindingStagingGuard` and `OperationScopedStagingGuard`; the typed Capture
+path ignores client-supplied approval, blocks `SYSTEM_AUTO/AUTO` direct binding,
+and requires Governance for that mode. No new-Capture production code uses a
+static Media UUID whitelist; old package IDs remain legacy/manual evidence only.
+
+VERIFICATION: Focused staging-scope, typed Capture, MediaBinding and Governance
+selection passes 40 tests / 120 assertions. The added tests cover dynamic scope,
+no static Media IDs, server signature, immutable fingerprint, wrong
+Media/target/operation/Capture, production, missing direct scope and
+`SYSTEM_AUTO` direct-path blocking. Unit-only execution passes 1,795 tests /
+8,830 assertions with one unrelated pre-existing `DemoCutoverCliContractTest`
+diagnostic mismatch (`REMOTE_DEPLOYMENT_FAILED` versus the test's
+`REMOTE_DEPLOYMENT_CONFIG_REQUIRED`). PHP lint, diff check and secret review
+pass. Integration/live acceptance remains blocked by the documented local
+WordPress/MySQL bootstrap prerequisites.
+
+STATUS: `DYNAMIC_MEDIA_SCOPE_LOCAL_READY / FULL_UNIT_ONE_UNRELATED_FAILURE / INTEGRATION_ENVIRONMENT_BLOCKED / LIVE_ACCEPTANCE_NOT_RUN`.
