@@ -104,6 +104,33 @@ after the Constitution.
   package remains historical evidence and is not part of this Public Clock
   run. Future content families require a newly authorized bounded package.
 
+- Additional bounded staging acceptance scope for Media binding case 567:
+  - environment: `staging`
+  - host: `https://demo.1945.vn`
+  - allowed_media_ids: `[01a0ab0c-fde0-7c01-a89d-fc5eef832c89]`
+  - allowed_attachment_ids: `[567]`
+  - allowed_target_ids: `[01a07614-832d-7f27-959c-74eb0cd63f3e]`
+  - allowed_target_types: `[classification]`
+  - allowed_target_stable_keys: `[nhk:classification:clock-type.cuckoo-clock]`
+  - allowed_target_names: `[Đồng hồ chim cúc cu]`
+  - allowed_binding:
+    - operation: `nhk.media.bind`
+    - receipt_operation: `nhk.media.binding.get`
+    - role: `representative`
+    - selection_source: `USER_EXPLICIT`
+    - selection_policy: `PINNED`
+  - allowed_operation_families:
+    - media_usage_reconciliation
+    - presentation_readiness
+    - frontend_projection_readback
+    - canonical_readback
+  - restrictions:
+    - exact IDs only; no fuzzy resolution
+    - no Media, attachment or Classification creation
+    - no duplicate binary, entity mutation, Graph relation or Knowledge mutation
+    - no `media_ingest`, manual SQL, direct table writer or unrelated staging mutation
+  - fail_closed_outside_scope: `true`
+
 
 
 - Development database is nhk_v3; integration database is nhk_v3_test.
