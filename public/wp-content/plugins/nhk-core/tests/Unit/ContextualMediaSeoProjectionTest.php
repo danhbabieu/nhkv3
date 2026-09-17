@@ -82,7 +82,7 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:62');
 
         self::assertFalse($result['eligible']);
-        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertSame(MediaSeoStateRegistry::INCOMPLETE_FEATURED, $result['state']);
         self::assertNull($result['url']);
     }
 
