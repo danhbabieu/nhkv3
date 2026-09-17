@@ -75,6 +75,12 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame('VERIFIED', $result['requirements']['semantic_delta']['state']);
         self::assertSame(['PROPOSAL', 'SUBMIT', 'APPROVE', 'ELIGIBILITY', 'CONTROLLED_APPLY'], $result['governance']['lifecycle']);
         self::assertCount(2, $result['writes']);
+        foreach ($result['writes'] as $write) {
+            self::assertArrayHasKey('canonical_readback', $write);
+            self::assertSame($write['canonical_id'], $write['canonical_readback']['canonical_id']);
+            self::assertTrue($write['canonical_readback']['active']);
+            self::assertGreaterThan(0, $write['canonical_readback']['revision']);
+        }
         self::assertSame('APPLIED', $result['status']);
     }
 
@@ -93,7 +99,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         $result = $service->execute('capture-mixed', 'resume-mixed', [
             'purpose' => 'MIXED',
-            'content_intent' => ['intent' => 'MIXED', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true]],
+            'content_intent' => ['intent' => 'IMAGE_ARTICLE', 'source' => 'CAPTURE', 'semantic_delta' => ['status' => 'REQUIRED', 'approved' => true]],
             'subject_resolution' => ['primary' => ['id' => $subject, 'type' => 'variant', 'revision' => 2], 'resolved' => [['id' => $subject, 'type' => 'variant', 'revision' => 2]]],
         ], ['proposal_ids' => [$proposalId]]);
 

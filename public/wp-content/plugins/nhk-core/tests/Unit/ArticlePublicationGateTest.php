@@ -115,12 +115,7 @@ final class ArticlePublicationGateTest extends TestCase
     {
         $evidence = $this->evidence();
         $evidence['semantic_readback_verified'] = false;
-        $evidence['requirements'] = [
-            'semantic_delta' => ['applicability' => 'NOT_APPLICABLE', 'policy' => 'VERIFY', 'state' => 'SKIPPED'],
-            'article_media' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
-            'public_route' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
-            'rendered_public' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
-        ];
+        $evidence['requirements'] = $this->requirements();
 
         $draft = $this->draft();
         $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
@@ -129,6 +124,48 @@ final class ArticlePublicationGateTest extends TestCase
         self::assertNotContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
         self::assertNotContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
         self::assertNotContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+    }
+
+    public function test_gate_blocks_unverified_required_article_media_even_when_semantic_is_not_applicable(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['semantic_readback_verified'] = false;
+        $evidence['requirements'] = $this->requirements('article_media');
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('MEDIAUSAGE_INCOMPLETE', $result->blockers);
+        self::assertNotContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
+    }
+
+    public function test_gate_blocks_unverified_required_public_route_even_when_semantic_is_not_applicable(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['semantic_readback_verified'] = false;
+        $evidence['requirements'] = $this->requirements('public_route');
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('PUBLIC_ROUTE_NOT_READY', $result->blockers);
+        self::assertNotContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
+    }
+
+    public function test_gate_blocks_unverified_required_rendered_public_readback_even_when_semantic_is_not_applicable(): void
+    {
+        $evidence = $this->evidence();
+        $evidence['semantic_readback_verified'] = false;
+        $evidence['requirements'] = $this->requirements('rendered_public');
+
+        $draft = $this->draft();
+        $result = (new ArticlePublicationGate())->check($draft, $evidence, $draft->token);
+
+        self::assertFalse($result->eligible);
+        self::assertContains('RENDERED_PUBLIC_VERIFICATION_UNAVAILABLE', $result->blockers);
+        self::assertNotContains('SEMANTIC_READBACK_UNVERIFIED', $result->blockers);
     }
 
     /** @return array<string,mixed> */
@@ -140,6 +177,19 @@ final class ArticlePublicationGateTest extends TestCase
             'media_usage_complete', 'real_image_requirements_met', 'claim_compliance_acceptable',
             'seo_projection_valid', 'internal_links_valid', 'structured_data_valid', 'public_route_ready', 'rendered_public_verification',
         ], true);
+    }
+
+    /** @return array<string,array<string,string>> */
+    private function requirements(string $unverified = ''): array
+    {
+        $requirements = [
+            'semantic_delta' => ['applicability' => 'NOT_APPLICABLE', 'policy' => 'VERIFY', 'state' => 'SKIPPED'],
+            'article_media' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+            'public_route' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+            'rendered_public' => ['applicability' => 'REQUIRED', 'policy' => 'VERIFY', 'state' => 'VERIFIED'],
+        ];
+        if ($unverified !== '') $requirements[$unverified]['state'] = 'PENDING';
+        return $requirements;
     }
 
     private function draft(): EditorialPostState
