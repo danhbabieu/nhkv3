@@ -205,6 +205,54 @@ final class AuthorityIntentPlannerTest extends TestCase
         self::assertSame($entity->revision, $plan['update_candidates'][0]['expected_revision']);
     }
 
+    public function test_existing_brand_full_allowed_delta_is_one_exact_update_candidate(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [
+            'aliases' => ['Gebrüder Hermle'],
+            'description' => 'Cũ.',
+            'country' => 'Đức',
+            'founded_year' => 1920,
+        ]);
+        $delta = [
+            'aliases' => ['Gebrüder Hermle', 'Hermle Uhren'],
+            'description' => 'Mô tả mới.',
+            'country' => 'Đức',
+            'founded_year' => 1922,
+        ];
+
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'text' => 'Cập nhật hồ sơ Hermle.',
+            'authority_intent' => ['mode' => 'PLAN', 'requests' => [[
+                'entity_type' => 'brand', 'name' => 'Hermle', 'payload_delta' => $delta,
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['update_candidates']);
+        self::assertSame([], $plan['create_candidates']);
+        self::assertSame([], $plan['reuse']);
+        self::assertSame(['aliases' => ['Gebrüder Hermle', 'Hermle Uhren'], 'description' => 'Mô tả mới.', 'founded_year' => 1922], $plan['update_candidates'][0]['payload_patch']);
+        self::assertSame($entity->canonicalId, $plan['update_candidates'][0]['canonical_uuid']);
+        self::assertSame($entity->revision, $plan['update_candidates'][0]['expected_revision']);
+        self::assertSame($entity->payload, $plan['update_candidates'][0]['before']);
+        self::assertSame(array_replace($entity->payload, $delta), $plan['update_candidates'][0]['after']);
+    }
+
+    public function test_same_brand_allowed_delta_is_explicit_noop_reuse(): void
+    {
+        $entity = $this->entity('brand', 'nhk:brand:hermle', 'Hermle', [
+            'aliases' => ['Hermle Uhren'], 'description' => 'Mô tả.', 'country' => 'Đức', 'founded_year' => 1922,
+        ]);
+        $plan = (new AuthorityIntentPlanner(new PlannerAuthorityRepository([$entity]), $this->types))->plan([
+            'authority_intent' => ['requests' => [[
+                'entity_type' => 'brand', 'name' => 'Hermle', 'payload_delta' => $entity->payload,
+            ]]],
+        ]);
+
+        self::assertCount(1, $plan['reuse']);
+        self::assertSame('NOOP_VALUES_MATCH', $plan['reuse'][0]['reason']);
+        self::assertSame([], $plan['update_candidates']);
+    }
+
     public function test_replanning_same_update_input_is_fingerprint_stable_for_apply_approved_plan(): void
     {
         $entity = $this->entity('classification', 'nhk:classification:clock-type.public-clock', 'Đồng hồ công cộng', ['family' => 'clock_type', 'description' => 'Cũ.']);

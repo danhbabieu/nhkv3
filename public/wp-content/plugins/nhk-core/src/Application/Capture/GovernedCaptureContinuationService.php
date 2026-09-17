@@ -47,6 +47,8 @@ final class GovernedCaptureContinuationService
         private ?VideoCompletenessReconciliationService $videoCompleteness = null,
         /** @var callable(Proposal,array<string,mixed>,array<string,mixed>):array<string,mixed>|null */
         private $proposalReconciliation = null,
+        /** @var callable(array<string,mixed>):array<string,mixed>|bool|null */
+        private $relationState = null,
     ) {
         $this->completion = $completion ?? new CompletionCoordinator();
     }
@@ -92,7 +94,32 @@ final class GovernedCaptureContinuationService
 
         $writes = [];
         $lifecycle = [];
+        $canonicalByCandidate = [];
         foreach ($plans as $plan) {
+            if (($plan['entity_type'] ?? '') === 'relation' && isset($plan['payload']['source_candidate_id'])) {
+                $sourceCandidateId = (string) $plan['payload']['source_candidate_id'];
+                $source = $canonicalByCandidate[$sourceCandidateId] ?? null;
+                if (!is_array($source) || !$this->dependencyWriteCompleted($source)) {
+                    $writes[] = ['entity_type' => 'relation', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['KNOWLEDGE_RELATION_SOURCE_UNAVAILABLE'], 'candidate_id' => $sourceCandidateId];
+                    continue;
+                }
+                $plan['payload']['source_uuid'] = (string) ($source['canonical_id'] ?? '');
+                $plan['payload']['source_revision'] = (int) ($source['canonical_readback']['revision'] ?? 0);
+                unset($plan['payload']['source_candidate_id']);
+            }
+            if (($plan['entity_type'] ?? '') === 'relation') {
+                $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+                if (trim((string) ($payload['predicate'] ?? '')) === '' || trim((string) ($payload['provenance']['origin'] ?? $payload['origin'] ?? '')) === '') {
+                    $writes[] = ['entity_type' => 'relation', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['RELATION_PROVENANCE_REQUIRED']];
+                    continue;
+                }
+                if (($payload['require_evidence'] ?? false) === true && (array) ($payload['evidence_refs'] ?? []) === []) {
+                    $writes[] = ['entity_type' => 'relation', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['RELATION_EVIDENCE_REQUIRED']];
+                    continue;
+                }
+                $reusedRelation = $this->reusedRelation($plan);
+                if ($reusedRelation !== null) { $writes[] = $reusedRelation; continue; }
+            }
             if (is_array($plan['video_editorial_reuse'] ?? null)) {
                 $reuse = $plan['video_editorial_reuse'];
                 if ($this->videoCompleteness !== null) {
@@ -157,6 +184,7 @@ final class GovernedCaptureContinuationService
                 $write = $this->classifiedFailure($plan, $error);
             }
             $writes[] = $write;
+            if (isset($plan['candidate_id']) && $this->dependencyWriteCompleted($write)) $canonicalByCandidate[(string) $plan['candidate_id']] = $write;
             if (($plan['entity_type'] ?? '') === 'video') $videoChildren[] = ['fingerprint' => $this->videoPlanFingerprint($plan, $context), 'status' => (string) ($write['status'] ?? 'FAILED_RETRYABLE'), 'blockers' => (array) ($write['blockers'] ?? [])];
         }
 
@@ -196,7 +224,7 @@ final class GovernedCaptureContinuationService
             if ($priorResolved !== []) $resolved = $priorResolved;
         }
         $intent = strtoupper(trim((string) ($context['content_intent']['intent'] ?? '')));
-        $subjects = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== ''));
+        $subjects = array_values(array_filter($resolved, static fn (mixed $item): bool => is_array($item) && UuidCodec::isValid((string) ($item['id'] ?? '')) && trim((string) ($item['type'] ?? '')) !== '' && ($item['active'] ?? true) === true));
         $variants = array_values(array_filter($subjects, static fn (array $item): bool => ($item['type'] ?? '') === 'variant'));
         $plans = [];
         $articleId = (int) ($context['article_id'] ?? 0);
@@ -259,7 +287,7 @@ final class GovernedCaptureContinuationService
                 : (array) ($context['interpretation']['user_claim_candidates'] ?? []);
             foreach ($candidates as $candidate) {
                 if (!is_array($candidate) || trim((string) ($candidate['text'] ?? '')) === '') continue;
-                $scope = $this->knowledgeScope((string) ($subject['type'] ?? ''), (string) ($candidate['scope'] ?? ''));
+                $scope = $this->knowledgeScope((string) ($subject['type'] ?? ''), (string) ($candidate['scope'] ?? ''), $candidate);
                 if ($scope === null) continue;
                 $facet = trim((string) ($candidate['facet'] ?? 'identity')) ?: 'identity';
                 try {
@@ -275,7 +303,28 @@ final class GovernedCaptureContinuationService
                     'text' => trim((string) $candidate['text']), 'claim_type' => 'fact',
                     'provenance' => ['metadata' => ['facet' => $facet, 'scope' => $scope, 'version' => 1, 'subject_id' => $subject['id'], 'subject_type' => $subject['type']], 'origin' => (string) ($candidate['provenance'] ?? 'EXPLICIT_USER_KNOWLEDGE')],
                 ];
-                $plans[] = $this->arguments('knowledge', 'ingest', (string) $subject['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
+                $knowledgePlan = $this->arguments('knowledge', 'ingest', (string) $subject['id'], $payload, 'capture:' . $captureId . ':knowledge:' . hash('sha256', (string) $payload['stable_key']));
+                $knowledgePlan['candidate_id'] = 'knowledge-candidate-' . hash('sha256', (string) $payload['stable_key']);
+                $plans[] = $knowledgePlan;
+                // A Knowledge claim is not semantically attached merely by
+                // carrying subject_id. Its canonical about edge is a second,
+                // governed Graph candidate whose source is bound only after
+                // the Knowledge read-back succeeds.
+                $relationPlan = $this->arguments('relation', 'relation_create', 'relation', [
+                    'source_type' => 'knowledge',
+                    'source_candidate_id' => $knowledgePlan['candidate_id'],
+                    'target_type' => (string) $subject['type'],
+                    'target_uuid' => (string) $subject['id'],
+                    'target_revision' => (int) ($subject['revision'] ?? 0),
+                    'predicate' => 'about',
+                    'origin' => 'CAPTURE_KNOWLEDGE_SUBJECT_BINDING',
+                    'provenance' => $payload['provenance'],
+                    'evidence_refs' => (array) ($candidate['evidence_refs'] ?? ($context['relation_evidence_refs'] ?? [])),
+                    'require_evidence' => (bool) ($context['relation_policy']['require_evidence'] ?? false),
+                ], 'capture:' . $captureId . ':knowledge-about:' . hash('sha256', (string) $payload['stable_key']) . ':' . (string) $subject['id']);
+                $relationPlan['candidate_id'] = 'relation-candidate-' . hash('sha256', (string) $relationPlan['idempotency_key']);
+                $relationPlan['dependency_ids'] = [$knowledgePlan['candidate_id']];
+                $plans[] = $relationPlan;
             }
             foreach ((array) ($context['observations'] ?? []) as $observation) {
                 if (!is_array($observation)) continue;
@@ -328,7 +377,7 @@ final class GovernedCaptureContinuationService
         return count($variants) === 1 ? $variants[0] : null;
     }
 
-    private function knowledgeScope(string $subjectType, string $candidateScope): ?string
+    private function knowledgeScope(string $subjectType, string $candidateScope, array $candidate = []): ?string
     {
         $default = match (strtolower(trim($subjectType))) {
             'classification', 'entity', 'product' => 'entity',
@@ -341,7 +390,14 @@ final class GovernedCaptureContinuationService
         };
         if ($default === null) return null;
         $candidateScope = trim($candidateScope);
-        return $candidateScope === '' || $candidateScope === $default ? $default : null;
+        if ($candidateScope === '' || strtolower($candidateScope) === 'unspecified') return $default;
+        $basis = strtoupper(trim((string) ($candidate['scope_basis'] ?? '')));
+        $facet = strtolower(trim((string) ($candidate['facet'] ?? 'identity')));
+        // Older interpreters emitted variant as a fallback for identity
+        // statements. Treat that value as unresolved only for non-explicit
+        // brand/company facets; explicit incompatible scope remains review.
+        if (strtolower($subjectType) === 'brand' && $candidateScope === 'variant' && !in_array($basis, ['EXPLICIT', 'EXPLICIT_CONTEXT', 'EXPLICIT_EVIDENCE'], true) && in_array($facet, ['identity', 'history', 'company', 'description'], true)) return $default;
+        return $candidateScope === $default ? $default : null;
     }
 
     /** @param array<string,mixed> $provenancePlan @param list<array<string,mixed>> $writes @param list<string> $lifecycle */
@@ -622,7 +678,12 @@ final class GovernedCaptureContinuationService
             $lifecycle[] = 'APPROVE';
         }
         if ($proposal->state === ProposalState::APPLIED || $state === ProposalState::APPLIED->value) {
-            $applied = ($this->apply)($proposal->id);
+            // An uncertain retry must never invoke Controlled Apply again.
+            // Reuse the persisted canonical read-back; if the lifecycle did
+            // not expose it, stop until a read boundary can verify the owner.
+            $readback = is_array($review['canonical_readback'] ?? null) ? $review['canonical_readback'] : (is_array($review['apply']['canonical_readback'] ?? null) ? $review['apply']['canonical_readback'] : null);
+            if (!is_array($readback)) throw new \RuntimeException('CANONICAL_READBACK_REQUIRED_AFTER_APPLIED');
+            $applied = ['canonical_id' => $readback['canonical_id'] ?? null, 'canonical_readback' => $readback, 'idempotent' => true];
             $lifecycle[] = 'CONTROLLED_APPLY';
             return $this->applied($proposal, $applied);
         }
@@ -677,9 +738,13 @@ final class GovernedCaptureContinuationService
         if ($error instanceof DependencyValidationException) {
             return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'REVIEW_REQUIRED', 'blockers' => [$error->errorCode]];
         }
+        $rawMessage = strtoupper(trim($error->getMessage()));
+        if ((int) $error->getCode() === 429 || preg_match('/(?:\b429\b|RATE[ _-]?LIMIT|TOO MANY REQUESTS|RETRY[- ]?AFTER)/', $rawMessage) === 1) {
+            return ['proposal_id' => (string) ($plan['proposal_id'] ?? ''), 'status' => 'FAILED_RETRYABLE', 'blockers' => ['EXTERNAL_RATE_LIMIT'], 'error' => $error->getMessage()];
+        }
         $code = strtoupper(trim((string) $error->getCode()));
         if ($code === '' || preg_match('/^[A-Z][A-Z0-9_]{2,63}$/', $code) !== 1) {
-            $message = strtoupper(trim($error->getMessage()));
+            $message = $rawMessage;
             $code = preg_match('/(?:^|:)([A-Z][A-Z0-9_]{2,63})$/', $message, $match) === 1 ? $match[1] : 'CAPTURE_GOVERNANCE_FAILED';
         }
         $blocked = preg_match('/(?:SUBJECT_BINDING|IDEMPOTENCY_STALE|IDEMPOTENCY_CONFLICT|BINDING_CONFLICT|REPAIR_REQUIRED|APPLIED_PROPOSAL_FORBIDDEN|INVARIANT|SCHEMA|CONTRACT|CAPABILITY|NOT_FOUND)/', $code) === 1;
@@ -779,6 +844,25 @@ final class GovernedCaptureContinuationService
     private function retrievedClaims(array $context): array
     {
         return is_array($context['retrieval']['selected_claims'] ?? null) ? $context['retrieval']['selected_claims'] : [];
+    }
+
+    /** @return array<string,mixed>|null */
+    private function reusedRelation(array $plan): ?array
+    {
+        if ($this->relationState === null) return null;
+        try { $state = ($this->relationState)($plan); } catch (\Throwable) { return null; }
+        if ($state === true) return ['entity_type' => 'relation', 'status' => 'REVIEW_REQUIRED', 'blockers' => ['RELATION_ACTIVE_READBACK_ID_UNAVAILABLE']];
+        if (!is_array($state) || strtoupper((string) ($state['status'] ?? '')) !== 'ACTIVE') return null;
+        $canonicalId = trim((string) ($state['canonical_id'] ?? $state['id'] ?? ''));
+        if ($canonicalId === '') return null;
+        return [
+            'entity_type' => 'relation', 'status' => 'REUSED_VERIFIED', 'canonical_id' => $canonicalId,
+            'canonical_readback' => [
+                'canonical_id' => $canonicalId, 'entity_type' => 'relation', 'active' => true,
+                'revision' => (int) ($state['revision'] ?? 0),
+            ],
+            'idempotent' => true, 'reused' => true,
+        ];
     }
 
     /** @return array<string,mixed> */

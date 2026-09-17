@@ -76,6 +76,11 @@ final class AuthorityIntentPlanner
             if ($type === '' && $name === '') continue;
             $delta = $item['payload_delta'] ?? $item['fields'] ?? $item['desired_payload'] ?? $item['payload'] ?? [];
             if (!is_array($delta)) $delta = [];
+            if ($delta === []) {
+                $controlKeys = array_flip(['mode', 'requests', 'entity_type', 'type', 'name', 'canonical_name', 'canonical_uuid', 'uuid', 'stable_key', 'family', 'allow_create', 'payload_delta', 'fields', 'desired_payload', 'payload']);
+                $explicitFields = array_diff_key($item, $controlKeys);
+                if ($explicitFields !== []) $delta = $explicitFields;
+            }
             if ($delta === [] && isset($item['description']) && is_string($item['description'])) $delta['description'] = trim($item['description']);
             if ($delta === [] && isset($intent['description']) && is_string($intent['description'])) $delta['description'] = trim($intent['description']);
             if ($delta === [] && isset($input['description']) && is_string($input['description'])) $delta['description'] = trim($input['description']);
@@ -172,7 +177,7 @@ final class AuthorityIntentPlanner
         if (count($matches) > 1) { $plan['ambiguities'][] = ['code' => 'IDENTITY_CONFLICT', 'entity_type' => $type, 'name' => $name, 'candidate_ids' => array_keys($matches)]; return; }
         if (count($matches) === 1) {
             $match = array_values($matches)[0];
-            if (!$this->updateCandidate($plan, $match['entity'], $payloadDelta)) $this->reuse($plan, $match['entity'], $match['match'], $family);
+            if (!$this->updateCandidate($plan, $match['entity'], $payloadDelta)) $this->reuse($plan, $match['entity'], $match['match'], $family, $payloadDelta !== [] ? 'NOOP_VALUES_MATCH' : null);
             return;
         }
         $retired = $this->retiredExact($type, $stableKey, $name);
@@ -195,7 +200,7 @@ final class AuthorityIntentPlanner
     }
 
     /** @param array<string,mixed> $plan */
-    private function reuse(array &$plan, AuthorityEntity $entity, string $match, string $requestedFamily): void { $family = (string) ($entity->payload['family'] ?? ''); $plan['reuse'][] = ['candidate_id' => $this->candidateId('REUSE', $entity->entityType, $entity->canonicalId), 'action' => 'REUSE', 'entity_type' => $entity->entityType, 'canonical_uuid' => $entity->canonicalId, 'canonical_revision' => $entity->revision, 'canonical_name' => $entity->canonicalName, 'stable_key' => $entity->stableKey, 'family' => $family !== '' ? $family : ($requestedFamily !== '' ? $requestedFamily : null), 'match' => $match, 'scope' => 'capture']; }
+    private function reuse(array &$plan, AuthorityEntity $entity, string $match, string $requestedFamily, ?string $reason = null): void { $family = (string) ($entity->payload['family'] ?? ''); $candidate = ['candidate_id' => $this->candidateId('REUSE', $entity->entityType, $entity->canonicalId), 'action' => 'REUSE', 'entity_type' => $entity->entityType, 'canonical_uuid' => $entity->canonicalId, 'canonical_revision' => $entity->revision, 'canonical_name' => $entity->canonicalName, 'stable_key' => $entity->stableKey, 'family' => $family !== '' ? $family : ($requestedFamily !== '' ? $requestedFamily : null), 'match' => $match, 'scope' => 'capture']; if ($reason !== null) $candidate['reason'] = $reason; $plan['reuse'][] = $candidate; }
 
     /** @param array<string,mixed> $plan @param array<string,mixed> $delta */
     private function updateCandidate(array &$plan, AuthorityEntity $entity, array $delta): bool
@@ -219,6 +224,9 @@ final class AuthorityIntentPlanner
             'family' => $payload['family'] ?? null,
             'payload_patch' => $patch,
             'entity_payload' => $payload,
+            'before' => $entity->payload,
+            'after' => $payload,
+            'delta' => $delta,
             'scope' => 'capture',
             'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
             'dependencies' => [],

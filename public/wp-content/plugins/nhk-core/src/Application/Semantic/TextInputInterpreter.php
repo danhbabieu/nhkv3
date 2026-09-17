@@ -85,7 +85,14 @@ final class TextInputInterpreter
         // sentence is non-semantic only when it is directing treatment of a
         // claim/source or explicitly describing an evidence/compliance state.
         if (preg_match('/(?:không\s+(?:coi|dùng|sử dụng|nâng|đăng|đưa|project)|chưa\s+có\s+(?:evidence|bằng chứng)|chưa\s+được\s+(?:chứng minh|xác minh)|nhận định\s+(?:so sánh|quảng bá)|claim\s+[^.?!]*\s+(?:chưa|không)\s+có\s+(?:evidence|bằng chứng))/u', $lower) === 1) return 'compliance';
+        // A factual imperative is still a semantic assertion. Assertion
+        // markers win over an operator verb, e.g. “ghi nhận rằng …”.
+        $hasAssertion = preg_match('/(?:\brằng\b|\b(?:là|có|được|sinh|thành lập|đặt tại|nằm ở)\b|\b(?:năm|year)\s+\d{3,4})/u', $lower) === 1;
         if (preg_match('/^(?:không\s+được|đừng|giữ|hãy\s+giữ|hãy\s+(?:reuse|dùng|sửa|đưa|giữ)|reuse\b|vui\s+lòng|please|sửa\b|đưa\b|không\s+dùng|không\s+nâng|không\s+đăng|không\s+coi|không\s+tạo|chỉ\s+là)\b/u', $lower) === 1) return 'instruction';
+        if (!$hasAssertion
+            && preg_match('/\b(?:bổ sung|cập nhật|hoàn thiện|kiểm tra|xác minh|liên kết|gắn|thêm|đính kèm|đồng bộ|tiếp tục|thực hiện)\b/u', $lower) === 1
+            && preg_match('/\b(?:nguồn|hồ sơ|bằng chứng|quan hệ|relation|evidence|source|dữ liệu|metadata|trường|field|website|tài liệu)\b/u', $lower) === 1
+        ) return 'instruction';
         return 'claim';
     }
 
@@ -110,7 +117,11 @@ final class TextInputInterpreter
             'text' => $sentence,
             'candidate_kind' => 'user_statement',
             'provenance' => 'EXPLICIT_USER_KNOWLEDGE',
-            'scope' => $specimenObservation ? 'specimen_observation' : 'variant',
+            // Configuration/music are intrinsically variant-scoped. General
+            // identity/history/company statements stay unresolved until the
+            // canonical subject and evidence context are locked.
+            'scope' => $specimenObservation ? 'specimen_observation' : (($configuration || $music) ? 'variant' : 'unspecified'),
+            'scope_basis' => $specimenObservation ? 'EXPLICIT_MEDIA_CONTEXT' : (($configuration || $music) ? 'FACET_DEFAULT' : 'UNRESOLVED_CANONICAL_SUBJECT'),
             'facet' => $configuration ? 'configuration' : ($music ? 'music' : ($recognition || $specimenObservation ? 'recognition' : 'identity')),
             'attributed' => $recognition || $specimenObservation,
             'review_required' => str_contains($lower, 'nữ hoàng'),

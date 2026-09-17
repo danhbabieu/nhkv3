@@ -599,6 +599,23 @@ final class Plugin {
                 proposalReconciliation: static function (\NHK\Core\Domain\Governance\Proposal $proposal, array $eligibility, array $control) use ($relationProposalReconciliation): array {
                     return $relationProposalReconciliation->reconcile($proposal, $control);
                 },
+                relationState: static function (array $plan) use ($graphService): array {
+                    $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
+                    $sourceType = trim((string) ($payload['source_type'] ?? ''));
+                    $sourceUuid = trim((string) ($payload['source_uuid'] ?? ''));
+                    $targetType = trim((string) ($payload['target_type'] ?? ''));
+                    $targetUuid = trim((string) ($payload['target_uuid'] ?? ''));
+                    $predicate = trim((string) ($payload['predicate'] ?? ''));
+                    if ($sourceType === '' || $sourceUuid === '' || $targetType === '' || $targetUuid === '' || $predicate === '') return [];
+                    try {
+                        $edge = $graphService->findEdge(
+                            new \NHK\Core\Domain\Graph\NodeReference($sourceType, $sourceUuid),
+                            $predicate,
+                            new \NHK\Core\Domain\Graph\NodeReference($targetType, $targetUuid),
+                        );
+                    } catch (\Throwable) { return []; }
+                    return $edge !== null && $edge->isActive() ? ['status' => 'ACTIVE', 'canonical_id' => $edge->edge_uuid, 'revision' => $edge->revision, 'active' => true] : [];
+                },
             );
             $articleReceipts = new WpdbArticleOperationReceiptRepository($wpdb);
             $categoryGateway = new CategoryGateway(new WpCategoryStore());

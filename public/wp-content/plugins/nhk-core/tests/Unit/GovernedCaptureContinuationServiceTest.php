@@ -239,17 +239,24 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
     {
         $variant = UuidCodec::newV7();
         $proposal = new Proposal(UuidCodec::newV7(), $variant, 'ingest', [], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:auto:knowledge', entityType: 'knowledge');
+        $relationProposal = new Proposal(UuidCodec::newV7(), 'relation', 'relation_create', [], 'relation-content', null, 'relation-dependency', ProposalState::DRAFT, idempotencyKey: 'capture:auto:relation', entityType: 'relation');
         $governance = $this->createMock(GovernedLifecycle::class);
-        $governance->expects(self::once())->method('createFromArguments')->willReturn($proposal);
-        $governance->expects(self::once())->method('submit')->with($proposal->id)->willReturn($proposal);
-        $governance->expects(self::exactly(2))->method('review')->with($proposal->id)->willReturnOnConsecutiveCalls(['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'], ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
-        $governance->expects(self::once())->method('approve')->with($proposal->id, 'content', 'dependency', self::anything())->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
-        $governance->expects(self::once())->method('eligibility')->with($proposal->id)->willReturn(['ready' => true]);
+        $governance->expects(self::exactly(2))->method('createFromArguments')->willReturnOnConsecutiveCalls($proposal, $relationProposal);
+        $governance->expects(self::exactly(2))->method('submit')->willReturnOnConsecutiveCalls($proposal, $relationProposal);
+        $governance->expects(self::exactly(4))->method('review')->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'draft', 'entity_type' => 'relation', 'content_fingerprint' => 'relation-content', 'dependency_fingerprint' => 'relation-dependency'],
+            ['state' => 'submitted', 'entity_type' => 'relation', 'content_fingerprint' => 'relation-content', 'dependency_fingerprint' => 'relation-dependency'],
+        );
+        $governance->expects(self::exactly(2))->method('approve')->willReturnOnConsecutiveCalls($proposal->transition(ProposalState::APPROVED, 'system'), $relationProposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->expects(self::exactly(2))->method('eligibility')->willReturn(['ready' => true]);
         $applied = [];
         $service = new GovernedCaptureContinuationService($governance, static function (string $id) use (&$applied): array {
             $applied[] = $id;
-            return ['canonical_id' => 'claim-1', 'canonical_readback' => ['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 1]];
-        }, $this->policies(['knowledge'], ['knowledge' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true);
+            $isRelation = count($applied) === 2;
+            return ['canonical_id' => $isRelation ? 'edge-1' : 'claim-1', 'canonical_readback' => ['canonical_id' => $isRelation ? 'edge-1' : 'claim-1', 'entity_type' => $isRelation ? 'relation' : 'knowledge', 'active' => true, 'revision' => 1]];
+        }, $this->policies(['knowledge', 'relation'], ['knowledge' => 'AUTO_PUBLISH', 'relation' => 'AUTO_PUBLISH']), static fn (string $capability): bool => true);
 
         $result = $service->execute('capture-1', 'capture-1:semantic', [
             'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
@@ -258,7 +265,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         ]);
 
         self::assertSame('APPLIED', $result['status']);
-        self::assertSame([$proposal->id], $applied);
+        self::assertSame([$proposal->id, $relationProposal->id], $applied);
         self::assertSame(['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 1], $result['writes'][0]['canonical_readback']);
     }
 
@@ -446,6 +453,96 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         $result = $method->invoke($service, ['entity_type' => 'video'], new \NHK\Core\Governance\Exception\ProposalSubjectBindingInvalid('changed diagnostic wording'));
         self::assertSame('SYSTEM_BLOCKED', $result['status']);
         self::assertSame('changed diagnostic wording', $result['error']);
+    }
+
+    public function test_brand_knowledge_scope_is_derived_from_locked_subject_not_interpreter_default(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $method = new \ReflectionMethod($service, 'plans');
+        $method->setAccessible(true);
+        $brand = UuidCodec::newV7();
+        $plans = $method->invoke($service, 'capture-brand', 'continuation', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $brand, 'type' => 'brand']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Hermle được thành lập năm 1922.', 'scope' => 'variant', 'facet' => 'identity']]],
+        ]);
+
+        self::assertCount(2, $plans);
+        self::assertSame('brand', $plans[0]['payload']['provenance']['metadata']['scope']);
+    }
+
+    public function test_knowledge_plan_emits_governed_about_relation_to_locked_subject(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $method = new \ReflectionMethod($service, 'plans');
+        $method->setAccessible(true);
+        $brand = UuidCodec::newV7();
+        $plans = $method->invoke($service, 'capture-brand', 'continuation', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $brand, 'type' => 'brand']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Hermle được thành lập năm 1922.', 'facet' => 'identity']]],
+        ]);
+
+        self::assertSame(['knowledge', 'relation'], array_column($plans, 'entity_type'));
+        self::assertSame('about', $plans[1]['payload']['predicate']);
+        self::assertSame($brand, $plans[1]['payload']['target_uuid']);
+        self::assertSame('knowledge', $plans[1]['payload']['source_type']);
+    }
+
+    public function test_active_knowledge_about_edge_is_reused_without_duplicate_governance_proposal(): void
+    {
+        $variant = UuidCodec::newV7();
+        $proposal = new Proposal(UuidCodec::newV7(), $variant, 'ingest', [], 'content', null, 'dependency', ProposalState::DRAFT, idempotencyKey: 'capture:knowledge', entityType: 'knowledge');
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('createFromArguments')->with(self::callback(static fn (array $plan): bool => ($plan['entity_type'] ?? '') === 'knowledge'))->willReturn($proposal);
+        $governance->method('submit')->willReturn($proposal);
+        $governance->method('review')->willReturnOnConsecutiveCalls(['state' => 'draft', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'], ['state' => 'submitted', 'entity_type' => 'knowledge', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency']);
+        $governance->method('approve')->willReturn($proposal->transition(ProposalState::APPROVED, 'system'));
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => ['canonical_id' => 'claim-1', 'canonical_readback' => ['canonical_id' => 'claim-1', 'active' => true, 'revision' => 1]],
+            $this->policies(['knowledge', 'relation'], ['knowledge' => 'AUTO_PUBLISH', 'relation' => 'AUTO_PUBLISH']),
+            static fn (): bool => true,
+            relationState: static fn (): array => ['status' => 'ACTIVE', 'canonical_id' => 'edge-1', 'revision' => 2, 'active' => true],
+        );
+
+        $result = $service->execute('capture-1', 'capture:knowledge', [
+            'content_intent' => ['intent' => 'KNOWLEDGE_DELTA'],
+            'subject_resolution' => ['resolved' => [['id' => $variant, 'type' => 'variant']]],
+            'interpretation' => ['user_claim_candidates' => [['text' => 'Cấu hình 10 côn.', 'provenance' => 'EXPLICIT_USER_KNOWLEDGE']]],
+        ]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame('REUSED_VERIFIED', $result['writes'][1]['status']);
+        self::assertSame('edge-1', $result['writes'][1]['canonical_id']);
+    }
+
+    public function test_rate_limit_is_retryable_and_has_stable_external_failure_code(): void
+    {
+        $service = new GovernedCaptureContinuationService($this->createMock(GovernedLifecycle::class), static fn (): array => [], $this->policies(), static fn (): bool => true);
+        $method = new \ReflectionMethod($service, 'classifiedFailure');
+        $method->setAccessible(true);
+        $result = $method->invoke($service, ['entity_type' => 'knowledge'], new \RuntimeException('HTTP 429 Too Many Requests; Retry-After: 10'));
+
+        self::assertSame('FAILED_RETRYABLE', $result['status']);
+        self::assertSame(['EXTERNAL_RATE_LIMIT'], $result['blockers']);
+    }
+
+    public function test_applied_proposal_replay_uses_persisted_readback_without_reapplying(): void
+    {
+        $proposalId = UuidCodec::newV7();
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'applied', 'entity_type' => 'knowledge', 'operation' => 'ingest', 'subject_id' => UuidCodec::newV7(),
+            'canonical_readback' => ['canonical_id' => 'claim-1', 'entity_type' => 'knowledge', 'active' => true, 'revision' => 2],
+        ]);
+        $service = new GovernedCaptureContinuationService($governance, static fn (): array => throw new \LogicException('APPLIED proposal must not be applied again'), $this->policies(), static fn (): bool => true);
+
+        $result = $service->execute('capture-1', 'replay', [], ['proposal_ids' => [$proposalId]]);
+
+        self::assertSame('APPLIED', $result['status']);
+        self::assertTrue($result['writes'][0]['idempotent']);
     }
 
     private function policies(array $types = ['knowledge'], array $stored = []): GovernanceAutomationPolicyResolver
