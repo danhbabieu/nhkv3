@@ -12149,3 +12149,30 @@ VERIFICATION: Focused Capture/Video/MCP/completion suite PASS — 116 tests /
 integration/runtime acceptance, server edit, deployment or push was performed.
 
 STATUS: `CAPTURE_PARTIAL_VIDEO_RETRY_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
+
+# Checkpoint — 2026-09-17 — Governed content automation expansion spec (LOCAL ONLY)
+
+SCOPE: Wrote the architectural specification for extending the existing
+Governance Automation pipeline to governed MediaUsage representative work,
+Knowledge, Classification, Brand, Model and registered Relationships. The
+spec preserves GovernanceAutomationPolicyResolver, GovernanceService,
+ProposalEligibilityService and ControlledApplyService as the single pipeline;
+Media representative work delegates to MediaBindingService, relations remain
+Graph-owned, and Article AUTO_PUBLISH remains behind ArticlePublicationGate and
+OwnerPublicationApplicationService. No code, schema, semantic data or runtime
+state was changed.
+
+CONTRACT_GATES: Movement generation/type is explicitly `REGISTRY_GAP` until
+the canonical contract registers its owner model, vocabulary, scope,
+provenance, operation compatibility, Eligibility, Apply and read-back rules.
+Future staging acceptance is specified as operation/capability-scoped and
+fail-closed; current exact-ID packages remain stricter transitional evidence.
+
+REGRESSION_BASELINE: Cúc cu Media binding case 567; Đồng hồ 400 ngày
+continuation; Đồng hồ công cộng classification/profile and Graph cases.
+
+VERIFICATION: Spec self-review, repository status inspection and
+`git diff --check` pass. No tests, deployment, push or live/staging mutation
+was run. Existing unrelated Capture worktree changes were preserved.
+
+STATUS: `GOVERNED_CONTENT_AUTOMATION_EXPANSION_SPEC_LOCAL_READY`.
