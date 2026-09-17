@@ -17,6 +17,16 @@ final class PreferredImageSeoProjectionTest extends TestCase
         MediaSeoStateRegistry::assertKnown(MediaSeoStateRegistry::MISSING);
     }
 
+    public function test_complete_state_uses_the_registered_media_seo_state(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/front.webp'],
+        ]);
+
+        self::assertSame(MediaSeoStateRegistry::COMPLETE, $result['state']);
+        MediaSeoStateRegistry::assertKnown((string) $result['state']);
+    }
+
     public function test_representative_precedence_is_not_replaced_by_newer_evidence(): void
     {
         $result = (new PreferredImageSeoProjection())->project([

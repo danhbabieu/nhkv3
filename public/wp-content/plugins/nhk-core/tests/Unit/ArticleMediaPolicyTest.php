@@ -648,7 +648,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $item = $service->create('seo-bridge-featured', 'SEO bridge featured', 'ready');
         $asset = $service->addAsset($item->canonicalId, 'original', 'uploads/seo-bridge.jpg', hash('sha256', 'seo-bridge'), 'image/jpeg', 10, 1200, 675, 'PUBLIC');
-        $service->addUsage($item->canonicalId, 'wp_post', '1:50', 'featured_primary', 0, 'Ảnh mặt trước');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:50', 'featured_primary', 0, 'Ảnh mặt trước', '', [], '', 'article:1:50:featured_primary');
         $adapter = new class implements WordPressArticleMediaAdapter {
             public function read(int $postId): array { return ['featured_media_id' => null, 'inline_media_ids' => [], 'managed_inline_media_id' => null, 'featured_attachment_id' => 0, 'inline_attachment_ids' => [], 'content' => '']; }
             public function synchronize(int $postId, array $result): array { return $this->read($postId); }
@@ -670,7 +670,7 @@ final class ArticleMediaPolicyTest extends TestCase
         [$media, $assets, $usages, $blueprints, $service] = $this->stores();
         $item = $service->create('portrait-featured', 'Portrait featured', 'ready');
         $service->addAsset($item->canonicalId, 'original', 'uploads/portrait-featured.webp', hash('sha256', 'portrait-featured'), 'image/webp', 10, 900, 1200, 'PUBLIC');
-        $service->addUsage($item->canonicalId, 'wp_post', '1:51', 'featured_primary', 0, 'Ảnh dọc');
+        $service->addUsage($item->canonicalId, 'wp_post', '1:51', 'featured_primary', 0, 'Ảnh dọc', '', [], '', 'article:1:51:featured_primary');
 
         $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:51');
 
