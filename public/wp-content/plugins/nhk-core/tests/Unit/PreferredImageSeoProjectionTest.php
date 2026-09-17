@@ -60,6 +60,30 @@ final class PreferredImageSeoProjectionTest extends TestCase
         self::assertNull($result['url']);
     }
 
+    public function test_incomplete_representative_is_rejected_when_a_complete_candidate_is_available(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/incomplete.webp', 'state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED, 'precedence' => 0],
+            ['role' => 'representative', 'url' => '/complete.webp', 'state' => MediaSeoStateRegistry::COMPLETE, 'precedence' => 1],
+        ]);
+
+        self::assertSame('/complete.webp', $result['url']);
+        self::assertSame(MediaSeoStateRegistry::COMPLETE, $result['state']);
+        self::assertTrue($result['eligible']);
+    }
+
+    public function test_incomplete_only_representatives_return_registered_missing_state(): void
+    {
+        $result = (new PreferredImageSeoProjection())->project([
+            ['role' => 'representative', 'url' => '/incomplete.webp', 'state' => MediaSeoStateRegistry::INCOMPLETE_FEATURED],
+            ['role' => 'representative', 'url' => '/placeholder.webp', 'state' => MediaSeoStateRegistry::PLACEHOLDER],
+        ]);
+
+        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertFalse($result['eligible']);
+        self::assertNull($result['url']);
+    }
+
     public function test_metadata_source_is_derived_from_actual_fields_not_candidate_label(): void
     {
         $result = (new PreferredImageSeoProjection())->project([

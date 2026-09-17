@@ -146,8 +146,25 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertStringNotContainsString('NỘI DUNG BÀI KHÔNG ĐƯỢC LEAK', $result['summary']);
         self::assertSame('Ảnh tư liệu trong kho hình ảnh NHK.', $result['summary']);
         self::assertSame('MEDIA_NEUTRAL', $result['metadata_source']);
+        self::assertTrue($result['eligible']);
+        self::assertSame(MediaSeoStateRegistry::COMPLETE, $result['state']);
+        self::assertArrayHasKey('image_url', $result);
         self::assertArrayNotHasKey('url', $result);
         self::assertSame('Tên Media toàn cục', $media->findByCanonicalId($item->canonicalId)?->canonicalName);
+    }
+
+    public function test_gallery_missing_card_preserves_ineligible_registered_missing_contract(): void
+    {
+        [$media, $assets, $usages, $service] = $this->stores();
+        $item = $service->create('gallery-missing', 'Ảnh đang thiếu', 'ready');
+
+        $result = (new PublicMediaGalleryQuery($media, $assets, null, $usages))->forMedia($item->canonicalId);
+
+        self::assertFalse($result['eligible']);
+        self::assertSame(MediaSeoStateRegistry::MISSING, $result['state']);
+        self::assertNull($result['image_url']);
+        self::assertArrayNotHasKey('url', $result);
+        self::assertSame('Ảnh tư liệu trong kho hình ảnh NHK.', $result['summary']);
     }
 
     public function test_visual_support_uses_neutral_media_metadata_and_private_asset_remains_missing(): void
