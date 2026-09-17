@@ -108,6 +108,126 @@ final class VideoEditorialResumePlannerTest extends TestCase
         $unrelated['fetched_at'] = 'later';
         self::assertSame($second['fingerprint'], $planner->plan(['payload' => ['canonical_id' => $videoId]], $unrelated)['fingerprint']);
     }
+
+    public function test_matching_fingerprint_with_stale_canonical_title_rebuilds_same_video(): void
+    {
+        $video = $this->videoWithCanonicalPackage();
+        $repository = new VideoEditorialResumeTestRepository($video);
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $context = $this->resumeContext();
+        $first = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+        $stale = $first['payload']['metadata'];
+        $stale['editorial']['title'] = 'Video tham chiếu NHK';
+        $repository->replaceMetadata($video->canonicalId, $stale);
+
+        $retry = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+
+        self::assertSame('REBUILD_EDITORIAL', $retry['status']);
+        self::assertSame('update', $retry['operation']);
+        self::assertSame($video->canonicalId, $retry['target_uuid']);
+        self::assertSame($video->revision, $retry['expected_revision']);
+        self::assertNotSame('Video tham chiếu NHK', $retry['payload']['metadata']['editorial']['title']);
+    }
+
+    public function test_matching_fingerprint_replays_captured_editorial_package_and_updates_canonical_title(): void
+    {
+        $video = $this->videoWithCanonicalPackage();
+        $repository = new VideoEditorialResumeTestRepository($video);
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $context = $this->resumeContext();
+        $first = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+        $desiredTitle = 'Đồng hồ vai bò Junghans W64 5 côn đồng bạch – chất âm rất đáng chơi';
+        $desiredMetadata = $first['payload']['metadata'];
+        $desiredMetadata['editorial']['title'] = $desiredTitle;
+        $desiredMetadata['seo']['title'] = $desiredTitle;
+        $desiredMetadata['seo_projection']['title'] = $desiredTitle;
+        $desiredMetadata['seo_projection']['open_graph']['title'] = $desiredTitle;
+        $desiredMetadata['seo_projection']['video_object']['name'] = $desiredTitle;
+        $stale = $first['payload']['metadata'];
+        $stale['editorial']['title'] = 'Video tham chiếu NHK';
+        $stale['seo']['title'] = 'Video tham chiếu NHK';
+        $repository->replaceMetadata($video->canonicalId, $stale);
+
+        $retry = $planner->plan(['payload' => [
+            'canonical_id' => $video->canonicalId,
+            'title' => $desiredTitle,
+            'metadata' => $desiredMetadata,
+        ]], $context);
+
+        self::assertSame('REBUILD_EDITORIAL', $retry['status']);
+        self::assertSame($video->canonicalId, $retry['target_uuid']);
+        self::assertSame($desiredTitle, $retry['payload']['title']);
+        self::assertSame($desiredTitle, $retry['payload']['metadata']['editorial']['title']);
+        self::assertSame('STALE_EDITORIAL_REPLAY', $retry['payload']['metadata']['editorial_reconciliation']['diagnostic']);
+    }
+
+    public function test_matching_fingerprint_with_stale_seo_projection_rebuilds_same_video(): void
+    {
+        $video = $this->videoWithCanonicalPackage();
+        $repository = new VideoEditorialResumeTestRepository($video);
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $context = $this->resumeContext();
+        $first = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+        $stale = $first['payload']['metadata'];
+        $stale['seo_projection']['title'] = 'Video tham chiếu NHK';
+        $stale['seo_projection']['open_graph']['title'] = 'Video tham chiếu NHK';
+        $repository->replaceMetadata($video->canonicalId, $stale);
+
+        $retry = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+
+        self::assertSame('REBUILD_EDITORIAL', $retry['status']);
+        self::assertSame($video->canonicalId, $retry['target_uuid']);
+        self::assertSame($retry['payload']['metadata']['seo_projection']['title'], $retry['payload']['metadata']['seo_projection']['open_graph']['title']);
+    }
+
+    public function test_matching_fingerprint_with_stale_subject_packet_rebuilds_same_video(): void
+    {
+        $video = $this->videoWithCanonicalPackage();
+        $repository = new VideoEditorialResumeTestRepository($video);
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $context = $this->resumeContext();
+        $first = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+        $stale = $first['payload']['metadata'];
+        $stale['subject_resolution_packet']['id'] = '33333333-3333-4333-8333-333333333333';
+        $repository->replaceMetadata($video->canonicalId, $stale);
+
+        $retry = $planner->plan(['payload' => ['canonical_id' => $video->canonicalId]], $context);
+
+        self::assertSame('REBUILD_EDITORIAL', $retry['status']);
+        self::assertSame($video->canonicalId, $retry['target_uuid']);
+        self::assertSame($context['subject_resolution']['primary']['id'], $retry['payload']['metadata']['subject_resolution_packet']['id']);
+    }
+
+    private function videoWithCanonicalPackage(): Video
+    {
+        return new Video(
+            '01a07971-2fe3-77da-9424-998cf6f249e0',
+            'youtube',
+            'dQw4w9WgXcQ',
+            'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'Nguồn video gốc',
+            [
+                'source' => ['external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'source_title' => 'Nguồn video gốc'],
+                'editorial_input_fingerprint' => 'placeholder',
+                'editorial' => ['title' => 'OLD TITLE', 'summary' => 'OLD SUMMARY', 'body' => 'OLD BODY', 'why_this_matters' => 'OLD WHY'],
+                'seo' => ['title' => 'OLD SEO', 'description' => 'OLD SEO DESCRIPTION'],
+                'semantic_attachments' => [],
+            ],
+            null,
+            true,
+            3,
+        );
+    }
+
+    /** @return array<string,mixed> */
+    private function resumeContext(): array
+    {
+        return [
+            'continuation_delta_text' => '',
+            'subject_resolution' => ['primary' => ['id' => '22222222-2222-4222-8222-222222222222', 'type' => 'variant', 'name' => 'Junghans W64']],
+            'retrieval' => ['selected_claims' => []],
+        ];
+    }
 }
 
 final class VideoEditorialResumeTestRepository implements VideoRepository

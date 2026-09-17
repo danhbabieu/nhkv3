@@ -7,12 +7,13 @@ use NHK\Core\Application\Capture\GovernedCaptureContinuationService;
 use NHK\Core\Application\Capture\CaptureOrchestrationBudget;
 use NHK\Core\Application\Governance\GovernanceAutomationPolicyResolver;
 use NHK\Core\Application\Semantic\ClaimReusePolicy;
-use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSeoProjection};
+use NHK\Core\Application\Video\{VideoEditorialGenerator, VideoEditorialResumePlanner, VideoSearchDocument, VideoSeoProjection, VideoService};
 use NHK\Core\Contracts\Governance\{AutomationPolicyStorage, GovernedLifecycle, VideoProposalReconciliationPort};
 use NHK\Core\Contracts\Video\VideoRepository;
 use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Video\Video;
 use NHK\Core\Shared\Uuid\UuidCodec;
+use NHK\Tests\Support\InMemoryAuthorityRepository;
 use PHPUnit\Framework\TestCase;
 
 final class GovernedCaptureContinuationServiceTest extends TestCase
@@ -418,6 +419,135 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
 
         self::assertSame('APPLIED', $result['status']);
         self::assertSame($videoId, $result['writes'][0]['canonical_id']);
+    }
+
+    public function test_matching_persisted_fingerprint_with_stale_canonical_editorial_retries_update_same_video(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $relationTarget = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $repository = new class($videoId, $relationTarget, $evidenceId) implements VideoRepository {
+            public Video $video;
+
+            public function __construct(string $id, string $relationTarget, string $evidenceId)
+            {
+                $this->video = new Video($id, 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Nguồn video', [
+                    'source' => ['external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'source_title' => 'Nguồn video'],
+                    'editorial_input_fingerprint' => 'placeholder',
+                    'editorial' => ['title' => 'Video tham chiếu NHK', 'summary' => 'OLD SUMMARY', 'body' => 'OLD BODY', 'why_this_matters' => 'OLD WHY'],
+                    'seo' => ['title' => 'OLD SEO', 'description' => 'OLD SEO DESCRIPTION'],
+                    'semantic_attachments' => [['predicate' => 'about', 'target_type' => 'variant', 'target_uuid' => $relationTarget, 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
+                ], null, true, 3);
+            }
+
+            public function findByCanonicalId(string $id): ?Video { return $id === $this->video->canonicalId ? $this->video : null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return $platform === $this->video->platform && $externalId === $this->video->externalVideoId ? $this->video : null; }
+            public function create(Video $video): Video { return $this->video = $video; }
+            public function update(Video $video, int $expectedRevision): Video
+            {
+                if ($this->video->revision !== $expectedRevision) throw new \RuntimeException('Video revision conflict.');
+                return $this->video = new Video($video->canonicalId, $video->platform, $video->externalVideoId, $video->canonicalUrl, $video->title, $video->metadata, $video->thumbnailMediaId, $video->active, $expectedRevision + 1);
+            }
+            public function list(bool $includeRetired = false): array { return [$this->video]; }
+            public function replaceMetadata(array $metadata): void { $this->video = new Video($this->video->canonicalId, $this->video->platform, $this->video->externalVideoId, $this->video->canonicalUrl, $this->video->title, $metadata, $this->video->thumbnailMediaId, $this->video->active, $this->video->revision); }
+        };
+        $context = [
+            'continuation_delta_text' => '',
+            'subject_resolution' => ['primary' => ['id' => '22222222-2222-4222-8222-222222222222', 'type' => 'variant', 'name' => 'Junghans W64']],
+            'retrieval' => ['selected_claims' => []],
+        ];
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $first = $planner->plan(['payload' => ['canonical_id' => $videoId]], $context);
+        $stale = $first['payload']['metadata'];
+        $stale['editorial']['title'] = 'Video tham chiếu NHK';
+        $repository->replaceMetadata($stale);
+
+        $createdEntityTypes = [];
+        $createdProposal = null;
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->method('createFromArguments')->willReturnCallback(function (array $arguments) use (&$createdEntityTypes, &$createdProposal, $videoId): Proposal {
+            $createdEntityTypes[] = $arguments['entity_type'] ?? '';
+            $createdProposal = new Proposal(
+                UuidCodec::newV7(),
+                $videoId,
+                'update',
+                $arguments['payload'],
+                'content',
+                (int) $arguments['expected_revision'],
+                'dependency',
+                ProposalState::DRAFT,
+                idempotencyKey: (string) $arguments['idempotency_key'],
+                targetUuid: $videoId,
+                entityType: 'video',
+            );
+            return $createdProposal;
+        });
+        $governance->method('submit')->willReturnCallback(static function (string $id) use (&$createdProposal): Proposal {
+            return $createdProposal->transition(ProposalState::SUBMITTED);
+        });
+        $governance->method('review')->willReturnOnConsecutiveCalls(
+            ['state' => 'draft', 'entity_type' => 'video', 'operation' => 'update', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+            ['state' => 'submitted', 'entity_type' => 'video', 'operation' => 'update', 'content_fingerprint' => 'content', 'dependency_fingerprint' => 'dependency'],
+        );
+        $governance->method('approve')->willReturnCallback(static function (string $id, string $content, string $dependency, string $actor) use (&$createdProposal): Proposal {
+            return $createdProposal->transition(ProposalState::APPROVED, $actor);
+        });
+        $governance->method('eligibility')->willReturn(['ready' => true]);
+
+        $apply = static function (string $proposalId) use (&$createdProposal, $repository): array {
+            $payload = $createdProposal->payload;
+            $updated = (new VideoService($repository))->update(
+                $payload['canonical_id'],
+                $payload['title'],
+                $payload['metadata'],
+                $payload['thumbnail_media_id'] ?? null,
+                $createdProposal->expectedRevision ?? 0,
+            );
+            return [
+                'canonical_id' => $updated->canonicalId,
+                'canonical_readback' => [
+                    'canonical_id' => $updated->canonicalId,
+                    'entity_type' => 'video',
+                    'active' => $updated->active,
+                    'revision' => $updated->revision,
+                    'title' => $updated->metadata['editorial']['title'] ?? '',
+                    'seo_projection' => $updated->metadata['seo_projection'] ?? [],
+                ],
+            ];
+        };
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            $apply,
+            $this->policies(['video'], ['video' => 'AUTO_PUBLISH']),
+            static fn (string $capability): bool => true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $planner,
+        );
+
+        $result = $service->execute('capture-resume', 'resume-editorial', $context + [
+            'capture_id' => 'capture-resume',
+            'existing_capture_continuation' => true,
+            'assets' => [['kind' => 'video', 'video_proposal' => ['entity_type' => 'video', 'operation' => 'ingest', 'payload' => ['canonical_id' => $videoId]]]],
+        ], ['resume_children' => ['video']]);
+
+        $updated = $repository->findByCanonicalId($videoId);
+        self::assertSame('APPLIED', $result['status']);
+        self::assertSame(['video'], $createdEntityTypes);
+        self::assertSame($videoId, $result['writes'][0]['canonical_id']);
+        self::assertSame($videoId, $updated?->canonicalId);
+        self::assertNotSame('Video tham chiếu NHK', $updated?->metadata['editorial']['title']);
+        self::assertSame($updated?->metadata['editorial']['title'], (new VideoSearchDocument(new InMemoryAuthorityRepository()))->title($updated));
+        self::assertSame($updated?->metadata['editorial']['title'], $updated?->metadata['seo_projection']['title']);
+        self::assertSame($updated?->metadata['editorial']['title'], $updated?->metadata['seo_projection']['open_graph']['title']);
+        self::assertSame($updated?->metadata['editorial']['title'], $updated?->metadata['seo_projection']['video_object']['name']);
+        self::assertSame($relationTarget, $updated?->metadata['semantic_attachments'][0]['target_uuid']);
     }
 
     public function test_invalid_hydrated_video_subject_uses_governed_replacement_boundary(): void

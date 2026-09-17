@@ -8,6 +8,7 @@ use NHK\Core\Application\Knowledge\CanonicalDependencyValidator;
 use NHK\Core\Application\PublicIdentity\{CanonicalPublicSlugPolicy, PublicIdentityReadRegistry, PublicIdentityService};
 use NHK\Core\Contracts\PublicIdentity\PublicIdentityRepository;
 use NHK\Core\Contracts\Video\VideoRepository;
+use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Domain\Video\{Video, VideoEditorialEnrichmentContext};
 use NHK\Core\Application\Video\VideoEditorialQualityPolicy;
 
@@ -60,6 +61,10 @@ final class CaptureVideoPublicationVerifier
                     $blockers[] = 'VIDEO_EXTERNAL_IDENTITY_NOT_RESOLVABLE';
                     continue;
                 }
+            }
+            if (!$this->canonicalEditorialReadbackMatches($video, $payload)) {
+                $blockers[] = 'VIDEO_EDITORIAL_READBACK_MISMATCH';
+                continue;
             }
             $metadata = is_array($video->metadata) ? $video->metadata : [];
             $editorialContext = VideoEditorialEnrichmentContext::fromArray(is_array($metadata['enrichment_context'] ?? null) ? $metadata['enrichment_context'] : []);
@@ -131,6 +136,11 @@ final class CaptureVideoPublicationVerifier
                 continue;
             }
             $path = (string) ($identity['current_path'] ?? '');
+            $desiredProjectionPath = trim((string) ($payload['metadata']['seo_projection']['canonical'] ?? ''));
+            if ($desiredProjectionPath !== '' && $desiredProjectionPath !== $path) {
+                $blockers[] = 'PUBLIC_IDENTITY_PROJECTION_MISMATCH';
+                continue;
+            }
             $frontendVerified = null;
             if (is_callable($this->frontendReadback)) {
                 try { $frontendVerified = (bool) ($this->frontendReadback)($video->canonicalId, $path); }
@@ -153,5 +163,35 @@ final class CaptureVideoPublicationVerifier
             ? $items[0]['completion']
             : $this->completion->finalize('video', '', ['canonical_state' => 'BLOCKED', 'blockers' => $blockers !== [] ? $blockers : ['VIDEO_FRONTEND_READBACK_REQUIRED']]);
         return ['status' => $blockers === [] ? 'verified' : 'REVIEW_REQUIRED', 'items' => $items, 'blockers' => array_values(array_unique($blockers)), 'completion' => $completion];
+    }
+
+    private function canonicalEditorialReadbackMatches(Video $video, array $payload): bool
+    {
+        $canonicalId = trim((string) ($payload['canonical_id'] ?? ''));
+        if ($canonicalId !== '' && $canonicalId !== $video->canonicalId) return false;
+        if (array_key_exists('title', $payload) && trim((string) $payload['title']) !== '' && (string) $payload['title'] !== $video->title) return false;
+
+        $desiredMetadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        if ($desiredMetadata === []) return true;
+        $actualMetadata = is_array($video->metadata) ? $video->metadata : [];
+        $desiredSource = is_array($desiredMetadata['source'] ?? null)
+            ? $desiredMetadata['source']
+            : (is_array($desiredMetadata['source_snapshot'] ?? null) ? $desiredMetadata['source_snapshot'] : []);
+        $actualSource = is_array($actualMetadata['source'] ?? null)
+            ? $actualMetadata['source']
+            : (is_array($actualMetadata['source_snapshot'] ?? null) ? $actualMetadata['source_snapshot'] : []);
+        foreach (['external_video_id', 'canonical_source_url'] as $field) {
+            if (array_key_exists($field, $desiredSource) && ($actualSource[$field] ?? null) !== $desiredSource[$field]) return false;
+        }
+        foreach (['editorial_input_fingerprint', 'editorial', 'seo', 'subject_resolution_packet', 'seo_projection'] as $field) {
+            if (array_key_exists($field, $desiredMetadata) && !$this->sameCanonicalValue($actualMetadata[$field] ?? null, $desiredMetadata[$field])) return false;
+        }
+        return true;
+    }
+
+    private function sameCanonicalValue(mixed $actual, mixed $desired): bool
+    {
+        if (!is_array($actual) || !is_array($desired)) return $actual === $desired;
+        return CommandCanonicalizer::canonicalize($actual) === CommandCanonicalizer::canonicalize($desired);
     }
 }

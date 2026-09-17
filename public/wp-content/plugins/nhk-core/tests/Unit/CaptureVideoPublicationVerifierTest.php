@@ -126,12 +126,113 @@ final class CaptureVideoPublicationVerifierTest extends TestCase
         self::assertSame('4NmkQFrNeWQ', $result['items'][0]['external_id']);
         self::assertTrue($result['completion']['complete']);
     }
+
+    public function test_completion_is_not_verified_when_canonical_editorial_title_differs_from_desired_payload(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Video chính xác', [
+            'source' => ['external_video_id' => '4NmkQFrNeWQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=4NmkQFrNeWQ'],
+            'editorial' => [
+                'title' => 'Video tham chiếu NHK',
+                'summary' => 'Bản ghi cho thấy các chi tiết nhận diện chính của hiện vật được chọn.',
+                'body' => 'Video này ghi lại đúng hiện vật trong nguồn tham chiếu. Nội dung giữ riêng các chi tiết quan sát được trên chiếc đồng hồ và phân biệt chúng với bối cảnh canonical, để người đọc có thể kiểm tra thêm mà không biến mô tả riêng thành đặc tính phổ quát.',
+                'why_this_matters' => 'Trang tạo điểm đối chiếu có phạm vi rõ ràng giữa nguồn video và tri thức NHK.',
+            ],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->with($videoId)->willReturn($video);
+        $videos->method('findByExternalReference')->with('youtube', '4NmkQFrNeWQ')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $service = new CaptureVideoPublicationVerifier(
+            $videos,
+            new PublicIdentityService($identityRepository, static fn (string $slug): bool => false),
+            $identityRepository,
+        );
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [[
+            'kind' => 'video',
+            'video_id' => $videoId,
+            'platform' => 'youtube',
+            'external_id' => '4NmkQFrNeWQ',
+            'video_proposal' => [
+                'operation' => 'update',
+                'payload' => [
+                    'canonical_id' => $videoId,
+                    'metadata' => [
+                        'source' => ['external_video_id' => '4NmkQFrNeWQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=4NmkQFrNeWQ'],
+                        'editorial' => ['title' => 'Đồng hồ vai bò Junghans W64 5 côn đồng bạch – chất âm rất đáng chơi'],
+                    ],
+                ],
+            ],
+        ]]]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertContains('VIDEO_EDITORIAL_READBACK_MISMATCH', $result['blockers']);
+        self::assertFalse($result['completion']['complete']);
+    }
+
+    public function test_stale_public_identity_is_not_projection_consistent(): void
+    {
+        $videoId = UuidCodec::newV7();
+        $evidenceId = UuidCodec::newV7();
+        $desiredPath = '/video/dong-ho-vai-bo-junghans-w64/';
+        $video = new Video($videoId, 'youtube', '4NmkQFrNeWQ', 'https://www.youtube.com/watch?v=4NmkQFrNeWQ', 'Desired title', [
+            'source' => ['external_video_id' => '4NmkQFrNeWQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=4NmkQFrNeWQ'],
+            'editorial' => [
+                'title' => 'Desired title',
+                'summary' => 'Bản ghi cho thấy các chi tiết nhận diện chính của hiện vật được chọn.',
+                'body' => 'Video này ghi lại đúng hiện vật trong nguồn tham chiếu. Nội dung giữ riêng các chi tiết quan sát được trên chiếc đồng hồ và phân biệt chúng với bối cảnh canonical, để người đọc có thể kiểm tra thêm mà không biến mô tả riêng thành đặc tính phổ quát.',
+                'why_this_matters' => 'Trang tạo điểm đối chiếu có phạm vi rõ ràng giữa nguồn video và tri thức NHK.',
+            ],
+            'seo_projection' => ['canonical' => $desiredPath],
+            'semantic_attachments' => [['target_type' => 'variant', 'target_uuid' => UuidCodec::newV7(), 'predicate' => 'about', 'evidence_refs' => [['evidence_id' => $evidenceId]]]],
+        ]);
+        $videos = $this->createMock(VideoRepository::class);
+        $videos->method('findByCanonicalId')->with($videoId)->willReturn($video);
+        $videos->method('findByExternalReference')->with('youtube', '4NmkQFrNeWQ')->willReturn($video);
+        $identityRepository = new InMemoryCaptureIdentityRepository();
+        $identityRepository->seed([
+            'identity_id' => UuidCodec::newV7(),
+            'owner_kind' => 'video',
+            'owner_id' => $videoId,
+            'route_type' => 'video',
+            'collision_scope' => 'root',
+            'current_slug' => 'video-tham-chieu-nha-kho',
+            'current_path' => '/video/video-tham-chieu-nha-kho/',
+            'revision' => 2,
+        ]);
+        $service = new CaptureVideoPublicationVerifier($videos, new PublicIdentityService($identityRepository, static fn (string $slug): bool => false), $identityRepository);
+
+        $result = $service->verify(['capture_id' => UuidCodec::newV7(), 'assets' => [[
+            'kind' => 'video',
+            'video_id' => $videoId,
+            'platform' => 'youtube',
+            'external_id' => '4NmkQFrNeWQ',
+            'video_proposal' => ['operation' => 'update', 'payload' => [
+                'canonical_id' => $videoId,
+                'title' => 'Desired title',
+                'metadata' => ['source' => $video->metadata['source'], 'seo_projection' => ['canonical' => $desiredPath]],
+            ]],
+        ]]]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertContains('PUBLIC_IDENTITY_PROJECTION_MISMATCH', $result['blockers']);
+        self::assertFalse($result['completion']['complete']);
+    }
 }
 
 final class InMemoryCaptureIdentityRepository implements PublicIdentityRepository
 {
     public ?string $ownerId = null;
     private ?array $identity = null;
+
+    public function seed(array $identity): void
+    {
+        $this->identity = $identity;
+        $this->ownerId = (string) ($identity['owner_id'] ?? '');
+    }
 
     public function allocate(array $record, string $idempotencyKey): array
     {
