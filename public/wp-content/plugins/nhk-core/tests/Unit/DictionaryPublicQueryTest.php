@@ -54,6 +54,46 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertFalse($packet['items'][0]['indexable']);
     }
 
+    public function test_approved_contextual_media_text_is_projected_without_replacing_lexical_definition(): void
+    {
+        $concept = new DictionaryConcept(
+            'c-media',
+            'Bộ máy đồng hồ',
+            'Cơ cấu tạo và duy trì chuyển động của đồng hồ.',
+            DictionaryConcept::APPROVED,
+            null,
+            null,
+            null,
+            ['public_slug' => 'bo-may-dong-ho']
+        );
+        $repo = $this->repository([$concept], ['c-media' => []]);
+        $contextual = 'Ảnh tư liệu: bộ máy cơ khí bên trong đồng hồ.';
+
+        $packet = (new DictionaryPublicQuery($repo, static fn (string $id): ?array => $id === 'c-media'
+            ? ['url' => '/anh/bo-may.webp', 'alt' => 'Bộ máy đồng hồ', 'caption' => $contextual, 'metadata_source' => 'MEDIA_USAGE']
+            : null))->hub();
+
+        self::assertSame('Cơ cấu tạo và duy trì chuyển động của đồng hồ.', $packet['items'][0]['description']);
+        self::assertSame($contextual, $packet['items'][0]['image']['caption']);
+        self::assertSame('MEDIA_USAGE', $packet['items'][0]['image']['metadata_source']);
+    }
+
+    public function test_delegated_concept_image_does_not_make_dictionary_page_indexable(): void
+    {
+        $concept = new DictionaryConcept('c-delegated-image', 'Westminster', 'Định nghĩa lexical.', DictionaryConcept::APPROVED, 'music', 'music-1', '/ban-nhac/westminster/');
+        $repo = $this->repository([$concept], ['c-delegated-image' => []]);
+
+        $packet = (new DictionaryPublicQuery($repo, static fn (string $id): ?array => [
+            'url' => '/anh/westminster.webp',
+            'alt' => 'Westminster',
+        ]))->hub();
+
+        self::assertFalse($packet['items'][0]['dedicated']);
+        self::assertFalse($packet['items'][0]['indexable']);
+        self::assertSame('/ban-nhac/westminster/', $packet['items'][0]['url']);
+        self::assertSame('/anh/westminster.webp', $packet['items'][0]['image']['url']);
+    }
+
     private function repository(array $concepts, array $labels): DictionaryConceptRepository
     {
         return new class($concepts, $labels) implements DictionaryConceptRepository {
