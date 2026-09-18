@@ -438,6 +438,24 @@ final class WordPressMediaAttachmentBridge implements WordPressArticleMediaAdapt
         try { return $this->representation($this->attachmentIdForMedia($media->canonicalId), $asset, $contextualAlt); } catch (\Throwable) { return []; }
     }
 
+    /** @return array<string,mixed> */
+    public function readAttachmentMetadata(int $attachmentId): array
+    {
+        try {
+            $this->assertAttachment($attachmentId);
+            $post = function_exists('get_post') ? get_post($attachmentId) : null;
+            if (!is_object($post)) return [];
+            return [
+                'attachment_id' => $attachmentId,
+                'title' => trim((string) ($post->post_title ?? '')),
+                'alt' => function_exists('get_post_meta') ? trim((string) get_post_meta($attachmentId, '_wp_attachment_image_alt', true)) : '',
+                'caption' => trim((string) ($post->post_excerpt ?? '')),
+            ];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     public function isHandlingWrite(): bool { return $this->controlledWriteDepth > 0; }
 
     /** @return array<string,mixed> */

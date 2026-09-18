@@ -9,7 +9,7 @@ use NHK\Core\Domain\Media\MediaUsageRoleRegistry;
 
 final class VisualSupportPublicProjection
 {
-    public function __construct(private ?MediaUsageRepository $usages = null) {}
+    public function __construct(private ?MediaUsageRepository $usages = null, private ?\Closure $attachmentReader = null) {}
 
     /** @param list<MediaAsset> $assets @return array<string,mixed>|null */
     public function resolve(VisualSupportRequirement $requirement, ?Media $media, array $assets): ?array
@@ -19,11 +19,11 @@ final class VisualSupportPublicProjection
         if ($asset === null) return null;
         $filename = is_string($asset->metadata['canonical_filename'] ?? null) ? $asset->metadata['canonical_filename'] : basename(str_replace('\\', '/', $asset->storageKey));
         if (trim($filename) === '') return null;
-        return array_merge($this->metadata($requirement, $media), ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'url' => (new PublicMediaAssetUrlResolver())->path($filename), 'visual_intent' => $requirement->visualIntent, 'feature_key' => $requirement->featureKey]);
+        return array_merge($this->metadata($requirement, $media, $asset), ['media_id' => $media->canonicalId, 'asset_id' => $asset->assetId, 'url' => (new PublicMediaAssetUrlResolver())->path($filename), 'visual_intent' => $requirement->visualIntent, 'feature_key' => $requirement->featureKey]);
     }
 
     /** @return array{title:string,alt:string,caption:string,metadata_source:string} */
-    private function metadata(VisualSupportRequirement $requirement, Media $media): array
+    private function metadata(VisualSupportRequirement $requirement, Media $media, MediaAsset $asset): array
     {
         $usage = null;
         if ($this->usages !== null) {
@@ -36,24 +36,41 @@ final class VisualSupportPublicProjection
         }
         $values = [];
         $sources = [];
+        $attachment = $this->attachmentMetadata($asset);
         foreach (['title', 'alt', 'caption'] as $field) {
-            $value = trim((string) ($field === 'alt' ? ($usage?->altText ?? '') : ($field === 'caption' ? ($usage?->caption ?? '') : ($usage?->title ?? ''))));
-            if ($value !== '') {
+            foreach ($candidates as $candidate) {
+                $value = trim((string) ($field === 'alt' ? $candidate->altText : ($field === 'caption' ? $candidate->caption : $candidate->title)));
+                if ($value === '') continue;
                 $values[$field] = $value;
-                $sources[] = 'SUBJECT_REPRESENTATIVE';
-                continue;
+                $sources[] = $candidate->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'SUBJECT_REPRESENTATIVE' : 'MEDIA_USAGE';
+                break;
             }
-            $neutral = trim($media->canonicalName);
-            if ($neutral !== '' && $field !== 'caption') {
+            if (!array_key_exists($field, $values) && trim($media->canonicalName) !== '' && $field !== 'caption') {
+                $neutral = trim($media->canonicalName);
                 $values[$field] = $neutral;
                 $sources[] = 'MEDIA_NEUTRAL';
-                continue;
             }
-            $values[$field] = '';
+            if (!array_key_exists($field, $values)) {
+                $attachmentValue = trim((string) ($attachment[$field] ?? ''));
+                if ($attachmentValue !== '') {
+                    $values[$field] = $attachmentValue;
+                    $sources[] = 'WORDPRESS_ATTACHMENT';
+                }
+            }
+            $values[$field] ??= '';
         }
-        $metadataSource = in_array('SUBJECT_REPRESENTATIVE', $sources, true)
-            ? 'SUBJECT_REPRESENTATIVE'
-            : (in_array('MEDIA_NEUTRAL', $sources, true) ? 'MEDIA_NEUTRAL' : 'MISSING');
+        $rank = ['SUBJECT_REPRESENTATIVE' => 0, 'MEDIA_USAGE' => 1, 'MEDIA_NEUTRAL' => 2, 'WORDPRESS_ATTACHMENT' => 3, 'MISSING' => 4];
+        usort($sources, static fn (string $left, string $right): int => ($rank[$left] ?? 99) <=> ($rank[$right] ?? 99));
+        $metadataSource = $sources[0] ?? 'MISSING';
         return array_merge($values, ['metadata_source' => $metadataSource]);
+    }
+
+    /** @return array<string,mixed> */
+    private function attachmentMetadata(MediaAsset $asset): array
+    {
+        $attachmentId = (int) ($asset->metadata['wordpress_attachment_id'] ?? 0);
+        if ($attachmentId < 1 || $this->attachmentReader === null) return [];
+        $metadata = ($this->attachmentReader)($attachmentId);
+        return is_array($metadata) && (int) ($metadata['attachment_id'] ?? 0) === $attachmentId ? $metadata : [];
     }
 }
