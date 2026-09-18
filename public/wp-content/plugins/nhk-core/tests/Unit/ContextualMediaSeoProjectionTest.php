@@ -68,7 +68,7 @@ final class ContextualMediaSeoProjectionTest extends TestCase
         self::assertSame($item->canonicalId, $asset->mediaId);
     }
 
-    public function test_article_uses_same_media_subject_representative_before_neutral_and_attachment_per_field(): void
+    public function test_article_skips_subject_representative_when_article_subject_identity_is_unavailable(): void
     {
         [$media, $assets, $usages, $service] = $this->stores();
         $item = $service->create('article-subject-precedence', 'Tên Media trung tính', 'ready');
@@ -78,10 +78,10 @@ final class ContextualMediaSeoProjectionTest extends TestCase
 
         $result = (new ArticleMediaSeoProjection($media, $assets, $usages))->forPost('1:68');
 
-        self::assertSame('SUBJECT_REPRESENTATIVE', $result['metadata_source']);
-        self::assertSame('Tiêu đề chủ thể', $result['title']);
-        self::assertSame('Alt chủ thể', $result['alt']);
-        self::assertSame('Caption chủ thể', $result['caption']);
+        self::assertSame('MEDIA_NEUTRAL', $result['metadata_source']);
+        self::assertSame('Tên Media trung tính', $result['title']);
+        self::assertSame('Tên Media trung tính', $result['alt']);
+        self::assertSame('Tên Media trung tính', $result['caption']);
     }
 
     public function test_article_does_not_leak_an_unproven_representative_usage_from_another_subject(): void
