@@ -129,9 +129,62 @@ final class VideoEditorialResumePlanner
     /** @return array<string,mixed> */
     private function preApplyCreatePlan(array $videoProposal, array $payload, string $videoId, array $external, array $context): array
     {
-        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
-        $metadata['source'] = array_merge(is_array($metadata['source'] ?? null) ? $metadata['source'] : [], $external);
+        // A planned UUID and source snapshot are immutable Capture inputs; the
+        // rest of a legacy proposal is a historical derived projection. Do
+        // not carry that projection into a new ingest after contracts change.
+        $persistedMetadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $source = is_array($persistedMetadata['source'] ?? null)
+            ? $persistedMetadata['source']
+            : (is_array($persistedMetadata['source_snapshot'] ?? null) ? $persistedMetadata['source_snapshot'] : []);
+        $source = array_merge($source, [
+            'platform' => (string) ($source['platform'] ?? $external['platform']),
+            'external_video_id' => (string) ($source['external_video_id'] ?? $external['external_video_id']),
+            'canonical_source_url' => (string) ($source['canonical_source_url'] ?? $external['canonical_source_url']),
+        ]);
+        $subject = $this->subject($context, $persistedMetadata);
+        $userHint = trim((string) ($context['user_hint'] ?? ($persistedMetadata['provenance']['user_hint']['value'] ?? '')));
+        $enrichmentContext = [
+            'source_facts' => trim((string) ($source['source_title'] ?? '')) !== '' ? [['text' => (string) $source['source_title']]] : [],
+            'canonical_context' => $subject === null ? [] : [[
+                'text' => (string) ($subject['name'] ?? ''),
+                'entity_id' => (string) ($subject['id'] ?? ''),
+                'entity_type' => (string) ($subject['type'] ?? ''),
+            ]],
+        ];
+        $metadata = [
+            // Source/snapshot data is the only persisted package data reused
+            // here. It is not regenerated and therefore preserves its hash.
+            'source' => $source,
+            'provenance' => is_array($persistedMetadata['provenance'] ?? null) ? $persistedMetadata['provenance'] : [],
+            'source_rights' => $persistedMetadata['source_rights'] ?? null,
+            'transcript_policy' => $persistedMetadata['transcript_policy'] ?? null,
+        ];
+        $metadata = array_filter($metadata, static fn (mixed $value): bool => $value !== null && $value !== []);
+        $metadata['subject_resolution_packet'] = $subject;
         $metadata = $this->refreshDerivedEnrichment($metadata, $external, $context);
+        $editorial = $this->editorial->generate(
+            $source,
+            $userHint,
+            trim((string) ($context['editorial_instruction'] ?? '')),
+            $subject,
+            trim((string) ($context['editorial_title'] ?? '')),
+            trim((string) ($context['compliance_note'] ?? '')),
+            $enrichmentContext,
+        );
+        ($this->publicCopyGuard ?? new PublicEditorialCopyGuard())->assertEditorialPackage($editorial);
+        $metadata['editorial'] = $editorial;
+        $metadata['seo'] = ['title' => (string) ($editorial['title'] ?? ''), 'description' => (string) ($editorial['summary'] ?? '')];
+        $metadata['seo_projection'] = $this->seo->project([
+            'source' => $source,
+            'editorial' => $editorial,
+            'seo' => $metadata['seo'],
+            'subject_resolution_packet' => $subject,
+        ], (string) ($source['canonical_source_url'] ?? ''));
+        // Candidate relations/completeness/diagnostics must be produced by
+        // the current governed continuation, never inherited from preview.
+        $metadata['semantic_attachments'] = [];
+        $metadata['completeness'] = ['publishable' => false, 'blockers' => ['GOVERNED_RECONCILIATION_REQUIRED'], 'warnings' => []];
+        $metadata['diagnostics'] = ['REBUILT_FROM_IMMUTABLE_CAPTURE_INPUTS'];
         $payload['canonical_id'] = $videoId;
         $payload['metadata'] = $metadata;
         $payload['url'] = (string) ($payload['url'] ?? $external['canonical_source_url'] ?? '');

@@ -13993,3 +13993,35 @@ source revision, documentation version and manifest hash are reported from the
 verified manifest at checkpoint handoff.
 
 STATUS: `GENERIC_AUTHORITY_REPRESENTATIVE_SCOPE_LOCAL_READY / INTEGRATION_BOOTSTRAP_BLOCKED / NO_LIVE_ACCEPTANCE / NO_DEPLOYMENT`.
+
+# Checkpoint — 2026-09-18 — Legacy Video Capture retry derived-state rebuild (LOCAL READY / DEPLOYMENT PENDING)
+
+SCOPE: Repaired generic existing-Capture Video retry reconstruction when the
+canonical Video UUID and external identity are both absent. No canonical Video,
+Capture, staging or production data was mutated; no deployment or live
+acceptance was performed.
+
+ROOT_CAUSE: Video-only retry skipped fresh Video enrichment because the Capture
+already had an asset, then `GovernedCaptureContinuationService::plans()` passed
+the persisted `assets[].video_proposal` to `VideoEditorialResumePlanner`.
+The absent-owner branch refreshed only Knowledge enrichment and carried legacy
+derived package state, including stale expected revision, completeness,
+diagnostics and semantic attachments, into `scopeVideoPlan()` and the server
+issued staging admission.
+
+FIX: The absent-owner retry branch now preserves only the immutable planned
+Video UUID and source snapshot/source hash/provenance inputs, rebuilds current
+editorial/SEO/enrichment projections from the current subject handoff, clears
+legacy attachment/completeness/diagnostic projections, and emits `ingest` with
+no owner CAS revision. The server-issued staging packet remains responsible for
+`expected_revision=0`. Video-only retry subject handoff prefers the current
+resolver result; fresh-ingest mismatch validation remains fail-closed.
+
+VERIFICATION: Exact legacy regression passes with absent canonical/external
+identity, persisted expected revision 1, null Classification enrichment,
+stale semantic attachment/completeness/diagnostic fields, immutable source hash
+and immutable Video UUID. Focused Video/Capture slice passes 324 tests / 1,356
+assertions, with 13 existing deprecations, 25 PHPUnit deprecations and 12
+environment-gated skips. PHP lint and `git diff --check` pass.
+
+STATUS: `VIDEO_LEGACY_RETRY_REBUILD_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`.

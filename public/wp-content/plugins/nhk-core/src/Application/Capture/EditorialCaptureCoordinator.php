@@ -331,7 +331,7 @@ final class EditorialCaptureCoordinator
                 ]);
                 $videoItems = is_array($videoManifest['items'] ?? null) ? array_values(array_filter($videoManifest['items'], 'is_array')) : [];
                 if ($videoItems !== []) $assets = array_merge($assets, $videoItems);
-                $handoff = $this->videoSubjectHandoff($resolution, $videoManifest, $videoItems);
+                $handoff = $this->videoSubjectHandoff($resolution, $videoManifest, $videoItems, $this->isVideoOnlyResume($input));
                 if ($handoff !== null) {
                     $resolution = $handoff;
                     $diagnostics['subjects'] = $resolution;
@@ -958,8 +958,13 @@ final class EditorialCaptureCoordinator
     }
 
     /** @param array<string,mixed> $resolution @param array<string,mixed> $manifest @param list<array<string,mixed>> $items @return array<string,mixed>|null */
-    private function videoSubjectHandoff(array $resolution, array $manifest, array $items): ?array
+    private function videoSubjectHandoff(array $resolution, array $manifest, array $items, bool $preferCurrent = false): ?array
     {
+        // Retry resolution is current executable state. A persisted preview is
+        // historical derived metadata and must not overwrite a valid current
+        // Classification handoff after Video contracts evolve.
+        $current = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
+        if ($preferCurrent && UuidCodec::isValid((string) ($current['id'] ?? '')) && trim((string) ($current['type'] ?? '')) !== '') return $resolution;
         $previewWasReturned = array_key_exists('video_preview', $manifest) || isset($items[0]['video_preview']);
         $preview = is_array($manifest['video_preview']['package']['subject_resolution_packet'] ?? null)
             ? $manifest['video_preview']['package']['subject_resolution_packet']
@@ -976,7 +981,6 @@ final class EditorialCaptureCoordinator
         $packetType = strtolower(trim((string) ($packet['type'] ?? '')));
         if (!UuidCodec::isValid($packetId) || $packetType === '') throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
 
-        $current = is_array($resolution['primary'] ?? null) ? $resolution['primary'] : [];
         if ($current !== [] && (strtolower((string) ($current['id'] ?? '')) !== strtolower($packetId) || strtolower((string) ($current['type'] ?? '')) !== $packetType)) {
             throw new \RuntimeException('VIDEO_SUBJECT_HANDOFF_INVARIANT_FAILED');
         }

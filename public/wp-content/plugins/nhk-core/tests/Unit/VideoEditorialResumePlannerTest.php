@@ -117,6 +117,62 @@ final class VideoEditorialResumePlannerTest extends TestCase
         self::assertNotContains('NO_SUPPORTED_SUBJECT', $plan['payload']['metadata']['knowledge_enrichment']['diagnostics']);
     }
 
+    public function test_legacy_preview_derived_state_is_not_authoritative_for_absent_video_retry(): void
+    {
+        $videoId = '01a0b384-6e09-71a6-8f58-df48654d6aee';
+        $subjectId = '01a09e44-539a-7f1a-938a-d7d91bb689a3';
+        $source = [
+            'platform' => 'youtube',
+            'external_video_id' => '2Fx8Wp4Hzyk',
+            'canonical_source_url' => 'https://www.youtube.com/watch?v=2Fx8Wp4Hzyk',
+            'source_snapshot_hash' => 'immutable-source-hash',
+            'source_revision' => 1,
+        ];
+        $repository = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection(), null, static function (array $context): array {
+            $subject = $context['intended_targets'][0] ?? [];
+            return ['status' => 'available', 'subject' => $subject, 'candidates' => [], 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []];
+        });
+
+        $plan = $planner->plan([
+            'operation' => 'ingest',
+            'entity_type' => 'video',
+            'expected_revision' => 1,
+            'payload' => [
+                'canonical_id' => $videoId,
+                'metadata' => [
+                    'source' => $source,
+                    'knowledge_enrichment' => ['subject' => null, 'diagnostics' => ['NO_SUPPORTED_SUBJECT']],
+                    'semantic_attachments' => [['target_uuid' => 'stale-target']],
+                    'completeness' => ['publishable' => true],
+                    'diagnostics' => ['STALE_DIAGNOSTIC'],
+                ],
+            ],
+        ], [
+            'continuation_delta_text' => '',
+            'retrieval' => ['selected_claims' => []],
+            'capture_id' => 'capture-legacy-video',
+            'subject_resolution' => ['primary' => ['id' => $subjectId, 'type' => 'classification', 'revision' => 2, 'name' => 'Đồng hồ công cộng']],
+        ]);
+
+        self::assertSame('REBUILD_INGEST', $plan['status']);
+        self::assertSame('ingest', $plan['operation']);
+        self::assertNull($plan['expected_revision']);
+        self::assertSame($videoId, $plan['payload']['canonical_id']);
+        self::assertSame($source, $plan['payload']['metadata']['source']);
+        self::assertSame($subjectId, $plan['payload']['metadata']['knowledge_enrichment']['subject']['id']);
+        self::assertSame('classification', $plan['payload']['metadata']['knowledge_enrichment']['subject']['type']);
+        self::assertSame([], $plan['payload']['metadata']['semantic_attachments']);
+        self::assertNotContains('NO_SUPPORTED_SUBJECT', $plan['payload']['metadata']['knowledge_enrichment']['diagnostics']);
+        self::assertNotContains('STALE_DIAGNOSTIC', $plan['payload']['metadata']['diagnostics']);
+    }
+
     public function test_video_resume_fails_closed_when_external_identity_belongs_to_another_canonical_owner(): void
     {
         $expectedId = '01a0aaf8-2a84-7287-bbd8-70af4d5485e4';
