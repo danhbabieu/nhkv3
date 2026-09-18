@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Completion\CompletionCoordinator;
+use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Domain\Capture\CaptureRecord;
 use PHPUnit\Framework\TestCase;
 
 final class CompletionConvergenceTest extends TestCase
@@ -176,5 +178,28 @@ final class CompletionConvergenceTest extends TestCase
         self::assertSame([['owner_type' => 'video', 'owner_id' => '']], $packet['missing_required_owners']);
         self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $packet['blockers']);
         self::assertContains('video', $packet['resume_hints']['resume_children']);
+    }
+
+    public function test_video_required_owner_reuses_canonical_id_from_governed_writeback(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'requiredOwners');
+        $method->setAccessible(true);
+        $capture = new CaptureRecord(
+            '01a0b384-6a83-7f99-b231-d784b9ab9542',
+            'capture-1',
+            hash('sha256', 'fingerprint'),
+            'SEMANTICS_RECONCILED',
+            'IN_PROGRESS',
+        );
+        $owners = $method->invoke($coordinator, ['intent' => 'VIDEO'], $capture, [], [], [], [
+            'writes' => [[
+                'entity_type' => 'video',
+                'canonical_id' => 'video-1',
+                'canonical_readback' => ['canonical_id' => 'video-1', 'revision' => 2],
+            ]],
+        ]);
+
+        self::assertSame([['owner_type' => 'video', 'owner_id' => 'video-1']], $owners);
     }
 }

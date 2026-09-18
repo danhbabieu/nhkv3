@@ -542,7 +542,7 @@ final class EditorialCaptureCoordinator
             $children = $this->completionChildren($record, $writes, $media, $videoPublication, $publication, $final, $published);
             $completion = $this->completion->aggregateCapture($record->captureId, $children, [
                 'canonical_state' => 'COMPLETE',
-                'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication),
+                'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
             ]);
             $diagnostics['completion'] = $completion;
             $diagnostics = $this->settleHistoricalFailure($diagnostics, $receipts);
@@ -574,7 +574,7 @@ final class EditorialCaptureCoordinator
                 $this->completionChildren($record, $writes, $media, $videoPublication, [], [], false),
                 [
                     'canonical_state' => 'COMPLETE',
-                    'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication),
+                    'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
                     'blockers' => [$failureCode],
                 ],
             );
@@ -697,7 +697,7 @@ final class EditorialCaptureCoordinator
 
         $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, $media, $videoPublication, [], $final, false), [
             'canonical_state' => 'COMPLETE',
-            'required_owners' => $this->requiredOwners($intent, $record, $assets, [], $videoPublication),
+            'required_owners' => $this->requiredOwners($intent, $record, $assets, [], $videoPublication, $writes),
         ]);
         $diagnostics['completion'] = $completion;
         $semanticStatus = strtoupper(trim((string) ($writes['status'] ?? '')));
@@ -735,10 +735,11 @@ final class EditorialCaptureCoordinator
      * @param array<string,mixed> $videoPublication
      * @return list<array{owner_type:string}>
      */
-    private function requiredOwners(array $intent, CaptureRecord $record, array $assets, array $media, array $videoPublication): array
+    private function requiredOwners(array $intent, CaptureRecord $record, array $assets, array $media, array $videoPublication, array $writes = []): array
     {
+        $videoOwnerId = $this->videoOwnerId($assets, $videoPublication, $writes);
         $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
-            'VIDEO' => [['owner_type' => 'video']],
+            'VIDEO' => [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
             'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
             'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post']],
             'MEDIA_ENRICHMENT' => [['owner_type' => 'media']],
@@ -746,6 +747,36 @@ final class EditorialCaptureCoordinator
         };
         if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'IMAGE_ARTICLE' && $assets !== []) $required[] = ['owner_type' => 'media'];
         return $required;
+    }
+
+    /** @return string */
+    private function videoOwnerId(array $assets, array $videoPublication, array $writes): string
+    {
+        foreach ((array) ($videoPublication['items'] ?? []) as $item) {
+            if (!is_array($item)) continue;
+            $id = trim((string) ($item['video_id'] ?? $item['canonical_id'] ?? ''));
+            if ($id !== '') return $id;
+        }
+        foreach ((array) ($writes['writes'] ?? []) as $write) {
+            if (!is_array($write) || strtolower((string) ($write['entity_type'] ?? '')) !== 'video') continue;
+            $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
+            $id = trim((string) ($write['canonical_id'] ?? $write['result_entity_uuid'] ?? ($readback['canonical_id'] ?? '')));
+            if ($id !== '') return $id;
+        }
+        foreach ((array) ($writes['video_children'] ?? []) as $child) {
+            if (!is_array($child)) continue;
+            $readback = is_array($child['canonical_readback'] ?? null) ? $child['canonical_readback'] : [];
+            $id = trim((string) ($child['canonical_id'] ?? ($readback['canonical_id'] ?? '')));
+            if ($id !== '') return $id;
+        }
+        foreach ($assets as $asset) {
+            if (!is_array($asset) || ($asset['kind'] ?? '') !== 'video') continue;
+            $proposal = is_array($asset['video_proposal'] ?? null) ? $asset['video_proposal'] : [];
+            $payload = is_array($proposal['payload'] ?? null) ? $proposal['payload'] : [];
+            $id = trim((string) ($asset['video_id'] ?? $payload['canonical_id'] ?? $proposal['subject_id'] ?? $proposal['target_uuid'] ?? ''));
+            if ($id !== '') return $id;
+        }
+        return '';
     }
 
     /** @param array<string,mixed> $input */

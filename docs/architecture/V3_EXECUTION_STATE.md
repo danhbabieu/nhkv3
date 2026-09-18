@@ -1,5 +1,38 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Video canonical owner propagation/readback (LOCAL FIX / DEPLOY PENDING)
+
+SCOPE: Repaired generic Capture-owned Video owner propagation after governed
+apply. No Capture, Video, Proposal, staging/production record, remote source or
+deployment was mutated.
+
+ROOT_CAUSE: The provenance Video continuation returned the applied canonical
+Video identity in `writes`, but its `video_children` receipt discarded
+`canonical_id` and `canonical_readback`. Separately,
+`EditorialCaptureCoordinator::requiredOwners()` emitted the VIDEO required
+owner with an empty ID and did not resolve the owner from governed write-back,
+child receipts, verified publication items or the persisted Capture asset.
+This made completion unable to correlate the existing Video UUID and surfaced
+`VIDEO_CANONICAL_READBACK_UNAVAILABLE` / `REQUIRED_OWNER_READBACK_UNVERIFIED`
+even when the governed result carried the canonical owner.
+
+FIX: Video child receipts now preserve the canonical owner ID and authoritative
+read-back. Required-owner calculation is generic and resolves the exact Video
+owner from canonical publication/write-back/read-back/child/asset identity in
+that order; no object-specific UUID or staging exception was added.
+
+REGRESSION: Added live-shaped assertions for the existing Capture/Video UUID
+shape. The governed continuation must retain the applied Video UUID in its
+child receipt, and Capture required-owner calculation must emit that same UUID
+from governed write-back rather than an empty owner.
+
+VERIFICATION: Focused Video/Capture/Completion suites pass 53 tests / 242
+assertions. Full Unit ran 1,893 tests / 9,398 assertions with one unrelated
+baseline DemoCutover CLI diagnostic mismatch. PHP lint and `git diff --check`
+pass. No external state changed.
+
+STATUS: `VIDEO_OWNER_PROPAGATION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic dynamic Video provenance scope propagation (LOCAL FIX / DEPLOY PENDING)
 
 SCOPE: Repaired the Capture-owned Video provenance continuation so the final

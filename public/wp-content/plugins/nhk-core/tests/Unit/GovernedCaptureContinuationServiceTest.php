@@ -682,6 +682,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame(['video'], $createdEntityTypes);
         self::assertSame($videoId, $result['writes'][0]['canonical_id']);
         self::assertSame('APPLIED', $result['video_children'][0]['status']);
+        self::assertSame($videoId, $result['video_children'][0]['canonical_id']);
         self::assertNotSame('REUSE_EDITORIAL', $result['video_children'][0]['reason'] ?? null);
         self::assertSame($videoId, $updated?->canonicalId);
         self::assertNotSame('Video tham chiếu NHK', $updated?->metadata['editorial']['title']);

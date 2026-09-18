@@ -179,7 +179,8 @@ final class GovernedCaptureContinuationService
             }
             if (($plan['entity_type'] ?? '') === 'video') {
                 $writes[] = $this->runGovernedChild($plan, $control, $lifecycle, 'VIDEO_GOVERNANCE');
-                $videoChildren[] = ['fingerprint' => $this->videoPlanFingerprint($plan, $context), 'status' => (string) ($writes[array_key_last($writes)]['status'] ?? 'FAILED_RETRYABLE'), 'blockers' => (array) ($writes[array_key_last($writes)]['blockers'] ?? [])];
+                $videoWrite = $writes[array_key_last($writes)] ?? [];
+                $videoChildren[] = $this->videoChildReceipt($plan, $context, is_array($videoWrite) ? $videoWrite : []);
                 continue;
             }
             try {
@@ -189,7 +190,7 @@ final class GovernedCaptureContinuationService
             }
             $writes[] = $write;
             if (isset($plan['candidate_id']) && $this->dependencyWriteCompleted($write)) $canonicalByCandidate[(string) $plan['candidate_id']] = $write;
-            if (($plan['entity_type'] ?? '') === 'video') $videoChildren[] = ['fingerprint' => $this->videoPlanFingerprint($plan, $context), 'status' => (string) ($write['status'] ?? 'FAILED_RETRYABLE'), 'blockers' => (array) ($write['blockers'] ?? [])];
+            if (($plan['entity_type'] ?? '') === 'video') $videoChildren[] = $this->videoChildReceipt($plan, $context, $write);
         }
 
         $pending = array_values(array_filter($writes, static fn (array $write): bool => ($write['status'] ?? '') === 'REVIEW_REQUIRED'));
@@ -847,6 +848,20 @@ final class GovernedCaptureContinuationService
             'about' => $this->stableAbout($metadata['semantic_attachments'] ?? ($payload['semantic_attachments'] ?? (isset($relation['target_uuid']) ? [['predicate' => 'about', 'target_type' => $relation['target_type'] ?? '', 'target_uuid' => $relation['target_uuid'] ?? '']] : []))),
         ];
         return hash('sha256', CommandCanonicalizer::canonicalize($packet));
+    }
+
+    /** @return array<string,mixed> */
+    private function videoChildReceipt(array $plan, array $context, array $write): array
+    {
+        $readback = is_array($write['canonical_readback'] ?? null) ? $write['canonical_readback'] : [];
+        $canonicalId = trim((string) ($write['canonical_id'] ?? $write['result_entity_uuid'] ?? ($readback['canonical_id'] ?? '')));
+        return [
+            'fingerprint' => $this->videoPlanFingerprint($plan, $context),
+            'status' => (string) ($write['status'] ?? 'FAILED_RETRYABLE'),
+            'canonical_id' => $canonicalId,
+            'canonical_readback' => $readback !== [] ? $readback : null,
+            'blockers' => (array) ($write['blockers'] ?? []),
+        ];
     }
 
     /** @return list<mixed> */
