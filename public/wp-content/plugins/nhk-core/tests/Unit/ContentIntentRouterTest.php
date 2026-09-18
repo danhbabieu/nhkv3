@@ -464,6 +464,9 @@ final class ContentIntentRouterTest extends TestCase
         self::assertSame(['draft' => 0, 'media' => 0, 'publication' => 0, 'final' => 1], $calls);
         self::assertSame('not_requested', $result->diagnostics['claim_retrieval']['status']);
         self::assertSame('SKIPPED', $result->diagnostics['semantic_write_back']['status']);
+        self::assertSame([['owner_type' => 'media', 'owner_id' => $mediaId]], $result->diagnostics['completion']['required_owners']);
+        self::assertSame([], $result->diagnostics['completion']['missing_required_owners']);
+        self::assertTrue($result->diagnostics['completion']['complete']);
     }
 
     public function test_typed_media_enrichment_does_not_complete_on_unverified_binding_receipt(): void

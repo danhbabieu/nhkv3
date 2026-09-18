@@ -336,6 +336,14 @@ present and verified. The receipt records `required_owners`,
 `resume_hints`; a child failure after another owner succeeds is `PARTIAL`, never
 `COMPLETE`. For `KNOWLEDGE_DELTA`, Article and image branches are not required;
 for `MEDIA_ENRICHMENT`, the Media branch is required and the Article branch is not;
+each reconciled canonical Media ID is emitted as a non-empty required owner and
+must match a verified Media read-back; an unresolved owner ID remains missing
+and fails closed. A committed MediaUsage/binding receipt alone cannot replace
+that Media owner read-back. Retrying a Capture after a committed binding reuses
+the idempotent binding receipt and re-enters final read-back without creating a
+second MediaUsage. For Article intents the native Post is required, and `IMAGE_ARTICLE` also
+requires the canonical Media branch. This is a completion/read-back boundary,
+not a new semantic owner or mutation path.
 for Article intents the native Post is required, and `IMAGE_ARTICLE` also
 requires the canonical Media branch. This is a completion/read-back boundary,
 not a new semantic owner or mutation path.

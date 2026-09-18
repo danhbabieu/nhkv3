@@ -138,7 +138,7 @@ final class CompletionCoordinator
                 if (!is_array($packet)) continue;
                 if (strtolower((string) ($packet['owner_type'] ?? '')) !== $required['owner_type']) continue;
                 $requiredId = $required['owner_id'];
-                if ($requiredId === '' || $requiredId === trim((string) ($packet['owner_id'] ?? ''))) return false;
+                if ($requiredId !== '' && $requiredId === trim((string) ($packet['owner_id'] ?? ''))) return false;
             }
             return true;
         }));

@@ -180,6 +180,19 @@ final class CompletionConvergenceTest extends TestCase
         self::assertContains('video', $packet['resume_hints']['resume_children']);
     }
 
+    public function test_empty_required_owner_id_never_matches_a_verified_child(): void
+    {
+        $packet = (new CompletionCoordinator())->aggregateCapture('capture-1', [
+            ['owner_type' => 'media', 'owner_id' => 'media-1', 'canonical_readback' => ['canonical_id' => 'media-1']],
+        ], [
+            'required_owners' => [['owner_type' => 'media', 'owner_id' => '']],
+        ]);
+
+        self::assertFalse($packet['complete']);
+        self::assertSame([['owner_type' => 'media', 'owner_id' => '']], $packet['missing_required_owners']);
+        self::assertContains('REQUIRED_OWNER_READBACK_UNVERIFIED', $packet['blockers']);
+    }
+
     public function test_video_required_owner_reuses_canonical_id_from_governed_writeback(): void
     {
         $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
@@ -201,5 +214,32 @@ final class CompletionConvergenceTest extends TestCase
         ]);
 
         self::assertSame([['owner_type' => 'video', 'owner_id' => 'video-1']], $owners);
+    }
+
+    public function test_media_enrichment_required_owners_are_all_reconciled_media_ids_deduplicated(): void
+    {
+        $coordinator = (new \ReflectionClass(EditorialCaptureCoordinator::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod($coordinator, 'requiredOwners');
+        $method->setAccessible(true);
+        $capture = new CaptureRecord(
+            '01a0b384-6a83-7f99-b231-d784b9ab9542',
+            'capture-1',
+            hash('sha256', 'fingerprint'),
+            'MEDIA_RECONCILED',
+            'IN_PROGRESS',
+        );
+
+        $owners = $method->invoke($coordinator, ['intent' => 'MEDIA_ENRICHMENT'], $capture, [], [
+            'status' => 'COMPLETE',
+            'media_ids' => ['media-1', 'media-2', 'media-1'],
+            'bindings' => [[
+                'readback' => ['status' => 'verified', 'media_id' => 'media-2'],
+            ]],
+        ], [], []);
+
+        self::assertSame([
+            ['owner_type' => 'media', 'owner_id' => 'media-1'],
+            ['owner_type' => 'media', 'owner_id' => 'media-2'],
+        ], $owners);
     }
 }

@@ -1,5 +1,22 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Homepage compact latest feed in Hero (LOCAL FIX / DEPLOY PENDING)
+
+SCOPE: Moved the existing read-only unified homepage latest-feed projection from
+the standalone section below Hero into the left Hero column directly below
+search. Replaced the four-column cards with a compact activity list showing up
+to five rows, small representative visuals or type fallback, public type badge,
+short date, bounded summary and chevron. Removed the obsolete “Dòng hoạt động”
+heading and standalone homepage section. Article, Video, Media, Knowledge and
+Authority feed sources and shared `LatestFirstOrder` ordering remain unchanged.
+
+VERIFICATION: PHP lint passes for changed templates; focused frontend contract
+suite passes 82 tests / 829 assertions with existing warnings/deprecations;
+`git diff --check` passes. No semantic mutation, database write, deployment or
+push occurred. Browser/live visual QA and deployment remain pending.
+
+STATUS: `HOMEPAGE_COMPACT_LATEST_FEED_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Video Capture classification handoff/readback hardening (LOCAL FIX / DEPLOYMENT PENDING)
 
 SCOPE: Closed a proven Video Capture semantic handoff defect: valid resolved

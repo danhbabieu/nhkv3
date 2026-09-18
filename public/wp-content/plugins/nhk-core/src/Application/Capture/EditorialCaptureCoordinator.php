@@ -697,7 +697,7 @@ final class EditorialCaptureCoordinator
 
         $completion = $this->completion->aggregateCapture($record->captureId, $this->completionChildren($record, $writes, $media, $videoPublication, [], $final, false), [
             'canonical_state' => 'COMPLETE',
-            'required_owners' => $this->requiredOwners($intent, $record, $assets, [], $videoPublication, $writes),
+            'required_owners' => $this->requiredOwners($intent, $record, $assets, $media, $videoPublication, $writes),
         ]);
         $diagnostics['completion'] = $completion;
         $semanticStatus = strtoupper(trim((string) ($writes['status'] ?? '')));
@@ -733,20 +733,51 @@ final class EditorialCaptureCoordinator
      * @param list<array<string,mixed>> $assets
      * @param array<string,mixed> $media
      * @param array<string,mixed> $videoPublication
-     * @return list<array{owner_type:string}>
+     * @return list<array{owner_type:string,owner_id:string}>
      */
     private function requiredOwners(array $intent, CaptureRecord $record, array $assets, array $media, array $videoPublication, array $writes = []): array
     {
         $videoOwnerId = $this->videoOwnerId($assets, $videoPublication, $writes);
+        $mediaOwners = array_map(
+            static fn (string $mediaId): array => ['owner_type' => 'media', 'owner_id' => $mediaId],
+            $this->mediaOwnerIds($media),
+        );
         $required = match (strtoupper(trim((string) ($intent['intent'] ?? '')))) {
             'VIDEO' => [['owner_type' => 'video', 'owner_id' => $videoOwnerId]],
             'KNOWLEDGE_DELTA' => [['owner_type' => 'knowledge']],
             'IMAGE_ARTICLE', 'TEXT_ARTICLE' => [['owner_type' => 'wp_post']],
-            'MEDIA_ENRICHMENT' => [['owner_type' => 'media']],
+            'MEDIA_ENRICHMENT' => $mediaOwners !== [] ? $mediaOwners : [['owner_type' => 'media', 'owner_id' => '']],
             default => [],
         };
-        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'IMAGE_ARTICLE' && $assets !== []) $required[] = ['owner_type' => 'media'];
+        if (strtoupper(trim((string) ($intent['intent'] ?? ''))) === 'IMAGE_ARTICLE' && $assets !== []) {
+            $required = array_merge($required, $mediaOwners !== [] ? $mediaOwners : [['owner_type' => 'media', 'owner_id' => '']]);
+        }
         return $required;
+    }
+
+    /** @return list<string> */
+    private function mediaOwnerIds(array $media): array
+    {
+        $ids = [];
+        foreach ((array) ($media['media_ids'] ?? []) as $mediaId) {
+            $mediaId = trim((string) $mediaId);
+            if ($mediaId !== '') $ids[] = $mediaId;
+        }
+        foreach (['media_id', 'canonical_id'] as $key) {
+            $mediaId = trim((string) ($media[$key] ?? ''));
+            if ($mediaId !== '') $ids[] = $mediaId;
+        }
+        foreach ((array) ($media['bindings'] ?? []) as $binding) {
+            if (!is_array($binding)) continue;
+            foreach (['media_id', 'canonical_id'] as $key) {
+                $mediaId = trim((string) ($binding[$key] ?? ''));
+                if ($mediaId !== '') $ids[] = $mediaId;
+            }
+            $readback = is_array($binding['readback'] ?? null) ? $binding['readback'] : [];
+            $mediaId = trim((string) ($readback['media_id'] ?? $readback['canonical_id'] ?? ''));
+            if ($mediaId !== '') $ids[] = $mediaId;
+        }
+        return array_values(array_unique($ids));
     }
 
     /** @return string */
