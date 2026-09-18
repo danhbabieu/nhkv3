@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace NHK\Core\Application\Media;
 
 use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
-use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoStateRegistry, MediaUsage};
+use NHK\Core\Domain\Media\{Media, MediaAsset, MediaSeoStateRegistry, MediaUsage, MediaUsageRoleRegistry};
 use NHK\Core\Application\Presentation\LatestFirstOrder;
 
 /**
@@ -55,7 +55,7 @@ final class PublicMediaGalleryQuery
         if (!$media->active || $media->readiness !== 'ready' || $media->isSystemPlaceholder()) return null;
         $image = $this->firstImage($media);
         $usages = $this->usagesForMedia($media);
-        $metadata = $this->metadataFor($media);
+        $metadata = $this->metadataFor($media, $usages);
         $articleUrl = $this->articleLinks?->firstPublished($usages);
         return array_merge($metadata, [
             'image_url' => $image['image_url'] ?? null,
@@ -102,9 +102,29 @@ final class PublicMediaGalleryQuery
     }
 
     /** @return array{title:string,alt:string,caption:string,metadata_source:string} */
-    private function metadataFor(Media $media): array
+    /** @param list<MediaUsage> $usages */
+    private function metadataFor(Media $media, array $usages): array
     {
-        return ['title' => $media->canonicalName, 'alt' => $media->canonicalName, 'caption' => $media->canonicalName, 'metadata_source' => 'MEDIA_NEUTRAL'];
+        $permitted = array_values(array_filter($usages, static fn (MediaUsage $usage): bool => $usage->endpointType !== 'wp_post' && in_array($usage->role, [MediaUsageRoleRegistry::REPRESENTATIVE, MediaUsageRoleRegistry::EVIDENCE, MediaUsageRoleRegistry::TECHNICAL_DETAIL, 'gallery'], true)));
+        usort($permitted, static fn (MediaUsage $left, MediaUsage $right): int => [$left->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 0 : 1, $left->sortOrder, $left->usageId] <=> [$right->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 0 : 1, $right->sortOrder, $right->usageId]);
+        $values = [];
+        $sources = [];
+        foreach (['title', 'alt', 'caption'] as $field) {
+            foreach ($permitted as $usage) {
+                $value = trim((string) ($field === 'alt' ? $usage->altText : ($field === 'caption' ? $usage->caption : $usage->title)));
+                if ($value === '') continue;
+                $values[$field] = $value;
+                $sources[] = $usage->role === MediaUsageRoleRegistry::REPRESENTATIVE ? 'SUBJECT_REPRESENTATIVE' : 'MEDIA_USAGE';
+                break;
+            }
+            if (!array_key_exists($field, $values)) {
+                $values[$field] = $media->canonicalName;
+                $sources[] = 'MEDIA_NEUTRAL';
+            }
+        }
+        $rank = ['SUBJECT_REPRESENTATIVE' => 0, 'MEDIA_USAGE' => 1, 'MEDIA_NEUTRAL' => 2];
+        usort($sources, static fn (string $left, string $right): int => ($rank[$left] ?? 99) <=> ($rank[$right] ?? 99));
+        return array_merge($values, ['metadata_source' => $sources[0] ?? 'MISSING']);
     }
 
     private function shorten(string $value): string

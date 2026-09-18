@@ -56,6 +56,7 @@ final class ArticleMediaSeoProjection
             $candidates = $field === 'caption'
                 ? [
                     ['value' => $usage->caption, 'source' => 'MEDIA_USAGE'],
+                    ['value' => $media->canonicalName, 'source' => 'MEDIA_NEUTRAL'],
                     ['value' => $attachment['caption'] ?? '', 'source' => 'WORDPRESS_ATTACHMENT'],
                 ]
                 : [

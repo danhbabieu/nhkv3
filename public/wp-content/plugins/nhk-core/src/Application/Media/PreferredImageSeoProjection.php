@@ -37,9 +37,8 @@ final class PreferredImageSeoProjection
         $sources = [];
         $sourceRank = ['MEDIA_USAGE' => 0, 'SUBJECT_REPRESENTATIVE' => 1, 'MEDIA_NEUTRAL' => 2, 'WORDPRESS_ATTACHMENT' => 3];
         foreach (['title', 'alt', 'caption'] as $field) {
-            $value = trim((string) ($candidate[$field] ?? ''));
+            $value = trim((string) ($candidate['usage_' . $field] ?? ''));
             $source = $value !== '' ? 'MEDIA_USAGE' : '';
-            if ($value === '') { $value = trim((string) ($candidate['usage_' . $field] ?? '')); $source = $value !== '' ? 'MEDIA_USAGE' : ''; }
             if ($value === '') { $value = trim((string) ($candidate['subject_' . $field] ?? '')); $source = $value !== '' ? 'SUBJECT_REPRESENTATIVE' : ''; }
             if ($value === '') {
                 $value = trim((string) ($candidate['media_' . $field] ?? ($field === 'title' || $field === 'alt' ? ($candidate['media_name'] ?? '') : '')));
