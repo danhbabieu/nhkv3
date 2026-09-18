@@ -37,7 +37,8 @@ final class StagingAcceptanceScopeVerifier
         if ($this->secret() === '') throw new \RuntimeException('STAGING_SCOPE_SIGNING_KEY_REQUIRED');
         $this->requireCapability();
         if (!is_callable($this->admission)) throw new \RuntimeException('STAGING_SCOPE_ADMISSION_REQUIRED');
-        if (strtoupper(trim((string) ($input['intent'] ?? ''))) !== 'MEDIA_ENRICHMENT') throw new \RuntimeException('STAGING_SCOPE_INTENT_INVALID');
+        $intent = strtoupper(trim((string) ($input['intent'] ?? '')));
+        if (!in_array($intent, ['IMAGE_ARTICLE', 'TEXT_ARTICLE', 'MEDIA_ENRICHMENT'], true)) throw new \RuntimeException('STAGING_SCOPE_INTENT_INVALID');
 
         $bindings = $this->bindingEntries($input, $assets);
         if ($bindings === []) throw new \RuntimeException('STAGING_SCOPE_BINDINGS_REQUIRED');
@@ -52,7 +53,7 @@ final class StagingAcceptanceScopeVerifier
             'operation' => 'representative_bind',
             'writer' => 'canonical_media_binding',
             'entrypoint' => 'nhk.capture.ingest',
-            'intent' => 'MEDIA_ENRICHMENT',
+            'intent' => $intent,
             'media_ids' => $mediaIds,
             'target' => $bindings[0]['target'],
             'bindings' => $bindings,

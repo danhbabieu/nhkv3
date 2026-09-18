@@ -1,5 +1,37 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Capture Article media-binding scope propagation (LOCAL READY / DEPLOY PENDING)
+
+SCOPE: Repaired the generic staging-admission continuation boundary for
+existing canonical Media used by `IMAGE_ARTICLE`/`TEXT_ARTICLE`. No new
+Capture, Post or Media was created; no staging/production mutation or remote
+source edit was performed.
+
+ROOT_CAUSE: The normal semantic Capture path reached the Plugin's
+`media_reconcile` closure with typed `media_bindings`, but called
+`MediaBindingService::bindMany()` without `staging_acceptance` or the Capture
+and payload fingerprints. Scope issuance existed only in the
+`MEDIA_ENRICHMENT` fast path, so the downstream guard correctly failed closed
+with `STAGING_SCOPE_REQUIRED`.
+
+FIX: The coordinator now asks the existing `StagingAcceptanceScopeVerifier`
+for one server-issued scope after intent resolution for typed bindings across
+Article and Media Enrichment intents, persists it on the Capture, and carries
+the exact scope/fingerprints into the later Media reconciliation callback. The
+Plugin passes that context into `MediaBindingService`; the existing guard and
+verifier remain the sole validators. Admission accepts the registered Article
+intent family without adding object-specific IDs. `SYSTEM_AUTO/AUTO` remains
+Governance-only.
+
+VERIFICATION: The actual coordinator orchestration regression passes for the
+live pair and an arbitrary second Media/Classification pair, including exact
+target stable key/revision and `USER_EXPLICIT/PINNED` scope verification.
+Focused Capture/Media/Governance/Authority/Video suite passes 124 tests / 433
+assertions; full Unit passes 1,878 tests / 9,350 assertions except the one
+parent-reproduced DemoCutover diagnostic mismatch. No external state changed.
+
+STATUS: `CAPTURE_MEDIA_SCOPE_PROPAGATION_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Generic dynamic Video staging acceptance (LOCAL READY / DEPLOY PENDING)
 
 SCOPE: Implemented one generic server-issued, Capture-owned staging scope for

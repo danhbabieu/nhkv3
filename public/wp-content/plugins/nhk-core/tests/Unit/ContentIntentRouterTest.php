@@ -5,6 +5,7 @@ namespace NHK\Tests\Unit;
 
 use NHK\Core\Application\Capture\ContentIntentRouter;
 use NHK\Core\Application\Capture\EditorialCaptureCoordinator;
+use NHK\Core\Application\Governance\StagingAcceptanceScopeVerifier;
 use NHK\Core\Application\Semantic\{ArticleComposer, ClaimRetrievalEngine, SubjectResolutionService, TextInputInterpreter};
 use NHK\Core\Contracts\Capture\CaptureRepository;
 use NHK\Core\Contracts\Media\MediaBindingPort;
@@ -14,6 +15,80 @@ use PHPUnit\Framework\TestCase;
 
 final class ContentIntentRouterTest extends TestCase
 {
+    /** @dataProvider genericArticleMediaBindingProvider */
+    public function test_image_article_semantic_continuation_propagates_server_scope_to_media_binding(string $mediaId, string $targetId, string $stableKey): void
+    {
+        $repository = new IntentCaptureRepository();
+        $binding = new OrchestrationScopeBindingPort();
+        $verifier = new StagingAcceptanceScopeVerifier(
+            static fn (): string => 'staging',
+            'test-secret',
+            static fn (): bool => true,
+            can: static fn (string $capability): bool => $capability === 'nhk_internal_content_operations',
+        );
+        $coordinator = new EditorialCaptureCoordinator(
+            $repository,
+            static function (array $input) use ($mediaId): array { return ['items' => [['kind' => 'image', 'media_id' => $mediaId, 'attachment_readback_status' => 'verified']]]; },
+            static fn (array $input): array => ['post_id' => 581, 'state_token' => 'state-581'],
+            new TextInputInterpreter(),
+            new SubjectResolutionService(static function (string $hint) use ($targetId, $stableKey): array {
+                return $hint === $targetId ? [['type' => 'classification', 'id' => $targetId, 'stable_key' => $stableKey, 'revision' => 1, 'match' => 'uuid_exact']] : [];
+            }),
+            new ClaimRetrievalEngine(static fn (array $subject): array => ['status' => 'available', 'items' => []], static fn (array $subject, array $neighborhood): array => []),
+            static fn (array $context): array => ['status' => 'SKIPPED', 'writes' => [], 'blockers' => []],
+            new ArticleComposer(),
+            static function (array $context) use ($binding): array {
+                $batch = $binding->bindMany((array) ($context['media_bindings'] ?? []), (string) ($context['capture']['capture_id'] ?? '') . ':media-binding', (array) ($context['assets'] ?? []), [
+                    'capture_id' => (string) ($context['capture']['capture_id'] ?? ''),
+                    'capture_fingerprint' => (string) ($context['capture_fingerprint'] ?? ''),
+                    'payload_fingerprint' => (string) ($context['payload_fingerprint'] ?? ''),
+                    'staging_acceptance' => $context['staging_acceptance'] ?? null,
+                ]);
+                return ['status' => 'RECONCILED', 'bindings' => $batch['bindings'], 'media_ids' => $batch['media_ids']];
+            },
+            static fn (array $context): array => ['eligible' => false, 'blockers' => ['OWNER_PUBLICATION_REQUIRED']],
+            static fn (array $context): array => ['status' => 'verified'],
+            contentIntentRouter: new ContentIntentRouter(),
+            mediaBindingService: $binding,
+            stagingScopeVerifier: $verifier,
+        );
+
+        $input = [
+            'idempotency_key' => 'generic-image-article-' . substr($mediaId, 0, 8),
+            'intent' => 'IMAGE_ARTICLE',
+            'text' => 'Bài viết về đồng hồ.',
+            'subject_hints' => [$targetId],
+            'media_bindings' => [[
+                'media_ref' => ['item_index' => 0],
+                'target' => ['type' => 'classification', 'id' => $targetId, 'stable_key' => $stableKey, 'revision' => 1],
+                'role' => 'representative',
+                'selection_source' => 'USER_EXPLICIT',
+                'selection_policy' => 'PINNED',
+            ]],
+        ];
+
+        $result = $coordinator->execute($input);
+
+        self::assertSame('581', (string) $result->articleId);
+        self::assertCount(1, $binding->requests);
+        self::assertSame($mediaId, $binding->requests[0]['media']['id']);
+        self::assertSame($targetId, $binding->requests[0]['target']['id']);
+        self::assertSame($stableKey, $binding->requests[0]['target']['stable_key']);
+        self::assertSame(1, $binding->requests[0]['target']['revision']);
+        self::assertSame('staging', $binding->requests[0]['staging_acceptance']['environment']);
+        self::assertSame('IMAGE_ARTICLE', $binding->requests[0]['staging_acceptance']['intent']);
+        self::assertSame('USER_EXPLICIT', $binding->requests[0]['selection_source']);
+        self::assertSame('PINNED', $binding->requests[0]['selection_policy']);
+    }
+
+    public static function genericArticleMediaBindingProvider(): array
+    {
+        return [
+            ['01a0a283-df53-79b1-be85-420cfca56d2e', '01a09f73-0aad-79b3-9aaf-5f02cb33a9d1', 'nhk:classification:clock-type.dong-ho-thap'],
+            [UuidCodec::newV7(), UuidCodec::newV7(), 'nhk:classification:generic-second'],
+        ];
+    }
+
     public function test_explicit_knowledge_delta_does_not_require_an_article(): void
     {
         $route = (new ContentIntentRouter())->route(
@@ -529,5 +604,41 @@ final class CountingMediaBindingPort implements MediaBindingPort
     {
         ++$this->calls;
         return $this->result;
+    }
+}
+
+final class OrchestrationScopeBindingPort implements MediaBindingPort
+{
+    /** @var list<array<string,mixed>> */
+    public array $requests = [];
+
+    public function bindMany(array $bindings, string $idempotencyKey, array $assets = [], array $context = []): array
+    {
+        foreach ($bindings as $index => $binding) {
+            $mediaId = (string) (($binding['media_ref']['media_id'] ?? '') ?: ($assets[(int) ($binding['media_ref']['item_index'] ?? -1)]['media_id'] ?? ''));
+            $request = $binding + [
+                'capture_id' => $context['capture_id'] ?? '',
+                'capture_fingerprint' => $context['capture_fingerprint'] ?? '',
+                'payload_fingerprint' => $context['payload_fingerprint'] ?? '',
+                'operation' => 'representative_bind',
+                'media' => ['id' => $mediaId],
+                'staging_acceptance' => $context['staging_acceptance'] ?? null,
+            ];
+            $request['target'] = $binding['target'] ?? [];
+            $request['role'] = $binding['role'] ?? 'representative';
+            $request['selection_source'] = $binding['selection_source'] ?? 'USER_EXPLICIT';
+            $request['selection_policy'] = $binding['selection_policy'] ?? 'PINNED';
+            $scope = $context['staging_acceptance'] ?? null;
+            if (!is_array($scope) || !$this->verifier($scope, $request)) throw new \RuntimeException('STAGING_SCOPE_REQUIRED');
+            $this->requests[] = $request;
+        }
+        return ['status' => 'COMPLETE', 'bindings' => array_map(static fn (array $request): array => ['status' => 'COMPLETE', 'media_id' => $request['media']['id'], 'readback' => ['status' => 'verified', 'media_id' => $request['media']['id'], 'usage_id' => UuidCodec::newV7()]], $this->requests), 'media_ids' => array_values(array_unique(array_map(static fn (array $request): string => (string) $request['media']['id'], $this->requests)))];
+    }
+
+    private function verifier(array $scope, array $request): bool
+    {
+        static $verifier;
+        $verifier ??= new StagingAcceptanceScopeVerifier(static fn (): string => 'staging', 'test-secret', static fn (): bool => true, can: static fn (): bool => true);
+        return $verifier->verifyBindingRequest($scope, $request);
     }
 }

@@ -35,7 +35,7 @@ final class MediaBindingStagingAdmission
             || ($scope['operation'] ?? '') !== 'representative_bind'
             || ($scope['writer'] ?? '') !== 'canonical_media_binding'
             || ($scope['entrypoint'] ?? '') !== 'nhk.capture.ingest'
-            || strtoupper(trim((string) ($scope['intent'] ?? ''))) !== 'MEDIA_ENRICHMENT'
+            || !in_array(strtoupper(trim((string) ($scope['intent'] ?? ''))), ['IMAGE_ARTICLE', 'TEXT_ARTICLE', 'MEDIA_ENRICHMENT'], true)
             || (string) ($scope['capture_id'] ?? '') !== $capture->captureId
             || (string) ($scope['capture_fingerprint'] ?? '') !== $capture->requestFingerprint) return false;
 

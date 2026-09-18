@@ -1000,7 +1000,13 @@ final class Plugin {
                     $bindingResults = [];
                     $typedBindings = is_array($context['media_bindings'] ?? null) ? $context['media_bindings'] : [];
                     if ($typedBindings !== []) {
-                        $bindingBatch = $mediaBindingService->bindMany($typedBindings, (string) ($context['capture']['capture_id'] ?? '') . ':media-binding', $assets);
+                        $bindingContext = [
+                            'capture_id' => (string) ($context['capture']['capture_id'] ?? ''),
+                            'capture_fingerprint' => (string) ($context['capture_fingerprint'] ?? ($context['capture']['request_fingerprint'] ?? '')),
+                            'staging_acceptance' => is_array($context['staging_acceptance'] ?? null) ? $context['staging_acceptance'] : null,
+                        ];
+                        if (isset($context['payload_fingerprint'])) $bindingContext['payload_fingerprint'] = (string) $context['payload_fingerprint'];
+                        $bindingBatch = $mediaBindingService->bindMany($typedBindings, (string) ($context['capture']['capture_id'] ?? '') . ':media-binding', $assets, $bindingContext);
                         $bindingResults = is_array($bindingBatch['bindings'] ?? null) ? $bindingBatch['bindings'] : [];
                     }
                     $governedMediaOperations = [];
