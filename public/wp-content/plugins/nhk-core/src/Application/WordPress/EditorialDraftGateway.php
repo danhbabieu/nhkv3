@@ -41,7 +41,10 @@ final class EditorialDraftGateway
     {
         $current = $this->posts->read($postId); if ($current === null) return ['ok' => false, 'reason' => 'WP_POST_UNAVAILABLE'];
         if (!EditorialStateToken::matches($expectedStateToken, $current)) return ['ok' => false, 'reason' => 'EDITORIAL_STATE_CONFLICT', 'post' => $current->snapshot(), 'state_token' => $current->token];
-        if ($current->status !== 'draft') return ['ok' => false, 'reason' => 'EDITORIAL_UPDATE_NOT_ELIGIBLE'];
+        // Existing public Articles are valid lifecycle targets. The native
+        // Post remains public while its editorial fields are CAS-updated; the
+        // caller must not smuggle a status transition through this boundary.
+        if (!in_array($current->status, ['draft', 'publish'], true)) return ['ok' => false, 'reason' => 'EDITORIAL_UPDATE_NOT_ELIGIBLE'];
         $managedExpectations = is_array($fields['managed_section_expectations'] ?? null) ? $fields['managed_section_expectations'] : [];
         unset($fields['managed_section_expectations']);
         if ($managedExpectations !== []) {
@@ -53,7 +56,7 @@ final class EditorialDraftGateway
         // an empty/no-op packet: native WordPress may still advance
         // post_modified_gmt or invoke write-capable hooks for it.
         if ($fields === [] || $this->isNoop($current, $fields)) {
-            return ['ok' => true, 'post' => $current->snapshot(), 'state_token' => $current->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
+            return ['ok' => true, 'post' => $current->snapshot(), 'state_token' => $current->token, 'publication_blockers' => $current->status === 'publish' ? [] : ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
         }
         $captureOwned = trim($captureId) !== '';
         if ($captureOwned) CaptureEditorialWriteGuard::enter();
@@ -62,7 +65,7 @@ final class EditorialDraftGateway
         } finally {
             if ($captureOwned) CaptureEditorialWriteGuard::leave();
         }
-        return ['ok' => true, 'post' => $updated->snapshot(), 'state_token' => $updated->token, 'publication_blockers' => ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
+        return ['ok' => true, 'post' => $updated->snapshot(), 'state_token' => $updated->token, 'publication_blockers' => $updated->status === 'publish' ? [] : ['DRAFT_INCOMPLETE_FOR_PUBLICATION']];
     }
 
     /** @param array<string,mixed> $fields */

@@ -456,7 +456,7 @@ require their own governed proposal and read-back.
 | Connector exposure parity | environment/client-specific subset may differ from executable runtime catalog | `CLIENT_EXPOSURE_GAP`; fresh discovery/read-back required, no generic-writer fallback |
 | SEO Blueprint contract | contract added | CODE_GAP for full planner/projection |
 | Shared capability source | partial catalog | CODE_GAP for manifest consumers |
-| WordPress editorial gateway | draft create/update boundary | Capture integration acceptance verified for the tested path; other exact gateway operations remain runtime-specific | draft-only, receipt idempotency, native state-token CAS and explicit publication blockers |
+| WordPress editorial gateway | draft create/update boundary | Capture integration acceptance verified for the tested path; existing public Article continuation is a bounded partial native update | native state-token CAS, omitted-field/public-identity preservation, no status smuggling and explicit publication blockers |
 | Taxonomy gateway | typed category facade exposed in MCP | runtime-unverified pending exact integration DB | no fuzzy-create, no Graph/semantic mutation, guarded delete |
 | Related semantic query | existing bounded query, policy gaps remain | CODE_GAP/REGISTRY_GAP where traversal policy is absent |
 | Video → Living Knowledge | planning seam implemented; target-handoff smoke verified | apply remains separate Governance boundary; no implicit Claim/Evidence write from preview |

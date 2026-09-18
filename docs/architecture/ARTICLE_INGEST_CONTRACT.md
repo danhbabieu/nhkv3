@@ -139,16 +139,18 @@ runtime support.
 
 ## Current implementation status
 
-Phase 1 implements the reconcile-only coordinator, durable operation receipt,
+Phase 1 implements the reconcile coordinator and bounded existing-Article
+continuation, durable operation receipt,
 deterministic child proposal planning, read-only editorial fingerprinting,
 semantic/editorial verification, diagnostics and the coordinated MCP surface.
 The receipt is orchestration/recovery state and never stores the full Article
 body. Semantic writes remain behind Governance and Controlled Apply.
 
 `nhk.article.preflight` is read-only; `nhk.article.ingest` remains the governed
-execute/resume surface for reconciliation. The separate typed draft gateway
-supports draft-only create/update with receipt idempotency and native
-state-token CAS; it does not publish, trash, apply semantic proposals, ingest
+execute/resume surface for reconciliation. The separate typed editorial gateway
+supports draft creation and bounded partial update of an existing draft or
+already-public Post with native state-token CAS; it does not publish, trash,
+apply semantic proposals, ingest
 Media/Video or copy body into semantic storage. Draft results remain blocked
 for publication until later semantic, media, compliance, rendered-public
 verification and read-back gates complete. Rendered verification preserves
@@ -324,7 +326,7 @@ not create another representation. Generated Article prose never becomes
 Knowledge or Evidence.
 
 The native WordPress Post remains the Article owner and its state token is
-checked by the existing draft update/read-back boundary. A continuation passes
+checked by the existing native update/read-back boundary. A continuation passes
 the prior managed-section manifest to composition so user-authored text is not
 treated as disposable generated content. Public text fields are checked by a
 fail-closed `PUBLIC_INTERNAL_JARGON_LEAK` boundary before the native write;

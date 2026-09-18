@@ -18,6 +18,8 @@ final class VideoEditorialResumePlanner
         private VideoEditorialGenerator $editorial,
         private VideoSeoProjection $seo,
         private ?PublicEditorialCopyGuard $publicCopyGuard = null,
+        /** @var callable(array<string,mixed>):array<string,mixed>|null */
+        private $knowledgeEnrichment = null,
     ) {
     }
 
@@ -129,6 +131,7 @@ final class VideoEditorialResumePlanner
     {
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         $metadata['source'] = array_merge(is_array($metadata['source'] ?? null) ? $metadata['source'] : [], $external);
+        $metadata = $this->refreshDerivedEnrichment($metadata, $external, $context);
         $payload['canonical_id'] = $videoId;
         $payload['metadata'] = $metadata;
         $payload['url'] = (string) ($payload['url'] ?? $external['canonical_source_url'] ?? '');
@@ -146,10 +149,54 @@ final class VideoEditorialResumePlanner
             'entity_type' => 'video',
             'subject_id' => $videoId,
             'target_uuid' => null,
+            // An ingest has no canonical owner revision. The staging packet
+            // represents this create CAS as zero; Capture revision never
+            // becomes Video revision.
+            'expected_revision' => null,
             'fingerprint' => $fingerprint,
             'idempotency_key' => $idempotencyKey,
             'payload' => $payload,
         ];
+    }
+
+    /** @param array<string,mixed> $metadata @param array<string,string> $external @param array<string,mixed> $context @return array<string,mixed> */
+    private function refreshDerivedEnrichment(array $metadata, array $external, array $context): array
+    {
+        if (!is_callable($this->knowledgeEnrichment)) return $metadata;
+        $subject = is_array($context['subject_resolution']['primary'] ?? null)
+            ? $context['subject_resolution']['primary']
+            : (is_array($metadata['subject_resolution_packet'] ?? null) ? $metadata['subject_resolution_packet'] : null);
+        $resolved = is_array($context['subject_resolution']['resolved'] ?? null)
+            ? $context['subject_resolution']['resolved']
+            : ($subject !== null ? [$subject] : []);
+        $userHint = trim((string) ($context['user_hint'] ?? ($metadata['provenance']['user_hint']['value'] ?? '')));
+        try {
+            $enrichment = ($this->knowledgeEnrichment)([
+                'resolved' => $resolved,
+                'ambiguous' => is_array($context['subject_resolution']['ambiguous'] ?? null) ? $context['subject_resolution']['ambiguous'] : [],
+                'intended_targets' => $subject !== null ? [$subject] : [],
+                'source' => $external,
+                'transcript_policy' => null,
+                'user_hint' => $userHint !== '' ? ['value' => $userHint, 'kind' => 'USER_HINT'] : null,
+            ]);
+            if (!is_array($enrichment)) return $metadata;
+            $metadata['knowledge_enrichment'] = $enrichment;
+            if ($subject !== null) $metadata['subject_resolution_packet'] = $subject;
+        } catch (\Throwable $error) {
+            // A failed recomputation must not silently preserve an obsolete
+            // packet. Keep the immutable source/identity fields, but expose a
+            // current diagnostic so stale derived state cannot masquerade as
+            // a successful retry.
+            $metadata['knowledge_enrichment'] = [
+                'status' => 'unavailable',
+                'subject' => $subject,
+                'candidates' => [],
+                'diagnostics' => ['KNOWLEDGE_ENRICHMENT_RECOMPUTE_FAILED:' . $error->getMessage()],
+                'proposal_ready' => false,
+                'unresolved_reasons' => ['ENRICHMENT_UNAVAILABLE'],
+            ];
+        }
+        return $metadata;
     }
 
     /** @return array<string,mixed> */

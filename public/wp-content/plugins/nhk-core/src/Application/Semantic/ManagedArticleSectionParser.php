@@ -39,4 +39,30 @@ final class ManagedArticleSectionParser
         }, $content);
         return trim(preg_replace('/\n{3,}/', "\n\n", is_string($updated) ? $updated : $content) ?? $content);
     }
+
+    /**
+     * Remove only NHK-owned managed blocks that are no longer in the desired
+     * composition. Manual prose is opaque and is never matched by this rule.
+     * Existing desired blocks still receive the normal fingerprint conflict
+     * checks from removeOwned().
+     *
+     * @param list<array<string,mixed>> $desired
+     */
+    public function reconcileStale(string $content, array $desired): string
+    {
+        $keep = [];
+        foreach ($desired as $section) {
+            if (is_array($section)) {
+                $id = trim((string) ($section['section_id'] ?? ''));
+                if ($id !== '') $keep[$id] = true;
+            }
+        }
+        $pattern = '/<!-- nhk-managed-section\s+(\{.*?\})\s*-->\s*(.*?)\s*<!-- \/nhk-managed-section -->/is';
+        $updated = preg_replace_callback($pattern, static function (array $match) use ($keep): string {
+            $metadata = json_decode((string) ($match[1] ?? ''), true);
+            $id = is_array($metadata) ? trim((string) ($metadata['section_id'] ?? '')) : '';
+            return $id !== '' && isset($keep[$id]) ? $match[0] : '';
+        }, $content);
+        return trim(preg_replace('/\n{3,}/', "\n\n", is_string($updated) ? $updated : $content) ?? $content);
+    }
 }

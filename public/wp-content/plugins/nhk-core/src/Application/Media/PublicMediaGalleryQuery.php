@@ -72,6 +72,13 @@ final class PublicMediaGalleryQuery
     private function firstImage(Media $media): ?array
     {
         $asset = (new PublicMediaAssetSelector())->canonical($this->assets->listByMediaId($media->canonicalId));
+        // A public projection is not useful when its canonical locator points
+        // at an asset that cannot pass the delivery boundary.  Keep this
+        // read-only and fail closed so stale attachment/path metadata cannot
+        // become a broken <img> in public projections.
+        if ($asset instanceof MediaAsset && $this->delivery !== null && $this->delivery->resolve($asset->assetId) === null) {
+            return null;
+        }
         // The read model may expose a governed public projection even when a
         // request-time binary check is temporarily unavailable. The /anh/
         // delivery route remains the fail-closed binary boundary.

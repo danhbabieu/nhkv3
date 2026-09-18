@@ -12,6 +12,7 @@ use NHK\Core\Domain\Governance\{Proposal, ProposalState};
 use NHK\Core\Domain\Governance\CommandCanonicalizer;
 use NHK\Core\Shared\Uuid\UuidCodec;
 use NHK\Core\Application\Media\ArticleMediaCoordinator;
+use NHK\Core\Contracts\WordPress\EditorialPostStore;
 
 final class ArticleIngestCoordinator
 {
@@ -28,6 +29,7 @@ final class ArticleIngestCoordinator
         private ?DependencyRepository $dependencies = null,
         private ?ArticleVerificationReader $verification = null,
         private ?ArticleMediaCoordinator $articleMedia = null,
+        private ?EditorialPostStore $editorialStore = null,
     ) {}
 
     /** @var array<string,mixed> */
@@ -87,7 +89,28 @@ final class ArticleIngestCoordinator
         // have advanced the native token. Refresh and continue from the
         // canonical Post; only a caller-supplied expected token is a hard CAS.
         $expectedToken = is_array($input['expected_editorial_state'] ?? null) ? trim((string) ($input['expected_editorial_state']['state_token'] ?? '')) : '';
-        if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
+        $editorialUpdate = is_array($input['editorial_update'] ?? null) ? $input['editorial_update'] : [];
+        $previousUpdate = is_array($receipt->diagnostics['media']['editorial_update'] ?? null)
+            ? $receipt->diagnostics['media']['editorial_update'] : [];
+        $requestedEditorialFields = $this->editorialFields($editorialUpdate);
+        $resumeMatchesNativeDelta = $requestedEditorialFields !== []
+            && (string) ($previousUpdate['fields_fingerprint'] ?? '') !== ''
+            && hash_equals((string) $previousUpdate['fields_fingerprint'], $this->editorialFingerprint($state, $requestedEditorialFields));
+        if ($expectedToken !== '' && !hash_equals($expectedToken, $state->token) && !$resumeMatchesNativeDelta) return $this->save($receipt, 'preflight', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EXPECTED_EDITORIAL_STATE_MISMATCH'], $state->token);
+        if ($editorialUpdate !== []) {
+            if ($this->editorialStore === null) return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'EDITORIAL_STORE_UNAVAILABLE'], $state->token);
+            $alreadyApplied = is_array($previousUpdate)
+                && ($resumeMatchesNativeDelta || hash_equals((string) ($previousUpdate['state_token'] ?? ''), $state->token));
+            if (!$alreadyApplied) {
+                if ($expectedToken === '' || !hash_equals($expectedToken, $state->token)) return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::RECONCILIATION_CONFLICT, false, ['code' => 'EDITORIAL_CAS_REQUIRED'], $state->token);
+                $fields = $this->editorialFields($editorialUpdate);
+                if ($fields !== []) {
+                    try { $state = $this->editorialStore->update($postId, $fields); }
+                    catch (\Throwable $error) { return $this->save($receipt, 'editorial_update', ArticleIngestOutcome::DEPENDENCY_UNAVAILABLE, true, ['code' => 'EDITORIAL_UPDATE_FAILED', 'error' => $error->getMessage()], $state->token); }
+                    $this->mediaDiagnostics['editorial_update'] = ['status' => 'APPLIED', 'state_token' => $state->token, 'post_id' => $state->postId, 'fields_fingerprint' => $this->editorialFingerprint($state, $fields)];
+                }
+            }
+        }
         if ($this->articleMedia !== null) {
             try {
                 $mediaContext = is_array($input['media_context'] ?? null) ? $input['media_context'] : ['subject' => $state->title, 'planned_title' => $state->title];
@@ -211,4 +234,24 @@ final class ArticleIngestCoordinator
     }
 
     private function elapsed(float $started): int { return (int) round((microtime(true) - $started) * 1000); }
+
+    /** @param array<string,mixed> $input @return array<string,mixed> */
+    private function editorialFields(array $input): array
+    {
+        $fields = is_array($input['fields'] ?? null) ? $input['fields'] : $input;
+        $allowed = ['post_title', 'post_content', 'post_excerpt', 'post_name'];
+        $result = [];
+        foreach ($allowed as $field) if (array_key_exists($field, $fields)) $result[$field] = (string) $fields[$field];
+        return $result;
+    }
+
+    /** @param array<string,mixed> $fields */
+    private function editorialFingerprint(\NHK\Core\Domain\Article\EditorialPostState $state, array $fields): string
+    {
+        $values = [];
+        foreach (['post_title' => $state->title, 'post_content' => $state->content, 'post_excerpt' => $state->excerpt, 'post_name' => $state->slug] as $field => $current) {
+            if (array_key_exists($field, $fields)) $values[$field] = (string) $fields[$field];
+        }
+        return hash('sha256', CommandCanonicalizer::canonicalize($values));
+    }
 }

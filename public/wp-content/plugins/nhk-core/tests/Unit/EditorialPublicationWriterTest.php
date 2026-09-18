@@ -43,6 +43,35 @@ final class EditorialPublicationWriterTest extends TestCase
         self::assertSame('EDITORIAL_STATE_CONFLICT', $gateway->restore(1, $created['state_token'], 'restore-bad')['reason']);
         self::assertSame('draft', $gateway->restore(1, $trashed['state_token'], 'restore')['post']['status']);
     }
+
+    public function test_published_article_update_is_cas_protected_and_keeps_public_identity(): void
+    {
+        $posts = new PublicationFakeEditorialStore();
+        $posts->rows[1] = new \NHK\Core\Domain\Article\EditorialPostState(1, '1:1', 'post', 'publish', 'Old', "Manual\n\nOld managed", 'Old excerpt', 'canonical-slug', '/canonical-slug/', 3, 3);
+        $gateway = new EditorialDraftGateway($posts, new PublicationFakeReceiptRepo());
+
+        $updated = $gateway->update(1, ['post_title' => 'New title'], $posts->rows[1]->token);
+
+        self::assertTrue($updated['ok']);
+        self::assertSame('publish', $updated['post']['status']);
+        self::assertSame('New title', $updated['post']['title']);
+        self::assertSame("Manual\n\nOld managed", $updated['post']['content']);
+        self::assertSame('canonical-slug', $updated['post']['slug']);
+        self::assertSame('/canonical-slug/', $updated['post']['permalink']);
+    }
+
+    public function test_published_article_update_rejects_stale_token_without_mutation(): void
+    {
+        $posts = new PublicationFakeEditorialStore();
+        $posts->rows[1] = new \NHK\Core\Domain\Article\EditorialPostState(1, '1:1', 'post', 'publish', 'Old', 'Body', '', 'canonical-slug', '/canonical-slug/', 3, 3);
+        $gateway = new EditorialDraftGateway($posts, new PublicationFakeReceiptRepo());
+
+        $result = $gateway->update(1, ['post_title' => 'Must not write'], str_repeat('0', 64));
+
+        self::assertFalse($result['ok']);
+        self::assertSame('EDITORIAL_STATE_CONFLICT', $result['reason']);
+        self::assertSame('Old', $posts->rows[1]->title);
+    }
 }
 
 final class PublicationFakeEditorialStore implements \NHK\Core\Contracts\WordPress\EditorialPostStore
@@ -50,7 +79,11 @@ final class PublicationFakeEditorialStore implements \NHK\Core\Contracts\WordPre
     public int $creates = 0; /** @var array<int,\NHK\Core\Domain\Article\EditorialPostState> */ public array $rows = [];
     public function read(int $postId): ?\NHK\Core\Domain\Article\EditorialPostState { return $this->rows[$postId] ?? null; }
     public function createDraft(array $fields): \NHK\Core\Domain\Article\EditorialPostState { $this->creates++; return $this->rows[1] = new \NHK\Core\Domain\Article\EditorialPostState(1, '1:1', 'post', 'draft', (string) ($fields['post_title'] ?? ''), (string) ($fields['post_content'] ?? ''), '', 'title', '/title/', 1, 1); }
-    public function update(int $postId, array $fields): \NHK\Core\Domain\Article\EditorialPostState { return $this->rows[$postId]; }
+    public function update(int $postId, array $fields): \NHK\Core\Domain\Article\EditorialPostState
+    {
+        $old = $this->rows[$postId];
+        return $this->rows[$postId] = new \NHK\Core\Domain\Article\EditorialPostState($old->postId, $old->endpointKey, $old->postType, $old->status, (string) ($fields['post_title'] ?? $old->title), (string) ($fields['post_content'] ?? $old->content), (string) ($fields['post_excerpt'] ?? $old->excerpt), (string) ($fields['post_name'] ?? $old->slug), $old->permalink, $old->latestRevisionId + 1, $old->revisionCount + 1);
+    }
     public function publish(int $postId): \NHK\Core\Domain\Article\EditorialPostState { return $this->status('publish'); }
     public function trash(int $postId): \NHK\Core\Domain\Article\EditorialPostState { return $this->status('trash'); }
     public function restore(int $postId): \NHK\Core\Domain\Article\EditorialPostState { return $this->status('draft'); }

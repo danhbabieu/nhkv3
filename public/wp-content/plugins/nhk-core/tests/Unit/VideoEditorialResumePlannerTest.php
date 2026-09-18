@@ -91,21 +91,30 @@ final class VideoEditorialResumePlannerTest extends TestCase
             public function update(Video $video, int $expectedRevision): Video { return $video; }
             public function list(bool $includeRetired = false): array { return []; }
         };
-        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection());
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection(), null, static function (array $context): array {
+            $subject = $context['intended_targets'][0] ?? [];
+            return ['status' => 'available', 'subject' => $subject, 'candidates' => [], 'diagnostics' => [], 'proposal_ready' => false, 'unresolved_reasons' => []];
+        });
 
+        $resumeContext = $this->resumeContext();
+        $resumeContext['subject_resolution'] = ['primary' => ['id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3', 'type' => 'classification']];
         $plan = $planner->plan(['operation' => 'ingest', 'entity_type' => 'video', 'idempotency_key' => 'capture:retry:video', 'payload' => [
             'canonical_id' => $videoId,
             'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
             'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ']],
-        ]], $this->resumeContext() + ['capture_id' => 'capture-retry']);
+        ]], $resumeContext + ['capture_id' => 'capture-retry']);
 
         self::assertSame('REBUILD_INGEST', $plan['status']);
         self::assertSame('ingest', $plan['operation']);
         self::assertSame($videoId, $plan['subject_id']);
         self::assertNull($plan['target_uuid']);
+        self::assertNull($plan['expected_revision']);
         self::assertSame('capture:retry:video', $plan['idempotency_key']);
         self::assertSame($videoId, $plan['payload']['canonical_id']);
         self::assertSame('dQw4w9WgXcQ', $plan['payload']['metadata']['source']['external_video_id']);
+        self::assertSame('01a09e44-539a-7f1a-938a-d7d91bb689a3', $plan['payload']['metadata']['knowledge_enrichment']['subject']['id']);
+        self::assertSame('classification', $plan['payload']['metadata']['knowledge_enrichment']['subject']['type']);
+        self::assertNotContains('NO_SUPPORTED_SUBJECT', $plan['payload']['metadata']['knowledge_enrichment']['diagnostics']);
     }
 
     public function test_video_resume_fails_closed_when_external_identity_belongs_to_another_canonical_owner(): void
@@ -126,6 +135,33 @@ final class VideoEditorialResumePlannerTest extends TestCase
             'canonical_id' => $expectedId,
             'metadata' => ['source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ']],
         ]], $this->resumeContext());
+    }
+
+    public function test_pre_apply_retry_does_not_reuse_stale_enrichment_when_recompute_fails(): void
+    {
+        $videoId = '01a0aaf8-2a84-7287-bbd8-70af4d5485e4';
+        $repository = new class implements VideoRepository {
+            public function findByCanonicalId(string $id): ?Video { return null; }
+            public function findByExternalReference(string $platform, string $externalId): ?Video { return null; }
+            public function create(Video $video): Video { return $video; }
+            public function update(Video $video, int $expectedRevision): Video { return $video; }
+            public function list(bool $includeRetired = false): array { return []; }
+        };
+        $planner = new VideoEditorialResumePlanner($repository, new VideoEditorialGenerator(), new VideoSeoProjection(), null, static function (array $context): array {
+            throw new \RuntimeException('planner unavailable');
+        });
+
+        $plan = $planner->plan(['operation' => 'ingest', 'entity_type' => 'video', 'payload' => [
+            'canonical_id' => $videoId,
+            'metadata' => [
+                'source' => ['platform' => 'youtube', 'external_video_id' => 'dQw4w9WgXcQ', 'canonical_source_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+                'knowledge_enrichment' => ['status' => 'available', 'subject' => null, 'diagnostics' => ['NO_SUPPORTED_SUBJECT']],
+            ],
+        ]], $this->resumeContext() + ['subject_resolution' => ['primary' => ['id' => '01a09e44-539a-7f1a-938a-d7d91bb689a3', 'type' => 'classification']]]);
+
+        self::assertSame('unavailable', $plan['payload']['metadata']['knowledge_enrichment']['status']);
+        self::assertStringContainsString('KNOWLEDGE_ENRICHMENT_RECOMPUTE_FAILED', $plan['payload']['metadata']['knowledge_enrichment']['diagnostics'][0]);
+        self::assertNotSame(['status' => 'available', 'subject' => null, 'diagnostics' => ['NO_SUPPORTED_SUBJECT']], $plan['payload']['metadata']['knowledge_enrichment']);
     }
 
     public function test_same_effective_resume_input_reuses_existing_fingerprint_without_update_plan(): void

@@ -499,6 +499,14 @@ final class McpToolCatalog
                 ],
                 'additionalProperties' => false,
             ],
+            'editorial_update' => [
+                'type' => 'object',
+                'properties' => [
+                    'fields' => ['type' => 'object', 'description' => 'Partial native editorial delta; omitted title/body/excerpt/slug are preserved.'],
+                ],
+                'required' => ['fields'],
+                'additionalProperties' => false,
+            ],
         ];
         $properties['research_topic'] = ['type' => 'string', 'minLength' => 1, 'maxLength' => 500];
         $properties['research_subject'] = ['type' => 'object'];

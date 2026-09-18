@@ -1,5 +1,134 @@
 # NHK V3 Execution State
 
+# Checkpoint — 2026-09-18 — Published Article lifecycle continuation (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Added the constitution-compliant existing-Article continuation needed
+for a bounded update/reconcile operation. No staging/production mutation,
+deployment, push, direct database write, live Article update or duplicate
+Article creation occurred.
+
+ROOT_CAUSE: `EditorialDraftGateway::update()` rejected every non-draft Post,
+while `nhk.article.ingest` only reconciled semantic proposals and had no native
+editorial update owner. `ArticleComposer` also removed managed sections only
+when an old manifest still listed them, so stale NHK markers could survive a
+lost/stale manifest. Preflight persistence remains a read-only diagnostic;
+`unattached_planning_candidate` is not treated as persisted subject state.
+
+FIX: The existing native editorial gateway now accepts partial CAS updates for
+`draft` and `publish`, never accepts a status field, preserves omitted fields
+and public identity, and keeps the public Post published throughout the
+update. `nhk.article.ingest` accepts a bounded `editorial_update` delta and
+reuses the existing `EditorialPostStore`; a retry recognizes the committed
+native state token from its durable receipt diagnostics and does not write the
+body a second time. Managed section reconciliation removes only NHK marker
+blocks that are not in the current desired set and leaves user-authored prose
+opaque. Semantic writes remain Proposal → Governance → Controlled Apply.
+
+VERIFICATION: Focused Article/publication/coordinator/contract/managed-section
+suite passes 49 tests / 643 assertions; PHP lint and `git diff --check` pass.
+Canonical documentation snapshot regenerated with source_revision
+`1b2f51f05c0da614896f7906bac5bdf0b75452ba` and manifest_hash
+`88e9ef3862cfb97d67aa2af54dd4bcdd93262b9cac9b280b7bb8ce591676f9c0`. Existing
+unrelated local changes remain preserved. No live acceptance was run.
+
+STATUS: `PUBLISHED_ARTICLE_CONTINUATION_LOCAL_READY / DEPLOYMENT_PENDING / LIVE_MUTATION_NONE`
+
+# Checkpoint — 2026-09-18 — Video pre-apply admission and stale enrichment recovery (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Continued the live-shaped Video Capture retry from the deployed
+`1b2f51f05c0da614896f7906bac5bdf0b75452ba` evidence. No staging/production
+mutation, deployment, push, direct database write or Governance bypass was
+performed.
+
+ROOT_CAUSE: `StagingAcceptanceScopeVerifier::issueForVideoPlan()` delegates
+`STAGING_SCOPE_NOT_ADMITTED` to `VideoStagingAdmission`. The generic ingest
+branch requires `expected_revision === 0` and a clean external-identity
+duplicate audit. The recovered packet's `expected_revision=1` was therefore a
+wrong CREATE/INGEST packet; the reserved child UUID did not prove canonical
+persistence. Capture revision is not Video revision.
+
+FIX: Pre-apply recovery emits `ingest`, preserves the reserved UUID, and emits
+no canonical owner revision (`expected_revision=null` in the plan, normalized
+to the server-issued ingest scope value `0`). Existing canonical UUID or
+external identity still selects update/reuse or fails closed on conflict.
+Retry recomputes the derived Knowledge enrichment from the current exact
+subject packet. If recomputation is unavailable, it records an explicit
+unavailable diagnostic instead of reusing stale derived preview data; source
+identity, user input and subject binding remain unchanged.
+
+VERIFICATION: Focused continuation/admission/Video suites pass 169 tests / 760
+assertions; the high Capture-revision-43 ingest fixture reaches fresh scope
+issuance with expected revision 0. No live acceptance was run. Downstream
+Source/Claim/Evidence/about/Graph/public completion remains an acceptance
+runtime gate and must be continued after deployment.
+
+STATUS: `VIDEO_PRE_APPLY_ADMISSION_AND_ENRICHMENT_LOCAL_READY / DEPLOYMENT_PENDING / LIVE_MUTATION_NONE`
+
+# Checkpoint — 2026-09-18 — Close Video pre-apply staging admission and stale enrichment (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Corrected the generic Video ingest revision semantics and refreshed
+derived Knowledge enrichment when an existing Capture retry re-enters a
+pre-apply Video create. A canonically absent Video now produces no owner CAS
+revision (`expected_revision=null` in the governed command and `0` in the
+server-issued staging packet); Capture revision and reserved child UUID are
+not treated as canonical Video revision or persistence.
+
+ROOT_CAUSE: `VideoStagingAdmission` correctly rejected `video:ingest` unless
+the staging packet carried `create_semantics=ingest` and
+`expected_revision=0`. The retry producer could retain the fresh-intake
+revision default of `1`. Separately, `VideoEditorialResumePlanner` reused
+persisted derived `knowledge_enrichment` metadata on pre-apply recovery, so a
+valid current Classification handoff could remain represented as
+`NO_SUPPORTED_SUBJECT`.
+
+VERIFICATION: Exact reject branch is
+`Application/Governance/VideoStagingAdmission.php::__invoke()` in the ingest
+branch, where non-zero expected revision returns false; the verifier then
+raises `STAGING_SCOPE_NOT_ADMITTED`. Focused Video suites pass 51 tests / 214
+assertions; continuation/governance suites pass 46 tests / 211 assertions
+with 10 existing deprecations. PHP lint and `git diff --check` pass. Regression
+covers high Capture revision, absent canonical/external Video, immutable UUID,
+fresh ingest scope, and Classification enrichment refresh.
+
+STATUS: `VIDEO_PRE_APPLY_ADMISSION_AND_ENRICHMENT_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
+# Checkpoint — 2026-09-18 — Performance Phase 2 stale public image guard and compact article responsive images (LOCAL FIX / DEPLOYMENT PENDING)
+
+SCOPE: Continued the owner-requested read-only Performance Phase 2 slice after
+the existing homepage request-scope deduplication. PublicMediaGalleryQuery now
+checks the selected canonical public asset through the existing delivery/read-
+back boundary before exposing its `/anh/` locator; an unavailable physical
+asset becomes an honest no-image projection instead of a broken public `<img>`.
+The compact homepage latest feed now carries native WordPress attachment
+identity for editorial items and renders those thumbnails through
+`wp_get_attachment_image()` so WordPress owns `srcset`, `sizes`, dimensions and
+derivative selection. Semantic Media/Video projection contracts were not
+changed, and no URL was synthesized by string manipulation.
+
+ROOT_CAUSE: The staging homepage emitted
+`/anh/dong-ho-chim-cuc-cu-anh-dai-dien.webp` for Hero slide 5 while the browser
+read-back showed `naturalWidth=0`/`naturalHeight=0`. The public projection chose
+canonical asset metadata without a request-time delivery check, so stale or
+missing physical attachment state surfaced as a 404. The compact latest feed
+also used a single URL for native editorial thumbnails instead of the native
+WordPress responsive image API.
+
+VERIFICATION: Browser read-only audit of `https://demo.1945.vn/` observed the
+broken Hero locator, 38 image elements, 67,565-byte DOM HTML, and 8 linked
+stylesheets plus 2 theme scripts (the browser also exposed WordPress admin-bar
+assets). Focused frontend/media suites pass 24 tests / 80 assertions; broader
+frontend/media contract suites pass 88 tests / 888 assertions with one existing
+warning. PHP lint and `git diff --check` pass. No database, staging,
+production, deployment, push, pull, cache change or semantic mutation occurred.
+
+LIVE EVIDENCE: The local guard and responsive rendering are not deployed, so
+`HOME_404_AFTER`, live post-fix image bytes, TTFB, PHP generation timing,
+query/DB counts, cache headers, OPcache, CDN state and Core Web Vitals remain
+UNVERIFIED. The staging baseline still shows the pre-fix broken Hero URL until
+an authorized deployment occurs.
+
+STATUS: `PERFORMANCE_PHASE2_404_GUARD_AND_ARTICLE_RESPONSIVE_LOCAL_READY / DEPLOYMENT_PENDING / SEMANTIC_MUTATION_NONE`
+
 # Checkpoint — 2026-09-18 — Video retry recovers pre-apply Capture (LOCAL FIX / DEPLOYMENT PENDING)
 
 SCOPE: Repaired existing-Capture Video retry when the immutable child UUID was

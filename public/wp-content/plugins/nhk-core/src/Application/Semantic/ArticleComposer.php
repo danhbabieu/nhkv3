@@ -16,6 +16,10 @@ final class ArticleComposer
         $userInput = trim($userInput);
         $priorSections = array_values(array_filter((array) ($context['prior_composition']['managed_sections'] ?? []), 'is_array'));
         $sectionParser = $this->sectionParser ?? new ManagedArticleSectionParser();
+        // Composition owns the complete NHK-managed section set for this
+        // Article. Remove stale NHK markers even when an old receipt lost its
+        // manifest, while preserving every user-authored paragraph.
+        $userInput = $sectionParser->reconcileStale($userInput, $priorSections);
         $userInput = $sectionParser->removeOwned($userInput, $priorSections);
         $title = trim((string) ($context['title'] ?? ''));
         if ($title === '') $title = $this->title($userInput);

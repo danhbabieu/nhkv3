@@ -533,11 +533,13 @@ wait for Governance approval, apply eligible children, and read back semantic
 and editorial state. A generic WordPress write by itself cannot be reported as
 a completed V3 knowledge Article workflow.
 
-The typed Article draft create/update boundary covers native WordPress draft
-creation/update only. Creation is idempotent via the existing Article operation
-receipt repository, never stores body in the receipt, and returns a native state
-token plus `DRAFT_INCOMPLETE_FOR_PUBLICATION`. Update requires a matching native
-state token and only updates an eligible draft. The typed Article publication
+The typed Article editorial boundary covers native WordPress draft creation and
+bounded partial update of an existing draft or already-public Post. Creation is
+idempotent via the existing Article operation receipt repository, never stores
+body in the receipt, and returns a native state token plus
+`DRAFT_INCOMPLETE_FOR_PUBLICATION`. Update requires a matching native state
+token, updates only supplied editorial fields, preserves omitted fields and
+public identity, and never accepts a status transition. The typed Article publication
 boundary is the only V3 publication writer: it requires the current draft token
 and verified evidence, calls `ArticlePublicationGate` before the native status
 transition, and reads the published Post back. Owner-review approval remains

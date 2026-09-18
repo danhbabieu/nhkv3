@@ -99,7 +99,7 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
                     ],
                 ],
             ],
-        ]], ['purpose' => 'VIDEO']);
+        ]], ['purpose' => 'VIDEO'], revision: 43);
         $scopeVerifier = new StagingAcceptanceScopeVerifier(
             static fn (): string => 'staging',
             'test-secret',

@@ -87,6 +87,33 @@ final class FrontendSemanticProjectionV2Test extends TestCase
         }
     }
 
+    public function test_media_gallery_fails_closed_when_the_canonical_public_asset_is_not_deliverable(): void
+    {
+        $root = sys_get_temp_dir() . '/nhk-gallery-missing-' . bin2hex(random_bytes(4));
+        mkdir($root);
+        $mediaId = UuidCodec::newV7();
+        $media = new Media($mediaId, 'missing', 'Ảnh stale', 'ready');
+        $asset = new MediaAsset(UuidCodec::newV7(), $mediaId, 'derivative', 'missing.webp', hash('sha256', 'missing'), 'image/webp', 7, 1200, 800, 'PUBLIC', ['canonical_filename' => 'missing.webp']);
+        try {
+            $gallery = new PublicMediaGalleryQuery($this->mediaRepository([$media]), $this->assetRepository([$asset]), new PublicMediaAssetDelivery($this->assetRepository([$asset]), $this->mediaRepository([$media]), $root));
+            $item = $gallery->archive(1, 12)['items'][0] ?? [];
+            self::assertNull($item['image_url'] ?? null);
+            self::assertFalse($item['has_real_image'] ?? true);
+        } finally {
+            @rmdir($root);
+        }
+    }
+
+    public function test_home_latest_article_thumbnails_use_wordpress_responsive_image_api(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/front-page.php');
+        $query = (string) file_get_contents(dirname(__DIR__, 4) . '/themes/nhk-v3/inc/class-nhk-home-page-query.php');
+
+        self::assertStringContainsString('wp_get_attachment_image((int) $item[\'attachment_id\']', $template);
+        self::assertStringContainsString('wp_get_attachment_image_srcset', $query);
+        self::assertStringContainsString('wp_get_attachment_image_sizes', $query);
+    }
+
     public function test_entity_knowledge_projection_groups_only_public_subject_scoped_claims_with_public_evidence(): void
     {
         $subjectId = UuidCodec::newV7();
