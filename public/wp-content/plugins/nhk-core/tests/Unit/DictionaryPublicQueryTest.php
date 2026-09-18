@@ -94,6 +94,37 @@ final class DictionaryPublicQueryTest extends TestCase
         self::assertSame('/anh/westminster.webp', $packet['items'][0]['image']['url']);
     }
 
+    public function test_approved_dictionary_concept_projects_pinned_preferred_illustration_without_replacing_lexical_definition(): void
+    {
+        $concept = new DictionaryConcept('concept-cuon-111', 'Côn 111', 'Tên gọi lexical của một bộ phận trong ngữ cảnh được duyệt.', DictionaryConcept::APPROVED, null, null, null, ['public_slug' => 'con-111']);
+        $repo = $this->repository([$concept], ['concept-cuon-111' => []]);
+        $resolverCalls = [];
+        $query = new DictionaryPublicQuery($repo, static function (string $conceptId, string $placement = '') use (&$resolverCalls): ?array {
+            $resolverCalls[] = [$conceptId, $placement];
+            return $conceptId === 'concept-cuon-111' && $placement === 'preferred_illustration'
+                ? ['url' => '/anh/con-111.webp', 'title' => 'Côn 111', 'alt' => 'Côn 111 nhìn toàn cảnh', 'caption' => 'Minh họa riêng cho mục từ Côn 111.', 'metadata_source' => 'MEDIA_USAGE', 'placement' => 'preferred_illustration']
+                : null;
+        });
+
+        $packet = $query->hub();
+
+        self::assertSame('Tên gọi lexical của một bộ phận trong ngữ cảnh được duyệt.', $packet['items'][0]['description']);
+        self::assertSame('/anh/con-111.webp', $packet['items'][0]['image']['url']);
+        self::assertSame('preferred_illustration', $packet['items'][0]['image']['placement']);
+        self::assertSame([['concept-cuon-111', 'preferred_illustration']], $resolverCalls);
+    }
+
+    public function test_rejected_or_ambiguous_dictionary_concept_has_no_public_preferred_illustration(): void
+    {
+        $draft = new DictionaryConcept('concept-draft', 'Côn 111', 'Bản nháp.', DictionaryConcept::DRAFT, null, null, null, ['public_slug' => 'con-111']);
+        $repo = $this->repository([$draft], ['concept-draft' => []]);
+
+        $packet = (new DictionaryPublicQuery($repo, static fn (): array => ['url' => '/anh/should-not-project.webp']))->hub();
+
+        self::assertSame([], $packet['items']);
+        self::assertNotSame('/anh/should-not-project.webp', $packet['items'][0]['image']['url'] ?? null);
+    }
+
     private function repository(array $concepts, array $labels): DictionaryConceptRepository
     {
         return new class($concepts, $labels) implements DictionaryConceptRepository {
