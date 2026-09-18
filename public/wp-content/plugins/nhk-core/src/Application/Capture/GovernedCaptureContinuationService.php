@@ -381,6 +381,23 @@ final class GovernedCaptureContinuationService
             $operation = trim((string) ($video['operation'] ?? 'ingest')) ?: 'ingest';
             $subjectId = trim((string) ($video['subject_id'] ?? ''));
             $payload = is_array($video['payload'] ?? null) ? $video['payload'] : $video;
+            // A persisted pending Video Proposal is already inside the
+            // Governance lifecycle. Re-enter it by canonical Proposal UUID;
+            // do not reconstruct a fresh pre-proposal staging packet from the
+            // Capture-derived asset (which may be a stale derived projection).
+            if (($context['existing_capture_continuation'] ?? false) === true && $entityType === 'video' && $operation === 'ingest') {
+                $pending = $this->pendingVideoProposal($context, $payload, $subjectId);
+                if ($pending !== null) {
+                    $plans[] = [
+                        'proposal_id' => $pending['proposal_id'],
+                        'entity_type' => 'video',
+                        'operation' => 'ingest',
+                        'subject_id' => $subjectId,
+                        'payload' => $payload,
+                    ];
+                    continue;
+                }
+            }
             if (!$includeSemanticChildren && $this->videoEditorialResume !== null && $entityType === 'video') {
                 $resume = $this->videoEditorialResume->plan($video, $context + ['capture_id' => $captureId]);
                 if (($resume['status'] ?? '') === 'REUSE_EDITORIAL') {
@@ -418,6 +435,42 @@ final class GovernedCaptureContinuationService
             $plans[array_key_last($plans)] = $this->scopeVideoPlan($captureId, $plans[array_key_last($plans)], $context);
         }
         return $plans;
+    }
+
+    /**
+     * Find the exact persisted pending Video Proposal for this Capture child.
+     * The receipt is only a locator: runGovernedPlan() performs the canonical
+     * Governance read-back by UUID before any lifecycle transition.
+     *
+     * @return array{proposal_id:string,target_uuid:string,platform:string,external_video_id:string}|null
+     */
+    private function pendingVideoProposal(array $context, array $payload, string $subjectId): ?array
+    {
+        $diagnostics = is_array($context['prior_diagnostics'] ?? null) ? $context['prior_diagnostics'] : [];
+        $writeBack = is_array($diagnostics['semantic_write_back'] ?? null) ? $diagnostics['semantic_write_back'] : [];
+        $rows = is_array($writeBack['writes'] ?? null) ? $writeBack['writes'] : [];
+        $canonicalId = trim((string) ($payload['canonical_id'] ?? $subjectId));
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $source = is_array($metadata['source'] ?? null) ? $metadata['source'] : (is_array($metadata['source_snapshot'] ?? null) ? $metadata['source_snapshot'] : []);
+        $platform = strtolower(trim((string) ($source['platform'] ?? '')));
+        $externalId = trim((string) ($source['external_video_id'] ?? ''));
+        foreach ($rows as $row) {
+            if (!is_array($row)
+                || strtolower(trim((string) ($row['entity_type'] ?? ''))) !== 'video'
+                || strtolower(trim((string) ($row['operation'] ?? ''))) !== 'ingest'
+                || (string) ($row['status'] ?? '') !== 'REVIEW_REQUIRED') continue;
+            $proposalId = trim((string) ($row['proposal_id'] ?? ''));
+            if (!UuidCodec::isValid($proposalId)) continue;
+            $target = trim((string) ($row['target_uuid'] ?? ''));
+            $external = is_array($row['external_video'] ?? null) ? $row['external_video'] : [];
+            $rowPlatform = strtolower(trim((string) ($external['platform'] ?? '')));
+            $rowExternalId = trim((string) ($external['external_video_id'] ?? ''));
+            if (($target !== '' && $target !== $canonicalId)
+                || ($rowPlatform !== '' && $platform !== '' && $rowPlatform !== $platform)
+                || ($rowExternalId !== '' && $externalId !== '' && $rowExternalId !== $externalId)) continue;
+            return ['proposal_id' => $proposalId, 'target_uuid' => $target, 'platform' => $rowPlatform, 'external_video_id' => $rowExternalId];
+        }
+        return null;
     }
 
     /** @param array<string,mixed> $plan @param array<string,mixed> $context @return array<string,mixed> */

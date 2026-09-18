@@ -1007,6 +1007,73 @@ final class GovernedCaptureContinuationServiceTest extends TestCase
         self::assertSame([$proposalId], $capture->toArray()['governance']['proposal_ids']);
     }
 
+    public function test_existing_capture_retry_reuses_pending_video_proposal_without_reissuing_staging_scope(): void
+    {
+        $captureId = '01a0b506-9e0c-763e-a796-a69e2d6df497';
+        $videoId = '01a0b506-a292-7cbe-a356-51fc78fec069';
+        $proposalId = UuidCodec::newV7();
+        $subjectId = '4cd79149-5cad-4427-aab4-0cea3aebe8c1';
+        $payload = [
+            'canonical_id' => $videoId,
+            'expected_revision' => 0,
+            'metadata' => [
+                'source' => [
+                    'platform' => 'youtube',
+                    'external_video_id' => 'mT4GmDAuWYY',
+                    'canonical_source_url' => 'https://www.youtube.com/watch?v=mT4GmDAuWYY',
+                ],
+                'subject_resolution_packet' => ['type' => 'variant', 'id' => $subjectId, 'revision' => 1],
+            ],
+        ];
+        $governance = $this->createMock(GovernedLifecycle::class);
+        $governance->expects(self::once())->method('review')->with($proposalId)->willReturn([
+            'state' => 'submitted',
+            'entity_type' => 'video',
+            'operation' => 'ingest',
+            'subject_id' => $videoId,
+            'target_uuid' => $videoId,
+            'payload' => $payload,
+            'content_fingerprint' => 'persisted-content-fingerprint',
+            'dependency_fingerprint' => 'persisted-dependency-fingerprint',
+        ]);
+        $governance->expects(self::never())->method('createFromArguments');
+        $governance->expects(self::never())->method('submit');
+        $governance->expects(self::never())->method('approve');
+        $service = new GovernedCaptureContinuationService(
+            $governance,
+            static fn (): array => throw new \LogicException('pending Proposal must not apply'),
+            $this->policies(['video'], ['video' => 'REVIEW_REQUIRED']),
+            static fn (): bool => true,
+            videoScopeIssuer: static fn (): array => throw new \LogicException('staging scope must not be reissued'),
+        );
+
+        $result = $service->execute($captureId, 'capture:video:retry', [
+            'existing_capture_continuation' => true,
+            'content_intent' => ['intent' => 'VIDEO'],
+            'prior_diagnostics' => [
+                'semantic_write_back' => [
+                    'writes' => [[
+                        'proposal_id' => $proposalId,
+                        'entity_type' => 'video',
+                        'operation' => 'ingest',
+                        'status' => 'REVIEW_REQUIRED',
+                        'target_uuid' => $videoId,
+                        'external_video' => ['platform' => 'youtube', 'external_video_id' => 'mT4GmDAuWYY'],
+                    ]],
+                ],
+            ],
+            'assets' => [['kind' => 'video', 'video_proposal' => [
+                'entity_type' => 'video', 'operation' => 'ingest', 'subject_id' => $videoId, 'payload' => $payload,
+            ]]],
+        ], ['resume_children' => ['video']]);
+
+        self::assertSame('REVIEW_REQUIRED', $result['status']);
+        self::assertSame([$proposalId], $result['governance']['proposal_ids']);
+        self::assertSame('persisted-content-fingerprint', $result['governance']['proposals'][0]['content_fingerprint']);
+        self::assertSame('persisted-dependency-fingerprint', $result['governance']['proposals'][0]['dependency_fingerprint']);
+        self::assertSame(['GOVERNANCE_APPROVAL_REQUIRED'], $result['blockers']);
+    }
+
     public function test_applied_proposal_replay_uses_persisted_readback_without_reapplying(): void
     {
         $proposalId = UuidCodec::newV7();
