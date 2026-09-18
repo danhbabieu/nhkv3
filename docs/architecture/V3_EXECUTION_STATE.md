@@ -12202,6 +12202,32 @@ fix).
 
 STATUS: `SLICE_4_TASK_2_FINAL_FIX_LOCAL_READY / LIVE_ACCEPTANCE_BLOCKED`.
 
+# Checkpoint — 2026-09-18 — Slice 4 Task 2 raster/WebP readback alignment (LOCAL ONLY)
+
+SCOPE: Corrected the remaining raster attachment mismatch. Existing raster
+WordPress attachments keep `_wp_attached_file` as the physical raster source,
+so adoption/replay/re-adoption now maps that attachment to the retained
+source-original asset for canonical physical readback. Existing WebP
+attachments continue to map to the PUBLIC WebP derivative. The source-original
+remains PRIVATE and the public derivative remains a separate asset under the
+same Media identity; no public URL/path or Media identity was changed.
+
+REGRESSION: Added a guarded integration assertion that the raster attachment
+mapping asset UUID/storage key is the source asset after re-adoption, while
+source/derivative visibility and complete MediaUsage identity preservation stay
+intact. The suite is honestly skipped without `NHK_WP_TEST_PATH` and
+`NHK_WP_TEST_DB`.
+
+VERIFICATION: Focused Unit plus guarded WordPress integration suites pass at
+61 tests / 634 assertions, with 8 guarded integration skips, 2 warnings and
+deprecations. `composer lint`, changed-scope PHP lint, `git diff --check` and
+changed-scope secret review pass. No staging/live acceptance, deployment,
+database write, upload, Video or Graph mutation was performed.
+
+COMMITS: `3f982b4e` (RED regression), `8bbf719f` (production fix).
+
+STATUS: `SLICE_4_TASK_2_RASTER_ALIGNMENT_LOCAL_READY / FORMAL_REVIEW_PENDING / LIVE_ACCEPTANCE_BLOCKED`.
+
 # Checkpoint — 2026-09-17 — Slice 2 Task 3 publication evidence review fix (LOCAL ONLY)
 
 SCOPE: Replaced the vacuous publication-gate media evidence fixture with an
