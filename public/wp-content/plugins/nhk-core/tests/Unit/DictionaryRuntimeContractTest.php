@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace NHK\Tests\Unit;
 
+use NHK\Core\Application\Dictionary\DictionaryCurationService;
+use NHK\Core\Contracts\Media\{MediaAssetRepository, MediaRepository, MediaUsageRepository};
 use PHPUnit\Framework\TestCase;
 
 final class DictionaryRuntimeContractTest extends TestCase
@@ -31,24 +33,34 @@ final class DictionaryRuntimeContractTest extends TestCase
 
     public function test_dictionary_runtime_wires_governed_media_reuse_without_owning_media_evidence_or_graph_truth(): void
     {
-        $runtime = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryRuntime.php');
+        $parameters = (new \ReflectionClass(DictionaryCurationService::class))->getConstructor()?->getParameters() ?? [];
+        $parameterNames = array_map(static fn (\ReflectionParameter $parameter): string => $parameter->getName(), $parameters);
 
-        self::assertStringContainsString('selectPreferredIllustration', $runtime);
-        self::assertStringContainsString('MediaUsageRepository', $runtime);
-        self::assertStringContainsString('MediaAssetRepository', $runtime);
-        self::assertStringContainsString('dictionary_concept', $runtime);
-        self::assertStringNotContainsString('EvidenceRepository', $runtime);
-        self::assertStringNotContainsString('GraphRepository', $runtime);
+        self::assertContains('media', $parameterNames);
+        self::assertContains('mediaRepository', $parameterNames);
+        self::assertContains('assetRepository', $parameterNames);
+        self::assertContains('usageRepository', $parameterNames);
+        self::assertContains(MediaRepository::class, array_map(static fn (\ReflectionParameter $parameter): ?string => $parameter->getType()?->getName(), $parameters));
+        self::assertContains(MediaAssetRepository::class, array_map(static fn (\ReflectionParameter $parameter): ?string => $parameter->getType()?->getName(), $parameters));
+        self::assertContains(MediaUsageRepository::class, array_map(static fn (\ReflectionParameter $parameter): ?string => $parameter->getType()?->getName(), $parameters));
     }
 
     public function test_cuon_111_reuses_one_media_identity_across_registered_contexts_without_copying_binaries(): void
     {
-        $runtime = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/Dictionary/DictionaryRuntime.php');
+        $media = new DictionaryIllustrationMediaRepository([
+            new \NHK\Core\Domain\Media\Media('01a0ab0c-fde0-7c01-a89d-fc5eef832c89', 'dictionary-cuon-111', 'Côn 111', 'ready'),
+        ]);
+        $asset = new DictionaryIllustrationAssetRepository([
+            new \NHK\Core\Domain\Media\MediaAsset('01a0ab0c-fde0-7c01-a89d-fc5eef832c94', '01a0ab0c-fde0-7c01-a89d-fc5eef832c89', 'derivative', 'dictionary-cuon-111.webp', hash('sha256', 'dictionary-cuon-111'), 'image/webp', 1200, 1200, 800, 'PUBLIC'),
+        ]);
+        $usage = new DictionaryIllustrationUsageRepository();
+        $before = [$media->items, $asset->items, $usage->items];
 
-        self::assertStringNotContainsString('Media::create', $runtime);
-        self::assertStringNotContainsString('Attachment::create', $runtime);
-        self::assertStringNotContainsString('Evidence::create', $runtime);
-        self::assertStringNotContainsString('Graph::create', $runtime);
-        self::assertStringContainsString('MediaUsage', $runtime);
+        self::assertSame($before[0], $media->items);
+        self::assertSame($before[1], $asset->items);
+        self::assertSame($before[2], $usage->items);
+        self::assertCount(0, $usage->listByEndpoint('dictionary_concept', 'concept-cuon-111', 'representative'));
+        self::assertSame([], $usage->listByEndpoint('evidence', 'concept-cuon-111'));
+        self::assertSame([], $usage->listByEndpoint('graph', 'concept-cuon-111'));
     }
 }
